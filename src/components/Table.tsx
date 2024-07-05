@@ -510,11 +510,11 @@ const Table: React.FC = () => {
       id: "actions",
       header: "Actions",
       cell: (info) => (
-        <div
-          className="flex items-center justify-center h-full"
-        >
-          <button className="text-gray-500 hover:text-gray-600"
-          onClick={(event) => handleDeleteRow(info.row.index, event)}>
+        <div className="flex items-center justify-center h-full">
+          <button
+            className="text-gray-500 hover:text-gray-600"
+            onClick={(event) => handleDeleteRow(info.row.index, event)}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="20"
