@@ -16,7 +16,7 @@ const App: React.FC = () => {
       </main>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-md"
+        className="mb-4 px-4 py-2 bg-sky-500 text-white rounded-full"
       >
         Add New Worker
       </button>

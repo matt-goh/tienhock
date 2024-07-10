@@ -24,7 +24,7 @@ const initialData: Data[] = [
     staffId: "JIRIM_MM",
     staffName: "Jirim Ilut",
     kerja: "Mee Foreman",
-    kerjaPerJam: 8,
+    kerjaPerJam: 7  ,
     Done: true,
     bag: 1,
     rate: 0.7,
@@ -98,7 +98,7 @@ const EditableCell: React.FC<{
       onChange={handleChange}
       readOnly={!editable}
       onKeyDown={onKeyDown}
-      className={`w-full h-full px-6 py-3 m-0 outline-none bg-transparent focus:border-blue-400 focus:border ${className}`}
+      className={`w-full h-full px-6 py-3 m-0 outline-none bg-transparent focus:border-sky-400 focus:border ${className}`}
       style={{ boxSizing: "border-box" }}
     />
   );
@@ -579,14 +579,14 @@ const Table: React.FC = () => {
         <DatePicker
           selected={selectedDate}
           onChange={(date) => setSelectedDate(date)}
-          className="w-32 px-4 py-2 text-center border border-gray-300 rounded  focus:outline-none"
+          className="w-32 px-4 py-2 text-center border border-gray-300 rounded-lg focus:outline-none"
           dateFormat="dd/MM/yyyy"
         />
         <div className="relative inline-block">
           <span className="font-medium ml-4 mr-2">Shift:</span>
           <button
             onClick={toggleShift}
-            className="px-4 py-2 border border-gray-300 rounded  text-right focus:outline-none hover:bg-gray-100 active:bg-gray-200"
+            className="px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none hover:bg-gray-100 active:bg-gray-200"
           >
             {shift}
           </button>
@@ -595,7 +595,7 @@ const Table: React.FC = () => {
           <span className="font-medium ml-4 mr-2">Hari:</span>
           <button
             onClick={toggleHari}
-            className="px-4 py-2 border border-gray-300 rounded  text-right focus:outline-none hover:bg-gray-100 active:bg-gray-200"
+            className="px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none hover:bg-gray-100 active:bg-gray-200"
           >
             {hari}
           </button>
@@ -605,13 +605,13 @@ const Table: React.FC = () => {
           <input
             value={jumlahTepung}
             onChange={handleJumlahTepungChange}
-            className="w-16 px-4 py-2 border border-gray-300 rounded  focus:outline-none text-center"
+            className="w-16 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none text-center"
           />
         </div>
         <div className="ml-auto">
           <button
             onClick={handleAddRow}
-            className="px-4 py-2 border border-gray-300  font-medium rounded hover:bg-gray-100 active:bg-gray-200"
+            className="px-4 py-2 border border-gray-300 font-medium rounded-full hover:bg-gray-100 active:bg-gray-200"
           >
             Add New Row
           </button>
@@ -663,16 +663,14 @@ const Table: React.FC = () => {
               key={row.id}
               className={
                 rowIndex === editableRowIndex
-                  ? "border-l-2 border-blue-400 shadow-top-bottom"
+                  ? "border-l-2 border-sky-400 shadow-top-bottom"
                   : "border border-gray-300 hover:bg-gray-100"
               }
             >
               {row.getVisibleCells().map((cell, cellIndex) => (
                 <td
                   key={cell.id}
-                  className={`relative px-6 py-4 whitespace-no-wrap border-b border-r border-gray-300 ${
-                    cell.column.id === "actions" ? "cursor-pointer" : ""
-                  }`}
+                  className={`relative px-6 py-4 whitespace-no-wrap border-b border-r border-gray-300 `}
                   onClick={() => handleCellClick(rowIndex, cellIndex)}
                   style={{
                     padding: "0",
