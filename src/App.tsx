@@ -2,29 +2,17 @@
 import React, { useState } from "react";
 import "./App.css";
 import Table from "./components/Table";
+import Sidebar from "./components/Sidebar";
 import NewStaffModal from "./components/NewStaffModal";
 
 const App: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleAddWorker = (worker: any) => {};
-
   return (
     <div className="App">
+      <Sidebar />
       <main className="">
-        <Table />
+        {/* <Table /> */}
       </main>
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="mb-4 px-4 py-2 bg-sky-500 text-white rounded-full"
-      >
-        Add New Worker
-      </button>
-      <NewStaffModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleAddWorker}
-      />
+      <NewStaffModal />
     </div>
   );
 };
