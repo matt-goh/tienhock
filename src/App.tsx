@@ -12,7 +12,7 @@ const App: React.FC = () => {
       <main className="">
         {/* <Table /> */}
       </main>
-      <NewStaffModal />
+      {/* <NewStaffModal /> */}
     </div>
   );
 };
