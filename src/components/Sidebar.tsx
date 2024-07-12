@@ -79,9 +79,9 @@ const Sidebar: React.FC = () => {
 
   return (
     <div className="relative">
-      <div className="fixed top-0 left-0 h-full bg-gray-100 transition-transform transform w-[240px]">
+      <div className="fixed top-0 left-0 overflow-auto h-full bg-white transition-transform transform w-[254px] sidebar-scrollbar">
         <div className="pt-4 text-gray-500 font-medium text-left">
-          <h2 className="text-xl font-bold pl-4">Tien Hock</h2>
+          <h2 className="text-xl text-center font-bold">Tien Hock</h2>
           <ul className="mt-4 space-y-2 text-base">
             <SidebarButton
               name="Bookmarks"
@@ -109,6 +109,7 @@ const Sidebar: React.FC = () => {
                       onMouseLeave={handleMouseLeave}
                       hasSubMenu={true}
                       buttonRef={meeButtonRef}
+                      isActive={hoveredOption === "mee"}
                     />
                     {hoveredOption === "mee" && (
                       <SidebarPopover
@@ -127,6 +128,7 @@ const Sidebar: React.FC = () => {
                       onMouseLeave={handleMouseLeave}
                       hasSubMenu={true}
                       buttonRef={bihunButtonRef}
+                      isActive={hoveredOption === "bihun"}
                     />
                     {hoveredOption === "bihun" && (
                       <SidebarPopover
@@ -180,7 +182,20 @@ const Sidebar: React.FC = () => {
               name="Catalogue"
               icon={<IconListDetails stroke={1.5} />}
               onClick={() => handleToggle("catalogue")}
-            />
+            >
+              {openItems.includes("catalogue") && (
+                <ul className="mt-2 space-y-1">
+                  <SidebarOption name="Staff" />
+                  <SidebarOption name="Job" />
+                  <SidebarOption name="Products/Services" />
+                  <SidebarOption name="Section" />
+                  <SidebarOption name="Job Location" />
+                  <SidebarOption name="Nationality" />
+                  <SidebarOption name="Race" />
+                  <SidebarOption name="Agama" />
+                </ul>
+              )}
+            </SidebarButton>
           </ul>
         </div>
       </div>

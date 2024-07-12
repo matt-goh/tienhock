@@ -4,15 +4,19 @@ import "./App.css";
 import Table from "./components/Table";
 import Sidebar from "./components/Sidebar";
 import NewStaffModal from "./components/NewStaffModal";
+import CatalogueTable from "./components/CatalogueTable";
 
 const App: React.FC = () => {
   return (
     <div className="App">
-      <Sidebar />
+      <aside className="">
+        <Sidebar />
+      </aside>
       <main className="">
         {/* <Table /> */}
+        <CatalogueTable />
       </main>
-      {/* <NewStaffModal /> */}
+      <NewStaffModal />
     </div>
   );
 };
