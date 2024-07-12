@@ -1,5 +1,6 @@
 // SidebarPopover.tsx
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface SidebarPopoverProps {
   options: { name: string; link: string }[];
@@ -24,11 +25,12 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+        const scrollLeft =
+          window.scrollX || document.documentElement.scrollLeft;
 
         setPosition({
-          top: rect.top + scrollTop - 160, // Align with the top of the button
-          left: rect.right + scrollLeft + 8, // Keep the horizontal offset
+          top: rect.top + scrollTop, // Align with the top of the button
+          left: rect.right + scrollLeft + 14, // Keep the horizontal offset
         });
       }
     };
@@ -42,10 +44,10 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
       window.removeEventListener("scroll", updatePosition);
     };
   }, [buttonRef]);
-
-  return (
+  
+  const popoverContent = (
     <div
-      className="absolute w-full bg-white border border-gray-200 shadow-lg rounded-lg p-2"
+      className="absolute w-auto bg-white text-gray-500 font-medium border border-gray-200 shadow-lg rounded-lg p-2"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -67,6 +69,8 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
       </ul>
     </div>
   );
+
+  return createPortal(popoverContent, document.body);
 };
 
 export default SidebarPopover;
