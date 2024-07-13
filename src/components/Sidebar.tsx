@@ -20,9 +20,7 @@ const Sidebar: React.FC = () => {
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
-
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
-
   const meeButtonRef = useRef<HTMLLIElement>(null);
   const bihunButtonRef = useRef<HTMLLIElement>(null);
 
@@ -78,11 +76,13 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="relative">
-      <div className="fixed top-0 left-0 overflow-auto h-full bg-white transition-transform transform w-[254px] sidebar-scrollbar">
-        <div className="pt-4 text-gray-500 font-medium text-left">
-          <h2 className="text-xl text-center font-bold">Tien Hock</h2>
-          <ul className="mt-4 space-y-2 text-base">
+    <div className="fixed top-0 left-0 h-full bg-white w-[254px] flex flex-col">
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4">
+        <h2 className="text-xl font-bold text-center">Tien Hock</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto sidebar-scrollbar">
+        <div className="text-gray-500 font-medium text-left">
+          <ul className="space-y-2 text-base">
             <SidebarButton
               name="Bookmarks"
               icon={<IconBookmark stroke={1.5} />}

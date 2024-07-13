@@ -98,7 +98,7 @@ const EditableCell: React.FC<{
       onChange={handleChange}
       readOnly={!editable}
       onKeyDown={onKeyDown}
-      className={`w-full h-full px-6 py-3 m-0 outline-none bg-transparent focus:border-sky-400 focus:border ${className}`}
+      className={`w-full h-full px-6 py-3 m-0 outline-none bg-transparent focus:border-gray-400 focus:border ${className}`}
       style={{ boxSizing: "border-box" }}
     />
   );
@@ -663,7 +663,7 @@ const Table: React.FC = () => {
               key={row.id}
               className={
                 rowIndex === editableRowIndex
-                  ? "border-l-2 border-sky-400 shadow-top-bottom"
+                  ? "border-l-2 border-gray-400 shadow-top-bottom"
                   : "border border-gray-300 hover:bg-gray-100"
               }
             >
