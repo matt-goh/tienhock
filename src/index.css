@@ -16,20 +16,9 @@ code {
     monospace;
 }
 
-.sidebar-scrollbar::-webkit-scrollbar {
-  width: 12px;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background: #D4D4D4;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgb(163, 163, 163, 0.6);
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #D4D4D4;
 }
 
 input[type="number"]::-webkit-outer-spin-button,
