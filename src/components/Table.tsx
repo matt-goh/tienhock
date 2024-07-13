@@ -280,7 +280,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         ),
       });
     } else {
-      return columnHelper.accessor(col.id as keyof Data, {
+      return columnHelper.accessor(col.id, {
         header: col.header,
         cell: (info) => (
           <div
@@ -319,7 +319,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       });
     }
   });
-  
 
   const table = useReactTable({
     data,
