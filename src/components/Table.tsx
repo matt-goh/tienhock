@@ -8,63 +8,43 @@ import {
 } from "@tanstack/react-table";
 import "react-datepicker/dist/react-datepicker.css";
 
-interface Data {
-  staffId: string;
-  staffName: string;
-  kerja: string;
-  kerjaPerJam: number;
-  Done: boolean;
-  bag: number;
-  rate: number;
-  amount: number;
+// Define column types
+type ColumnType =
+  | "string"
+  | "number"
+  | "rate"
+  | "readonly"
+  | "checkbox"
+  | "action";
+
+// Define column configuration
+interface ColumnConfig {
+  id: string;
+  header: string;
+  type: ColumnType;
+  width?: number;
 }
 
-const initialData: Data[] = [
-  {
-    staffId: "JIRIM_MM",
-    staffName: "Jirim Ilut",
-    kerja: "Mee Foreman",
-    kerjaPerJam: 7  ,
-    Done: true,
-    bag: 1,
-    rate: 0.7,
-    amount: 5.6,
-  },
-  {
-    staffId: "",
-    staffName: "",
-    kerja: "",
-    kerjaPerJam: 0,
-    Done: true,
-    bag: 0,
-    rate: 0,
-    amount: 0,
-  },
-];
+// Define data structure
+interface Data {
+  [key: string]: any;
+}
 
-const columnHelper = createColumnHelper<Data>();
+// Props for the Table component
+interface TableProps {
+  initialData: Data[];
+  columns: ColumnConfig[];
+}
 
+// EditableCell component
 const EditableCell: React.FC<{
   value: any;
   onChange: (value: any) => void;
-  type?: string;
-  step?: string;
-  min?: string;
+  type: ColumnType;
   editable: boolean;
   focus: boolean;
   onKeyDown: (e: React.KeyboardEvent) => void;
-  className?: string;
-}> = ({
-  value,
-  onChange,
-  type = "text",
-  step,
-  min,
-  editable,
-  focus,
-  onKeyDown,
-  className = "",
-}) => {
+}> = ({ value, onChange, type, editable, focus, onKeyDown }) => {
   const [cellValue, setCellValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -75,7 +55,7 @@ const EditableCell: React.FC<{
   useEffect(() => {
     if (editable && focus && inputRef.current) {
       inputRef.current.focus();
-      if (type === "text") {
+      if (type === "string") {
         const length = inputRef.current.value.length;
         inputRef.current.setSelectionRange(length, length);
       }
@@ -88,79 +68,51 @@ const EditableCell: React.FC<{
     onChange(newValue);
   };
 
-  return (
-    <input
-      ref={inputRef}
-      type={type}
-      step={step}
-      min={min}
-      value={cellValue}
-      onChange={handleChange}
-      readOnly={!editable}
-      onKeyDown={onKeyDown}
-      className={`w-full h-full px-6 py-3 m-0 outline-none bg-transparent focus:border-gray-400 focus:border ${className}`}
-      style={{ boxSizing: "border-box" }}
-    />
-  );
-};
-
-const CheckboxCell: React.FC<{
-  value: boolean;
-  onChange: (value: boolean) => void;
-  editable: boolean;
-  focus: boolean;
-  onKeyDown: (e: React.KeyboardEvent) => void;
-  className?: string;
-}> = ({ value, onChange, editable, focus, onKeyDown, className = "" }) => {
-  const checkboxRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editable && focus && checkboxRef.current) {
-      checkboxRef.current.focus();
+  const getInputProps = () => {
+    switch (type) {
+      case "number":
+        return { type: "number", min: "0" };
+      case "rate":
+        return { type: "number", step: "0.01", min: "0" };
+      case "checkbox":
+        return { type: "checkbox", checked: value };
+      default:
+        return { type: "text" };
     }
-  }, [editable, focus]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.checked);
   };
 
   return (
     <input
-      ref={checkboxRef}
-      type="checkbox"
-      checked={value}
+      ref={inputRef}
+      {...getInputProps()}
+      value={type !== "checkbox" ? cellValue : undefined}
       onChange={handleChange}
       readOnly={!editable}
       onKeyDown={onKeyDown}
-      className={`w-auto h-full p-4 m-0 border-none outline-none bg-transparent ${className}`}
+      className={`w-full h-full px-6 py-3 m-0 outline-none bg-transparent focus:border-gray-400 focus:border ${
+        type === "number" || type === "rate" ? "text-right" : ""
+      } ${type === "checkbox" ? "w-auto cursor-pointer" : ""}`}
       style={{ boxSizing: "border-box" }}
     />
   );
 };
 
-const Table: React.FC = () => {
+// Table component
+const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [data, setData] = useState<Data[]>(initialData);
   const [editableRowIndex, setEditableRowIndex] = useState<number | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
     null
   );
-  const [previousValue, setPreviousValue] = useState<string | null>(null);
+  const [previousValue, setPreviousValue] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [shift, setShift] = useState("Day");
   const [hari, setHari] = useState("Biasa");
   const [jumlahTepung, setJumlahTepung] = useState<number>(50);
   const tableRef = useRef<HTMLDivElement>(null);
-  const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
-    staffId: 300,
-    staffName: 400,
-    kerja: 400,
-    kerjaPerJam: 200,
-    Done: 150,
-    bag: 200,
-    rate: 200,
-    amount: 250,
-    actions: 0,
-  });
+  const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
+    Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
+  );
 
   const handleClickOutside = (event: MouseEvent) => {
     if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
@@ -179,18 +131,10 @@ const Table: React.FC = () => {
   const handleCellClick = (rowIndex: number, cellIndex: number) => {
     setEditableRowIndex(rowIndex);
     setEditableCellIndex(cellIndex);
-    setPreviousValue(
-      data[rowIndex][
-        Object.keys(data[rowIndex])[cellIndex] as keyof Data
-      ] as string
-    );
+    setPreviousValue(data[rowIndex][columns[cellIndex].id]);
   };
 
-  const handleCellChange = (
-    rowIndex: number,
-    columnId: keyof Data,
-    value: any
-  ) => {
+  const handleCellChange = (rowIndex: number, columnId: string, value: any) => {
     setData((oldData) => {
       const newData = [...oldData];
       if (columnId === "bag" && parseFloat(value) > 99999999) {
@@ -198,13 +142,7 @@ const Table: React.FC = () => {
       }
       newData[rowIndex] = {
         ...newData[rowIndex],
-        [columnId]:
-          columnId === "kerjaPerJam" ||
-          columnId === "bag" ||
-          columnId === "rate" ||
-          columnId === "amount"
-            ? parseFloat(value) || 0
-            : value,
+        [columnId]: value,
       };
       return newData;
     });
@@ -217,9 +155,7 @@ const Table: React.FC = () => {
         editableCellIndex !== null &&
         previousValue !== null
       ) {
-        const columnId = Object.keys(data[editableRowIndex])[
-          editableCellIndex
-        ] as keyof Data;
+        const columnId = columns[editableCellIndex].id;
         handleCellChange(editableRowIndex, columnId, previousValue);
       }
       setEditableRowIndex(null);
@@ -227,8 +163,7 @@ const Table: React.FC = () => {
     } else if (e.key === "Tab") {
       e.preventDefault();
       if (editableRowIndex !== null && editableCellIndex !== null) {
-        const nextCellIndex =
-          (editableCellIndex + 1) % Object.keys(data[0]).length;
+        const nextCellIndex = (editableCellIndex + 1) % columns.length;
         const nextRowIndex =
           nextCellIndex === 0
             ? (editableRowIndex + 1) % data.length
@@ -240,7 +175,7 @@ const Table: React.FC = () => {
       e.preventDefault();
       if (editableRowIndex !== null && editableCellIndex !== null) {
         const nextCellIndex = editableCellIndex + 1;
-        if (nextCellIndex < Object.keys(data[0]).length) {
+        if (nextCellIndex < columns.length) {
           setEditableCellIndex(nextCellIndex);
         } else {
           const nextRowIndex = editableRowIndex + 1;
@@ -257,19 +192,8 @@ const Table: React.FC = () => {
   };
 
   const handleAddRow = () => {
-    setData([
-      ...data,
-      {
-        staffId: "",
-        staffName: "",
-        kerja: "",
-        kerjaPerJam: 0,
-        Done: true,
-        bag: 0,
-        rate: 0,
-        amount: 0,
-      },
-    ]);
+    const newRow = Object.fromEntries(columns.map((col) => [col.id, ""]));
+    setData([...data, newRow]);
   };
 
   const handleDeleteRow = (rowIndex: number, event: React.MouseEvent) => {
@@ -319,249 +243,100 @@ const Table: React.FC = () => {
     });
   };
 
-  const columns = [
-    columnHelper.accessor("staffId", {
-      header: "Staff ID",
-      cell: (info) => (
-        <div
-          onClick={() =>
-            handleCellClick(info.row.index, info.cell.column.getIndex())
-          }
-        >
-          <EditableCell
-            value={info.getValue()}
-            onChange={(val) => handleCellChange(info.row.index, "staffId", val)}
-            editable={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            focus={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      ),
-    }),
-    columnHelper.accessor("staffName", {
-      header: "Staff Name",
-      cell: (info) => (
-        <div
-          onClick={() =>
-            handleCellClick(info.row.index, info.cell.column.getIndex())
-          }
-        >
-          <EditableCell
-            value={info.getValue()}
-            onChange={(val) =>
-              handleCellChange(info.row.index, "staffName", val)
-            }
-            editable={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            focus={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      ),
-    }),
-    columnHelper.accessor("kerja", {
-      header: "Kerja",
-      cell: (info) => (
-        <div
-          onClick={() =>
-            handleCellClick(info.row.index, info.cell.column.getIndex())
-          }
-        >
-          <EditableCell
-            value={info.getValue()}
-            onChange={(val) => handleCellChange(info.row.index, "kerja", val)}
-            editable={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            focus={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      ),
-    }),
-    columnHelper.accessor("kerjaPerJam", {
-      header: "Kerja/Jam",
-      cell: (info) => (
-        <div
-          onClick={() =>
-            handleCellClick(info.row.index, info.cell.column.getIndex())
-          }
-        >
-          <EditableCell
-            value={info.getValue()}
-            onChange={(val) =>
-              handleCellChange(info.row.index, "kerjaPerJam", val)
-            }
-            type="number"
-            min="0"
-            editable={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            focus={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            onKeyDown={handleKeyDown}
-            className="text-right no-spinner"
-          />
-        </div>
-      ),
-    }),
-    columnHelper.accessor("Done", {
-      id: "done",
-      header: "Done",
-      cell: (info) => (
-        <CheckboxCell
-          value={info.getValue()}
-          onChange={(val) => handleCellChange(info.row.index, "Done", val)}
-          editable={
-            info.row.index === editableRowIndex &&
-            info.cell.column.getIndex() === editableCellIndex
-          }
-          focus={
-            info.row.index === editableRowIndex &&
-            info.cell.column.getIndex() === editableCellIndex
-          }
-          onKeyDown={handleKeyDown}
-          className="cursor-pointer"
-        />
-      ),
-    }),
-    columnHelper.accessor("bag", {
-      header: "Bag",
-      cell: (info) => (
-        <div
-          onClick={() =>
-            handleCellClick(info.row.index, info.cell.column.getIndex())
-          }
-        >
-          <EditableCell
-            value={info.getValue()}
-            onChange={(val) => handleCellChange(info.row.index, "bag", val)}
-            type="number"
-            min="0"
-            editable={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            focus={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            onKeyDown={handleKeyDown}
-            className="text-right no-spinner"
-          />
-        </div>
-      ),
-    }),
-    columnHelper.accessor("rate", {
-      header: "Rate",
-      cell: (info) => (
-        <div
-          onClick={() =>
-            handleCellClick(info.row.index, info.cell.column.getIndex())
-          }
-        >
-          <EditableCell
-            value={info.getValue()}
-            onChange={(val) => handleCellChange(info.row.index, "rate", val)}
-            type="number"
-            step="0.01"
-            min="0"
-            editable={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            focus={
-              info.row.index === editableRowIndex &&
-              info.cell.column.getIndex() === editableCellIndex
-            }
-            onKeyDown={handleKeyDown}
-            className="text-right no-spinner"
-          />
-        </div>
-      ),
-    }),
-    columnHelper.accessor("amount", {
-      header: "Amount",
-      cell: (info) => (
-        <div className="text-right px-6">
-          {(info.row.original.bag * info.row.original.rate).toFixed(2)}
-        </div>
-      ),
-    }),
-    columnHelper.display({
-      id: "actions",
-      header: "Actions",
-      cell: (info) => (
-        <div className="flex items-center justify-center h-full">
-          <button
-            className="text-gray-500 hover:text-gray-600"
-            onClick={(event) => handleDeleteRow(info.row.index, event)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="icon icon-tabler icon-tabler-trash"
+  const columnHelper = createColumnHelper<Data>();
+
+  const tableColumns = columns.map((col) => {
+    if (col.type === "action") {
+      return columnHelper.display({
+        id: col.id,
+        header: col.header,
+        cell: (info) => (
+          <div className="flex items-center justify-center h-full">
+            <button
+              className="text-gray-500 hover:text-gray-600"
+              onClick={(event) => handleDeleteRow(info.row.index, event)}
             >
-              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-              <path d="M4 7l16 0" />
-              <path d="M10 11l0 6" />
-              <path d="M14 11l0 6" />
-              <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
-              <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
-            </svg>
-          </button>
-        </div>
-      ),
-    }),
-  ];
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="icon icon-tabler icon-tabler-trash"
+              >
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M4 7l16 0" />
+                <path d="M10 11l0 6" />
+                <path d="M14 11l0 6" />
+                <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+              </svg>
+            </button>
+          </div>
+        ),
+      });
+    } else {
+      return columnHelper.accessor(col.id as keyof Data, {
+        header: col.header,
+        cell: (info) => (
+          <div
+            onClick={() =>
+              handleCellClick(info.row.index, info.cell.column.getIndex())
+            }
+          >
+            {col.type === "readonly" ? (
+              <div
+                className={`px-6 ${
+                  ["number", "rate"].includes(col.type) ? "text-right" : ""
+                }`}
+              >
+                {info.getValue()}
+              </div>
+            ) : (
+              <EditableCell
+                value={info.getValue()}
+                onChange={(val) =>
+                  handleCellChange(info.row.index, col.id, val)
+                }
+                type={col.type}
+                editable={
+                  info.row.index === editableRowIndex &&
+                  info.cell.column.getIndex() === editableCellIndex
+                }
+                focus={
+                  info.row.index === editableRowIndex &&
+                  info.cell.column.getIndex() === editableCellIndex
+                }
+                onKeyDown={handleKeyDown}
+              />
+            )}
+          </div>
+        ),
+      });
+    }
+  });
+  
 
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const getHeaderClass = (columnId: string) => {
-    switch (columnId) {
-      case "staffId":
-      case "staffName":
-      case "kerja":
-        return "text-left";
-      case "kerjaPerJam":
-      case "bag":
+  const getHeaderClass = (columnType: ColumnType) => {
+    switch (columnType) {
+      case "number":
       case "rate":
-      case "amount":
         return "text-right";
-      case "Done":
-      case "actions":
+      case "checkbox":
+      case "action":
         return "text-center";
       default:
-        return "";
+        return "text-left";
     }
   };
 
@@ -625,18 +400,20 @@ const Table: React.FC = () => {
                 <th
                   key={header.id}
                   className={`px-6 py-3 border border-b-2 border-gray-300 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider ${getHeaderClass(
-                    header.column.id
+                    columns[header.index].type
                   )}`}
                   style={{
                     position: "relative",
-                    width: `${columnWidths[header.column.id]}px` || "auto",
+                    width: columnWidths[columns[header.index].id]
+                      ? `${columnWidths[columns[header.index].id]}px`
+                      : "auto",
                   }}
                 >
                   {flexRender(
                     header.column.columnDef.header,
                     header.getContext()
                   )}
-                  {header.column.id !== "actions" && (
+                  {columns[header.index].type !== "action" && (
                     <div
                       className="resizer"
                       style={{
@@ -649,7 +426,9 @@ const Table: React.FC = () => {
                         userSelect: "none",
                         background: "transparent",
                       }}
-                      onMouseDown={(e) => handleMouseDown(e, header.column.id)}
+                      onMouseDown={(e) =>
+                        handleMouseDown(e, columns[header.index].id)
+                      }
                     />
                   )}
                 </th>
@@ -670,12 +449,12 @@ const Table: React.FC = () => {
               {row.getVisibleCells().map((cell, cellIndex) => (
                 <td
                   key={cell.id}
-                  className={`relative px-6 py-4 whitespace-no-wrap border-b border-r border-gray-300 `}
+                  className={`relative px-6 py-4 whitespace-no-wrap border-b border-r border-gray-300`}
                   onClick={() => handleCellClick(rowIndex, cellIndex)}
                   style={{
                     padding: "0",
                     boxSizing: "border-box",
-                    width: `${columnWidths[cell.column.id]}px` || "auto",
+                    width: `${columnWidths[columns[cellIndex].id]}px` || "auto",
                   }}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
