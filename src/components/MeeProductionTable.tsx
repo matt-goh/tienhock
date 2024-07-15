@@ -24,7 +24,7 @@ const initialData: Data[] = [
     staffId: "JIRIM_MM",
     staffName: "Jirim Ilut",
     kerja: "Mee Foreman",
-    kerjaPerJam: 7  ,
+    kerjaPerJam: 7,
     Done: true,
     bag: 1,
     rate: 0.7,

@@ -8,9 +8,14 @@ import CatalogueTable from "./components/CatalogueTable";
 import MeeProductionTable from "./components/MeeProductionTable";
 
 const App: React.FC = () => {
-
   // Define column types
-  type ColumnType = 'string' | 'number' | 'rate' | 'readonly' | 'checkbox' | 'action';
+  type ColumnType =
+    | "string"
+    | "number"
+    | "rate"
+    | "readonly"
+    | "checkbox"
+    | "action";
   // Define data structure
 
   interface Data {
@@ -62,7 +67,7 @@ const App: React.FC = () => {
     <div className="App">
       <aside className="">{/* <Sidebar /> */}</aside>
       <main className="">
-      <Table initialData={initialData} columns={columns} />
+        <Table initialData={initialData} columns={columns} />
         {/* <MeeProductionTable /> */}
         {/* <CatalogueTable /> */}
       </main>
