@@ -9,6 +9,7 @@ import {
   getSortedRowModel,
 } from "@tanstack/react-table";
 import "react-datepicker/dist/react-datepicker.css";
+import { IconTrash } from "@tabler/icons-react";
 
 // Define column types
 type ColumnType =
@@ -17,6 +18,7 @@ type ColumnType =
   | "rate"
   | "readonly"
   | "checkbox"
+  | "amount"
   | "action";
 
 // Define column configuration
@@ -38,7 +40,7 @@ interface TableProps {
   columns: ColumnConfig[];
 }
 
-// EditableCell component
+// EditableCejll component
 const EditableCell: React.FC<{
   value: any;
   onChange: (value: any) => void;
@@ -115,15 +117,11 @@ const EditableCell: React.FC<{
 const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [data, setData] = useState<Data[]>(initialData);
   const [editableRowId, setEditableRowId] = useState<string | null>(null);
-  const [editableRowIndex, setEditableRowIndex] = useState<number | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
     null
   );
   const [previousValue, setPreviousValue] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
-  const [shift, setShift] = useState("Day");
-  const [hari, setHari] = useState("Biasa");
-  const [jumlahTepung, setJumlahTepung] = useState<number>(50);
   const tableRef = useRef<HTMLDivElement>(null);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
@@ -133,8 +131,8 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
 
   const handleClickOutside = (event: MouseEvent) => {
     if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
-      setEditableRowIndex(null);
       setEditableCellIndex(null);
+      setSelectedRowId(null);
     }
   };
 
@@ -148,27 +146,33 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const handleCellClick = (rowId: string, cellIndex: number) => {
     setEditableRowId(rowId);
     setEditableCellIndex(cellIndex);
+    setSelectedRowId(rowId);
     const rowIndex = table
       .getRowModel()
       .rows.findIndex((row) => row.id === rowId);
-    setPreviousValue(data[rowIndex][columns[cellIndex].id]);
+    setPreviousValue(
+      table.getRowModel().rows[rowIndex].original[columns[cellIndex].id]
+    );
   };
 
   const handleCellChange = (rowId: string, columnId: string, value: any) => {
     setData((oldData) => {
       const newData = [...oldData];
-      const rowIndex = newData.findIndex((row) => row.id === rowId);
+      const rowIndex = table
+        .getRowModel()
+        .rows.findIndex((row) => row.id === rowId);
+      const originalIndex = table.getRowModel().rows[rowIndex].index;
       if (columnId === "bag" && parseFloat(value) > 99999) {
         value = 99999;
       }
-      newData[rowIndex] = {
-        ...newData[rowIndex],
+      newData[originalIndex] = {
+        ...newData[originalIndex],
         [columnId]: value,
       };
       // Recalculate amount
       if (columnId === "bag" || columnId === "rate") {
-        newData[rowIndex].amount = (
-          newData[rowIndex].bag * newData[rowIndex].rate
+        newData[originalIndex].amount = (
+          newData[originalIndex].bag * newData[originalIndex].rate
         ).toFixed(2);
       }
       return newData;
@@ -259,7 +263,8 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
 
   const handleDeleteRow = (rowIndex: number, event: React.MouseEvent) => {
     event.stopPropagation();
-    setData((oldData) => oldData.filter((_, index) => index !== rowIndex));
+    const originalIndex = table.getRowModel().rows[rowIndex].index;
+    setData((oldData) => oldData.filter((_, index) => index !== originalIndex));
   };
 
   const handleMouseDown = (event: React.MouseEvent, columnId: string) => {
@@ -285,28 +290,38 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  const toggleShift = () => {
-    setShift((prevShift) => (prevShift === "Day" ? "Night" : "Day"));
-  };
-
-  const toggleHari = () => {
-    setHari((prevHari) => {
-      switch (prevHari) {
-        case "Biasa":
-          return "Ahad";
-        case "Ahad":
-          return "Umum";
-        case "Umum":
-          return "Biasa";
-        default:
-          return "Biasa";
-      }
-    });
-  };
-
   const columnHelper = createColumnHelper<Data>();
 
   const tableColumns = columns.map((col) => {
+    const headerContent = (
+      <div
+        className={`flex items-center group cursor-pointer w-full h-full ${
+          col.type === "number" || col.type === "rate" || col.type === "amount"
+            ? "justify-end"
+            : ""
+        }`}
+        onClick={() => columns.toggleSorting()}
+      >
+        {col.type === "number" ||
+        col.type === "rate" ||
+        col.type === "amount" ? (
+          <>
+            <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              {getSortIcon(col.id)}
+            </span>
+            {col.header}
+          </>
+        ) : (
+          <>
+            {col.header}
+            <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              {getSortIcon(col.id)}
+            </span>
+          </>
+        )}
+      </div>
+    );
+
     if (col.type === "action") {
       return columnHelper.display({
         id: col.id,
@@ -317,25 +332,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
               className="text-gray-500 hover:text-gray-600"
               onClick={(event) => handleDeleteRow(info.row.index, event)}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="icon icon-tabler icon-tabler-trash"
-              >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M4 7l16 0" />
-                <path d="M10 11l0 6" />
-                <path d="M14 11l0 6" />
-                <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
-                <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
-              </svg>
+              <IconTrash stroke={2} width={20} height={20} />
             </button>
           </div>
         ),
@@ -349,20 +346,56 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           </div>
         ),
       });
+    } else if (col.type === "checkbox") {
+      return columnHelper.accessor(col.id, {
+        header: col.header,
+        cell: (info) => (
+          <div className="flex items-center justify-center h-full">
+            <input
+              type="checkbox"
+              checked={info.getValue()}
+              onChange={(e) =>
+                handleCellChange(info.row.id, col.id, e.target.checked)
+              }
+              className="w-4 h-4"
+            />
+          </div>
+        ),
+      });
+    } else if (
+      col.type === "amount" ||
+      col.type === "number" ||
+      col.type === "rate"
+    ) {
+      return columnHelper.accessor(col.id, {
+        header: ({ column }) => headerContent,
+        cell: (info) => (
+          <div className="px-6 text-right">
+            {col.type === "amount"
+              ? parseFloat(info.getValue()).toFixed(2)
+              : info.getValue()}
+          </div>
+        ),
+      });
     } else {
       return columnHelper.accessor(col.id, {
-        header: () => (
-          <div className="flex items-center">
-            {col.type === "number" && (
-              <button onClick={() => handleSort(col.id)} className="mr-2">
-                {getSortIcon(col.id)}
-              </button>
-            )}
-            {col.header}
-            {col.type !== "number" && (
-              <button onClick={() => handleSort(col.id)} className="ml-2">
-                {getSortIcon(col.id)}
-              </button>
+        header: ({ column }) => (
+          <div
+            className="flex items-center group cursor-pointer w-full h-full"
+            onClick={() => column.toggleSorting()}
+          >
+            {col.type === "number" ||
+            col.type === "rate" ||
+            col.type === "amount" ? (
+              <>
+                <span className="mr-2">{getSortIcon(col.id)}</span>
+                {col.header}
+              </>
+            ) : (
+              <>
+                {col.header}
+                <span className="ml-2">{getSortIcon(col.id)}</span>
+              </>
             )}
           </div>
         ),
@@ -405,15 +438,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     },
   });
 
-  const handleSort = (columnId: string) => {
-    setSorting((old) => {
-      const existingSort = old.find((s) => s.id === columnId);
-      if (!existingSort) return [{ id: columnId, desc: false }];
-      if (existingSort.desc) return [];
-      return [{ id: columnId, desc: true }];
-    });
-  };
-
   const getSortIcon = (columnId: string) => {
     const sort = sorting.find((s) => s.id === columnId);
     if (!sort) return "⇅";
@@ -425,6 +449,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       case "number":
       case "rate":
       case "readonly":
+      case "amount":
         return "text-right";
       case "checkbox":
       case "action":
@@ -434,50 +459,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     }
   };
 
-  const handleJumlahTepungChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value) && Number(value) <= 999) {
-      setJumlahTepung(Number(value));
-    }
-  };
-
   return (
-    <div ref={tableRef} className="p-8 w-full">
-      <div className="flex items-center mb-4 w-full">
-        <span className="font-medium mr-2">Date:</span>
-        <DatePicker
-          selected={selectedDate}
-          onChange={(date) => setSelectedDate(date)}
-          className="relative inline-block w-24 hover:w-28 px-2 py-1.5 pl-0 hover:pl-2 hover:border hover:border-gray-300 hover:shadow-md rounded-lg hover:text-center transition-all duration-200"
-          dateFormat="dd/MM/yyyy"
-        />
-        <div className="relative inline-block">
-          <span className="font-medium ml-4 mr-2">Shift:</span>
-          <button
-            onClick={toggleShift}
-            className="px-3 py-1.5 pl-0 hover:pl-3 hover:border hover:border-gray-300 hover:shadow-md rounded-lg text-right active:bg-gray-100 transition-all duration-200"
-          >
-            {shift}
-          </button>
-        </div>
-        <div className="relative inline-block">
-          <span className="font-medium ml-4 mr-2">Hari:</span>
-          <button
-            onClick={toggleHari}
-            className="px-3 py-1.5 pl-0 hover:pl-3 hover:border hover:border-gray-300 hover:shadow-md rounded-lg text-right active:bg-gray-100 transition-all duration-200"
-          >
-            {hari}
-          </button>
-        </div>
-        <div className="relative inline-block">
-          <span className="font-medium ml-4 mr-2">Jumlah Tepung:</span>
-          <input
-            max={999}
-            value={jumlahTepung}
-            onChange={handleJumlahTepungChange}
-            className="w-12 px-2 py-1.5 pl-0 hover:pl-2 hover:border hover:border-gray-300 hover:shadow-md rounded-lg hover:text-center transition-all duration-200"
-          />
-        </div>
+    <div ref={tableRef} className="p-8 w-auto">
+      <div className="flex items-center mb-4 w-auto">
         <div className="ml-auto flex items-center">
           <div className="flex items-center mr-4">
             <button
@@ -505,11 +489,11 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             onClick={() => handleAddRow()}
             className="px-4 py-2 border border-gray-300 font-medium rounded-full hover:bg-gray-100 active:bg-gray-200"
           >
-            Add New Row{newRowCount > 1 ? "s" : ""}
+            Add row{newRowCount > 1 ? "s" : ""}
           </button>
         </div>
       </div>
-      <table className="min-w-full bg-white border-collapse border-spacing-0">
+      <table className="w-auto bg-white border-collapse border-spacing-0">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -555,13 +539,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             <tr
               key={row.id}
               className={
-                row.id === editableRowId &&
-                columns.some(
-                  (col) =>
-                    col.type !== "readonly" &&
-                    col.type !== "checkbox" &&
-                    col.type !== "action"
-                )
+                row.id === selectedRowId
                   ? "border-l-2 border-gray-400 shadow-top-bottom"
                   : "border border-gray-300 hover:bg-gray-100"
               }

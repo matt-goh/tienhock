@@ -5,7 +5,7 @@ import Table from "./components/Table";
 import Sidebar from "./components/Sidebar";
 import NewStaffModal from "./components/NewStaffModal";
 import CatalogueTable from "./components/CatalogueTable";
-import MeeProductionTable from "./components/MeeProductionTable";
+import MeeProduction from "./components/MeeProduction";
 
 const App: React.FC = () => {
   // Define column types
@@ -14,6 +14,7 @@ const App: React.FC = () => {
     | "number"
     | "rate"
     | "readonly"
+    | "amount"
     | "checkbox"
     | "action";
   // Define data structure
@@ -60,15 +61,16 @@ const App: React.FC = () => {
     { id: "Done", header: "Done", type: "checkbox", width: 150 },
     { id: "bag", header: "Bag", type: "number", width: 200 },
     { id: "rate", header: "Rate", type: "rate", width: 200 },
-    { id: "amount", header: "Amount", type: "readonly", width: 250 },
+    { id: "amount", header: "Amount", type: "amount", width: 250 },
     { id: "actions", header: "Actions", type: "action", width: 100 },
   ];
+
   return (
     <div className="App">
       <aside className="">{/* <Sidebar /> */}</aside>
       <main className="">
+        {/* <MeeProduction /> */}
         <Table initialData={initialData} columns={columns} />
-        {/* <MeeProductionTable /> */}
         {/* <CatalogueTable /> */}
       </main>
       {/* <NewStaffModal /> */}
