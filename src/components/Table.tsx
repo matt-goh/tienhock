@@ -5,6 +5,8 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  SortingState,
+  getSortedRowModel,
 } from "@tanstack/react-table";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -63,7 +65,19 @@ const EditableCell: React.FC<{
   }, [editable, focus, type]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
+    let newValue: string | number | boolean = e.target.value;
+    if (type === "checkbox") {
+      newValue = e.target.checked;
+    } else if (type === "number" || type === "rate") {
+      if (e.target.value === "") {
+        newValue = 0;
+      } else {
+        newValue =
+          type === "number"
+            ? Math.floor(Number(e.target.value))
+            : Number(e.target.value);
+      }
+    }
     setCellValue(newValue);
     onChange(newValue);
   };
@@ -71,7 +85,7 @@ const EditableCell: React.FC<{
   const getInputProps = () => {
     switch (type) {
       case "number":
-        return { type: "number", min: "0" };
+        return { type: "number", min: "0", step: "1" };
       case "rate":
         return { type: "number", step: "0.01", min: "0" };
       case "checkbox":
@@ -100,6 +114,7 @@ const EditableCell: React.FC<{
 // Table component
 const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [data, setData] = useState<Data[]>(initialData);
+  const [editableRowId, setEditableRowId] = useState<string | null>(null);
   const [editableRowIndex, setEditableRowIndex] = useState<number | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
     null
@@ -113,6 +128,8 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [newRowCount, setNewRowCount] = useState<number>(5);
 
   const handleClickOutside = (event: MouseEvent) => {
     if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
@@ -128,72 +145,116 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     };
   }, []);
 
-  const handleCellClick = (rowIndex: number, cellIndex: number) => {
-    setEditableRowIndex(rowIndex);
+  const handleCellClick = (rowId: string, cellIndex: number) => {
+    setEditableRowId(rowId);
     setEditableCellIndex(cellIndex);
+    const rowIndex = table
+      .getRowModel()
+      .rows.findIndex((row) => row.id === rowId);
     setPreviousValue(data[rowIndex][columns[cellIndex].id]);
   };
 
-  const handleCellChange = (rowIndex: number, columnId: string, value: any) => {
+  const handleCellChange = (rowId: string, columnId: string, value: any) => {
     setData((oldData) => {
       const newData = [...oldData];
-      if (columnId === "bag" && parseFloat(value) > 99999999) {
-        value = 99999999;
+      const rowIndex = newData.findIndex((row) => row.id === rowId);
+      if (columnId === "bag" && parseFloat(value) > 99999) {
+        value = 99999;
       }
       newData[rowIndex] = {
         ...newData[rowIndex],
         [columnId]: value,
       };
+      // Recalculate amount
+      if (columnId === "bag" || columnId === "rate") {
+        newData[rowIndex].amount = (
+          newData[rowIndex].bag * newData[rowIndex].rate
+        ).toFixed(2);
+      }
       return newData;
     });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent,
+    rowId: string,
+    cellIndex: number
+  ) => {
     if (e.key === "Escape") {
       if (
-        editableRowIndex !== null &&
+        editableRowId !== null &&
         editableCellIndex !== null &&
         previousValue !== null
       ) {
         const columnId = columns[editableCellIndex].id;
-        handleCellChange(editableRowIndex, columnId, previousValue);
+        handleCellChange(editableRowId, columnId, previousValue);
       }
-      setEditableRowIndex(null);
+      setEditableRowId(null);
       setEditableCellIndex(null);
-    } else if (e.key === "Tab") {
+    } else if (e.key === "Tab" || e.key === "Enter") {
       e.preventDefault();
-      if (editableRowIndex !== null && editableCellIndex !== null) {
-        const nextCellIndex = (editableCellIndex + 1) % columns.length;
-        const nextRowIndex =
-          nextCellIndex === 0
-            ? (editableRowIndex + 1) % data.length
-            : editableRowIndex;
-        setEditableRowIndex(nextRowIndex);
-        setEditableCellIndex(nextCellIndex);
-      }
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (editableRowIndex !== null && editableCellIndex !== null) {
-        const nextCellIndex = editableCellIndex + 1;
-        if (nextCellIndex < columns.length) {
-          setEditableCellIndex(nextCellIndex);
-        } else {
-          const nextRowIndex = editableRowIndex + 1;
-          if (nextRowIndex < data.length) {
-            setEditableRowIndex(nextRowIndex);
-            setEditableCellIndex(0);
-          } else {
-            setEditableRowIndex(null);
-            setEditableCellIndex(null);
+      let nextCellIndex = cellIndex;
+      let nextRowId = rowId;
+
+      const sortedRows = table.getRowModel().rows;
+      const currentRowIndex = sortedRows.findIndex((row) => row.id === rowId);
+
+      const lastSelectableColumnIndex = columns.reduce(
+        (lastIndex, col, index) =>
+          col.type !== "readonly" && col.type !== "action" ? index : lastIndex,
+        -1
+      );
+
+      if (
+        e.key === "Enter" &&
+        nextCellIndex === lastSelectableColumnIndex &&
+        currentRowIndex === sortedRows.length - 1
+      ) {
+        handleAddRow(1);
+        nextCellIndex = columns.findIndex(
+          (col) => col.type !== "readonly" && col.type !== "action"
+        );
+        nextRowId = sortedRows[sortedRows.length].id;
+      } else {
+        do {
+          nextCellIndex = (nextCellIndex + 1) % columns.length;
+          if (nextCellIndex === 0) {
+            const nextRowIndex = (currentRowIndex + 1) % sortedRows.length;
+            nextRowId = sortedRows[nextRowIndex].id;
           }
-        }
+        } while (
+          columns[nextCellIndex].type === "readonly" ||
+          columns[nextCellIndex].type === "action" ||
+          columns[nextCellIndex].type === "checkbox"
+        );
       }
+
+      setEditableRowId(nextRowId);
+      setEditableCellIndex(nextCellIndex);
     }
   };
 
-  const handleAddRow = () => {
-    const newRow = Object.fromEntries(columns.map((col) => [col.id, ""]));
-    setData([...data, newRow]);
+  const handleAddRow = (count: number = newRowCount) => {
+    const newRows = Array(count)
+      .fill(null)
+      .map(() =>
+        Object.fromEntries(
+          columns.map((col) => {
+            switch (col.type) {
+              case "number":
+              case "rate":
+                return [col.id, 0];
+              case "checkbox":
+                return [col.id, true];
+              case "readonly":
+                return [col.id, 0];
+              default:
+                return [col.id, ""];
+            }
+          })
+        )
+      );
+    setData((oldData) => [...oldData, ...newRows]);
   };
 
   const handleDeleteRow = (rowIndex: number, event: React.MouseEvent) => {
@@ -279,41 +340,54 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           </div>
         ),
       });
-    } else {
+    } else if (col.type === "readonly") {
       return columnHelper.accessor(col.id, {
         header: col.header,
         cell: (info) => (
+          <div className="px-6 text-right">
+            {parseFloat(info.getValue()).toFixed(2)}
+          </div>
+        ),
+      });
+    } else {
+      return columnHelper.accessor(col.id, {
+        header: () => (
+          <div className="flex items-center">
+            {col.type === "number" && (
+              <button onClick={() => handleSort(col.id)} className="mr-2">
+                {getSortIcon(col.id)}
+              </button>
+            )}
+            {col.header}
+            {col.type !== "number" && (
+              <button onClick={() => handleSort(col.id)} className="ml-2">
+                {getSortIcon(col.id)}
+              </button>
+            )}
+          </div>
+        ),
+        cell: (info) => (
           <div
             onClick={() =>
-              handleCellClick(info.row.index, info.cell.column.getIndex())
+              handleCellClick(info.row.id, info.cell.column.getIndex())
             }
           >
-            {col.type === "readonly" ? (
-              <div
-                className={`px-6 ${
-                  ["number", "rate"].includes(col.type) ? "text-right" : ""
-                }`}
-              >
-                {info.getValue()}
-              </div>
-            ) : (
-              <EditableCell
-                value={info.getValue()}
-                onChange={(val) =>
-                  handleCellChange(info.row.index, col.id, val)
-                }
-                type={col.type}
-                editable={
-                  info.row.index === editableRowIndex &&
-                  info.cell.column.getIndex() === editableCellIndex
-                }
-                focus={
-                  info.row.index === editableRowIndex &&
-                  info.cell.column.getIndex() === editableCellIndex
-                }
-                onKeyDown={handleKeyDown}
-              />
-            )}
+            <EditableCell
+              value={info.getValue()}
+              onChange={(val) => handleCellChange(info.row.id, col.id, val)}
+              type={col.type}
+              editable={
+                info.row.id === editableRowId &&
+                info.cell.column.getIndex() === editableCellIndex
+              }
+              focus={
+                info.row.id === editableRowId &&
+                info.cell.column.getIndex() === editableCellIndex
+              }
+              onKeyDown={(e) =>
+                handleKeyDown(e, info.row.id, info.cell.column.getIndex())
+              }
+            />
           </div>
         ),
       });
@@ -324,12 +398,33 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     data,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
   });
+
+  const handleSort = (columnId: string) => {
+    setSorting((old) => {
+      const existingSort = old.find((s) => s.id === columnId);
+      if (!existingSort) return [{ id: columnId, desc: false }];
+      if (existingSort.desc) return [];
+      return [{ id: columnId, desc: true }];
+    });
+  };
+
+  const getSortIcon = (columnId: string) => {
+    const sort = sorting.find((s) => s.id === columnId);
+    if (!sort) return "⇅";
+    return sort.desc ? "↓" : "↑";
+  };
 
   const getHeaderClass = (columnType: ColumnType) => {
     switch (columnType) {
       case "number":
       case "rate":
+      case "readonly":
         return "text-right";
       case "checkbox":
       case "action":
@@ -353,14 +448,14 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         <DatePicker
           selected={selectedDate}
           onChange={(date) => setSelectedDate(date)}
-          className="w-32 px-4 py-2 text-center border border-gray-300 rounded-lg focus:outline-none"
+          className="relative inline-block w-24 hover:w-28 px-2 py-1.5 pl-0 hover:pl-2 hover:border hover:border-gray-300 hover:shadow-md rounded-lg hover:text-center transition-all duration-200"
           dateFormat="dd/MM/yyyy"
         />
         <div className="relative inline-block">
           <span className="font-medium ml-4 mr-2">Shift:</span>
           <button
             onClick={toggleShift}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none hover:bg-gray-100 active:bg-gray-200"
+            className="px-3 py-1.5 pl-0 hover:pl-3 hover:border hover:border-gray-300 hover:shadow-md rounded-lg text-right active:bg-gray-100 transition-all duration-200"
           >
             {shift}
           </button>
@@ -369,7 +464,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           <span className="font-medium ml-4 mr-2">Hari:</span>
           <button
             onClick={toggleHari}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none hover:bg-gray-100 active:bg-gray-200"
+            className="px-3 py-1.5 pl-0 hover:pl-3 hover:border hover:border-gray-300 hover:shadow-md rounded-lg text-right active:bg-gray-100 transition-all duration-200"
           >
             {hari}
           </button>
@@ -377,17 +472,40 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         <div className="relative inline-block">
           <span className="font-medium ml-4 mr-2">Jumlah Tepung:</span>
           <input
+            max={999}
             value={jumlahTepung}
             onChange={handleJumlahTepungChange}
-            className="w-16 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none text-center"
+            className="w-12 px-2 py-1.5 pl-0 hover:pl-2 hover:border hover:border-gray-300 hover:shadow-md rounded-lg hover:text-center transition-all duration-200"
           />
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center">
+          <div className="flex items-center mr-4">
+            <button
+              onClick={() => setNewRowCount((prev) => Math.max(1, prev - 1))}
+              className="px-2 py-1 border border-gray-300 rounded-l-lg"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              value={newRowCount}
+              onChange={(e) =>
+                setNewRowCount(Math.max(1, parseInt(e.target.value) || 1))
+              }
+              className="w-12 px-2 py-1 text-center border-t border-b border-gray-300"
+            />
+            <button
+              onClick={() => setNewRowCount((prev) => prev + 1)}
+              className="px-2 py-1 border border-gray-300 rounded-r-lg"
+            >
+              +
+            </button>
+          </div>
           <button
-            onClick={handleAddRow}
+            onClick={() => handleAddRow()}
             className="px-4 py-2 border border-gray-300 font-medium rounded-full hover:bg-gray-100 active:bg-gray-200"
           >
-            Add New Row
+            Add New Row{newRowCount > 1 ? "s" : ""}
           </button>
         </div>
       </div>
@@ -399,20 +517,19 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                 <th
                   key={header.id}
                   className={`px-6 py-3 border border-b-2 border-gray-300 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider ${getHeaderClass(
-                    columns[header.index].type
+                    columns.find((col) => col.id === header.id)?.type ||
+                      "string"
                   )}`}
                   style={{
                     position: "relative",
-                    width: columnWidths[columns[header.index].id]
-                      ? `${columnWidths[columns[header.index].id]}px`
-                      : "auto",
+                    width: `${columnWidths[header.id]}px` || "auto",
                   }}
                 >
                   {flexRender(
                     header.column.columnDef.header,
                     header.getContext()
                   )}
-                  {columns[header.index].type !== "action" && (
+                  {header.id !== "actions" && (
                     <div
                       className="resizer"
                       style={{
@@ -425,9 +542,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                         userSelect: "none",
                         background: "transparent",
                       }}
-                      onMouseDown={(e) =>
-                        handleMouseDown(e, columns[header.index].id)
-                      }
+                      onMouseDown={(e) => handleMouseDown(e, header.id)}
                     />
                   )}
                 </th>
@@ -436,11 +551,17 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row, rowIndex) => (
+          {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
               className={
-                rowIndex === editableRowIndex
+                row.id === editableRowId &&
+                columns.some(
+                  (col) =>
+                    col.type !== "readonly" &&
+                    col.type !== "checkbox" &&
+                    col.type !== "action"
+                )
                   ? "border-l-2 border-gray-400 shadow-top-bottom"
                   : "border border-gray-300 hover:bg-gray-100"
               }
@@ -449,11 +570,11 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                 <td
                   key={cell.id}
                   className={`relative px-6 py-4 whitespace-no-wrap border-b border-r border-gray-300`}
-                  onClick={() => handleCellClick(rowIndex, cellIndex)}
+                  onClick={() => handleCellClick(row.id, cellIndex)}
                   style={{
                     padding: "0",
                     boxSizing: "border-box",
-                    width: `${columnWidths[columns[cellIndex].id]}px` || "auto",
+                    width: `${columnWidths[cell.column.id]}px` || "auto",
                   }}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
