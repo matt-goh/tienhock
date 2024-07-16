@@ -6,4 +6,12 @@ export const theme = {
 export const variants = {
   extend: {},
 };
-export const plugins = [];
+export const plugins = [function({ addComponents }) {
+  addComponents({
+    '.cell-highlight': {
+      '&::before': {
+        content: '""',
+      },
+    },
+  })
+},];
