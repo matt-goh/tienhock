@@ -6,30 +6,9 @@ import Sidebar from "./components/Sidebar";
 import NewStaffModal from "./components/NewStaffModal";
 import CatalogueTable from "./components/CatalogueTable";
 import MeeProduction from "./components/MeeProduction";
+import { ColumnConfig, Data } from "./types/types";
 
 const App: React.FC = () => {
-  // Define column types
-  type ColumnType =
-    | "string"
-    | "number"
-    | "rate"
-    | "readonly"
-    | "amount"
-    | "checkbox"
-    | "action";
-  // Define data structure
-
-  interface Data {
-    [key: string]: any;
-  }
-
-  // Define column configuration
-  interface ColumnConfig {
-    id: string;
-    header: string;
-    type: ColumnType;
-    width?: number;
-  }
   const initialData: Data[] = [
     {
       staffId: "JIRIM_MM",
