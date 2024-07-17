@@ -29,11 +29,13 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   );
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [previousValue, setPreviousValue] = useState<any>(null);
+  const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const tableRef = useRef<HTMLDivElement>(null);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [isSorting, setIsSorting] = useState(false);
   const [newRowCount, setNewRowCount] = useState<number>(5);
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -50,6 +52,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  //HC
   const handleCellClick = (rowId: string, cellIndex: number) => {
     setEditableRowId(rowId);
     setEditableCellIndex(cellIndex);
@@ -62,39 +65,29 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     );
   };
 
+  //HC
   const handleCellChange = (rowIndex: number, columnId: string, value: any) => {
     setData((prevData) => {
       const updatedData = prevData.map((row, index) => {
         if (index === rowIndex) {
-          let updatedValue = value;
-
-          if (columnId === "bag" || columnId === "rate") {
-            updatedValue = parseFloat(value) || 0;
-          }
-
-          const updatedRow = { ...row, [columnId]: updatedValue };
-
-          // Recalculate amount if bag or rate changes
-          if (columnId === "bag" || columnId === "rate") {
-            const bag = parseFloat(updatedRow.bag) || 0;
-            const rate = parseFloat(updatedRow.rate) || 0;
-            updatedRow.amount = (bag * rate).toFixed(3); // Use 3 decimal places
-          }
-
+          let updatedRow = { ...row, [columnId]: value };
+          const jamPerDay = parseFloat(updatedRow.jamPerDay) || 0;
+          const rate = parseFloat(updatedRow.rate) || 0;
+          updatedRow.amount = (jamPerDay * rate).toFixed(2);
           return updatedRow;
         }
         return row;
       });
 
-      return recalculateSubtotals(updatedData);
+      return isSorting ? updatedData : recalculateSubtotals(updatedData);
     });
 
-    // Trigger a re-sort if the column is currently being sorted
     if (sorting.some((sort) => sort.id === columnId)) {
       table.setSorting([...sorting]);
     }
   };
 
+  //HK
   const handleKeyDown = (
     e: React.KeyboardEvent,
     rowId: string,
@@ -123,6 +116,12 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             : lastIndex,
         -1
       );
+
+      setTimeout(() => {
+        setSelectedRowId(nextRowId);
+        setEditableRowId(nextRowId);
+        setEditableCellIndex(nextCellIndex);
+      }, 10);
 
       if (
         e.key === "Enter" &&
@@ -184,63 +183,103 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           })
         )
       );
-    setData((oldData) => [...oldData, ...newRows]);
+    setData((oldData) => recalculateSubtotals([...oldData, ...newRows]));
   };
 
+  //HAS
   const handleAddSubtotalRow = () => {
-    const lastModifiedRowIndex = data.findIndex(
-      (row) => !row.isSubtotal && row.amount > 0
-    );
-    if (lastModifiedRowIndex === -1) return;
+    if (!canAddSubtotal) return;
 
-    const newData = [...data];
-    const subtotalRow = createSubtotalRow(lastModifiedRowIndex);
-    newData.splice(lastModifiedRowIndex + 1, 0, subtotalRow);
+    setData((prevData) => {
+      const lastNonSubtotalRowWithAmount = prevData.reduceRight(
+        (acc, row, index) => {
+          if (!row.isSubtotal && parseFloat(row.amount) > 0 && acc === -1) {
+            return index;
+          }
+          return acc;
+        },
+        -1
+      );
 
-    setData(newData);
-    recalculateSubtotals(newData);
+      if (lastNonSubtotalRowWithAmount === -1) return prevData;
+
+      const newData = [...prevData];
+      const subtotalRow = createSubtotalRow(0, lastNonSubtotalRowWithAmount);
+      newData.splice(lastNonSubtotalRowWithAmount + 1, 0, subtotalRow);
+
+      return recalculateSubtotals(newData);
+    });
   };
 
-  const createSubtotalRow = (endIndex: number) => ({
+  //CS
+  const createSubtotalRow = (subtotalAmount: number, endIndex: number) => ({
     ...Object.fromEntries(columns.map((col) => [col.id, ""])),
     [columns.find((col) => col.type === "amount")?.id || "amount"]:
-      "Subtotal: 0.00",
+      subtotalAmount.toFixed(2),
     isSubtotal: true,
     subtotalEndIndex: endIndex,
   });
 
-  const recalculateSubtotals = (currentData: Data[]) => {
-    let currentSubtotalStartIndex = 0;
-    const newData = [...currentData];
+  //RS
+  const recalculateSubtotals = (currentData: Data[]): Data[] => {
+    let currentSubtotal = 0;
+    let lastSubtotalIndex = -1;
 
-    newData.forEach((row, index) => {
+    return currentData.map((row, index) => {
       if (row.isSubtotal) {
-        const subtotalAmount = newData
-          .slice(currentSubtotalStartIndex, index)
-          .reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
-
-        newData[index] = {
+        const subtotalAmount = currentSubtotal.toFixed(2);
+        currentSubtotal = 0;
+        lastSubtotalIndex = index;
+        return {
           ...row,
-          [columns.find((col) => col.type === "amount")?.id ||
-          "amount"]: `Subtotal: ${subtotalAmount.toFixed(2)}`,
+          [columns.find((col) => col.type === "amount")?.id || "amount"]:
+            subtotalAmount,
           subtotalEndIndex: index - 1,
         };
-
-        currentSubtotalStartIndex = index + 1;
+      } else {
+        const amount = parseFloat(row.amount) || 0;
+        currentSubtotal += amount;
+        return row;
       }
     });
-
-    return newData;
   };
+
+  //HAV
+  const hasAmountValuesAfterLastSubtotal = (data: Data[]): boolean => {
+    const lastSubtotalIndex = data.reduceRight((acc, row, index) => {
+      if (row.isSubtotal && acc === -1) return index;
+      return acc;
+    }, -1);
+
+    const remainingRows =
+      lastSubtotalIndex === -1 ? data : data.slice(lastSubtotalIndex + 1);
+    return remainingRows.some((row) => parseFloat(row.amount) > 0);
+  };
+
+  useEffect(() => {
+    setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
+  }, [data]);
+
+  useEffect(() => {
+    setData((prevData) =>
+      recalculateSubtotals(
+        prevData.map((row) => {
+          if (!row.isSubtotal) {
+            const jamPerDay = parseFloat(row.jamPerDay) || 0;
+            const rate = parseFloat(row.rate) || 0;
+            return { ...row, amount: (jamPerDay * rate).toFixed(2) };
+          }
+          return row;
+        })
+      )
+    );
+  }, []);
 
   const hasAmountColumn = useMemo(() => {
     return columns.some((col) => col.type === "amount");
   }, [columns]);
 
-  useEffect(() => {
-    recalculateSubtotals(data);
-  }, [sorting]);
-
+  //RC
   const renderCell = (
     row: Row<Data>,
     cell: Cell<Data, unknown>,
@@ -251,24 +290,28 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     if (row.original.isSubtotal) {
       if (columnType === "amount") {
         return (
-          <td
-            key={cell.id}
-            colSpan={columns.length - 1}
-            className="py-3 pr-6 text-right font-semibold border"
-          >
-            {cell.getValue() as ReactNode}
-          </td>
+          <React.Fragment>
+            <td
+              colSpan={columns.length - 2}
+              className="py-3 pr-6 text-right font-semibold border"
+            >
+              Subtotal:
+            </td>
+            <td className="py-3 pr-6 text-right font-semibold border">
+              {cell.getValue() as ReactNode}
+            </td>
+          </React.Fragment>
         );
       } else if (columnType === "action") {
         return (
-          <td key={cell.id} className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center h-full">
             <button
               className="text-gray-500 hover:text-gray-600"
               onClick={(event) => handleDeleteRow(row.index, event)}
             >
               <IconTrash stroke={2} width={20} height={20} />
             </button>
-          </td>
+          </div>
         );
       }
       return null;
@@ -313,9 +356,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     }
 
     if (columnType === "amount") {
-      const bag = parseFloat(row.original.bag) || 0;
+      const jamPerDay = parseFloat(row.original.jamPerDay) || 0;
       const rate = parseFloat(row.original.rate) || 0;
-      const amount = (bag * rate).toFixed(2);
+      const amount = (jamPerDay * rate).toFixed(2);
       return (
         <TableEditableCell
           value={amount}
@@ -352,12 +395,17 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       />
     );
   };
+
+  //HD
   const handleDeleteRow = (rowIndex: number, event: React.MouseEvent) => {
     event.stopPropagation();
-    const originalIndex = table.getRowModel().rows[rowIndex].index;
-    setData((oldData) => oldData.filter((_, index) => index !== originalIndex));
+    setData((oldData) => {
+      const newData = oldData.filter((_, index) => index !== rowIndex);
+      return recalculateSubtotals(newData);
+    });
   };
 
+  //HMD
   const handleMouseDown = (event: React.MouseEvent, columnId: string) => {
     if (columnId === "actions") return;
 
@@ -383,6 +431,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
 
   const columnHelper = createColumnHelper<Data>();
 
+  //TC
   const tableColumns = useMemo(
     () =>
       columns.map((col) => {
@@ -393,11 +442,29 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                 ? "justify-end"
                 : ""
             }`}
-            onClick={() => column.toggleSorting()}
+            onClick={(e) => {
+              e.stopPropagation();
+              column.toggleSorting();
+              const isSorted = column.getIsSorted() !== false;
+              setIsSorting(isSorted);
+              setData((prevData) => {
+                if (isSorted) {
+                  return prevData.filter((row) => !row.isSubtotal);
+                } else {
+                  return recalculateSubtotals(prevData);
+                }
+              });
+            }}
           >
             {["number", "rate", "amount"].includes(col.type) ? (
               <>
-                <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span
+                  className={`mr-2 ${
+                    column.getIsSorted()
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                  } transition-opacity p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-full`}
+                >
                   {getSortIcon(col.id, col.type, column.getIsSorted())}
                 </span>
                 {col.header}
@@ -405,7 +472,13 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             ) : (
               <>
                 {col.header}
-                <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span
+                  className={`ml-2 ${
+                    column.getIsSorted()
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                  } transition-opacity p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-full`}
+                >
                   {getSortIcon(col.id, col.type, column.getIsSorted())}
                 </span>
               </>
@@ -415,13 +488,14 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
 
         const commonCellContent = (info: any) => (
           <div
-            onClick={() =>
-              handleCellClick(info.row.id, info.cell.column.getIndex())
-            }
+            onClick={(event) => {
+              event.stopPropagation(); // Add this line
+              handleCellClick(info.row.id, info.cell.column.getIndex());
+            }}
           >
             <TableEditableCell
               value={info.getValue()}
-              onChange={(val) => handleCellChange(info.row.id, col.id, val)}
+              onChange={(val) => handleCellChange(info.row.index, col.id, val)}
               type={col.type}
               editable={
                 info.row.id === editableRowId &&
@@ -460,9 +534,10 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
               header: ({ column }) => commonHeaderContent(column),
               cell: (info) => {
                 if (col.type === "amount") {
-                  const bag = parseFloat(info.row.original.bag) || 0;
+                  const jamPerDay =
+                    parseFloat(info.row.original.jamPerDay) || 0;
                   const rate = parseFloat(info.row.original.rate) || 0;
-                  const amount = (bag * rate).toFixed(2); // Use 3 decimal places
+                  const amount = (jamPerDay * rate).toFixed(2);
                   return <div className="px-6 py-3 text-right">{amount}</div>;
                 }
                 return (
@@ -531,17 +606,44 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             });
         }
       }),
-    [columns, editableRowId, editableCellIndex]
+    [
+      columns,
+      editableRowId,
+      editableCellIndex,
+      handleCellChange,
+      handleCellClick,
+      handleDeleteRow,
+      handleKeyDown,
+    ]
   );
 
+  //T
   const table = useReactTable({
     data,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      const newSorting =
+        typeof updater === "function" ? updater(sorting) : updater;
+      setSorting(newSorting);
+      const isSorted = newSorting.length > 0;
+      setIsSorting(isSorted);
+      setData((prevData) => {
+        if (isSorted) {
+          return prevData.filter((row) => !row.isSubtotal);
+        } else {
+          return recalculateSubtotals(prevData);
+        }
+      });
+    },
     state: { sorting },
   });
+
+  const isSortableColumn = (columnId: string) => {
+    const column = columns.find((col) => col.id === columnId);
+    return column && column.type !== "action" && column.type !== "checkbox";
+  };
 
   const getSortIcon = (
     columnId: string,
@@ -578,17 +680,18 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   }, [columns]);
 
   const getHeaderClass = (columnType: ColumnType) => {
+    let baseClass = "cursor-pointer ";
     switch (columnType) {
       case "number":
       case "rate":
       case "readonly":
       case "amount":
-        return "text-right";
+        return baseClass + "text-right";
       case "checkbox":
       case "action":
         return "text-center";
       default:
-        return "text-left";
+        return baseClass + "text-left";
     }
   };
 
@@ -598,7 +701,12 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         {hasAmountColumn && (
           <button
             onClick={handleAddSubtotalRow}
-            className="px-4 py-2 ml-2 border border-gray-300 font-medium rounded-full hover:bg-gray-100 active:bg-gray-200"
+            className={`px-4 py-2 ml-2 border border-gray-300 font-medium rounded-full ${
+              canAddSubtotal
+                ? "hover:bg-gray-100 active:bg-gray-200"
+                : "opacity-50 cursor-not-allowed"
+            }`}
+            disabled={!canAddSubtotal}
           >
             Add Subtotal
           </button>
@@ -643,10 +751,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className={`px-6 py-3 border border-b-2 border-gray-300 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider ${getHeaderClass(
+                  className={`px-6 py-2 border border-b-2 border-gray-300 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
                     columns.find((col) => col.id === header.id)?.type ||
                       "string"
                   )}`}
+                  onClick={(e) => {
+                    if (isSortableColumn(header.column.id)) {
+                      table.getColumn(header.column.id)?.toggleSorting();
+                    }
+                  }}
                   style={{
                     position: "relative",
                     width: `${columnWidths[header.id]}px` || "auto",
@@ -681,15 +794,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              className={`
-        ${row.original.isSubtotal ? "border-t border-b border-gray-300" : ""}
-        ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
-        ${
-          !row.original.isSubtotal
-            ? "border border-gray-300 hover:bg-gray-100"
-            : ""
-        }
-      `}
+              className={`${
+                row.original.isSubtotal
+                  ? "border-t border-b border-gray-300"
+                  : ""
+              } ${row.id === selectedRowId ? "shadow-top-bottom" : ""} ${
+                !row.original.isSubtotal
+                  ? "border border-gray-300 hover:bg-gray-100"
+                  : ""
+              }`}
               onClick={() =>
                 row.original.isSubtotal ? setSelectedRowId(row.id) : null
               }
@@ -706,7 +819,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                         colSpan={columns.length - 1}
                         className="py-3 pr-6 text-right font-semibold border border-gray-300"
                       >
-                        {cell.getValue() as ReactNode}
+                        Subtotal: {cell.getValue() as ReactNode}
                       </td>
                     );
                   } else {
@@ -716,17 +829,18 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                   return (
                     <td
                       key={cell.id}
-                      className={`
-    relative px-6 py-4 whitespace-no-wrap cursor-default ${
-      row.original.isSubtotal ? "" : "border border-gray-300"
-    }
-    ${cell.column.id === "actions" ? "border border-gray-300" : ""}
-    ${
-      row.id === editableRowId && cellIndex === editableCellIndex
-        ? "cell-highlight before:absolute before:inset-[-1px] before:border-[1.5px] before:border-gray-400 before:pointer-events-none before:z-10"
-        : ""
-    }
-  `}
+                      className={`relative px-6 py-4 whitespace-no-wrap cursor-default ${
+                        row.original.isSubtotal ? "" : "border border-gray-300"
+                      } ${
+                        cell.column.id === "actions"
+                          ? "border border-gray-300"
+                          : ""
+                      } ${
+                        row.id === editableRowId &&
+                        cellIndex === editableCellIndex
+                          ? "cell-highlight before:absolute before:inset-[-1px] before:border-[1.5px] before:border-gray-400 before:pointer-events-none before:z-10"
+                          : ""
+                      }`}
                       onClick={() =>
                         !row.original.isSubtotal &&
                         handleCellClick(row.id, cellIndex)

@@ -38,7 +38,10 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   const formatEditValue = (value: string): string => {
     if (type === "number" || type === "rate") {
       // Remove non-numeric characters (except decimal point for rate)
-      let formatted = type === "rate" ? value.replace(/[^\d.]/g, "") : value.replace(/\D/g, "");
+      let formatted =
+        type === "rate"
+          ? value.replace(/[^\d.]/g, "")
+          : value.replace(/\D/g, "");
 
       // Handle decimal point for rate
       if (type === "rate") {
@@ -95,26 +98,14 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       // Remove trailing decimal point
       finalValue = finalValue.replace(/\.$/, "");
 
-      if (type === "rate") {
-        // Ensure exactly 3 decimal places for rate
-        const parts = finalValue.split(".");
-        if (parts.length === 1) {
-          finalValue += ".000";
-        } else {
-          finalValue = parts[0] + "." + parts[1].padEnd(3, "0").slice(0, 3);
-        }
-      } else {
-        // For regular numbers, remove all decimal points
-        finalValue = finalValue.replace(/\./g, "");
-      }
-
       // Ensure the value is not empty
       if (finalValue === "") {
         finalValue = "0";
       }
 
       // Convert to number for onChange, but keep as string for display
-      const outputValue = type === "rate" ? parseFloat(finalValue) : parseInt(finalValue, 10);
+      const outputValue =
+        type === "rate" ? parseFloat(finalValue) : parseInt(finalValue, 10);
       setCellValue(finalValue);
       setEditValue(finalValue);
       onChange(outputValue);
