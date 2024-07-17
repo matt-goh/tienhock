@@ -18,7 +18,7 @@ import {
   IconSortDescendingNumbers,
   IconTrash,
 } from "@tabler/icons-react";
-import { ColumnType, TableProps, Data } from "../types/types";
+import { ColumnType, TableProps, Data, ColumnConfig } from "../types/types";
 import TableEditableCell from "./TableEditableCell";
 
 const Table: React.FC<TableProps> = ({ initialData, columns }) => {
@@ -111,62 +111,84 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       setSelectedRowId(null);
     } else if (e.key === "Tab" || e.key === "Enter") {
       e.preventDefault();
-      let nextCellIndex = cellIndex;
-      let nextRowId = rowId;
       const sortedRows = table.getRowModel().rows;
       const currentRowIndex = sortedRows.findIndex((row) => row.id === rowId);
-      const lastSelectableColumnIndex = columns.reduce(
-        (lastIndex, col, index) =>
+
+      const isEditableColumn = (col: ColumnConfig) => {
+        return (
           col.type !== "readonly" &&
           col.type !== "action" &&
-          col.type !== "amount"
-            ? index
-            : lastIndex,
-        -1
+          col.type !== "amount" &&
+          col.type !== "checkbox"
+        );
+      };
+
+      const findNextEditableCell = (
+        startRowIndex: number,
+        startColIndex: number
+      ): { rowIndex: number; colIndex: number; isLastCell: boolean } => {
+        let rowIndex = startRowIndex;
+        let colIndex = startColIndex;
+
+        while (rowIndex < sortedRows.length) {
+          while (colIndex < columns.length) {
+            if (
+              !sortedRows[rowIndex].original.isSubtotal &&
+              isEditableColumn(columns[colIndex])
+            ) {
+              return {
+                rowIndex,
+                colIndex,
+                isLastCell:
+                  rowIndex === sortedRows.length - 1 &&
+                  colIndex ===
+                    columns.reduce(
+                      (lastIndex, col, index) =>
+                        isEditableColumn(col) ? index : lastIndex,
+                      -1
+                    ),
+              };
+            }
+            colIndex++;
+          }
+          rowIndex++;
+          colIndex = 0;
+        }
+
+        // If we've reached the end, return the first editable cell
+        const firstEditableColIndex = columns.findIndex(isEditableColumn);
+        return {
+          rowIndex: 0,
+          colIndex: firstEditableColIndex,
+          isLastCell: false,
+        };
+      };
+
+      const {
+        rowIndex: nextRowIndex,
+        colIndex: nextColIndex,
+        isLastCell,
+      } = findNextEditableCell(
+        currentRowIndex,
+        (cellIndex + 1) % columns.length
       );
 
-      setTimeout(() => {
-        setSelectedRowId(nextRowId);
-        setEditableRowId(nextRowId);
-        setEditableCellIndex(nextCellIndex);
-      }, 10);
-
-      if (
-        e.key === "Enter" &&
-        nextCellIndex === lastSelectableColumnIndex &&
-        currentRowIndex === sortedRows.length - 1
-      ) {
+      if (e.key === "Enter" && isLastCell) {
         handleAddRow(1);
-        nextCellIndex = columns.findIndex(
-          (col) =>
-            col.type !== "readonly" &&
-            col.type !== "action" &&
-            col.type !== "amount"
-        );
-        // Use setTimeout to allow the new row to be added before trying to access it
         setTimeout(() => {
           const newRows = table.getRowModel().rows;
-          if (newRows.length > sortedRows.length) {
-            nextRowId = newRows[newRows.length - 1].id;
-            setEditableRowId(nextRowId);
-            setEditableCellIndex(nextCellIndex);
-          }
-        }, 0);
+          const newRowId = newRows[newRows.length - 1].id;
+          setSelectedRowId(newRowId);
+          setEditableRowId(newRowId);
+          setEditableCellIndex(columns.findIndex(isEditableColumn));
+        }, 10);
       } else {
-        do {
-          nextCellIndex = (nextCellIndex + 1) % columns.length;
-          if (nextCellIndex === 0) {
-            const nextRowIndex = (currentRowIndex + 1) % sortedRows.length;
-            nextRowId = sortedRows[nextRowIndex].id;
-          }
-        } while (
-          columns[nextCellIndex].type === "readonly" ||
-          columns[nextCellIndex].type === "action" ||
-          columns[nextCellIndex].type === "amount" ||
-          columns[nextCellIndex].type === "checkbox"
-        );
-        setEditableRowId(nextRowId);
-        setEditableCellIndex(nextCellIndex);
+        const nextRowId = sortedRows[nextRowIndex].id;
+        setTimeout(() => {
+          setSelectedRowId(nextRowId);
+          setEditableRowId(nextRowId);
+          setEditableCellIndex(nextColIndex);
+        }, 10);
       }
     }
   };
