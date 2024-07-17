@@ -18,7 +18,7 @@ const App: React.FC = () => {
       done: true,
       bag: 1,
       rate: 0.7,
-      amount: 5.6,
+      amount: 0,
     },
     {
       staffId: "",
@@ -33,15 +33,15 @@ const App: React.FC = () => {
   ];
 
   const columns: ColumnConfig[] = [
-    { id: "staffId", header: "Staff ID", type: "string", width: 300 },
+    { id: "staffId", header: "Staff ID", type: "string", width: 400 },
     { id: "staffName", header: "Staff Name", type: "string", width: 400 },
-    { id: "kerja", header: "Kerja", type: "string", width: 400 },
-    { id: "done", header: "Done", type: "checkbox", width: 150 },
-    { id: "bag", header: "Bag", type: "number", width: 150 },
-    { id: "jamPerDay", header: "Jam/Day", type: "number", width: 200 },
-    { id: "rate", header: "Rate", type: "rate", width: 200 },
-    { id: "amount", header: "Amount", type: "amount", width: 250 },
-    { id: "actions", header: "Actions", type: "action", width: 100 },
+    { id: "kerja", header: "Kerja", type: "string", width: 300 },
+    { id: "done", header: "Done", type: "checkbox", width: 50 },
+    { id: "bag", header: "Bag", type: "number", width: 50 },
+    { id: "jamPerDay", header: "Jam", type: "number", width: 50 },
+    { id: "rate", header: "Rate", type: "rate", width: 50 },
+    { id: "amount", header: "Amount", type: "amount", width: 150 },
+    { id: "actions", header: "Actions", type: "action", width: 50 },
   ];
 
   return (

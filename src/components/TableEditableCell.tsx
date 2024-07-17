@@ -8,6 +8,7 @@ interface TableEditableCellProps {
   editable: boolean;
   focus: boolean;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  isSorting: boolean;
 }
 
 const TableEditableCell: React.FC<TableEditableCellProps> = ({
@@ -17,6 +18,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   editable,
   focus,
   onKeyDown,
+  isSorting,
 }) => {
   const [cellValue, setCellValue] = useState(value.toString());
   const [editValue, setEditValue] = useState(value.toString());
@@ -138,10 +140,11 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         type === "number" || type === "rate" || type === "amount"
           ? "text-right"
           : ""
-      } ${type === "checkbox" ? "w-auto cursor-pointer" : ""} ${
-        type === "amount" ? "cursor-default" : ""
+      } ${type === "checkbox" ? "w-auto" : ""} ${
+        type === "amount" || isSorting ? "cursor-default" : ""
       }`,
       style: { boxSizing: "border-box" } as CSSProperties,
+      disabled: isSorting, // Disable all inputs when sorting
     };
 
     if (type === "checkbox") {
@@ -149,14 +152,14 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         ...baseProps,
         type: "checkbox",
         checked: cellValue === "true",
-        readOnly: !editable,
+        readOnly: !editable || isSorting,
       };
     } else {
       return {
         ...baseProps,
         type: "text",
         value: editable ? editValue : cellValue,
-        readOnly: !editable,
+        readOnly: !editable || isSorting,
         inputMode: type === "number" || type === "rate" ? "decimal" : undefined,
       };
     }
