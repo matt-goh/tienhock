@@ -18,7 +18,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
     <li className="m-2">
       <button
         onClick={onClick}
-        className="block flex py-2 pl-4 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 hover:text-gray-600 rounded-lg focus:outline-none w-full text-left"
+        className="block flex py-2 pl-4 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 hover:text-gray-600 rounded-full focus:outline-none w-full text-left"
       >
         {icon}
         <span className="font-semibold ml-2">{name}</span>

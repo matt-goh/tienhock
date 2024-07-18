@@ -16,6 +16,8 @@ import {
   IconSortAscendingNumbers,
   IconSortDescendingLetters,
   IconSortDescendingNumbers,
+  IconSquare,
+  IconSquareCheckFilled,
   IconTrash,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, Data, ColumnConfig } from "../types/types";
@@ -23,6 +25,7 @@ import TableEditableCell from "./TableEditableCell";
 
 const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [data, setData] = useState<Data[]>(initialData);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editableRowId, setEditableRowId] = useState<string | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
     null
@@ -193,6 +196,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     }
   };
 
+  // HAR
   const handleAddRow = (count: number = newRowCount) => {
     const newRows = Array(count)
       .fill(null)
@@ -317,7 +321,37 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     cell: Cell<Data, unknown>,
     cellIndex: number
   ): ReactNode => {
-    const columnType = columns[cellIndex].type;
+    const columnType = allColumns[cellIndex].type;
+
+    if (columnType === "selection") {
+      const isSelected = selectedRows.has(row.id);
+      return (
+        <div className="flex items-center justify-center h-full">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRowSelection(row.id);
+            }}
+            className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
+          >
+            {isSelected ? (
+              <IconSquareCheckFilled
+                width={20}
+                height={20}
+                className="text-blue-600"
+              />
+            ) : (
+              <IconSquare
+                width={20}
+                height={20}
+                stroke={2}
+                className="text-gray-400"
+              />
+            )}
+          </button>
+        </div>
+      );
+    }
 
     if (row.original.isSubtotal) {
       if (columnType === "amount") {
@@ -338,8 +372,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         return (
           <div className="flex items-center justify-center h-full">
             <button
-              className="text-gray-500 hover:text-gray-600"
-              onClick={(event) => handleDeleteRow(row.index, event)}
+              className={`text-gray-500 hover:text-gray-600 ${
+                isSorting ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              onClick={(event) => {
+                if (!isSorting) {
+                  handleDeleteRow(row.index, event);
+                }
+              }}
+              disabled={isSorting}
             >
               <IconTrash stroke={2} width={20} height={20} />
             </button>
@@ -471,10 +512,19 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
 
   const columnHelper = createColumnHelper<Data>();
 
+  const checkboxColumn: ColumnConfig = {
+    id: "selection",
+    header: "",
+    type: "selection",
+    width: 50,
+  };
+
+  const allColumns = [checkboxColumn, ...columns];
+
   //TC
   const tableColumns = useMemo(
     () =>
-      columns.map((col) => {
+      allColumns.map((col) => {
         // CHC
         const commonHeaderContent = (column: any) => (
           <div
@@ -558,6 +608,64 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           </div>
         );
 
+        if (col.type === "selection") {
+          return columnHelper.display({
+            id: col.id,
+            header: ({ table }) => (
+              <div className="flex items-center justify-center h-full">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectAll();
+                  }}
+                  className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
+                >
+                  {selectedRows.size === table.getRowModel().rows.length ? (
+                    <IconSquareCheckFilled
+                      width={20}
+                      height={20}
+                      className="text-blue-600"
+                    />
+                  ) : (
+                    <IconSquare
+                      width={20}
+                      height={20}
+                      stroke={2}
+                      className="text-gray-400"
+                    />
+                  )}
+                </button>
+              </div>
+            ),
+            cell: ({ row }) => (
+              <div className="flex items-center justify-center h-full">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRowSelection(row.id);
+                  }}
+                  className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
+                >
+                  {selectedRows.has(row.id) ? (
+                    <IconSquareCheckFilled
+                      width={20}
+                      height={20}
+                      className="text-blue-600"
+                    />
+                  ) : (
+                    <IconSquare
+                      width={20}
+                      height={20}
+                      stroke={2}
+                      className="text-gray-400"
+                    />
+                  )}
+                </button>
+              </div>
+            ),
+          });
+        }
+
         switch (col.type) {
           case "action":
             return columnHelper.display({
@@ -566,8 +674,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
               cell: (info) => (
                 <div className="flex items-center justify-center h-full">
                   <button
-                    className="text-gray-500 hover:text-gray-600"
-                    onClick={(event) => handleDeleteRow(info.row.index, event)}
+                    className={`text-gray-500 hover:text-gray-600 ${
+                      isSorting ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                    onClick={(event) => {
+                      if (!isSorting) {
+                        handleDeleteRow(info.row.index, event);
+                      }
+                    }}
+                    disabled={isSorting}
                   >
                     <IconTrash stroke={2} width={20} height={20} />
                   </button>
@@ -661,43 +776,11 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       editableCellIndex,
       handleCellChange,
       handleCellClick,
-      handleDeleteRow,
       handleKeyDown,
+      selectedRows,
+      isSorting,
     ]
   );
-
-  //T
-  const table = useReactTable({
-    data,
-    columns: tableColumns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onSortingChange: (updater) => {
-      const newSorting =
-        typeof updater === "function" ? updater(sorting) : updater;
-      setSorting(newSorting);
-      const isSorted = newSorting.length > 0;
-      setIsSorting(isSorted);
-      if (isSorted) {
-        setData((prevData) => prevData.filter((row) => !row.isSubtotal));
-      } else {
-        setData((prevData) => {
-          const recalculatedData = originalData.map((row) => {
-            if (!row.isSubtotal) {
-              const jamPerDay = parseFloat(row.jamPerDay) || 0;
-              const rate = parseFloat(row.rate) || 0;
-              return { ...row, amount: (jamPerDay * rate).toFixed(2) };
-            }
-            return row;
-          });
-          const newData = recalculateSubtotals(recalculatedData);
-          setOriginalData(newData);
-          return newData;
-        });
-      }
-    },
-    state: { sorting },
-  });
 
   const isSortableColumn = (columnId: string) => {
     const column = columns.find((col) => col.id === columnId);
@@ -754,9 +837,65 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     }
   };
 
+  const handleRowSelection = (rowId: string) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(rowId)) {
+        newSet.delete(rowId);
+      } else {
+        newSet.add(rowId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRows.size === data.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(data.map((row) => row.id)));
+    }
+  };
+
+  //T
+  const table = useReactTable({
+    data,
+    columns: tableColumns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    //OSC
+    onSortingChange: (updater) => {
+      const newSorting =
+        typeof updater === "function" ? updater(sorting) : updater;
+      setSorting(newSorting);
+      const isSorted = newSorting.length > 0;
+      setIsSorting(isSorted);
+      if (isSorted) {
+        setData((prevData) => prevData.filter((row) => !row.isSubtotal));
+      } else {
+        setData((prevData) => {
+          const recalculatedData = originalData.map((row) => {
+            if (!row.isSubtotal) {
+              const jamPerDay = parseFloat(row.jamPerDay) || 0;
+              const rate = parseFloat(row.rate) || 0;
+              return { ...row, amount: (jamPerDay * rate).toFixed(2) };
+            }
+            return row;
+          });
+          const newData = recalculateSubtotals(recalculatedData);
+          setOriginalData(newData);
+          return newData;
+        });
+      }
+    },
+    state: { sorting },
+  });
+
   return (
-    <div ref={tableRef} className="p-8 w-auto">
-      <div className="flex items-center mb-4 w-auto">
+    <div ref={tableRef} className="w-auto">
+      <div
+        className={`flex items-center ${hasInputColumns ? "mb-4" : ""} w-auto`}
+      >
         {hasAmountColumn && (
           <button
             onClick={handleAddSubtotalRow}
@@ -844,9 +983,37 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                     width: `${columnWidths[header.id]}px` || "auto",
                   }}
                 >
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext()
+                  {header.column.id === "selection" ? (
+                    <div className="flex items-center justify-center h-full">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectAll();
+                        }}
+                        className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
+                      >
+                        {selectedRows.size === data.length ? (
+                          <IconSquareCheckFilled
+                            stroke={2}
+                            width={20}
+                            height={20}
+                            className="text-blue-600"
+                          />
+                        ) : (
+                          <IconSquare
+                            width={20}
+                            height={20}
+                            stroke={2}
+                            className="text-gray-400"
+                          />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )
                   )}
                   {header.id !== "actions" && (
                     <div

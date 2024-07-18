@@ -20,13 +20,13 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   onKeyDown,
   isSorting,
 }) => {
-  const [cellValue, setCellValue] = useState(value.toString());
-  const [editValue, setEditValue] = useState(value.toString());
+  const [cellValue, setCellValue] = useState(value?.toString() ?? "");
+  const [editValue, setEditValue] = useState(value?.toString() ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
-
+  
   useEffect(() => {
-    setCellValue(value.toString());
-    setEditValue(value.toString());
+    setCellValue(value?.toString() ?? "");
+    setEditValue(value?.toString() ?? "");
   }, [value]);
 
   useEffect(() => {

@@ -28,7 +28,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     >
       <a
         href="#"
-        className={`block group flex items-center py-2 pl-7 pr-2 transition-colors duration-200 rounded-lg focus:outline-none ${
+        className={`block group flex items-center py-2 pl-7 pr-2 transition-colors duration-200 rounded-full focus:outline-none ${
           isActive ? "bg-gray-100 active:bg-gray-200 hover:text-gray-600" : "hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600"
         }`}
       >

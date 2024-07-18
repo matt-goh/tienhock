@@ -18,19 +18,20 @@ import {
   DialogPanel,
 } from "@headlessui/react";
 import clsx from "clsx";
+import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 
 const sections = ["Section A", "Section B", "Section C"];
-const locations = ["Location X", "Location Y", "Location Z"];
-const productsServices = ["Product 1", "Service 1", "Product 2", "Service 2"];
 
-const NewJobModal = () => {
+interface NewJobModalProps {
+  onJobAdded: () => void;
+}
+
+const NewJobModal: React.FC<NewJobModalProps> = ({ onJobAdded }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     id: "",
     name: "",
     section: [] as string[],
-    location: [] as string[],
-    productsServices: [] as string[],
   });
 
   const [query, setQuery] = useState("");
@@ -40,20 +41,6 @@ const NewJobModal = () => {
       ? sections
       : sections.filter((section) =>
           section.toLowerCase().includes(query.toLowerCase())
-        );
-
-  const filteredLocations =
-    query === ""
-      ? locations
-      : locations.filter((location) =>
-          location.toLowerCase().includes(query.toLowerCase())
-        );
-
-  const filteredProductsServices =
-    query === ""
-      ? productsServices
-      : productsServices.filter((productService) =>
-          productService.toLowerCase().includes(query.toLowerCase())
         );
 
   const handleChange = (
@@ -79,15 +66,22 @@ const NewJobModal = () => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to submit form");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to submit form");
       }
 
       const result = await response.json();
       console.log(result.message);
       setIsModalOpen(false);
+      setFormData({
+        id: "",
+        name: "",
+        section: [],
+      });
+      onJobAdded(); // Call this function to refresh the job list
     } catch (error) {
-      console.error(error);
-      // Handle error (e.g., display an error message)
+      console.error("Error:", error);
+      // Handle error (e.g., display an error message to the user)
     }
   };
 
@@ -95,9 +89,9 @@ const NewJobModal = () => {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="mb-4 px-4 py-2 bg-gray-500 text-white rounded-full focus:outline-none"
+        className="px-4 py-2 bg-gray-500 text-white rounded-full focus:outline-none"
       >
-        Add new job
+        Add job
       </button>
       <Transition appear show={isModalOpen} as={Fragment}>
         <Dialog
@@ -135,9 +129,7 @@ const NewJobModal = () => {
                         Job Entry
                       </Legend>
                       <Field>
-                        <Label className="font-medium text-gray-900">
-                          ID
-                        </Label>
+                        <Label className="font-medium text-gray-900">ID</Label>
                         <Input
                           className={clsx(
                             "mt-3 block w-full rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-900",
@@ -193,25 +185,11 @@ const NewJobModal = () => {
                                 }
                               />
                               <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
+                                <IconChevronDown
+                                  stroke={2}
                                   width="22"
                                   height="22"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
-                                >
-                                  <path
-                                    stroke="none"
-                                    d="M0 0h24v24H0z"
-                                    fill="none"
-                                  />
-                                  <path d="M6 9l6 6 6-6" />
-                                </svg>
+                                />
                               </ComboboxButton>
                               <Transition
                                 show={open}
@@ -243,253 +221,17 @@ const NewJobModal = () => {
                                           </span>
                                           {selected && (
                                             <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
-                                              <svg
-                                                xmlns="http://www.w3.org/2000/svg"
+                                              <IconCheck
+                                                stroke={2}
                                                 width="22"
                                                 height="22"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                className="icon icon-tabler icons-tabler-outline icon-tabler-check"
-                                              >
-                                                <path
-                                                  stroke="none"
-                                                  d="M0 0h24v24H0z"
-                                                  fill="none"
-                                                />
-                                                <path d="M5 12l5 5 10-10" />
-                                              </svg>
+                                              />
                                             </span>
                                           )}
                                         </>
                                       )}
                                     </ComboboxOption>
                                   ))}
-                                </ComboboxOptions>
-                              </Transition>
-                            </div>
-                          )}
-                        </Combobox>
-                      </Field>
-                      <Field>
-                        <Label className="font-medium text-gray-900">
-                          Location
-                        </Label>
-                        <Combobox
-                          multiple
-                          value={formData.location}
-                          onChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              location: value,
-                            }))
-                          }
-                        >
-                          {({ open }) => (
-                            <div className="relative mt-3">
-                              <ComboboxInput
-                                className={clsx(
-                                  "mt-3 block w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-gray-900",
-                                  "focus:outline-none focus:border-gray-400"
-                                )}
-                                displayValue={(locations: string[]) =>
-                                  locations.join(", ")
-                                }
-                                onChange={(event) =>
-                                  setQuery(event.target.value)
-                                }
-                              />
-                              <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="22"
-                                  height="22"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
-                                >
-                                  <path
-                                    stroke="none"
-                                    d="M0 0h24v24H0z"
-                                    fill="none"
-                                  />
-                                  <path d="M6 9l6 6 6-6" />
-                                </svg>
-                              </ComboboxButton>
-                              <Transition
-                                show={open}
-                                as={Fragment}
-                                leave="transition ease-in duration-100"
-                                leaveFrom="opacity-100"
-                                leaveTo="opacity-0"
-                              >
-                                <ComboboxOptions
-                                  static
-                                  className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none"
-                                >
-                                  {filteredLocations.map((location, index) => (
-                                    <ComboboxOption
-                                      key={index}
-                                      className={`relative cursor-pointer select-none rounded py-2 pl-4 pr-4 text-gray-900 data-[focus]:bg-gray-100 data-[focus]:text-gray-900`}
-                                      value={location}
-                                    >
-                                      {({ selected }) => (
-                                        <>
-                                          <span
-                                            className={`block truncate ${
-                                              selected
-                                                ? "font-medium"
-                                                : "font-normal"
-                                            }`}
-                                          >
-                                            {location}
-                                          </span>
-                                          {selected && (
-                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
-                                              <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="22"
-                                                height="22"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                className="icon icon-tabler icons-tabler-outline icon-tabler-check"
-                                              >
-                                                <path
-                                                  stroke="none"
-                                                  d="M0 0h24v24H0z"
-                                                  fill="none"
-                                                />
-                                                <path d="M5 12l5 5 10-10" />
-                                              </svg>
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                    </ComboboxOption>
-                                  ))}
-                                </ComboboxOptions>
-                              </Transition>
-                            </div>
-                          )}
-                        </Combobox>
-                      </Field>
-                      <Field>
-                        <Label className="font-medium text-gray-900">
-                          Products/Services
-                        </Label>
-                        <Combobox
-                          multiple
-                          value={formData.productsServices}
-                          onChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              productsServices: value,
-                            }))
-                          }
-                        >
-                          {({ open }) => (
-                            <div className="relative mt-3">
-                              <ComboboxInput
-                                className={clsx(
-                                  "mt-3 block w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-gray-900",
-                                  "focus:outline-none focus:border-gray-400"
-                                )}
-                                displayValue={(productsServices: string[]) =>
-                                  productsServices.join(", ")
-                                }
-                                onChange={(event) =>
-                                  setQuery(event.target.value)
-                                }
-                              />
-                              <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="22"
-                                  height="22"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
-                                >
-                                  <path
-                                    stroke="none"
-                                    d="M0 0h24v24H0z"
-                                    fill="none"
-                                  />
-                                  <path d="M6 9l6 6 6-6" />
-                                </svg>
-                              </ComboboxButton>
-                              <Transition
-                                show={open}
-                                as={Fragment}
-                                leave="transition ease-in duration-100"
-                                leaveFrom="opacity-100"
-                                leaveTo="opacity-0"
-                              >
-                                <ComboboxOptions
-                                  static
-                                  className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none"
-                                >
-                                  {filteredProductsServices.map(
-                                    (productService, index) => (
-                                      <ComboboxOption
-                                        key={index}
-                                        className={`relative cursor-pointer select-none rounded py-2 pl-4 pr-4 text-gray-900 data-[focus]:bg-gray-100 data-[focus]:text-gray-900`}
-                                        value={productService}
-                                      >
-                                        {({ selected }) => (
-                                          <>
-                                            <span
-                                              className={`block truncate ${
-                                                selected
-                                                  ? "font-medium"
-                                                  : "font-normal"
-                                              }`}
-                                            >
-                                              {productService}
-                                            </span>
-                                            {selected && (
-                                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
-                                                <svg
-                                                  xmlns="http://www.w3.org/2000/svg"
-                                                  width="22"
-                                                  height="22"
-                                                  viewBox="0 0 24 24"
-                                                  fill="none"
-                                                  stroke="currentColor"
-                                                  strokeWidth="2"
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  className="icon icon-tabler icons-tabler-outline icon-tabler-check"
-                                                >
-                                                  <path
-                                                    stroke="none"
-                                                    d="M0 0h24v24H0z"
-                                                    fill="none"
-                                                  />
-                                                  <path d="M5 12l5 5 10-10" />
-                                                </svg>
-                                              </span>
-                                            )}
-                                          </>
-                                        )}
-                                      </ComboboxOption>
-                                    )
-                                  )}
                                 </ComboboxOptions>
                               </Transition>
                             </div>
