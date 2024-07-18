@@ -21,38 +21,48 @@ const pool = new Pool({
 app.use(cors());
 app.use(json());
 
-app.post('/api/staff', async (req, res) => {
-  const {
-    id,
-    name,
-    gender,
-    job,
-    description,
-    payment_type,
-  } = req.body;
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+app.post('/api/jobs', async (req, res) => {
+  const { id, name, section } = req.body;
 
   try {
     const query = `
-      INSERT INTO staff (id, name, gender, job, description, payment_type)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO jobs (id, name, section)
+      VALUES ($1, $2, $3)
+      RETURNING *
     `;
+    
+    // Join array values into comma-separated strings
     const values = [
-      id,
-      name,
-      gender,
-      job,
-      description,
-      payment_type,
+      id, 
+      name, 
+      Array.isArray(section) ? section.join(', ') : section,
     ];
 
-    await pool.query(query, values);
-    res.status(200).json({ message: 'Staff member added successfully' });
+    const result = await pool.query(query, values);
+    res.status(201).json({ message: 'Job created successfully', job: result.rows[0] });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Error inserting job:', error);
+    res.status(500).json({ message: 'Error creating job', error: error.message });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.get('/api/jobs', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM jobs';
+    const result = await pool.query(query);
+    
+    const jobs = result.rows.map(job => ({
+      ...job,
+      section: job.section.split(', '),
+    }));
+
+    res.json(jobs);
+  } catch (error) {
+    console.error('Error fetching jobs:', error);
+    res.status(500).json({ message: 'Error fetching jobs', error: error.message });
+  }
 });

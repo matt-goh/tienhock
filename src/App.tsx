@@ -4,9 +4,9 @@ import "./App.css";
 import Table from "./components/Table";
 import Sidebar from "./components/Sidebar";
 import NewStaffModal from "./components/NewStaffModal";
-import CatalogueTable from "./components/CatalogueTable";
 import MeeProduction from "./components/MeeProduction";
 import { ColumnConfig, Data } from "./types/types";
+import CatalogueJob from "./components/CatalogueJob";
 
 const App: React.FC = () => {
   const initialData: Data[] = [
@@ -46,13 +46,14 @@ const App: React.FC = () => {
 
   return (
     <div className="App">
-      <aside className="">{/* <Sidebar /> */}</aside>
+      <aside className="">
+        {/* <Sidebar /> */}
+      </aside>
       <main className="">
+        <CatalogueJob />
         {/* <MeeProduction /> */}
-        <Table initialData={initialData} columns={columns} />
-        {/* <CatalogueTable /> */}
+        {/* <Table initialData={initialData} columns={columns} /> */}
       </main>
-      {/* <NewStaffModal /> */}
     </div>
   );
 };

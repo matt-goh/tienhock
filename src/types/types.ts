@@ -1,6 +1,6 @@
-
 // Define column types
 export type ColumnType =
+  | "selection"
   | "string"
   | "number"
   | "rate"
@@ -19,9 +19,9 @@ export interface ColumnConfig {
 
 // Define data structure
 export interface Data {
-    [key: string]: any;
-  }
-  
+  [key: string]: any;
+}
+
 // Props for the Table component
 export interface TableProps {
   initialData: Data[];
