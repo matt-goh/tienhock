@@ -137,18 +137,13 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       const findNextEditableCell = (
         startRowIndex: number,
         startColIndex: number
-      ): { rowIndex: number; colIndex: number; isLastCell: boolean } => {
+      ): { rowIndex: number; colIndex: number } => {
         let rowIndex = startRowIndex;
         let colIndex = startColIndex;
 
         const totalRows = sortedRows.length;
         const editableColumns = allColumns.filter(isEditableColumn);
         const totalEditableCols = editableColumns.length;
-        const lastEditableColIndex = allColumns.reduce(
-          (lastIndex, col, index) =>
-            isEditableColumn(col) ? index : lastIndex,
-          -1
-        );
 
         for (let i = 0; i < totalRows * totalEditableCols; i++) {
           colIndex++;
@@ -162,13 +157,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             !sortedRows[rowIndex].original.isSubtotal &&
             isEditableColumn(column)
           ) {
-            const isLastEditableCell =
-              rowIndex === totalRows - 1 && colIndex === lastEditableColIndex;
-
             return {
               rowIndex,
               colIndex,
-              isLastCell: isLastEditableCell,
             };
           }
         }
@@ -178,20 +169,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         return {
           rowIndex: 0,
           colIndex: firstEditableColIndex,
-          isLastCell: false,
         };
       };
 
-      const {
-        rowIndex: nextRowIndex,
-        colIndex: nextColIndex,
-        isLastCell,
-      } = findNextEditableCell(currentRowIndex, cellIndex);
-
+      const { rowIndex: nextRowIndex, colIndex: nextColIndex } =
+        findNextEditableCell(currentRowIndex, cellIndex);
       if (
         e.key === "Enter" &&
-        isLastCell &&
-        currentRowIndex === sortedRows.length - 1
+        // Check if next row exists
+        nextRowIndex === 0
       ) {
         handleAddRow(1);
         setTimeout(() => {
@@ -200,7 +186,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           setSelectedRowId(newRowId);
           setEditableRowId(newRowId);
           setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-        }, 10);
+        }, 0);
       } else {
         const nextRowId = sortedRows[nextRowIndex].id;
         setSelectedRowId(nextRowId);
@@ -275,13 +261,11 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   // RS
   const recalculateSubtotals = (currentData: Data[]): Data[] => {
     let currentSubtotal = 0;
-    let lastSubtotalIndex = -1;
 
     return currentData.map((row, index) => {
       if (row.isSubtotal) {
         const subtotalAmount = currentSubtotal.toFixed(2);
         currentSubtotal = 0;
-        lastSubtotalIndex = index;
         return {
           ...row,
           id: row.id || `subtotal-${Math.random().toString(36).substr(2, 9)}`, // Preserve existing ID or create a new one
