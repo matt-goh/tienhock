@@ -18,7 +18,9 @@ import {
   IconSortDescendingNumbers,
   IconSquare,
   IconSquareCheckFilled,
+  IconSquareMinusFilled,
   IconTrash,
+  IconTrashX,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, Data, ColumnConfig } from "../types/types";
 import TableEditableCell from "./TableEditableCell";
@@ -34,13 +36,17 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [previousValue, setPreviousValue] = useState<any>(null);
   const [originalData, setOriginalData] = useState<Data[]>(initialData);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
-  const tableRef = useRef<HTMLDivElement>(null);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
+  const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [isIndeterminate, setIsIndeterminate] = useState(false);
   const [newRowCount, setNewRowCount] = useState<number>(5);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLTableElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -57,22 +63,24 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  //HC
-  const handleCellClick = (rowId: string, cellIndex: number) => {
-    if (isSorting) return; // Prevent cell editing when sorting is active
+  //HCC
+  const handleCellClick = (rowId: string | undefined, cellIndex: number) => {
+    if (isSorting || !rowId) return; // Prevent cell editing when sorting is active or rowId is undefined
+
+    const row = table.getRowModel().rows.find((r) => r.id === rowId);
+    if (!row || row.original.isSubtotal) return; // Don't proceed if row is not found or is a subtotal row
 
     setEditableRowId(rowId);
     setEditableCellIndex(cellIndex);
     setSelectedRowId(rowId);
-    const rowIndex = table
-      .getRowModel()
-      .rows.findIndex((row) => row.id === rowId);
-    setPreviousValue(
-      table.getRowModel().rows[rowIndex].original[columns[cellIndex].id]
-    );
+
+    const columnId = columns[cellIndex]?.id;
+    if (!columnId) return; // Don't proceed if column is not found
+
+    setPreviousValue(row.original[columnId]);
   };
 
-  //HC
+  //HCC
   const handleCellChange = (rowIndex: number, columnId: string, value: any) => {
     setData((prevData) => {
       const updatedData = prevData.map((row, index) => {
@@ -200,8 +208,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const handleAddRow = (count: number = newRowCount) => {
     const newRows = Array(count)
       .fill(null)
-      .map(() =>
-        Object.fromEntries(
+      .map(() => ({
+        id: Math.random().toString(36).substr(2, 9), // Generate a unique id
+        ...Object.fromEntries(
           columns.map((col) => {
             switch (col.type) {
               case "number":
@@ -215,12 +224,12 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                 return [col.id, ""];
             }
           })
-        )
-      );
+        ),
+      }));
     setData((oldData) => recalculateSubtotals([...oldData, ...newRows]));
   };
 
-  //HAS
+  //HASR
   const handleAddSubtotalRow = () => {
     if (!canAddSubtotal) return;
 
@@ -247,8 +256,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     });
   };
 
-  //CS
+  // CS
   const createSubtotalRow = (subtotalAmount: number, endIndex: number) => ({
+    id: `subtotal-${Math.random().toString(36).substr(2, 9)}`, // Generate a unique id for subtotal rows
     ...Object.fromEntries(columns.map((col) => [col.id, ""])),
     [columns.find((col) => col.type === "amount")?.id || "amount"]:
       subtotalAmount.toFixed(2),
@@ -256,7 +266,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     subtotalEndIndex: endIndex,
   });
 
-  //RS
+  // RS
   const recalculateSubtotals = (currentData: Data[]): Data[] => {
     let currentSubtotal = 0;
     let lastSubtotalIndex = -1;
@@ -268,6 +278,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         lastSubtotalIndex = index;
         return {
           ...row,
+          id: row.id || `subtotal-${Math.random().toString(36).substr(2, 9)}`, // Preserve existing ID or create a new one
           [columns.find((col) => col.type === "amount")?.id || "amount"]:
             subtotalAmount,
           subtotalEndIndex: index - 1,
@@ -324,17 +335,17 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     const columnType = allColumns[cellIndex].type;
 
     if (columnType === "selection") {
-      const isSelected = selectedRows.has(row.id);
       return (
         <div className="flex items-center justify-center h-full">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleRowSelection(row.id);
+              handleRowSelection(row);
             }}
-            className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
+            className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
+            disabled={isSorting}
           >
-            {isSelected ? (
+            {selectedRows.has(row.original.id) ? (
               <IconSquareCheckFilled
                 width={20}
                 height={20}
@@ -358,7 +369,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         return (
           <React.Fragment>
             <td
-              colSpan={columns.length - 2}
+              colSpan={columns.length - 1}
               className="py-3 pr-6 text-right font-semibold border"
             >
               Subtotal:
@@ -372,7 +383,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         return (
           <div className="flex items-center justify-center h-full">
             <button
-              className={`text-gray-500 hover:text-gray-600 ${
+              className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600 ${
                 isSorting ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={(event) => {
@@ -475,7 +486,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     );
   };
 
-  //HD
+  // HDR
   const handleDeleteRow = (rowIndex: number, event: React.MouseEvent) => {
     event.stopPropagation();
     setData((oldData) => {
@@ -486,7 +497,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     });
   };
 
-  //HMD
+  // HMD
   const handleMouseDown = (event: React.MouseEvent, columnId: string) => {
     if (columnId === "actions") return;
 
@@ -516,10 +527,121 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     id: "selection",
     header: "",
     type: "selection",
-    width: 50,
+    width: 10,
   };
 
   const allColumns = [checkboxColumn, ...columns];
+
+  const isSortableColumn = (columnId: string) => {
+    const column = columns.find((col) => col.id === columnId);
+    return column && column.type !== "action" && column.type !== "checkbox";
+  };
+
+  const getSortIcon = (
+    columnId: string,
+    columnType: ColumnType,
+    isSorted: false | "asc" | "desc"
+  ) => {
+    if (
+      columnType === "number" ||
+      columnType === "rate" ||
+      columnType === "amount"
+    ) {
+      if (!isSorted)
+        return <IconArrowsSort stroke={2} width={18} height={18} />;
+      return isSorted === "desc" ? (
+        <IconSortDescendingNumbers stroke={2} width={18} height={18} />
+      ) : (
+        <IconSortAscendingNumbers stroke={2} width={18} height={18} />
+      );
+    } else {
+      if (!isSorted)
+        return <IconArrowsSort stroke={2} width={18} height={18} />;
+      return isSorted === "desc" ? (
+        <IconSortDescendingLetters stroke={2} width={18} height={18} />
+      ) : (
+        <IconSortAscendingLetters stroke={2} width={18} height={18} />
+      );
+    }
+  };
+
+  const hasInputColumns = useMemo(() => {
+    return columns.some((col) =>
+      ["string", "number", "rate", "checkbox"].includes(col.type)
+    );
+  }, [columns]);
+
+  const getHeaderClass = (columnType: ColumnType) => {
+    let baseClass = "cursor-pointer ";
+    switch (columnType) {
+      case "number":
+      case "rate":
+      case "readonly":
+      case "amount":
+        return baseClass + "text-right";
+      case "checkbox":
+      case "action":
+        return "text-center";
+      default:
+        return baseClass + "text-left";
+    }
+  };
+
+  // HRS
+  const handleRowSelection = (row: Row<Data>) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(row.original.id)) {
+        newSet.delete(row.original.id);
+      } else {
+        newSet.add(row.original.id);
+      }
+      updateSelectionState(newSet);
+      return newSet;
+    });
+  };
+
+  // HSA
+  const handleSelectAll = () => {
+    let newSelectedRows: Set<string>;
+    if (isAllSelected || isIndeterminate) {
+      newSelectedRows = new Set<string>();
+    } else {
+      newSelectedRows = new Set(data.map((row) => row.id));
+    }
+    setSelectedRows(newSelectedRows);
+    updateSelectionState(newSelectedRows);
+  };
+
+  // USS
+  const updateSelectionState = (selectedRows: Set<string>) => {
+    const allSelected = selectedRows.size === data.length && data.length > 0;
+    const someSelected = selectedRows.size > 0 && !allSelected;
+    setIsAllSelected(allSelected);
+    setIsIndeterminate(someSelected);
+    setShowDeleteButton(selectedRows.size > 0);
+  };
+
+  // HDS
+  const handleDeleteSelected = () => {
+    setData((oldData) => {
+      let newData: Data[];
+      if (isAllSelected) {
+        newData = []; // Delete all rows
+      } else {
+        newData = oldData.filter((row) => !selectedRows.has(row.id));
+      }
+      const updatedData = recalculateSubtotals(newData);
+      setOriginalData(updatedData);
+      setSelectedRows(new Set());
+      updateSelectionState(new Set());
+      return updatedData;
+    });
+  };
+
+  useEffect(() => {
+    updateSelectionState(selectedRows);
+  }, [selectedRows, data]);
 
   //TC
   const tableColumns = useMemo(
@@ -608,64 +730,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           </div>
         );
 
-        if (col.type === "selection") {
-          return columnHelper.display({
-            id: col.id,
-            header: ({ table }) => (
-              <div className="flex items-center justify-center h-full">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectAll();
-                  }}
-                  className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
-                >
-                  {selectedRows.size === table.getRowModel().rows.length ? (
-                    <IconSquareCheckFilled
-                      width={20}
-                      height={20}
-                      className="text-blue-600"
-                    />
-                  ) : (
-                    <IconSquare
-                      width={20}
-                      height={20}
-                      stroke={2}
-                      className="text-gray-400"
-                    />
-                  )}
-                </button>
-              </div>
-            ),
-            cell: ({ row }) => (
-              <div className="flex items-center justify-center h-full">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRowSelection(row.id);
-                  }}
-                  className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
-                >
-                  {selectedRows.has(row.id) ? (
-                    <IconSquareCheckFilled
-                      width={20}
-                      height={20}
-                      className="text-blue-600"
-                    />
-                  ) : (
-                    <IconSquare
-                      width={20}
-                      height={20}
-                      stroke={2}
-                      className="text-gray-400"
-                    />
-                  )}
-                </button>
-              </div>
-            ),
-          });
-        }
-
         switch (col.type) {
           case "action":
             return columnHelper.display({
@@ -674,7 +738,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
               cell: (info) => (
                 <div className="flex items-center justify-center h-full">
                   <button
-                    className={`text-gray-500 hover:text-gray-600 ${
+                    className={`p-2 rounded-full text-gray-500 hover:bg-gray-200 active:bg-gray-300 hover:text-gray-600 ${
                       isSorting ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                     onClick={(event) => {
@@ -774,88 +838,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       columns,
       editableRowId,
       editableCellIndex,
+      selectedRows,
+      isSorting,
+      isAllSelected,
+      isIndeterminate,
       handleCellChange,
       handleCellClick,
       handleKeyDown,
-      selectedRows,
-      isSorting,
     ]
   );
-
-  const isSortableColumn = (columnId: string) => {
-    const column = columns.find((col) => col.id === columnId);
-    return column && column.type !== "action" && column.type !== "checkbox";
-  };
-
-  const getSortIcon = (
-    columnId: string,
-    columnType: ColumnType,
-    isSorted: false | "asc" | "desc"
-  ) => {
-    if (
-      columnType === "number" ||
-      columnType === "rate" ||
-      columnType === "amount"
-    ) {
-      if (!isSorted)
-        return <IconArrowsSort stroke={2} width={18} height={18} />;
-      return isSorted === "desc" ? (
-        <IconSortDescendingNumbers stroke={2} width={18} height={18} />
-      ) : (
-        <IconSortAscendingNumbers stroke={2} width={18} height={18} />
-      );
-    } else {
-      if (!isSorted)
-        return <IconArrowsSort stroke={2} width={18} height={18} />;
-      return isSorted === "desc" ? (
-        <IconSortDescendingLetters stroke={2} width={18} height={18} />
-      ) : (
-        <IconSortAscendingLetters stroke={2} width={18} height={18} />
-      );
-    }
-  };
-
-  const hasInputColumns = useMemo(() => {
-    return columns.some((col) =>
-      ["string", "number", "rate", "checkbox"].includes(col.type)
-    );
-  }, [columns]);
-
-  const getHeaderClass = (columnType: ColumnType) => {
-    let baseClass = "cursor-pointer ";
-    switch (columnType) {
-      case "number":
-      case "rate":
-      case "readonly":
-      case "amount":
-        return baseClass + "text-right";
-      case "checkbox":
-      case "action":
-        return "text-center";
-      default:
-        return baseClass + "text-left";
-    }
-  };
-
-  const handleRowSelection = (rowId: string) => {
-    setSelectedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(rowId)) {
-        newSet.delete(rowId);
-      } else {
-        newSet.add(rowId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedRows.size === data.length) {
-      setSelectedRows(new Set());
-    } else {
-      setSelectedRows(new Set(data.map((row) => row.id)));
-    }
-  };
 
   //T
   const table = useReactTable({
@@ -894,24 +885,13 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   return (
     <div ref={tableRef} className="w-auto">
       <div
-        className={`flex items-center ${hasInputColumns ? "mb-4" : ""} w-auto`}
+        className={`flex ${
+          showDeleteButton ? "mr-[5.5rem]" : ""
+        } items-center justify-end ${hasInputColumns ? "mb-4" : ""} w-auto`}
       >
-        {hasAmountColumn && (
-          <button
-            onClick={handleAddSubtotalRow}
-            className={`px-4 py-2 ml-2 border border-gray-300 font-medium rounded-full ${
-              canAddSubtotal && !isSorting
-                ? "hover:bg-gray-100 active:bg-gray-200"
-                : "opacity-50 cursor-not-allowed"
-            }`}
-            disabled={!canAddSubtotal || isSorting}
-          >
-            Add Subtotal
-          </button>
-        )}
         {hasInputColumns && (
-          <div className="ml-auto flex items-center">
-            <div className="flex items-center mr-4">
+          <>
+            <div className="flex items-center">
               <button
                 onClick={() => setNewRowCount((prev) => Math.max(1, prev - 1))}
                 className={`px-2 py-1 border border-gray-300 rounded-l-lg ${
@@ -947,22 +927,38 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
               >
                 +
               </button>
+              <button
+                onClick={() => handleAddRow()}
+                className={`ml-2 px-4 py-2 border border-gray-300 font-medium rounded-full ${
+                  !isSorting
+                    ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
+                disabled={isSorting}
+              >
+                Add row{newRowCount > 1 ? "s" : ""}
+              </button>
             </div>
-            <button
-              onClick={() => handleAddRow()}
-              className={`px-4 py-2 border border-gray-300 font-medium rounded-full ${
-                !isSorting
-                  ? "hover:bg-gray-100 active:bg-gray-200"
-                  : "opacity-50 cursor-not-allowed"
-              }`}
-              disabled={isSorting}
-            >
-              Add row{newRowCount > 1 ? "s" : ""}
-            </button>
-          </div>
+          </>
+        )}
+        {hasAmountColumn && (
+          <button
+            onClick={handleAddSubtotalRow}
+            className={`ml-2 px-4 py-2 border border-gray-300 font-medium rounded-full ${
+              canAddSubtotal && !isSorting
+                ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
+                : "opacity-50 cursor-not-allowed"
+            }`}
+            disabled={!canAddSubtotal || isSorting}
+          >
+            Add Subtotal
+          </button>
         )}
       </div>
-      <table className="w-auto bg-white border-collapse border-spacing-0">
+      <table
+        className="w-auto bg-white border-collapse border-spacing-0"
+        ref={tableContainerRef}
+      >
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -990,11 +986,16 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                           e.stopPropagation();
                           handleSelectAll();
                         }}
-                        className="p-1 rounded-full hover:bg-gray-200 transition-colors duration-200"
+                        className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
                       >
-                        {selectedRows.size === data.length ? (
+                        {isAllSelected ? (
                           <IconSquareCheckFilled
-                            stroke={2}
+                            width={20}
+                            height={20}
+                            className="text-blue-600"
+                          />
+                        ) : isIndeterminate ? (
+                          <IconSquareMinusFilled
                             width={20}
                             height={20}
                             className="text-blue-600"
@@ -1040,22 +1041,31 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              className={`${
-                row.original.isSubtotal
-                  ? "border-t border-b border-gray-300"
-                  : ""
-              } ${row.id === selectedRowId ? "shadow-top-bottom" : ""} ${
-                !row.original.isSubtotal
-                  ? "border border-gray-300 hover:bg-gray-100"
-                  : ""
-              }`}
+              className={`
+                ${
+                  row.original.isSubtotal
+                    ? "border-t border-b border-gray-300"
+                    : ""
+                } ${row.id === selectedRowId ? "shadow-top-bottom" : ""} ${
+                !row.original.isSubtotal ? "border border-gray-300" : ""
+              } ${
+                selectedRows.has(row.original.id)
+                  ? "bg-blue-50 hover:bg-blue-50"
+                  : "hover:bg-gray-100"
+              } ${row.id === editableRowId ? "relative z-10" : ""}`}
               onClick={() =>
                 row.original.isSubtotal ? setSelectedRowId(row.id) : null
               }
             >
               {row.getVisibleCells().map((cell, cellIndex) => {
-                if (row.original.isSubtotal && cell.column.id !== "actions") {
-                  if (
+                if (row.original.isSubtotal) {
+                  if (cell.column.id === "selection") {
+                    return (
+                      <td key={cell.id} className="border border-gray-300">
+                        {renderCell(row, cell, cellIndex)}
+                      </td>
+                    );
+                  } else if (
                     cell.column.id ===
                     columns.find((col) => col.type === "amount")?.id
                   ) {
@@ -1068,6 +1078,12 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                         Subtotal: {cell.getValue() as ReactNode}
                       </td>
                     );
+                  } else if (cell.column.id === "actions") {
+                    return (
+                      <td key={cell.id} className="border border-gray-300">
+                        {renderCell(row, cell, cellIndex)}
+                      </td>
+                    );
                   } else {
                     return null;
                   }
@@ -1077,24 +1093,14 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                       key={cell.id}
                       className={`relative px-6 py-4 whitespace-no-wrap ${
                         isSorting ? "bg-gray-50" : "cursor-default"
-                      } ${
-                        row.original.isSubtotal ? "" : "border border-gray-300"
-                      } ${
-                        cell.column.id === "actions"
-                          ? "border border-gray-300"
-                          : ""
-                      } ${
+                      } border border-gray-300 ${
                         row.id === editableRowId &&
                         cellIndex === editableCellIndex &&
                         !isSorting
-                          ? "cell-highlight before:absolute before:inset-[-1px] before:border-[1.5px] before:border-gray-400 before:pointer-events-none before:z-10"
+                          ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
                           : ""
                       }`}
-                      onClick={() =>
-                        !row.original.isSubtotal &&
-                        !isSorting &&
-                        handleCellClick(row.id, cellIndex)
-                      }
+                      onClick={() => handleCellClick(row.id, cellIndex)}
                       style={{
                         padding: "0",
                         boxSizing: "border-box",
@@ -1110,6 +1116,16 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           ))}
         </tbody>
       </table>
+      {showDeleteButton && (
+        <div className="absolute z-10 top-0 right-0">
+          <button
+            onClick={handleDeleteSelected}
+            className="px-4 py-2 text-rose-500 font-medium border border-rose-500 hover:bg-rose-500 hover:text-white active:bg-rose-600 rounded-full transition-colors duration-200"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 };

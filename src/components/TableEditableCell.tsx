@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, CSSProperties } from "react";
 import { ColumnType } from "../types/types";
+import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 
 interface TableEditableCellProps {
   value: any;
@@ -23,7 +24,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   const [cellValue, setCellValue] = useState(value?.toString() ?? "");
   const [editValue, setEditValue] = useState(value?.toString() ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   useEffect(() => {
     setCellValue(value?.toString() ?? "");
     setEditValue(value?.toString() ?? "");
@@ -153,6 +154,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         type: "checkbox",
         checked: cellValue === "true",
         readOnly: !editable || isSorting,
+        className: "hidden", // Hide the actual checkbox input
       };
     } else {
       return {
@@ -164,6 +166,40 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       };
     }
   };
+
+  if (type === "checkbox") {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <button
+          onClick={() => {
+            if (!isSorting) {
+              const newValue = cellValue !== "true";
+              setCellValue(newValue.toString());
+              onChange(newValue);
+            }
+          }}
+          className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
+          disabled={isSorting}
+        >
+          {cellValue === "true" ? (
+            <IconSquareCheckFilled
+              width={18}
+              height={18}
+              className="text-blue-600"
+            />
+          ) : (
+            <IconSquare
+              width={18}
+              height={18}
+              stroke={2}
+              className="text-gray-400"
+            />
+          )}
+        </button>
+        <input {...getInputProps()} />
+      </div>
+    );
+  }
 
   return <input ref={inputRef} {...getInputProps()} />;
 };
