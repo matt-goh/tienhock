@@ -145,7 +145,8 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         type === "amount" || isSorting ? "cursor-default" : ""
       }`,
       style: { boxSizing: "border-box" } as CSSProperties,
-      disabled: isSorting, // Disable all inputs when sorting
+      disabled: isSorting,
+      tabIndex: editable && !isSorting ? 0 : -1, // Make non-editable cells non-focusable
     };
 
     if (type === "checkbox") {
