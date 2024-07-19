@@ -11,6 +11,7 @@ import CatalogueJob from "./components/CatalogueJob";
 const App: React.FC = () => {
   const initialData: Data[] = [
     {
+      id: "1", // Add this line
       staffId: "JIRIM_MM",
       staffName: "Jirim Ilut",
       kerja: "Mee Foreman",
@@ -21,6 +22,7 @@ const App: React.FC = () => {
       amount: 0,
     },
     {
+      id: "2", // Add this line
       staffId: "",
       staffName: "",
       kerja: "",
@@ -46,13 +48,11 @@ const App: React.FC = () => {
 
   return (
     <div className="App">
-      <aside className="">
-        {/* <Sidebar /> */}
-      </aside>
+      <aside className="">{/* <Sidebar /> */}</aside>
       <main className="">
-        <CatalogueJob />
+        {/* <CatalogueJob /> */}
         {/* <MeeProduction /> */}
-        {/* <Table initialData={initialData} columns={columns} /> */}
+        <Table initialData={initialData} columns={columns} />
       </main>
     </div>
   );
