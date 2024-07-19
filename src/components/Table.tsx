@@ -44,9 +44,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isIndeterminate, setIsIndeterminate] = useState(false);
-  const [newRowCount, setNewRowCount] = useState<number>(5);
+  const [newRowCount, setNewRowCount] = useState<number>(4);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
+
+  const isEditableColumn = (col: ColumnConfig) => {
+    return !["selection", "readonly", "action", "amount", "checkbox"].includes(
+      col.type
+    );
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -65,17 +71,20 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
 
   //HCC
   const handleCellClick = (rowId: string | undefined, cellIndex: number) => {
-    if (isSorting || !rowId) return; // Prevent cell editing when sorting is active or rowId is undefined
+    if (isSorting || !rowId) return;
 
     const row = table.getRowModel().rows.find((r) => r.id === rowId);
-    if (!row || row.original.isSubtotal) return; // Don't proceed if row is not found or is a subtotal row
+    if (!row || row.original.isSubtotal) return;
+
+    const columnConfig = allColumns[cellIndex];
+    if (!isEditableColumn(columnConfig)) return; // Skip non-editable columns
 
     setEditableRowId(rowId);
     setEditableCellIndex(cellIndex);
     setSelectedRowId(rowId);
 
     const columnId = columns[cellIndex]?.id;
-    if (!columnId) return; // Don't proceed if column is not found
+    if (!columnId) return;
 
     setPreviousValue(row.original[columnId]);
   };
@@ -106,7 +115,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     }
   };
 
-  //HK
+  // HKD
   const handleKeyDown = (
     e: React.KeyboardEvent,
     rowId: string,
@@ -125,15 +134,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       const sortedRows = table.getRowModel().rows;
       const currentRowIndex = sortedRows.findIndex((row) => row.id === rowId);
 
-      const isEditableColumn = (col: ColumnConfig) => {
-        return (
-          col.type !== "readonly" &&
-          col.type !== "action" &&
-          col.type !== "amount" &&
-          col.type !== "checkbox"
-        );
-      };
-
       const findNextEditableCell = (
         startRowIndex: number,
         startColIndex: number
@@ -141,33 +141,40 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         let rowIndex = startRowIndex;
         let colIndex = startColIndex;
 
-        while (rowIndex < sortedRows.length) {
-          while (colIndex < columns.length) {
-            if (
-              !sortedRows[rowIndex].original.isSubtotal &&
-              isEditableColumn(columns[colIndex])
-            ) {
-              return {
-                rowIndex,
-                colIndex,
-                isLastCell:
-                  rowIndex === sortedRows.length - 1 &&
-                  colIndex ===
-                    columns.reduce(
-                      (lastIndex, col, index) =>
-                        isEditableColumn(col) ? index : lastIndex,
-                      -1
-                    ),
-              };
-            }
-            colIndex++;
+        const totalRows = sortedRows.length;
+        const editableColumns = allColumns.filter(isEditableColumn);
+        const totalEditableCols = editableColumns.length;
+        const lastEditableColIndex = allColumns.reduce(
+          (lastIndex, col, index) =>
+            isEditableColumn(col) ? index : lastIndex,
+          -1
+        );
+
+        for (let i = 0; i < totalRows * totalEditableCols; i++) {
+          colIndex++;
+          if (colIndex >= allColumns.length) {
+            colIndex = 0;
+            rowIndex = (rowIndex + 1) % totalRows;
           }
-          rowIndex++;
-          colIndex = 0;
+
+          const column = allColumns[colIndex];
+          if (
+            !sortedRows[rowIndex].original.isSubtotal &&
+            isEditableColumn(column)
+          ) {
+            const isLastEditableCell =
+              rowIndex === totalRows - 1 && colIndex === lastEditableColIndex;
+
+            return {
+              rowIndex,
+              colIndex,
+              isLastCell: isLastEditableCell,
+            };
+          }
         }
 
-        // If we've reached the end, return the first editable cell
-        const firstEditableColIndex = columns.findIndex(isEditableColumn);
+        // If we've cycled through all cells and found nothing, return to the first editable cell
+        const firstEditableColIndex = allColumns.findIndex(isEditableColumn);
         return {
           rowIndex: 0,
           colIndex: firstEditableColIndex,
@@ -179,27 +186,26 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         rowIndex: nextRowIndex,
         colIndex: nextColIndex,
         isLastCell,
-      } = findNextEditableCell(
-        currentRowIndex,
-        (cellIndex + 1) % columns.length
-      );
+      } = findNextEditableCell(currentRowIndex, cellIndex);
 
-      if (e.key === "Enter" && isLastCell) {
+      if (
+        e.key === "Enter" &&
+        isLastCell &&
+        currentRowIndex === sortedRows.length - 1
+      ) {
         handleAddRow(1);
         setTimeout(() => {
           const newRows = table.getRowModel().rows;
           const newRowId = newRows[newRows.length - 1].id;
           setSelectedRowId(newRowId);
           setEditableRowId(newRowId);
-          setEditableCellIndex(columns.findIndex(isEditableColumn));
+          setEditableCellIndex(allColumns.findIndex(isEditableColumn));
         }, 10);
       } else {
         const nextRowId = sortedRows[nextRowIndex].id;
-        setTimeout(() => {
-          setSelectedRowId(nextRowId);
-          setEditableRowId(nextRowId);
-          setEditableCellIndex(nextColIndex);
-        }, 10);
+        setSelectedRowId(nextRowId);
+        setEditableRowId(nextRowId);
+        setEditableCellIndex(nextColIndex);
       }
     }
   };
@@ -333,6 +339,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     cellIndex: number
   ): ReactNode => {
     const columnType = allColumns[cellIndex].type;
+    const columnConfig = allColumns[cellIndex];
+    const isEditable =
+      !isSorting && !row.original.isSubtotal && isEditableColumn(columnConfig);
 
     if (columnType === "selection") {
       return (
@@ -406,28 +415,10 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       return flexRender(cell.column.columnDef.cell, cell.getContext());
     }
 
-    const isEditable =
-      !isSorting && row.id === editableRowId && cellIndex === editableCellIndex;
-
-    if (columnType === "number" || columnType === "rate") {
-      const value = cell.getValue();
-      let displayValue: string | number = value as string | number;
-
-      if (!isEditable) {
-        if (typeof displayValue === "string") {
-          const cleanedValue = displayValue
-            .replace(/^0+(?=\d)/, "")
-            .replace(/\.$/, "");
-          const parsedValue = parseFloat(cleanedValue);
-          displayValue = isNaN(parsedValue) ? "0" : parsedValue;
-        } else if (typeof displayValue !== "number" || isNaN(displayValue)) {
-          displayValue = "0";
-        }
-      }
-
+    if (["number", "rate", "string", "date"].includes(columnType)) {
       return (
         <TableEditableCell
-          value={displayValue}
+          value={cell.getValue()}
           onChange={(val) => {
             if (!isSorting) {
               handleCellChange(row.index, cell.column.id, val);
@@ -435,7 +426,12 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           }}
           type={columnType}
           editable={isEditable && !isSorting}
-          focus={isEditable && !isSorting}
+          focus={
+            isEditable &&
+            !isSorting &&
+            row.id === editableRowId &&
+            cellIndex === editableCellIndex
+          }
           onKeyDown={(e) => !isSorting && handleKeyDown(e, row.id, cellIndex)}
           isSorting={isSorting}
         />
@@ -473,14 +469,30 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       );
     }
 
+    if (columnType === "checkbox") {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <TableEditableCell
+            value={cell.getValue()}
+            onChange={(val) => handleCellChange(row.index, cell.column.id, val)}
+            type="checkbox"
+            editable={!isSorting}
+            focus={false}
+            onKeyDown={() => {}}
+            isSorting={isSorting}
+          />
+        </div>
+      );
+    }
+
     return (
       <TableEditableCell
         value={cell.getValue()}
-        onChange={(val) => handleCellChange(row.index, cell.column.id, val)}
+        onChange={() => {}}
         type={columnType}
-        editable={isEditable}
-        focus={isEditable}
-        onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
+        editable={false}
+        focus={false}
+        onKeyDown={() => {}}
         isSorting={isSorting}
       />
     );
@@ -530,7 +542,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     width: 10,
   };
 
-  const allColumns = [checkboxColumn, ...columns];
+  const allColumns = useMemo(() => [checkboxColumn, ...columns], [columns]);
 
   const isSortableColumn = (columnId: string) => {
     const column = columns.find((col) => col.id === columnId);
@@ -893,42 +905,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           <>
             <div className="flex items-center">
               <button
-                onClick={() => setNewRowCount((prev) => Math.max(1, prev - 1))}
-                className={`px-2 py-1 border border-gray-300 rounded-l-lg ${
-                  !isSorting
-                    ? "hover:bg-gray-100 active:bg-gray-200"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
-                disabled={isSorting}
-              >
-                -
-              </button>
-              <input
-                type="number"
-                value={newRowCount}
-                onChange={(e) =>
-                  setNewRowCount(Math.max(1, parseInt(e.target.value) || 1))
-                }
-                className={`w-10 px-2 py-1 text-center border-t border-b border-gray-300 ${
-                  !isSorting
-                    ? "hover:bg-gray-100 active:bg-gray-200"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
-                disabled={isSorting}
-              />
-              <button
-                onClick={() => setNewRowCount((prev) => prev + 1)}
-                className={`px-2 py-1 border border-gray-300 rounded-r-lg  ${
-                  !isSorting
-                    ? "hover:bg-gray-100 active:bg-gray-200"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
-                disabled={isSorting}
-              >
-                +
-              </button>
-              <button
-                onClick={() => handleAddRow()}
+                onClick={() => handleAddRow(4)}
                 className={`ml-2 px-4 py-2 border border-gray-300 font-medium rounded-full ${
                   !isSorting
                     ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
@@ -936,7 +913,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                 }`}
                 disabled={isSorting}
               >
-                Add row{newRowCount > 1 ? "s" : ""}
+                Add rows
               </button>
             </div>
           </>
@@ -1042,11 +1019,11 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             <tr
               key={row.id}
               className={`
-                ${
-                  row.original.isSubtotal
-                    ? "border-t border-b border-gray-300"
-                    : ""
-                } ${row.id === selectedRowId ? "shadow-top-bottom" : ""} ${
+                  ${
+                    row.original.isSubtotal
+                      ? "border-t border-b border-gray-300"
+                      : ""
+                  } ${row.id === selectedRowId ? "shadow-top-bottom" : ""} ${
                 !row.original.isSubtotal ? "border border-gray-300" : ""
               } ${
                 selectedRows.has(row.original.id)
@@ -1092,7 +1069,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                     <td
                       key={cell.id}
                       className={`relative px-6 py-4 whitespace-no-wrap ${
-                        isSorting ? "bg-gray-50" : "cursor-default"
+                        isSorting ? "bg-gray-100" : "cursor-default"
                       } border border-gray-300 ${
                         row.id === editableRowId &&
                         cellIndex === editableCellIndex &&
