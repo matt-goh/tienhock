@@ -10,6 +10,7 @@ interface TableEditableCellProps {
   focus: boolean;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   isSorting: boolean;
+  previousCellValue: any;
 }
 
 const TableEditableCell: React.FC<TableEditableCellProps> = ({
@@ -20,6 +21,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   focus,
   onKeyDown,
   isSorting,
+  previousCellValue,
 }) => {
   const [cellValue, setCellValue] = useState(value?.toString() ?? "");
   const [editValue, setEditValue] = useState(value?.toString() ?? "");
@@ -120,9 +122,18 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && (editValue === "0" || editValue === "")) {
+    if (e.key === "Escape") {
+      setCellValue(previousCellValue?.toString() ?? "");
+      setEditValue(previousCellValue?.toString() ?? "");
+      onChange(previousCellValue);
+    } else if (
+      e.key === "Backspace" &&
+      (editValue === "0" || editValue === "")
+    ) {
       e.preventDefault();
       setEditValue("0");
+    } else if (e.key === "Enter") {
+      handleBlur();
     }
     onKeyDown(e);
   };
@@ -131,12 +142,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
     const baseProps: React.InputHTMLAttributes<HTMLInputElement> = {
       onChange: handleChange,
       onBlur: handleBlur,
-      onKeyDown: (e) => {
-        handleKeyDown(e);
-        if (e.key === "Enter") {
-          handleBlur();
-        }
-      },
+      onKeyDown: handleKeyDown,
       className: `w-full h-full px-6 py-3 m-0 outline-none bg-transparent ${
         type === "number" || type === "rate" || type === "amount"
           ? "text-right"
