@@ -20,7 +20,6 @@ import {
   IconSquareCheckFilled,
   IconSquareMinusFilled,
   IconTrash,
-  IconTrashX,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, Data, ColumnConfig } from "../types/types";
 import TableEditableCell from "./TableEditableCell";
@@ -33,7 +32,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     null
   );
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-  const [previousValue, setPreviousValue] = useState<any>(null);
+  const [previousCellValues, setPreviousCellValues] = useState<{
+    [key: string]: any;
+  }>({});
   const [originalData, setOriginalData] = useState<Data[]>(initialData);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
@@ -44,7 +45,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isIndeterminate, setIsIndeterminate] = useState(false);
-  const [newRowCount, setNewRowCount] = useState<number>(4);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
@@ -77,7 +77,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     if (!row || row.original.isSubtotal) return;
 
     const columnConfig = allColumns[cellIndex];
-    if (!isEditableColumn(columnConfig)) return; // Skip non-editable columns
+    if (!isEditableColumn(columnConfig)) return;
 
     setEditableRowId(rowId);
     setEditableCellIndex(cellIndex);
@@ -86,7 +86,11 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     const columnId = columns[cellIndex]?.id;
     if (!columnId) return;
 
-    setPreviousValue(row.original[columnId]);
+    const cellValue = row.original[columnId];
+    setPreviousCellValues((prev) => ({
+      ...prev,
+      [`${rowId}-${columnId}`]: cellValue,
+    }));
   };
 
   //HCC
@@ -122,11 +126,14 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     cellIndex: number
   ) => {
     if (e.key === "Escape") {
-      const rowIndex = table
-        .getRowModel()
-        .rows.findIndex((row) => row.id === rowId);
       const columnId = columns[cellIndex].id;
-      handleCellChange(rowIndex, columnId, previousValue);
+      const previousValue = previousCellValues[`${rowId}-${columnId}`];
+      if (previousValue !== undefined) {
+        const rowIndex = table
+          .getRowModel()
+          .rows.findIndex((row) => row.id === rowId);
+        handleCellChange(rowIndex, columnId, previousValue);
+      }
       setEditableCellIndex(null);
       setSelectedRowId(null);
     } else if (e.key === "Tab" || e.key === "Enter") {
@@ -177,7 +184,8 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       if (
         e.key === "Enter" &&
         // Check if next row exists
-        nextRowIndex === 0
+        nextRowIndex === 0 &&
+        currentRowIndex === sortedRows.length - 1
       ) {
         handleAddRow(1);
         setTimeout(() => {
@@ -197,7 +205,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   };
 
   // HAR
-  const handleAddRow = (count: number = newRowCount) => {
+  const handleAddRow = (count: number = 4) => {
     const newRows = Array(count)
       .fill(null)
       .map(() => ({
@@ -418,6 +426,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           }
           onKeyDown={(e) => !isSorting && handleKeyDown(e, row.id, cellIndex)}
           isSorting={isSorting}
+          previousCellValue={
+            previousCellValues[`${row.id}-${cell.column.id}`] ?? cell.getValue()
+          }
         />
       );
     }
@@ -435,6 +446,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           focus={false}
           onKeyDown={() => {}}
           isSorting={isSorting}
+          previousCellValue={amount}
         />
       );
     }
@@ -449,6 +461,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           focus={false}
           onKeyDown={() => {}}
           isSorting={isSorting}
+          previousCellValue={cell.getValue()}
         />
       );
     }
@@ -464,6 +477,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
             focus={false}
             onKeyDown={() => {}}
             isSorting={isSorting}
+            previousCellValue={cell.getValue()}
           />
         </div>
       );
@@ -478,6 +492,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         focus={false}
         onKeyDown={() => {}}
         isSorting={isSorting}
+        previousCellValue={cell.getValue()}
       />
     );
   };
@@ -722,6 +737,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                 handleKeyDown(e, info.row.id, info.cell.column.getIndex())
               }
               isSorting={isSorting}
+              previousCellValue={info.cell.getValue()}
             />
           </div>
         );
@@ -804,6 +820,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
                     focus={false}
                     onKeyDown={() => {}}
                     isSorting={isSorting}
+                    previousCellValue={info.cell.getValue()}
                   />
                 </div>
               ),
