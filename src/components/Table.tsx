@@ -134,8 +134,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           .rows.findIndex((row) => row.id === rowId);
         handleCellChange(rowIndex, columnId, previousValue);
       }
-      setEditableCellIndex(null);
-      setSelectedRowId(null);
     } else if (e.key === "Tab" || e.key === "Enter") {
       e.preventDefault();
       const sortedRows = table.getRowModel().rows;
