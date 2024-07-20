@@ -126,12 +126,6 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       setCellValue(previousCellValue?.toString() ?? "");
       setEditValue(previousCellValue?.toString() ?? "");
       onChange(previousCellValue);
-    } else if (
-      e.key === "Backspace" &&
-      (editValue === "0" || editValue === "")
-    ) {
-      e.preventDefault();
-      setEditValue("0");
     } else if (e.key === "Enter") {
       handleBlur();
     }
