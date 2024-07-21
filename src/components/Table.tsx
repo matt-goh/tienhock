@@ -37,6 +37,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
   }>({});
   const [originalData, setOriginalData] = useState<Data[]>(initialData);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
+  const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
+    string | null
+  >(null);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
@@ -232,26 +235,39 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     if (!canAddSubtotal) return;
 
     setData((prevData) => {
-      const lastNonSubtotalRowWithAmount = prevData.reduceRight(
-        (acc, row, index) => {
-          if (!row.isSubtotal && parseFloat(row.amount) > 0 && acc === -1) {
-            return index;
-          }
-          return acc;
-        },
-        -1
-      );
+      let insertIndex: number;
+      let subtotalEndIndex: number;
 
-      if (lastNonSubtotalRowWithAmount === -1) return prevData;
+      if (selectedRowForSubtotal) {
+        insertIndex =
+          prevData.findIndex((row) => row.id === selectedRowForSubtotal) + 1;
+        subtotalEndIndex = insertIndex - 1;
+      } else {
+        const lastNonSubtotalRowWithAmount = prevData.reduceRight(
+          (acc, row, index) => {
+            if (!row.isSubtotal && parseFloat(row.amount) > 0 && acc === -1) {
+              return index;
+            }
+            return acc;
+          },
+          -1
+        );
+        insertIndex = lastNonSubtotalRowWithAmount + 1;
+        subtotalEndIndex = lastNonSubtotalRowWithAmount;
+      }
+
+      if (insertIndex === 0) return prevData;
 
       const newData = [...prevData];
-      const subtotalRow = createSubtotalRow(0, lastNonSubtotalRowWithAmount);
-      newData.splice(lastNonSubtotalRowWithAmount + 1, 0, subtotalRow);
+      const subtotalRow = createSubtotalRow(0, subtotalEndIndex);
+      newData.splice(insertIndex, 0, subtotalRow);
 
       const recalculatedData = recalculateSubtotals(newData);
       setOriginalData(recalculatedData);
       return recalculatedData;
     });
+
+    setSelectedRowForSubtotal(null);
   };
 
   // CS
@@ -602,7 +618,13 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       const newSet = new Set(prev);
       if (newSet.has(row.original.id)) {
         newSet.delete(row.original.id);
+        setSelectedRowForSubtotal(null);
       } else {
+        if (newSet.size === 0) {
+          setSelectedRowForSubtotal(row.original.id);
+        } else {
+          setSelectedRowForSubtotal(null);
+        }
         newSet.add(row.original.id);
       }
       updateSelectionState(newSet);
@@ -629,6 +651,9 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     setIsAllSelected(allSelected);
     setIsIndeterminate(someSelected);
     setShowDeleteButton(selectedRows.size > 0);
+    setCanAddSubtotal(
+      selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
+    );
   };
 
   // HDS
@@ -1096,7 +1121,7 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
         <div className="absolute z-10 top-0 right-0">
           <button
             onClick={handleDeleteSelected}
-            className="px-4 py-2 text-rose-500 font-medium border border-rose-500 hover:bg-rose-500 hover:text-white active:bg-rose-600 rounded-full transition-colors duration-200"
+            className="px-4 py-2 text-white font-medium border border-rose-500 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 hover:text-gray-100 rounded-full transition-colors duration-200"
           >
             Delete
           </button>
