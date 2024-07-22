@@ -21,6 +21,17 @@ const App: React.FC = () => {
       rate: 0.7,
       amount: 0,
     },
+    {
+      id: "2", // Add this line
+      staffId: "",
+      staffName: "",
+      kerja: "",
+      jamPerDay: 0,
+      done: true,
+      bag: 0,
+      rate: 0,
+      amount: 0,
+    },
   ];
 
   const columns: ColumnConfig[] = [
