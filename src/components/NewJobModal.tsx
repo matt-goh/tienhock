@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Fragment } from "react";
+import React, { useState, Fragment, useEffect } from "react";
 import {
   Dialog,
   Transition,
@@ -23,11 +23,16 @@ import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 const sections = ["Section A", "Section B", "Section C"];
 
 interface NewJobModalProps {
+  isOpen: boolean;
+  onClose: () => void;
   onJobAdded: () => void;
 }
 
-const NewJobModal: React.FC<NewJobModalProps> = ({ onJobAdded }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+const NewJobModal: React.FC<NewJobModalProps> = ({
+  isOpen,
+  onClose,
+  onJobAdded,
+}) => {
   const [formData, setFormData] = useState({
     id: "",
     name: "",
@@ -35,6 +40,13 @@ const NewJobModal: React.FC<NewJobModalProps> = ({ onJobAdded }) => {
   });
 
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({ id: "", name: "", section: [] });
+      setQuery("");
+    }
+  }, [isOpen]);
 
   const filteredSections =
     query === ""
@@ -72,13 +84,8 @@ const NewJobModal: React.FC<NewJobModalProps> = ({ onJobAdded }) => {
 
       const result = await response.json();
       console.log(result.message);
-      setIsModalOpen(false);
-      setFormData({
-        id: "",
-        name: "",
-        section: [],
-      });
-      onJobAdded(); // Call this function to refresh the job list
+      onJobAdded();
+      onClose();
     } catch (error) {
       console.error("Error:", error);
       // Handle error (e.g., display an error message to the user)
@@ -87,18 +94,8 @@ const NewJobModal: React.FC<NewJobModalProps> = ({ onJobAdded }) => {
 
   return (
     <>
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="px-4 py-2 border border-gray-300 hover:bg-gray-100 active:bg-gray-200 font-medium rounded-full focus:outline-none"
-      >
-        Add job
-      </button>
-      <Transition appear show={isModalOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-50"
-          onClose={() => setIsModalOpen(false)}
-        >
+      <Transition appear show={isOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={onClose}>
           <TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
@@ -241,7 +238,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({ onJobAdded }) => {
                       <div className="!mt-6 flex justify-end">
                         <button
                           type="button"
-                          onClick={() => setIsModalOpen(false)}
+                          onClick={onClose}
                           className="mr-2 px-6 py-3 text-sm font-medium text-gray-700 bg-gray-200 rounded-full hover:bg-gray-300/75 active:bg-gray-300 focus:outline-none"
                         >
                           Cancel

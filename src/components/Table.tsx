@@ -29,19 +29,14 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, Data, ColumnConfig } from "../types/types";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  Transition,
-  TransitionChild,
-} from "@headlessui/react";
 import TableEditableCell from "./TableEditableCell";
+import DeleteButton from "./DeleteButton";
 
 const Table: React.FC<TableProps> = ({
   initialData,
   columns,
   onShowDeleteButton,
+  onDelete,
 }) => {
   const [data, setData] = useState<Data[]>(initialData);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -61,24 +56,19 @@ const Table: React.FC<TableProps> = ({
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
+  const [deleteButtonPosition, setDeleteButtonPosition] = useState({
+    top: 0,
+    right: 0,
+  });
   const [showDeleteButton, setShowDeleteButton] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState<{
     index: number;
     id: string;
   } | null>(null);
-  const [isMultiDelete, setIsMultiDelete] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isIndeterminate, setIsIndeterminate] = useState(false);
-  const [position, setPosition] = useState<{
-    top: number;
-    right: number;
-  }>({
-    top: 0,
-    right: 0,
-  });
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
@@ -141,15 +131,15 @@ const Table: React.FC<TableProps> = ({
   // UP
   useEffect(() => {
     const updatePosition = () => {
-      if (tableContainerRef.current) {
-        const rect = tableContainerRef.current.getBoundingClientRect();
+      if (tableRef.current) {
+        const rect = tableRef.current.getBoundingClientRect();
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        const scrollRight =
+        const scrollLeft =
           window.scrollX || document.documentElement.scrollLeft;
 
-        setPosition({
-          top: rect.top + scrollTop - 58,
-          right: rect.left + scrollRight, // Adjust this value to position the button correctly
+        setDeleteButtonPosition({
+          top: rect.top + scrollTop - 58, // Adjust this value as needed
+          right: window.innerWidth - (rect.right + scrollLeft), // Adjust this value as needed
         });
       }
     };
@@ -438,7 +428,6 @@ const Table: React.FC<TableProps> = ({
       return updatedData;
     });
 
-    setDeleteDialogOpen(false);
     setRowToDelete(null);
   };
 
@@ -448,53 +437,10 @@ const Table: React.FC<TableProps> = ({
     const rowData = data[rowIndex];
     if (rowData.id) {
       setRowToDelete({ index: rowIndex, id: rowData.id });
-      setIsMultiDelete(false);
-      setDeleteDialogOpen(true);
     } else {
       // For rows not in the database, delete immediately
       deleteRow(rowIndex);
     }
-  };
-
-  // DSR
-  const deleteSelectedRows = async () => {
-    const rowsToDelete = isAllSelected
-      ? data
-      : data.filter((row) => selectedRows.has(row.id));
-
-    for (const row of rowsToDelete) {
-      if (row.id) {
-        try {
-          const response = await fetch(
-            `http://localhost:5000/api/jobs/${row.id}`,
-            {
-              method: "DELETE",
-            }
-          );
-          if (!response.ok) {
-            console.error(`Failed to delete job ${row.id} from the database`);
-          }
-        } catch (error) {
-          console.error("Error deleting job:", error);
-        }
-      }
-    }
-
-    setData((oldData) => {
-      let newData: Data[];
-      if (isAllSelected) {
-        newData = [];
-      } else {
-        newData = oldData.filter((row) => !selectedRows.has(row.id));
-      }
-      const updatedData = recalculateSubtotals(newData);
-      setOriginalData(updatedData);
-      return updatedData;
-    });
-
-    setSelectedRows(new Set());
-    updateSelectionState(new Set());
-    setDeleteDialogOpen(false);
   };
 
   // HRS
@@ -545,9 +491,11 @@ const Table: React.FC<TableProps> = ({
   };
 
   // HDS
-  const handleDeleteSelected = () => {
-    setIsMultiDelete(true);
-    setDeleteDialogOpen(true);
+  const handleDeleteSelected = async () => {
+    const selectedIds = Array.from(selectedRows);
+    await onDelete(selectedIds);
+    setSelectedRows(new Set());
+    // Refresh data or update local state as needed
   };
 
   useEffect(() => {
@@ -1243,99 +1191,18 @@ const Table: React.FC<TableProps> = ({
       </table>
       {/* SDB */}
       {showDeleteButton && (
-        <div
-          className="fixed z-10"
+        <DeleteButton
+          onDelete={handleDeleteSelected}
+          selectedCount={selectedRows.size}
+          isAllSelected={isAllSelected}
           style={{
-            top: `${position.top}px`,
-            right: `${position.right}px`,
+            position: "fixed",
+            top: `${deleteButtonPosition.top}px`,
+            right: `${deleteButtonPosition.right}px`,
+            zIndex: 10,
           }}
-        >
-          <button
-            onClick={handleDeleteSelected}
-            className="px-4 py-2 text-white font-medium border border-rose-500 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 hover:text-gray-100 rounded-full transition-colors duration-200"
-          >
-            Delete
-          </button>
-        </div>
+        />
       )}
-      <Transition appear show={deleteDialogOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-10"
-          onClose={() => setDeleteDialogOpen(false)}
-        >
-          <TransitionChild
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-25" />
-          </TransitionChild>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
-              <TransitionChild
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <DialogTitle
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900"
-                  >
-                    Delete Confirmation
-                  </DialogTitle>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      {isMultiDelete
-                        ? `Are you sure you want to delete ${
-                            isAllSelected ? "all" : "selected"
-                          } rows? This action cannot be undone.`
-                        : "Are you sure you want to delete this row? This action cannot be undone."}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex justify-end space-x-2">
-                    <button
-                      type="button"
-                      className="inline-flex justify-center rounded-full border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 active:bg-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
-                      onClick={() => {
-                        setDeleteDialogOpen(false);
-                        setRowToDelete(null);
-                        setIsMultiDelete(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex justify-center rounded-full border border-transparent bg-rose-500 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600 active:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
-                      onClick={() => {
-                        if (isMultiDelete) {
-                          deleteSelectedRows();
-                        } else if (rowToDelete) {
-                          deleteRow(rowToDelete.index);
-                        }
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </DialogPanel>
-              </TransitionChild>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
     </div>
   );
 };
