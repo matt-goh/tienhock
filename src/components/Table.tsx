@@ -991,7 +991,7 @@ const Table: React.FC<TableProps> = ({
   });
 
   return (
-    <div ref={tableRef} className="w-auto">
+    <div ref={tableRef} className="w-auto m-8">
       <div
         className={`flex ${
           showDeleteButton ? "mr-[5.5rem]" : ""
@@ -1028,167 +1028,197 @@ const Table: React.FC<TableProps> = ({
           </button>
         )}
       </div>
-      <table
-        className="w-auto bg-white border-collapse border-spacing-0"
-        ref={tableContainerRef}
-      >
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th
-                  key={header.id}
-                  className={`px-6 py-2 border border-b-2 border-gray-300 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
-                    columns.find((col) => col.id === header.id)?.type ||
-                      "string"
-                  )}`}
-                  onClick={(e) => {
-                    if (isSortableColumn(header.column.id)) {
-                      table.getColumn(header.column.id)?.toggleSorting();
-                    }
-                  }}
-                  style={{
-                    position: "relative",
-                    width: `${columnWidths[header.id]}px` || "auto",
-                  }}
-                >
-                  {header.column.id === "selection" ? (
-                    <div className="flex items-center justify-center h-full">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectAll();
+      <div className="rounded-lg border border-gray-300">
+        <table
+          className="w-auto bg-white border-collapse border-spacing-0 rounded-lg"
+          ref={tableContainerRef}
+        >
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header, index) => (
+                  <th
+                    key={header.id}
+                    className={`px-6 py-2 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
+                      columns.find((col) => col.id === header.id)?.type ||
+                        "string"
+                    )} ${
+                      index === 0 ? "border-l-0" : "border-l border-gray-300"
+                    } ${
+                      index === headerGroup.headers.length - 1
+                        ? "border-r-0"
+                        : ""
+                    } border-b border-gray-300`}
+                    onClick={(e) => {
+                      if (isSortableColumn(header.column.id)) {
+                        table.getColumn(header.column.id)?.toggleSorting();
+                      }
+                    }}
+                    style={{
+                      position: "relative",
+                      width: `${columnWidths[header.id]}px` || "auto",
+                    }}
+                  >
+                    {header.column.id === "selection" ? (
+                      <div className="flex items-center justify-center h-full">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectAll();
+                          }}
+                          className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
+                        >
+                          {isAllSelected ? (
+                            <IconSquareCheckFilled
+                              width={20}
+                              height={20}
+                              className="text-blue-600"
+                            />
+                          ) : isIndeterminate ? (
+                            <IconSquareMinusFilled
+                              width={20}
+                              height={20}
+                              className="text-blue-600"
+                            />
+                          ) : (
+                            <IconSquare
+                              width={20}
+                              height={20}
+                              stroke={2}
+                              className="text-gray-400"
+                            />
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )
+                    )}
+                    {header.id !== "actions" && (
+                      <div
+                        className="resizer"
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          height: "100%",
+                          width: "5px",
+                          cursor: "col-resize",
+                          userSelect: "none",
+                          background: "transparent",
                         }}
-                        className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
-                      >
-                        {isAllSelected ? (
-                          <IconSquareCheckFilled
-                            width={20}
-                            height={20}
-                            className="text-blue-600"
-                          />
-                        ) : isIndeterminate ? (
-                          <IconSquareMinusFilled
-                            width={20}
-                            height={20}
-                            className="text-blue-600"
-                          />
-                        ) : (
-                          <IconSquare
-                            width={20}
-                            height={20}
-                            stroke={2}
-                            className="text-gray-400"
-                          />
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )
-                  )}
-                  {header.id !== "actions" && (
-                    <div
-                      className="resizer"
-                      style={{
-                        position: "absolute",
-                        right: 0,
-                        top: 0,
-                        height: "100%",
-                        width: "5px",
-                        cursor: "col-resize",
-                        userSelect: "none",
-                        background: "transparent",
-                      }}
-                      onMouseDown={(e) => handleMouseDown(e, header.id)}
-                    />
-                  )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              className={`
-                  ${
-                    row.original.isSubtotal
-                      ? "border-t border-b border-gray-300"
-                      : ""
-                  } ${row.id === selectedRowId ? "shadow-top-bottom" : ""} ${
-                !row.original.isSubtotal ? "border border-gray-300" : ""
-              } ${
-                selectedRows.has(row.original.id)
-                  ? "bg-blue-50 hover:bg-blue-50"
-                  : "hover:bg-gray-100"
-              } ${row.id === editableRowId ? "relative z-10" : ""}`}
-              onClick={() =>
-                row.original.isSubtotal ? setSelectedRowId(row.id) : null
-              }
-            >
-              {row.getVisibleCells().map((cell, cellIndex) => {
-                if (row.original.isSubtotal) {
-                  if (cell.column.id === "selection") {
-                    return (
-                      <td key={cell.id} className="border border-gray-300">
-                        {renderCell(row, cell, cellIndex)}
-                      </td>
-                    );
-                  } else if (
-                    cell.column.id ===
-                    columns.find((col) => col.type === "amount")?.id
-                  ) {
-                    return (
-                      <td
-                        key={cell.id}
-                        colSpan={columns.length - 1}
-                        className="py-3 pr-6 text-right font-semibold border border-gray-300"
-                      >
-                        Subtotal: {cell.getValue() as ReactNode}
-                      </td>
-                    );
-                  } else if (cell.column.id === "actions") {
-                    return (
-                      <td key={cell.id} className="border border-gray-300">
-                        {renderCell(row, cell, cellIndex)}
-                      </td>
-                    );
-                  } else {
-                    return null;
+                        onMouseDown={(e) => handleMouseDown(e, header.id)}
+                      />
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row, rowIndex) => {
+              const isLastRow =
+                rowIndex === table.getRowModel().rows.length - 1;
+              return (
+                <tr
+                  key={row.id}
+                  className={`border-t ${
+                    isLastRow ? "border-b-0" : "border-b border-gray-300"
+                  } ${
+                    row.id === selectedRowId ? "shadow-top-bottom" : ""
                   }
-                } else {
-                  return (
-                    <td
-                      key={cell.id}
-                      className={`relative px-6 py-4 whitespace-no-wrap ${
-                        isSorting ? "bg-gray-100" : "cursor-default"
-                      } border border-gray-300 ${
-                        row.id === editableRowId &&
-                        cellIndex === editableCellIndex &&
-                        !isSorting
-                          ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
-                          : ""
-                      }`}
-                      onClick={() => handleCellClick(row.id, cellIndex)}
-                      style={{
-                        padding: "0",
-                        boxSizing: "border-box",
-                        width: `${columnWidths[cell.column.id]}px` || "auto",
-                      }}
-                    >
-                      {renderCell(row, cell, cellIndex)}
-                    </td>
-                  );
-                }
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  ${
+                    selectedRows.has(row.original.id)
+                      ? "bg-blue-50 hover:bg-blue-50"
+                      : "hover:bg-gray-100"
+                  } ${row.id === editableRowId ? "relative z-10" : ""}}`}
+                  onClick={() =>
+                    row.original.isSubtotal ? setSelectedRowId(row.id) : null
+                  }
+                >
+                  {row.getVisibleCells().map((cell, cellIndex) => {
+                    const isLastRow =
+                      rowIndex === table.getRowModel().rows.length - 1;
+                    const isFirstCell = cellIndex === 0;
+                    const isLastCell =
+                      cellIndex === row.getVisibleCells().length - 1;
+                    if (row.original.isSubtotal) {
+                      if (cell.column.id === "selection") {
+                        return (
+                          <td
+                            key={cell.id}
+                            className="border-r border-gray-300"
+                          >
+                            {renderCell(row, cell, cellIndex)}
+                          </td>
+                        );
+                      } else if (
+                        cell.column.id ===
+                        columns.find((col) => col.type === "amount")?.id
+                      ) {
+                        return (
+                          <td
+                            key={cell.id}
+                            colSpan={columns.length - 1}
+                            className={`py-3 pr-6 text-right font-semibold`}
+                          >
+                            Subtotal: {cell.getValue() as ReactNode}
+                          </td>
+                        );
+                      } else if (cell.column.id === "actions") {
+                        return (
+                          <td
+                            key={cell.id}
+                            className="border-l border-gray-300"
+                          >
+                            {renderCell(row, cell, cellIndex)}
+                          </td>
+                        );
+                      } else {
+                        return null;
+                      }
+                    } else {
+                      return (
+                        <td
+                          key={cell.id}
+                          className={`relative px-6 py-4 whitespace-no-wrap ${
+                            isSorting ? "bg-gray-100" : "cursor-default"
+                          } ${
+                            row.id === editableRowId &&
+                            cellIndex === editableCellIndex &&
+                            !isSorting
+                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
+                              : ""
+                          } ${
+                            isFirstCell
+                              ? "border-l-0"
+                              : "border-l border-gray-300"
+                          }
+                        ${isLastCell ? "border-r-0" : ""}
+                        ${
+                          isLastRow ? "border-b-0" : "border-b border-gray-300"
+                        } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${isFirstCell && isLastRow ? "rounded-bl-lg" : ""}`}
+                          onClick={() => handleCellClick(row.id, cellIndex)}
+                          style={{
+                            padding: "0",
+                            boxSizing: "border-box",
+                            width:
+                              `${columnWidths[cell.column.id]}px` || "auto",
+                          }}
+                        >
+                          {renderCell(row, cell, cellIndex)}
+                        </td>
+                      );
+                    }
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {/* SDB */}
       {showDeleteButton && (
         <DeleteButton
