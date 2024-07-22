@@ -1,11 +1,11 @@
 import React, { useState, useEffect, Fragment } from "react";
 import {
-  Listbox,
-  ListboxButton,
-  ListboxOptions,
-  ListboxOption,
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOptions,
+  ComboboxOption,
   Transition,
-  Label,
   Field,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
@@ -21,6 +21,7 @@ const CatalogueJob: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewJobModal, setShowNewJobModal] = useState(false);
+  const [query, setQuery] = useState("");
 
   const productColumns: ColumnConfig[] = [
     { id: "id", header: "ID", type: "readonly", width: 50 },
@@ -83,8 +84,8 @@ const CatalogueJob: React.FC = () => {
     setShowNewJobModal(false);
   };
 
-  const handleJobSelection = (selection: Job | "add") => {
-    if (selection === "add") {
+  const handleJobSelection = (selection: Job | null) => {
+    if (selection === null) {
       setShowNewJobModal(true);
     } else {
       setSelectedJob(selection);
@@ -122,6 +123,13 @@ const CatalogueJob: React.FC = () => {
     }
   };
 
+  const filteredJobs =
+    query === ""
+      ? jobs
+      : jobs.filter((job) =>
+          job.name.toLowerCase().includes(query.toLowerCase())
+        );
+
   return (
     <div className={`flex justify-center py-[60px]`}>
       <div className="flex flex-col items-start w-full max-w-4xl px-4">
@@ -133,42 +141,50 @@ const CatalogueJob: React.FC = () => {
         >
           <div className={`${selectedJob ? "w-48" : "w-full max-w-xs"}`}>
             <Field>
-              <Listbox value={selectedJob} onChange={handleJobSelection}>
-                {({ open }) => (
-                  <div className="relative">
-                    <ListboxButton
-                      className={`relative w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400`}
-                    >
-                      <span className="block truncate">
-                        {selectedJob ? selectedJob.name : "Select a job"}
-                      </span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <IconChevronDown
-                          className="h-5 w-5 text-gray-400"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    </ListboxButton>
-                    <Transition
-                      show={open}
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions
-                        static
-                        className="absolute z-20 w-full p-1 mt-11 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg"
+              <Combobox value={selectedJob} onChange={handleJobSelection}>
+                <div className="relative">
+                  <ComboboxInput
+                    className="w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400"
+                    displayValue={(job: Job | null) => job?.name || ""}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Select a job"
+                  />
+                  <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                    <IconChevronDown
+                      className="h-5 w-5 text-gray-400"
+                      aria-hidden="true"
+                    />
+                  </ComboboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                      <ComboboxOption
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none rounded py-2 pl-4 pr-4 text-left ${
+                            active
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-900"
+                          }`
+                        }
+                        value={null}
                       >
-                        <ListboxOption
+                        + Add Job
+                      </ComboboxOption>
+                      {filteredJobs.map((job) => (
+                        <ComboboxOption
+                          key={job.id}
                           className={({ active }) =>
-                            `relative cursor-pointer select-none rounded py-2 pl-4 pr-4 text-left ${
+                            `relative cursor-pointer select-none rounded text-left py-2 pl-4 pr-4 ${
                               active
                                 ? "bg-gray-100 text-gray-900"
                                 : "text-gray-900"
                             }`
                           }
-                          value="add"
+                          value={job}
                         >
                           {({ selected }) => (
                             <>
@@ -177,7 +193,7 @@ const CatalogueJob: React.FC = () => {
                                   selected ? "font-medium" : "font-normal"
                                 }`}
                               >
-                                + Add Job
+                                {job.name}
                               </span>
                               {selected && (
                                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
@@ -190,46 +206,12 @@ const CatalogueJob: React.FC = () => {
                               )}
                             </>
                           )}
-                        </ListboxOption>
-                        {jobs.map((job) => (
-                          <ListboxOption
-                            key={job.id}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded text-left py-2 pl-4 pr-4 ${
-                                active
-                                  ? "bg-gray-100 text-gray-900"
-                                  : "text-gray-900"
-                              }`
-                            }
-                            value={job}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {job.name}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
-                                    <IconCheck
-                                      stroke={2}
-                                      width="22"
-                                      height="22"
-                                    />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </ListboxOption>
-                        ))}
-                      </ListboxOptions>
-                    </Transition>
-                  </div>
-                )}
-              </Listbox>
+                        </ComboboxOption>
+                      ))}
+                    </ComboboxOptions>
+                  </Transition>
+                </div>
+              </Combobox>
             </Field>
           </div>
           {selectedJob && (
