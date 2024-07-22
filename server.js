@@ -66,3 +66,16 @@ app.get('/api/jobs', async (req, res) => {
     res.status(500).json({ message: 'Error fetching jobs', error: error.message });
   }
 });
+
+app.delete('/api/jobs/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const query = 'DELETE FROM jobs WHERE id = $1';
+    await pool.query(query, [id]);
+    res.status(200).json({ message: 'Job deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({ message: 'Error deleting job', error: error.message });
+  }
+});

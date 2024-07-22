@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo, ReactNode } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  ReactNode,
+  Fragment,
+} from "react";
 import {
   createColumnHelper,
   flexRender,
@@ -22,9 +29,20 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, Data, ColumnConfig } from "../types/types";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import TableEditableCell from "./TableEditableCell";
 
-const Table: React.FC<TableProps> = ({ initialData, columns }) => {
+const Table: React.FC<TableProps> = ({
+  initialData,
+  columns,
+  onShowDeleteButton,
+}) => {
   const [data, setData] = useState<Data[]>(initialData);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editableRowId, setEditableRowId] = useState<string | null>(null);
@@ -44,10 +62,23 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
   const [showDeleteButton, setShowDeleteButton] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState<{
+    index: number;
+    id: string;
+  } | null>(null);
+  const [isMultiDelete, setIsMultiDelete] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isIndeterminate, setIsIndeterminate] = useState(false);
+  const [position, setPosition] = useState<{
+    top: number;
+    right: number;
+  }>({
+    top: 0,
+    right: 0,
+  });
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
@@ -55,6 +86,22 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
       col.type
     );
+  };
+
+  const getHeaderClass = (columnType: ColumnType) => {
+    let baseClass = "cursor-pointer ";
+    switch (columnType) {
+      case "number":
+      case "rate":
+      case "readonly":
+      case "amount":
+        return baseClass + "text-right";
+      case "checkbox":
+      case "action":
+        return "text-center";
+      default:
+        return baseClass + "text-left";
+    }
   };
 
   useEffect(() => {
@@ -71,6 +118,55 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
+  }, [data]);
+
+  useEffect(() => {
+    setData((prevData) =>
+      recalculateSubtotals(
+        prevData.map((row) => {
+          if (!row.isSubtotal) {
+            const jamPerDay = parseFloat(row.jamPerDay) || 0;
+            const rate = parseFloat(row.rate) || 0;
+            return { ...row, amount: (jamPerDay * rate).toFixed(2) };
+          }
+          return row;
+        })
+      )
+    );
+  }, []);
+
+  // UP
+  useEffect(() => {
+    const updatePosition = () => {
+      if (tableContainerRef.current) {
+        const rect = tableContainerRef.current.getBoundingClientRect();
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const scrollRight =
+          window.scrollX || document.documentElement.scrollLeft;
+
+        setPosition({
+          top: rect.top + scrollTop - 58,
+          right: rect.left + scrollRight, // Adjust this value to position the button correctly
+        });
+      }
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition);
+    };
+  }, [tableRef]);
+
+  const hasAmountColumn = useMemo(() => {
+    return columns.some((col) => col.type === "amount");
+  }, [columns]);
 
   //HCC
   const handleCellClick = (rowId: string | undefined, cellIndex: number) => {
@@ -315,27 +411,221 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
     return remainingRows.some((row) => parseFloat(row.amount) > 0);
   };
 
-  useEffect(() => {
-    setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
-  }, [data]);
-
-  useEffect(() => {
-    setData((prevData) =>
-      recalculateSubtotals(
-        prevData.map((row) => {
-          if (!row.isSubtotal) {
-            const jamPerDay = parseFloat(row.jamPerDay) || 0;
-            const rate = parseFloat(row.rate) || 0;
-            return { ...row, amount: (jamPerDay * rate).toFixed(2) };
+  // DR
+  const deleteRow = async (rowIndex: number) => {
+    if (rowToDelete && rowToDelete.id) {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/jobs/${rowToDelete.id}`,
+          {
+            method: "DELETE",
           }
-          return row;
-        })
-      )
-    );
-  }, []);
+        );
+        if (!response.ok) {
+          throw new Error("Failed to delete job from the database");
+        }
+      } catch (error) {
+        console.error("Error deleting job:", error);
+        // Handle error (e.g., show error message to user)
+        return;
+      }
+    }
 
-  const hasAmountColumn = useMemo(() => {
-    return columns.some((col) => col.type === "amount");
+    setData((oldData) => {
+      const newData = oldData.filter((_, index) => index !== rowIndex);
+      const updatedData = recalculateSubtotals(newData);
+      setOriginalData(updatedData);
+      return updatedData;
+    });
+
+    setDeleteDialogOpen(false);
+    setRowToDelete(null);
+  };
+
+  // HDR
+  const handleDeleteRow = async (rowIndex: number, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const rowData = data[rowIndex];
+    if (rowData.id) {
+      setRowToDelete({ index: rowIndex, id: rowData.id });
+      setIsMultiDelete(false);
+      setDeleteDialogOpen(true);
+    } else {
+      // For rows not in the database, delete immediately
+      deleteRow(rowIndex);
+    }
+  };
+
+  // DSR
+  const deleteSelectedRows = async () => {
+    const rowsToDelete = isAllSelected
+      ? data
+      : data.filter((row) => selectedRows.has(row.id));
+
+    for (const row of rowsToDelete) {
+      if (row.id) {
+        try {
+          const response = await fetch(
+            `http://localhost:5000/api/jobs/${row.id}`,
+            {
+              method: "DELETE",
+            }
+          );
+          if (!response.ok) {
+            console.error(`Failed to delete job ${row.id} from the database`);
+          }
+        } catch (error) {
+          console.error("Error deleting job:", error);
+        }
+      }
+    }
+
+    setData((oldData) => {
+      let newData: Data[];
+      if (isAllSelected) {
+        newData = [];
+      } else {
+        newData = oldData.filter((row) => !selectedRows.has(row.id));
+      }
+      const updatedData = recalculateSubtotals(newData);
+      setOriginalData(updatedData);
+      return updatedData;
+    });
+
+    setSelectedRows(new Set());
+    updateSelectionState(new Set());
+    setDeleteDialogOpen(false);
+  };
+
+  // HRS
+  const handleRowSelection = (row: Row<Data>) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(row.original.id)) {
+        newSet.delete(row.original.id);
+        setSelectedRowForSubtotal(null);
+      } else {
+        if (newSet.size === 0) {
+          setSelectedRowForSubtotal(row.original.id);
+        } else {
+          setSelectedRowForSubtotal(null);
+        }
+        newSet.add(row.original.id);
+      }
+      updateSelectionState(newSet);
+      return newSet;
+    });
+  };
+
+  // HSA
+  const handleSelectAll = () => {
+    let newSelectedRows: Set<string>;
+    if (isAllSelected || isIndeterminate) {
+      newSelectedRows = new Set<string>();
+    } else {
+      newSelectedRows = new Set(data.map((row) => row.id));
+    }
+    setSelectedRows(newSelectedRows);
+    updateSelectionState(newSelectedRows);
+  };
+
+  // USS
+  const updateSelectionState = (selectedRows: Set<string>) => {
+    const allSelected = selectedRows.size === data.length && data.length > 0;
+    const someSelected = selectedRows.size > 0 && !allSelected;
+    setIsAllSelected(allSelected);
+    setIsIndeterminate(someSelected);
+    setShowDeleteButton(selectedRows.size > 0);
+    setCanAddSubtotal(
+      selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
+    );
+    if (onShowDeleteButton) {
+      onShowDeleteButton(selectedRows.size > 0);
+    }
+  };
+
+  // HDS
+  const handleDeleteSelected = () => {
+    setIsMultiDelete(true);
+    setDeleteDialogOpen(true);
+  };
+
+  useEffect(() => {
+    updateSelectionState(selectedRows);
+  }, [selectedRows, data]);
+
+  // HMD
+  const handleMouseDown = (event: React.MouseEvent, columnId: string) => {
+    if (columnId === "actions") return;
+
+    const startX = event.clientX;
+    const startWidth = columnWidths[columnId];
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = startWidth + e.clientX - startX;
+      setColumnWidths((prev) => ({
+        ...prev,
+        [columnId]: Math.max(newWidth, 30),
+      }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const columnHelper = createColumnHelper<Data>();
+
+  const checkboxColumn: ColumnConfig = {
+    id: "selection",
+    header: "",
+    type: "selection",
+    width: 10,
+  };
+
+  const allColumns = useMemo(() => [checkboxColumn, ...columns], [columns]);
+
+  const isSortableColumn = (columnId: string) => {
+    const column = columns.find((col) => col.id === columnId);
+    return column && column.type !== "action" && column.type !== "checkbox";
+  };
+
+  const getSortIcon = (
+    columnId: string,
+    columnType: ColumnType,
+    isSorted: false | "asc" | "desc"
+  ) => {
+    if (
+      columnType === "number" ||
+      columnType === "rate" ||
+      columnType === "amount"
+    ) {
+      if (!isSorted)
+        return <IconArrowsSort stroke={2} width={18} height={18} />;
+      return isSorted === "desc" ? (
+        <IconSortDescendingNumbers stroke={2} width={18} height={18} />
+      ) : (
+        <IconSortAscendingNumbers stroke={2} width={18} height={18} />
+      );
+    } else {
+      if (!isSorted)
+        return <IconArrowsSort stroke={2} width={18} height={18} />;
+      return isSorted === "desc" ? (
+        <IconSortDescendingLetters stroke={2} width={18} height={18} />
+      ) : (
+        <IconSortAscendingLetters stroke={2} width={18} height={18} />
+      );
+    }
+  };
+
+  const hasInputColumns = useMemo(() => {
+    return columns.some((col) =>
+      ["string", "number", "rate", "checkbox"].includes(col.type)
+    );
   }, [columns]);
 
   //RC
@@ -510,172 +800,6 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
       />
     );
   };
-
-  // HDR
-  const handleDeleteRow = (rowIndex: number, event: React.MouseEvent) => {
-    event.stopPropagation();
-    setData((oldData) => {
-      const newData = oldData.filter((_, index) => index !== rowIndex);
-      const updatedData = recalculateSubtotals(newData);
-      setOriginalData(updatedData);
-      return updatedData;
-    });
-  };
-
-  // HMD
-  const handleMouseDown = (event: React.MouseEvent, columnId: string) => {
-    if (columnId === "actions") return;
-
-    const startX = event.clientX;
-    const startWidth = columnWidths[columnId];
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = startWidth + e.clientX - startX;
-      setColumnWidths((prev) => ({
-        ...prev,
-        [columnId]: Math.max(newWidth, 30),
-      }));
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
-
-  const columnHelper = createColumnHelper<Data>();
-
-  const checkboxColumn: ColumnConfig = {
-    id: "selection",
-    header: "",
-    type: "selection",
-    width: 10,
-  };
-
-  const allColumns = useMemo(() => [checkboxColumn, ...columns], [columns]);
-
-  const isSortableColumn = (columnId: string) => {
-    const column = columns.find((col) => col.id === columnId);
-    return column && column.type !== "action" && column.type !== "checkbox";
-  };
-
-  const getSortIcon = (
-    columnId: string,
-    columnType: ColumnType,
-    isSorted: false | "asc" | "desc"
-  ) => {
-    if (
-      columnType === "number" ||
-      columnType === "rate" ||
-      columnType === "amount"
-    ) {
-      if (!isSorted)
-        return <IconArrowsSort stroke={2} width={18} height={18} />;
-      return isSorted === "desc" ? (
-        <IconSortDescendingNumbers stroke={2} width={18} height={18} />
-      ) : (
-        <IconSortAscendingNumbers stroke={2} width={18} height={18} />
-      );
-    } else {
-      if (!isSorted)
-        return <IconArrowsSort stroke={2} width={18} height={18} />;
-      return isSorted === "desc" ? (
-        <IconSortDescendingLetters stroke={2} width={18} height={18} />
-      ) : (
-        <IconSortAscendingLetters stroke={2} width={18} height={18} />
-      );
-    }
-  };
-
-  const hasInputColumns = useMemo(() => {
-    return columns.some((col) =>
-      ["string", "number", "rate", "checkbox"].includes(col.type)
-    );
-  }, [columns]);
-
-  const getHeaderClass = (columnType: ColumnType) => {
-    let baseClass = "cursor-pointer ";
-    switch (columnType) {
-      case "number":
-      case "rate":
-      case "readonly":
-      case "amount":
-        return baseClass + "text-right";
-      case "checkbox":
-      case "action":
-        return "text-center";
-      default:
-        return baseClass + "text-left";
-    }
-  };
-
-  // HRS
-  const handleRowSelection = (row: Row<Data>) => {
-    setSelectedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(row.original.id)) {
-        newSet.delete(row.original.id);
-        setSelectedRowForSubtotal(null);
-      } else {
-        if (newSet.size === 0) {
-          setSelectedRowForSubtotal(row.original.id);
-        } else {
-          setSelectedRowForSubtotal(null);
-        }
-        newSet.add(row.original.id);
-      }
-      updateSelectionState(newSet);
-      return newSet;
-    });
-  };
-
-  // HSA
-  const handleSelectAll = () => {
-    let newSelectedRows: Set<string>;
-    if (isAllSelected || isIndeterminate) {
-      newSelectedRows = new Set<string>();
-    } else {
-      newSelectedRows = new Set(data.map((row) => row.id));
-    }
-    setSelectedRows(newSelectedRows);
-    updateSelectionState(newSelectedRows);
-  };
-
-  // USS
-  const updateSelectionState = (selectedRows: Set<string>) => {
-    const allSelected = selectedRows.size === data.length && data.length > 0;
-    const someSelected = selectedRows.size > 0 && !allSelected;
-    setIsAllSelected(allSelected);
-    setIsIndeterminate(someSelected);
-    setShowDeleteButton(selectedRows.size > 0);
-    setCanAddSubtotal(
-      selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
-    );
-  };
-
-  // HDS
-  const handleDeleteSelected = () => {
-    setData((oldData) => {
-      let newData: Data[];
-      if (isAllSelected) {
-        newData = []; // Delete all rows
-      } else {
-        newData = oldData.filter((row) => !selectedRows.has(row.id));
-      }
-      const updatedData = recalculateSubtotals(newData);
-      setOriginalData(updatedData);
-      setSelectedRows(new Set());
-      updateSelectionState(new Set());
-      return updatedData;
-    });
-  };
-
-  useEffect(() => {
-    updateSelectionState(selectedRows);
-  }, [selectedRows, data]);
 
   //TC
   const tableColumns = useMemo(
@@ -1117,8 +1241,15 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           ))}
         </tbody>
       </table>
+      {/* SDB */}
       {showDeleteButton && (
-        <div className="absolute z-10 top-0 right-0">
+        <div
+          className="fixed z-10"
+          style={{
+            top: `${position.top}px`,
+            right: `${position.right}px`,
+          }}
+        >
           <button
             onClick={handleDeleteSelected}
             className="px-4 py-2 text-white font-medium border border-rose-500 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 hover:text-gray-100 rounded-full transition-colors duration-200"
@@ -1127,6 +1258,84 @@ const Table: React.FC<TableProps> = ({ initialData, columns }) => {
           </button>
         </div>
       )}
+      <Transition appear show={deleteDialogOpen} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-10"
+          onClose={() => setDeleteDialogOpen(false)}
+        >
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </TransitionChild>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <TransitionChild
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <DialogTitle
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900"
+                  >
+                    Delete Confirmation
+                  </DialogTitle>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      {isMultiDelete
+                        ? `Are you sure you want to delete ${
+                            isAllSelected ? "all" : "selected"
+                          } rows? This action cannot be undone.`
+                        : "Are you sure you want to delete this row? This action cannot be undone."}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex justify-end space-x-2">
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-full border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 active:bg-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                      onClick={() => {
+                        setDeleteDialogOpen(false);
+                        setRowToDelete(null);
+                        setIsMultiDelete(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-full border border-transparent bg-rose-500 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600 active:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
+                      onClick={() => {
+                        if (isMultiDelete) {
+                          deleteSelectedRows();
+                        } else if (rowToDelete) {
+                          deleteRow(rowToDelete.index);
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </DialogPanel>
+              </TransitionChild>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 };

@@ -48,11 +48,11 @@ const App: React.FC = () => {
 
   return (
     <div className="App">
-      <aside className="">{/* <Sidebar /> */}</aside>
+      <aside className=""><Sidebar /></aside>
       <main className="">
-        {/* <CatalogueJob /> */}
+        <CatalogueJob />
         {/* <MeeProduction /> */}
-        <Table initialData={initialData} columns={columns} />
+        {/* <Table initialData={initialData} columns={columns} /> */}
       </main>
     </div>
   );
