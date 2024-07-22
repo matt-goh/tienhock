@@ -991,7 +991,7 @@ const Table: React.FC<TableProps> = ({
   });
 
   return (
-    <div ref={tableRef} className="w-auto m-8">
+    <div ref={tableRef} className="w-auto">
       <div
         className={`flex ${
           showDeleteButton ? "mr-[5.5rem]" : ""
