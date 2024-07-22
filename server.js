@@ -79,3 +79,54 @@ app.delete('/api/jobs/:id', async (req, res) => {
     res.status(500).json({ message: 'Error deleting job', error: error.message });
   }
 });
+
+// Fetch all products for job catalogue
+app.get('/api/jobs/:jobId/products', async (req, res) => {
+  const { jobId } = req.params;
+
+  try {
+    const query = `
+      SELECT p.* 
+      FROM products p
+      JOIN job_products jp ON p.id = jp.product_id
+      WHERE jp.job_id = $1
+    `;
+    const result = await pool.query(query, [jobId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching products for job:', error);
+    res.status(500).json({ message: 'Error fetching products', error: error.message });
+  }
+});
+
+// Delete association from job_products table
+app.delete('/api/job_products', async (req, res) => {
+  const { jobId, productId } = req.body;
+
+  try {
+    const query = 'DELETE FROM job_products WHERE job_id = $1 AND product_id = $2';
+    await pool.query(query, [jobId, productId]);
+    res.status(200).json({ message: 'Association removed successfully' });
+  } catch (error) {
+    console.error('Error removing job-product association:', error);
+    res.status(500).json({ message: 'Error removing association', error: error.message });
+  }
+});
+
+// Delete a product
+app.delete('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // First, remove any associations in the job_products table
+    await pool.query('DELETE FROM job_products WHERE product_id = $1', [id]);
+
+    // Then, delete the product itself
+    const query = 'DELETE FROM products WHERE id = $1';
+    await pool.query(query, [id]);
+    res.status(200).json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ message: 'Error deleting product', error: error.message });
+  }
+});
