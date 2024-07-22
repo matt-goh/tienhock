@@ -26,4 +26,5 @@ export interface Data {
 export interface TableProps {
   initialData: Data[];
   columns: ColumnConfig[];
+  onShowDeleteButton?: (show: boolean) => void;
 }

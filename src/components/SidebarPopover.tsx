@@ -60,7 +60,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
           <li key={index}>
             <a
               href={option.link}
-              className="block py-2 px-4 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-full"
+              className="block py-2 px-4 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-lg"
             >
               {option.name}
             </a>

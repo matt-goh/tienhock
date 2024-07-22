@@ -6,6 +6,7 @@ import NewJobModal from "./NewJobModal";
 const CatalogueJob: React.FC = () => {
   const [jobs, setJobs] = useState<Data[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDeleteButton, setShowDeleteButton] = useState(false);
 
   const columns: ColumnConfig[] = [
     { id: "id", header: "ID", type: "readonly" },
@@ -42,21 +43,25 @@ const CatalogueJob: React.FC = () => {
         {dataFound ? (
           ""
         ) : (
-          <p className="text-center text-gray-500">
-            No data found.
-          </p>
+          <p className="text-center text-gray-500">No data found.</p>
         )}
         <div
-          className={`flex ${   
+          className={`flex ${
             dataFound ? "justify-end mb-4" : "justify-center mt-4"
-          }`}
+          } ${showDeleteButton ? "mr-[5.5rem]" : ""}`}
         >
           <NewJobModal onJobAdded={fetchJobs} />
         </div>
         {loading ? (
           <p>Loading...</p>
         ) : (
-          dataFound && <Table initialData={jobs} columns={columns} />
+          dataFound && (
+            <Table
+              initialData={jobs}
+              columns={columns}
+              onShowDeleteButton={setShowDeleteButton}
+            />
+          )
         )}
       </div>
     </div>
