@@ -1030,7 +1030,7 @@ const Table: React.FC<TableProps> = ({
       </div>
       <div className="rounded-lg border border-gray-300">
         <table
-          className="w-auto bg-white border-collapse border-spacing-0 rounded-lg"
+          className="w-auto border-collapse border-spacing-0 rounded-lg"
           ref={tableContainerRef}
         >
           <thead>
@@ -1125,7 +1125,7 @@ const Table: React.FC<TableProps> = ({
                 <tr
                   key={row.id}
                   className={`border-t ${
-                    isLastRow ? "border-b-0" : "border-b border-gray-300"
+                    isLastRow ? "border-b-0 rounded-b-lg" : "border-b border-gray-300"
                   } ${
                     row.id === selectedRowId ? "shadow-top-bottom" : ""
                   }
