@@ -161,8 +161,8 @@ const Sidebar: React.FC = () => {
             >
               {openItems.includes("stock") && (
                 <ul className="mt-2 space-y-1">
-                  <SidebarOption name="Opening" />
-                  <SidebarOption name="Card" />
+                  <SidebarOption name="Opening" link="/stock/opening" />
+                  <SidebarOption name="Card" link="/stock/card" />
                 </ul>
               )}
             </SidebarButton>
@@ -173,8 +173,8 @@ const Sidebar: React.FC = () => {
             >
               {openItems.includes("statement") && (
                 <ul className="mt-2 space-y-1">
-                  <SidebarOption name="Option 1" />
-                  <SidebarOption name="Option 2" />
+                  <SidebarOption name="Option 1" link="/catalogue/job" />
+                  <SidebarOption name="Option 2" link="/catalogue/job" />
                 </ul>
               )}
             </SidebarButton>
@@ -185,14 +185,20 @@ const Sidebar: React.FC = () => {
             >
               {openItems.includes("catalogue") && (
                 <ul className="mt-2 space-y-1">
-                  <SidebarOption name="Staff" />
-                  <SidebarOption name="Job" />
-                  <SidebarOption name="Products/Services" />
-                  <SidebarOption name="Section" />
-                  <SidebarOption name="Job Location" />
-                  <SidebarOption name="Nationality" />
-                  <SidebarOption name="Race" />
-                  <SidebarOption name="Agama" />
+                  <SidebarOption name="Staff" link="/catalogue/staff" />
+                  <SidebarOption name="Job" link="/catalogue/job" />
+                  <SidebarOption name="Products" link="/catalogue/products" />
+                  <SidebarOption name="Section" link="/catalogue/section" />
+                  <SidebarOption
+                    name="Job Location"
+                    link="/catalogue/joblocation"
+                  />
+                  <SidebarOption
+                    name="Nationality"
+                    link="/catalogue/nationality"
+                  />
+                  <SidebarOption name="Race" link="/catalogue/race" />
+                  <SidebarOption name="Agama" link="/catalogue/agama" />
                 </ul>
               )}
             </SidebarButton>
