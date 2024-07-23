@@ -46,7 +46,6 @@ const App: React.FC = () => {
     { id: "actions", header: "Actions", type: "action", width: 50 },
   ];
   const handleDeleteProducts = async (selectedIds: string[]) => {
-
     try {
       for (const productId of selectedIds) {
         // First, remove the association from the job_products table
@@ -73,15 +72,15 @@ const App: React.FC = () => {
 
   return (
     <div className="App">
-      {/* <aside className=""><Sidebar /></aside> */}
+      <aside className=""><Sidebar /></aside>
       <main className="">
-        {/* <CatalogueJob /> */}
+        <CatalogueJob />
         {/* <MeeProduction /> */}
-        <Table
+        {/* <Table
           initialData={initialData}
           columns={columns}
           onDelete={handleDeleteProducts}
-        />
+        /> */}
       </main>
     </div>
   );

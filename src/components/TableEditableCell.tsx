@@ -33,7 +33,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   }, [value]);
 
   useEffect(() => {
-    if (editable && focus && inputRef.current && type !== "checkbox") {
+    if (editable && focus && inputRef.current && type !== "checkbox" && type == "rate") {
       inputRef.current.focus();
       const length = inputRef.current.value.length;
       inputRef.current.setSelectionRange(length, length);
@@ -88,7 +88,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       newValue = e.target.checked;
       setCellValue(newValue.toString());
       onChange(newValue);
-    } else if (type === "number" || type === "rate") {
+    } else if (type === "number" || type === "rate" || type === "float") {
       newValue = formatEditValue(newValue);
       setEditValue(newValue);
     } else {
@@ -99,7 +99,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   const handleBlur = () => {
     let finalValue: string = editValue;
 
-    if (type === "number" || type === "rate") {
+    if (type === "number" || type === "rate" || type === "float") {
       // Remove trailing decimal point
       finalValue = finalValue.replace(/\.$/, "");
 
@@ -109,8 +109,9 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       }
 
       // Convert to number for onChange, but keep as string for display
-      const outputValue =
+      let outputValue =
         type === "rate" ? parseFloat(finalValue) : parseInt(finalValue, 10);
+
       setCellValue(finalValue);
       setEditValue(finalValue);
       onChange(outputValue);
@@ -138,7 +139,10 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       onBlur: handleBlur,
       onKeyDown: handleKeyDown,
       className: `w-full h-full px-6 py-3 m-0 outline-none bg-transparent ${
-        type === "number" || type === "rate" || type === "amount"
+        type === "number" ||
+        type === "rate" ||
+        type === "amount" ||
+        type === "float"
           ? "text-right"
           : ""
       } ${type === "checkbox" ? "w-auto" : ""} ${
@@ -163,7 +167,11 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         type: "text",
         value: editable ? editValue : cellValue,
         readOnly: !editable || isSorting,
-        inputMode: type === "number" || type === "rate" ? "decimal" : undefined,
+        inputMode:
+          type === "number" || type === "rate" || type === "float"
+            ? "decimal"
+            : undefined,
+        step: type === "float" ? "0.01" : undefined,
       };
     }
   };
