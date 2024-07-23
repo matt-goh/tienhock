@@ -7,6 +7,7 @@ export type ColumnType =
   | "readonly"
   | "checkbox"
   | "amount"
+  | "float"
   | "action";
 
 // Define column configuration
@@ -23,11 +24,13 @@ export interface Data {
 }
 
 // Props for the Table component
-export interface TableProps {
-  initialData: Data[];
+export interface TableProps<T> {
+  initialData: T[];
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;
   onDelete: (selectedIds: string[]) => Promise<void>;
+  onChange?: (changedData: T[]) => void;
+  isEditing: boolean;
 }
 
 export interface Job {
