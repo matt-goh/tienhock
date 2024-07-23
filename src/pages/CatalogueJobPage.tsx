@@ -15,14 +15,14 @@ import {
   IconTrash,
   IconCancel,
 } from "@tabler/icons-react";
-import Table from "./Table";
-import { ColumnConfig, Data, Job, Product } from "../types/types";
-import NewJobModal from "./NewJobModal";
-import DeleteDialog from "./DeleteDialog";
+import Table from "../components/Table";
+import { ColumnConfig, Job, Product } from "../types/types";
+import NewJobModal from "../components/NewJobModal";
+import DeleteDialog from "../components/DeleteDialog";
 
 type JobSelection = Job | null;
 
-const CatalogueJob: React.FC = () => {
+const CatalogueJobPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [editedJob, setEditedJob] = useState<Job | null>(null);
@@ -339,7 +339,9 @@ const CatalogueJob: React.FC = () => {
                       >
                         + Add Job
                       </ComboboxOption>
-                      <div className="border-t border-gray-150 w-full my-1"></div>
+                      {jobs.length !== 0 && (
+                        <div className="border-t border-gray-150 w-full my-1"></div>
+                      )}
                       {filteredJobs.map((job) => (
                         <div
                           key={job.id}
@@ -525,4 +527,4 @@ const CatalogueJob: React.FC = () => {
   );
 };
 
-export default CatalogueJob;
+export default CatalogueJobPage;
