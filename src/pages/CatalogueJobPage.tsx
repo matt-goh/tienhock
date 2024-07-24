@@ -108,12 +108,18 @@ const CatalogueJobPage: React.FC = () => {
     setShowNewJobModal(false);
   }, [fetchJobs]);
 
+  // HJS
   const handleJobSelection = useCallback((selection: Job | null) => {
     if (selection === null) {
       setShowNewJobModal(true);
     } else {
       setSelectedJob(selection);
+      setShowNewJobModal(false);
     }
+  }, []);
+
+  const handleNewJobModalClose = useCallback(() => {
+    setShowNewJobModal(false);
   }, []);
 
   const handleDeleteJob = useCallback(async (job: Job, e: React.MouseEvent) => {
@@ -485,7 +491,7 @@ const CatalogueJobPage: React.FC = () => {
 
         <NewJobModal
           isOpen={showNewJobModal}
-          onClose={() => setShowNewJobModal(false)}
+          onClose={handleNewJobModalClose}
           onJobAdded={handleJobAdded}
         />
         <DeleteDialog

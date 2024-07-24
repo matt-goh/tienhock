@@ -21,6 +21,7 @@ import {
 import "react-datepicker/dist/react-datepicker.css";
 import {
   IconArrowsSort,
+  IconPlus,
   IconSortAscendingLetters,
   IconSortAscendingNumbers,
   IconSortDescendingLetters,
@@ -53,6 +54,9 @@ function Table<T extends Record<string, any>>({
     [key: string]: any;
   }>({});
   const [originalData, setOriginalData] = useState<T[]>(initialData);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartY, setDragStartY] = useState(0);
+  const [rowsToAdd, setRowsToAdd] = useState(0);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
     string | null
@@ -70,6 +74,7 @@ function Table<T extends Record<string, any>>({
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isIndeterminate, setIsIndeterminate] = useState(false);
+  const [tableWidth, setTableWidth] = useState(0);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
@@ -159,6 +164,21 @@ function Table<T extends Record<string, any>>({
       window.removeEventListener("scroll", updatePosition);
     };
   }, [tableRef]);
+
+  useEffect(() => {
+    const updateTableWidth = () => {
+      if (tableRef.current) {
+        setTableWidth(tableRef.current.offsetWidth);
+      }
+    };
+
+    updateTableWidth();
+    window.addEventListener("resize", updateTableWidth);
+
+    return () => {
+      window.removeEventListener("resize", updateTableWidth);
+    };
+  }, []);
 
   //HCC
   const handleCellClick = useCallback(
@@ -279,7 +299,7 @@ function Table<T extends Record<string, any>>({
         nextRowIndex === 0 &&
         currentRowIndex === sortedRows.length - 1
       ) {
-        handleAddRow(1);
+        handleAddRow();
         setTimeout(() => {
           const newRows = table.getRowModel().rows;
           const newRowId = newRows[newRows.length - 1].id;
@@ -297,29 +317,57 @@ function Table<T extends Record<string, any>>({
   };
 
   // HAR
-  const handleAddRow = (count: number = 4) => {
-    const newRows = Array(count)
-      .fill(null)
-      .map(() => ({
-        id: Math.random().toString(36).substr(2, 9), // Generate a unique id
-        ...Object.fromEntries(
-          columns.map((col) => {
-            switch (col.type) {
-              case "number":
-              case "rate":
-              case "float":
-              case "amount":
-              case "readonly":
-                return [col.id, 0];
-              case "checkbox":
-                return [col.id, true];
-              default:
-                return [col.id, ""];
-            }
-          })
-        ),
-      }));
-    setData((oldData) => recalculateSubtotals([...oldData, ...newRows]));
+  const handleAddRow = useCallback(() => {
+    const newRow = {
+      id: Math.random().toString(36).substr(2, 9),
+      ...Object.fromEntries(
+        columns.map((col) => {
+          switch (col.type) {
+            case "number":
+            case "rate":
+            case "float":
+            case "amount":
+            case "readonly":
+              return [col.id, 0];
+            case "checkbox":
+              return [col.id, false];
+            default:
+              return [col.id, ""];
+          }
+        })
+      ),
+    } as T;
+
+    setData((prevData) => {
+      const newData = [...prevData, newRow];
+      if (onChange) {
+        onChange(newData);
+      }
+      return newData;
+    });
+  }, [columns, onChange]);
+
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    setDragStartY(e.clientY);
+  };
+
+  const handleDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      const dragDelta = dragStartY - e.clientY;
+      const newRowsToAdd = Math.floor(dragDelta / 30); // Assuming each row is about 30px high
+      setRowsToAdd(newRowsToAdd > 0 ? newRowsToAdd : 0);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    if (rowsToAdd > 0) {
+      for (let i = 0; i < rowsToAdd; i++) {
+        handleAddRow();
+      }
+    }
+    setRowsToAdd(0);
   };
 
   //HASR
@@ -572,130 +620,168 @@ function Table<T extends Record<string, any>>({
   const renderCell = (
     row: Row<T>,
     cell: Cell<T, unknown>,
-    cellIndex: number
+    cellIndex: number,
+    isLastRow: boolean
   ): ReactNode => {
-    const columnType = allColumns[cellIndex].type;
-    const columnConfig = allColumns[cellIndex];
-    const isEditable =
-      !isSorting && !row.original.isSubtotal && isEditableColumn(columnConfig);
+    const renderCellContent = () => {
+      const columnType = allColumns[cellIndex].type;
+      const columnConfig = allColumns[cellIndex];
+      const isEditable =
+        !isSorting &&
+        !row.original.isSubtotal &&
+        isEditableColumn(columnConfig);
 
-    if (columnType === "selection") {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRowSelection(row);
-            }}
-            className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
-            disabled={isSorting}
-          >
-            {selectedRows.has(row.original.id) ? (
-              <IconSquareCheckFilled
-                width={20}
-                height={20}
-                className="text-blue-600"
-              />
-            ) : (
-              <IconSquare
-                width={20}
-                height={20}
-                stroke={2}
-                className="text-gray-400"
-              />
-            )}
-          </button>
-        </div>
-      );
-    }
-
-    if (row.original.isSubtotal) {
-      if (columnType === "amount") {
-        return (
-          <React.Fragment>
-            <td
-              colSpan={columns.length - 1}
-              className="py-3 pr-6 text-right font-semibold border"
-            >
-              Subtotal:
-            </td>
-            <td className="py-3 pr-6 text-right font-semibold border">
-              {cell.getValue() as ReactNode}
-            </td>
-          </React.Fragment>
-        );
-      } else if (columnType === "action") {
+      if (columnType === "selection") {
         return (
           <div className="flex items-center justify-center h-full">
             <button
-              className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600 ${
-                isSorting ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-              onClick={(event) => {
-                if (!isSorting) {
-                  handleDeleteRow(row.index, event);
-                }
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRowSelection(row);
               }}
+              className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
               disabled={isSorting}
             >
-              <IconTrash stroke={2} width={20} height={20} />
+              {selectedRows.has(row.original.id) ? (
+                <IconSquareCheckFilled
+                  width={20}
+                  height={20}
+                  className="text-blue-600"
+                />
+              ) : (
+                <IconSquare
+                  width={20}
+                  height={20}
+                  stroke={2}
+                  className="text-gray-400"
+                />
+              )}
             </button>
           </div>
         );
       }
-      return null;
-    }
 
-    // Non-subtotal rows
-    if (columnType === "action") {
-      return flexRender(cell.column.columnDef.cell, cell.getContext());
-    }
+      if (row.original.isSubtotal) {
+        if (columnType === "amount") {
+          return (
+            <React.Fragment>
+              <td
+                colSpan={columns.length - 1}
+                className="py-3 pr-6 text-right font-semibold border"
+              >
+                Subtotal:
+              </td>
+              <td className="py-3 pr-6 text-right font-semibold border">
+                {cell.getValue() as ReactNode}
+              </td>
+            </React.Fragment>
+          );
+        } else if (columnType === "action") {
+          return (
+            <div className="flex items-center justify-center h-full">
+              <button
+                className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600 ${
+                  isSorting ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                onClick={(event) => {
+                  if (!isSorting) {
+                    handleDeleteRow(row.index, event);
+                  }
+                }}
+                disabled={isSorting}
+              >
+                <IconTrash stroke={2} width={20} height={20} />
+              </button>
+            </div>
+          );
+        }
+        return null;
+      }
 
-    if (["number", "rate", "string", "float", "date"].includes(columnType)) {
-      return (
-        <TableEditableCell
-          value={cell.getValue()}
-          onChange={(val) => {
-            if (!isSorting) {
-              handleCellChange(row.index, cell.column.id, val);
+      // Non-subtotal rows
+      if (columnType === "action") {
+        return flexRender(cell.column.columnDef.cell, cell.getContext());
+      }
+
+      if (["number", "rate", "string", "float", "date"].includes(columnType)) {
+        return (
+          <TableEditableCell
+            value={cell.getValue()}
+            onChange={(val) => {
+              if (!isSorting) {
+                handleCellChange(row.index, cell.column.id, val);
+              }
+            }}
+            type={columnType}
+            editable={isEditable && !isSorting}
+            focus={
+              isEditable &&
+              !isSorting &&
+              row.id === editableRowId &&
+              cellIndex === editableCellIndex
             }
-          }}
-          type={columnType}
-          editable={isEditable && !isSorting}
-          focus={
-            isEditable &&
-            !isSorting &&
-            row.id === editableRowId &&
-            cellIndex === editableCellIndex
-          }
-          onKeyDown={(e) => !isSorting && handleKeyDown(e, row.id, cellIndex)}
-          isSorting={isSorting}
-          previousCellValue={
-            previousCellValues[`${row.id}-${cell.column.id}`] ?? cell.getValue()
-          }
-        />
-      );
-    }
+            onKeyDown={(e) => !isSorting && handleKeyDown(e, row.id, cellIndex)}
+            isSorting={isSorting}
+            previousCellValue={
+              previousCellValues[`${row.id}-${cell.column.id}`] ??
+              cell.getValue()
+            }
+          />
+        );
+      }
 
-    if (columnType === "amount") {
-      const jamPerDay = parseFloat(row.original.jamPerDay) || 0;
-      const rate = parseFloat(row.original.rate) || 0;
-      const amount = (jamPerDay * rate).toFixed(2);
-      return (
-        <TableEditableCell
-          value={amount}
-          onChange={() => {}}
-          type={columnType}
-          editable={false}
-          focus={false}
-          onKeyDown={() => {}}
-          isSorting={isSorting}
-          previousCellValue={amount}
-        />
-      );
-    }
+      if (columnType === "amount") {
+        const jamPerDay = parseFloat(row.original.jamPerDay) || 0;
+        const rate = parseFloat(row.original.rate) || 0;
+        const amount = (jamPerDay * rate).toFixed(2);
+        return (
+          <TableEditableCell
+            value={amount}
+            onChange={() => {}}
+            type={columnType}
+            editable={false}
+            focus={false}
+            onKeyDown={() => {}}
+            isSorting={isSorting}
+            previousCellValue={amount}
+          />
+        );
+      }
 
-    if (columnType === "readonly") {
+      if (columnType === "readonly") {
+        return (
+          <TableEditableCell
+            value={cell.getValue()}
+            onChange={() => {}}
+            type={columnType}
+            editable={false}
+            focus={false}
+            onKeyDown={() => {}}
+            isSorting={isSorting}
+            previousCellValue={cell.getValue()}
+          />
+        );
+      }
+
+      if (columnType === "checkbox") {
+        return (
+          <div className="flex items-center justify-center h-full">
+            <TableEditableCell
+              value={cell.getValue()}
+              onChange={(val) =>
+                handleCellChange(row.index, cell.column.id, val)
+              }
+              type="checkbox"
+              editable={!isSorting}
+              focus={false}
+              onKeyDown={() => {}}
+              isSorting={isSorting}
+              previousCellValue={cell.getValue()}
+            />
+          </div>
+        );
+      }
+
       return (
         <TableEditableCell
           value={cell.getValue()}
@@ -708,37 +794,9 @@ function Table<T extends Record<string, any>>({
           previousCellValue={cell.getValue()}
         />
       );
-    }
+    };
 
-    if (columnType === "checkbox") {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <TableEditableCell
-            value={cell.getValue()}
-            onChange={(val) => handleCellChange(row.index, cell.column.id, val)}
-            type="checkbox"
-            editable={!isSorting}
-            focus={false}
-            onKeyDown={() => {}}
-            isSorting={isSorting}
-            previousCellValue={cell.getValue()}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <TableEditableCell
-        value={cell.getValue()}
-        onChange={() => {}}
-        type={columnType}
-        editable={false}
-        focus={false}
-        onKeyDown={() => {}}
-        isSorting={isSorting}
-        previousCellValue={cell.getValue()}
-      />
-    );
+    return renderCellContent();
   };
 
   //TC
@@ -1002,25 +1060,6 @@ function Table<T extends Record<string, any>>({
           showDeleteButton ? "mr-[5.5rem]" : ""
         } items-center justify-end w-auto`}
       >
-        {hasInputColumns && (
-          <button
-            onClick={() => handleAddRow(2)}
-            className={`px-4 py-2 border border-gray-300 font-medium rounded-full ${
-              !isSorting
-                ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
-                : "opacity-50 cursor-not-allowed"
-            }`}
-            disabled={isSorting}
-            style={{
-              position: "fixed",
-              top: `${buttonPosition.top}px`,
-              right: `${buttonPosition.leftright}px`,
-              zIndex: 10,
-            }}
-          >
-            Add rows
-          </button>
-        )}
         {hasAmountColumn && hasNumberColumn && (
           <button
             onClick={handleAddSubtotalRow}
@@ -1142,7 +1181,7 @@ function Table<T extends Record<string, any>>({
                             key={cell.id}
                             className="border-r border-gray-300"
                           >
-                            {renderCell(row, cell, cellIndex)}
+                            {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
                         );
                       } else if (
@@ -1164,7 +1203,7 @@ function Table<T extends Record<string, any>>({
                             key={cell.id}
                             className="border-l border-gray-300"
                           >
-                            {renderCell(row, cell, cellIndex)}
+                            {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
                         );
                       } else {
@@ -1201,7 +1240,7 @@ function Table<T extends Record<string, any>>({
                               `${columnWidths[cell.column.id]}px` || "auto",
                           }}
                         >
-                          {renderCell(row, cell, cellIndex)}
+                          {renderCell(row, cell, cellIndex, isLastRow)}
                         </td>
                       );
                     }
@@ -1212,6 +1251,16 @@ function Table<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
+      
+    <div
+      style={{ width: `${tableWidth}px` }}
+      className="h-4 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors duration-200 cursor-pointer mt-1"
+      onClick={handleAddRow}
+      onMouseDown={handleDragStart}
+      onMouseMove={handleDrag}
+      onMouseUp={handleDragEnd}
+      onMouseLeave={handleDragEnd}
+    />
       {/* SDB */}
       {showDeleteButton && (
         <DeleteButton

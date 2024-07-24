@@ -5,6 +5,7 @@ import CatalogueJobPage from "./pages/CatalogueJobPage";
 import MeeProduction from "./components/MeeProduction";
 import Sidebar from "./components/Sidebar";
 import "./App.css";
+import TablePlayground from "./components/TablePlayground";
 
 const App: React.FC = () => {
   return (
@@ -18,6 +19,7 @@ const App: React.FC = () => {
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
           </Routes>
           {/* <MeeProduction /> */}
+          <TablePlayground />
         </main>
       </div>
     </Router>

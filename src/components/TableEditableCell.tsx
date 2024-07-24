@@ -33,10 +33,12 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   }, [value]);
 
   useEffect(() => {
-    if (editable && focus && inputRef.current && type !== "checkbox" && type == "rate") {
+    if (editable && focus && inputRef.current && type !== "checkbox") {
       inputRef.current.focus();
-      const length = inputRef.current.value.length;
-      inputRef.current.setSelectionRange(length, length);
+      if (type === "number" || type === "rate" || type === "float") {
+        const length = inputRef.current.value.length;
+        inputRef.current.setSelectionRange(length, length);
+      }
     }
   }, [editable, focus, type]);
 
