@@ -350,6 +350,9 @@ function Table<T extends Record<string, any>>({
   const addRowBarRef = useRef<HTMLDivElement>(null);
   const lastAddedOrRemovedY = useRef(0);
   const animationFrameId = useRef<number | null>(null);
+  const [isLastRowHovered, setIsLastRowHovered] = useState(false);
+  const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
+  const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
@@ -381,6 +384,7 @@ function Table<T extends Record<string, any>>({
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
+    setIsAddRowBarActive(true);
     setRowsToAddOrRemove(0);
     lastAddedOrRemovedY.current = e.clientY;
   }, []);
@@ -421,6 +425,7 @@ function Table<T extends Record<string, any>>({
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
+      setIsAddRowBarActive(false);
       setRowsToAddOrRemove(0);
     }
   }, [isDragging]);
@@ -875,6 +880,17 @@ function Table<T extends Record<string, any>>({
         />
       );
     };
+
+    if (isLastRow) {
+      return (
+        <div
+          onMouseEnter={() => setIsLastRowHovered(true)}
+          onMouseLeave={() => setIsLastRowHovered(false)}
+        >
+          {renderCellContent()}
+        </div>
+      );
+    }
 
     return renderCellContent();
   };
@@ -1352,10 +1368,27 @@ function Table<T extends Record<string, any>>({
           width: `${tableWidth}px`,
           height: "18px",
           userSelect: "none",
+          opacity:
+            isLastRowHovered || isAddRowBarHovered || isAddRowBarActive ? 1 : 0,
+          transition: "opacity 0.2s ease-in-out",
         }}
-        className="bg-gray-200 rounded-full hover:bg-gray-300 active:bg-teal-400 transition-colors duration-200 mt-1 flex items-center justify-center hover:cursor-row-resize active:cursor-row-resize"
+        className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center hover:cursor-row-resize ${
+          isAddRowBarActive ? "active-bg" : ""
+        }
+        }`}
         onMouseDown={handleMouseDown}
+        onClick={handleAddRow}
+        onMouseEnter={() => setIsAddRowBarHovered(true)}
+        onMouseLeave={() => setIsAddRowBarHovered(false)}
       ></div>
+      <style>{`
+        .active-bg {
+          background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+        }
+        .active-bg:active {
+          background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+        }
+      `}</style>
     </div>
   );
 }
