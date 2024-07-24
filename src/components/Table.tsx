@@ -21,6 +21,7 @@ import {
 import "react-datepicker/dist/react-datepicker.css";
 import {
   IconArrowsSort,
+  IconMinus,
   IconPlus,
   IconSortAscendingLetters,
   IconSortAscendingNumbers,
@@ -54,9 +55,6 @@ function Table<T extends Record<string, any>>({
     [key: string]: any;
   }>({});
   const [originalData, setOriginalData] = useState<T[]>(initialData);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStartY, setDragStartY] = useState(0);
-  const [rowsToAdd, setRowsToAdd] = useState(0);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
     string | null
@@ -347,28 +345,107 @@ function Table<T extends Record<string, any>>({
     });
   }, [columns, onChange]);
 
-  const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
+  const addRowBarRef = useRef<HTMLDivElement>(null);
+  const lastAddedOrRemovedY = useRef(0);
+  const animationFrameId = useRef<number | null>(null);
+
+  const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
+
+  const isRowEmpty = useCallback((row: T) => {
+    return Object.values(row).every(
+      (value) =>
+        value === "" ||
+        value === 0 ||
+        value === false ||
+        value === null ||
+        value === undefined
+    );
+  }, []);
+
+  const handleRemoveEmptyRow = useCallback(() => {
+    setData((prevData) => {
+      const lastRow = prevData[prevData.length - 1];
+      if (lastRow && isRowEmpty(lastRow)) {
+        const newData = prevData.slice(0, -1);
+        if (onChange) {
+          onChange(newData);
+        }
+        return newData;
+      }
+      return prevData;
+    });
+  }, [onChange, isRowEmpty]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
     setIsDragging(true);
-    setDragStartY(e.clientY);
-  };
+    setRowsToAddOrRemove(0);
+    lastAddedOrRemovedY.current = e.clientY;
+  }, []);
 
-  const handleDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isDragging) {
-      const dragDelta = dragStartY - e.clientY;
-      const newRowsToAdd = Math.floor(dragDelta / 30); // Assuming each row is about 30px high
-      setRowsToAdd(newRowsToAdd > 0 ? newRowsToAdd : 0);
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const currentY = e.clientY;
+      const mouseDelta = currentY - lastAddedOrRemovedY.current;
+
+      // Check if we've dragged past the threshold
+      if (Math.abs(mouseDelta) >= DRAG_THRESHOLD) {
+        const rowsChanged =
+          Math.sign(mouseDelta) *
+          Math.floor(Math.abs(mouseDelta) / DRAG_THRESHOLD);
+        setRowsToAddOrRemove((prev) => prev + rowsChanged);
+        lastAddedOrRemovedY.current = currentY;
+      }
+    },
+    [isDragging]
+  );
+
+  const updateRows = useCallback(() => {
+    if (rowsToAddOrRemove > 0) {
+      handleAddRow();
+      setRowsToAddOrRemove((prev) => prev - 1);
+    } else if (rowsToAddOrRemove < 0) {
+      handleRemoveEmptyRow();
+      setRowsToAddOrRemove((prev) => prev + 1);
     }
-  };
 
-  const handleDragEnd = () => {
-    setIsDragging(false);
-    if (rowsToAdd > 0) {
-      for (let i = 0; i < rowsToAdd; i++) {
-        handleAddRow();
+    if (rowsToAddOrRemove !== 0) {
+      animationFrameId.current = requestAnimationFrame(updateRows);
+    }
+  }, [rowsToAddOrRemove, handleAddRow, handleRemoveEmptyRow]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      setRowsToAddOrRemove(0);
+    }
+  }, [isDragging]);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      animationFrameId.current = requestAnimationFrame(updateRows);
+    } else {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
       }
     }
-    setRowsToAdd(0);
-  };
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
   //HASR
   const handleAddSubtotalRow = () => {
@@ -566,7 +643,10 @@ function Table<T extends Record<string, any>>({
     width: 10,
   };
 
-  const allColumns = useMemo(() => [checkboxColumn, ...columns], [columns]);
+  const allColumns = useMemo(
+    () => (isEditing ? [checkboxColumn, ...columns] : columns),
+    [columns, isEditing]
+  );
 
   const isSortableColumn = (columnId: string) => {
     const column = columns.find((col) => col.id === columnId);
@@ -1007,12 +1087,13 @@ function Table<T extends Record<string, any>>({
       }),
     [
       columns,
-      editableRowId,
-      editableCellIndex,
-      selectedRows,
+      isEditing,
       isSorting,
+      selectedRows,
+      editableRowId,
       isAllSelected,
       isIndeterminate,
+      editableCellIndex,
       handleCellChange,
       handleCellClick,
       handleKeyDown,
@@ -1105,7 +1186,7 @@ function Table<T extends Record<string, any>>({
                       width: `${columnWidths[header.id]}px` || "auto",
                     }}
                   >
-                    {header.column.id === "selection" ? (
+                    {header.column.id === "selection" && isEditing ? (
                       <div className="flex items-center justify-center h-full">
                         <button
                           onClick={(e) => {
@@ -1251,16 +1332,6 @@ function Table<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
-      
-    <div
-      style={{ width: `${tableWidth}px` }}
-      className="h-4 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors duration-200 cursor-pointer mt-1"
-      onClick={handleAddRow}
-      onMouseDown={handleDragStart}
-      onMouseMove={handleDrag}
-      onMouseUp={handleDragEnd}
-      onMouseLeave={handleDragEnd}
-    />
       {/* SDB */}
       {showDeleteButton && (
         <DeleteButton
@@ -1275,6 +1346,16 @@ function Table<T extends Record<string, any>>({
           }}
         />
       )}
+      <div
+        ref={addRowBarRef}
+        style={{
+          width: `${tableWidth}px`,
+          height: "18px",
+          userSelect: "none",
+        }}
+        className="bg-gray-200 rounded-full hover:bg-gray-300 active:bg-teal-400 transition-colors duration-200 mt-1 flex items-center justify-center hover:cursor-row-resize active:cursor-row-resize"
+        onMouseDown={handleMouseDown}
+      ></div>
     </div>
   );
 }
