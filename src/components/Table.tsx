@@ -349,23 +349,38 @@ function Table<T extends Record<string, any>>({
   const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
   const addRowBarRef = useRef<HTMLDivElement>(null);
   const lastAddedOrRemovedY = useRef(0);
+  const initialDragY = useRef(0);
   const animationFrameId = useRef<number | null>(null);
   const [isLastRowHovered, setIsLastRowHovered] = useState(false);
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
+  const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
+  const [isCursorAboveInitialPoint, setIsCursorAboveInitialPoint] = useState(false);
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
   const isRowEmpty = useCallback((row: T) => {
-    return Object.values(row).every(
-      (value) =>
-        value === "" ||
-        value === 0 ||
-        value === false ||
-        value === null ||
-        value === undefined
-    );
+    return Object.entries(row).every(([key, value]) => {
+      if (key === 'id' || key === 'isSubtotal') return true;
+      return value === "" || value === 0 || value === false || value === null || value === undefined;
+    });
   }, []);
+
+  const updateRemovableRowsAbove = useCallback(() => {
+    let count = 0;
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (isRowEmpty(data[i])) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    setRemovableRowsAbove(count);
+  }, [data, isRowEmpty]);
+
+  useEffect(() => {
+    updateRemovableRowsAbove();
+  }, [data, updateRemovableRowsAbove]);
 
   const handleRemoveEmptyRow = useCallback(() => {
     setData((prevData) => {
@@ -387,6 +402,8 @@ function Table<T extends Record<string, any>>({
     setIsAddRowBarActive(true);
     setRowsToAddOrRemove(0);
     lastAddedOrRemovedY.current = e.clientY;
+    initialDragY.current = e.clientY;
+    setIsCursorAboveInitialPoint(false);
   }, []);
 
   const handleMouseMove = useCallback(
@@ -396,39 +413,63 @@ function Table<T extends Record<string, any>>({
       const currentY = e.clientY;
       const mouseDelta = currentY - lastAddedOrRemovedY.current;
 
-      // Check if we've dragged past the threshold
-      if (Math.abs(mouseDelta) >= DRAG_THRESHOLD) {
-        const rowsChanged =
-          Math.sign(mouseDelta) *
-          Math.floor(Math.abs(mouseDelta) / DRAG_THRESHOLD);
-        setRowsToAddOrRemove((prev) => prev + rowsChanged);
-        lastAddedOrRemovedY.current = currentY;
+      if (currentY < initialDragY.current) {
+        setIsCursorAboveInitialPoint(true);
+      } else {
+        setIsCursorAboveInitialPoint(false);
+      }
+
+      // Process drag if cursor is at or below the initial drag point, or if there are removable rows above
+      if (!isCursorAboveInitialPoint || currentY >= initialDragY.current || removableRowsAbove > 0) {
+        // Check if we've dragged past the threshold
+        if (Math.abs(mouseDelta) >= DRAG_THRESHOLD) {
+          const rowsChanged = Math.sign(mouseDelta) * Math.floor(Math.abs(mouseDelta) / DRAG_THRESHOLD);
+          setRowsToAddOrRemove((prev) => {
+            const newValue = prev + rowsChanged;
+            // Prevent removing more rows than available
+            return Math.max(newValue, -removableRowsAbove);
+          });
+          lastAddedOrRemovedY.current = currentY;
+        }
+      }
+
+      // Always update the bar position
+      if (addRowBarRef.current) {
+        const barRect = addRowBarRef.current.getBoundingClientRect();
+        const newTop = barRect.top + mouseDelta;
+        addRowBarRef.current.style.top = `${newTop}px`;
       }
     },
-    [isDragging]
+    [isDragging, isCursorAboveInitialPoint, removableRowsAbove]
   );
 
   const updateRows = useCallback(() => {
     if (rowsToAddOrRemove > 0) {
       handleAddRow();
       setRowsToAddOrRemove((prev) => prev - 1);
-    } else if (rowsToAddOrRemove < 0) {
+    } else if (rowsToAddOrRemove < 0 && removableRowsAbove > 0) {
       handleRemoveEmptyRow();
       setRowsToAddOrRemove((prev) => prev + 1);
+      setRemovableRowsAbove((prev) => prev - 1);
     }
 
     if (rowsToAddOrRemove !== 0) {
       animationFrameId.current = requestAnimationFrame(updateRows);
     }
-  }, [rowsToAddOrRemove, handleAddRow, handleRemoveEmptyRow]);
+  }, [rowsToAddOrRemove, handleAddRow, handleRemoveEmptyRow, removableRowsAbove]);
 
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
       setIsAddRowBarActive(false);
       setRowsToAddOrRemove(0);
+      setIsCursorAboveInitialPoint(false);
+      if (addRowBarRef.current) {
+        addRowBarRef.current.style.top = 'auto';
+      }
+      updateRemovableRowsAbove();
     }
-  }, [isDragging]);
+  }, [isDragging, updateRemovableRowsAbove]);
 
   useEffect(() => {
     if (isDragging) {
