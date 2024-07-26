@@ -10,10 +10,7 @@ import {
 import {
   IconCheck,
   IconChevronDown,
-  IconDeviceFloppy,
-  IconEdit,
   IconTrash,
-  IconCancel,
 } from "@tabler/icons-react";
 import Table from "../components/Table";
 import { ColumnConfig, Job, Product } from "../types/types";
@@ -310,11 +307,11 @@ const CatalogueJobPage: React.FC = () => {
 
   return (
     <div className={`flex justify-center py-[60px]`}>
-      <div className="flex flex-col items-start max-w-4xl px-4">
+      <div className="flex flex-col items-start max-w-4xl">
         <div className={`w-full text-lg font-medium text-gray-700 mb-4`}>
           Job Catalogue
         </div>
-        <div className={`w-full flex justify-center items-center mb-4`}>
+        <div className={`w-full flex justify-start items-center mb-4`}>
           <div className={`${selectedJob ? "w-54 mr-4" : "w-full max-w-xs"}`}>
             {!isEditing ? (
               <Field>
@@ -461,30 +458,6 @@ const CatalogueJobPage: React.FC = () => {
                   <span className="mr-3">{selectedJob.section}</span>
                 )}
               </div>
-              {!isEditing ? (
-                <div
-                  className="px-2 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
-                  onClick={toggleEditing}
-                >
-                  <IconEdit className="mr-1.5" />
-                  <span>Edit</span>
-                </div>
-              ) : (
-                <div className="flex border border-gray-300 rounded-lg">
-                  <div
-                    className="px-2 py-2 text-sky-500 hover:text-sky-600 active:text-sky-700 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
-                    onClick={handleSave}
-                  >
-                    <IconDeviceFloppy />
-                  </div>
-                  <div
-                    className="px-2 py-2 text-rose-500 hover:text-rose-600 active:text-rose-700  rounded-r-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
-                    onClick={handleCancel}
-                  >
-                    <IconCancel />
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -520,6 +493,9 @@ const CatalogueJobPage: React.FC = () => {
                 onDelete={handleDeleteProducts}
                 onChange={() => handleDataChange}
                 isEditing={isEditing}
+                onToggleEditing={toggleEditing}
+                onSave={handleSave}
+                onCancel={handleCancel}
               />
             </div>
           </div>
