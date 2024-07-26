@@ -11,11 +11,11 @@ const port = 5000;
 
 // PostgreSQL connection
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'tienhock',
-  password: 'foodmaker',
-  port: 5432,
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'db', // 'db' is the service name in docker-compose
+  database: process.env.DB_NAME || 'tienhock',
+  password: process.env.DB_PASSWORD || 'foodmaker',
+  port: parseInt(process.env.DB_PORT || 5432),
 });
 
 app.use(cors());
