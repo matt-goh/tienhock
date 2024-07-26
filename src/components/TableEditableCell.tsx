@@ -90,7 +90,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       newValue = e.target.checked;
       setCellValue(newValue.toString());
       onChange(newValue);
-    } else if (type === "number" || type === "rate" || type === "float") {
+    } else if (type === "number" || type === "rate") {
       newValue = formatEditValue(newValue);
       setEditValue(newValue);
     } else {
@@ -101,7 +101,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   const handleBlur = () => {
     let finalValue: string = editValue;
 
-    if (type === "number" || type === "rate" || type === "float") {
+    if (type === "number" || type === "rate") {
       // Remove trailing decimal point
       finalValue = finalValue.replace(/\.$/, "");
 
@@ -169,10 +169,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         type: "text",
         value: editable ? editValue : cellValue,
         readOnly: !editable || isSorting,
-        inputMode:
-          type === "number" || type === "rate" || type === "float"
-            ? "decimal"
-            : undefined,
+        inputMode: type === "number" || type === "rate" ? "decimal" : undefined,
         step: type === "float" ? "0.01" : undefined,
       };
     }
