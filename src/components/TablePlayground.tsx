@@ -93,7 +93,7 @@ const TablePlayground: React.FC = () => {
           }))}
           onShowDeleteButton={() => {}}
           onDelete={handleDeleteProducts}
-          onChange={handleDataChange}
+          onChange={() => handleDataChange}
           isEditing={isEditing}
         />
       </div>
