@@ -4,7 +4,6 @@ import React, {
   useRef,
   useMemo,
   ReactNode,
-  Fragment,
   useCallback,
 } from "react";
 import {
@@ -123,6 +122,10 @@ function Table<T extends Record<string, any>>({
   }, []);
 
   useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
+  useEffect(() => {
     setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
   }, [data]);
 
@@ -131,9 +134,7 @@ function Table<T extends Record<string, any>>({
       recalculateSubtotals(
         prevData.map((row) => {
           if (!row.isSubtotal) {
-            const jamPerDay = parseFloat(row.jamPerDay) || 0;
-            const rate = parseFloat(row.rate) || 0;
-            return { ...row, amount: (jamPerDay * rate).toFixed(2) };
+            return { ...row };
           }
           return row;
         })
@@ -181,6 +182,12 @@ function Table<T extends Record<string, any>>({
       window.removeEventListener("resize", updateTableWidth);
     };
   }, [isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      setOriginalData([...data]);
+    }
+  }, [isEditing, data]);
 
   //HCC
   const handleCellClick = useCallback(
@@ -684,6 +691,13 @@ function Table<T extends Record<string, any>>({
     type: "selection",
     width: 10,
   };
+
+  const handleCancel = useCallback(() => {
+    setData(initialData);
+    if (onCancel) {
+      onCancel();
+    }
+  }, [initialData, onCancel]);
 
   const allColumns = useMemo(
     () => (isEditing ? [checkboxColumn, ...columns] : columns),
@@ -1421,7 +1435,7 @@ function Table<T extends Record<string, any>>({
             right: `${buttonPosition.leftright}px`,
             zIndex: 10,
             marginRight: `${
-              hasAmountColumn && hasNumberColumn ? "238px" : "96px"
+              hasAmountColumn && hasNumberColumn ? "235px" : "128px"
             }`,
           }}
         />
@@ -1429,7 +1443,7 @@ function Table<T extends Record<string, any>>({
       {hasAmountColumn && hasNumberColumn && (
         <button
           onClick={handleAddSubtotalRow}
-          className={`mr-[96px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
+          className={`mr-[128px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
             canAddSubtotal && !isSorting
               ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
               : "opacity-50 cursor-not-allowed"
@@ -1442,12 +1456,12 @@ function Table<T extends Record<string, any>>({
             zIndex: 10,
           }}
         >
-          Add Subtotal
+          Subtotal
         </button>
       )}
       {!isEditing ? (
         <div
-          className="px-2 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+          className="px-3 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
           onClick={onToggleEditing}
           style={{
             position: "fixed",
@@ -1470,14 +1484,14 @@ function Table<T extends Record<string, any>>({
           }}
         >
           <div
-            className="px-2 py-2 text-sky-500 hover:text-sky-600 active:text-sky-700 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
+            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
             onClick={onSave}
           >
             <IconDeviceFloppy />
           </div>
           <div
-            className="px-2 py-2 text-rose-500 hover:text-rose-600 active:text-rose-700  rounded-r-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
-            onClick={onCancel}
+            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-r-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+            onClick={handleCancel}
           >
             <IconCancel />
           </div>

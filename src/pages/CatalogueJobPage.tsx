@@ -7,15 +7,13 @@ import {
   ComboboxOption,
   Field,
 } from "@headlessui/react";
-import {
-  IconCheck,
-  IconChevronDown,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconTrash } from "@tabler/icons-react";
+import _ from "lodash";
 import Table from "../components/Table";
 import { ColumnConfig, Job, Product } from "../types/types";
 import NewJobModal from "../components/NewJobModal";
 import DeleteDialog from "../components/DeleteDialog";
+import { setTime } from "react-datepicker/dist/date_utils";
 
 type JobSelection = Job | null;
 
@@ -23,12 +21,15 @@ const CatalogueJobPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [editedJob, setEditedJob] = useState<Job | null>(null);
-  const [originalJob, setOriginalJob] = useState<Job | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
   const [changedProducts, setChangedProducts] = useState<Set<string>>(
     new Set()
   );
-  const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
+  const [originalJobState, setOriginalJobState] = useState<{
+    job: Job | null;
+    products: Product[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showNewJobModal, setShowNewJobModal] = useState(false);
@@ -76,7 +77,6 @@ const CatalogueJobPage: React.FC = () => {
       if (!response.ok) throw new Error("Failed to fetch products");
       const data = await response.json();
       setProducts(data);
-      setOriginalProducts(data);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -92,11 +92,9 @@ const CatalogueJobPage: React.FC = () => {
     if (selectedJob) {
       fetchProducts(selectedJob.id);
       setEditedJob(selectedJob);
-      setOriginalJob(selectedJob);
     } else {
       setProducts([]);
       setEditedJob(null);
-      setOriginalJob(null);
     }
   }, [selectedJob, fetchProducts]);
 
@@ -209,20 +207,35 @@ const CatalogueJobPage: React.FC = () => {
           job.name.toLowerCase().includes(query.toLowerCase())
         );
 
+  // TE
   const toggleEditing = useCallback(() => {
-    setIsEditing((prev) => !prev);
-    if (!isEditing) {
-      setOriginalJob(selectedJob);
-      setOriginalProducts([...products]);
+    setIsEditing((prev) => {
+      if (!prev) {
+        // Entering edit mode
+        setOriginalJobState({
+          job: editedJob ? _.cloneDeep(editedJob) : null,
+          products: _.cloneDeep(products),
+        });
+      }
+      return !prev;
+    });
+  }, [editedJob, products]);
+
+  const handleCancel = useCallback(() => {
+    if (originalJobState) {
+      setEditedJob(originalJobState.job);
+      setProducts(originalJobState.products);
       setChangedProducts(new Set());
     }
-  }, [isEditing, selectedJob, products]);
+    setIsEditing(false);
+  }, [originalJobState]);
 
   // HS
   const handleSave = useCallback(async () => {
     if (!editedJob) return;
 
     try {
+      // Update job
       const jobResponse = await fetch(
         `http://localhost:5000/api/jobs/${editedJob.id}`,
         {
@@ -234,43 +247,43 @@ const CatalogueJobPage: React.FC = () => {
 
       if (!jobResponse.ok) throw new Error("Failed to update job");
 
-      for (const productId of Array.from(changedProducts)) {
-        const product = products.find((p) => p.id === productId);
-        if (product) {
-          const productResponse = await fetch(
-            `http://localhost:5000/api/products/${productId}`,
-            {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(product),
-            }
-          );
+      // Update products
+      const changedProductsArray = products.filter((product) =>
+        changedProducts.has(product.id)
+      );
 
-          if (!productResponse.ok)
-            throw new Error(`Failed to update product ${productId}`);
+      if (changedProductsArray.length > 0) {
+        const productsResponse = await fetch(
+          "http://localhost:5000/api/products",
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(changedProductsArray),
+          }
+        );
+
+        if (!productsResponse.ok) {
+          const errorData = await productsResponse.json();
+          throw new Error(`Failed to update products: ${errorData.message}`);
         }
+      } else {
+        console.log("No products to update");
       }
 
       setSelectedJob(editedJob);
       setJobs((jobs) =>
         jobs.map((job) => (job.id === editedJob.id ? editedJob : job))
       );
-      setOriginalJob(editedJob);
-      setOriginalProducts([...products]);
       setChangedProducts(new Set());
       setIsEditing(false);
+
+      // Fetch updated products to ensure local state is in sync with the database
+      await fetchProducts(editedJob.id);
     } catch (error) {
       console.error("Error updating data:", error);
       // Handle error (e.g., show error message to user)
     }
-  }, [editedJob, changedProducts, products]);
-
-  const handleCancel = useCallback(() => {
-    setIsEditing(false);
-    setEditedJob(originalJob);
-    setProducts(originalProducts);
-    setChangedProducts(new Set());
-  }, [originalJob, originalProducts]);
+  }, [editedJob, changedProducts, products, fetchProducts]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -288,21 +301,29 @@ const CatalogueJobPage: React.FC = () => {
     [editedJob]
   );
 
+  // HDC
   const handleDataChange = useCallback(
     (updatedData: Product[]) => {
-      setProducts(updatedData);
-      const newChangedProducts = new Set(changedProducts);
+      setTimeout(() => setProducts(updatedData), 0);
+
+      const newChangedProducts = new Set<string>();
       updatedData.forEach((product, index) => {
         const originalProduct = originalProducts[index];
-        if (JSON.stringify(product) !== JSON.stringify(originalProduct)) {
+
+        if (!originalProduct) {
           newChangedProducts.add(product.id);
-        } else {
-          newChangedProducts.delete(product.id);
+        } else if (
+          product.name !== originalProduct.name ||
+          product.amount !== originalProduct.amount ||
+          product.remark !== originalProduct.remark
+        ) {
+          newChangedProducts.add(product.id);
         }
       });
-      setChangedProducts(newChangedProducts);
+
+      setTimeout(() => setChangedProducts(newChangedProducts), 0);
     },
-    [originalProducts, changedProducts]
+    [originalProducts]
   );
 
   return (
@@ -491,7 +512,7 @@ const CatalogueJobPage: React.FC = () => {
                 }))}
                 onShowDeleteButton={() => {}}
                 onDelete={handleDeleteProducts}
-                onChange={() => handleDataChange}
+                onChange={handleDataChange}
                 isEditing={isEditing}
                 onToggleEditing={toggleEditing}
                 onSave={handleSave}
