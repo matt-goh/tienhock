@@ -28,9 +28,9 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setCellValue(value?.toString() ?? "");
+    setCellValue(formatDisplayValue(value, type));
     setEditValue(value?.toString() ?? "");
-  }, [value]);
+  }, [value, type]);
 
   useEffect(() => {
     if (editable && focus && inputRef.current && type !== "checkbox") {
@@ -42,16 +42,23 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
     }
   }, [editable, focus, type]);
 
+  const formatDisplayValue = (value: any, type: ColumnType): string => {
+    if (type === "float" || type === "amount") {
+      const floatValue = parseFloat(value);
+      return isNaN(floatValue) ? "" : floatValue.toFixed(2);
+    }
+    return value?.toString() ?? "";
+  };
   const formatEditValue = (value: string): string => {
-    if (type === "number" || type === "rate") {
+    if (type === "number" || type === "rate" || type === "float") {
       // Remove non-numeric characters (except decimal point for rate)
       let formatted =
-        type === "rate"
+        type === "rate" || type === "float"
           ? value.replace(/[^\d.]/g, "")
           : value.replace(/\D/g, "");
 
       // Handle decimal point for rate
-      if (type === "rate") {
+      if (type === "rate" || type === "float") {
         const parts = formatted.split(".");
         if (parts.length > 2) {
           formatted = parts[0] + "." + parts.slice(1).join("");
@@ -90,7 +97,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       newValue = e.target.checked;
       setCellValue(newValue.toString());
       onChange(newValue);
-    } else if (type === "number" || type === "rate") {
+    } else if (type === "number" || type === "rate" || type === "float") {
       newValue = formatEditValue(newValue);
       setEditValue(newValue);
     } else {

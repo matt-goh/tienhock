@@ -185,6 +185,50 @@ app.put('/api/jobs/:id', async (req, res) => {
   }
 });
 
+app.put('/api/products', async (req, res) => {
+  const products = req.body;
+  console.log('Received products for update:', products);
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updatedProducts = [];
+      for (const product of products) {
+        const { id, name, amount, remark } = product;
+        console.log(`Updating product: ${id}, ${name}, ${amount}, ${remark}`);
+        
+        const query = `
+          UPDATE products
+          SET name = $1, amount = $2, remark = $3
+          WHERE id = $4
+          RETURNING *
+        `;
+        const values = [name, amount, remark, id];
+        const result = await client.query(query, values);
+        
+        if (result.rowCount === 0) {
+          throw new Error(`Product with id ${id} not found`);
+        }
+        updatedProducts.push(result.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      console.log('Products updated successfully:', updatedProducts);
+      res.json({ message: 'Products updated successfully', updatedProducts });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating products:', error);
+    res.status(500).json({ message: 'Error updating products', error: error.message });
+  }
+});
+
 // Update a product
 app.put('/api/products/:id', async (req, res) => {
   const { id } = req.params;
