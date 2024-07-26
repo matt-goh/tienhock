@@ -1,23 +1,32 @@
-# Build stage
-FROM node:14 AS build
+FROM node:14
 
+# Install Electron dependencies
+RUN apt-get update && apt-get install -y \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxss1 \
+    libnss3 \
+    libasound2 \
+    xvfb
+
+# Set working directory
 WORKDIR /app
 
+# Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Install all dependencies, including devDependencies
 RUN npm install
 
+# Install concurrently globally
+RUN npm install -g concurrently
+
+# Copy the rest of the application
 COPY . .
-RUN npm run build
 
-# Production stage
-FROM node:14-alpine
-
-WORKDIR /app
-
-COPY --from=build /app/build ./build
-COPY package*.json ./
-RUN npm install --only=production
-
+# Expose the port the app runs on
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Use Xvfb to create a virtual framebuffer
+CMD xvfb-run --server-args="-screen 0 1024x768x24" npm start
