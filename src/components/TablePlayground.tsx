@@ -95,6 +95,9 @@ const TablePlayground: React.FC = () => {
           onDelete={handleDeleteProducts}
           onChange={() => handleDataChange}
           isEditing={isEditing}
+          onToggleEditing={() => {}}
+          onSave={() => {}}
+          onCancel={() => {}}
         />
       </div>
     </div>

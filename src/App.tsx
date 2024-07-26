@@ -12,7 +12,7 @@ const App: React.FC = () => {
     <Router>
       <div className="App">
         <aside className="">
-          <Sidebar />
+          {/* <Sidebar /> */}
         </aside>
         <main className="">
           <Routes>

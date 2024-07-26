@@ -21,8 +21,9 @@ import {
 import "react-datepicker/dist/react-datepicker.css";
 import {
   IconArrowsSort,
-  IconMinus,
-  IconPlus,
+  IconCancel,
+  IconDeviceFloppy,
+  IconEdit,
   IconSortAscendingLetters,
   IconSortAscendingNumbers,
   IconSortDescendingLetters,
@@ -43,6 +44,9 @@ function Table<T extends Record<string, any>>({
   onDelete,
   onChange,
   isEditing,
+  onToggleEditing,
+  onSave,
+  onCancel,
 }: TableProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -147,7 +151,7 @@ function Table<T extends Record<string, any>>({
           window.scrollX || document.documentElement.scrollLeft;
 
         setbuttonPosition({
-          top: rect.top + scrollTop - 58, // Adjust this value as needed
+          top: rect.top + scrollTop - 58.55, // Adjust this value as needed
           leftright: window.innerWidth - (rect.right + scrollLeft), // Adjust this value as needed
         });
       }
@@ -161,7 +165,7 @@ function Table<T extends Record<string, any>>({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition);
     };
-  }, [tableRef]);
+  }, [tableRef, isEditing]);
 
   useEffect(() => {
     const updateTableWidth = () => {
@@ -355,14 +359,21 @@ function Table<T extends Record<string, any>>({
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
   const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
-  const [isCursorAboveInitialPoint, setIsCursorAboveInitialPoint] = useState(false);
+  const [isCursorAboveInitialPoint, setIsCursorAboveInitialPoint] =
+    useState(false);
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
-      if (key === 'id' || key === 'isSubtotal') return true;
-      return value === "" || value === 0 || value === false || value === null || value === undefined;
+      if (key === "id" || key === "isSubtotal") return true;
+      return (
+        value === "" ||
+        value === 0 ||
+        value === false ||
+        value === null ||
+        value === undefined
+      );
     });
   }, []);
 
@@ -420,10 +431,16 @@ function Table<T extends Record<string, any>>({
       }
 
       // Process drag if cursor is at or below the initial drag point, or if there are removable rows above
-      if (!isCursorAboveInitialPoint || currentY >= initialDragY.current || removableRowsAbove > 0) {
+      if (
+        !isCursorAboveInitialPoint ||
+        currentY >= initialDragY.current ||
+        removableRowsAbove > 0
+      ) {
         // Check if we've dragged past the threshold
         if (Math.abs(mouseDelta) >= DRAG_THRESHOLD) {
-          const rowsChanged = Math.sign(mouseDelta) * Math.floor(Math.abs(mouseDelta) / DRAG_THRESHOLD);
+          const rowsChanged =
+            Math.sign(mouseDelta) *
+            Math.floor(Math.abs(mouseDelta) / DRAG_THRESHOLD);
           setRowsToAddOrRemove((prev) => {
             const newValue = prev + rowsChanged;
             // Prevent removing more rows than available
@@ -456,7 +473,12 @@ function Table<T extends Record<string, any>>({
     if (rowsToAddOrRemove !== 0) {
       animationFrameId.current = requestAnimationFrame(updateRows);
     }
-  }, [rowsToAddOrRemove, handleAddRow, handleRemoveEmptyRow, removableRowsAbove]);
+  }, [
+    rowsToAddOrRemove,
+    handleAddRow,
+    handleRemoveEmptyRow,
+    removableRowsAbove,
+  ]);
 
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
@@ -465,7 +487,7 @@ function Table<T extends Record<string, any>>({
       setRowsToAddOrRemove(0);
       setIsCursorAboveInitialPoint(false);
       if (addRowBarRef.current) {
-        addRowBarRef.current.style.top = 'auto';
+        addRowBarRef.current.style.top = "auto";
       }
       updateRemovableRowsAbove();
     }
@@ -622,7 +644,7 @@ function Table<T extends Record<string, any>>({
   };
 
   // HRS
-  const handleRowSelection = (row: Row<T>) => {
+  const handleRowSelection = useCallback((row: Row<T>) => {
     setSelectedRows((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(row.id)) {
@@ -636,37 +658,11 @@ function Table<T extends Record<string, any>>({
         }
         newSet.add(row.id);
       }
+
       updateSelectionState(newSet);
       return newSet;
     });
-  };
-
-  // HSA
-  const handleSelectAll = () => {
-    let newSelectedRows: Set<string>;
-    if (isAllSelected || isIndeterminate) {
-      newSelectedRows = new Set<string>();
-    } else {
-      newSelectedRows = new Set(data.map((row) => row.id));
-    }
-    setSelectedRows(newSelectedRows);
-    updateSelectionState(newSelectedRows);
-  };
-
-  // USS
-  const updateSelectionState = (selectedRows: Set<string>) => {
-    const allSelected = selectedRows.size === data.length && data.length > 0;
-    const someSelected = selectedRows.size > 0 && !allSelected;
-    setIsAllSelected(allSelected);
-    setIsIndeterminate(someSelected);
-    setShowDeleteButton(selectedRows.size > 0);
-    setCanAddSubtotal(
-      selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
-    );
-    if (onShowDeleteButton) {
-      onShowDeleteButton(selectedRows.size > 0);
-    }
-  };
+  }, []);
 
   // HDS
   const handleDeleteSelected = async () => {
@@ -728,12 +724,6 @@ function Table<T extends Record<string, any>>({
     }
   };
 
-  const hasInputColumns = useMemo(() => {
-    return columns.some((col) =>
-      ["string", "number", "float", "rate", "checkbox"].includes(col.type)
-    );
-  }, [columns]);
-
   const hasAmountColumn = useMemo(() => {
     return columns.some((col) => col.type === "amount");
   }, [columns]);
@@ -768,7 +758,13 @@ function Table<T extends Record<string, any>>({
               className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
               disabled={isSorting}
             >
-              {selectedRows.has(row.original.id) ? (
+              {isAllSelected ? (
+                <IconSquareCheckFilled
+                  width={20}
+                  height={20}
+                  className="text-blue-600"
+                />
+              ) : selectedRows.has(row.id) ? (
                 <IconSquareCheckFilled
                   width={20}
                   height={20}
@@ -941,6 +937,7 @@ function Table<T extends Record<string, any>>({
     () =>
       allColumns.map((col): ColumnDef<T> => {
         // CHC
+
         const commonHeaderContent = (column: any) => (
           <div
             className={`flex items-center group cursor-pointer w-full h-full ${
@@ -1191,27 +1188,50 @@ function Table<T extends Record<string, any>>({
     state: { sorting },
   });
 
+  // HSA
+  const handleSelectAll = useCallback(() => {
+    setSelectedRows((prev) => {
+      if (isAllSelected || isIndeterminate) {
+        // If all are selected or in indeterminate state, clear the selection
+        updateSelectionState(new Set());
+        return new Set();
+      } else {
+        // Select all non-subtotal rows
+        const allRowIds = table
+          .getRowModel()
+          .rows.filter((row) => !row.original.isSubtotal)
+          .map((row) => row.id);
+        const newSet = new Set(allRowIds);
+        updateSelectionState(newSet);
+        return newSet;
+      }
+    });
+  }, [isAllSelected, isIndeterminate, table]);
+
+  // USS
+  const updateSelectionState = useCallback(
+    (selectedRows: Set<string>) => {
+      const selectableRowCount = table
+        .getRowModel()
+        .rows.filter((row) => !row.original.isSubtotal).length;
+      const allSelected =
+        selectedRows.size === selectableRowCount && selectableRowCount > 0;
+      const someSelected = selectedRows.size > 0 && !allSelected;
+      setIsAllSelected(allSelected);
+      setIsIndeterminate(someSelected);
+      setShowDeleteButton(selectedRows.size > 0);
+      setCanAddSubtotal(
+        selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
+      );
+      if (onShowDeleteButton) {
+        onShowDeleteButton(selectedRows.size > 0);
+      }
+    },
+    [table, hasAmountValuesAfterLastSubtotal, data, onShowDeleteButton]
+  );
+
   return (
     <div ref={tableRef} className="w-auto">
-      <div
-        className={`flex ${
-          showDeleteButton ? "mr-[5.5rem]" : ""
-        } items-center justify-end w-auto`}
-      >
-        {hasAmountColumn && hasNumberColumn && (
-          <button
-            onClick={handleAddSubtotalRow}
-            className={`ml-2 px-4 py-2 border border-gray-300 font-medium rounded-full ${
-              canAddSubtotal && !isSorting
-                ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
-                : "opacity-50 cursor-not-allowed"
-            }`}
-            disabled={!canAddSubtotal || isSorting}
-          >
-            Add Subtotal
-          </button>
-        )}
-      </div>
       <div className="rounded-lg border border-gray-300 w-fit">
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"
@@ -1390,7 +1410,7 @@ function Table<T extends Record<string, any>>({
         </table>
       </div>
       {/* SDB */}
-      {showDeleteButton && (
+      {showDeleteButton && isEditing && (
         <DeleteButton
           onDelete={handleDeleteSelected}
           selectedCount={selectedRows.size}
@@ -1398,10 +1418,70 @@ function Table<T extends Record<string, any>>({
           style={{
             position: "fixed",
             top: `${buttonPosition.top}px`,
-            left: `${buttonPosition.leftright}px`,
+            right: `${buttonPosition.leftright}px`,
             zIndex: 10,
+            marginRight: `${
+              hasAmountColumn && hasNumberColumn ? "238px" : "96px"
+            }`,
           }}
         />
+      )}
+      {hasAmountColumn && hasNumberColumn && (
+        <button
+          onClick={handleAddSubtotalRow}
+          className={`mr-[96px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
+            canAddSubtotal && !isSorting
+              ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
+              : "opacity-50 cursor-not-allowed"
+          }`}
+          disabled={!canAddSubtotal || isSorting}
+          style={{
+            position: "fixed",
+            top: `${buttonPosition.top}px`,
+            right: `${buttonPosition.leftright}px`,
+            zIndex: 10,
+          }}
+        >
+          Add Subtotal
+        </button>
+      )}
+      {!isEditing ? (
+        <div
+          className="px-2 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+          onClick={onToggleEditing}
+          style={{
+            position: "fixed",
+            top: `${buttonPosition.top}px`,
+            right: `${buttonPosition.leftright}px`,
+            zIndex: 10,
+          }}
+        >
+          <IconEdit className="mr-1.5" />
+          <span>Edit</span>
+        </div>
+      ) : (
+        <div
+          className="flex border border-gray-300 rounded-lg"
+          style={{
+            position: "fixed",
+            top: `${buttonPosition.top}px`,
+            right: `${buttonPosition.leftright}px`,
+            zIndex: 10,
+          }}
+        >
+          <div
+            className="px-2 py-2 text-sky-500 hover:text-sky-600 active:text-sky-700 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
+            onClick={onSave}
+          >
+            <IconDeviceFloppy />
+          </div>
+          <div
+            className="px-2 py-2 text-rose-500 hover:text-rose-600 active:text-rose-700  rounded-r-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+            onClick={onCancel}
+          >
+            <IconCancel />
+          </div>
+        </div>
       )}
       {isEditing && (
         <>
@@ -1409,7 +1489,7 @@ function Table<T extends Record<string, any>>({
             ref={addRowBarRef}
             style={{
               width: `${tableWidth}px`,
-              height: "18px",
+              height: "16px",
               userSelect: "none",
               opacity:
                 isLastRowHovered || isAddRowBarHovered || isAddRowBarActive

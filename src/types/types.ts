@@ -31,6 +31,9 @@ export interface TableProps<T> {
   onDelete: (selectedIds: string[]) => Promise<void>;
   onChange?: (changedData: T[]) => void;
   isEditing: boolean;
+  onToggleEditing: () => void;
+  onSave: () => void;
+  onCancel: () => void;
 }
 
 export interface Job {
