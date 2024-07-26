@@ -165,8 +165,8 @@ function Table<T extends Record<string, any>>({
 
   useEffect(() => {
     const updateTableWidth = () => {
-      if (tableRef.current) {
-        setTableWidth(tableRef.current.offsetWidth);
+      if (tableContainerRef.current) {
+        setTableWidth(tableContainerRef.current.offsetWidth);
       }
     };
 
@@ -176,7 +176,7 @@ function Table<T extends Record<string, any>>({
     return () => {
       window.removeEventListener("resize", updateTableWidth);
     };
-  }, []);
+  }, [isEditing]);
 
   //HCC
   const handleCellClick = useCallback(
@@ -1171,7 +1171,7 @@ function Table<T extends Record<string, any>>({
           </button>
         )}
       </div>
-      <div className="rounded-lg border border-gray-300">
+      <div className="rounded-lg border border-gray-300 w-fit">
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"
           ref={tableContainerRef}
@@ -1362,26 +1362,30 @@ function Table<T extends Record<string, any>>({
           }}
         />
       )}
-      <div
-        ref={addRowBarRef}
-        style={{
-          width: `${tableWidth}px`,
-          height: "18px",
-          userSelect: "none",
-          opacity:
-            isLastRowHovered || isAddRowBarHovered || isAddRowBarActive ? 1 : 0,
-          transition: "opacity 0.2s ease-in-out",
-        }}
-        className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center hover:cursor-row-resize ${
-          isAddRowBarActive ? "active-bg" : ""
-        }
+      {isEditing && (
+        <>
+          <div
+            ref={addRowBarRef}
+            style={{
+              width: `${tableWidth}px`,
+              height: "18px",
+              userSelect: "none",
+              opacity:
+                isLastRowHovered || isAddRowBarHovered || isAddRowBarActive
+                  ? 1
+                  : 0,
+              transition: "opacity 0.2s ease-in-out",
+            }}
+            className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
+              isAddRowBarActive ? "active-bg" : ""
+            } 
         }`}
-        onMouseDown={handleMouseDown}
-        onClick={handleAddRow}
-        onMouseEnter={() => setIsAddRowBarHovered(true)}
-        onMouseLeave={() => setIsAddRowBarHovered(false)}
-      ></div>
-      <style>{`
+            onMouseDown={handleMouseDown}
+            onClick={handleAddRow}
+            onMouseEnter={() => setIsAddRowBarHovered(true)}
+            onMouseLeave={() => setIsAddRowBarHovered(false)}
+          ></div>
+          <style>{`
         .active-bg {
           background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
         }
@@ -1389,6 +1393,8 @@ function Table<T extends Record<string, any>>({
           background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
         }
       `}</style>
+        </>
+      )}
     </div>
   );
 }
