@@ -334,20 +334,18 @@ function Table<T extends Record<string, any>>({
       }
       return newData;
     });
+
+    return true;
   }, [columns, onChange]);
 
   const [isDragging, setIsDragging] = useState(false);
   const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
   const addRowBarRef = useRef<HTMLDivElement>(null);
-  const lastAddedOrRemovedY = useRef(0);
   const initialDragY = useRef(0);
-  const animationFrameId = useRef<number | null>(null);
   const [isLastRowHovered, setIsLastRowHovered] = useState(false);
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
   const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
-  const [isCursorAboveInitialPoint, setIsCursorAboveInitialPoint] =
-    useState(false);
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
@@ -399,54 +397,40 @@ function Table<T extends Record<string, any>>({
     setIsDragging(true);
     setIsAddRowBarActive(true);
     setRowsToAddOrRemove(0);
-    lastAddedOrRemovedY.current = e.clientY;
     initialDragY.current = e.clientY;
-    setIsCursorAboveInitialPoint(false);
   }, []);
 
+  // HMM
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isDragging) return;
 
       const currentY = e.clientY;
-      const mouseDelta = currentY - lastAddedOrRemovedY.current;
+      const mouseDelta = currentY - initialDragY.current;
 
-      if (currentY < initialDragY.current) {
-        setIsCursorAboveInitialPoint(true);
-      } else {
-        setIsCursorAboveInitialPoint(false);
-      }
-
-      // Process drag if cursor is at or below the initial drag point, or if there are removable rows above
-      if (
-        !isCursorAboveInitialPoint ||
-        currentY >= initialDragY.current ||
-        removableRowsAbove > 0
-      ) {
-        // Check if we've dragged past the threshold
-        if (Math.abs(mouseDelta) >= DRAG_THRESHOLD) {
-          const rowsChanged =
-            Math.sign(mouseDelta) *
-            Math.floor(Math.abs(mouseDelta) / DRAG_THRESHOLD);
-          setRowsToAddOrRemove((prev) => {
-            const newValue = prev + rowsChanged;
-            // Prevent removing more rows than available
-            return Math.max(newValue, -removableRowsAbove);
-          });
-          lastAddedOrRemovedY.current = currentY;
-        }
-      }
-
-      // Always update the bar position
+      // Update the bar position
       if (addRowBarRef.current) {
-        const barRect = addRowBarRef.current.getBoundingClientRect();
-        const newTop = barRect.top + mouseDelta;
-        addRowBarRef.current.style.top = `${newTop}px`;
+        addRowBarRef.current.style.top = `${mouseDelta}px`;
+      }
+
+      // Calculate rows to add or remove
+      const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
+
+      setRowsToAddOrRemove(newRowsToAddOrRemove);
+
+      // Immediately add or remove rows
+      if (newRowsToAddOrRemove > 0) {
+        handleAddRow();
+        initialDragY.current += DRAG_THRESHOLD;
+      } else if (newRowsToAddOrRemove < 0 && removableRowsAbove > 0) {
+        handleRemoveEmptyRow();
+        initialDragY.current -= DRAG_THRESHOLD;
       }
     },
-    [isDragging, isCursorAboveInitialPoint, removableRowsAbove]
+    [isDragging, removableRowsAbove, handleAddRow, handleRemoveEmptyRow]
   );
 
+  // UR
   const updateRows = useCallback(() => {
     if (rowsToAddOrRemove > 0) {
       handleAddRow();
@@ -458,7 +442,7 @@ function Table<T extends Record<string, any>>({
     }
 
     if (rowsToAddOrRemove !== 0) {
-      animationFrameId.current = requestAnimationFrame(updateRows);
+      requestAnimationFrame(updateRows);
     }
   }, [
     rowsToAddOrRemove,
@@ -468,37 +452,28 @@ function Table<T extends Record<string, any>>({
   ]);
 
   const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      setIsAddRowBarActive(false);
-      setRowsToAddOrRemove(0);
-      setIsCursorAboveInitialPoint(false);
-      if (addRowBarRef.current) {
-        addRowBarRef.current.style.top = "auto";
-      }
-      updateRemovableRowsAbove();
+    setIsDragging(false);
+    setIsAddRowBarActive(false);
+    setRowsToAddOrRemove(0);
+    if (addRowBarRef.current) {
+      addRowBarRef.current.style.top = "0px";
     }
-  }, [isDragging, updateRemovableRowsAbove]);
+    updateRemovableRowsAbove();
+  }, [updateRemovableRowsAbove]);
 
   useEffect(() => {
     if (isDragging) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
-      animationFrameId.current = requestAnimationFrame(updateRows);
     } else {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
-      if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
-      }
+      updateRows();
     }
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
-      if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
-      }
     };
   }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
