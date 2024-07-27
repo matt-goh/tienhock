@@ -180,15 +180,12 @@ function Table<T extends Record<string, any>>({
       const row = table.getRowModel().rows.find((r) => r.id === rowId);
       if (!row || row.original.isSubtotal) return;
 
-      const columnConfig = allColumns[cellIndex];
-      if (!isEditableColumn(columnConfig)) return;
-
-      const columnId = columns[cellIndex]?.id;
+      const columnId = columns[cellIndex - 1]?.id;
       if (!columnId) return;
 
       const cellValue = row.original[columnId];
 
-      // Use React's setState updater function
+      // Always update these states
       setEditableRowId(rowId);
       setEditableCellIndex(cellIndex);
       setSelectedRowId(rowId);
@@ -197,7 +194,7 @@ function Table<T extends Record<string, any>>({
         [`${rowId}-${columnId}`]: cellValue,
       }));
     },
-    [isSorting, columns, isEditableColumn]
+    [isSorting, columns]
   );
 
   //HCC
