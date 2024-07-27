@@ -19,7 +19,7 @@ const App: React.FC = () => {
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
           </Routes>
           {/* <MeeProduction /> */}
-          {/* <TablePlayground /> */}
+          <TablePlayground />
         </main>
       </div>
     </Router>
