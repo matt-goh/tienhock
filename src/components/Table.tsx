@@ -988,11 +988,11 @@ function Table<T extends Record<string, any>>({
                 >
                   {getSortIcon(col.id, col.type, column.getIsSorted())}
                 </span>
-                {col.header}
+                <span className="select-none">{col.header}</span>
               </>
             ) : (
               <>
-                {col.header}
+                <span className="select-none">{col.header}</span>
                 <span
                   className={`ml-2 ${
                     column.getIsSorted()
@@ -1187,9 +1187,7 @@ function Table<T extends Record<string, any>>({
         setData((prevData) => {
           const recalculatedData = originalData.map((row) => {
             if (!row.isSubtotal) {
-              const jamPerDay = parseFloat(row.jamPerDay) || 0;
-              const rate = parseFloat(row.rate) || 0;
-              return { ...row, amount: (jamPerDay * rate).toFixed(2) };
+              return { ...row };
             }
             return row;
           });

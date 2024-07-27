@@ -19,7 +19,7 @@ const TablePlayground: React.FC = () => {
     {
       id: "amount",
       header: "Amount",
-      type: "number",
+      type: "float",
       width: 50,
     },
     { id: "remark", header: "Remark", type: "string", width: 300 },
@@ -94,7 +94,7 @@ const TablePlayground: React.FC = () => {
           onShowDeleteButton={() => {}}
           onDelete={handleDeleteProducts}
           onChange={() => handleDataChange}
-          isEditing={isEditing}
+          isEditing={true}
           onToggleEditing={() => {}}
           onSave={() => {}}
           onCancel={() => {}}
