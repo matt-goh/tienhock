@@ -56,6 +56,42 @@ const TablePlayground: React.FC = () => {
       amount: 79.99,
       remark: "Programmable with built-in grinder",
     },
+    {
+      id: "P006",
+      name: "Coffee Maker",
+      amount: 79.99,
+      remark: "Programmable with built-in grinder",
+    },
+    {
+      id: "P007",
+      name: "Coffee Maker",
+      amount: 79.99,
+      remark: "Programmable with built-in grinder",
+    },
+    {
+      id: "P008",
+      name: "Coffee Maker",
+      amount: 79.99,
+      remark: "Programmable with built-in grinder",
+    },
+    {
+      id: "P009",
+      name: "Coffee Maker",
+      amount: 79.99,
+      remark: "Programmable with built-in grinder",
+    },
+    {
+      id: "P010",
+      name: "Coffee Maker",
+      amount: 79.99,
+      remark: "Programmable with built-in grinder",
+    },
+    {
+      id: "P011",
+      name: "Coffee Maker",
+      amount: 79.99,
+      remark: "Programmable with built-in grinder",
+    },
   ];
 
   const handleDataChange = useCallback(

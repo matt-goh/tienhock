@@ -35,6 +35,7 @@ import { ColumnType, TableProps, ColumnConfig } from "../types/types";
 import TableEditableCell from "./TableEditableCell";
 import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
+import TablePagination from "./TablePagination";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -76,8 +77,35 @@ function Table<T extends Record<string, any>>({
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isIndeterminate, setIsIndeterminate] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
+  const addRowBarRef = useRef<HTMLDivElement>(null);
+  const initialDragY = useRef(0);
+  const [isLastRowHovered, setIsLastRowHovered] = useState(false);
+  const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
+  const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
+  const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
+
+  const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
+
+  // Calculate total pages
+  const totalPages = useMemo(() => Math.ceil(data.length / itemsPerPage), [data.length, itemsPerPage]);
+
+  // Get current page's data
+  const currentPageData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  }, [currentPage, itemsPerPage, data]);
+
+  // Handle page change
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
   const columnWidths: { [k: string]: number } = Object.fromEntries(
     columns.map((col) => [col.id, col.width || 200])
@@ -337,17 +365,6 @@ function Table<T extends Record<string, any>>({
 
     return true;
   }, [columns, onChange]);
-
-  const [isDragging, setIsDragging] = useState(false);
-  const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
-  const addRowBarRef = useRef<HTMLDivElement>(null);
-  const initialDragY = useRef(0);
-  const [isLastRowHovered, setIsLastRowHovered] = useState(false);
-  const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
-  const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
-  const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
-
-  const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
@@ -901,7 +918,7 @@ function Table<T extends Record<string, any>>({
     return renderCellContent();
   };
 
-  //TC
+  // TC
   const tableColumns: ColumnDef<T>[] = useMemo(
     () =>
       allColumns.map((col): ColumnDef<T> => {
@@ -1123,9 +1140,9 @@ function Table<T extends Record<string, any>>({
     ]
   );
 
-  //T
+  // T
   const table = useReactTable<T>({
-    data,
+    data: currentPageData,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -1429,6 +1446,13 @@ function Table<T extends Record<string, any>>({
         }
       `}</style>
         </>
+      )}
+      {data.length > itemsPerPage && (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
       )}
     </div>
   );
