@@ -59,6 +59,7 @@ function Table<T extends Record<string, any>>({
     [key: string]: any;
   }>({});
   const [originalData, setOriginalData] = useState<T[]>(initialData);
+  const [editingData, setEditingData] = useState<T[]>([]);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
     string | null
@@ -92,15 +93,23 @@ function Table<T extends Record<string, any>>({
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
-  // Calculate total pages
-  const totalPages = useMemo(() => Math.ceil(data.length / itemsPerPage), [data.length, itemsPerPage]);
+  const tableData = useMemo(
+    () => (isEditing ? editingData : data),
+    [isEditing, editingData, data]
+  );
+
+  // Recalculate total pages when tableData changes
+  const totalPages = useMemo(
+    () => Math.ceil(data.length / itemsPerPage),
+    [data.length, itemsPerPage]
+  );
 
   // Get current page's data
   const currentPageData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return data.slice(startIndex, endIndex);
-  }, [currentPage, itemsPerPage, data]);
+    return tableData.slice(startIndex, endIndex);
+  }, [currentPage, itemsPerPage, tableData]);
 
   // Handle page change
   const handlePageChange = useCallback((page: number) => {
@@ -117,6 +126,25 @@ function Table<T extends Record<string, any>>({
     );
   };
 
+  // Update currentPage if it's greater than totalPages
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setData(initialData);
+    }
+  }, [initialData, isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      setEditingData([...data]);
+    }
+  }, [isEditing, data]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -131,10 +159,6 @@ function Table<T extends Record<string, any>>({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    setData(initialData);
-  }, [initialData]);
 
   useEffect(() => {
     setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
@@ -196,9 +220,9 @@ function Table<T extends Record<string, any>>({
 
   useEffect(() => {
     if (isEditing) {
-      setOriginalData([...data]);
+      setOriginalData([...initialData]);
     }
-  }, [isEditing, data]);
+  }, [isEditing, initialData]);
 
   //HCC
   const handleCellClick = useCallback(
@@ -360,11 +384,20 @@ function Table<T extends Record<string, any>>({
       if (onChange) {
         onChange(newData);
       }
+
+      // Calculate the new total pages
+      const newTotalPages = Math.ceil(newData.length / itemsPerPage);
+
+      // If we've exceeded the items per page, move to the next page
+      if (newData.length > currentPage * itemsPerPage) {
+        setCurrentPage(newTotalPages);
+      }
+
       return newData;
     });
 
     return true;
-  }, [columns, onChange]);
+  }, [columns, onChange, currentPage, itemsPerPage]);
 
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
@@ -395,6 +428,7 @@ function Table<T extends Record<string, any>>({
     updateRemovableRowsAbove();
   }, [data, updateRemovableRowsAbove]);
 
+  // HRER
   const handleRemoveEmptyRow = useCallback(() => {
     setData((prevData) => {
       const lastRow = prevData[prevData.length - 1];
@@ -403,11 +437,18 @@ function Table<T extends Record<string, any>>({
         if (onChange) {
           onChange(newData);
         }
+
+        // Check if we need to go back to the previous page
+        const totalPages = Math.ceil(newData.length / itemsPerPage);
+        if (currentPage > totalPages) {
+          setCurrentPage(totalPages);
+        }
+
         return newData;
       }
       return prevData;
     });
-  }, [onChange, isRowEmpty]);
+  }, [onChange, isRowEmpty, currentPage, itemsPerPage]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -430,13 +471,23 @@ function Table<T extends Record<string, any>>({
         addRowBarRef.current.style.top = `${mouseDelta}px`;
       }
 
+      // Check if we're on the last page and it's not full
+      const isLastPageNotFull =
+        currentPage === Math.ceil(data.length / itemsPerPage) &&
+        data.length % itemsPerPage !== 0;
+
       // Calculate rows to add or remove
       const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
+
+      // Only allow adding rows if we're on the last page and it's not full
+      if (newRowsToAddOrRemove > 0 && !isLastPageNotFull) {
+        return;
+      }
 
       setRowsToAddOrRemove(newRowsToAddOrRemove);
 
       // Immediately add or remove rows
-      if (newRowsToAddOrRemove > 0) {
+      if (newRowsToAddOrRemove > 0 && isLastPageNotFull) {
         handleAddRow();
         initialDragY.current += DRAG_THRESHOLD;
       } else if (newRowsToAddOrRemove < 0 && removableRowsAbove > 0) {
@@ -444,7 +495,16 @@ function Table<T extends Record<string, any>>({
         initialDragY.current -= DRAG_THRESHOLD;
       }
     },
-    [isDragging, removableRowsAbove, handleAddRow, handleRemoveEmptyRow]
+    [
+      isDragging,
+      removableRowsAbove,
+      handleAddRow,
+      handleRemoveEmptyRow,
+      currentPage,
+      totalPages,
+      data.length,
+      itemsPerPage,
+    ]
   );
 
   // UR
@@ -664,12 +724,22 @@ function Table<T extends Record<string, any>>({
     width: 10,
   };
 
+  // HC
   const handleCancel = useCallback(() => {
-    setData(initialData);
+    setEditingData([]);
     if (onCancel) {
       onCancel();
     }
-  }, [initialData, onCancel]);
+  }, [onCancel]);
+
+  // HS
+  const handleSave = useCallback(() => {
+    setData(editingData);
+    setEditingData([]);
+    if (onSave) {
+      onSave();
+    }
+  }, [editingData, onSave]);
 
   const allColumns = useMemo(
     () => (isEditing ? [checkboxColumn, ...columns] : columns),
@@ -1402,7 +1472,7 @@ function Table<T extends Record<string, any>>({
         >
           <div
             className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
-            onClick={onSave}
+            onClick={handleSave}
           >
             <IconDeviceFloppy />
           </div>
@@ -1414,7 +1484,7 @@ function Table<T extends Record<string, any>>({
           </div>
         </div>
       )}
-      {isEditing && (
+      {isEditing && currentPage === totalPages && (
         <>
           <div
             ref={addRowBarRef}
@@ -1447,7 +1517,7 @@ function Table<T extends Record<string, any>>({
       `}</style>
         </>
       )}
-      {data.length > itemsPerPage && (
+      {tableData.length > itemsPerPage && (
         <TablePagination
           currentPage={currentPage}
           totalPages={totalPages}

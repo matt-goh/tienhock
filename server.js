@@ -12,7 +12,7 @@ const port = 5000;
 // PostgreSQL connection
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'db', // 'db' is the service name in docker-compose
+  host: process.env.DB_HOST || 'localhost', // 'db' is the service name in docker-compose
   database: process.env.DB_NAME || 'tienhock',
   password: process.env.DB_PASSWORD || 'foodmaker',
   port: parseInt(process.env.DB_PORT || 5432),
@@ -185,6 +185,7 @@ app.put('/api/jobs/:id', async (req, res) => {
   }
 });
 
+// Update existing products
 app.put('/api/products', async (req, res) => {
   const products = req.body;
   console.log('Received products for update:', products);
@@ -226,6 +227,143 @@ app.put('/api/products', async (req, res) => {
   } catch (error) {
     console.error('Error updating products:', error);
     res.status(500).json({ message: 'Error updating products', error: error.message });
+  }
+});
+
+// Insert new products
+app.post('/api/products', async (req, res) => {
+  const products = req.body;
+  console.log('Received new products for insertion:', products);
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const insertedProducts = [];
+      for (const product of products) {
+        const { name, amount, remark, jobId } = product;
+        console.log(`Inserting new product: ${name}, ${amount}, ${remark}, ${jobId}`);
+        
+        const query = `
+          INSERT INTO products (name, amount, remark)
+          VALUES ($1, $2, $3)
+          RETURNING *
+        `;
+        const values = [name, amount, remark];
+        const result = await client.query(query, values);
+        
+        const newProduct = result.rows[0];
+        
+        // Associate the new product with the job
+        const associationQuery = `
+          INSERT INTO job_products (job_id, product_id)
+          VALUES ($1, $2)
+        `;
+        await client.query(associationQuery, [jobId, newProduct.id]);
+        
+        insertedProducts.push(newProduct);
+      }
+
+      await client.query('COMMIT');
+      console.log('New products inserted successfully:', insertedProducts);
+      res.status(201).json({ message: 'New products inserted successfully', insertedProducts });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error inserting new products:', error);
+    res.status(500).json({ message: 'Error inserting new products', error: error.message });
+  }
+});
+
+// Batch update/insert products
+app.post('/api/products/batch', async (req, res) => {
+  const { jobId, products } = req.body;
+  console.log('Received products for batch update/insert:', { jobId, products });
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const processedProducts = [];
+      const jobProducts = [];
+
+      for (const product of products) {
+        const { id, name, amount, remark } = product;
+        
+        if (id && !id.startsWith('new_')) {
+          // Update existing product
+          console.log(`Updating product: ${id}, ${name}, ${amount}, ${remark}`);
+          const updateQuery = `
+            UPDATE products
+            SET name = $1, amount = $2, remark = $3
+            WHERE id = $4
+            RETURNING *
+          `;
+          const updateValues = [name, amount, remark, id];
+          const result = await client.query(updateQuery, updateValues);
+          
+          if (result.rowCount > 0) {
+            processedProducts.push(result.rows[0]);
+            jobProducts.push({ job_id: jobId, product_id: id });
+          } else {
+            console.log(`Product with id ${id} not found, inserting as new product`);
+            // If update fails, insert as new product
+            const insertQuery = `
+              INSERT INTO products (id, name, amount, remark)
+              VALUES ($1, $2, $3, $4)
+              RETURNING *
+            `;
+            const insertValues = [id, name, amount, remark];
+            const insertResult = await client.query(insertQuery, insertValues);
+            processedProducts.push(insertResult.rows[0]);
+            jobProducts.push({ job_id: jobId, product_id: id });
+          }
+        } else {
+          // Insert new product
+          console.log(`Inserting new product: ${name}, ${amount}, ${remark}`);
+          const insertQuery = `
+            INSERT INTO products (name, amount, remark)
+            VALUES ($1, $2, $3)
+            RETURNING *
+          `;
+          const insertValues = [name, amount, remark];
+          const result = await client.query(insertQuery, insertValues);
+          
+          const newProduct = result.rows[0];
+          processedProducts.push(newProduct);
+          jobProducts.push({ job_id: jobId, product_id: newProduct.id });
+        }
+      }
+
+      // Clear existing job-product associations and insert new ones
+      await client.query('DELETE FROM job_products WHERE job_id = $1', [jobId]);
+      for (const jp of jobProducts) {
+        await client.query('INSERT INTO job_products (job_id, product_id) VALUES ($1, $2)', [jp.job_id, jp.product_id]);
+      }
+
+      await client.query('COMMIT');
+      console.log('Products processed successfully:', processedProducts);
+      console.log('Job-Product associations:', jobProducts);
+      res.json({ 
+        message: 'Products processed successfully', 
+        products: processedProducts,
+        jobProducts: jobProducts
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error processing products:', error);
+    res.status(500).json({ message: 'Error processing products', error: error.message });
   }
 });
 
