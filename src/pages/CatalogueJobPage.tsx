@@ -13,7 +13,6 @@ import Table from "../components/Table";
 import { ColumnConfig, Job, Product } from "../types/types";
 import NewJobModal from "../components/NewJobModal";
 import DeleteDialog from "../components/DeleteDialog";
-import { setTime } from "react-datepicker/dist/date_utils";
 
 type JobSelection = Job | null;
 
@@ -23,9 +22,6 @@ const CatalogueJobPage: React.FC = () => {
   const [editedJob, setEditedJob] = useState<Job | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
-  const [changedProducts, setChangedProducts] = useState<Set<string>>(
-    new Set()
-  );
   const [originalJobState, setOriginalJobState] = useState<{
     job: Job | null;
     products: Product[];
@@ -131,7 +127,7 @@ const CatalogueJobPage: React.FC = () => {
         setDeleteError(
           `Cannot delete job. There are still ${count} product(s) associated with this job. Please delete all associated products first.`
         );
-        setTimeout(() => setDeleteError(null), 10000);
+        setTimeout(() => setDeleteError(null), 5000);
       } else {
         setJobToDelete(job);
         setShowDeleteDialog(true);
@@ -139,7 +135,7 @@ const CatalogueJobPage: React.FC = () => {
     } catch (error) {
       console.error("Error checking associated products:", error);
       setDeleteError("An error occurred while checking associated products.");
-      setTimeout(() => setDeleteError(null), 10000);
+      setTimeout(() => setDeleteError(null), 5000);
     }
   }, []);
 
@@ -165,7 +161,7 @@ const CatalogueJobPage: React.FC = () => {
     } catch (error) {
       console.error("Error deleting job:", error);
       setDeleteError("An error occurred while deleting the job.");
-      setTimeout(() => setDeleteError(null), 10000);
+      setTimeout(() => setDeleteError(null), 5000);
     }
   }, [jobToDelete, selectedJob]);
 
@@ -225,7 +221,6 @@ const CatalogueJobPage: React.FC = () => {
     if (originalJobState) {
       setEditedJob(originalJobState.job);
       setProducts(originalJobState.products);
-      setChangedProducts(new Set());
     }
     setIsEditing(false);
   }, [originalJobState]);
@@ -247,43 +242,54 @@ const CatalogueJobPage: React.FC = () => {
 
       if (!jobResponse.ok) throw new Error("Failed to update job");
 
-      // Update products
-      const changedProductsArray = products.filter((product) =>
-        changedProducts.has(product.id)
+      // Check for products with null IDs
+      const productsWithNullIds = products.filter(
+        (product) =>
+          product.id === null || product.id === undefined || product.id === ""
+      );
+      if (productsWithNullIds.length > 0) {
+        const errorMessage = `Cannot save changes. ${productsWithNullIds.length} product(s) have null IDs. Please ensure all products have valid IDs before saving.`;
+        setDeleteError(errorMessage);
+        setTimeout(() => setDeleteError(null), 5000);
+        return; // Exit the function early
+      }
+
+      // Send all products to the server
+      const productsResponse = await fetch(
+        "http://localhost:5000/api/products/batch",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobId: editedJob.id,
+            products: products,
+          }),
+        }
       );
 
-      if (changedProductsArray.length > 0) {
-        const productsResponse = await fetch(
-          "http://localhost:5000/api/products",
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(changedProductsArray),
-          }
+      if (!productsResponse.ok) {
+        const errorData = await productsResponse.json();
+        throw new Error(
+          `Failed to update/insert products: ${errorData.message}`
         );
-
-        if (!productsResponse.ok) {
-          const errorData = await productsResponse.json();
-          throw new Error(`Failed to update products: ${errorData.message}`);
-        }
-      } else {
-        console.log("No products to update");
       }
+
+      const result = await productsResponse.json();
+
+      // Update local state with the result from the server
+      setProducts(result.products);
 
       setSelectedJob(editedJob);
       setJobs((jobs) =>
         jobs.map((job) => (job.id === editedJob.id ? editedJob : job))
       );
-      setChangedProducts(new Set());
       setIsEditing(false);
-
-      // Fetch updated products to ensure local state is in sync with the database
-      await fetchProducts(editedJob.id);
     } catch (error) {
       console.error("Error updating data:", error);
-      // Handle error (e.g., show error message to user)
+      setDeleteError((error as Error).message);
+      setTimeout(() => setDeleteError(null), 5000);
     }
-  }, [editedJob, changedProducts, products, fetchProducts]);
+  }, [editedJob, products]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -320,8 +326,6 @@ const CatalogueJobPage: React.FC = () => {
           newChangedProducts.add(product.id);
         }
       });
-
-      setTimeout(() => setChangedProducts(newChangedProducts), 0);
     },
     [originalProducts]
   );
@@ -482,7 +486,9 @@ const CatalogueJobPage: React.FC = () => {
             </div>
           )}
         </div>
-
+        {deleteError && (
+          <div className="mb-4 text-rose-500 font-semibold">{deleteError}</div>
+        )}
         <NewJobModal
           isOpen={showNewJobModal}
           onClose={handleNewJobModalClose}
@@ -495,9 +501,6 @@ const CatalogueJobPage: React.FC = () => {
           title="Delete Job"
           message="Are you sure you want to delete this job? This action cannot be undone."
         />
-        {deleteError && (
-          <div className="mb-4 text-rose-500 font-semibold">{deleteError}</div>
-        )}
         {loading ? (
           <p className="mt-4 text-center">Loading...</p>
         ) : selectedJob && products.length > 0 ? (
