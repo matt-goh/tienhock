@@ -1145,7 +1145,7 @@ function Table<T extends Record<string, any>>({
                   );
                 },
               }
-            );
+            ) as ColumnDef<T>;
           case "checkbox":
             return columnHelper.accessor((row: T) => row[col.id as keyof T], {
               id: col.id,
@@ -1166,7 +1166,7 @@ function Table<T extends Record<string, any>>({
                   />
                 </div>
               ),
-            });
+            }) as ColumnDef<T>;
           default:
             return columnHelper.accessor(
               (row: T) => row[col.id as keyof T] as string,
@@ -1192,7 +1192,7 @@ function Table<T extends Record<string, any>>({
                   );
                 },
               }
-            );
+            ) as ColumnDef<T>;
         }
       }),
     [
