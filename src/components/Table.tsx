@@ -203,7 +203,8 @@ function Table<T extends Record<string, any>>({
       const row = table.getRowModel().rows.find((r) => r.id === rowId);
       if (!row || row.original.isSubtotal) return;
 
-      const columnId = columns[cellIndex - 1]?.id;
+      const filteredCellIndex = isEditing ? cellIndex - 1 : cellIndex;
+      const columnId = columns[filteredCellIndex]?.id;
       if (!columnId) return;
 
       const cellValue = row.original[columnId];
@@ -252,7 +253,7 @@ function Table<T extends Record<string, any>>({
     cellIndex: number
   ) => {
     if (e.key === "Escape") {
-      const columnId = columns[cellIndex].id;
+      const columnId = columns[cellIndex - 1].id;
       const previousValue = previousCellValues[`${rowId}-${columnId}`];
       if (previousValue !== undefined) {
         const rowIndex = table
@@ -318,7 +319,7 @@ function Table<T extends Record<string, any>>({
           setSelectedRowId(newRowId);
           setEditableRowId(newRowId);
           setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-        }, 0);
+        }, 10);
       } else {
         const nextRowId = sortedRows[nextRowIndex].id;
         setSelectedRowId(nextRowId);
