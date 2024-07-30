@@ -13,6 +13,7 @@ import Table from "../components/Table";
 import { ColumnConfig, Job, Product } from "../types/types";
 import NewJobModal from "../components/NewJobModal";
 import DeleteDialog from "../components/DeleteDialog";
+import toast from "react-hot-toast";
 
 type JobSelection = Job | null;
 
@@ -32,7 +33,6 @@ const CatalogueJobPage: React.FC = () => {
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
   const productColumns: ColumnConfig[] = [
@@ -124,18 +124,16 @@ const CatalogueJobPage: React.FC = () => {
       const { count } = await response.json();
 
       if (count > 0) {
-        setDeleteError(
+        toast.error(
           `Cannot delete job. There are still ${count} product(s) associated with this job. Please delete all associated products first.`
         );
-        setTimeout(() => setDeleteError(null), 5000);
       } else {
         setJobToDelete(job);
         setShowDeleteDialog(true);
       }
     } catch (error) {
       console.error("Error checking associated products:", error);
-      setDeleteError("An error occurred while checking associated products.");
-      setTimeout(() => setDeleteError(null), 5000);
+      toast.error("An error occurred while checking associated products.");
     }
   }, []);
 
@@ -158,10 +156,10 @@ const CatalogueJobPage: React.FC = () => {
       }
       setShowDeleteDialog(false);
       setJobToDelete(null);
+      toast.success("Job deleted successfully");
     } catch (error) {
       console.error("Error deleting job:", error);
-      setDeleteError("An error occurred while deleting the job.");
-      setTimeout(() => setDeleteError(null), 5000);
+      toast.error("An error occurred while deleting the job.");
     }
   }, [jobToDelete, selectedJob]);
 
@@ -249,8 +247,7 @@ const CatalogueJobPage: React.FC = () => {
       );
       if (productsWithNullIds.length > 0) {
         const errorMessage = `Cannot save changes. ${productsWithNullIds.length} product(s) have null IDs. Please ensure all products have valid IDs before saving.`;
-        setDeleteError(errorMessage);
-        setTimeout(() => setDeleteError(null), 5000);
+        toast.error(errorMessage);
         return; // Exit the function early
       }
 
@@ -284,10 +281,10 @@ const CatalogueJobPage: React.FC = () => {
         jobs.map((job) => (job.id === editedJob.id ? editedJob : job))
       );
       setIsEditing(false);
+      toast.success("Changes saved successfully");
     } catch (error) {
       console.error("Error updating data:", error);
-      setDeleteError((error as Error).message);
-      setTimeout(() => setDeleteError(null), 5000);
+      toast.error((error as Error).message);
     }
   }, [editedJob, products]);
 
@@ -486,9 +483,6 @@ const CatalogueJobPage: React.FC = () => {
             </div>
           )}
         </div>
-        {deleteError && (
-          <div className="mb-4 text-rose-500 font-semibold">{deleteError}</div>
-        )}
         <NewJobModal
           isOpen={showNewJobModal}
           onClose={handleNewJobModalClose}
