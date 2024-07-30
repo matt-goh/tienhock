@@ -29,7 +29,7 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
 
   return (
     <>
-      <div className="z-10" style={style}>
+      <div className="absolute top-[-58px] right-0 " style={style}>
         <button
           onClick={() => setIsOpen(true)}
           className="px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-gray-100 active:text-gray-200 rounded-full transition-colors duration-200"

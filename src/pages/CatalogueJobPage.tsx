@@ -36,8 +36,8 @@ const CatalogueJobPage: React.FC = () => {
   const [query, setQuery] = useState("");
 
   const productColumns: ColumnConfig[] = [
-    { id: "id", header: "ID", type: "readonly", width: 50 },
-    { id: "name", header: "Name", type: "readonly" },
+    { id: "id", header: "ID", type: "number", width: 50 },
+    { id: "name", header: "Name", type: "amount" },
     {
       id: "amount",
       header: "Amount",
@@ -505,7 +505,7 @@ const CatalogueJobPage: React.FC = () => {
           <p className="mt-4 text-center">Loading...</p>
         ) : selectedJob && products.length > 0 ? (
           <div className="w-full">
-            <div className="overflow-x-auto relative">
+            <div className="relative">
               <Table
                 initialData={products}
                 columns={productColumns.map((col) => ({

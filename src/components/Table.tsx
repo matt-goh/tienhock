@@ -1423,59 +1423,35 @@ function Table<T extends Record<string, any>>({
           selectedCount={selectedRows.size}
           isAllSelected={isAllSelected}
           style={{
-            position: "fixed",
-            top: `${buttonPosition.top}px`,
-            right: `${buttonPosition.leftright}px`,
-            zIndex: 10,
             marginRight: `${
               hasAmountColumn && hasNumberColumn ? "235px" : "128px"
             }`,
           }}
         />
       )}
-      {hasAmountColumn && hasNumberColumn && (
+      {hasAmountColumn && hasNumberColumn && isEditing && (
         <button
           onClick={handleAddSubtotalRow}
-          className={`mr-[128px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
+          className={`absolute top-[-57px] right-0 mr-[128px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
             canAddSubtotal && !isSorting
               ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
               : "opacity-50 cursor-not-allowed"
           }`}
           disabled={!canAddSubtotal || isSorting}
-          style={{
-            position: "fixed",
-            top: `${buttonPosition.top}px`,
-            right: `${buttonPosition.leftright}px`,
-            zIndex: 10,
-          }}
         >
           Subtotal
         </button>
       )}
       {!isEditing ? (
         <div
-          className="px-3 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+          className="absolute top-[-57px] right-0 px-3 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
           onClick={onToggleEditing}
-          style={{
-            position: "fixed",
-            top: `${buttonPosition.top}px`,
-            right: `${buttonPosition.leftright}px`,
-            zIndex: 10,
-          }}
         >
           <IconEdit className="mr-1.5" />
           <span>Edit</span>
         </div>
       ) : (
-        <div
-          className="flex border border-gray-300 rounded-lg"
-          style={{
-            position: "fixed",
-            top: `${buttonPosition.top}px`,
-            right: `${buttonPosition.leftright}px`,
-            zIndex: 10,
-          }}
-        >
+        <div className="absolute top-[-57px] right-0 flex border border-gray-300 rounded-lg">
           <div
             className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
             onClick={handleSave}
