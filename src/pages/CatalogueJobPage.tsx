@@ -21,7 +21,7 @@ const CatalogueJobPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [editedJob, setEditedJob] = useState<Job | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
+  const [originalProducts] = useState<Product[]>([]);
   const [originalJobState, setOriginalJobState] = useState<{
     job: Job | null;
     products: Product[];
@@ -36,8 +36,8 @@ const CatalogueJobPage: React.FC = () => {
   const [query, setQuery] = useState("");
 
   const productColumns: ColumnConfig[] = [
-    { id: "id", header: "ID", type: "number", width: 50 },
-    { id: "name", header: "Name", type: "amount" },
+    { id: "id", header: "ID", type: "readonly", width: 50 },
+    { id: "name", header: "Name", type: "readonly" },
     {
       id: "amount",
       header: "Amount",

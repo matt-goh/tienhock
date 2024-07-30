@@ -65,10 +65,6 @@ function Table<T extends Record<string, any>>({
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
     string | null
   >(null);
-  const [buttonPosition, setbuttonPosition] = useState({
-    top: 0,
-    leftright: 0,
-  });
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [rowToDelete, setRowToDelete] = useState<{
     index: number;
@@ -177,32 +173,6 @@ function Table<T extends Record<string, any>>({
       )
     );
   }, []);
-
-  // UP
-  useEffect(() => {
-    const updatePosition = () => {
-      if (tableRef.current) {
-        const rect = tableRef.current.getBoundingClientRect();
-        const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        const scrollLeft =
-          window.scrollX || document.documentElement.scrollLeft;
-
-        setbuttonPosition({
-          top: rect.top + scrollTop - 58.55, // Adjust this value as needed
-          leftright: window.innerWidth - (rect.right + scrollLeft), // Adjust this value as needed
-        });
-      }
-    };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition);
-
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition);
-    };
-  }, [tableRef, isEditing]);
 
   useEffect(() => {
     const updateTableWidth = () => {
