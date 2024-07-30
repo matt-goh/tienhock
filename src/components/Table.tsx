@@ -36,6 +36,7 @@ import TableEditableCell from "./TableEditableCell";
 import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
+import TablePageRowsSelector from "./TablePageRowsSelector";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -87,7 +88,7 @@ function Table<T extends Record<string, any>>({
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
   const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
@@ -423,6 +424,11 @@ function Table<T extends Record<string, any>>({
     }
     setRemovableRowsAbove(count);
   }, [data, isRowEmpty]);
+
+  const handleItemsPerPageChange = useCallback((newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  }, []);
 
   useEffect(() => {
     updateRemovableRowsAbove();
@@ -1517,13 +1523,21 @@ function Table<T extends Record<string, any>>({
       `}</style>
         </>
       )}
-      {tableData.length > itemsPerPage && (
-        <TablePagination
+      <div className="flex justify-between items-center mt-4">
+        <TablePageRowsSelector
+          itemsPerPage={itemsPerPage}
+          onItemsPerPageChange={handleItemsPerPageChange}
+          totalItems={data.length}
           currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
         />
-      )}
+        {tableData.length > itemsPerPage && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        )}
+      </div>
     </div>
   );
 }
