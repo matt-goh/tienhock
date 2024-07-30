@@ -16,6 +16,8 @@ import {
   Cell,
   Row,
   ColumnDef,
+  getPaginationRowModel,
+  PaginationState,
 } from "@tanstack/react-table";
 import "react-datepicker/dist/react-datepicker.css";
 import {
@@ -36,7 +38,7 @@ import TableEditableCell from "./TableEditableCell";
 import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
-import TablePageRowsSelector from "./TablePageRowsSelector";
+import { setTime } from "react-datepicker/dist/date_utils";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -83,6 +85,10 @@ function Table<T extends Record<string, any>>({
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
   const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -107,11 +113,6 @@ function Table<T extends Record<string, any>>({
     const endIndex = startIndex + itemsPerPage;
     return tableData.slice(startIndex, endIndex);
   }, [currentPage, itemsPerPage, tableData]);
-
-  // Handle page change
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
 
   const columnWidths: { [k: string]: number } = Object.fromEntries(
     columns.map((col) => [col.id, col.width || 200])
@@ -357,19 +358,27 @@ function Table<T extends Record<string, any>>({
         onChange(newData);
       }
 
-      // Calculate the new total pages
-      const newTotalPages = Math.ceil(newData.length / itemsPerPage);
+      // Calculate the correct page index for the new row
+      const newPageIndex = Math.floor(data.length / pagination.pageSize);
+      const currentLastItemIndex =
+        (pagination.pageIndex + 1) * pagination.pageSize;
 
-      // If we've exceeded the items per page, move to the next page
-      if (newData.length > currentPage * itemsPerPage) {
-        setCurrentPage(newTotalPages);
+      // If the current page is full, move to the next page
+      if (currentLastItemIndex === prevData.length) {
+        setTimeout(() => {
+          setPagination((prev) => ({
+            ...prev,
+            pageIndex: newPageIndex + 1,
+          }));
+          table.nextPage();
+        }, 0);
       }
 
       return newData;
     });
 
     return true;
-  }, [columns, onChange, currentPage, itemsPerPage]);
+  }, [columns, onChange, pagination]);
 
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
@@ -1187,12 +1196,19 @@ function Table<T extends Record<string, any>>({
     ]
   );
 
-  // T
+  // TuRT
   const table = useReactTable<T>({
-    data: currentPageData,
+    data,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    state: {
+      sorting,
+      pagination,
+    },
+    onPaginationChange: setPagination,
+    pageCount: Math.ceil(data.length / pagination.pageSize),
     //OSC
     onSortingChange: (updater) => {
       const newSorting =
@@ -1216,7 +1232,6 @@ function Table<T extends Record<string, any>>({
         });
       }
     },
-    state: { sorting },
   });
 
   // HSA
@@ -1260,6 +1275,8 @@ function Table<T extends Record<string, any>>({
     },
     [table, hasAmountValuesAfterLastSubtotal, data, onShowDeleteButton]
   );
+
+  const isLastPage = table.getCanNextPage() === false;
 
   return (
     <div ref={tableRef} className="w-auto">
@@ -1437,7 +1454,7 @@ function Table<T extends Record<string, any>>({
           </div>
         </div>
       )}
-      {isEditing && currentPage === totalPages && (
+      {isEditing && isLastPage && (
         <>
           <div
             ref={addRowBarRef}
@@ -1471,19 +1488,7 @@ function Table<T extends Record<string, any>>({
         </>
       )}
       <div className="flex justify-between items-center mt-4">
-        <TablePageRowsSelector
-          itemsPerPage={itemsPerPage}
-          onItemsPerPageChange={handleItemsPerPageChange}
-          totalItems={data.length}
-          currentPage={currentPage}
-        />
-        {tableData.length > itemsPerPage && (
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-          />
-        )}
+        {tableData.length > itemsPerPage && <TablePagination table={table} />}
       </div>
     </div>
   );
