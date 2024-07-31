@@ -117,21 +117,43 @@ app.delete('/api/job_products', async (req, res) => {
   }
 });
 
-// Delete a product
-app.delete('/api/products/:id', async (req, res) => {
-  const { id } = req.params;
+// Delete multiple products
+app.delete('/api/products', async (req, res) => {
+  const { productIds } = req.body;
+
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(400).json({ message: 'Invalid product IDs provided' });
+  }
 
   try {
-    // First, remove any associations in the job_products table
-    await pool.query('DELETE FROM job_products WHERE product_id = $1', [id]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Then, delete the product itself
-    const query = 'DELETE FROM products WHERE id = $1';
-    await pool.query(query, [id]);
-    res.status(200).json({ message: 'Product deleted successfully' });
+      // Remove associations in the job_products table
+      const removeAssociationsQuery = 'DELETE FROM job_products WHERE product_id = ANY($1)';
+      await client.query(removeAssociationsQuery, [productIds]);
+
+      // Delete the products
+      const deleteProductsQuery = 'DELETE FROM products WHERE id = ANY($1) RETURNING id';
+      const result = await client.query(deleteProductsQuery, [productIds]);
+
+      await client.query('COMMIT');
+
+      const deletedIds = result.rows.map(row => row.id);
+      res.status(200).json({ 
+        message: 'Products deleted successfully', 
+        deletedProductIds: deletedIds 
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
-    console.error('Error deleting product:', error);
-    res.status(500).json({ message: 'Error deleting product', error: error.message });
+    console.error('Error deleting products:', error);
+    res.status(500).json({ message: 'Error deleting products', error: error.message });
   }
 });
 

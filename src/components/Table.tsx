@@ -52,7 +52,7 @@ function Table<T extends Record<string, any>>({
   onCancel,
 }: TableProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [editableRowId, setEditableRowId] = useState<string | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
     null
@@ -65,7 +65,7 @@ function Table<T extends Record<string, any>>({
   const [editingData, setEditingData] = useState<T[]>([]);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
-    string | null
+    number | null
   >(null);
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [rowToDelete, setRowToDelete] = useState<{
@@ -323,7 +323,7 @@ function Table<T extends Record<string, any>>({
   // HAR
   const handleAddRow = useCallback(() => {
     const newRow = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: `new_${Math.random().toString(36).substr(2, 9)}`,
       ...Object.fromEntries(
         columns.map((col) => {
           switch (col.type) {
@@ -645,16 +645,16 @@ function Table<T extends Record<string, any>>({
   const handleRowSelection = useCallback((row: Row<T>) => {
     setSelectedRows((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(row.id)) {
-        newSet.delete(row.id);
+      if (newSet.has(row.index)) {
+        newSet.delete(row.index);
         setSelectedRowForSubtotal(null);
       } else {
         if (newSet.size === 0) {
-          setSelectedRowForSubtotal(row.id);
+          setSelectedRowForSubtotal(row.index);
         } else {
           setSelectedRowForSubtotal(null);
         }
-        newSet.add(row.id);
+        newSet.add(row.index);
       }
 
       updateSelectionState(newSet);
@@ -663,12 +663,34 @@ function Table<T extends Record<string, any>>({
   }, []);
 
   // HDS
-  const handleDeleteSelected = async () => {
-    const selectedIds = Array.from(selectedRows);
-    await onDelete(selectedIds);
+  const handleDeleteSelected = useCallback(async () => {
+    const selectedIndices = Array.from(selectedRows);
+    await onDelete(selectedIndices);
+    // Clear selection after deletion
     setSelectedRows(new Set());
-    // Refresh data or update local state as needed
-  };
+
+    // Update the table data
+    setData((prevData) => {
+      const updatedData = prevData.filter(
+        (_, index) => !selectedIndices.includes(index)
+      );
+      return updatedData;
+    });
+
+    // Recalculate subtotals if necessary
+    setData((prevData) => recalculateSubtotals(prevData));
+
+    // Update pagination if necessary
+    if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
+      setPagination((prev) => ({
+        ...prev,
+        pageIndex: Math.max(
+          0,
+          Math.ceil(data.length / pagination.pageSize) - 1
+        ),
+      }));
+    }
+  }, [selectedRows, onDelete, data.length, pagination.pageSize]);
 
   useEffect(() => {
     updateSelectionState(selectedRows);
@@ -686,6 +708,7 @@ function Table<T extends Record<string, any>>({
   // HC
   const handleCancel = useCallback(() => {
     setEditingData([]);
+    setSelectedRows(new Set());
     if (onCancel) {
       onCancel();
     }
@@ -695,6 +718,7 @@ function Table<T extends Record<string, any>>({
   const handleSave = useCallback(() => {
     setData(editingData);
     setEditingData([]);
+    setSelectedRows(new Set());
     if (onSave) {
       onSave();
     }
@@ -779,7 +803,7 @@ function Table<T extends Record<string, any>>({
                   height={20}
                   className="text-blue-600"
                 />
-              ) : selectedRows.has(row.id) ? (
+              ) : selectedRows.has(row.index) ? (
                 <IconSquareCheckFilled
                   width={20}
                   height={20}
@@ -1211,16 +1235,14 @@ function Table<T extends Record<string, any>>({
   const handleSelectAll = useCallback(() => {
     setSelectedRows((prev) => {
       if (isAllSelected || isIndeterminate) {
-        // If all are selected or in indeterminate state, clear the selection
         updateSelectionState(new Set());
         return new Set();
       } else {
-        // Select all non-subtotal rows
-        const allRowIds = table
+        const allRowIndices = table
           .getRowModel()
           .rows.filter((row) => !row.original.isSubtotal)
-          .map((row) => row.id);
-        const newSet = new Set(allRowIds);
+          .map((row) => row.index);
+        const newSet = new Set(allRowIndices);
         updateSelectionState(newSet);
         return newSet;
       }
@@ -1229,7 +1251,7 @@ function Table<T extends Record<string, any>>({
 
   // USS
   const updateSelectionState = useCallback(
-    (selectedRows: Set<string>) => {
+    (selectedRows: Set<number>) => {
       const selectableRowCount = table
         .getRowModel()
         .rows.filter((row) => !row.original.isSubtotal).length;

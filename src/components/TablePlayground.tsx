@@ -106,7 +106,7 @@ const TablePlayground: React.FC = () => {
   );
 
   const handleDeleteProducts = useCallback(
-    async (selectedIds: string[]) => {
+    async (selectedIds: number[]) => {
       if (!selectedJob) return;
     },
     [selectedJob]

@@ -28,7 +28,7 @@ export interface TableProps<T> {
   initialData: T[];
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;
-  onDelete: (selectedIds: string[]) => Promise<void>;
+  onDelete: (selectedIds: number[]) => Promise<void>;
   onChange?: (changedData: T[]) => void;
   isEditing: boolean;
   onToggleEditing: () => void;

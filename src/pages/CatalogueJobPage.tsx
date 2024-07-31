@@ -163,29 +163,67 @@ const CatalogueJobPage: React.FC = () => {
     }
   }, [jobToDelete, selectedJob]);
 
-  const handleDeleteProducts = useCallback(
-    async (selectedIds: string[]) => {
-      if (!selectedJob) return;
+  const isRowFromDatabase = useCallback((product: Product) => {
+    return (
+      product.id !== undefined &&
+      product.id !== null &&
+      !product.id.startsWith("new_")
+    );
+  }, []);
 
-      try {
-        for (const productId of selectedIds) {
-          await fetch(`http://localhost:5000/api/job_products`, {
+  const handleDeleteProducts = useCallback(
+    async (selectedIndices: number[]) => {
+      if (!selectedJob) {
+        return;
+      }
+
+      const sortedIndices = selectedIndices.sort((a, b) => b - a);
+      const productsToDeleteFromDB: string[] = [];
+      let updatedProducts = [...products];
+
+      for (const index of sortedIndices) {
+        const product = updatedProducts[index];
+        if (isRowFromDatabase(product)) {
+          productsToDeleteFromDB.push(product.id);
+        }
+        updatedProducts.splice(index, 1);
+      }
+
+      // Update local state immediately
+      setProducts(updatedProducts);
+
+      if (productsToDeleteFromDB.length > 0) {
+        try {
+          const response = await fetch(`http://localhost:5000/api/products`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jobId: selectedJob.id, productId }),
+            body: JSON.stringify({ productIds: productsToDeleteFromDB }),
           });
 
-          await fetch(`http://localhost:5000/api/products/${productId}`, {
-            method: "DELETE",
-          });
+          if (!response.ok) {
+            throw new Error("Failed to delete products on the server");
+          }
+
+          const result = await response.json();
+
+          toast.success("Selected products deleted successfully");
+        } catch (error) {
+          console.error("Error deleting selected products:", error);
+          toast.error(
+            "Failed to delete some products from the server. Please try again."
+          );
+          // Refresh products from the server in case of error
+          await fetchProducts(selectedJob.id);
+          return;
         }
-
-        await fetchProducts(selectedJob.id);
-      } catch (error) {
-        console.error("Error deleting products:", error);
+      } else {
+        toast.success("Selected rows removed");
       }
+
+      // Ensure the Table component is updated with the new data
+      handleDataChange(updatedProducts);
     },
-    [selectedJob, fetchProducts]
+    [selectedJob, products, isRowFromDatabase, fetchProducts]
   );
 
   const handleOptionClick = (e: React.MouseEvent, job: Job) => {
@@ -323,6 +361,10 @@ const CatalogueJobPage: React.FC = () => {
           newChangedProducts.add(product.id);
         }
       });
+
+      // Trigger a re-render of the Table component
+
+      setTimeout(() => setProducts([...updatedData]), 0);
     },
     [originalProducts]
   );
