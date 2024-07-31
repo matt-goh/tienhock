@@ -38,7 +38,7 @@ import TableEditableCell from "./TableEditableCell";
 import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
-import { setTime } from "react-datepicker/dist/date_utils";
+import ToolTip from "./ToolTip";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -409,6 +409,7 @@ function Table<T extends Record<string, any>>({
     });
   }, [onChange, isRowEmpty]);
 
+  // HMD
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -1428,27 +1429,33 @@ function Table<T extends Record<string, any>>({
       )}
       {isEditing && isLastPage && (
         <>
-          <div
-            ref={addRowBarRef}
-            style={{
-              width: `${tableWidth}px`,
-              height: "16px",
-              userSelect: "none",
-              opacity:
-                isLastRowHovered || isAddRowBarHovered || isAddRowBarActive
-                  ? 1
-                  : 0,
-              transition: "opacity 0.2s ease-in-out",
-            }}
-            className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
-              isAddRowBarActive ? "active-bg" : ""
-            } 
+          <ToolTip
+            content={`Klik untuk menambah baris baharu\nSeret untuk menambah atau mengalih keluar baris`}
+            position="bottom"
+            visible={isAddRowBarHovered && !isDragging}
+          >
+            <div
+              ref={addRowBarRef}
+              style={{
+                width: `${tableWidth}px`,
+                height: "16px",
+                userSelect: "none",
+                opacity:
+                  isLastRowHovered || isAddRowBarHovered || isAddRowBarActive
+                    ? 1
+                    : 0,
+                transition: "opacity 0.2s ease-in-out",
+              }}
+              className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
+                isAddRowBarActive ? "active-bg" : ""
+              } 
         }`}
-            onMouseDown={handleMouseDown}
-            onClick={handleAddRow}
-            onMouseEnter={() => setIsAddRowBarHovered(true)}
-            onMouseLeave={() => setIsAddRowBarHovered(false)}
-          ></div>
+              onMouseDown={handleMouseDown}
+              onClick={handleAddRow}
+              onMouseEnter={() => setIsAddRowBarHovered(true)}
+              onMouseLeave={() => setIsAddRowBarHovered(false)}
+            ></div>
+          </ToolTip>
           <style>{`
         .active-bg {
           background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
