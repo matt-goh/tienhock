@@ -450,15 +450,15 @@ const CatalogueJobPage: React.FC = () => {
                             )}
                           </ComboboxOption>
                           <div
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 my-2 z-10"
+                            className="absolute inset-y-0 right-0 flex items-center pr-2 my-2 z-10"
                             onMouseEnter={() => setHoveredJob(job.id)}
                             onMouseLeave={() => setHoveredJob(null)}
                           >
-                            <div className="relative w-6 h-6 flex items-center justify-center">
+                            <div className="relative w-8 h-8 flex items-center justify-center">
                               {hoveredJob === job.id && (
                                 <button
                                   onClick={(e) => handleDeleteJob(job, e)}
-                                  className="delete-button absolute inset-0 flex items-center justify-center rounded-full bg-white"
+                                  className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-white hover:bg-gray-100 active:bg-gray-200 focus:outline-none"
                                 >
                                   <IconTrash
                                     className="text-red-600 active:text-red-700"
