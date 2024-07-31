@@ -36,10 +36,10 @@ const App: React.FC = () => {
         <aside className="">{/* <Sidebar /> */}</aside>
         <main className="">
           <Routes>
-            {/* <Route path="/catalogue/job" element={<CatalogueJobPage />} /> */}
+            <Route path="/catalogue/job" element={<CatalogueJobPage />} />
           </Routes>
           {/* <MeeProduction /> */}
-          <TablePlayground />
+          {/* <TablePlayground /> */}
         </main>
       </div>
     </Router>

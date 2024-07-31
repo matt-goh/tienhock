@@ -48,12 +48,12 @@ const TablePagination = <T extends Record<string, unknown>>({
   return (
     <div className="flex justify-between items-center w-full">
       <div className="flex items-center space-x-2 text-sm text-gray-700">
-        <span>Show</span>
+        <span>Show:</span>
         <div className="relative">
           <select
             value={table.getState().pagination.pageSize}
             onChange={(e) => table.setPageSize(Number(e.target.value))}
-            className="appearance-none bg-white border border-gray-300 rounded-md py-1 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="appearance-none bg-white border border-gray-300 rounded-full py-1 pl-3 pr-8 focus:outline-none focus:border-gray-400"
           >
             {[10, 25, 50].map((pageSize) => (
               <option key={pageSize} value={pageSize}>
@@ -66,7 +66,7 @@ const TablePagination = <T extends Record<string, unknown>>({
           </div>
         </div>
         <span>per page</span>
-        <span>
+        <span className="pl-2">
           {table.getState().pagination.pageIndex *
             table.getState().pagination.pageSize +
             1}
@@ -84,7 +84,7 @@ const TablePagination = <T extends Record<string, unknown>>({
         <button
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-accent hover:bg-gray-100 active:bg-gray-200 hover:text-accent-foreground h-10 px-4 py-2"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-accent hover:bg-gray-100 active:bg-gray-200 hover:text-accent-foreground h-10 w-10 py-2"
         >
           <IconChevronLeft className="h-4 w-4" />
         </button>
@@ -111,7 +111,7 @@ const TablePagination = <T extends Record<string, unknown>>({
         <button
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground h-10 w-10 py-2"
         >
           <IconChevronRight className="h-4 w-4" />
         </button>

@@ -89,30 +89,15 @@ function Table<T extends Record<string, any>>({
     pageIndex: 0,
     pageSize: 10,
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
-  const tableData = useMemo(
-    () => (isEditing ? editingData : data),
-    [isEditing, editingData, data]
-  );
-
-  // Recalculate total pages when tableData changes
   const totalPages = useMemo(
-    () => Math.ceil(data.length / itemsPerPage),
-    [data.length, itemsPerPage]
+    () => Math.ceil(data.length / pagination.pageSize),
+    [data.length, pagination.pageSize]
   );
-
-  // Get current page's data
-  const currentPageData = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return tableData.slice(startIndex, endIndex);
-  }, [currentPage, itemsPerPage, tableData]);
 
   const columnWidths: { [k: string]: number } = Object.fromEntries(
     columns.map((col) => [col.id, col.width || 200])
@@ -124,12 +109,17 @@ function Table<T extends Record<string, any>>({
     );
   };
 
-  // Update currentPage if it's greater than totalPages
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
+      setPagination((prev) => ({
+        ...prev,
+        pageIndex: Math.max(
+          0,
+          Math.ceil(data.length / pagination.pageSize) - 1
+        ),
+      }));
     }
-  }, [currentPage, totalPages]);
+  }, [data.length, pagination.pageIndex, pagination.pageSize]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -359,19 +349,13 @@ function Table<T extends Record<string, any>>({
       }
 
       // Calculate the correct page index for the new row
-      const newPageIndex = Math.floor(data.length / pagination.pageSize);
+      const newPageIndex = Math.floor(newData.length / pagination.pageSize);
       const currentLastItemIndex =
         (pagination.pageIndex + 1) * pagination.pageSize;
 
       // If the current page is full, move to the next page
       if (currentLastItemIndex === prevData.length) {
-        setTimeout(() => {
-          setPagination((prev) => ({
-            ...prev,
-            pageIndex: newPageIndex + 1,
-          }));
-          table.nextPage();
-        }, 0);
+        table.nextPage();
       }
 
       return newData;
@@ -405,11 +389,6 @@ function Table<T extends Record<string, any>>({
     setRemovableRowsAbove(count);
   }, [data, isRowEmpty]);
 
-  const handleItemsPerPageChange = useCallback((newItemsPerPage: number) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when changing items per page
-  }, []);
-
   useEffect(() => {
     updateRemovableRowsAbove();
   }, [data, updateRemovableRowsAbove]);
@@ -424,17 +403,11 @@ function Table<T extends Record<string, any>>({
           onChange(newData);
         }
 
-        // Check if we need to go back to the previous page
-        const totalPages = Math.ceil(newData.length / itemsPerPage);
-        if (currentPage > totalPages) {
-          setCurrentPage(totalPages);
-        }
-
         return newData;
       }
       return prevData;
     });
-  }, [onChange, isRowEmpty, currentPage, itemsPerPage]);
+  }, [onChange, isRowEmpty]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -458,9 +431,9 @@ function Table<T extends Record<string, any>>({
       }
 
       // Check if we're on the last page and it's not full
+      const isLastPage = !table.getCanNextPage();
       const isLastPageNotFull =
-        currentPage === Math.ceil(data.length / itemsPerPage) &&
-        data.length % itemsPerPage !== 0;
+        isLastPage && data.length % pagination.pageSize !== 0;
 
       // Calculate rows to add or remove
       const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
@@ -486,10 +459,9 @@ function Table<T extends Record<string, any>>({
       removableRowsAbove,
       handleAddRow,
       handleRemoveEmptyRow,
-      currentPage,
       totalPages,
       data.length,
-      itemsPerPage,
+      pagination,
     ]
   );
 
@@ -1203,12 +1175,12 @@ function Table<T extends Record<string, any>>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    autoResetPageIndex: false,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       pagination,
     },
-    onPaginationChange: setPagination,
-    pageCount: Math.ceil(data.length / pagination.pageSize),
     //OSC
     onSortingChange: (updater) => {
       const newSorting =
@@ -1488,7 +1460,7 @@ function Table<T extends Record<string, any>>({
         </>
       )}
       <div className="flex justify-between items-center mt-4">
-        {tableData.length > itemsPerPage && <TablePagination table={table} />}
+        {data.length > pagination.pageSize && <TablePagination table={table} />}
       </div>
     </div>
   );
