@@ -23,7 +23,7 @@ const ToolTip = ({
     return words.map((word, index) => {
       if (word === "Klik" || word === "Seret") {
         return (
-          <span key={index} className="text-gray-600">
+          <span key={index} className="font-bold text-gray-500">
             {word}
           </span>
         );
