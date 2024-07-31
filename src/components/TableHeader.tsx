@@ -11,8 +11,10 @@ interface TableHeaderProps<T> {
   headerGroup: any;
   columns: Array<{ id: string; type: ColumnType }>;
   isEditing: boolean;
-  isAllSelected: boolean;
-  isIndeterminate: boolean;
+  isAllSelectedGlobal: boolean;
+  isIndeterminateGlobal: boolean;
+  isAllSelectedPage: boolean;
+  isIndeterminatePage: boolean;
   handleSelectAll: () => void;
   isSortableColumn: (columnId: string) => boolean | undefined;
   columnWidths: { [k: string]: number };
@@ -22,8 +24,10 @@ function TableHeader<T>({
   headerGroup,
   columns,
   isEditing,
-  isAllSelected,
-  isIndeterminate,
+  isAllSelectedGlobal,
+  isIndeterminateGlobal,
+  isAllSelectedPage,
+  isIndeterminatePage,
   handleSelectAll,
   isSortableColumn,
   columnWidths,
@@ -74,13 +78,13 @@ function TableHeader<T>({
                 }}
                 className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
               >
-                {isAllSelected ? (
+                {isAllSelectedGlobal ? (
                   <IconSquareCheckFilled
                     width={20}
                     height={20}
                     className="text-blue-600"
                   />
-                ) : isIndeterminate ? (
+                ) : isIndeterminateGlobal ? (
                   <IconSquareMinusFilled
                     width={20}
                     height={20}
