@@ -74,8 +74,10 @@ function Table<T extends Record<string, any>>({
   } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
-  const [isAllSelected, setIsAllSelected] = useState(false);
-  const [isIndeterminate, setIsIndeterminate] = useState(false);
+  const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
+  const [isIndeterminateGlobal, setIsIndeterminateGlobal] = useState(false);
+  const [isAllSelectedPage, setIsAllSelectedPage] = useState(false);
+  const [isIndeterminatePage, setIsIndeterminatePage] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
@@ -641,27 +643,6 @@ function Table<T extends Record<string, any>>({
     }
   };
 
-  // HRS
-  const handleRowSelection = useCallback((row: Row<T>) => {
-    setSelectedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(row.index)) {
-        newSet.delete(row.index);
-        setSelectedRowForSubtotal(null);
-      } else {
-        if (newSet.size === 0) {
-          setSelectedRowForSubtotal(row.index);
-        } else {
-          setSelectedRowForSubtotal(null);
-        }
-        newSet.add(row.index);
-      }
-
-      updateSelectionState(newSet);
-      return newSet;
-    });
-  }, []);
-
   // HDS
   const handleDeleteSelected = useCallback(async () => {
     const selectedIndices = Array.from(selectedRows);
@@ -797,7 +778,7 @@ function Table<T extends Record<string, any>>({
               className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
               disabled={isSorting}
             >
-              {isAllSelected ? (
+              {isAllSelectedGlobal ? (
                 <IconSquareCheckFilled
                   width={20}
                   height={20}
@@ -1184,8 +1165,8 @@ function Table<T extends Record<string, any>>({
       isSorting,
       selectedRows,
       editableRowId,
-      isAllSelected,
-      isIndeterminate,
+      isAllSelectedGlobal,
+      isIndeterminateGlobal,
       editableCellIndex,
       handleCellChange,
       handleCellClick,
@@ -1231,35 +1212,26 @@ function Table<T extends Record<string, any>>({
     },
   });
 
-  // HSA
-  const handleSelectAll = useCallback(() => {
-    setSelectedRows((prev) => {
-      if (isAllSelected || isIndeterminate) {
-        updateSelectionState(new Set());
-        return new Set();
-      } else {
-        const allRowIndices = table
-          .getRowModel()
-          .rows.filter((row) => !row.original.isSubtotal)
-          .map((row) => row.index);
-        const newSet = new Set(allRowIndices);
-        updateSelectionState(newSet);
-        return newSet;
-      }
-    });
-  }, [isAllSelected, isIndeterminate, table]);
-
   // USS
   const updateSelectionState = useCallback(
     (selectedRows: Set<number>) => {
-      const selectableRowCount = table
-        .getRowModel()
-        .rows.filter((row) => !row.original.isSubtotal).length;
-      const allSelected =
-        selectedRows.size === selectableRowCount && selectableRowCount > 0;
-      const someSelected = selectedRows.size > 0 && !allSelected;
-      setIsAllSelected(allSelected);
-      setIsIndeterminate(someSelected);
+      const allRowsCount = data.filter((row) => !row.isSubtotal).length;
+      const isAllSelected = selectedRows.size === allRowsCount;
+      const isIndeterminate = selectedRows.size > 0 && !isAllSelected;
+
+      setIsAllSelectedGlobal(isAllSelected);
+      setIsIndeterminateGlobal(isIndeterminate);
+
+      const currentPageRows = table.getRowModel().rows;
+      const selectedPageRows = currentPageRows.filter((row) =>
+        selectedRows.has(row.index)
+      );
+      setIsAllSelectedPage(selectedPageRows.length === currentPageRows.length);
+      setIsIndeterminatePage(
+        selectedPageRows.length > 0 &&
+          selectedPageRows.length < currentPageRows.length
+      );
+
       setShowDeleteButton(selectedRows.size > 0);
       setCanAddSubtotal(
         selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
@@ -1268,7 +1240,42 @@ function Table<T extends Record<string, any>>({
         onShowDeleteButton(selectedRows.size > 0);
       }
     },
-    [table, hasAmountValuesAfterLastSubtotal, data, onShowDeleteButton]
+    [data, hasAmountValuesAfterLastSubtotal, onShowDeleteButton, table]
+  );
+
+  // HSA
+  const handleSelectAll = useCallback(() => {
+    setSelectedRows((prev) => {
+      let newSet: Set<number>;
+      if (isAllSelectedGlobal || isIndeterminateGlobal) {
+        // Deselect all rows across all pages
+        newSet = new Set();
+      } else {
+        // Select all rows across all pages
+        newSet = new Set(
+          data.filter((row) => !row.isSubtotal).map((_, index) => index)
+        );
+      }
+      updateSelectionState(newSet);
+      return newSet;
+    });
+  }, [isAllSelectedGlobal, isIndeterminateGlobal, data, updateSelectionState]);
+
+  // HRS
+  const handleRowSelection = useCallback(
+    (row: Row<T>) => {
+      setSelectedRows((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(row.index)) {
+          newSet.delete(row.index);
+        } else {
+          newSet.add(row.index);
+        }
+        updateSelectionState(newSet);
+        return newSet;
+      });
+    },
+    [updateSelectionState]
   );
 
   const isLastPage = table.getCanNextPage() === false;
@@ -1287,8 +1294,10 @@ function Table<T extends Record<string, any>>({
                 headerGroup={headerGroup}
                 columns={columns}
                 isEditing={isEditing}
-                isAllSelected={isAllSelected}
-                isIndeterminate={isIndeterminate}
+                isAllSelectedGlobal={isAllSelectedGlobal}
+                isIndeterminateGlobal={isIndeterminateGlobal}
+                isAllSelectedPage={isAllSelectedPage}
+                isIndeterminatePage={isIndeterminatePage}
                 handleSelectAll={handleSelectAll}
                 isSortableColumn={isSortableColumn}
                 columnWidths={columnWidths}
@@ -1404,7 +1413,7 @@ function Table<T extends Record<string, any>>({
         <DeleteButton
           onDelete={handleDeleteSelected}
           selectedCount={selectedRows.size}
-          isAllSelected={isAllSelected}
+          isAllSelected={isAllSelectedGlobal}
           style={{
             marginRight: `${
               hasAmountColumn && hasNumberColumn ? "235px" : "128px"
