@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 services:
   react-app:
     build:
@@ -24,8 +24,13 @@ services:
       - DB_NAME=tienhock
       - DB_PASSWORD=foodmaker
       - DB_PORT=5432
+    env_file:
+      - .env
     depends_on:
       - db
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
 
   db:
     image: postgres:13
@@ -35,6 +40,8 @@ services:
       - POSTGRES_DB=tienhock
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
 volumes:
   postgres_data:
