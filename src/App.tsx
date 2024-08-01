@@ -33,7 +33,7 @@ const App: React.FC = () => {
         }}
       />
       <div className="App">
-        <aside className="">{/* <Sidebar /> */}</aside>
+        {/* <aside className=""><Sidebar /></aside> */}
         <main className="">
           <Routes>
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />

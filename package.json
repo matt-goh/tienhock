@@ -35,12 +35,12 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "concurrently \"npm run electron-dev\" \"npm run react\"",
-    "electron-dev": "electron .",
-    "react": "react-scripts start",
+    "start": "react-scripts start",
+    "react": "WATCHPACK_POLLING=true react-scripts start",
     "build": "react-scripts build",
+    "electron-dev": "electron .",
     "electron-prod": "npm run build && electron .",
-    "dev": "nodemon --watch . --ext js,jsx,ts,tsx --exec \"npm run start\""
+    "server": "nodemon server.js"
   },
   "eslintConfig": {
     "extends": [

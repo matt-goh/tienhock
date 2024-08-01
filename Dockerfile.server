@@ -3,26 +3,14 @@ FROM node:14
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
-
-# Log the contents of the directory for debugging
-RUN ls -la
-
 # Install dependencies
 RUN npm install
 
 # Install nodemon globally
 RUN npm install -g nodemon
 
-# Copy the rest of the application
-COPY . .
-
-# Log the contents of the directory again for debugging
-RUN ls -la
-
 # Expose the port the app runs on
 EXPOSE 5000
 
 # Use the npm script to run the server
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "server"]

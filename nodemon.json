@@ -1,6 +1,0 @@
-{
-  "watch": ["src", "main.js"],
-  "ext": "js,jsx,ts,tsx,json",
-  "ignore": ["node_modules"],
-  "exec": "npm run start"
-}
