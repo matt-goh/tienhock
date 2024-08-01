@@ -9,14 +9,12 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Install concurrently globally
-RUN npm install -g concurrently
+# Install nodemon and concurrently globally
+RUN npm install -g nodemon concurrently
 
-# Copy the rest of the application
-COPY . .
+# We'll copy the rest of the code via volume mounting
 
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application using nodemon and concurrently
+CMD ["npm", "run", "dev"]

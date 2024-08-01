@@ -40,7 +40,7 @@
     "react": "react-scripts start",
     "build": "react-scripts build",
     "electron-prod": "npm run build && electron .",
-    "dev": "nodemon --experimental-specifier-resolution=node server.js"
+    "dev": "nodemon --watch . --ext js,jsx,ts,tsx --exec \"npm run start\""
   },
   "eslintConfig": {
     "extends": [
