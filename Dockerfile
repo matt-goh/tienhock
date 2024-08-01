@@ -27,6 +27,3 @@ COPY . .
 
 # Expose the port the app runs on
 EXPOSE 3000
-
-# Use Xvfb to create a virtual framebuffer
-CMD xvfb-run --server-args="-screen 0 1024x768x24" npm start
