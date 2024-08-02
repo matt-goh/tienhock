@@ -2,10 +2,10 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import React, { useState } from "react";
 import { Toaster } from "react-hot-toast";
+import CatalogueProductPage from "./pages/CatalogueProductPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
 import MeeProduction from "./components/MeeProduction";
 import Sidebar from "./components/Sidebar";
-import TablePlayground from "./components/TablePlayground";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -14,21 +14,11 @@ const App: React.FC = () => {
       <Toaster
         position="top-right"
         toastOptions={{
-          success: {
-            style: {
-              padding: "12px",
-              fontSize: "0.875rem",
-              lineHeight: "1.25rem",
-              fontWeight: 500,
-            },
-          },
-          error: {
-            style: {
-              padding: "12px",
-              fontSize: "0.875rem",
-              lineHeight: "1.25rem",
-              fontWeight: 500,
-            },
+          style: {
+            padding: "12px",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
+            fontWeight: 500,
           },
         }}
       />
@@ -37,6 +27,10 @@ const App: React.FC = () => {
         <main className="">
           <Routes>
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
+            <Route
+              path="/catalogue/product"
+              element={<CatalogueProductPage />}
+            />
           </Routes>
           {/* <MeeProduction /> */}
           {/* <TablePlayground /> */}
