@@ -32,7 +32,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
       <IconChevronRight
         width="18"
         height="18"
-        stroke={2.5}
+        stroke={2.25}
         className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-300 right-2 absolute ${
           isActive
             ? "opacity-100 hover:text-gray-600"
