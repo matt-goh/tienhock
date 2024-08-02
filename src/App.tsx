@@ -1,10 +1,10 @@
 // src/App.tsx
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import React, { useState } from "react";
+import React from "react";
 import { Toaster } from "react-hot-toast";
 import CatalogueProductPage from "./pages/CatalogueProductPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
-import MeeProduction from "./components/MeeProduction";
+import CatalogueSectionPage from "./pages/CatalogueSectionPage";
 import Sidebar from "./components/Sidebar";
 
 const App: React.FC = () => {
@@ -31,6 +31,10 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/product"
               element={<CatalogueProductPage />}
+            />
+            <Route
+              path="/catalogue/section"
+              element={<CatalogueSectionPage />}
             />
           </Routes>
           {/* <MeeProduction /> */}
