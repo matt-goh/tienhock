@@ -1282,7 +1282,7 @@ function Table<T extends Record<string, any>>({
   const isLastPage = table.getCanNextPage() === false;
 
   return (
-    <div ref={tableRef} className="w-auto">
+    <div ref={tableRef} className="flex flex-col items-center w-auto">
       <div className="rounded-lg border border-gray-300 w-fit">
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"

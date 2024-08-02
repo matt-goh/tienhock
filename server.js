@@ -589,7 +589,7 @@ app.post('/api/sections/batch', async (req, res) => {
 
       const processedSections = [];
 
-      // Step 1: Process all sections
+      // Process all sections
       for (const section of sections) {
         const { id, newId, name } = section;
         

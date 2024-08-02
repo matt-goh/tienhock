@@ -84,6 +84,7 @@ const CatalogueProductPage: React.FC = () => {
         );
 
         toast.success("Selected products deleted successfully");
+        setIsEditing(false);
       } catch (error) {
         console.error("Error deleting selected products:", error);
         toast.error("Failed to delete products. Please try again.");
