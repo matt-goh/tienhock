@@ -6,7 +6,6 @@ import CatalogueProductPage from "./pages/CatalogueProductPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
 import MeeProduction from "./components/MeeProduction";
 import Sidebar from "./components/Sidebar";
-import "./App.css";
 
 const App: React.FC = () => {
   return (
@@ -22,9 +21,11 @@ const App: React.FC = () => {
           },
         }}
       />
-      <div className="App">
-        {/* <aside className=""><Sidebar /></aside> */}
-        <main className="">
+      <div className="flex">
+        <aside className="hidden xl:flex">
+          <Sidebar />
+        </aside>
+        <main className="flex justify-center w-full">
           <Routes>
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
             <Route
@@ -33,7 +34,6 @@ const App: React.FC = () => {
             />
           </Routes>
           {/* <MeeProduction /> */}
-          {/* <TablePlayground /> */}
         </main>
       </div>
     </Router>

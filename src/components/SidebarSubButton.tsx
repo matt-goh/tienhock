@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import { IconChevronRight } from "@tabler/icons-react";
 
 interface SidebarSubButtonProps {
@@ -20,7 +20,7 @@ const SidebarSubButton: React.FC<SidebarSubButtonProps> = ({
     <li className="relative">
       <button
         onClick={onToggle}
-        className="flex group items-center block py-2 pl-7 pr-2 hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600 transition-colors duration-200 rounded-lg w-full text-left focus:outline-none"
+        className="flex group items-center block py-2 pl-7 pr-2 hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800 transition-colors duration-200 rounded-lg w-full text-left focus:outline-none"
       >
         <span className="flex items-center">
           {icon}
@@ -30,7 +30,7 @@ const SidebarSubButton: React.FC<SidebarSubButtonProps> = ({
           width="20"
           height="20"
           stroke={2}
-          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-2 opacity-0 hover:text-gray-600 group-hover:opacity-100 transform transition-all duration-300 ${
+          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-2 opacity-0 hover:text-gray-800 group-hover:opacity-100 transform transition-all duration-300 ${
             isOpen ? "rotate-90" : ""
           }`}
         />

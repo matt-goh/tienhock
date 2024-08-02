@@ -133,8 +133,8 @@ const CatalogueProductPage: React.FC = () => {
   }
 
   return (
-    <div className={`flex justify-center py-[60px]`}>
-      <div className="flex flex-col items-center justify-center w-full">
+    <div className={`relative py-[60px]`}>
+      <div className="flex flex-col items-center justify-center w-auto">
         <div className={`relative text-lg font-medium text-gray-700 mb-6`}>
           Product Catalogue
         </div>

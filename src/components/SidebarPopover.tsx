@@ -47,7 +47,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
   
   const popoverContent = (
     <div
-      className="absolute w-auto bg-white text-gray-500 font-medium border border-gray-200 shadow-lg rounded-lg p-2"
+      className="absolute w-auto bg-white text-gray-700 font-medium border border-gray-200 shadow-lg rounded-lg p-2"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -60,7 +60,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
           <li key={index}>
             <a
               href={option.link}
-              className="block py-2 px-4 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-lg"
+              className="block py-2 px-4 hover:bg-gray-200/90 active:bg-gray-300/90 transition-colors duration-200 rounded-lg"
             >
               {option.name}
             </a>
