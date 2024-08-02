@@ -80,6 +80,11 @@ const Sidebar: React.FC = () => {
       <div className="relative py-4">
         <h2 className="text-xl font-bold text-center">Tien Hock</h2>
       </div>
+      {/* Hierarchy
+          SidebarButton
+            SidebarSubButton
+              SidebarOption
+                SidebarPopover */}
       <div className="flex-1 overflow-y-auto sidebar-scrollbar">
         <div className="text-gray-700 font-medium text-left">
           <ul className="mx-2 space-y-2 text-base">
@@ -94,7 +99,7 @@ const Sidebar: React.FC = () => {
               onClick={() => handleToggle("payroll")}
             >
               {openItems.includes("payroll") && (
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1.5 space-y-1.5">
                   <SidebarSubButton
                     name="Production"
                     icon={
@@ -107,7 +112,6 @@ const Sidebar: React.FC = () => {
                       name="Mee"
                       onMouseEnter={() => handleMouseEnter("mee")}
                       onMouseLeave={handleMouseLeave}
-                      hasSubMenu={true}
                       buttonRef={meeButtonRef}
                       isActive={hoveredOption === "mee"}
                     />
@@ -126,7 +130,6 @@ const Sidebar: React.FC = () => {
                       name="Bihun"
                       onMouseEnter={() => handleMouseEnter("bihun")}
                       onMouseLeave={handleMouseLeave}
-                      hasSubMenu={true}
                       buttonRef={bihunButtonRef}
                       isActive={hoveredOption === "bihun"}
                     />
@@ -160,7 +163,7 @@ const Sidebar: React.FC = () => {
               onClick={() => handleToggle("stock")}
             >
               {openItems.includes("stock") && (
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1.5 space-y-1">
                   <SidebarOption name="Opening" link="/stock/opening" />
                   <SidebarOption name="Card" link="/stock/card" />
                 </ul>
@@ -172,7 +175,7 @@ const Sidebar: React.FC = () => {
               onClick={() => handleToggle("statement")}
             >
               {openItems.includes("statement") && (
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1.5 space-y-1">
                   <SidebarOption name="Option 1" link="/catalogue/job" />
                   <SidebarOption name="Option 2" link="/catalogue/job" />
                 </ul>
@@ -184,7 +187,7 @@ const Sidebar: React.FC = () => {
               onClick={() => handleToggle("catalogue")}
             >
               {openItems.includes("catalogue") && (
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1.5 space-y-1">
                   <SidebarOption name="Staff" link="/catalogue/staff" />
                   <SidebarOption name="Job" link="/catalogue/job" />
                   <SidebarOption name="Product" link="/catalogue/product" />

@@ -434,7 +434,7 @@ const CatalogueJobPage: React.FC = () => {
   return (
     <div className={`flex justify-center py-[60px]`}>
       <div className="flex flex-col items-start max-w-4xl">
-        <div className={`w-full text-lg font-medium text-gray-700 mb-4`}>
+        <div className={`w-full text-lg text-center font-medium text-gray-700 mb-4`}>
           Job Catalogue
         </div>
         <div className={`w-full flex justify-start items-center mb-4`}>
