@@ -62,7 +62,6 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.19",
-    "concurrently": "^6.2.0",
     "electron": "^31.1.0",
     "postcss": "^8.4.38",
     "serve": "^14.2.3",
