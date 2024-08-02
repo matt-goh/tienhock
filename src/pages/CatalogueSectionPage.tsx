@@ -5,7 +5,7 @@ import { ColumnConfig } from "../types/types";
 import toast from "react-hot-toast";
 
 interface Section {
-  originalId: any | string;
+  originalId: string;
   id: string;
   name: string;
 }
@@ -32,7 +32,9 @@ const CatalogueSectionPage: React.FC = () => {
       const response = await fetch("http://localhost:5000/api/sections");
       if (!response.ok) throw new Error("Failed to fetch sections");
       const data = await response.json();
-      setSections(data);
+      setSections(
+        data.map((section: Section) => ({ ...section, originalId: section.id }))
+      );
     } catch (error) {
       console.error("Error fetching sections:", error);
       toast.error("Failed to fetch sections. Please try again.");
@@ -78,6 +80,7 @@ const CatalogueSectionPage: React.FC = () => {
         );
 
         toast.success("Selected sections deleted successfully");
+        setIsEditing(false);
       } catch (error) {
         console.error("Error deleting selected sections:", error);
         toast.error("Failed to delete sections. Please try again.");
@@ -88,12 +91,35 @@ const CatalogueSectionPage: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     try {
-      const sectionsToUpdate = editedSections.map((section) => {
-        if (section.id !== section.originalId) {
-          return { ...section, newId: section.id, id: section.originalId };
+      // Check for empty section IDs
+      const emptySectionId = editedSections.find(
+        (section) => !section.id.trim()
+      );
+      if (emptySectionId) {
+        toast.error("Section ID cannot be empty");
+        return;
+      }
+
+      // Check for duplicate section IDs
+      const sectionIds = new Set();
+      const duplicateSectionId = editedSections.find((section) => {
+        if (sectionIds.has(section.id)) {
+          return true;
         }
-        return section;
+        sectionIds.add(section.id);
+        return false;
       });
+
+      if (duplicateSectionId) {
+        toast.error(`Duplicate section ID: ${duplicateSectionId.id}`);
+        return;
+      }
+
+      const sectionsToUpdate = editedSections.map((section) => ({
+        ...section,
+        newId: section.id !== section.originalId ? section.id : undefined,
+        id: section.originalId,
+      }));
 
       const response = await fetch("http://localhost:5000/api/sections/batch", {
         method: "POST",
@@ -106,12 +132,17 @@ const CatalogueSectionPage: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error || "An error occurred while saving sections"
+          errorData.message || "An error occurred while saving sections"
         );
       }
 
       const result = await response.json();
-      setSections(result.sections);
+      setSections(
+        result.sections.map((section: Section) => ({
+          ...section,
+          originalId: section.id,
+        }))
+      );
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {
@@ -141,7 +172,7 @@ const CatalogueSectionPage: React.FC = () => {
         >
           Section Catalogue
         </div>
-        <div className="relative">
+        <div className="relative justify-center">
           <Table
             initialData={isEditing ? editedSections : sections}
             columns={isEditing ? editableSectionColumns : sectionColumns}
