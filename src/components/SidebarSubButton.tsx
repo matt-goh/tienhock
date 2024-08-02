@@ -27,10 +27,10 @@ const SidebarSubButton: React.FC<SidebarSubButtonProps> = ({
           {name}
         </span>
         <IconChevronRight
-          width="20"
-          height="20"
-          stroke={2}
-          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-2 opacity-0 hover:text-gray-800 group-hover:opacity-100 transform transition-all duration-300 ${
+          width="18"
+          height="18"
+          stroke={2.5}
+          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-2 opacity-0 hover:text-gray-600 group-hover:opacity-100 transform transition-all duration-300 ${
             isOpen ? "rotate-90" : ""
           }`}
         />

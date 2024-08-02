@@ -7,7 +7,6 @@ interface SidebarOptionProps {
   link?: string; // New prop for the link
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  hasSubMenu?: boolean;
   buttonRef?: React.RefObject<HTMLLIElement>;
   isActive?: boolean;
 }
@@ -17,7 +16,6 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   link,
   onMouseEnter,
   onMouseLeave,
-  hasSubMenu,
   buttonRef,
   isActive,
 }) => {
@@ -31,18 +29,16 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     <>
       <svg width="24" height="24" className="mr-2"></svg>
       {name}
-      {hasSubMenu && (
-        <IconChevronRight
-          width="20"
-          height="20"
-          stroke={2}
-          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-300 right-2 absolute ${
-            isActive
-              ? "opacity-100 hover:text-gray-800"
-              : "opacity-0 group-hover:opacity-100 hover:text-gray-800"
-          }`}
-        />
-      )}
+      <IconChevronRight
+        width="18"
+        height="18"
+        stroke={2.5}
+        className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-300 right-2 absolute ${
+          isActive
+            ? "opacity-100 hover:text-gray-600"
+            : "opacity-0 group-hover:opacity-100 hover:text-gray-600"
+        }`}
+      />
     </>
   );
 
