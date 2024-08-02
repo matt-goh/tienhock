@@ -59,10 +59,15 @@ const CatalogueJobPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching jobs:", error);
+      toast.error("Failed to fetch jobs. Please try again.");
     } finally {
       setLoading(false);
     }
   }, [selectedJob]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
 
   const fetchProducts = useCallback(async (jobId: string) => {
     try {
@@ -75,14 +80,11 @@ const CatalogueJobPage: React.FC = () => {
       setProducts(data);
     } catch (error) {
       console.error("Error fetching products:", error);
+      toast.error("Failed to fetch products. Please try again.");
     } finally {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
 
   useEffect(() => {
     if (selectedJob) {
@@ -94,10 +96,31 @@ const CatalogueJobPage: React.FC = () => {
     }
   }, [selectedJob, fetchProducts]);
 
-  const handleJobAdded = useCallback(() => {
-    fetchJobs();
-    setShowNewJobModal(false);
-  }, [fetchJobs]);
+  const handleJobAdded = useCallback(async (newJob: Omit<Job, "id">) => {
+    try {
+      const response = await fetch("http://localhost:5000/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newJob),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message);
+      }
+
+      const data = await response.json();
+      setJobs((prevJobs) => [...prevJobs, data.job]);
+      setSelectedJob(data.job);
+      setShowNewJobModal(false);
+      toast.success("Job added successfully");
+    } catch (error) {
+      console.error("Error adding job:", error);
+      toast.error(
+        (error as Error).message || "Failed to add job. Please try again."
+      );
+    }
+  }, []);
 
   // HJS
   const handleJobSelection = useCallback((selection: Job | null) => {
@@ -204,8 +227,6 @@ const CatalogueJobPage: React.FC = () => {
             throw new Error("Failed to delete products on the server");
           }
 
-          const result = await response.json();
-
           toast.success("Selected products deleted successfully");
         } catch (error) {
           console.error("Error deleting selected products:", error);
@@ -265,29 +286,64 @@ const CatalogueJobPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!editedJob) return;
 
+    // Check for empty job ID
+    if (!editedJob.id.trim()) {
+      toast.error("Job ID cannot be empty");
+      return;
+    }
+
+    // Check for duplicate job ID
+    const isDuplicateJobId = jobs.some(
+      (job) => job.id === editedJob.id && job.id !== selectedJob?.id
+    );
+    if (isDuplicateJobId) {
+      toast.error("A job with this ID already exists");
+      return;
+    }
+
+    // Check for empty product IDs
+    const emptyProductId = products.find((product) => !product.id.trim());
+    if (emptyProductId) {
+      toast.error("Product ID cannot be empty");
+      return;
+    }
+
+    // Check for duplicate product IDs
+    const productIds = new Set();
+    const duplicateProductId = products.find((product) => {
+      if (productIds.has(product.id)) {
+        return true;
+      }
+      productIds.add(product.id);
+      return false;
+    });
+
+    if (duplicateProductId) {
+      toast.error(`Duplicate product ID: ${duplicateProductId.id}`);
+      return;
+    }
+
     try {
       // Update job
       const jobResponse = await fetch(
-        `http://localhost:5000/api/jobs/${editedJob.id}`,
+        `http://localhost:5000/api/jobs/${selectedJob?.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editedJob),
+          body: JSON.stringify({
+            name: editedJob.name,
+            section: editedJob.section,
+            newId: editedJob.id !== selectedJob?.id ? editedJob.id : undefined,
+          }),
         }
       );
 
-      if (!jobResponse.ok) throw new Error("Failed to update job");
-
-      // Check for products with null IDs
-      const productsWithNullIds = products.filter(
-        (product) =>
-          product.id === null || product.id === undefined || product.id === ""
-      );
-      if (productsWithNullIds.length > 0) {
-        const errorMessage = `Cannot save changes. ${productsWithNullIds.length} product(s) have null IDs. Please ensure all products have valid IDs before saving.`;
-        toast.error(errorMessage);
-        return; // Exit the function early
+      if (!jobResponse.ok) {
+        const errorData = await jobResponse.json();
+        throw new Error(errorData.message);
       }
+
+      const updatedJob = await jobResponse.json();
 
       // Send all products to the server
       const productsResponse = await fetch(
@@ -296,8 +352,15 @@ const CatalogueJobPage: React.FC = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            jobId: editedJob.id,
-            products: products,
+            jobId: updatedJob.job.id,
+            products: products.map((product) => ({
+              ...product,
+              newId:
+                product.id !==
+                originalProducts.find((p) => p.id === product.id)?.id
+                  ? product.id
+                  : undefined,
+            })),
           }),
         }
       );
@@ -313,18 +376,16 @@ const CatalogueJobPage: React.FC = () => {
 
       // Update local state with the result from the server
       setProducts(result.products);
-
-      setSelectedJob(editedJob);
+      setSelectedJob(updatedJob.job);
       setJobs((jobs) =>
-        jobs.map((job) => (job.id === editedJob.id ? editedJob : job))
+        jobs.map((job) => (job.id === selectedJob?.id ? updatedJob.job : job))
       );
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {
-      console.error("Error updating data:", error);
       toast.error((error as Error).message);
     }
-  }, [editedJob, products]);
+  }, [editedJob, selectedJob, products, jobs, originalProducts]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -335,6 +396,7 @@ const CatalogueJobPage: React.FC = () => {
             ({
               ...prev!,
               [property]: value,
+              newId: property === "id" ? value : prev!.id,
             } as Job)
         );
       }
@@ -354,6 +416,7 @@ const CatalogueJobPage: React.FC = () => {
         if (!originalProduct) {
           newChangedProducts.add(product.id);
         } else if (
+          product.id !== originalProduct.id ||
           product.name !== originalProduct.name ||
           product.amount !== originalProduct.amount ||
           product.remark !== originalProduct.remark
@@ -363,7 +426,6 @@ const CatalogueJobPage: React.FC = () => {
       });
 
       // Trigger a re-render of the Table component
-
       setTimeout(() => setProducts([...updatedData]), 0);
     },
     [originalProducts]

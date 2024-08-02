@@ -39,6 +39,7 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "./ToolTip";
+import toast from "react-hot-toast";
 
 function Table<T extends Record<string, any>>({
   initialData,

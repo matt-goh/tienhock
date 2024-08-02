@@ -25,17 +25,50 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
+// Check for duplicate job name
+async function checkDuplicateJobName(name, id = null) {
+  const query = id
+    ? 'SELECT * FROM jobs WHERE name = $1 AND id != $2'
+    : 'SELECT * FROM jobs WHERE name = $1';
+  const values = id ? [name, id] : [name];
+  const result = await pool.query(query, values);
+  return result.rows.length > 0;
+}
+
+// Check for duplicate job ID
+async function checkDuplicateJobId(id) {
+  const query = 'SELECT * FROM jobs WHERE id = $1';
+  const result = await pool.query(query, [id]);
+  return result.rows.length > 0;
+}
+
+// Check for duplicate product ID
+async function checkDuplicateProductId(id) {
+  const query = 'SELECT * FROM products WHERE id = $1';
+  const result = await pool.query(query, [id]);
+  return result.rows.length > 0;
+}
+
 app.post('/api/jobs', async (req, res) => {
   const { id, name, section } = req.body;
 
   try {
+    const isDuplicateName = await checkDuplicateJobName(name);
+    if (isDuplicateName) {
+      return res.status(400).json({ message: 'A job with this name already exists' });
+    }
+
+    const isDuplicateId = await checkDuplicateJobId(id);
+    if (isDuplicateId) {
+      return res.status(400).json({ message: 'A job with this ID already exists' });
+    }
+
     const query = `
       INSERT INTO jobs (id, name, section)
       VALUES ($1, $2, $3)
       RETURNING *
     `;
     
-    // Join array values into comma-separated strings
     const values = [
       id, 
       name, 
@@ -178,29 +211,75 @@ app.get('/api/jobs/:jobId/products/count', async (req, res) => {
 // Update a job
 app.put('/api/jobs/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, section } = req.body;
+  const { name, section, newId } = req.body;
 
   try {
-    const query = `
-      UPDATE jobs
-      SET name = $1, section = $2
-      WHERE id = $3
-      RETURNING *
-    `;
-    
-    const values = [
-      name, 
-      Array.isArray(section) ? section.join(', ') : section,
-      id
-    ];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const result = await pool.query(query, values);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Job not found' });
+      // Check if the job exists
+      const existingJobQuery = 'SELECT * FROM jobs WHERE id = $1';
+      const existingJobResult = await client.query(existingJobQuery, [id]);
+      
+      if (existingJobResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: 'Job not found' });
+      }
+
+      const existingJob = existingJobResult.rows[0];
+
+      // Only check for duplicate name if the name is being changed
+      if (name !== existingJob.name) {
+        const isDuplicateName = await checkDuplicateJobName(name, id);
+        if (isDuplicateName) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ message: 'A job with this name already exists' });
+        }
+      }
+
+      let updatedId = id;
+      if (newId && newId !== id) {
+        const isDuplicateId = await checkDuplicateJobId(newId);
+        if (isDuplicateId) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ message: 'A job with this ID already exists' });
+        }
+
+        // Drop the foreign key constraint
+        await client.query('ALTER TABLE job_products DROP CONSTRAINT job_products_job_id_fkey');
+
+        // Update job ID in jobs table
+        await client.query('UPDATE jobs SET id = $1 WHERE id = $2', [newId, id]);
+
+        // Update job ID in job_products table
+        await client.query('UPDATE job_products SET job_id = $1 WHERE job_id = $2', [newId, id]);
+
+        // Recreate the foreign key constraint
+        await client.query('ALTER TABLE job_products ADD CONSTRAINT job_products_job_id_fkey FOREIGN KEY (job_id) REFERENCES jobs(id)');
+
+        updatedId = newId;
+      }
+
+      // Update other job details
+      const query = `
+        UPDATE jobs
+        SET name = $1, section = $2
+        WHERE id = $3
+        RETURNING *
+      `;
+      const values = [name, Array.isArray(section) ? section.join(', ') : section, updatedId];
+
+      const result = await client.query(query, values);
+
+      await client.query('COMMIT');
+      res.json({ message: 'Job updated successfully', job: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    res.json({ message: 'Job updated successfully', job: result.rows[0] });
   } catch (error) {
     console.error('Error updating job:', error);
     res.status(500).json({ message: 'Error updating job', error: error.message });
@@ -305,7 +384,6 @@ app.post('/api/products', async (req, res) => {
 // Batch update/insert products
 app.post('/api/products/batch', async (req, res) => {
   const { jobId, products } = req.body;
-  console.log('Received products for batch update/insert:', { jobId, products });
 
   try {
     const client = await pool.connect();
@@ -313,69 +391,68 @@ app.post('/api/products/batch', async (req, res) => {
       await client.query('BEGIN');
 
       const processedProducts = [];
-      const jobProducts = [];
 
+      // Step 1: Process all products
       for (const product of products) {
-        const { id, name, amount, remark } = product;
+        const { id, newId, name, amount, remark } = product;
         
-        if (id && !id.startsWith('new_')) {
-          // Update existing product
-          console.log(`Updating product: ${id}, ${name}, ${amount}, ${remark}`);
-          const updateQuery = `
-            UPDATE products
-            SET name = $1, amount = $2, remark = $3
-            WHERE id = $4
+        if (newId && newId !== id) {
+          // This is an existing product with an ID change
+          // First, insert the new product or update if it already exists
+          const upsertQuery = `
+            INSERT INTO products (id, name, amount, remark)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (id) DO UPDATE
+            SET name = EXCLUDED.name, amount = EXCLUDED.amount, remark = EXCLUDED.remark
             RETURNING *
           `;
-          const updateValues = [name, amount, remark, id];
-          const result = await client.query(updateQuery, updateValues);
+          const upsertValues = [newId, name, amount, remark];
+          const upsertResult = await client.query(upsertQuery, upsertValues);
           
-          if (result.rowCount > 0) {
-            processedProducts.push(result.rows[0]);
-            jobProducts.push({ job_id: jobId, product_id: id });
-          } else {
-            console.log(`Product with id ${id} not found, inserting as new product`);
-            // If update fails, insert as new product
-            const insertQuery = `
-              INSERT INTO products (id, name, amount, remark)
-              VALUES ($1, $2, $3, $4)
-              RETURNING *
-            `;
-            const insertValues = [id, name, amount, remark];
-            const insertResult = await client.query(insertQuery, insertValues);
-            processedProducts.push(insertResult.rows[0]);
-            jobProducts.push({ job_id: jobId, product_id: id });
-          }
+          // Update job_products table to use the new product ID
+          await client.query('UPDATE job_products SET product_id = $1 WHERE product_id = $2', [newId, id]);
+          
+          // Now, delete the old product
+          await client.query('DELETE FROM products WHERE id = $1', [id]);
+          
+          processedProducts.push(upsertResult.rows[0]);
         } else {
-          // Insert new product
-          console.log(`Inserting new product: ${name}, ${amount}, ${remark}`);
-          const insertQuery = `
-            INSERT INTO products (name, amount, remark)
-            VALUES ($1, $2, $3)
+          // This is an existing product without ID change or a new product
+          const upsertQuery = `
+            INSERT INTO products (id, name, amount, remark)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (id) DO UPDATE
+            SET name = EXCLUDED.name, amount = EXCLUDED.amount, remark = EXCLUDED.remark
             RETURNING *
           `;
-          const insertValues = [name, amount, remark];
-          const result = await client.query(insertQuery, insertValues);
-          
-          const newProduct = result.rows[0];
-          processedProducts.push(newProduct);
-          jobProducts.push({ job_id: jobId, product_id: newProduct.id });
+          const upsertValues = [id, name, amount, remark];
+          const result = await client.query(upsertQuery, upsertValues);
+          processedProducts.push(result.rows[0]);
         }
       }
 
-      // Clear existing job-product associations and insert new ones
-      await client.query('DELETE FROM job_products WHERE job_id = $1', [jobId]);
-      for (const jp of jobProducts) {
-        await client.query('INSERT INTO job_products (job_id, product_id) VALUES ($1, $2)', [jp.job_id, jp.product_id]);
+      // Step 2: Update job_products table
+      if (jobId) {
+        const currentProductIds = processedProducts.map(p => p.id);
+        await client.query('DELETE FROM job_products WHERE job_id = $1 AND product_id != ALL($2)', [jobId, currentProductIds]);
+
+        for (const product of processedProducts) {
+          await client.query('INSERT INTO job_products (job_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [jobId, product.id]);
+        }
       }
 
+      // Step 3: Remove orphaned products
+      const orphanedProductsQuery = `
+        DELETE FROM products
+        WHERE id NOT IN (SELECT DISTINCT product_id FROM job_products)
+        AND id != ALL($1)
+      `;
+      await client.query(orphanedProductsQuery, [processedProducts.map(p => p.id)]);
+
       await client.query('COMMIT');
-      console.log('Products processed successfully:', processedProducts);
-      console.log('Job-Product associations:', jobProducts);
       res.json({ 
         message: 'Products processed successfully', 
-        products: processedProducts,
-        jobProducts: jobProducts
+        products: processedProducts
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -414,5 +491,22 @@ app.put('/api/products/:id', async (req, res) => {
   } catch (error) {
     console.error('Error updating product:', error);
     res.status(500).json({ message: 'Error updating product', error: error.message });
+  }
+});
+
+// Fetch all products with associated job_name
+app.get('/api/products', async (req, res) => {
+  try {
+    const query = `
+      SELECT p.*, j.name as job_name
+      FROM products p
+      LEFT JOIN job_products jp ON p.id = jp.product_id
+      LEFT JOIN jobs j ON jp.job_id = j.id
+    `;
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ message: 'Error fetching products', error: error.message });
   }
 });

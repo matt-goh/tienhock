@@ -39,7 +39,8 @@ export interface TableProps<T> {
 export interface Job {
   id: string;
   name: string;
-  section: string;
+  section: string[];
+  newId: string;
 }
 
 export interface Product {

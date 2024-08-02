@@ -19,13 +19,15 @@ import {
 } from "@headlessui/react";
 import clsx from "clsx";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
+import toast from "react-hot-toast";
+import { Job } from "../types/types";
 
 const sections = ["Section A", "Section B", "Section C"];
 
 interface NewJobModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onJobAdded: () => void;
+  onJobAdded: (job: Omit<Job, "id">) => Promise<void>;
 }
 
 const NewJobModal: React.FC<NewJobModalProps> = ({
@@ -37,14 +39,16 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
     id: "",
     name: "",
     section: [] as string[],
+    newId: "",
   });
-
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
-      setFormData({ id: "", name: "", section: [] });
+      setFormData({ id: "", name: "", section: [], newId: "" });
       setQuery("");
+      setError("");
     }
   }, [isOpen]);
 
@@ -67,28 +71,14 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/jobs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to submit form");
-      }
-
-      const result = await response.json();
-      console.log(result.message);
-      onJobAdded();
-      onClose();
+      await onJobAdded(formData);
+      setTimeout(() => onClose, 0);
     } catch (error) {
       console.error("Error:", error);
-      // Handle error (e.g., display an error message to the user)
+      setError((error as Error).message || "Failed to add job");
     }
   };
 
@@ -235,6 +225,9 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                           )}
                         </Combobox>
                       </Field>
+                      {error && (
+                        <p className="text-red-500 text-sm mt-2">{error}</p>
+                      )}
                       <div className="!mt-6 flex justify-end">
                         <button
                           type="button"
