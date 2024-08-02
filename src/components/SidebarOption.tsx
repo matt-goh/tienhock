@@ -23,8 +23,8 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 }) => {
   const commonClasses = `block group flex items-center py-2 pl-7 pr-2 transition-colors duration-200 rounded-lg focus:outline-none ${
     isActive
-      ? "bg-gray-100 active:bg-gray-200 hover:text-gray-600"
-      : "hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600"
+      ? "bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800"
+      : "hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800"
   }`;
 
   const content = (
@@ -38,8 +38,8 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           stroke={2}
           className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-300 right-2 absolute ${
             isActive
-              ? "opacity-100 hover:text-gray-600"
-              : "opacity-0 group-hover:opacity-100 hover:text-gray-600"
+              ? "opacity-100 hover:text-gray-800"
+              : "opacity-0 group-hover:opacity-100 hover:text-gray-800"
           }`}
         />
       )}
