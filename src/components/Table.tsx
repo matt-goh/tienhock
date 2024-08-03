@@ -39,7 +39,6 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "./ToolTip";
-import toast from "react-hot-toast";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -51,6 +50,7 @@ function Table<T extends Record<string, any>>({
   onToggleEditing,
   onSave,
   onCancel,
+  tableKey,
 }: TableProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
@@ -111,6 +111,9 @@ function Table<T extends Record<string, any>>({
       col.type
     );
   };
+
+  const disableAddRowBar = tableKey === "catalogueProduct";
+  const isCatalogueProduct = tableKey === "catalogueProduct";
 
   useEffect(() => {
     if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
@@ -325,6 +328,7 @@ function Table<T extends Record<string, any>>({
 
   // HAR
   const handleAddRow = useCallback(() => {
+    if (disableAddRowBar) return false;
     const newRow = {
       id: `new_${Math.random().toString(36).substr(2, 9)}`,
       ...Object.fromEntries(
@@ -352,7 +356,6 @@ function Table<T extends Record<string, any>>({
       }
 
       // Calculate the correct page index for the new row
-      const newPageIndex = Math.floor(newData.length / pagination.pageSize);
       const currentLastItemIndex =
         (pagination.pageIndex + 1) * pagination.pageSize;
 
@@ -365,7 +368,7 @@ function Table<T extends Record<string, any>>({
     });
 
     return true;
-  }, [columns, onChange, pagination]);
+  }, [columns, onChange, pagination, disableAddRowBar]);
 
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
@@ -414,6 +417,7 @@ function Table<T extends Record<string, any>>({
 
   // HMD
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (disableAddRowBar) return;
     e.preventDefault();
     setIsDragging(true);
     setIsAddRowBarActive(true);
@@ -1462,7 +1466,11 @@ function Table<T extends Record<string, any>>({
       {isEditing && isLastPage && (
         <>
           <ToolTip
-            content={`Klik untuk menambah baris baharu\nSeret untuk menambah atau mengalih keluar baris`}
+            content={
+              isCatalogueProduct
+                ? 'Sila tambah produk baharu dalam halaman "Job".'
+                : "Klik untuk menambah baris baharu\nSeret untuk menambah atau mengalih keluar baris"
+            }
             position="bottom"
             visible={isAddRowBarHovered && !isDragging}
           >
@@ -1483,7 +1491,7 @@ function Table<T extends Record<string, any>>({
               } 
         }`}
               onMouseDown={handleMouseDown}
-              onClick={handleAddRow}
+              onClick={disableAddRowBar ? undefined : handleAddRow}
               onMouseEnter={() => setIsAddRowBarHovered(true)}
               onMouseLeave={() => setIsAddRowBarHovered(false)}
             ></div>

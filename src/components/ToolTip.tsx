@@ -36,7 +36,7 @@ const ToolTip = ({
       <div>{children}</div>
       {visible && (
         <div
-          className={`absolute z-10 px-3 py-2 font-semibold text-xs text-gray-500/80 text-center bg-gray-200 rounded-lg shadow-sm left-1/2 transform -translate-x-1/2 whitespace-pre-wrap ${tooltipClass}`}
+          className={`absolute z-10 px-3 py-2 w-auto font-semibold text-xs text-gray-500/80 text-center bg-gray-200 rounded-lg shadow-sm left-1/2 transform -translate-x-1/2 whitespace-pre-wrap ${tooltipClass}`}
         >
           {renderContent(content)}
         </div>
