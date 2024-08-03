@@ -1498,7 +1498,7 @@ function Table<T extends Record<string, any>>({
       `}</style>
         </>
       )}
-      <div className="flex justify-between items-center mt-4">
+      <div className="flex justify-between items-center mt-4 w-full">
         {data.length > pagination.pageSize && <TablePagination table={table} />}
       </div>
     </div>
