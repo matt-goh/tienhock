@@ -46,7 +46,7 @@ const TablePagination = <T extends Record<string, unknown>>({
   };
 
   return (
-    <div className="flex justify-between items-center w-full">
+    <div className="flex justify-between items-center w-full space-x-4">
       <div className="flex items-center space-x-2 text-sm text-gray-700">
         <span>Show:</span>
         <div className="relative">
