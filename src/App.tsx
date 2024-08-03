@@ -1,10 +1,10 @@
 // src/App.tsx
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import React from "react";
 import { Toaster } from "react-hot-toast";
+import React from "react";
 import CatalogueProductPage from "./pages/CatalogueProductPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
-import CatalogueSectionPage from "./pages/CatalogueSectionPage";
+import CataloguePage from "./pages/CataloguePage";
 import Sidebar from "./components/Sidebar";
 
 const App: React.FC = () => {
@@ -34,10 +34,55 @@ const App: React.FC = () => {
             />
             <Route
               path="/catalogue/section"
-              element={<CatalogueSectionPage />}
+              element={
+                <CataloguePage
+                  title="Section Catalogue"
+                  apiEndpoint="sections"
+                  tableKey="catalogueSection"
+                />
+              }
+            />
+            <Route
+              path="/catalogue/location"
+              element={
+                <CataloguePage
+                  title="Location Catalogue"
+                  apiEndpoint="locations"
+                  tableKey="catalogueLocation"
+                />
+              }
+            />
+            <Route
+              path="/catalogue/nationality"
+              element={
+                <CataloguePage
+                  title="Nationality Catalogue"
+                  apiEndpoint="nationalities"
+                  tableKey="catalogueNationality"
+                />
+              }
+            />
+            <Route
+              path="/catalogue/race"
+              element={
+                <CataloguePage
+                  title="Race Catalogue"
+                  apiEndpoint="races"
+                  tableKey="catalogueRace"
+                />
+              }
+            />
+            <Route
+              path="/catalogue/agama"
+              element={
+                <CataloguePage
+                  title="Agama Catalogue"
+                  apiEndpoint="agamas"
+                  tableKey="catalogueAgama"
+                />
+              }
             />
           </Routes>
-          {/* <MeeProduction /> */}
         </main>
       </div>
     </Router>

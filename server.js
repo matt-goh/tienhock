@@ -506,138 +506,148 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// SECTION SERVER ENDPOINTS
-app.post('/api/sections', async (req, res) => {
-  const { id, name } = req.body;
+// PAGES WITH DOUBLE COLUMNS TABLE SERVER ENDPOINTS
+const setupEntityEndpoints = (app, entityName, tableName) => {
+  const capitalizedEntity = entityName.charAt(0).toUpperCase() + entityName.slice(1);
 
-  try {
-    const query = `
-      INSERT INTO sections (id, name)
-      VALUES ($1, $2)
-      RETURNING *
-    `;
-    
-    const values = [id, name];
+  // Create a new entity
+  app.post(`/api/${entityName}s`, async (req, res) => {
+    const { id, name } = req.body;
 
-    const result = await pool.query(query, values);
-    res.status(201).json({ message: 'Section created successfully', section: result.rows[0] });
-  } catch (error) {
-    if (error.code === '23505') { // unique_violation error code
-      return res.status(400).json({ message: 'A section with this ID already exists' });
-    }
-    console.error('Error inserting section:', error);
-    res.status(500).json({ message: 'Error creating section', error: error.message });
-  }
-});
-
-// Get all sections
-app.get('/api/sections', async (req, res) => {
-  try {
-    const query = 'SELECT * FROM sections';
-    const result = await pool.query(query);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error fetching sections:', error);
-    res.status(500).json({ message: 'Error fetching sections', error: error.message });
-  }
-});
-
-// Delete sections
-app.delete('/api/sections', async (req, res) => {
-  const { sectionIds } = req.body;
-
-  if (!Array.isArray(sectionIds) || sectionIds.length === 0) {
-    return res.status(400).json({ message: 'Invalid section IDs provided' });
-  }
-
-  try {
-    const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      const query = `
+        INSERT INTO ${tableName} (id, name)
+        VALUES ($1, $2)
+        RETURNING *
+      `;
+      
+      const values = [id, name];
 
-      // Delete the sections
-      const deleteSectionsQuery = 'DELETE FROM sections WHERE id = ANY($1::text[]) RETURNING id';
-      const result = await client.query(deleteSectionsQuery, [sectionIds]);
-
-      await client.query('COMMIT');
-
-      const deletedIds = result.rows.map(row => row.id);
-      res.status(200).json({ 
-        message: 'Sections deleted successfully', 
-        deletedSectionIds: deletedIds 
-      });
+      const result = await pool.query(query, values);
+      res.status(201).json({ message: `${capitalizedEntity} created successfully`, [entityName]: result.rows[0] });
     } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Error deleting sections:', error);
-    res.status(500).json({ message: 'Error deleting sections', error: error.message });
-  }
-});
-
-// Batch update/insert sections
-app.post('/api/sections/batch', async (req, res) => {
-  const { sections } = req.body;
-
-  try {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const processedSections = [];
-
-      // Process all sections
-      for (const section of sections) {
-        const { id, newId, name } = section;
-        
-        if (newId && newId !== id) {
-          // This is an existing section with an ID change
-          // First, insert the new section or update if it already exists
-          const upsertQuery = `
-            INSERT INTO sections (id, name)
-            VALUES ($1, $2)
-            ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name
-            RETURNING *
-          `;
-          const upsertValues = [newId, name];
-          const upsertResult = await client.query(upsertQuery, upsertValues);
-          
-          // Now, delete the old section
-          await client.query('DELETE FROM sections WHERE id = $1', [id]);
-          
-          processedSections.push(upsertResult.rows[0]);
-        } else {
-          // This is an existing section without ID change or a new section
-          const upsertQuery = `
-            INSERT INTO sections (id, name)
-            VALUES ($1, $2)
-            ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name
-            RETURNING *
-          `;
-          const upsertValues = [id, name];
-          const result = await client.query(upsertQuery, upsertValues);
-          processedSections.push(result.rows[0]);
-        }
+      if (error.code === '23505') { // unique_violation error code
+        return res.status(400).json({ message: `A ${entityName} with this ID already exists` });
       }
-
-      await client.query('COMMIT');
-      res.json({ 
-        message: 'Sections processed successfully', 
-        sections: processedSections
-      });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      console.error(`Error inserting ${entityName}:`, error);
+      res.status(500).json({ message: `Error creating ${entityName}`, error: error.message });
     }
-  } catch (error) {
-    console.error('Error processing sections:', error);
-    res.status(500).json({ message: 'Error processing sections', error: error.message });
-  }
-});
+  });
+
+  // Get all entities
+  app.get(`/api/${entityName}s`, async (req, res) => {
+    try {
+      const query = `SELECT * FROM ${tableName}`;
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error(`Error fetching ${entityName}s:`, error);
+      res.status(500).json({ message: `Error fetching ${entityName}s`, error: error.message });
+    }
+  });
+
+  // Delete entities
+  app.delete(`/api/${entityName}s`, async (req, res) => {
+    const entityIds = req.body[`${entityName}Ids`];
+
+    if (!Array.isArray(entityIds) || entityIds.length === 0) {
+      return res.status(400).json({ message: `Invalid ${entityName} IDs provided` });
+    }
+
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // Delete the entities
+        const deleteQuery = `DELETE FROM ${tableName} WHERE id = ANY($1::text[]) RETURNING id`;
+        const result = await client.query(deleteQuery, [entityIds]);
+
+        await client.query('COMMIT');
+
+        const deletedIds = result.rows.map(row => row.id);
+        res.status(200).json({ 
+          message: `${capitalizedEntity}s deleted successfully`, 
+          [`deleted${capitalizedEntity}Ids`]: deletedIds 
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error(`Error deleting ${entityName}s:`, error);
+      res.status(500).json({ message: `Error deleting ${entityName}s`, error: error.message });
+    }
+  });
+
+  // Batch update/insert entities
+  app.post(`/api/${entityName}s/batch`, async (req, res) => {
+    const entities = req.body[`${entityName}s`];
+
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const processedEntities = [];
+
+        // Process all entities
+        for (const entity of entities) {
+          const { id, newId, name } = entity;
+          
+          if (newId && newId !== id) {
+            // This is an existing entity with an ID change
+            const upsertQuery = `
+              INSERT INTO ${tableName} (id, name)
+              VALUES ($1, $2)
+              ON CONFLICT (id) DO UPDATE
+              SET name = EXCLUDED.name
+              RETURNING *
+            `;
+            const upsertValues = [newId, name];
+            const upsertResult = await client.query(upsertQuery, upsertValues);
+            
+            // Delete the old entity
+            await client.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
+            
+            processedEntities.push(upsertResult.rows[0]);
+          } else {
+            // This is an existing entity without ID change or a new entity
+            const upsertQuery = `
+              INSERT INTO ${tableName} (id, name)
+              VALUES ($1, $2)
+              ON CONFLICT (id) DO UPDATE
+              SET name = EXCLUDED.name
+              RETURNING *
+            `;
+            const upsertValues = [id, name];
+            const result = await client.query(upsertQuery, upsertValues);
+            processedEntities.push(result.rows[0]);
+          }
+        }
+
+        await client.query('COMMIT');
+        res.json({ 
+          message: `${capitalizedEntity}s processed successfully`, 
+          [`${entityName}s`]: processedEntities
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error(`Error processing ${entityName}s:`, error);
+      res.status(500).json({ message: `Error processing ${entityName}s`, error: error.message });
+    }
+  });
+};
+
+setupEntityEndpoints(app, 'section', 'sections');
+setupEntityEndpoints(app, 'location', 'locations');
+setupEntityEndpoints(app, 'nationalitie', 'nationalities');
+setupEntityEndpoints(app, 'race', 'races');
+setupEntityEndpoints(app, 'agama', 'agama');
