@@ -90,7 +90,7 @@ const Sidebar: React.FC = () => {
                 SidebarPopover */}
       <div className="flex-1 overflow-y-auto sidebar-scrollbar">
         <div className="text-gray-700 font-medium text-left">
-          <ul className="mx-2 space-y-2 text-base">
+          <ul className="mx-1 space-y-2 text-base">
             <SidebarButton
               name="Bookmarks"
               icon={<IconBookmark stroke={1.5} />}
@@ -196,8 +196,8 @@ const Sidebar: React.FC = () => {
                   <SidebarOption name="Product" link="/catalogue/product" />
                   <SidebarOption name="Section" link="/catalogue/section" />
                   <SidebarOption
-                    name="Job Location"
-                    link="/catalogue/joblocation"
+                    name="Location"
+                    link="/catalogue/location"
                   />
                   <SidebarOption
                     name="Nationality"
