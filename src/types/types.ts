@@ -34,6 +34,7 @@ export interface TableProps<T> {
   onToggleEditing: () => void;
   onSave: () => void;
   onCancel: () => void;
+  tableKey: string;
 }
 
 export interface Job {

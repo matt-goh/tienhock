@@ -1,5 +1,5 @@
 // Sidebar.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   IconBookmark,
   IconBuildingFactory2,
@@ -15,7 +15,10 @@ import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
 
 const Sidebar: React.FC = () => {
-  const [openItems, setOpenItems] = useState<string[]>(["bookmarks"]);
+  const [openItems, setOpenItems] = useState<string[]>([
+    "bookmarks",
+    "catalogue",
+  ]);
   const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([]);
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);

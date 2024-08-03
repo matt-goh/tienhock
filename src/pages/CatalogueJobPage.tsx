@@ -621,6 +621,7 @@ const CatalogueJobPage: React.FC = () => {
                 onToggleEditing={toggleEditing}
                 onSave={handleSave}
                 onCancel={handleCancel}
+                tableKey="catalogueJob"
               />
             </div>
           </div>

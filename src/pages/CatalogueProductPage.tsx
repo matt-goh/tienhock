@@ -150,6 +150,7 @@ const CatalogueProductPage: React.FC = () => {
             onToggleEditing={handleToggleEditing}
             onSave={handleSave}
             onCancel={handleCancel}
+            tableKey="catalogueProduct"
           />
         </div>
       </div>

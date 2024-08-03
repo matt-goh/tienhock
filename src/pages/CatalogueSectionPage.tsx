@@ -183,6 +183,7 @@ const CatalogueSectionPage: React.FC = () => {
             onToggleEditing={handleToggleEditing}
             onSave={handleSave}
             onCancel={handleCancel}
+            tableKey="catalogueSection"
           />
         </div>
       </div>
