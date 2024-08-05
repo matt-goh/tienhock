@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
+import { SidebarData, SidebarItem } from "./SidebarData";
+import { useLocation } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
-import { SidebarData, SidebarItem } from "./SidebarData";
 
 const Sidebar: React.FC = () => {
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -14,10 +15,12 @@ const Sidebar: React.FC = () => {
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
+  const [activeRoute, setActiveRoute] = useState<string | null>(null);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLLIElement> }>(
     {}
   );
+  const location = useLocation();
 
   useEffect(() => {
     // Set initial open state based on defaultOpen property
@@ -26,6 +29,36 @@ const Sidebar: React.FC = () => {
     );
     setOpenItems(defaultOpenItems);
   }, []);
+
+  useEffect(() => {
+    // Update active route when location changes
+    const currentPath = location.pathname;
+    let foundActiveRoute = false;
+
+    const checkRouteMatch = (item: SidebarItem) => {
+      if (item.link && currentPath.startsWith(item.link)) {
+        setActiveRoute(item.name);
+        foundActiveRoute = true;
+      }
+      if (item.popoverOptions) {
+        item.popoverOptions.forEach((option) => {
+          if (option.link && currentPath.startsWith(option.link)) {
+            setActiveRoute(item.name);
+            foundActiveRoute = true;
+          }
+        });
+      }
+      if (item.subItems) {
+        item.subItems.forEach(checkRouteMatch);
+      }
+    };
+
+    SidebarData.forEach(checkRouteMatch);
+
+    if (!foundActiveRoute) {
+      setActiveRoute(null);
+    }
+  }, [location]);
 
   const handleToggle = (item: string) => {
     setOpenItems((prevItems) =>
@@ -139,6 +172,7 @@ const Sidebar: React.FC = () => {
     }
     const buttonRef = buttonRefs.current[item.name];
     const hasPopover = !!item.popoverOptions && item.popoverOptions.length > 0;
+    const isActive = activeRoute === item.name || hoveredOption === item.name;
 
     return (
       <React.Fragment key={item.name}>
@@ -148,7 +182,7 @@ const Sidebar: React.FC = () => {
           onMouseEnter={() => handleMouseEnter(item.name)}
           onMouseLeave={handleMouseLeave}
           buttonRef={buttonRef}
-          isActive={hoveredOption === item.name}
+          isActive={isActive}
         />
         {hoveredOption === item.name && hasPopover && (
           <SidebarPopover
