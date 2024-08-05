@@ -28,7 +28,7 @@ const CataloguePage: React.FC<CataloguePageProps> = ({
   const [isEditing, setIsEditing] = useState(false);
 
   const columns: ColumnConfig[] = [
-    { id: "id", header: "ID", type: "readonly", width: 150 },
+    { id: "id", header: "ID", type: "readonly", width: 200 },
     { id: "name", header: "Name", type: "readonly", width: 300 },
   ];
 
