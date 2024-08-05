@@ -27,7 +27,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 
   const content = (
     <>
-      <div className="absolute -left-3 -top-1 bottom-0 w-0.5 bg-gray-200" />
+      <div className="absolute -left-3 -top-1.5 bottom-0 w-0.5 bg-gray-200" />
       {name}
       <IconChevronRight
         width="18"
