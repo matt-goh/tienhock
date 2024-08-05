@@ -648,6 +648,8 @@ const setupEntityEndpoints = (app, entityName, tableName) => {
 
 setupEntityEndpoints(app, 'section', 'sections');
 setupEntityEndpoints(app, 'location', 'locations');
+setupEntityEndpoints(app, 'bank', 'banks');
+setupEntityEndpoints(app, 'taxe', 'taxes');
 setupEntityEndpoints(app, 'nationalitie', 'nationalities');
 setupEntityEndpoints(app, 'race', 'races');
 setupEntityEndpoints(app, 'agama', 'agama');

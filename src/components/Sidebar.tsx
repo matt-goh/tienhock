@@ -200,6 +200,14 @@ const Sidebar: React.FC = () => {
                     link="/catalogue/location"
                   />
                   <SidebarOption
+                    name="Bank"
+                    link="/catalogue/bank"
+                  />
+                  <SidebarOption
+                    name="Tax"
+                    link="/catalogue/tax"
+                  />
+                  <SidebarOption
                     name="Nationality"
                     link="/catalogue/nationality"
                   />
