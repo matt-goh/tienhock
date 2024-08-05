@@ -3,6 +3,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import React from "react";
 import CatalogueProductPage from "./pages/CatalogueProductPage";
+import CatalogueStaffPage from "./pages/CatalogueStaffPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
 import CataloguePage from "./pages/CataloguePage";
 import Sidebar from "./components/Sidebar";
@@ -27,6 +28,7 @@ const App: React.FC = () => {
         </aside>
         <main className="flex justify-center w-full">
           <Routes>
+            <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
             <Route
               path="/catalogue/product"
