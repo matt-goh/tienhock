@@ -1,34 +1,31 @@
-// Sidebar.tsx
 import React, { useState, useRef, useEffect } from "react";
-import {
-  IconBookmark,
-  IconBuildingFactory2,
-  IconInvoice,
-  IconListDetails,
-  IconPackage,
-  IconReportMoney,
-  IconFileInvoice,
-} from "@tabler/icons-react";
 import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
+import { SidebarData, SidebarItem } from "./SidebarData";
 
 const Sidebar: React.FC = () => {
-  const [openItems, setOpenItems] = useState<string[]>([
-    "bookmarks",
-    "catalogue",
-  ]);
+  const [openItems, setOpenItems] = useState<string[]>([]);
   const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
     "production",
     "pinjam",
   ]);
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
-  const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
+  const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
-  const meeButtonRef = useRef<HTMLLIElement>(null);
-  const bihunButtonRef = useRef<HTMLLIElement>(null);
+  const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLLIElement> }>(
+    {}
+  );
+
+  useEffect(() => {
+    // Set initial open state based on defaultOpen property
+    const defaultOpenItems = SidebarData.filter((item) => item.defaultOpen).map(
+      (item) => item.name
+    );
+    setOpenItems(defaultOpenItems);
+  }, []);
 
   const handleToggle = (item: string) => {
     setOpenItems((prevItems) =>
@@ -81,139 +78,99 @@ const Sidebar: React.FC = () => {
     }, 300);
   };
 
+  const renderIcon = (IconComponent?: SidebarItem["icon"]) => {
+    return IconComponent ? (
+      <IconComponent stroke={1.5} className="flex-shrink-0" />
+    ) : null;
+  };
+
+  const renderSidebarItems = (items: SidebarItem[]) => {
+    return items.map((item) => {
+      if (item.subItems) {
+        return (
+          <SidebarButton
+            key={item.name}
+            name={item.name}
+            icon={renderIcon(item.icon)}
+            onClick={() => handleToggle(item.name)}
+            isOpen={openItems.includes(item.name)}
+          >
+            {openItems.includes(item.name) && (
+              <ul className="mt-1.5 space-y-1.5">
+                {item.name === "Payroll"
+                  ? renderPayrollItems(item.subItems)
+                  : renderSubItems(item.subItems)}
+              </ul>
+            )}
+          </SidebarButton>
+        );
+      } else {
+        return renderSidebarOption(item);
+      }
+    });
+  };
+
+  const renderPayrollItems = (items: SidebarItem[]) => {
+    return items.map((item) => (
+      <SidebarSubButton
+        key={item.name}
+        name={item.name}
+        icon={renderIcon(item.icon)}
+        isOpen={openPayrollOptions.includes(item.name.toLowerCase())}
+        onToggle={() => handlePayrollToggle(item.name.toLowerCase())}
+      >
+        {openPayrollOptions.includes(item.name.toLowerCase()) &&
+          item.subItems && (
+            <ul className="mt-1.5 space-y-1">
+              {item.subItems.map(renderSidebarOption)}
+            </ul>
+          )}
+      </SidebarSubButton>
+    ));
+  };
+
+  const renderSubItems = (items: SidebarItem[]) => {
+    return items.map(renderSidebarOption);
+  };
+
+  const renderSidebarOption = (item: SidebarItem) => {
+    if (!buttonRefs.current[item.name]) {
+      buttonRefs.current[item.name] = React.createRef<HTMLLIElement>();
+    }
+    const buttonRef = buttonRefs.current[item.name];
+    const hasPopover = !!item.popoverOptions && item.popoverOptions.length > 0;
+
+    return (
+      <React.Fragment key={item.name}>
+        <SidebarOption
+          name={item.name}
+          link={item.link}
+          onMouseEnter={() => handleMouseEnter(item.name)}
+          onMouseLeave={handleMouseLeave}
+          buttonRef={buttonRef}
+          isActive={hoveredOption === item.name}
+        />
+        {hoveredOption === item.name && hasPopover && (
+          <SidebarPopover
+            options={item.popoverOptions!}
+            onMouseEnter={handlePopoverMouseEnter}
+            onMouseLeave={handlePopoverMouseLeave}
+            buttonRef={buttonRef}
+          />
+        )}
+      </React.Fragment>
+    );
+  };
+
   return (
     <div className="relative top-0 left-0 h-screen bg-gray-100/75 w-[254px] flex flex-col">
       <div className="relative py-4">
         <h2 className="text-xl font-bold text-center">Tien Hock</h2>
       </div>
-      {/* SidebarButton
-            SidebarSubButton
-              SidebarOption
-                SidebarPopover */}
       <div className="flex-1 overflow-y-auto sidebar-scrollbar">
         <div className="text-gray-700 font-medium text-left">
           <ul className="mx-1 space-y-2 text-base">
-            <SidebarButton
-              name="Bookmarks"
-              icon={<IconBookmark stroke={1.5} />}
-              onClick={() => handleToggle("bookmarks")}
-              isOpen={openItems.includes("bookmarks")}
-            />
-            <SidebarButton
-              name="Payroll"
-              icon={<IconReportMoney stroke={1.5} />}
-              onClick={() => handleToggle("payroll")}
-              isOpen={openItems.includes("payroll")}
-            >
-              {openItems.includes("payroll") && (
-                <ul className="mt-1.5 space-y-1.5">
-                  <SidebarSubButton
-                    name="Production"
-                    icon={
-                      <IconBuildingFactory2 stroke={1.5} className="mr-2" />
-                    }
-                    isOpen={openPayrollOptions.includes("production")}
-                    onToggle={() => handlePayrollToggle("production")}
-                  >
-                    <SidebarOption
-                      name="Mee"
-                      onMouseEnter={() => handleMouseEnter("mee")}
-                      onMouseLeave={handleMouseLeave}
-                      buttonRef={meeButtonRef}
-                      isActive={hoveredOption === "mee"}
-                    />
-                    {hoveredOption === "mee" && (
-                      <SidebarPopover
-                        options={[
-                          { name: "Mee Option 1", link: "#" },
-                          { name: "Mee Option 2", link: "#" },
-                        ]}
-                        onMouseEnter={handlePopoverMouseEnter}
-                        onMouseLeave={handlePopoverMouseLeave}
-                        buttonRef={meeButtonRef}
-                      />
-                    )}
-                    <SidebarOption
-                      name="Bihun"
-                      onMouseEnter={() => handleMouseEnter("bihun")}
-                      onMouseLeave={handleMouseLeave}
-                      buttonRef={bihunButtonRef}
-                      isActive={hoveredOption === "bihun"}
-                    />
-                    {hoveredOption === "bihun" && (
-                      <SidebarPopover
-                        options={[
-                          { name: "Bihun Option 1", link: "#" },
-                          { name: "Bihun Option 2", link: "#" },
-                        ]}
-                        onMouseEnter={handlePopoverMouseEnter}
-                        onMouseLeave={handlePopoverMouseLeave}
-                        buttonRef={bihunButtonRef}
-                      />
-                    )}
-                  </SidebarSubButton>
-                  <SidebarSubButton
-                    name="Pinjam"
-                    icon={<IconInvoice stroke={1.5} className="mr-2" />}
-                    isOpen={openPayrollOptions.includes("pinjam")}
-                    onToggle={() => handlePayrollToggle("pinjam")}
-                  >
-                    <SidebarOption name="Entry" />
-                    <SidebarOption name="Summary" />
-                  </SidebarSubButton>
-                </ul>
-              )}
-            </SidebarButton>
-            <SidebarButton
-              name="Stock"
-              icon={<IconPackage stroke={1.5} />}
-              onClick={() => handleToggle("stock")}
-              isOpen={openItems.includes("stock")}
-            >
-              {openItems.includes("stock") && (
-                <ul className="mt-1.5 space-y-1">
-                  <SidebarOption name="Opening" link="/stock/opening" />
-                  <SidebarOption name="Card" link="/stock/card" />
-                </ul>
-              )}
-            </SidebarButton>
-            <SidebarButton
-              name="Statement"
-              icon={<IconFileInvoice stroke={1.5} />}
-              onClick={() => handleToggle("statement")}
-              isOpen={openItems.includes("statement")}
-            >
-              {openItems.includes("statement") && (
-                <ul className="mt-1.5 space-y-1">
-                  <SidebarOption name="Option 1" link="/catalogue/job" />
-                  <SidebarOption name="Option 2" link="/catalogue/job" />
-                </ul>
-              )}
-            </SidebarButton>
-            <SidebarButton
-              name="Catalogue"
-              icon={<IconListDetails stroke={1.5} />}
-              onClick={() => handleToggle("catalogue")}
-              isOpen={openItems.includes("catalogue")}
-            >
-              {openItems.includes("catalogue") && (
-                <ul className="mt-1.5 space-y-1">
-                  <SidebarOption name="Staff" link="/catalogue/staff" />
-                  <SidebarOption name="Job" link="/catalogue/job" />
-                  <SidebarOption name="Product" link="/catalogue/product" />
-                  <SidebarOption name="Section" link="/catalogue/section" />
-                  <SidebarOption name="Location" link="/catalogue/location" />
-                  <SidebarOption name="Bank" link="/catalogue/bank" />
-                  <SidebarOption name="Tax" link="/catalogue/tax" />
-                  <SidebarOption
-                    name="Nationality"
-                    link="/catalogue/nationality"
-                  />
-                  <SidebarOption name="Race" link="/catalogue/race" />
-                  <SidebarOption name="Agama" link="/catalogue/agama" />
-                </ul>
-              )}
-            </SidebarButton>
+            {renderSidebarItems(SidebarData)}
           </ul>
         </div>
       </div>
