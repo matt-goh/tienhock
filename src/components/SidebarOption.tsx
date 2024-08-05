@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 interface SidebarOptionProps {
   name: string;
-  link?: string; // New prop for the link
+  link?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   buttonRef?: React.RefObject<HTMLLIElement>;
@@ -19,7 +19,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   buttonRef,
   isActive,
 }) => {
-  const commonClasses = `block group flex items-center py-2 pl-7 pr-2 transition-colors duration-200 rounded-lg focus:outline-none ${
+  const commonClasses = `block group flex items-center ml-10 pl-3 py-2 pr-2 transition-colors duration-200 rounded-lg focus:outline-none relative ${
     isActive
       ? "bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800"
       : "hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800"
@@ -27,7 +27,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 
   const content = (
     <>
-      <svg width="24" height="24" className="mr-2"></svg>
+      <div className="absolute -left-3 -top-1 bottom-0 w-0.5 bg-gray-200" />
       {name}
       <IconChevronRight
         width="18"

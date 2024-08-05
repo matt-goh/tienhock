@@ -19,7 +19,10 @@ const Sidebar: React.FC = () => {
     "bookmarks",
     "catalogue",
   ]);
-  const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([]);
+  const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
+    "production",
+    "pinjam",
+  ]);
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
@@ -83,8 +86,7 @@ const Sidebar: React.FC = () => {
       <div className="relative py-4">
         <h2 className="text-xl font-bold text-center">Tien Hock</h2>
       </div>
-      {/* Hierarchy
-          SidebarButton
+      {/* SidebarButton
             SidebarSubButton
               SidebarOption
                 SidebarPopover */}
@@ -95,11 +97,13 @@ const Sidebar: React.FC = () => {
               name="Bookmarks"
               icon={<IconBookmark stroke={1.5} />}
               onClick={() => handleToggle("bookmarks")}
+              isOpen={openItems.includes("bookmarks")}
             />
             <SidebarButton
               name="Payroll"
               icon={<IconReportMoney stroke={1.5} />}
               onClick={() => handleToggle("payroll")}
+              isOpen={openItems.includes("payroll")}
             >
               {openItems.includes("payroll") && (
                 <ul className="mt-1.5 space-y-1.5">
@@ -164,6 +168,7 @@ const Sidebar: React.FC = () => {
               name="Stock"
               icon={<IconPackage stroke={1.5} />}
               onClick={() => handleToggle("stock")}
+              isOpen={openItems.includes("stock")}
             >
               {openItems.includes("stock") && (
                 <ul className="mt-1.5 space-y-1">
@@ -176,6 +181,7 @@ const Sidebar: React.FC = () => {
               name="Statement"
               icon={<IconFileInvoice stroke={1.5} />}
               onClick={() => handleToggle("statement")}
+              isOpen={openItems.includes("statement")}
             >
               {openItems.includes("statement") && (
                 <ul className="mt-1.5 space-y-1">
@@ -188,6 +194,7 @@ const Sidebar: React.FC = () => {
               name="Catalogue"
               icon={<IconListDetails stroke={1.5} />}
               onClick={() => handleToggle("catalogue")}
+              isOpen={openItems.includes("catalogue")}
             >
               {openItems.includes("catalogue") && (
                 <ul className="mt-1.5 space-y-1">
@@ -195,18 +202,9 @@ const Sidebar: React.FC = () => {
                   <SidebarOption name="Job" link="/catalogue/job" />
                   <SidebarOption name="Product" link="/catalogue/product" />
                   <SidebarOption name="Section" link="/catalogue/section" />
-                  <SidebarOption
-                    name="Location"
-                    link="/catalogue/location"
-                  />
-                  <SidebarOption
-                    name="Bank"
-                    link="/catalogue/bank"
-                  />
-                  <SidebarOption
-                    name="Tax"
-                    link="/catalogue/tax"
-                  />
+                  <SidebarOption name="Location" link="/catalogue/location" />
+                  <SidebarOption name="Bank" link="/catalogue/bank" />
+                  <SidebarOption name="Tax" link="/catalogue/tax" />
                   <SidebarOption
                     name="Nationality"
                     link="/catalogue/nationality"

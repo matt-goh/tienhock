@@ -1,5 +1,4 @@
 import React from "react";
-import { IconChevronRight } from "@tabler/icons-react";
 
 interface SidebarSubButtonProps {
   name: string;
@@ -20,22 +19,14 @@ const SidebarSubButton: React.FC<SidebarSubButtonProps> = ({
     <li className="relative">
       <button
         onClick={onToggle}
-        className="flex group items-center block py-2 pl-7 pr-2 hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800 transition-colors duration-200 rounded-lg w-full text-left focus:outline-none"
+        className="flex group items-center block py-2 pl-4 pr-2 hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800 transition-colors duration-200 rounded-lg w-full text-left focus:outline-none"
       >
         <span className="flex items-center">
           {icon}
-          {name}
+          <span className="ml-1">{name}</span>
         </span>
-        <IconChevronRight
-          width="18"
-          height="18"
-          stroke={2.25}
-          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-2 opacity-0 hover:text-gray-600 group-hover:opacity-100 transform transition-all duration-300 ${
-            isOpen ? "rotate-90" : ""
-          }`}
-        />
       </button>
-      {isOpen && <ul className="mt-1 space-y-1">{children}</ul>}
+      {isOpen && <ul className="mt-1.5 space-y-1">{children}</ul>}
     </li>
   );
 };
