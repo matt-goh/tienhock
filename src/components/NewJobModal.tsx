@@ -19,10 +19,12 @@ import {
 } from "@headlessui/react";
 import clsx from "clsx";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
-import toast from "react-hot-toast";
 import { Job } from "../types/types";
 
-const sections = ["Section A", "Section B", "Section C"];
+interface Section {
+  id: string;
+  name: string;
+}
 
 interface NewJobModalProps {
   isOpen: boolean;
@@ -43,6 +45,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
   });
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [sections, setSections] = useState<Section[]>([]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -52,11 +55,33 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    fetchSections();
+  }, []);
+
+  const fetchSections = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/sections");
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Server response:", text);
+        throw new Error(
+          `Failed to fetch sections: ${response.status} ${response.statusText}`
+        );
+      }
+      const data = await response.json();
+      setSections(data);
+    } catch (error) {
+      console.error("Error fetching sections:", error);
+      setError("Failed to load sections");
+    }
+  };
+
   const filteredSections =
     query === ""
       ? sections
       : sections.filter((section) =>
-          section.toLowerCase().includes(query.toLowerCase())
+          section.name.toLowerCase().includes(query.toLowerCase())
         );
 
   const handleChange = (
@@ -189,11 +214,11 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                   static
                                   className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none"
                                 >
-                                  {filteredSections.map((section, index) => (
+                                  {filteredSections.map((section) => (
                                     <ComboboxOption
-                                      key={index}
-                                      className={`relative cursor-pointer select-none rounded py-2 pl-4 pr-4 text-gray-900 data-[focus]:bg-gray-100 data-[focus]:text-gray-900`}
-                                      value={section}
+                                      key={section.id}
+                                      className={`relative cursor-pointer select-none rounded py-2 px-4 text-gray-900 hover:bg-gray-100 active:bg-gray-200 transition-all duration-200`}
+                                      value={section.name}
                                     >
                                       {({ selected }) => (
                                         <>
@@ -204,7 +229,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                                 : "font-normal"
                                             }`}
                                           >
-                                            {section}
+                                            {section.name}
                                           </span>
                                           {selected && (
                                             <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
