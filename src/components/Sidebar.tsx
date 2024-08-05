@@ -197,7 +197,7 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="relative top-0 left-0 h-screen bg-gray-100/75 w-[254px] flex flex-col">
+    <div className="relative top-0 left-0 h-screen bg-gray-100/75 border-r border-gray-200 w-[254px] flex flex-col">
       <div className="relative py-4">
         <h2 className="text-xl font-bold text-center">Tien Hock</h2>
       </div>
