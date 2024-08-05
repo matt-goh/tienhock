@@ -53,6 +53,26 @@ const App: React.FC = () => {
               }
             />
             <Route
+              path="/catalogue/bank"
+              element={
+                <CataloguePage
+                  title="Bank Catalogue"
+                  apiEndpoint="banks"
+                  tableKey="catalogueBank"
+                />
+              }
+            />
+            <Route
+              path="/catalogue/tax"
+              element={
+                <CataloguePage
+                  title="Tax Catalogue"
+                  apiEndpoint="taxes"
+                  tableKey="catalogueTax"
+                />
+              }
+            />
+            <Route
               path="/catalogue/nationality"
               element={
                 <CataloguePage
