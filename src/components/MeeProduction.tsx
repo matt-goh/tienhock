@@ -1,6 +1,4 @@
 import React, { useState } from "react";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 
 const MeeProduction = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -37,12 +35,6 @@ const MeeProduction = () => {
   return (
     <div className="flex items-center w-full p-8">
       <span className="font-medium mr-2">Date:</span>
-      <DatePicker
-        selected={selectedDate}
-        onChange={(date) => setSelectedDate(date)}
-        className="relative inline-block w-24 hover:w-28 px-2 py-1.5 pl-0 hover:pl-2 hover:border hover:border-gray-300 hover:shadow-md rounded-lg hover:text-center transition-all duration-200"
-        dateFormat="dd/MM/yyyy"
-      />
       <div className="relative inline-block">
         <span className="font-medium ml-4 mr-2">Shift:</span>
         <button

@@ -1,18 +1,154 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronLeft } from "@tabler/icons-react";
-import Tab from "../components/Tab"; // Make sure this path is correct
+import {
+  IconChevronLeft,
+  IconChevronDown,
+  IconCheck,
+} from "@tabler/icons-react";
+import {
+  Listbox,
+  Transition,
+  Combobox,
+  ComboboxInput,
+  ComboboxButton,
+  ComboboxOptions,
+  ComboboxOption,
+  ListboxOption,
+  ListboxOptions,
+  ListboxButton,
+} from "@headlessui/react";
+import Tab from "../components/Tab";
+import clsx from "clsx";
+
+interface SelectOption {
+  id: string;
+  name: string;
+}
+
+interface FormData {
+  id: string;
+  name: string;
+  telephoneNo: string;
+  email: string;
+  gender: string;
+  nationality: string;
+  birthdate: string;
+  address: string;
+  job: string[];
+  location: string[];
+  dateJoined: string;
+  icNo: string;
+  bankAccountNumber: string;
+  epcNo: string;
+  incomeTaxNo: string;
+  socsoNo: string;
+  document: string;
+  paymentType: string;
+  paymentPreference: string;
+  race: string;
+  agama: string;
+  dateResigned: string;
+}
 
 const CatalogueAddStaffPage: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    // ... (previous form data state)
+  const [formData, setFormData] = useState<FormData>({
+    id: "",
+    name: "",
+    telephoneNo: "",
+    email: "",
+    gender: "",
+    nationality: "",
+    birthdate: "",
+    address: "",
+    job: [],
+    location: [],
+    dateJoined: "",
+    icNo: "",
+    bankAccountNumber: "",
+    epcNo: "",
+    incomeTaxNo: "",
+    socsoNo: "",
+    document: "",
+    paymentType: "",
+    paymentPreference: "",
+    race: "",
+    agama: "",
+    dateResigned: "",
   });
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  const [nationalities, setNationalities] = useState<SelectOption[]>([]);
+  const [races, setRaces] = useState<SelectOption[]>([]);
+  const [agamas, setAgamas] = useState<SelectOption[]>([]);
+  const [jobs, setJobs] = useState<SelectOption[]>([]);
+  const [locations, setLocations] = useState<SelectOption[]>([]);
+  const [jobQuery, setJobQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+
+  const genderOptions = [
+    { id: "male", name: "Male" },
+    { id: "female", name: "Female" },
+  ];
+
+  const documentOptions = [
+    { id: "NI", name: "NI" },
+    { id: "OI", name: "OI" },
+    { id: "PP", name: "PP" },
+    { id: "IM", name: "IM" },
+  ];
+
+  const paymentTypeOptions = [
+    { id: "Delivery", name: "Delivery" },
+    { id: "M", name: "M" },
+    { id: "Cash", name: "Cash" },
+  ];
+
+  const paymentPreferenceOptions = [
+    { id: "Bank", name: "Bank" },
+    { id: "Cash", name: "Cash" },
+    { id: "Cheque", name: "Cheque" },
+  ];
+
+  useEffect(() => {
+    fetchOptions("nationalities", setNationalities);
+    fetchOptions("races", setRaces);
+    fetchOptions("agamas", setAgamas);
+    fetchOptions("jobs", setJobs);
+    fetchOptions("locations", setLocations);
+  }, []);
+
+  const fetchOptions = async (
+    endpoint: string,
+    setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
   ) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/${endpoint}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setter(data);
+    } catch (error) {
+      console.error(`Error fetching ${endpoint}:`, error);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
+  const handleListboxChange = (name: keyof FormData, value: string) => {
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
+  const handleComboboxChange = (name: "job" | "location", value: string[]) => {
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -25,7 +161,11 @@ const CatalogueAddStaffPage: React.FC = () => {
     navigate("/catalogue/staff");
   };
 
-  const renderInput = (name: string, label: string, type: string = "text") => (
+  const renderInput = (
+    name: keyof FormData,
+    label: string,
+    type: string = "text"
+  ) => (
     <div className="space-y-2">
       <label htmlFor={name} className="text-sm font-medium text-gray-700">
         {label}
@@ -34,10 +174,163 @@ const CatalogueAddStaffPage: React.FC = () => {
         type={type}
         id={name}
         name={name}
-        value={formData[name as keyof typeof formData]}
+        value={formData[name].toString()}
         onChange={handleInputChange}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-500"
       />
+    </div>
+  );
+
+  const renderListbox = (
+    name: keyof FormData,
+    label: string,
+    options: SelectOption[]
+  ) => (
+    <div className="space-y-2">
+      <label htmlFor={name} className="text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <Listbox
+        value={formData[name]}
+        onChange={(value) =>
+          handleListboxChange(
+            name,
+            Array.isArray(value) ? value.join(",") : value
+          )
+        }
+      >
+        <div className="relative mt-1">
+          <ListboxButton
+            className={clsx(
+              "relative w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-left",
+              "focus:outline-none focus:border-gray-400"
+            )}
+          >
+            <span className="block truncate">{formData[name] || "Select"}</span>
+            <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <IconChevronDown size={20} className="text-gray-500" />
+            </span>
+          </ListboxButton>
+          <Transition
+            as={Fragment}
+            leave="transition ease-in duration-100"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+              {options.map((option) => (
+                <ListboxOption
+                  key={option.id}
+                  className={({ active }) =>
+                    `relative cursor-pointer select-none rounded py-2 px-4 ${
+                      active ? "bg-gray-100" : "text-gray-900"
+                    }`
+                  }
+                  value={option.name}
+                >
+                  {({ selected }) => (
+                    <>
+                      <span
+                        className={`block truncate ${
+                          selected ? "font-medium" : "font-normal"
+                        }`}
+                      >
+                        {option.name}
+                      </span>
+                      {selected ? (
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                          <IconCheck stroke={2} size={22} />
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </ListboxOption>
+              ))}
+            </ListboxOptions>
+          </Transition>
+        </div>
+      </Listbox>
+    </div>
+  );
+
+  const renderCombobox = (
+    name: "job" | "location",
+    label: string,
+    options: SelectOption[],
+    query: string,
+    setQuery: React.Dispatch<React.SetStateAction<string>>
+  ) => (
+    <div className="space-y-2">
+      <label htmlFor={name} className="text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <Combobox
+        multiple
+        value={formData[name]}
+        onChange={(value) => handleComboboxChange(name, value)}
+      >
+        {({ open }) => (
+          <div className="relative mt-1">
+            <ComboboxInput
+              className={clsx(
+                "w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-gray-900",
+                "focus:outline-none focus:border-gray-400"
+              )}
+              displayValue={(selected: string[]) =>
+                selected
+                  .map((id) => options.find((option) => option.id === id)?.name)
+                  .join(", ")
+              }
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-500">
+              <IconChevronDown stroke={2} size={20} />
+            </ComboboxButton>
+            <Transition
+              show={open}
+              as={Fragment}
+              leave="transition ease-in duration-100"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                {options
+                  .filter((option) =>
+                    option.name.toLowerCase().includes(query.toLowerCase())
+                  )
+                  .map((option) => (
+                    <ComboboxOption
+                      key={option.id}
+                      className={({ active }) =>
+                        `relative cursor-pointer select-none rounded py-2 px-4 ${
+                          active ? "bg-gray-100" : "text-gray-900"
+                        }`
+                      }
+                      value={option.id}
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : "font-normal"
+                            }`}
+                          >
+                            {option.name}
+                          </span>
+                          {selected ? (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                              <IconCheck stroke={2} size={22} />
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </ComboboxOption>
+                  ))}
+              </ComboboxOptions>
+            </Transition>
+          </div>
+        )}
+      </Combobox>
     </div>
   );
 
@@ -50,7 +343,7 @@ const CatalogueAddStaffPage: React.FC = () => {
         <IconChevronLeft className="mr-1" size={20} />
         Back
       </button>
-      <div className="bg-white rounded-lg overflow-hidden">
+      <div className="bg-white rounded-lg">
         <div className="pl-6">
           <h1 className="text-xl font-semibold text-gray-900">Add New Staff</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -78,8 +371,8 @@ const CatalogueAddStaffPage: React.FC = () => {
                   {renderInput("email", "Email", "email")}
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderInput("gender", "Gender")}
-                  {renderInput("nationality", "Nationality")}
+                  {renderListbox("gender", "Gender", genderOptions)}
+                  {renderListbox("nationality", "Nationality", nationalities)}
                   {renderInput("birthdate", "Birthdate", "date")}
                 </div>
                 <div className="grid grid-cols-1 gap-6">
@@ -88,8 +381,14 @@ const CatalogueAddStaffPage: React.FC = () => {
               </div>
               <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderInput("job", "Job")}
-                  {renderInput("location", "Location")}
+                  {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
+                  {renderCombobox(
+                    "location",
+                    "Location",
+                    locations,
+                    locationQuery,
+                    setLocationQuery
+                  )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
               </div>
@@ -100,15 +399,23 @@ const CatalogueAddStaffPage: React.FC = () => {
                   {renderInput("epcNo", "EPC Number")}
                   {renderInput("incomeTaxNo", "Income Tax Number")}
                   {renderInput("socsoNo", "SOCSO Number")}
-                  {renderInput("document", "Document")}
+                  {renderListbox("document", "Document", documentOptions)}
                 </div>
               </div>
               <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderInput("paymentType", "Payment Type")}
-                  {renderInput("paymentPreference", "Payment Preference")}
-                  {renderInput("race", "Race")}
-                  {renderInput("agama", "Agama")}
+                  {renderListbox(
+                    "paymentType",
+                    "Payment Type",
+                    paymentTypeOptions
+                  )}
+                  {renderListbox(
+                    "paymentPreference",
+                    "Payment Preference",
+                    paymentPreferenceOptions
+                  )}
+                  {renderListbox("race", "Race", races)}
+                  {renderListbox("agama", "Agama", agamas)}
                   {renderInput("dateResigned", "Date Resigned", "date")}
                 </div>
               </div>
