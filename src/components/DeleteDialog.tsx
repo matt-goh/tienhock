@@ -1,5 +1,11 @@
-import React from 'react';
-import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
+import React from "react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 
 interface DeleteDialogProps {
   isOpen: boolean;
@@ -7,6 +13,7 @@ interface DeleteDialogProps {
   onConfirm: () => void;
   title: string;
   message: string;
+  confirmButtonText?: string;
 }
 
 const DeleteDialog: React.FC<DeleteDialogProps> = ({
@@ -15,10 +22,15 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
   onConfirm,
   title,
   message,
+  confirmButtonText = "Delete",
 }) => {
   return (
     <Transition appear show={isOpen} as={React.Fragment}>
-      <Dialog as="div" className="fixed inset-0 z-10 overflow-y-auto" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-10 overflow-y-auto"
+        onClose={onClose}
+      >
         <div className="min-h-screen px-4 text-center" onClick={onClose}>
           <TransitionChild
             as={React.Fragment}
@@ -48,7 +60,7 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <DialogPanel 
+            <DialogPanel
               className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
               onClick={(e) => e.stopPropagation()} // Prevent click from bubbling up
             >
@@ -75,7 +87,7 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
                   className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-rose-500 border border-transparent rounded-full hover:bg-rose-600 active:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
                   onClick={onConfirm}
                 >
-                  Delete
+                  {confirmButtonText}
                 </button>
               </div>
             </DialogPanel>

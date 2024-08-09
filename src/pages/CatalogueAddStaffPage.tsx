@@ -19,6 +19,8 @@ import {
 } from "@headlessui/react";
 import Tab from "../components/Tab";
 import clsx from "clsx";
+import toast from "react-hot-toast";
+import DeleteDialog from "../components/DeleteDialog";
 
 interface SelectOption {
   id: string;
@@ -76,7 +78,33 @@ const CatalogueAddStaffPage: React.FC = () => {
     agama: "",
     dateResigned: "",
   });
+  const [initialFormData, setInitialFormData] = useState<FormData>({
+    id: "",
+    name: "",
+    telephoneNo: "",
+    email: "",
+    gender: "",
+    nationality: "",
+    birthdate: "",
+    address: "",
+    job: [],
+    location: [],
+    dateJoined: "",
+    icNo: "",
+    bankAccountNumber: "",
+    epcNo: "",
+    incomeTaxNo: "",
+    socsoNo: "",
+    document: "",
+    paymentType: "",
+    paymentPreference: "",
+    race: "",
+    agama: "",
+    dateResigned: "",
+  });
 
+  const [isFormChanged, setIsFormChanged] = useState(false);
+  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [nationalities, setNationalities] = useState<SelectOption[]>([]);
   const [races, setRaces] = useState<SelectOption[]>([]);
   const [agamas, setAgamas] = useState<SelectOption[]>([]);
@@ -110,12 +138,36 @@ const CatalogueAddStaffPage: React.FC = () => {
   ];
 
   useEffect(() => {
+    // Check if form data has changed
+    const hasChanged =
+      JSON.stringify(formData) !== JSON.stringify(initialFormData);
+    setIsFormChanged(hasChanged);
+  }, [formData, initialFormData]);
+
+  useEffect(() => {
+    setInitialFormData({ ...formData });
+  }, []);
+
+  useEffect(() => {
     fetchOptions("nationalities", setNationalities);
     fetchOptions("races", setRaces);
     fetchOptions("agamas", setAgamas);
     fetchOptions("jobs", setJobs);
     fetchOptions("locations", setLocations);
   }, []);
+
+  const handleBackClick = () => {
+    if (isFormChanged) {
+      setShowBackConfirmation(true);
+    } else {
+      navigate("/catalogue/staff");
+    }
+  };
+
+  const handleConfirmBack = () => {
+    setShowBackConfirmation(false);
+    navigate("/catalogue/staff");
+  };
 
   const fetchOptions = async (
     endpoint: string,
@@ -155,10 +207,71 @@ const CatalogueAddStaffPage: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = (): boolean => {
+    const requiredFields: (keyof FormData)[] = ["id", "name"];
+
+    for (const field of requiredFields) {
+      if (!formData[field]) {
+        toast.error(
+          `${field.charAt(0).toUpperCase() + field.slice(1)} is required.`
+        );
+        return false;
+      }
+    }
+
+    // Email validation (only if email is not empty)
+    if (formData.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        toast.error("Please enter a valid email address or leave it empty.");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("New staff data:", formData);
-    navigate("/catalogue/staff");
+
+    if (!validateForm()) {
+      return;
+    }
+
+    const dataToSend = {
+      ...formData,
+      birthdate: formData.birthdate || null,
+      dateJoined: formData.dateJoined || null,
+      dateResigned: formData.dateResigned || null,
+    };
+
+    try {
+      const response = await fetch("http://localhost:5000/api/staffs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dataToSend),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message ||
+            "An error occurred while creating the staff member."
+        );
+      }
+
+      const data = await response.json();
+      toast.success("Staff member created successfully!");
+      navigate("/catalogue/staff");
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("An unexpected error occurred.");
+      }
+    }
   };
 
   const renderInput = (
@@ -337,7 +450,7 @@ const CatalogueAddStaffPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4">
       <button
-        onClick={() => navigate("/catalogue/staff")}
+        onClick={handleBackClick}
         className="ml-3 mb-6 pl-2.5 pr-4 py-2 flex items-center font-medium hover:bg-gray-100 active:bg-gray-200 rounded-full text-gray-700 hover:text-gray-800 transition-colors duration-200"
       >
         <IconChevronLeft className="mr-1" size={20} />
@@ -431,6 +544,14 @@ const CatalogueAddStaffPage: React.FC = () => {
           </div>
         </form>
       </div>
+      <DeleteDialog
+        isOpen={showBackConfirmation}
+        onClose={() => setShowBackConfirmation(false)}
+        onConfirm={handleConfirmBack}
+        title="Discard Changes"
+        message="Are you sure you want to go back? All unsaved changes will be lost."
+        confirmButtonText="Confirm"
+      />
     </div>
   );
 };

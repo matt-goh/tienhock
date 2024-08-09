@@ -25,6 +25,13 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
+// Check for duplicate staff ID
+async function checkDuplicateStaffId(id) {
+  const query = 'SELECT * FROM staffs WHERE id = $1';
+  const result = await pool.query(query, [id]);
+  return result.rows.length > 0;
+}
+
 // Check for duplicate job name
 async function checkDuplicateJobName(name, id = null) {
   const query = id
@@ -41,6 +48,84 @@ async function checkDuplicateJobId(id) {
   const result = await pool.query(query, [id]);
   return result.rows.length > 0;
 }
+
+// STAFF SERVER ENDPOINTS
+app.post('/api/staffs', async (req, res) => {
+  const {
+    id,
+    name,
+    telephoneNo,
+    email,
+    gender,
+    nationality,
+    birthdate,
+    address,
+    job,
+    location,
+    dateJoined,
+    icNo,
+    bankAccountNumber,
+    epcNo,
+    incomeTaxNo,
+    socsoNo,
+    document,
+    paymentType,
+    paymentPreference,
+    race,
+    agama,
+    dateResigned
+  } = req.body;
+
+  try {
+    // Check for duplicate ID
+    const isDuplicateId = await checkDuplicateStaffId(id);
+    if (isDuplicateId) {
+      return res.status(400).json({ message: 'A staff member with this ID already exists' });
+    }
+    
+    const query = `
+      INSERT INTO staffs (
+        id, name, telephone_no, email, gender, nationality, birthdate, address,
+        job, location, date_joined, ic_no, bank_account_number, epc_no,
+        income_tax_no, socso_no, document, payment_type, payment_preference,
+        race, agama, date_resigned
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+      RETURNING *
+    `;
+
+    const values = [
+      id, 
+      name, 
+      telephoneNo, 
+      email || null, 
+      gender, 
+      nationality, 
+      birthdate ? new Date(birthdate) : null, 
+      address,
+      JSON.stringify(job), 
+      JSON.stringify(location), 
+      dateJoined ? new Date(dateJoined) : null, 
+      icNo,
+      bankAccountNumber, 
+      epcNo, 
+      incomeTaxNo, 
+      socsoNo, 
+      document, 
+      paymentType,
+      paymentPreference, 
+      race, 
+      agama, 
+      dateResigned ? new Date(dateResigned) : null
+    ];
+
+    const result = await pool.query(query, values);
+    res.status(201).json({ message: 'Staff member created successfully', staff: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating staff member:', error);
+    res.status(500).json({ message: 'Error creating staff member', error: error.message });
+  }
+});
 
 // JOBS SERVER ENDPOINTS
 app.post('/api/jobs', async (req, res) => {
