@@ -105,9 +105,23 @@ const CatalogueStaffPage = () => {
 
   const ITEMS_PER_PAGE = 12;
 
+  const filteredEmployees = employees.filter((employee) =>
+    employee.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedEmployees = filteredEmployees.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  useEffect(() => {
+    setTotalPages(Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE));
+    setCurrentPage(1);
+  }, [filteredEmployees]);
 
   const fetchEmployees = async () => {
     try {
@@ -128,14 +142,9 @@ const CatalogueStaffPage = () => {
     }
   };
 
-  const filteredEmployees = employees.filter((employee) =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const paginatedEmployees = filteredEmployees.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -280,29 +289,39 @@ const CatalogueStaffPage = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {paginatedEmployees.map((employee) => (
-          <EmployeeCard key={employee.id} employee={employee} />
-        ))}
-      </div>
+      {filteredEmployees.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">
+            No employees found matching your search.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {paginatedEmployees.map((employee) => (
+            <EmployeeCard key={employee.id} employee={employee} />
+          ))}
+        </div>
+      )}
 
-      <div className="mt-6 flex justify-between items-center text-gray-700">
-        <button
-          className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground"
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-        >
-          <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
-        </button>
-        <div className="flex space-x-2">{renderPaginationButtons()}</div>
-        <button
-          className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground"
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-        >
-          Next <IconChevronRight className="w-5 h-5 ml-2" />
-        </button>
-      </div>
+      {filteredEmployees.length > 0 && (
+        <div className="mt-6 flex justify-between items-center text-gray-700">
+          <button
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
+          </button>
+          <div className="flex space-x-2">{renderPaginationButtons()}</div>
+          <button
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next <IconChevronRight className="w-5 h-5 ml-2" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

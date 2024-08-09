@@ -123,8 +123,13 @@ const CatalogueJobPage: React.FC = () => {
   }, []);
 
   // HJS
+  // HJS
   const handleJobSelection = useCallback((selection: Job | null) => {
     if (selection === null) {
+      // Do nothing when the input is cleared
+      return;
+    } else if (selection === undefined) {
+      // This represents the "Add Job" option
       setShowNewJobModal(true);
     } else {
       setSelectedJob(selection);
@@ -467,76 +472,82 @@ const CatalogueJobPage: React.FC = () => {
                               : "text-gray-900"
                           }`
                         }
-                        value={null}
+                        value={undefined}
                       >
                         + Add Job
                       </ComboboxOption>
                       {jobs.length !== 0 && (
                         <div className="border-t border-gray-150 w-full my-1"></div>
                       )}
-                      {filteredJobs.map((job) => (
-                        <div
-                          key={job.id}
-                          className="relative"
-                          onClick={(e) => handleOptionClick(e, job)}
-                        >
-                          <ComboboxOption
-                            value={job}
-                            className={({ active }) =>
-                              `cursor-pointer select-none rounded text-left py-2 pl-4 pr-12 ${
-                                active
-                                  ? "bg-gray-100 text-gray-900"
-                                  : "text-gray-900"
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {job.name}
-                                </span>
-                                <span className="absolute inset-y-0 right-0 flex items-center mr-3 my-2">
-                                  <div className="relative w-6 h-6 flex items-center justify-center">
-                                    {selected && (
-                                      <IconCheck
-                                        className="text-gray-600"
-                                        stroke={2}
-                                        width={22}
-                                        height={22}
-                                      />
-                                    )}
-                                  </div>
-                                </span>
-                              </>
-                            )}
-                          </ComboboxOption>
+                      {filteredJobs.length === 0 && query !== "" ? (
+                        <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                          No jobs found.
+                        </div>
+                      ) : (
+                        filteredJobs.map((job) => (
                           <div
-                            className="absolute inset-y-0 right-0 flex items-center pr-2 my-2 z-10"
-                            onMouseEnter={() => setHoveredJob(job.id)}
-                            onMouseLeave={() => setHoveredJob(null)}
+                            key={job.id}
+                            className="relative"
+                            onClick={(e) => handleOptionClick(e, job)}
                           >
-                            <div className="relative w-8 h-8 flex items-center justify-center">
-                              {hoveredJob === job.id && (
-                                <button
-                                  onClick={(e) => handleDeleteJob(job, e)}
-                                  className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-white hover:bg-gray-100 active:bg-gray-200 focus:outline-none"
-                                >
-                                  <IconTrash
-                                    className="text-red-600 active:text-red-700"
-                                    stroke={1.5}
-                                    width={20}
-                                    height={20}
-                                  />
-                                </button>
+                            <ComboboxOption
+                              value={job}
+                              className={({ active }) =>
+                                `cursor-pointer select-none rounded text-left py-2 pl-4 pr-12 ${
+                                  active
+                                    ? "bg-gray-100 text-gray-900"
+                                    : "text-gray-900"
+                                }`
+                              }
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span
+                                    className={`block truncate ${
+                                      selected ? "font-medium" : "font-normal"
+                                    }`}
+                                  >
+                                    {job.name}
+                                  </span>
+                                  <span className="absolute inset-y-0 right-0 flex items-center mr-3 my-2">
+                                    <div className="relative w-6 h-6 flex items-center justify-center">
+                                      {selected && (
+                                        <IconCheck
+                                          className="text-gray-600"
+                                          stroke={2}
+                                          width={22}
+                                          height={22}
+                                        />
+                                      )}
+                                    </div>
+                                  </span>
+                                </>
                               )}
+                            </ComboboxOption>
+                            <div
+                              className="absolute inset-y-0 right-0 flex items-center pr-2 my-2 z-10"
+                              onMouseEnter={() => setHoveredJob(job.id)}
+                              onMouseLeave={() => setHoveredJob(null)}
+                            >
+                              <div className="relative w-8 h-8 flex items-center justify-center">
+                                {hoveredJob === job.id && (
+                                  <button
+                                    onClick={(e) => handleDeleteJob(job, e)}
+                                    className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-white hover:bg-gray-100 active:bg-gray-200 focus:outline-none"
+                                  >
+                                    <IconTrash
+                                      className="text-red-600 active:text-red-700"
+                                      stroke={1.5}
+                                      width={20}
+                                      height={20}
+                                    />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </ComboboxOptions>
                   </div>
                 </Combobox>

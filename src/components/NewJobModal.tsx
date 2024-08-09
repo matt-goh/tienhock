@@ -197,10 +197,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                 }
                               />
                               <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
-                                <IconChevronDown
-                                  stroke={2}
-                                  size={22}
-                                />
+                                <IconChevronDown stroke={2} size={22} />
                               </ComboboxButton>
                               <Transition
                                 show={open}
@@ -213,35 +210,42 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                   static
                                   className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none"
                                 >
-                                  {filteredSections.map((section) => (
-                                    <ComboboxOption
-                                      key={section.id}
-                                      className={`relative cursor-pointer select-none rounded py-2 px-4 text-gray-900 hover:bg-gray-100 active:bg-gray-200 transition-all duration-200`}
-                                      value={section.name}
-                                    >
-                                      {({ selected }) => (
-                                        <>
-                                          <span
-                                            className={`block truncate ${
-                                              selected
-                                                ? "font-medium"
-                                                : "font-normal"
-                                            }`}
-                                          >
-                                            {section.name}
-                                          </span>
-                                          {selected && (
-                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
-                                              <IconCheck
-                                                stroke={2}
-                                                size={22}
-                                              />
+                                  {filteredSections.length === 0 &&
+                                  query !== "" ? (
+                                    <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                                      No sections found.
+                                    </div>
+                                  ) : (
+                                    filteredSections.map((section) => (
+                                      <ComboboxOption
+                                        key={section.id}
+                                        className={`relative cursor-pointer select-none rounded py-2 px-4 text-gray-900 hover:bg-gray-100 active:bg-gray-200 transition-all duration-200`}
+                                        value={section.name}
+                                      >
+                                        {({ selected }) => (
+                                          <>
+                                            <span
+                                              className={`block truncate ${
+                                                selected
+                                                  ? "font-medium"
+                                                  : "font-normal"
+                                              }`}
+                                            >
+                                              {section.name}
                                             </span>
-                                          )}
-                                        </>
-                                      )}
-                                    </ComboboxOption>
-                                  ))}
+                                            {selected && (
+                                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                                                <IconCheck
+                                                  stroke={2}
+                                                  size={22}
+                                                />
+                                              </span>
+                                            )}
+                                          </>
+                                        )}
+                                      </ComboboxOption>
+                                    ))
+                                  )}
                                 </ComboboxOptions>
                               </Transition>
                             </div>
