@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   IconSearch,
   IconChevronLeft,
@@ -100,28 +100,13 @@ const CatalogueStaffPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
 
-  const filteredEmployees = employees.filter((employee) =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const paginatedEmployees = filteredEmployees.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
   useEffect(() => {
     fetchEmployees();
   }, []);
-
-  useEffect(() => {
-    setTotalPages(Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE));
-    setCurrentPage(1);
-  }, [filteredEmployees]);
 
   const fetchEmployees = async () => {
     try {
@@ -132,7 +117,6 @@ const CatalogueStaffPage = () => {
       }
       const data = await response.json();
       setEmployees(data);
-      setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
       setError(null);
     } catch (err) {
       setError("Failed to fetch employees. Please try again later.");
@@ -141,6 +125,23 @@ const CatalogueStaffPage = () => {
       setLoading(false);
     }
   };
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((employee) =>
+      employee.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [employees, searchTerm]);
+
+  const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
+
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredEmployees, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -187,10 +188,8 @@ const CatalogueStaffPage = () => {
 
       if (currentPage > 3) {
         buttons.push(
-          <div className="flex items-center">
-            <span key="ellipsis1" className="px-2">
-              ...
-            </span>
+          <div key="ellipsis1" className="flex items-center">
+            <span className="px-2">...</span>
           </div>
         );
       }
@@ -216,10 +215,8 @@ const CatalogueStaffPage = () => {
 
       if (currentPage < totalPages - 2) {
         buttons.push(
-          <div className="flex items-center">
-            <span key="ellipsis2" className="px-2">
-              ...
-            </span>
+          <div key="ellipsis2" className="flex items-center">
+            <span className="px-2">...</span>
           </div>
         );
       }
@@ -278,10 +275,7 @@ const CatalogueStaffPage = () => {
             placeholder="Search"
             className="w-full pl-11 pr-4 py-2 border focus:border-gray-500 rounded-full"
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={handleSearchChange}
           />
         </div>
         <button className="px-4 py-2 border rounded-full text-gray-600 hover:bg-gray-100">
