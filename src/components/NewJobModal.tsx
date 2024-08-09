@@ -199,8 +199,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                               <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
                                 <IconChevronDown
                                   stroke={2}
-                                  width="22"
-                                  height="22"
+                                  size={22}
                                 />
                               </ComboboxButton>
                               <Transition
@@ -235,8 +234,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                             <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
                                               <IconCheck
                                                 stroke={2}
-                                                width="22"
-                                                height="22"
+                                                size={22}
                                               />
                                             </span>
                                           )}
