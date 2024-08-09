@@ -19,7 +19,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   buttonRef,
   isActive,
 }) => {
-  const commonClasses = `block group flex items-center ml-10 pl-3 py-2 pr-2 transition-colors duration-200 rounded-lg focus:outline-none relative ${
+  const commonClasses = `block group/option flex items-center ml-10 pl-3 py-2 pr-2 transition-colors duration-200 rounded-lg focus:outline-none relative ${
     isActive
       ? "bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800"
       : "hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800"
@@ -27,7 +27,6 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 
   const content = (
     <>
-      <div className="absolute -left-3 -top-1 -bottom-0.5 w-0.5 bg-gray-200/75" />
       {name}
       <IconChevronRight
         size={18}
@@ -35,7 +34,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
         className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-300 right-2 absolute ${
           isActive
             ? "opacity-100 hover:text-gray-600"
-            : "opacity-0 group-hover:opacity-100 hover:text-gray-600"
+            : "opacity-0 group-hover/option:opacity-100 hover:text-gray-600"
         }`}
       />
     </>

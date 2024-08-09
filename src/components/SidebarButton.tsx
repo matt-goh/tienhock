@@ -21,7 +21,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
     <li className="m-2">
       <button
         onClick={onClick}
-        className="relative flex group items-center block py-2 pl-4 pr-2 hover:bg-gray-200/90 hover:text-gray-800 active:bg-gray-300/90 transition-colors duration-200 rounded-lg focus:outline-none w-full text-left"
+        className="relative group/button flex items-center block py-2 pl-4 pr-2 hover:bg-gray-200/90 hover:text-gray-800 active:bg-gray-300/90 transition-colors duration-200 rounded-lg focus:outline-none w-full text-left"
       >
         {icon}
         <span className="font-semibold ml-3">{name}</span>
@@ -29,7 +29,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
           width="18"
           height="18"
           stroke={2.25}
-          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-3 opacity-0 hover:text-gray-600 group-hover:opacity-100 transform transition-all duration-300 ${
+          className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right absolute right-3 opacity-0 hover:text-gray-600 group-hover/button:opacity-100 transform transition-all duration-300 ${
             isOpen ? "rotate-90" : ""
           }`}
         />

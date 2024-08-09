@@ -16,11 +16,6 @@ code {
     monospace;
 }
 
-.sidebar-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #d4d4d4;
-}
-
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -43,4 +38,23 @@ input[type="number"] {
 
 :focus {
   outline: none;
+}
+
+.sidebar-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.group\/sidebar:hover .sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #D1D5DB transparent;
+}
+
+.group\/sidebar:hover .sidebar-scrollbar::-webkit-scrollbar {
+  display: block;
+  width: 6px;
 }
