@@ -11,13 +11,13 @@ interface CatalogueItem {
   [key: string]: any; // Allow for additional properties
 }
 
-interface CataloguePageProps {
+interface CatalogueBasicPageProps {
   title: string;
   apiEndpoint: string;
   tableKey: string;
 }
 
-const CataloguePage: React.FC<CataloguePageProps> = ({
+const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
   title,
   apiEndpoint,
   tableKey,
@@ -180,7 +180,7 @@ const CataloguePage: React.FC<CataloguePageProps> = ({
   }
 
   return (
-    <div className={`relative py-[60px]`}>
+    <div className={`relative`}>
       <div className="flex flex-col items-center justify-center w-auto">
         <div
           className={`relative w-full text-center text-lg text-gray-700 font-medium mb-6`}
@@ -206,4 +206,4 @@ const CataloguePage: React.FC<CataloguePageProps> = ({
   );
 };
 
-export default CataloguePage;
+export default CatalogueBasicPage;

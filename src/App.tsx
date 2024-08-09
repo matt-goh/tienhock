@@ -2,10 +2,11 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import React from "react";
+import CatalogueAddStaffPage from "./pages/CatalogueAddStaffPage";
 import CatalogueProductPage from "./pages/CatalogueProductPage";
+import CatalogueBasicPage from "./pages/CatalogueBasicPage";
 import CatalogueStaffPage from "./pages/CatalogueStaffPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
-import CataloguePage from "./pages/CataloguePage";
 import Sidebar from "./components/Sidebar";
 
 const App: React.FC = () => {
@@ -26,9 +27,10 @@ const App: React.FC = () => {
         <aside className="hidden xl:flex">
           <Sidebar />
         </aside>
-        <main className="flex justify-center w-full">
+        <main className="flex justify-center w-full py-[60px]">
           <Routes>
             <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
+            <Route path="/catalogue/staff/new" element={<CatalogueAddStaffPage />} />
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
             <Route
               path="/catalogue/product"
@@ -37,7 +39,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/section"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Section Catalogue"
                   apiEndpoint="sections"
                   tableKey="catalogueSection"
@@ -47,7 +49,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/location"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Location Catalogue"
                   apiEndpoint="locations"
                   tableKey="catalogueLocation"
@@ -57,7 +59,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/bank"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Bank Catalogue"
                   apiEndpoint="banks"
                   tableKey="catalogueBank"
@@ -67,7 +69,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/tax"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Tax Catalogue"
                   apiEndpoint="taxes"
                   tableKey="catalogueTax"
@@ -77,7 +79,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/nationality"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Nationality Catalogue"
                   apiEndpoint="nationalities"
                   tableKey="catalogueNationality"
@@ -87,7 +89,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/race"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Race Catalogue"
                   apiEndpoint="races"
                   tableKey="catalogueRace"
@@ -97,7 +99,7 @@ const App: React.FC = () => {
             <Route
               path="/catalogue/agama"
               element={
-                <CataloguePage
+                <CatalogueBasicPage
                   title="Agama Catalogue"
                   apiEndpoint="agamas"
                   tableKey="catalogueAgama"
