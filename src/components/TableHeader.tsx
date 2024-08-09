@@ -1,4 +1,3 @@
-import React from "react";
 import { flexRender } from "@tanstack/react-table";
 import {
   IconSquareCheckFilled,

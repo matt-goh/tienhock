@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   IconSearch,
-  IconFilter,
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
@@ -59,7 +58,7 @@ type Employee = {
 
 const EmployeeCard = ({ employee }: { employee: Employee }) => (
   <div
-    className="bg-gray-100/75 active:bg-gray-200/75 text-left rounded-lg p-4 transition-all duration-200 cursor-pointer"
+    className="bg-white active:bg-gray-100 border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer"
     onClick={() => {}}
   >
     <div className="mb-2">
@@ -93,7 +92,7 @@ const CatalogueStaffPage = () => {
           Staffs ({sampleEmployees.length})
         </h1>
         <div className="flex">
-          <button className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200">
+          <button className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200">
             <IconPlus stroke={2} size={18} className="mr-2" />
             Add New
           </button>
@@ -102,7 +101,7 @@ const CatalogueStaffPage = () => {
 
       <div className="flex mb-6">
         <div className="relative flex-grow mr-4">
-          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={22} />
           <input
             type="text"
             placeholder="Search"

@@ -5,6 +5,7 @@ import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
+import "../index.css"
 
 const Sidebar: React.FC = () => {
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -197,7 +198,7 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="relative top-0 left-0 h-screen bg-gray-100/75 border-r border-gray-200 w-[254px] flex flex-col">
+    <div className="relative top-0 left-0 h-screen bg-gray-100/75 border-r border-gray-200 w-[254px] flex flex-col group/sidebar">
       <div className="relative py-4">
         <h2 className="text-xl font-bold text-center">Tien Hock</h2>
       </div>
