@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconChevronLeft,
@@ -200,12 +200,19 @@ const CatalogueAddStaffPage: React.FC = () => {
     }));
   };
 
-  const handleComboboxChange = (name: "job" | "location", value: string[]) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
+  const handleComboboxChange = useCallback(
+    (name: "job" | "location", value: string[] | null) => {
+      if (value === null) {
+        // Do nothing when the input is cleared
+        return;
+      }
+      setFormData((prevData) => ({
+        ...prevData,
+        [name]: value,
+      }));
+    },
+    []
+  );
 
   const validateForm = (): boolean => {
     const requiredFields: (keyof FormData)[] = ["id", "name"];
@@ -407,38 +414,49 @@ const CatalogueAddStaffPage: React.FC = () => {
               leaveTo="opacity-0"
             >
               <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-                {options
-                  .filter((option) =>
+                {options.length === 0 ||
+                (options.length > 0 &&
+                  query !== "" &&
+                  options.filter((option) =>
                     option.name.toLowerCase().includes(query.toLowerCase())
-                  )
-                  .map((option) => (
-                    <ComboboxOption
-                      key={option.id}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none rounded py-2 px-4 ${
-                          active ? "bg-gray-100" : "text-gray-900"
-                        }`
-                      }
-                      value={option.id}
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : "font-normal"
-                            }`}
-                          >
-                            {option.name}
-                          </span>
-                          {selected ? (
-                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
-                              <IconCheck stroke={2} size={22} />
+                  ).length === 0) ? (
+                  <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                    No {name}s found.
+                  </div>
+                ) : (
+                  options
+                    .filter((option) =>
+                      option.name.toLowerCase().includes(query.toLowerCase())
+                    )
+                    .map((option) => (
+                      <ComboboxOption
+                        key={option.id}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none rounded py-2 px-4 ${
+                            active ? "bg-gray-100" : "text-gray-900"
+                          }`
+                        }
+                        value={option.id}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              {option.name}
                             </span>
-                          ) : null}
-                        </>
-                      )}
-                    </ComboboxOption>
-                  ))}
+                            {selected ? (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                                <IconCheck stroke={2} size={22} />
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </ComboboxOption>
+                    ))
+                )}
               </ComboboxOptions>
             </Transition>
           </div>
