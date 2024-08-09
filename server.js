@@ -50,6 +50,45 @@ async function checkDuplicateJobId(id) {
 }
 
 // STAFF SERVER ENDPOINTS
+app.get('/api/staffs', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        s.id, 
+        s.name, 
+        s.ic_no as "icNo", 
+        s.telephone_no as "telephoneNo",
+        COALESCE(
+          (SELECT array_agg(DISTINCT j.name) 
+           FROM jobs j 
+           WHERE j.id::text = ANY(SELECT jsonb_array_elements_text(s.job::jsonb))),
+          ARRAY[]::text[]
+        ) as job,
+        COALESCE(
+          (SELECT array_agg(DISTINCT l.name) 
+           FROM locations l 
+           WHERE l.id::text = ANY(SELECT jsonb_array_elements_text(s.location::jsonb))),
+          ARRAY[]::text[]
+        ) as location
+      FROM 
+        staffs s
+    `;
+    
+    const result = await pool.query(query);
+    
+    const staffs = result.rows.map(staff => ({
+      ...staff,
+      job: staff.job || [],
+      location: staff.location || []
+    }));
+
+    res.json(staffs);
+  } catch (error) {
+    console.error('Error fetching staffs:', error);
+    res.status(500).json({ message: 'Error fetching staffs', error: error.message });
+  }
+});
+
 app.post('/api/staffs', async (req, res) => {
   const {
     id,
