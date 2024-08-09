@@ -5,6 +5,7 @@ import {
   IconChevronRight,
   IconPlus,
 } from "@tabler/icons-react";
+import { useNavigate } from 'react-router-dom';
 
 const sampleEmployees = [
   {
@@ -58,7 +59,7 @@ type Employee = {
 
 const EmployeeCard = ({ employee }: { employee: Employee }) => (
   <div
-    className="bg-white active:bg-gray-100 border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer"
+    className="hover:bg-gray-100 active:bg-gray-200 border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer"
     onClick={() => {}}
   >
     <div className="mb-2">
@@ -80,19 +81,23 @@ const EmployeeCard = ({ employee }: { employee: Employee }) => (
 
 const CatalogueStaffPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
 
   const filteredEmployees = sampleEmployees.filter((employee) =>
     employee.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="relative py-[60px]">
+    <div className="relative">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl text-gray-700 font-bold">
           Staffs ({sampleEmployees.length})
         </h1>
         <div className="flex">
-          <button className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200">
+          <button
+            className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
+            onClick={() => navigate("/catalogue/staff/new")}
+          >
             <IconPlus stroke={2} size={18} className="mr-2" />
             Add New
           </button>
@@ -101,11 +106,14 @@ const CatalogueStaffPage = () => {
 
       <div className="flex mb-6">
         <div className="relative flex-grow mr-4">
-          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={22} />
+          <IconSearch
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            size={22}
+          />
           <input
             type="text"
             placeholder="Search"
-            className="w-full pl-11 pr-4 py-2 border focus:border-gray-300 focus:border-1.5 rounded-full"
+            className="w-full pl-11 pr-4 py-2 border focus:border-gray-500 rounded-full"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -122,7 +130,7 @@ const CatalogueStaffPage = () => {
       </div>
 
       <div className="mt-6 flex justify-between items-center text-gray-700">
-        <button className="pl-3 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground">
+        <button className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground">
           <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
         </button>
         <div className="flex space-x-2">
@@ -139,7 +147,7 @@ const CatalogueStaffPage = () => {
             </button>
           ))}
         </div>
-        <button className="pl-4 pr-3 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground">
+        <button className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground">
           Next <IconChevronRight className="w-5 h-5 ml-2" />
         </button>
       </div>
