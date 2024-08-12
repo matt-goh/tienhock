@@ -325,38 +325,32 @@ const CatalogueStaffPage = () => {
 
   return (
     <div className="relative w-full mx-24">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl text-gray-700 font-bold">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="relative text-2xl text-gray-700 font-bold">
           Staffs ({filteredEmployees.length})
         </h1>
         <div className="flex">
+          <div className="relative mx-3">
+            <IconSearch
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={22}
+            />
+            <input
+              type="text"
+              placeholder="Search"
+              className="w-full pl-11 py-2 border focus:border-gray-500 rounded-full"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+          </div>
           <button
             className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
             onClick={() => navigate("/catalogue/staff/new")}
           >
             <IconPlus stroke={2} size={18} className="mr-2" />
-            Add New
+            Add Staff
           </button>
         </div>
-      </div>
-
-      <div className="flex mb-6">
-        <div className="relative flex-grow mr-4">
-          <IconSearch
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-            size={22}
-          />
-          <input
-            type="text"
-            placeholder="Search"
-            className="w-full pl-11 pr-4 py-2 border focus:border-gray-500 rounded-full"
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
-        </div>
-        <button className="px-4 py-2 border rounded-full text-gray-600 hover:bg-gray-100">
-          Filters
-        </button>
       </div>
 
       {filteredEmployees.length === 0 ? (
