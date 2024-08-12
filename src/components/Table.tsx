@@ -995,7 +995,7 @@ function Table<T extends Record<string, any>>({
                     column.getIsSorted()
                       ? "opacity-100"
                       : "opacity-0 group-hover:opacity-100"
-                  } transition-opacity p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-full`}
+                  } transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 rounded-full`}
                 >
                   {getSortIcon(col.id, col.type, column.getIsSorted())}
                 </span>
@@ -1009,7 +1009,7 @@ function Table<T extends Record<string, any>>({
                     column.getIsSorted()
                       ? "opacity-100"
                       : "opacity-0 group-hover:opacity-100"
-                  } transition-opacity p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 rounded-full`}
+                  } transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 rounded-full`}
                 >
                   {getSortIcon(col.id, col.type, column.getIsSorted())}
                 </span>
@@ -1376,7 +1376,7 @@ function Table<T extends Record<string, any>>({
                         <td
                           key={cell.id}
                           className={`relative px-6 py-4 whitespace-no-wrap ${
-                            isSorting ? "bg-gray-100" : "cursor-default"
+                            isSorting ? "bg-gray-50" : "cursor-default"
                           } ${
                             row.id === editableRowId &&
                             cellIndex === editableCellIndex &&

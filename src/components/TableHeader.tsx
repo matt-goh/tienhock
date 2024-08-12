@@ -25,8 +25,6 @@ function TableHeader<T>({
   isEditing,
   isAllSelectedGlobal,
   isIndeterminateGlobal,
-  isAllSelectedPage,
-  isIndeterminatePage,
   handleSelectAll,
   isSortableColumn,
   columnWidths,
@@ -53,10 +51,10 @@ function TableHeader<T>({
       {headerGroup.headers.map((header: any, index: number) => (
         <th
           key={header.id}
-          className={`px-6 py-2 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
+          className={`px-6 py-2 bg-gray-100 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
             columns.find((col) => col.id === header.id)?.type || "string"
-          )} ${index === 0 ? "border-l-0" : "border-l border-gray-300"} ${
-            index === headerGroup.headers.length - 1 ? "border-r-0" : ""
+          )} ${index === 0 ? "border-l-0 rounded-tl-lg" : "border-gray-300"} ${
+            index === headerGroup.headers.length - 1 ? "border-r-0 rounded-tr-lg" : ""
           } border-b border-gray-300`}
           onClick={() => {
             if (isSortableColumn(header.column.id)) {
