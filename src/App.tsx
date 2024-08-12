@@ -2,7 +2,7 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import React from "react";
-import CatalogueAddStaffPage from "./pages/CatalogueAddStaffPage";
+import CatalogueStaffFormPage from "./pages/CatalogueStaffFormPage";
 import CatalogueProductPage from "./pages/CatalogueProductPage";
 import CatalogueBasicPage from "./pages/CatalogueBasicPage";
 import CatalogueStaffPage from "./pages/CatalogueStaffPage";
@@ -30,7 +30,8 @@ const App: React.FC = () => {
         <main className="flex justify-center w-full py-[60px]">
           <Routes>
             <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
-            <Route path="/catalogue/staff/new" element={<CatalogueAddStaffPage />} />
+            <Route path="/catalogue/staff/new" element={<CatalogueStaffFormPage />} />
+            <Route path="/catalogue/staff/:id" element={<CatalogueStaffFormPage />} />
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
             <Route
               path="/catalogue/product"

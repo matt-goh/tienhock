@@ -20,6 +20,7 @@ const EmployeeCard = ({ employee }: { employee: Employee }) => {
   const [displayLocations, setDisplayLocations] = useState<string[]>([]);
   const [remainingCount, setRemainingCount] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const calculateDisplayLocations = () => {
@@ -64,10 +65,14 @@ const EmployeeCard = ({ employee }: { employee: Employee }) => {
       window.removeEventListener("resize", calculateDisplayLocations);
   }, [employee.location]);
 
+  const handleClick = () => {
+    navigate(`/catalogue/staff/${employee.id}`);
+  };
+
   return (
     <div
       className="hover:bg-gray-100 active:bg-gray-200 border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer"
-      onClick={() => {}}
+      onClick={handleClick}
     >
       <div className="mb-2">
         <h3 className="font-semibold">{employee.name}</h3>
