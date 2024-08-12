@@ -356,7 +356,7 @@ const CatalogueStaffPage = () => {
       {filteredEmployees.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-gray-500">
-            No employees found matching your search.
+            No employees found.
           </p>
         </div>
       ) : (

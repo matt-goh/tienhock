@@ -451,7 +451,7 @@ const CatalogueJobPage: React.FC = () => {
                 <Combobox value={selectedJob} onChange={handleJobSelection}>
                   <div className="relative">
                     <ComboboxInput
-                      className="w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400"
+                      className="w-full cursor-input rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400"
                       displayValue={(job: Job | null) => job?.name || ""}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Select a job"

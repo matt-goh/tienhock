@@ -79,7 +79,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
           {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ [`${apiEndpoint}Ids`]: itemIdsToDelete }),
+            body: JSON.stringify({ [`${apiEndpoint}`]: itemIdsToDelete }),
           }
         );
 
@@ -183,7 +183,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
     <div className={`relative`}>
       <div className="flex flex-col items-center justify-center w-auto">
         <div
-          className={`relative w-full text-center text-lg text-gray-700 font-medium mb-6`}
+          className={`relative w-full text-left text-lg text-gray-700 font-medium mb-6`}
         >
           {title}
         </div>

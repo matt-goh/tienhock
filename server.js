@@ -831,7 +831,7 @@ const setupEntityEndpoints = (app, entityName, tableName) => {
 
   // Delete entities
   app.delete(`/api/${entityName}s`, async (req, res) => {
-    const entityIds = req.body[`${entityName}Ids`];
+    const entityIds = req.body[`${entityName}s`];
 
     if (!Array.isArray(entityIds) || entityIds.length === 0) {
       return res.status(400).json({ message: `Invalid ${entityName} IDs provided` });
@@ -851,7 +851,7 @@ const setupEntityEndpoints = (app, entityName, tableName) => {
         const deletedIds = result.rows.map(row => row.id);
         res.status(200).json({ 
           message: `${capitalizedEntity}s deleted successfully`, 
-          [`deleted${capitalizedEntity}Ids`]: deletedIds 
+          [`deleted${capitalizedEntity}s`]: deletedIds 
         });
       } catch (error) {
         await client.query('ROLLBACK');
