@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   IconChevronLeft,
   IconChevronDown,
@@ -52,11 +52,8 @@ interface FormData {
   dateResigned: string;
 }
 
-const CatalogueStaffFormPage: React.FC = () => {
+const CatalogueAddStaffPage: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const isEditMode = !!id;
-
   const [formData, setFormData] = useState<FormData>({
     id: "",
     name: "",
@@ -82,21 +79,39 @@ const CatalogueStaffFormPage: React.FC = () => {
     dateResigned: "",
   });
   const [initialFormData, setInitialFormData] = useState<FormData>({
-    ...formData,
+    id: "",
+    name: "",
+    telephoneNo: "",
+    email: "",
+    gender: "",
+    nationality: "",
+    birthdate: "",
+    address: "",
+    job: [],
+    location: [],
+    dateJoined: "",
+    icNo: "",
+    bankAccountNumber: "",
+    epcNo: "",
+    incomeTaxNo: "",
+    socsoNo: "",
+    document: "",
+    paymentType: "",
+    paymentPreference: "",
+    race: "",
+    agama: "",
+    dateResigned: "",
   });
 
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [nationalities, setNationalities] = useState<SelectOption[]>([]);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [races, setRaces] = useState<SelectOption[]>([]);
   const [agamas, setAgamas] = useState<SelectOption[]>([]);
   const [jobs, setJobs] = useState<SelectOption[]>([]);
   const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
-  const [loading, setLoading] = useState(isEditMode);
-  const [error, setError] = useState<string | null>(null);
 
   const genderOptions = [
     { id: "male", name: "Male" },
@@ -123,43 +138,35 @@ const CatalogueStaffFormPage: React.FC = () => {
   ];
 
   useEffect(() => {
+    // Check if form data has changed
     const hasChanged =
       JSON.stringify(formData) !== JSON.stringify(initialFormData);
     setIsFormChanged(hasChanged);
   }, [formData, initialFormData]);
 
   useEffect(() => {
-    if (isEditMode) {
-      fetchStaffDetails();
-    } else {
-      setInitialFormData({ ...formData });
-    }
+    setInitialFormData({ ...formData });
+  }, []);
+
+  useEffect(() => {
     fetchOptions("nationalities", setNationalities);
     fetchOptions("races", setRaces);
     fetchOptions("agamas", setAgamas);
     fetchOptions("jobs", setJobs);
     fetchOptions("locations", setLocations);
-  }, [id]);
+  }, []);
 
-  const fetchStaffDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/staffs/${id}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch staff details");
-      }
-      const data = await response.json();
-
-      // The job and location arrays now contain IDs, so we don't need to convert them
-      setFormData(data);
-      setInitialFormData(data);
-      setError(null);
-    } catch (err) {
-      setError("Failed to fetch staff details. Please try again later.");
-      console.error("Error fetching staff details:", err);
-    } finally {
-      setLoading(false);
+  const handleBackClick = () => {
+    if (isFormChanged) {
+      setShowBackConfirmation(true);
+    } else {
+      navigate("/catalogue/staff");
     }
+  };
+
+  const handleConfirmBack = () => {
+    setShowBackConfirmation(false);
+    navigate("/catalogue/staff");
   };
 
   const fetchOptions = async (
@@ -176,42 +183,6 @@ const CatalogueStaffFormPage: React.FC = () => {
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
     }
-  };
-
-  const handleDeleteClick = () => {
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (id) {
-      try {
-        const response = await fetch(`http://localhost:5000/api/staffs/${id}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) {
-          throw new Error("Failed to delete staff member");
-        }
-        setIsDeleteDialogOpen(false);
-        toast.success("Staff member deleted successfully");
-        navigate("/catalogue/staff");
-      } catch (err) {
-        console.error("Error deleting staff member:", err);
-        toast.error("Failed to delete staff member. Please try again.");
-      }
-    }
-  };
-
-  const handleBackClick = () => {
-    if (isFormChanged) {
-      setShowBackConfirmation(true);
-    } else {
-      navigate("/catalogue/staff");
-    }
-  };
-
-  const handleConfirmBack = () => {
-    setShowBackConfirmation(false);
-    navigate("/catalogue/staff");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,6 +203,7 @@ const CatalogueStaffFormPage: React.FC = () => {
   const handleComboboxChange = useCallback(
     (name: "job" | "location", value: string[] | null) => {
       if (value === null) {
+        // Do nothing when the input is cleared
         return;
       }
       setFormData((prevData) => ({
@@ -254,6 +226,7 @@ const CatalogueStaffFormPage: React.FC = () => {
       }
     }
 
+    // Email validation (only if email is not empty)
     if (formData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
@@ -280,13 +253,8 @@ const CatalogueStaffFormPage: React.FC = () => {
     };
 
     try {
-      const url = isEditMode
-        ? `http://localhost:5000/api/staffs/${id}`
-        : "http://localhost:5000/api/staffs";
-      const method = isEditMode ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method: method,
+      const response = await fetch("http://localhost:5000/api/staffs", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -297,16 +265,12 @@ const CatalogueStaffFormPage: React.FC = () => {
         const errorData = await response.json();
         throw new Error(
           errorData.message ||
-            `An error occurred while ${
-              isEditMode ? "updating" : "creating"
-            } the staff member.`
+            "An error occurred while creating the staff member."
         );
       }
 
       const data = await response.json();
-      toast.success(
-        `Staff member ${isEditMode ? "updated" : "created"} successfully!`
-      );
+      toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
     } catch (error) {
       if (error instanceof Error) {
@@ -330,7 +294,7 @@ const CatalogueStaffFormPage: React.FC = () => {
         type={type}
         id={name}
         name={name}
-        value={formData[name] || ""}
+        value={formData[name].toString()}
         onChange={handleInputChange}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-500"
       />
@@ -422,7 +386,7 @@ const CatalogueStaffFormPage: React.FC = () => {
       </label>
       <Combobox
         multiple
-        value={formData[name] ?? ""}
+        value={formData[name]}
         onChange={(value) => handleComboboxChange(name, value)}
       >
         {({ open }) => (
@@ -501,14 +465,6 @@ const CatalogueStaffFormPage: React.FC = () => {
     </div>
   );
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
-
   return (
     <div className="container mx-auto px-4">
       <button
@@ -520,23 +476,20 @@ const CatalogueStaffFormPage: React.FC = () => {
       </button>
       <div className="bg-white rounded-lg">
         <div className="pl-6">
-          <h1 className="text-xl font-semibold text-gray-900">
-            {isEditMode ? "Edit Staff" : "Add New Staff"}
-          </h1>
+          <h1 className="text-xl font-semibold text-gray-900">Add New Staff</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {isEditMode
-              ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
-              : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
+            Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
+            anda selesai.
           </p>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="pl-6 pt-5">
             <Tab
               labels={[
-                "Personal",
-                "Work",
+                "Personal and contact data",
+                "Work data",
                 "Documents",
-                "Additional",
+                "Additional data",
               ]}
             >
               <div className="space-y-6">
@@ -599,16 +552,7 @@ const CatalogueStaffFormPage: React.FC = () => {
               </div>
             </Tab>
           </div>
-          <div className="mt-8 py-3 space-x-3 text-right">
-            {isEditMode && (
-              <button
-                type="button"
-                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-gray-100 active:text-gray-200 transition-colors duration-200"
-                onClick={handleDeleteClick}
-              >
-                Delete
-              </button>
-            )}
+          <div className="mt-8 py-3 text-right">
             <button
               type="submit"
               className="px-5 py-2 border border-gray-300 rounded-full font-medium text-base text-gray-700 hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
@@ -618,14 +562,6 @@ const CatalogueStaffFormPage: React.FC = () => {
           </div>
         </form>
       </div>
-      <DeleteDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Staff"
-        message={`Are you sure you want to remove ${formData.name} from the staff list? This action cannot be undone.`}
-        confirmButtonText="Delete"
-      />
       <DeleteDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
@@ -638,4 +574,4 @@ const CatalogueStaffFormPage: React.FC = () => {
   );
 };
 
-export default CatalogueStaffFormPage;
+export default CatalogueAddStaffPage;

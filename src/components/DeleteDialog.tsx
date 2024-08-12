@@ -77,14 +77,14 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
               <div className="mt-4 flex justify-end space-x-2">
                 <button
                   type="button"
-                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-transparent rounded-full hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500"
+                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-transparent rounded-full hover:bg-gray-200 active:bg-gray-300 focus:outline-none"
                   onClick={onClose}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-rose-500 border border-transparent rounded-full hover:bg-rose-600 active:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-rose-500 border border-transparent rounded-full hover:bg-rose-600 active:bg-rose-700 focus:outline-none"
                   onClick={onConfirm}
                 >
                   {confirmButtonText}

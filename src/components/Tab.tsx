@@ -15,7 +15,7 @@ const Tab: React.FC<TabProps> = ({ children, labels }) => {
           <button
             key={index}
             type="button"
-            className={`px-4 py-2 my-1 text-sm font-medium transition-all duration-200 ${
+            className={`px-4 py-2 my-1 text-sm font-medium transition-all duration-200 w-[8rem] ${
               index === activeTab
                 ? 'bg-white rounded-lg'
                 : 'text-gray-700 hover:text-gray-800'

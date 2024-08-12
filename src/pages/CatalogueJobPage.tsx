@@ -123,7 +123,6 @@ const CatalogueJobPage: React.FC = () => {
   }, []);
 
   // HJS
-  // HJS
   const handleJobSelection = useCallback((selection: Job | null) => {
     if (selection === null) {
       // Do nothing when the input is cleared
@@ -489,6 +488,8 @@ const CatalogueJobPage: React.FC = () => {
                             key={job.id}
                             className="relative"
                             onClick={(e) => handleOptionClick(e, job)}
+                            onMouseEnter={() => setHoveredJob(job.id)}
+                            onMouseLeave={() => setHoveredJob(null)}
                           >
                             <ComboboxOption
                               value={job}
@@ -515,8 +516,7 @@ const CatalogueJobPage: React.FC = () => {
                                         <IconCheck
                                           className="text-gray-600"
                                           stroke={2}
-                                          width={22}
-                                          height={22}
+                                          size={22}
                                         />
                                       )}
                                     </div>
@@ -524,22 +524,17 @@ const CatalogueJobPage: React.FC = () => {
                                 </>
                               )}
                             </ComboboxOption>
-                            <div
-                              className="absolute inset-y-0 right-0 flex items-center pr-2 my-2 z-10"
-                              onMouseEnter={() => setHoveredJob(job.id)}
-                              onMouseLeave={() => setHoveredJob(null)}
-                            >
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-2 my-2 z-10">
                               <div className="relative w-8 h-8 flex items-center justify-center">
                                 {hoveredJob === job.id && (
                                   <button
                                     onClick={(e) => handleDeleteJob(job, e)}
-                                    className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-white hover:bg-gray-100 active:bg-gray-200 focus:outline-none"
+                                    className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-100 active:bg-gray-200 focus:outline-none"
                                   >
                                     <IconTrash
-                                      className="text-red-600 active:text-red-700"
+                                      className="text-gray-700 active:text-gray-800"
                                       stroke={1.5}
-                                      width={20}
-                                      height={20}
+                                      size={20}
                                     />
                                   </button>
                                 )}
