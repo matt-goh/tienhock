@@ -307,6 +307,24 @@ app.put('/api/staffs/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/staffs/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const query = 'DELETE FROM staffs WHERE id = $1 RETURNING *';
+    const result = await pool.query(query, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Staff member not found' });
+    }
+
+    res.json({ message: 'Staff member deleted successfully', staff: result.rows[0] });
+  } catch (error) {
+    console.error('Error deleting staff member:', error);
+    res.status(500).json({ message: 'Error deleting staff member', error: error.message });
+  }
+});
+
 // JOBS SERVER ENDPOINTS
 app.post('/api/jobs', async (req, res) => {
   const { id, name, section } = req.body;

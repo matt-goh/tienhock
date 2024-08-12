@@ -4,8 +4,11 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
+  IconTrash,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import DeleteDialog from "../components/DeleteDialog";
 
 type Employee = {
   id: string;
@@ -16,9 +19,17 @@ type Employee = {
   telephoneNo: string;
 };
 
-const EmployeeCard = ({ employee }: { employee: Employee }) => {
+const EmployeeCard = ({
+  employee,
+  onDeleteClick,
+}: {
+  employee: Employee;
+  onDeleteClick: (employee: Employee) => void;
+}) => {
   const [displayLocations, setDisplayLocations] = useState<string[]>([]);
   const [remainingCount, setRemainingCount] = useState(0);
+  const [isCardHovered, setIsCardHovered] = useState(false);
+  const [isTrashHovered, setIsTrashHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -69,10 +80,20 @@ const EmployeeCard = ({ employee }: { employee: Employee }) => {
     navigate(`/catalogue/staff/${employee.id}`);
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDeleteClick(employee);
+  };
+
   return (
     <div
-      className="hover:bg-gray-100 active:bg-gray-200 border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer"
+      className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
+        isCardHovered && !isTrashHovered ? "bg-gray-100" : ""
+      }`}
       onClick={handleClick}
+      onMouseEnter={() => setIsCardHovered(true)}
+      onMouseLeave={() => setIsCardHovered(false)}
     >
       <div className="mb-2">
         <h3 className="font-semibold">{employee.name}</h3>
@@ -95,6 +116,24 @@ const EmployeeCard = ({ employee }: { employee: Employee }) => {
       </div>
       <p className="text-sm">IC: {employee.icNo}</p>
       <p className="text-sm">Phone no: {employee.telephoneNo}</p>
+      <div className="absolute inset-y-0 top-2 right-2">
+        <div className="relative w-8 h-8">
+          {isCardHovered && (
+            <button
+              onClick={handleDeleteClick}
+              onMouseEnter={() => setIsTrashHovered(true)}
+              onMouseLeave={() => setIsTrashHovered(false)}
+              className={`delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-gray-100 active:bg-gray-200 focus:outline-none`}
+            >
+              <IconTrash
+                className="text-gray-700 active:text-gray-800"
+                stroke={1.5}
+                size={18}
+              />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -105,6 +144,10 @@ const CatalogueStaffPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
+    null
+  );
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -129,6 +172,34 @@ const CatalogueStaffPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (employeeToDelete) {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/staffs/${employeeToDelete.id}`,
+          {
+            method: "DELETE",
+          }
+        );
+        if (!response.ok) {
+          throw new Error("Failed to delete employee");
+        }
+        setEmployees(employees.filter((emp) => emp.id !== employeeToDelete.id));
+        setIsDeleteDialogOpen(false);
+        setEmployeeToDelete(null);
+        toast.success("Employee deleted successfully");
+      } catch (err) {
+        console.error("Error deleting employee:", err);
+        toast.error("Failed to delete employee. Please try again.");
+      }
+    }
+  };
+
+  const handleDeleteClick = (employee: Employee) => {
+    setEmployeeToDelete(employee);
+    setIsDeleteDialogOpen(true);
   };
 
   const filteredEmployees = useMemo(() => {
@@ -297,7 +368,11 @@ const CatalogueStaffPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {paginatedEmployees.map((employee) => (
-            <EmployeeCard key={employee.id} employee={employee} />
+            <EmployeeCard
+              key={employee.id}
+              employee={employee}
+              onDeleteClick={handleDeleteClick}
+            />
           ))}
         </div>
       )}
@@ -321,6 +396,14 @@ const CatalogueStaffPage = () => {
           </button>
         </div>
       )}
+      <DeleteDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Staff"
+        message={`Are you sure you want to remove ${employeeToDelete?.name} from the staff list? This action cannot be undone.`}
+        confirmButtonText="Delete"
+      />
     </div>
   );
 };
