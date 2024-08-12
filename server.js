@@ -166,6 +166,147 @@ app.post('/api/staffs', async (req, res) => {
   }
 });
 
+// Fetch a single staff member by ID
+app.get('/api/staffs/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const query = `
+      SELECT 
+        s.id, 
+        s.name, 
+        s.ic_no as "icNo", 
+        s.telephone_no as "telephoneNo",
+        s.email,
+        s.gender,
+        s.nationality,
+        s.birthdate,
+        s.address,
+        s.date_joined as "dateJoined",
+        s.bank_account_number as "bankAccountNumber",
+        s.epc_no as "epcNo",
+        s.income_tax_no as "incomeTaxNo",
+        s.socso_no as "socsoNo",
+        s.document,
+        s.payment_type as "paymentType",
+        s.payment_preference as "paymentPreference",
+        s.race,
+        s.agama,
+        s.date_resigned as "dateResigned",
+        s.job,
+        s.location
+      FROM 
+        staffs s
+      WHERE
+        s.id = $1
+    `;
+    
+    const result = await pool.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Staff member not found' });
+    }
+
+    const staff = result.rows[0];
+
+    // Format dates
+    const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
+    
+    // Convert null values to empty strings and format dates
+    const formattedStaff = Object.entries(staff).reduce((acc, [key, value]) => {
+      if (key === 'birthdate' || key === 'dateJoined' || key === 'dateResigned') {
+        acc[key] = formatDate(value);
+      } else if (key === 'job' || key === 'location') {
+        acc[key] = Array.isArray(value) ? value : [];
+      } else {
+        acc[key] = value === null ? '' : value;
+      }
+      return acc;
+    }, {});
+
+    res.json(formattedStaff);
+  } catch (error) {
+    console.error('Error fetching staff member:', error);
+    res.status(500).json({ message: 'Error fetching staff member', error: error.message });
+  }
+});
+
+// Update an existing staff member
+app.put('/api/staffs/:id', async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    telephoneNo,
+    email,
+    gender,
+    nationality,
+    birthdate,
+    address,
+    job,
+    location,
+    dateJoined,
+    icNo,
+    bankAccountNumber,
+    epcNo,
+    incomeTaxNo,
+    socsoNo,
+    document,
+    paymentType,
+    paymentPreference,
+    race,
+    agama,
+    dateResigned
+  } = req.body;
+
+  try {
+    const query = `
+      UPDATE staffs
+      SET name = $1, telephone_no = $2, email = $3, gender = $4, nationality = $5, 
+          birthdate = $6, address = $7, job = $8, location = $9, date_joined = $10, 
+          ic_no = $11, bank_account_number = $12, epc_no = $13, income_tax_no = $14, 
+          socso_no = $15, document = $16, payment_type = $17, payment_preference = $18, 
+          race = $19, agama = $20, date_resigned = $21
+      WHERE id = $22
+      RETURNING *
+    `;
+
+    const values = [
+      name, 
+      telephoneNo, 
+      email || null, 
+      gender, 
+      nationality, 
+      birthdate ? new Date(birthdate) : null, 
+      address,
+      JSON.stringify(job), 
+      JSON.stringify(location), 
+      dateJoined ? new Date(dateJoined) : null, 
+      icNo,
+      bankAccountNumber, 
+      epcNo, 
+      incomeTaxNo, 
+      socsoNo, 
+      document, 
+      paymentType,
+      paymentPreference, 
+      race, 
+      agama, 
+      dateResigned ? new Date(dateResigned) : null,
+      id
+    ];
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Staff member not found' });
+    }
+
+    res.json({ message: 'Staff member updated successfully', staff: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating staff member:', error);
+    res.status(500).json({ message: 'Error updating staff member', error: error.message });
+  }
+});
+
 // JOBS SERVER ENDPOINTS
 app.post('/api/jobs', async (req, res) => {
   const { id, name, section } = req.body;

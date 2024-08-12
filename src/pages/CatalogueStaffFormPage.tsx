@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   IconChevronLeft,
   IconChevronDown,
@@ -52,8 +52,11 @@ interface FormData {
   dateResigned: string;
 }
 
-const CatalogueAddStaffPage: React.FC = () => {
+const CatalogueStaffFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = !!id;
+
   const [formData, setFormData] = useState<FormData>({
     id: "",
     name: "",
@@ -79,28 +82,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     dateResigned: "",
   });
   const [initialFormData, setInitialFormData] = useState<FormData>({
-    id: "",
-    name: "",
-    telephoneNo: "",
-    email: "",
-    gender: "",
-    nationality: "",
-    birthdate: "",
-    address: "",
-    job: [],
-    location: [],
-    dateJoined: "",
-    icNo: "",
-    bankAccountNumber: "",
-    epcNo: "",
-    incomeTaxNo: "",
-    socsoNo: "",
-    document: "",
-    paymentType: "",
-    paymentPreference: "",
-    race: "",
-    agama: "",
-    dateResigned: "",
+    ...formData,
   });
 
   const [isFormChanged, setIsFormChanged] = useState(false);
@@ -112,6 +94,8 @@ const CatalogueAddStaffPage: React.FC = () => {
   const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
+  const [loading, setLoading] = useState(isEditMode);
+  const [error, setError] = useState<string | null>(null);
 
   const genderOptions = [
     { id: "male", name: "Male" },
@@ -138,35 +122,43 @@ const CatalogueAddStaffPage: React.FC = () => {
   ];
 
   useEffect(() => {
-    // Check if form data has changed
     const hasChanged =
       JSON.stringify(formData) !== JSON.stringify(initialFormData);
     setIsFormChanged(hasChanged);
   }, [formData, initialFormData]);
 
   useEffect(() => {
-    setInitialFormData({ ...formData });
-  }, []);
-
-  useEffect(() => {
+    if (isEditMode) {
+      fetchStaffDetails();
+    } else {
+      setInitialFormData({ ...formData });
+    }
     fetchOptions("nationalities", setNationalities);
     fetchOptions("races", setRaces);
     fetchOptions("agamas", setAgamas);
     fetchOptions("jobs", setJobs);
     fetchOptions("locations", setLocations);
-  }, []);
+  }, [id]);
 
-  const handleBackClick = () => {
-    if (isFormChanged) {
-      setShowBackConfirmation(true);
-    } else {
-      navigate("/catalogue/staff");
+  const fetchStaffDetails = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`http://localhost:5000/api/staffs/${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch staff details");
+      }
+      const data = await response.json();
+
+      // The job and location arrays now contain IDs, so we don't need to convert them
+      setFormData(data);
+      setInitialFormData(data);
+      setError(null);
+    } catch (err) {
+      setError("Failed to fetch staff details. Please try again later.");
+      console.error("Error fetching staff details:", err);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleConfirmBack = () => {
-    setShowBackConfirmation(false);
-    navigate("/catalogue/staff");
   };
 
   const fetchOptions = async (
@@ -183,6 +175,19 @@ const CatalogueAddStaffPage: React.FC = () => {
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
     }
+  };
+
+  const handleBackClick = () => {
+    if (isFormChanged) {
+      setShowBackConfirmation(true);
+    } else {
+      navigate("/catalogue/staff");
+    }
+  };
+
+  const handleConfirmBack = () => {
+    setShowBackConfirmation(false);
+    navigate("/catalogue/staff");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,7 +208,6 @@ const CatalogueAddStaffPage: React.FC = () => {
   const handleComboboxChange = useCallback(
     (name: "job" | "location", value: string[] | null) => {
       if (value === null) {
-        // Do nothing when the input is cleared
         return;
       }
       setFormData((prevData) => ({
@@ -226,7 +230,6 @@ const CatalogueAddStaffPage: React.FC = () => {
       }
     }
 
-    // Email validation (only if email is not empty)
     if (formData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
@@ -253,8 +256,13 @@ const CatalogueAddStaffPage: React.FC = () => {
     };
 
     try {
-      const response = await fetch("http://localhost:5000/api/staffs", {
-        method: "POST",
+      const url = isEditMode
+        ? `http://localhost:5000/api/staffs/${id}`
+        : "http://localhost:5000/api/staffs";
+      const method = isEditMode ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -265,12 +273,16 @@ const CatalogueAddStaffPage: React.FC = () => {
         const errorData = await response.json();
         throw new Error(
           errorData.message ||
-            "An error occurred while creating the staff member."
+            `An error occurred while ${
+              isEditMode ? "updating" : "creating"
+            } the staff member.`
         );
       }
 
       const data = await response.json();
-      toast.success("Staff member created successfully!");
+      toast.success(
+        `Staff member ${isEditMode ? "updated" : "created"} successfully!`
+      );
       navigate("/catalogue/staff");
     } catch (error) {
       if (error instanceof Error) {
@@ -294,7 +306,7 @@ const CatalogueAddStaffPage: React.FC = () => {
         type={type}
         id={name}
         name={name}
-        value={formData[name].toString()}
+        value={formData[name] || ""}
         onChange={handleInputChange}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-500"
       />
@@ -386,7 +398,7 @@ const CatalogueAddStaffPage: React.FC = () => {
       </label>
       <Combobox
         multiple
-        value={formData[name]}
+        value={formData[name] ?? ""}
         onChange={(value) => handleComboboxChange(name, value)}
       >
         {({ open }) => (
@@ -465,6 +477,14 @@ const CatalogueAddStaffPage: React.FC = () => {
     </div>
   );
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
   return (
     <div className="container mx-auto px-4">
       <button
@@ -476,10 +496,13 @@ const CatalogueAddStaffPage: React.FC = () => {
       </button>
       <div className="bg-white rounded-lg">
         <div className="pl-6">
-          <h1 className="text-xl font-semibold text-gray-900">Add New Staff</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            {isEditMode ? "Edit Staff" : "Add New Staff"}
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
-            anda selesai.
+            {isEditMode
+              ? "Edit staff information here. Click 'Save' when you're done."
+              : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
           </p>
         </div>
         <form onSubmit={handleSubmit}>
@@ -574,4 +597,4 @@ const CatalogueAddStaffPage: React.FC = () => {
   );
 };
 
-export default CatalogueAddStaffPage;
+export default CatalogueStaffFormPage;
