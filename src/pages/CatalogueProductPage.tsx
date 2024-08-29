@@ -15,11 +15,11 @@ const CatalogueProductPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   const productColumns: ColumnConfig[] = [
-    { id: "id", header: "ID", type: "readonly", width: 50 },
-    { id: "name", header: "Name", type: "readonly" },
+    { id: "id", header: "ID", type: "readonly", width: 200 },
+    { id: "name", header: "Name", type: "readonly", width: 300 },
     { id: "amount", header: "Amount", type: "readonly", width: 100 },
     { id: "job_name", header: "Job", type: "readonly", width: 200 },
-    { id: "remark", header: "Remark", type: "readonly", width: 300 },
+    { id: "remark", header: "Remark", type: "readonly", width: 200 },
   ];
 
   const editableProductColumns: ColumnConfig[] = productColumns.map((col) => ({
