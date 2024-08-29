@@ -789,6 +789,150 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+// TAX SERVER ENDPOINTS
+// Create a new tax entry
+app.post('/api/taxes', async (req, res) => {
+  const { name, rate } = req.body;
+
+  try {
+    const query = `
+      INSERT INTO taxes (name, rate)
+      VALUES ($1, $2)
+      RETURNING *
+    `;
+    
+    const values = [name, rate];
+
+    const result = await pool.query(query, values);
+    res.status(201).json({ message: 'Tax entry created successfully', tax: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') { // unique_violation error code
+      return res.status(400).json({ message: 'A tax entry with this name already exists' });
+    }
+    console.error('Error creating tax entry:', error);
+    res.status(500).json({ message: 'Error creating tax entry', error: error.message });
+  }
+});
+
+// Get all tax entries
+app.get('/api/taxes', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM taxes';
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching tax entries:', error);
+    res.status(500).json({ message: 'Error fetching tax entries', error: error.message });
+  }
+});
+
+// Update a tax entry
+app.put('/api/taxes/:name', async (req, res) => {
+  const { name } = req.params;
+  const { rate } = req.body;
+
+  try {
+    const query = `
+      UPDATE taxes
+      SET rate = $1
+      WHERE name = $2
+      RETURNING *
+    `;
+    
+    const values = [rate, name];
+
+    const result = await pool.query(query, values);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Tax entry not found' });
+    }
+
+    res.json({ message: 'Tax entry updated successfully', tax: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating tax entry:', error);
+    res.status(500).json({ message: 'Error updating tax entry', error: error.message });
+  }
+});
+
+// Delete a tax entry
+app.delete('/api/taxes', async (req, res) => {
+  const { taxIds } = req.body;
+
+  if (!Array.isArray(taxIds) || taxIds.length === 0) {
+    return res.status(400).json({ message: 'Invalid tax IDs provided' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Delete the taxes
+      const deleteTaxesQuery = 'DELETE FROM taxes WHERE name = ANY($1) RETURNING name';
+      const result = await client.query(deleteTaxesQuery, [taxIds]);
+
+      await client.query('COMMIT');
+
+      const deletedNames = result.rows.map(row => row.name);
+      res.status(200).json({ 
+        message: 'Taxes deleted successfully', 
+        deletedTaxNames: deletedNames 
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error deleting taxes:', error);
+    res.status(500).json({ message: 'Error deleting taxes', error: error.message });
+  }
+});
+
+// Batch update/insert tax entries
+app.post('/api/taxes/batch', async (req, res) => {
+  const { taxes } = req.body;
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const processedTaxes = [];
+
+      for (const tax of taxes) {
+        const { name, rate } = tax;
+        
+        const upsertQuery = `
+          INSERT INTO taxes (name, rate)
+          VALUES ($1, $2)
+          ON CONFLICT (name) DO UPDATE
+          SET rate = EXCLUDED.rate
+          RETURNING *
+        `;
+        const upsertValues = [name, rate];
+        const result = await client.query(upsertQuery, upsertValues);
+        processedTaxes.push(result.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      res.json({ 
+        message: 'Tax entries processed successfully', 
+        taxes: processedTaxes
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error processing tax entries:', error);
+    res.status(500).json({ message: 'Error processing tax entries', error: error.message });
+  }
+});
+
 // PAGES WITH DOUBLE COLUMNS TABLE SERVER ENDPOINTS
 const setupEntityEndpoints = (app, entityName, tableName) => {
   const capitalizedEntity = entityName.charAt(0).toUpperCase() + entityName.slice(1);
@@ -932,7 +1076,6 @@ const setupEntityEndpoints = (app, entityName, tableName) => {
 setupEntityEndpoints(app, 'section', 'sections');
 setupEntityEndpoints(app, 'location', 'locations');
 setupEntityEndpoints(app, 'bank', 'banks');
-setupEntityEndpoints(app, 'taxe', 'taxes');
 setupEntityEndpoints(app, 'nationalitie', 'nationalities');
 setupEntityEndpoints(app, 'race', 'races');
 setupEntityEndpoints(app, 'agama', 'agama');
