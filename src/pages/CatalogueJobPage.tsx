@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  Fragment,
+  useMemo,
+} from "react";
 import {
   Combobox,
   ComboboxButton,
@@ -6,11 +12,15 @@ import {
   ComboboxOptions,
   ComboboxOption,
   Field,
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconTrash } from "@tabler/icons-react";
 import _ from "lodash";
 import Table from "../components/Table";
-import { ColumnConfig, Job, Product } from "../types/types";
+import { ColumnConfig, Job, JobDetail } from "../types/types";
 import NewJobModal from "../components/NewJobModal";
 import DeleteDialog from "../components/DeleteDialog";
 import toast from "react-hot-toast";
@@ -21,11 +31,12 @@ const CatalogueJobPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [editedJob, setEditedJob] = useState<Job | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [originalProducts] = useState<Product[]>([]);
+  const [jobType, setJobType] = useState<string>("Gaji");
+  const [jobDetails, setJobDetails] = useState<JobDetail[]>([]);
+  const [originalJobDetails] = useState<JobDetail[]>([]);
   const [originalJobState, setOriginalJobState] = useState<{
     job: Job | null;
-    products: Product[];
+    jobDetails: JobDetail[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -35,17 +46,45 @@ const CatalogueJobPage: React.FC = () => {
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [query, setQuery] = useState("");
 
-  const productColumns: ColumnConfig[] = [
-    { id: "id", header: "ID", type: "readonly", width: 200 },
-    { id: "name", header: "Name", type: "readonly", width: 300 },
-    {
-      id: "amount",
-      header: "Amount",
-      type: isEditing ? "float" : "readonly",
-      width: 50,
-    },
-    { id: "remark", header: "Remark", type: "readonly", width: 200 },
-  ];
+  const jobDetailColumns: ColumnConfig[] = useMemo(() => {
+    const baseColumns: ColumnConfig[] = [
+      {
+        id: "id",
+        header: "ID",
+        type: isEditing ? "string" : "readonly",
+        width: 300,
+      },
+      {
+        id: "description",
+        header: "Description",
+        type: isEditing ? "string" : "readonly",
+        width: 300,
+      },
+      {
+        id: "amount",
+        header: "Amount",
+        type: isEditing ? "float" : "readonly",
+        width: 100,
+      },
+      {
+        id: "remark",
+        header: "Remark",
+        type: isEditing ? "string" : "readonly",
+        width: 150,
+      },
+    ];
+
+    if (jobType === "All" || isEditing) {
+      baseColumns.push({
+        id: "type",
+        header: "Type",
+        type: isEditing ? "string" : "readonly",
+        width: 100,
+      });
+    }
+
+    return baseColumns;
+  }, [isEditing, jobType]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -69,18 +108,18 @@ const CatalogueJobPage: React.FC = () => {
     fetchJobs();
   }, [fetchJobs]);
 
-  const fetchProducts = useCallback(async (jobId: string) => {
+  const fetchJobDetails = useCallback(async (jobId: string) => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:5000/api/jobs/${jobId}/products`
+        `http://localhost:5000/api/jobs/${jobId}/details`
       );
-      if (!response.ok) throw new Error("Failed to fetch products");
+      if (!response.ok) throw new Error("Failed to fetch job details");
       const data = await response.json();
-      setProducts(data);
+      setJobDetails(data);
     } catch (error) {
-      console.error("Error fetching products:", error);
-      toast.error("Failed to fetch products. Please try again.");
+      console.error("Error fetching job details:", error);
+      toast.error("Failed to fetch job details. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -88,13 +127,13 @@ const CatalogueJobPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedJob) {
-      fetchProducts(selectedJob.id);
+      fetchJobDetails(selectedJob.id);
       setEditedJob(selectedJob);
     } else {
-      setProducts([]);
+      setJobDetails([]);
       setEditedJob(null);
     }
-  }, [selectedJob, fetchProducts]);
+  }, [selectedJob, fetchJobDetails]);
 
   const handleJobAdded = useCallback(async (newJob: Omit<Job, "id">) => {
     try {
@@ -145,22 +184,22 @@ const CatalogueJobPage: React.FC = () => {
     e.stopPropagation();
     try {
       const response = await fetch(
-        `http://localhost:5000/api/jobs/${job.id}/products/count`
+        `http://localhost:5000/api/jobs/${job.id}/details/count`
       );
-      if (!response.ok) throw new Error("Failed to check associated products");
+      if (!response.ok) throw new Error("Failed to check associated job details");
       const { count } = await response.json();
 
       if (count > 0) {
         toast.error(
-          `Cannot delete job. There are still ${count} product(s) associated with this job. Please delete all associated products first.`
+          `Cannot delete job. There are still ${count} job detail(s) associated with this job. Please delete all associated job details first.`
         );
       } else {
         setJobToDelete(job);
         setShowDeleteDialog(true);
       }
     } catch (error) {
-      console.error("Error checking associated products:", error);
-      toast.error("An error occurred while checking associated products.");
+      console.error("Error checking associated job details:", error);
+      toast.error("An error occurred while checking associated job details.");
     }
   }, []);
 
@@ -190,56 +229,59 @@ const CatalogueJobPage: React.FC = () => {
     }
   }, [jobToDelete, selectedJob]);
 
-  const isRowFromDatabase = useCallback((product: Product) => {
+  const isRowFromDatabase = useCallback((jobDetail: JobDetail) => {
     return (
-      product.id !== undefined &&
-      product.id !== null &&
-      !product.id.startsWith("new_")
+      jobDetail.id !== undefined &&
+      jobDetail.id !== null &&
+      !jobDetail.id.startsWith("new_")
     );
   }, []);
 
-  const handleDeleteProducts = useCallback(
+  const handleDeleteJobDetails = useCallback(
     async (selectedIndices: number[]) => {
       if (!selectedJob) {
         return;
       }
 
       const sortedIndices = selectedIndices.sort((a, b) => b - a);
-      const productsToDeleteFromDB: string[] = [];
-      let updatedProducts = [...products];
+      const jobDetailsToDeleteFromDB: string[] = [];
+      let updatedJobDetails = [...jobDetails];
 
       for (const index of sortedIndices) {
-        const product = updatedProducts[index];
-        if (isRowFromDatabase(product)) {
-          productsToDeleteFromDB.push(product.id);
+        const jobDetail = updatedJobDetails[index];
+        if (isRowFromDatabase(jobDetail)) {
+          jobDetailsToDeleteFromDB.push(jobDetail.id);
         }
-        updatedProducts.splice(index, 1);
+        updatedJobDetails.splice(index, 1);
       }
 
       // Update local state immediately
-      setProducts(updatedProducts);
+      setJobDetails(updatedJobDetails);
 
-      if (productsToDeleteFromDB.length > 0) {
+      if (jobDetailsToDeleteFromDB.length > 0) {
         try {
-          const response = await fetch(`http://localhost:5000/api/products`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productIds: productsToDeleteFromDB }),
-          });
+          const response = await fetch(
+            `http://localhost:5000/api/job-details`,
+            {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jobDetailIds: jobDetailsToDeleteFromDB }),
+            }
+          );
 
           if (!response.ok) {
-            throw new Error("Failed to delete products on the server");
+            throw new Error("Failed to delete job details on the server");
           }
 
-          toast.success("Selected products deleted successfully");
+          toast.success("Selected job details deleted successfully");
           setIsEditing(false);
         } catch (error) {
-          console.error("Error deleting selected products:", error);
+          console.error("Error deleting selected job details:", error);
           toast.error(
-            "Failed to delete some products from the server. Please try again."
+            "Failed to delete some job details from the server. Please try again."
           );
-          // Refresh products from the server in case of error
-          await fetchProducts(selectedJob.id);
+          // Refresh job details from the server in case of error
+          await fetchJobDetails(selectedJob.id);
           return;
         }
       } else {
@@ -247,9 +289,9 @@ const CatalogueJobPage: React.FC = () => {
       }
 
       // Ensure the Table component is updated with the new data
-      handleDataChange(updatedProducts);
+      handleDataChange(updatedJobDetails);
     },
-    [selectedJob, products, isRowFromDatabase, fetchProducts]
+    [selectedJob, jobDetails, isRowFromDatabase, fetchJobDetails]
   );
 
   const handleOptionClick = (e: React.MouseEvent, job: Job) => {
@@ -265,6 +307,66 @@ const CatalogueJobPage: React.FC = () => {
           job.name.toLowerCase().includes(query.toLowerCase())
         );
 
+  const handleJobTypeChange = (value: string) => {
+    setJobType(value);
+  };
+
+  const filteredJobDetails = useMemo(() => {
+    if (jobType === "All") {
+      return jobDetails;
+    }
+    return jobDetails.filter((detail) => detail.type === jobType);
+  }, [jobDetails, jobType]);
+
+  const renderJobTypeListbox = () => (
+    <>
+      <span className="font-semibold mr-2">Type:</span>
+      <Listbox value={jobType} onChange={handleJobTypeChange}>
+        <div className="relative">
+          <ListboxButton className="w-40 rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-gray-400">
+            <span className="block truncate">{jobType}</span>
+            <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <IconChevronDown
+                className="h-5 w-5 text-gray-400"
+                aria-hidden="true"
+              />
+            </span>
+          </ListboxButton>
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            {["All", "Gaji", "Tambahan", "Overtime"].map((type) => (
+              <ListboxOption
+                key={type}
+                className={({ active }) =>
+                  `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                    active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                  }`
+                }
+                value={type}
+              >
+                {({ selected }) => (
+                  <>
+                    <span
+                      className={`block truncate ${
+                        selected ? "font-medium" : "font-normal"
+                      }`}
+                    >
+                      {type}
+                    </span>
+                    {selected && (
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                        <IconCheck className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                    )}
+                  </>
+                )}
+              </ListboxOption>
+            ))}
+          </ListboxOptions>
+        </div>
+      </Listbox>
+    </>
+  );
+
   // TE
   const toggleEditing = useCallback(() => {
     setIsEditing((prev) => {
@@ -272,17 +374,17 @@ const CatalogueJobPage: React.FC = () => {
         // Entering edit mode
         setOriginalJobState({
           job: editedJob ? _.cloneDeep(editedJob) : null,
-          products: _.cloneDeep(products),
+          jobDetails: _.cloneDeep(jobDetails),
         });
       }
       return !prev;
     });
-  }, [editedJob, products]);
+  }, [editedJob, jobDetails]);
 
   const handleCancel = useCallback(() => {
     if (originalJobState) {
       setEditedJob(originalJobState.job);
-      setProducts(originalJobState.products);
+      setJobDetails(originalJobState.jobDetails);
     }
     setIsEditing(false);
   }, [originalJobState]);
@@ -307,24 +409,24 @@ const CatalogueJobPage: React.FC = () => {
     }
 
     // Check for empty product IDs
-    const emptyProductId = products.find((product) => !product.id.trim());
-    if (emptyProductId) {
-      toast.error("Product ID cannot be empty");
+    const emptyDetailId = jobDetails.find((details) => !details.id.trim());
+    if (emptyDetailId) {
+      toast.error("Detail ID cannot be empty");
       return;
     }
 
     // Check for duplicate product IDs
-    const productIds = new Set();
-    const duplicateProductId = products.find((product) => {
-      if (productIds.has(product.id)) {
+    const detailIds = new Set();
+    const duplicateDetailId = jobDetails.find((details) => {
+      if (detailIds.has(details.id)) {
         return true;
       }
-      productIds.add(product.id);
+      detailIds.add(details.id);
       return false;
     });
 
-    if (duplicateProductId) {
-      toast.error(`Duplicate product ID: ${duplicateProductId.id}`);
+    if (duplicateDetailId) {
+      toast.error(`Duplicate product ID: ${duplicateDetailId.id}`);
       return;
     }
 
@@ -350,37 +452,37 @@ const CatalogueJobPage: React.FC = () => {
 
       const updatedJob = await jobResponse.json();
 
-      // Send all products to the server
-      const productsResponse = await fetch(
-        "http://localhost:5000/api/products/batch",
+      // Send all job details to the server
+      const jobDetailsResponse = await fetch(
+        "http://localhost:5000/api/job-details/batch",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jobId: updatedJob.job.id,
-            products: products.map((product) => ({
-              ...product,
+            jobDetails: jobDetails.map((jobDetail) => ({
+              ...jobDetail,
               newId:
-                product.id !==
-                originalProducts.find((p) => p.id === product.id)?.id
-                  ? product.id
+                jobDetail.id !==
+                originalJobDetails.find((d) => d.id === jobDetail.id)?.id
+                  ? jobDetail.id
                   : undefined,
             })),
           }),
         }
       );
 
-      if (!productsResponse.ok) {
-        const errorData = await productsResponse.json();
+      if (!jobDetailsResponse.ok) {
+        const errorData = await jobDetailsResponse.json();
         throw new Error(
-          `Failed to update/insert products: ${errorData.message}`
+          `Failed to update/insert job details: ${errorData.message}`
         );
       }
 
-      const result = await productsResponse.json();
+      const result = await jobDetailsResponse.json();
 
       // Update local state with the result from the server
-      setProducts(result.products);
+      setJobDetails(result.jobDetails);
       setSelectedJob(updatedJob.job);
       setJobs((jobs) =>
         jobs.map((job) => (job.id === selectedJob?.id ? updatedJob.job : job))
@@ -390,7 +492,7 @@ const CatalogueJobPage: React.FC = () => {
     } catch (error) {
       toast.error((error as Error).message);
     }
-  }, [editedJob, selectedJob, products, jobs, originalProducts]);
+  }, [editedJob, selectedJob, jobDetails, jobs, originalJobDetails]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -411,29 +513,30 @@ const CatalogueJobPage: React.FC = () => {
 
   // HDC
   const handleDataChange = useCallback(
-    (updatedData: Product[]) => {
-      setTimeout(() => setProducts(updatedData), 0);
+    (updatedData: JobDetail[]) => {
+      setTimeout(() => setJobDetails(updatedData), 0);
 
-      const newChangedProducts = new Set<string>();
-      updatedData.forEach((product, index) => {
-        const originalProduct = originalProducts[index];
+      const newChangedJobDetails = new Set<string>();
+      updatedData.forEach((jobDetail, index) => {
+        const originalJobDetail = originalJobDetails[index];
 
-        if (!originalProduct) {
-          newChangedProducts.add(product.id);
+        if (!originalJobDetail) {
+          newChangedJobDetails.add(jobDetail.id);
         } else if (
-          product.id !== originalProduct.id ||
-          product.name !== originalProduct.name ||
-          product.amount !== originalProduct.amount ||
-          product.remark !== originalProduct.remark
+          jobDetail.id !== originalJobDetail.id ||
+          jobDetail.description !== originalJobDetail.description ||
+          jobDetail.amount !== originalJobDetail.amount ||
+          jobDetail.remark !== originalJobDetail.remark ||
+          jobDetail.type !== originalJobDetail.type
         ) {
-          newChangedProducts.add(product.id);
+          newChangedJobDetails.add(jobDetail.id);
         }
       });
 
       // Trigger a re-render of the Table component
-      setTimeout(() => setProducts([...updatedData]), 0);
+      setTimeout(() => setJobDetails([...updatedData]), 0);
     },
-    [originalProducts]
+    [originalJobDetails]
   );
 
   return (
@@ -590,9 +693,16 @@ const CatalogueJobPage: React.FC = () => {
                     className="w-24 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400 mr-4"
                   />
                 ) : (
-                  <span className="mr-3">{selectedJob.section}</span>
+                  <span className="mr-4">{selectedJob.section}</span>
                 )}
               </div>
+              {isEditing ? (
+                <></>
+              ) : (
+                <div className="flex items-center">
+                  {renderJobTypeListbox()}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -614,14 +724,10 @@ const CatalogueJobPage: React.FC = () => {
           <div className="w-full">
             <div className="relative">
               <Table
-                initialData={products}
-                columns={productColumns.map((col) => ({
-                  ...col,
-                  type:
-                    isEditing && col.type === "readonly" ? "string" : col.type,
-                }))}
+                initialData={filteredJobDetails}
+                columns={jobDetailColumns}
                 onShowDeleteButton={() => {}}
-                onDelete={handleDeleteProducts}
+                onDelete={handleDeleteJobDetails}
                 onChange={handleDataChange}
                 isEditing={isEditing}
                 onToggleEditing={toggleEditing}
@@ -629,10 +735,8 @@ const CatalogueJobPage: React.FC = () => {
                 onCancel={handleCancel}
                 tableKey="catalogueJob"
               />
-              {products.length === 0 && (
-                <p className="mt-4 text-center w-full">
-                  No products found for this job.
-                </p>
+              {filteredJobDetails.length === 0 && (
+                <p className="mt-4 text-center w-full">No details found.</p>
               )}
             </div>
           </div>

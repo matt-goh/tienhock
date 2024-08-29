@@ -3,7 +3,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import React from "react";
 import CatalogueStaffFormPage from "./pages/CatalogueStaffFormPage";
-import CatalogueProductPage from "./pages/CatalogueProductPage";
+import CatalogueProductPage from "./pages/CatalogueJobCategoryPage";
 import CatalogueBasicPage from "./pages/CatalogueBasicPage";
 import CatalogueStaffPage from "./pages/CatalogueStaffPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";

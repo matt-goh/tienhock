@@ -91,7 +91,7 @@ export const SidebarData: SidebarItem[] = [
     subItems: [
       { name: "Staff", link: "/catalogue/staff" },
       { name: "Job", link: "/catalogue/job" },
-      { name: "Product", link: "/catalogue/product" },
+      { name: "Job Category", link: "/catalogue/job_category" },
       { name: "Section", link: "/catalogue/section" },
       { name: "Location", link: "/catalogue/location" },
       { name: "Bank", link: "/catalogue/bank" },
