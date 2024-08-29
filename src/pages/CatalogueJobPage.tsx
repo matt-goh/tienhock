@@ -36,15 +36,15 @@ const CatalogueJobPage: React.FC = () => {
   const [query, setQuery] = useState("");
 
   const productColumns: ColumnConfig[] = [
-    { id: "id", header: "ID", type: "readonly", width: 50 },
-    { id: "name", header: "Name", type: "readonly" },
+    { id: "id", header: "ID", type: "readonly", width: 200 },
+    { id: "name", header: "Name", type: "readonly", width: 300 },
     {
       id: "amount",
       header: "Amount",
       type: isEditing ? "float" : "readonly",
       width: 50,
     },
-    { id: "remark", header: "Remark", type: "readonly", width: 300 },
+    { id: "remark", header: "Remark", type: "readonly", width: 200 },
   ];
 
   const fetchJobs = useCallback(async () => {
@@ -556,7 +556,7 @@ const CatalogueJobPage: React.FC = () => {
                   onChange={(e) =>
                     handleJobPropertyChange("name", e.target.value)
                   }
-                  className="w-24 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400"
+                  className="w-48 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400"
                 />
               </>
             )}
@@ -572,7 +572,7 @@ const CatalogueJobPage: React.FC = () => {
                     onChange={(e) =>
                       handleJobPropertyChange("id", e.target.value)
                     }
-                    className="w-24 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400 mr-4"
+                    className="w-36 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400 mr-4"
                   />
                 ) : (
                   <span className="mr-4">{selectedJob.id}</span>
@@ -610,7 +610,7 @@ const CatalogueJobPage: React.FC = () => {
         />
         {loading ? (
           <p className="mt-4 text-center">Loading...</p>
-        ) : selectedJob && products.length > 0 ? (
+        ) : selectedJob ? (
           <div className="w-full">
             <div className="relative">
               <Table
@@ -629,12 +629,13 @@ const CatalogueJobPage: React.FC = () => {
                 onCancel={handleCancel}
                 tableKey="catalogueJob"
               />
+              {products.length === 0 && (
+                <p className="mt-4 text-center w-full">
+                  No products found for this job.
+                </p>
+              )}
             </div>
           </div>
-        ) : selectedJob ? (
-          <p className="mt-4 text-center w-full">
-            No products found for this job.
-          </p>
         ) : null}
       </div>
     </div>
