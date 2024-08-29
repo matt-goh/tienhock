@@ -8,6 +8,7 @@ import CatalogueBasicPage from "./pages/CatalogueBasicPage";
 import CatalogueStaffPage from "./pages/CatalogueStaffPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
 import Sidebar from "./components/Sidebar";
+import CatalogueTaxPage from "./pages/CatalogueTaxPage";
 
 const App: React.FC = () => {
   return (
@@ -30,8 +31,14 @@ const App: React.FC = () => {
         <main className="flex justify-center w-full py-[60px]">
           <Routes>
             <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
-            <Route path="/catalogue/staff/new" element={<CatalogueStaffFormPage />} />
-            <Route path="/catalogue/staff/:id" element={<CatalogueStaffFormPage />} />
+            <Route
+              path="/catalogue/staff/new"
+              element={<CatalogueStaffFormPage />}
+            />
+            <Route
+              path="/catalogue/staff/:id"
+              element={<CatalogueStaffFormPage />}
+            />
             <Route path="/catalogue/job" element={<CatalogueJobPage />} />
             <Route
               path="/catalogue/product"
@@ -67,16 +74,7 @@ const App: React.FC = () => {
                 />
               }
             />
-            <Route
-              path="/catalogue/tax"
-              element={
-                <CatalogueBasicPage
-                  title="Tax Catalogue"
-                  apiEndpoint="taxes"
-                  tableKey="catalogueTax"
-                />
-              }
-            />
+            <Route path="/catalogue/tax" element={<CatalogueTaxPage />} />
             <Route
               path="/catalogue/nationality"
               element={
