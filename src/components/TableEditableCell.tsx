@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, CSSProperties } from "react";
 import { ColumnType } from "../types/types";
-import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
+import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 
 interface TableEditableCellProps {
   value: any;
@@ -11,6 +12,7 @@ interface TableEditableCellProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   isSorting: boolean;
   previousCellValue: any;
+  options?: string[];
 }
 
 const TableEditableCell: React.FC<TableEditableCellProps> = ({
@@ -22,6 +24,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   onKeyDown,
   isSorting,
   previousCellValue,
+  options = [],
 }) => {
   const [cellValue, setCellValue] = useState(value?.toString() ?? "");
   const [editValue, setEditValue] = useState(value?.toString() ?? "");
@@ -49,6 +52,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
     }
     return value?.toString() ?? "";
   };
+
   const formatEditValue = (value: string): string => {
     if (type === "number" || type === "rate" || type === "float") {
       // Remove non-numeric characters (except decimal point for rate)
@@ -213,6 +217,58 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         </button>
         <input {...getInputProps()} />
       </div>
+    );
+  }
+
+  if (type === "listbox") {
+    return (
+      <Listbox
+        value={value}
+        onChange={onChange}
+        disabled={!editable || isSorting}
+      >
+        <div className="relative w-full">
+          <ListboxButton className="w-full px-6 py-3 text-left focus:outline-none focus:border-gray-400">
+            <span className="block truncate">{value}</span>
+            <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <IconChevronDown
+                className="h-5 w-5 text-gray-400"
+                aria-hidden="true"
+              />
+            </span>
+          </ListboxButton>
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            {options.map((option) => (
+              <ListboxOption
+                key={option}
+                className={({ active }) =>
+                  `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                    active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                  }`
+                }
+                value={option}
+              >
+                {({ selected }) => (
+                  <>
+                    <span
+                      className={`block truncate ${
+                        selected ? "font-medium" : "font-normal"
+                      }`}
+                    >
+                      {option}
+                    </span>
+                    {selected && (
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                        <IconCheck className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                    )}
+                  </>
+                )}
+              </ListboxOption>
+            ))}
+          </ListboxOptions>
+        </div>
+      </Listbox>
     );
   }
 

@@ -8,7 +8,8 @@ export type ColumnType =
   | "checkbox"
   | "amount"
   | "float"
-  | "action";
+  | "action"
+  | "listbox";
 
 // Define column configuration
 export interface ColumnConfig {
@@ -16,6 +17,7 @@ export interface ColumnConfig {
   header: string;
   type: ColumnType;
   width?: number;
+  options?: string[];
 }
 
 // Define data structure
