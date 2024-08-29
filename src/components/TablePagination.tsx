@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Table } from "@tanstack/react-table";
 import {
   IconChevronDown,
@@ -16,6 +16,18 @@ const TablePagination = <T extends Record<string, unknown>>({
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalPages = table.getPageCount();
   const totalItems = table.getFilteredRowModel().rows.length;
+
+  useEffect(() => {
+    const storedPageSize = localStorage.getItem('tablePageSize');
+    if (storedPageSize) {
+      table.setPageSize(Number(storedPageSize));
+    }
+  }, []);
+  
+  const handlePageSizeChange = (newPageSize: number) => {
+    table.setPageSize(newPageSize);
+    localStorage.setItem('tablePageSize', newPageSize.toString());
+  };
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -52,7 +64,7 @@ const TablePagination = <T extends Record<string, unknown>>({
         <div className="relative">
           <select
             value={table.getState().pagination.pageSize}
-            onChange={(e) => table.setPageSize(Number(e.target.value))}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
             className="appearance-none bg-white border border-gray-300 rounded-full py-1 pl-3 pr-8 focus:outline-none focus:border-gray-400"
           >
             {[10, 25, 50].map((pageSize) => (
