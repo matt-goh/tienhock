@@ -78,8 +78,9 @@ const CatalogueJobPage: React.FC = () => {
       baseColumns.push({
         id: "type",
         header: "Type",
-        type: isEditing ? "string" : "readonly",
+        type: isEditing ? "listbox" : "readonly",
         width: 100,
+        options: ["Gaji", "Tambahan", "Overtime"],
       });
     }
 
@@ -186,7 +187,8 @@ const CatalogueJobPage: React.FC = () => {
       const response = await fetch(
         `http://localhost:5000/api/jobs/${job.id}/details/count`
       );
-      if (!response.ok) throw new Error("Failed to check associated job details");
+      if (!response.ok)
+        throw new Error("Failed to check associated job details");
       const { count } = await response.json();
 
       if (count > 0) {

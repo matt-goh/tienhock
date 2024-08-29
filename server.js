@@ -563,19 +563,19 @@ app.post('/api/job-details/batch', async (req, res) => {
 
       // Step 1: Process all job details
       for (const jobDetail of jobDetails) {
-        const { id, newId, name, value, remark } = jobDetail;
+        const { id, newId, description, amount, remark } = jobDetail;
         
         if (newId && newId !== id) {
           // This is an existing job detail with an ID change
           // First, insert the new job detail or update if it already exists
           const upsertQuery = `
-            INSERT INTO job_details (id, name, value, remark)
+            INSERT INTO job_details (id, description, amount, remark)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name, value = EXCLUDED.value, remark = EXCLUDED.remark
+            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark
             RETURNING *
           `;
-          const upsertValues = [newId, name, value, remark];
+          const upsertValues = [newId, description, amount, remark];
           const upsertResult = await client.query(upsertQuery, upsertValues);
           
           // Update jobs_job_details table to use the new job detail ID
@@ -588,13 +588,13 @@ app.post('/api/job-details/batch', async (req, res) => {
         } else {
           // This is an existing job detail without ID change or a new job detail
           const upsertQuery = `
-            INSERT INTO job_details (id, name, value, remark)
+            INSERT INTO job_details (id, description, amount, remark)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name, value = EXCLUDED.value, remark = EXCLUDED.remark
+            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark
             RETURNING *
           `;
-          const upsertValues = [id, name, value, remark];
+          const upsertValues = [id, description, amount, remark];
           const result = await client.query(upsertQuery, upsertValues);
           processedJobDetails.push(result.rows[0]);
         }
@@ -638,17 +638,17 @@ app.post('/api/job-details/batch', async (req, res) => {
 // Update a job detail
 app.put('/api/job-details/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, value, remark } = req.body;
+  const { description, amount, remark } = req.body;
 
   try {
     const query = `
       UPDATE job_details
-      SET name = $1, value = $2, remark = $3
+      SET description = $1, amount = $2, remark = $3
       WHERE id = $4
       RETURNING *
     `;
     
-    const values = [name, value, remark, id];
+    const values = [description, amount, remark, id];
 
     const result = await pool.query(query, values);
     

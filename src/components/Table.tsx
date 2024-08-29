@@ -850,7 +850,11 @@ function Table<T extends Record<string, any>>({
         return flexRender(cell.column.columnDef.cell, cell.getContext());
       }
 
-      if (["number", "rate", "string", "float", "date"].includes(columnType)) {
+      if (
+        ["number", "rate", "string", "float", "date", "listbox"].includes(
+          columnType
+        )
+      ) {
         return (
           <TableEditableCell
             value={cell.getValue()}
@@ -873,6 +877,7 @@ function Table<T extends Record<string, any>>({
               previousCellValues[`${row.id}-${cell.column.id}`] ??
               cell.getValue()
             }
+            options={columnConfig.options}
           />
         );
       }
