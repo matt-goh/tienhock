@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import _ from "lodash";
 import Table from "../components/Table";
-import { ColumnConfig, Product } from "../types/types";
+import { ColumnConfig, JobDetail } from "../types/types";
 import toast from "react-hot-toast";
 
-interface EditedProduct extends Omit<Product, 'job_id'> {
+interface EditedProduct extends Omit<JobDetail, 'job_id'> {
   job_name: string;
 }
 
-const CatalogueProductPage: React.FC = () => {
+const CatalogueJobCategoryPage: React.FC = () => {
   const [products, setProducts] = useState<EditedProduct[]>([]);
   const [editedProducts, setEditedProducts] = useState<EditedProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,4 +158,4 @@ const CatalogueProductPage: React.FC = () => {
   );
 };
 
-export default CatalogueProductPage;
+export default CatalogueJobCategoryPage;

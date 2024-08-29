@@ -44,9 +44,10 @@ export interface Job {
   newId: string;
 }
 
-export interface Product {
+export interface JobDetail {
   id: string;
-  name: string;
+  description: string;
   amount: number;
   remark: string;
+  type: string;
 }

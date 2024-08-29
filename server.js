@@ -377,39 +377,45 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
+// Delete a job and its associated job details
 app.delete('/api/jobs/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    // First, delete associated records in the job_products table
-    await pool.query('DELETE FROM job_products WHERE job_id = $1', [id]);
+    await pool.query('BEGIN');
 
-    // Then, delete the job
-    const query = 'DELETE FROM jobs WHERE id = $1';
-    await pool.query(query, [id]);
-    res.status(200).json({ message: 'Job deleted successfully' });
+    // Delete associated records in the jobs_job_details table
+    await pool.query('DELETE FROM jobs_job_details WHERE job_id = $1', [id]);
+
+    // Delete the job
+    const deleteJobQuery = 'DELETE FROM jobs WHERE id = $1';
+    await pool.query(deleteJobQuery, [id]);
+
+    await pool.query('COMMIT');
+    res.status(200).json({ message: 'Job and associated details deleted successfully' });
   } catch (error) {
+    await pool.query('ROLLBACK');
     console.error('Error deleting job:', error);
     res.status(500).json({ message: 'Error deleting job', error: error.message });
   }
 });
 
-// Fetch all products for job catalogue
-app.get('/api/jobs/:jobId/products', async (req, res) => {
+// Fetch all job details for a specific job
+app.get('/api/jobs/:jobId/details', async (req, res) => {
   const { jobId } = req.params;
 
   try {
     const query = `
-      SELECT p.* 
-      FROM products p
-      JOIN job_products jp ON p.id = jp.product_id
-      WHERE jp.job_id = $1
+      SELECT jd.* 
+      FROM job_details jd
+      JOIN jobs_job_details jjd ON jd.id = jjd.job_detail_id
+      WHERE jjd.job_id = $1
     `;
     const result = await pool.query(query, [jobId]);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching products for job:', error);
-    res.status(500).json({ message: 'Error fetching products', error: error.message });
+    console.error('Error fetching job details for job:', error);
+    res.status(500).json({ message: 'Error fetching job details', error: error.message });
   }
 });
 
@@ -451,17 +457,11 @@ app.put('/api/jobs/:id', async (req, res) => {
           return res.status(400).json({ message: 'A job with this ID already exists' });
         }
 
-        // Drop the foreign key constraint
-        await client.query('ALTER TABLE job_products DROP CONSTRAINT job_products_job_id_fkey');
-
         // Update job ID in jobs table
         await client.query('UPDATE jobs SET id = $1 WHERE id = $2', [newId, id]);
 
-        // Update job ID in job_products table
-        await client.query('UPDATE job_products SET job_id = $1 WHERE job_id = $2', [newId, id]);
-
-        // Recreate the foreign key constraint
-        await client.query('ALTER TABLE job_products ADD CONSTRAINT job_products_job_id_fkey FOREIGN KEY (job_id) REFERENCES jobs(id)');
+        // Update job ID in jobs_job_details table
+        await client.query('UPDATE jobs_job_details SET job_id = $1 WHERE job_id = $2', [newId, id]);
 
         updatedId = newId;
       }
@@ -491,45 +491,31 @@ app.put('/api/jobs/:id', async (req, res) => {
   }
 });
 
-// Delete association from job_products table
-app.delete('/api/job_products', async (req, res) => {
-  const { jobId, productId } = req.body;
-
-  try {
-    const query = 'DELETE FROM job_products WHERE job_id = $1 AND product_id = $2';
-    await pool.query(query, [jobId, productId]);
-    res.status(200).json({ message: 'Association removed successfully' });
-  } catch (error) {
-    console.error('Error removing job-product association:', error);
-    res.status(500).json({ message: 'Error removing association', error: error.message });
-  }
-});
-
-// Product count endpoint
-app.get('/api/jobs/:jobId/products/count', async (req, res) => {
+// Count job details for a job
+app.get('/api/jobs/:jobId/details/count', async (req, res) => {
   const { jobId } = req.params;
 
   try {
     const query = `
       SELECT COUNT(*) 
-      FROM job_products
+      FROM jobs_job_details
       WHERE job_id = $1
     `;
     const result = await pool.query(query, [jobId]);
     res.json({ count: parseInt(result.rows[0].count) });
   } catch (error) {
-    console.error('Error counting products for job:', error);
-    res.status(500).json({ message: 'Error counting products', error: error.message });
+    console.error('Error counting job details for job:', error);
+    res.status(500).json({ message: 'Error counting job details', error: error.message });
   }
 });
 
-// PRODUCTS SERVER ENDPOINTS
-// Delete multiple products
-app.delete('/api/products', async (req, res) => {
-  const { productIds } = req.body;
+// JOB DETAILS SERVER ENDPOINTS
+// Delete multiple job details
+app.delete('/api/job-details', async (req, res) => {
+  const { jobDetailIds } = req.body;
 
-  if (!Array.isArray(productIds) || productIds.length === 0) {
-    return res.status(400).json({ message: 'Invalid product IDs provided' });
+  if (!Array.isArray(jobDetailIds) || jobDetailIds.length === 0) {
+    return res.status(400).json({ message: 'Invalid job detail IDs provided' });
   }
 
   try {
@@ -537,20 +523,20 @@ app.delete('/api/products', async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // Remove associations in the job_products table
-      const removeAssociationsQuery = 'DELETE FROM job_products WHERE product_id = ANY($1)';
-      await client.query(removeAssociationsQuery, [productIds]);
+      // Remove associations in the jobs_job_details table
+      const removeAssociationsQuery = 'DELETE FROM jobs_job_details WHERE job_detail_id = ANY($1)';
+      await client.query(removeAssociationsQuery, [jobDetailIds]);
 
-      // Delete the products
-      const deleteProductsQuery = 'DELETE FROM products WHERE id = ANY($1) RETURNING id';
-      const result = await client.query(deleteProductsQuery, [productIds]);
+      // Delete the job details
+      const deleteJobDetailsQuery = 'DELETE FROM job_details WHERE id = ANY($1) RETURNING id';
+      const result = await client.query(deleteJobDetailsQuery, [jobDetailIds]);
 
       await client.query('COMMIT');
 
       const deletedIds = result.rows.map(row => row.id);
       res.status(200).json({ 
-        message: 'Products deleted successfully', 
-        deletedProductIds: deletedIds 
+        message: 'Job details deleted successfully', 
+        deletedJobDetailIds: deletedIds 
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -559,178 +545,83 @@ app.delete('/api/products', async (req, res) => {
       client.release();
     }
   } catch (error) {
-    console.error('Error deleting products:', error);
-    res.status(500).json({ message: 'Error deleting products', error: error.message });
+    console.error('Error deleting job details:', error);
+    res.status(500).json({ message: 'Error deleting job details', error: error.message });
   }
 });
 
-// Update existing products
-app.put('/api/products', async (req, res) => {
-  const products = req.body;
-  console.log('Received products for update:', products);
+// Batch update/insert job details
+app.post('/api/job-details/batch', async (req, res) => {
+  const { jobId, jobDetails } = req.body;
 
   try {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      const updatedProducts = [];
-      for (const product of products) {
-        const { id, name, amount, remark } = product;
-        console.log(`Updating product: ${id}, ${name}, ${amount}, ${remark}`);
-        
-        const query = `
-          UPDATE products
-          SET name = $1, amount = $2, remark = $3
-          WHERE id = $4
-          RETURNING *
-        `;
-        const values = [name, amount, remark, id];
-        const result = await client.query(query, values);
-        
-        if (result.rowCount === 0) {
-          throw new Error(`Product with id ${id} not found`);
-        }
-        updatedProducts.push(result.rows[0]);
-      }
+      const processedJobDetails = [];
 
-      await client.query('COMMIT');
-      console.log('Products updated successfully:', updatedProducts);
-      res.json({ message: 'Products updated successfully', updatedProducts });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Error updating products:', error);
-    res.status(500).json({ message: 'Error updating products', error: error.message });
-  }
-});
-
-// Insert new products
-app.post('/api/products', async (req, res) => {
-  const products = req.body;
-  console.log('Received new products for insertion:', products);
-
-  try {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const insertedProducts = [];
-      for (const product of products) {
-        const { name, amount, remark, jobId } = product;
-        console.log(`Inserting new product: ${name}, ${amount}, ${remark}, ${jobId}`);
-        
-        const query = `
-          INSERT INTO products (name, amount, remark)
-          VALUES ($1, $2, $3)
-          RETURNING *
-        `;
-        const values = [name, amount, remark];
-        const result = await client.query(query, values);
-        
-        const newProduct = result.rows[0];
-        
-        // Associate the new product with the job
-        const associationQuery = `
-          INSERT INTO job_products (job_id, product_id)
-          VALUES ($1, $2)
-        `;
-        await client.query(associationQuery, [jobId, newProduct.id]);
-        
-        insertedProducts.push(newProduct);
-      }
-
-      await client.query('COMMIT');
-      console.log('New products inserted successfully:', insertedProducts);
-      res.status(201).json({ message: 'New products inserted successfully', insertedProducts });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Error inserting new products:', error);
-    res.status(500).json({ message: 'Error inserting new products', error: error.message });
-  }
-});
-
-// Batch update/insert products
-app.post('/api/products/batch', async (req, res) => {
-  const { jobId, products } = req.body;
-
-  try {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const processedProducts = [];
-
-      // Step 1: Process all products
-      for (const product of products) {
-        const { id, newId, name, amount, remark } = product;
+      // Step 1: Process all job details
+      for (const jobDetail of jobDetails) {
+        const { id, newId, name, value, remark } = jobDetail;
         
         if (newId && newId !== id) {
-          // This is an existing product with an ID change
-          // First, insert the new product or update if it already exists
+          // This is an existing job detail with an ID change
+          // First, insert the new job detail or update if it already exists
           const upsertQuery = `
-            INSERT INTO products (id, name, amount, remark)
+            INSERT INTO job_details (id, name, value, remark)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name, amount = EXCLUDED.amount, remark = EXCLUDED.remark
+            SET name = EXCLUDED.name, value = EXCLUDED.value, remark = EXCLUDED.remark
             RETURNING *
           `;
-          const upsertValues = [newId, name, amount, remark];
+          const upsertValues = [newId, name, value, remark];
           const upsertResult = await client.query(upsertQuery, upsertValues);
           
-          // Update job_products table to use the new product ID
-          await client.query('UPDATE job_products SET product_id = $1 WHERE product_id = $2', [newId, id]);
+          // Update jobs_job_details table to use the new job detail ID
+          await client.query('UPDATE jobs_job_details SET job_detail_id = $1 WHERE job_detail_id = $2', [newId, id]);
           
-          // Now, delete the old product
-          await client.query('DELETE FROM products WHERE id = $1', [id]);
+          // Now, delete the old job detail
+          await client.query('DELETE FROM job_details WHERE id = $1', [id]);
           
-          processedProducts.push(upsertResult.rows[0]);
+          processedJobDetails.push(upsertResult.rows[0]);
         } else {
-          // This is an existing product without ID change or a new product
+          // This is an existing job detail without ID change or a new job detail
           const upsertQuery = `
-            INSERT INTO products (id, name, amount, remark)
+            INSERT INTO job_details (id, name, value, remark)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name, amount = EXCLUDED.amount, remark = EXCLUDED.remark
+            SET name = EXCLUDED.name, value = EXCLUDED.value, remark = EXCLUDED.remark
             RETURNING *
           `;
-          const upsertValues = [id, name, amount, remark];
+          const upsertValues = [id, name, value, remark];
           const result = await client.query(upsertQuery, upsertValues);
-          processedProducts.push(result.rows[0]);
+          processedJobDetails.push(result.rows[0]);
         }
       }
 
-      // Step 2: Update job_products table
+      // Step 2: Update jobs_job_details table
       if (jobId) {
-        const currentProductIds = processedProducts.map(p => p.id);
-        await client.query('DELETE FROM job_products WHERE job_id = $1 AND product_id != ALL($2)', [jobId, currentProductIds]);
+        const currentJobDetailIds = processedJobDetails.map(jd => jd.id);
+        await client.query('DELETE FROM jobs_job_details WHERE job_id = $1 AND job_detail_id != ALL($2)', [jobId, currentJobDetailIds]);
 
-        for (const product of processedProducts) {
-          await client.query('INSERT INTO job_products (job_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [jobId, product.id]);
+        for (const jobDetail of processedJobDetails) {
+          await client.query('INSERT INTO jobs_job_details (job_id, job_detail_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [jobId, jobDetail.id]);
         }
       }
 
-      // Step 3: Remove orphaned products
-      const orphanedProductsQuery = `
-        DELETE FROM products
-        WHERE id NOT IN (SELECT DISTINCT product_id FROM job_products)
+      // Step 3: Remove orphaned job details
+      const orphanedJobDetailsQuery = `
+        DELETE FROM job_details
+        WHERE id NOT IN (SELECT DISTINCT job_detail_id FROM jobs_job_details)
         AND id != ALL($1)
       `;
-      await client.query(orphanedProductsQuery, [processedProducts.map(p => p.id)]);
+      await client.query(orphanedJobDetailsQuery, [processedJobDetails.map(jd => jd.id)]);
 
       await client.query('COMMIT');
       res.json({ 
-        message: 'Products processed successfully', 
-        products: processedProducts
+        message: 'Job details processed successfully', 
+        jobDetails: processedJobDetails
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -739,53 +630,71 @@ app.post('/api/products/batch', async (req, res) => {
       client.release();
     }
   } catch (error) {
-    console.error('Error processing products:', error);
-    res.status(500).json({ message: 'Error processing products', error: error.message });
+    console.error('Error processing job details:', error);
+    res.status(500).json({ message: 'Error processing job details', error: error.message });
   }
 });
 
-// Update a product
-app.put('/api/products/:id', async (req, res) => {
+// Update a job detail
+app.put('/api/job-details/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, amount, remark } = req.body;
+  const { name, value, remark } = req.body;
 
   try {
     const query = `
-      UPDATE products
-      SET name = $1, amount = $2, remark = $3
+      UPDATE job_details
+      SET name = $1, value = $2, remark = $3
       WHERE id = $4
       RETURNING *
     `;
     
-    const values = [name, amount, remark, id];
+    const values = [name, value, remark, id];
 
     const result = await pool.query(query, values);
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ message: 'Job detail not found' });
     }
 
-    res.json({ message: 'Product updated successfully', product: result.rows[0] });
+    res.json({ message: 'Job detail updated successfully', jobDetail: result.rows[0] });
   } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Error updating product', error: error.message });
+    console.error('Error updating job detail:', error);
+    res.status(500).json({ message: 'Error updating job detail', error: error.message });
   }
 });
 
-// Fetch all products with associated job_name
-app.get('/api/products', async (req, res) => {
+// Fetch all job details with associated job_name
+app.get('/api/job-details', async (req, res) => {
   try {
     const query = `
-      SELECT p.*, j.name as job_name
-      FROM products p
-      LEFT JOIN job_products jp ON p.id = jp.product_id
-      LEFT JOIN jobs j ON jp.job_id = j.id
+      SELECT jd.*, j.name as job_name
+      FROM job_details jd
+      LEFT JOIN jobs_job_details jjd ON jd.id = jjd.job_detail_id
+      LEFT JOIN jobs j ON jjd.job_id = j.id
     `;
     const result = await pool.query(query);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ message: 'Error fetching products', error: error.message });
+    console.error('Error fetching job details:', error);
+    res.status(500).json({ message: 'Error fetching job details', error: error.message });
+  }
+});
+
+// Update the job count endpoint
+app.get('/api/jobs/:jobId/details/count', async (req, res) => {
+  const { jobId } = req.params;
+
+  try {
+    const query = `
+      SELECT COUNT(*) 
+      FROM jobs_job_details
+      WHERE job_id = $1
+    `;
+    const result = await pool.query(query, [jobId]);
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error('Error counting job details for job:', error);
+    res.status(500).json({ message: 'Error counting job details', error: error.message });
   }
 });
 
