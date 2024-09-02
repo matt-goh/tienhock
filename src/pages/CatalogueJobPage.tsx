@@ -32,6 +32,7 @@ const CatalogueJobPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [editedJob, setEditedJob] = useState<Job | null>(null);
   const [jobType, setJobType] = useState<string>("Gaji");
+  const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
   const [jobDetails, setJobDetails] = useState<JobDetail[]>([]);
   const [originalJobDetails] = useState<JobDetail[]>([]);
   const [originalJobState, setOriginalJobState] = useState<{
@@ -117,6 +118,7 @@ const CatalogueJobPage: React.FC = () => {
       );
       if (!response.ok) throw new Error("Failed to fetch job details");
       const data = await response.json();
+      setAllJobDetails(data);
       setJobDetails(data);
     } catch (error) {
       console.error("Error fetching job details:", error);
@@ -462,7 +464,7 @@ const CatalogueJobPage: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jobId: updatedJob.job.id,
-            jobDetails: jobDetails.map((jobDetail) => ({
+            jobDetails: allJobDetails.map((jobDetail) => ({
               ...jobDetail,
               newId:
                 jobDetail.id !==
@@ -484,6 +486,7 @@ const CatalogueJobPage: React.FC = () => {
       const result = await jobDetailsResponse.json();
 
       // Update local state with the result from the server
+      setAllJobDetails(result.jobDetails);
       setJobDetails(result.jobDetails);
       setSelectedJob(updatedJob.job);
       setJobs((jobs) =>
@@ -494,7 +497,7 @@ const CatalogueJobPage: React.FC = () => {
     } catch (error) {
       toast.error((error as Error).message);
     }
-  }, [editedJob, selectedJob, jobDetails, jobs, originalJobDetails]);
+  }, [editedJob, selectedJob, allJobDetails, jobs, originalJobDetails]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -516,6 +519,12 @@ const CatalogueJobPage: React.FC = () => {
   // HDC
   const handleDataChange = useCallback(
     (updatedData: JobDetail[]) => {
+      const updatedAllJobDetails = allJobDetails.map((detail) => {
+        const updatedDetail = updatedData.find((d) => d.id === detail.id);
+        return updatedDetail || detail;
+      });
+
+      setAllJobDetails(updatedAllJobDetails);
       setTimeout(() => setJobDetails(updatedData), 0);
 
       const newChangedJobDetails = new Set<string>();
@@ -538,7 +547,7 @@ const CatalogueJobPage: React.FC = () => {
       // Trigger a re-render of the Table component
       setTimeout(() => setJobDetails([...updatedData]), 0);
     },
-    [originalJobDetails]
+    [allJobDetails]
   );
 
   return (
@@ -729,7 +738,7 @@ const CatalogueJobPage: React.FC = () => {
                 initialData={filteredJobDetails}
                 columns={jobDetailColumns}
                 onShowDeleteButton={() => {}}
-                onDelete={handleDeleteJobDetails}
+                onDelete={handleDeleteJobDetails} 
                 onChange={handleDataChange}
                 isEditing={isEditing}
                 onToggleEditing={toggleEditing}

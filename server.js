@@ -563,19 +563,19 @@ app.post('/api/job-details/batch', async (req, res) => {
 
       // Step 1: Process all job details
       for (const jobDetail of jobDetails) {
-        const { id, newId, description, amount, remark } = jobDetail;
+        const { id, newId, description, amount, remark, type } = jobDetail;
         
         if (newId && newId !== id) {
           // This is an existing job detail with an ID change
           // First, insert the new job detail or update if it already exists
           const upsertQuery = `
-            INSERT INTO job_details (id, description, amount, remark)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO job_details (id, description, amount, remark, type)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (id) DO UPDATE
-            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark
+            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark, type = EXCLUDED.type
             RETURNING *
           `;
-          const upsertValues = [newId, description, amount, remark];
+          const upsertValues = [newId, description, amount, remark, type];
           const upsertResult = await client.query(upsertQuery, upsertValues);
           
           // Update jobs_job_details table to use the new job detail ID
@@ -588,13 +588,13 @@ app.post('/api/job-details/batch', async (req, res) => {
         } else {
           // This is an existing job detail without ID change or a new job detail
           const upsertQuery = `
-            INSERT INTO job_details (id, description, amount, remark)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO job_details (id, description, amount, remark, type)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (id) DO UPDATE
-            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark
+            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark, type = EXCLUDED.type
             RETURNING *
           `;
-          const upsertValues = [id, description, amount, remark];
+          const upsertValues = [id, description, amount, remark, type];
           const result = await client.query(upsertQuery, upsertValues);
           processedJobDetails.push(result.rows[0]);
         }
