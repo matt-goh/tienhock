@@ -25,7 +25,7 @@ const App: React.FC = () => {
         }}
       />
       <div className="flex">
-        <aside className="hidden xl:flex">
+        <aside className="flex">
           <Sidebar />
         </aside>
         <main className="flex justify-center w-full py-[60px]">

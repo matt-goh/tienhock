@@ -136,7 +136,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
               >
                 <DialogPanel className="text-left align-middle shadow-xl w-full max-w-lg">
                   <form onSubmit={handleSubmit} className="">
-                    <Fieldset className="transform bg-white space-y-4 rounded-xl bg-white p-8 transition-all">
+                    <Fieldset className="transform space-y-4 rounded-xl bg-white p-8 transition-all">
                       <Legend className="text-lg font-bold text-gray-900">
                         Job Entry
                       </Legend>
