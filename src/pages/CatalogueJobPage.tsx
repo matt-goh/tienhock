@@ -2,7 +2,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  Fragment,
   useMemo,
 } from "react";
 import {
@@ -53,13 +52,13 @@ const CatalogueJobPage: React.FC = () => {
         id: "id",
         header: "ID",
         type: isEditing ? "string" : "readonly",
-        width: 300,
+        width: 250,
       },
       {
         id: "description",
         header: "Description",
         type: isEditing ? "string" : "readonly",
-        width: 300,
+        width: 400,
       },
       {
         id: "amount",
@@ -564,7 +563,7 @@ const CatalogueJobPage: React.FC = () => {
 
   return (
     <div className={`relative`}>
-      <div className="flex flex-col items-start max-w-4xl">
+      <div className="flex flex-col items-start">
         <div
           className={`w-full text-lg text-center font-medium text-gray-700 mb-4`}
         >
