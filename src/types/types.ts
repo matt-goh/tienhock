@@ -53,3 +53,13 @@ export interface JobDetail {
   remark: string;
   type: string;
 }
+
+export interface JobCategory {
+  id: string;
+  originalId?: string;
+  category: string;
+  section: string;
+  gaji: string;
+  ikut: string;
+  jv: string;
+}
