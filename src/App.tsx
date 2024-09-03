@@ -7,8 +7,9 @@ import CatalogueProductPage from "./pages/CatalogueJobCategoryPage";
 import CatalogueBasicPage from "./pages/CatalogueBasicPage";
 import CatalogueStaffPage from "./pages/CatalogueStaffPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
-import Sidebar from "./components/Sidebar";
 import CatalogueTaxPage from "./pages/CatalogueTaxPage";
+import Sidebar from "./components/Sidebar";
+import "./index.css";
 
 const App: React.FC = () => {
   return (
@@ -25,7 +26,7 @@ const App: React.FC = () => {
         }}
       />
       <div className="flex">
-        <aside className="flex">
+        <aside className="sidebar-hidden">
           <Sidebar />
         </aside>
         <main className="flex justify-center w-full py-[60px]">
