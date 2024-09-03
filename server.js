@@ -565,38 +565,26 @@ app.post('/api/job-details/batch', async (req, res) => {
       for (const jobDetail of jobDetails) {
         const { id, newId, description, amount, remark, type } = jobDetail;
         
+        const upsertQuery = `
+          INSERT INTO job_details (id, description, amount, remark, type)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (id) DO UPDATE
+          SET description = EXCLUDED.description, 
+              amount = EXCLUDED.amount, 
+              remark = EXCLUDED.remark, 
+              type = EXCLUDED.type
+          RETURNING *
+        `;
+
+        const upsertValues = [newId || id, description, amount, remark, type];
+        const result = await client.query(upsertQuery, upsertValues);
+        processedJobDetails.push(result.rows[0]);
+
         if (newId && newId !== id) {
-          // This is an existing job detail with an ID change
-          // First, insert the new job detail or update if it already exists
-          const upsertQuery = `
-            INSERT INTO job_details (id, description, amount, remark, type)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (id) DO UPDATE
-            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark, type = EXCLUDED.type
-            RETURNING *
-          `;
-          const upsertValues = [newId, description, amount, remark, type];
-          const upsertResult = await client.query(upsertQuery, upsertValues);
-          
           // Update jobs_job_details table to use the new job detail ID
           await client.query('UPDATE jobs_job_details SET job_detail_id = $1 WHERE job_detail_id = $2', [newId, id]);
-          
-          // Now, delete the old job detail
+          // Delete the old job detail
           await client.query('DELETE FROM job_details WHERE id = $1', [id]);
-          
-          processedJobDetails.push(upsertResult.rows[0]);
-        } else {
-          // This is an existing job detail without ID change or a new job detail
-          const upsertQuery = `
-            INSERT INTO job_details (id, description, amount, remark, type)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (id) DO UPDATE
-            SET description = EXCLUDED.description, amount = EXCLUDED.amount, remark = EXCLUDED.remark, type = EXCLUDED.type
-            RETURNING *
-          `;
-          const upsertValues = [id, description, amount, remark, type];
-          const result = await client.query(upsertQuery, upsertValues);
-          processedJobDetails.push(result.rows[0]);
         }
       }
 

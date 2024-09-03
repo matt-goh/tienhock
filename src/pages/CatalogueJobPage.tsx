@@ -464,7 +464,7 @@ const CatalogueJobPage: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jobId: updatedJob.job.id,
-            jobDetails: allJobDetails.map((jobDetail) => ({
+            jobDetails: jobDetails.map((jobDetail) => ({
               ...jobDetail,
               newId:
                 jobDetail.id !==
@@ -495,9 +495,10 @@ const CatalogueJobPage: React.FC = () => {
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {
+      console.error("Error in handleSave:", error);
       toast.error((error as Error).message);
     }
-  }, [editedJob, selectedJob, allJobDetails, jobs, originalJobDetails]);
+  }, [editedJob, selectedJob, jobDetails, jobs, originalJobDetails]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -519,35 +520,46 @@ const CatalogueJobPage: React.FC = () => {
   // HDC
   const handleDataChange = useCallback(
     (updatedData: JobDetail[]) => {
-      const updatedAllJobDetails = allJobDetails.map((detail) => {
-        const updatedDetail = updatedData.find((d) => d.id === detail.id);
-        return updatedDetail || detail;
-      });
 
-      setAllJobDetails(updatedAllJobDetails);
+      const updatedAllJobDetails = [
+        ...allJobDetails.filter((detail) =>
+          updatedData.some((d) => d.id === detail.id)
+        ),
+        ...updatedData.filter(
+          (detail) => !allJobDetails.some((d) => d.id === detail.id)
+        ),
+      ];
+
+      setTimeout(() => setAllJobDetails(updatedAllJobDetails), 0);
       setTimeout(() => setJobDetails(updatedData), 0);
 
       const newChangedJobDetails = new Set<string>();
-      updatedData.forEach((jobDetail, index) => {
-        const originalJobDetail = originalJobDetails[index];
+      updatedData.forEach((jobDetail) => {
+        const originalJobDetail = originalJobDetails.find(
+          (d) => d.id === jobDetail.id
+        );
 
         if (!originalJobDetail) {
           newChangedJobDetails.add(jobDetail.id);
-        } else if (
-          jobDetail.id !== originalJobDetail.id ||
-          jobDetail.description !== originalJobDetail.description ||
-          jobDetail.amount !== originalJobDetail.amount ||
-          jobDetail.remark !== originalJobDetail.remark ||
-          jobDetail.type !== originalJobDetail.type
-        ) {
-          newChangedJobDetails.add(jobDetail.id);
+        } else {
+          const changes = Object.keys(jobDetail).filter(
+            (key) =>
+              !_.isEqual(
+                jobDetail[key as keyof JobDetail],
+                originalJobDetail[key as keyof JobDetail]
+              )
+          );
+
+          if (changes.length > 0) {
+            newChangedJobDetails.add(jobDetail.id);
+          }
         }
       });
 
       // Trigger a re-render of the Table component
       setTimeout(() => setJobDetails([...updatedData]), 0);
     },
-    [allJobDetails]
+    [allJobDetails, originalJobDetails]
   );
 
   return (
@@ -738,7 +750,7 @@ const CatalogueJobPage: React.FC = () => {
                 initialData={filteredJobDetails}
                 columns={jobDetailColumns}
                 onShowDeleteButton={() => {}}
-                onDelete={handleDeleteJobDetails} 
+                onDelete={handleDeleteJobDetails}
                 onChange={handleDataChange}
                 isEditing={isEditing}
                 onToggleEditing={toggleEditing}
