@@ -559,11 +559,13 @@ app.post('/api/job-details/batch', async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      const processedJobDetails = [];
+      // Delete all existing job details for this job
+      await client.query('DELETE FROM jobs_job_details WHERE job_id = $1', [jobId]);
+      await client.query('DELETE FROM job_details WHERE id NOT IN (SELECT job_detail_id FROM jobs_job_details)');
 
-      // Step 1: Process all job details
+      // Insert or update all job details
       for (const jobDetail of jobDetails) {
-        const { id, newId, description, amount, remark, type } = jobDetail;
+        const { id, description, amount, remark, type } = jobDetail;
         
         const upsertQuery = `
           INSERT INTO job_details (id, description, amount, remark, type)
@@ -576,40 +578,26 @@ app.post('/api/job-details/batch', async (req, res) => {
           RETURNING *
         `;
 
-        const upsertValues = [newId || id, description, amount, remark, type];
+        const upsertValues = [id || `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, description, amount, remark, type];
         const result = await client.query(upsertQuery, upsertValues);
-        processedJobDetails.push(result.rows[0]);
-
-        if (newId && newId !== id) {
-          // Update jobs_job_details table to use the new job detail ID
-          await client.query('UPDATE jobs_job_details SET job_detail_id = $1 WHERE job_detail_id = $2', [newId, id]);
-          // Delete the old job detail
-          await client.query('DELETE FROM job_details WHERE id = $1', [id]);
-        }
+        
+        // Link job detail to job
+        await client.query('INSERT INTO jobs_job_details (job_id, job_detail_id) VALUES ($1, $2)', [jobId, result.rows[0].id]);
       }
 
-      // Step 2: Update jobs_job_details table
-      if (jobId) {
-        const currentJobDetailIds = processedJobDetails.map(jd => jd.id);
-        await client.query('DELETE FROM jobs_job_details WHERE job_id = $1 AND job_detail_id != ALL($2)', [jobId, currentJobDetailIds]);
-
-        for (const jobDetail of processedJobDetails) {
-          await client.query('INSERT INTO jobs_job_details (job_id, job_detail_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [jobId, jobDetail.id]);
-        }
-      }
-
-      // Step 3: Remove orphaned job details
-      const orphanedJobDetailsQuery = `
-        DELETE FROM job_details
-        WHERE id NOT IN (SELECT DISTINCT job_detail_id FROM jobs_job_details)
-        AND id != ALL($1)
+      // Fetch all job details for this job
+      const fetchQuery = `
+        SELECT jd.* 
+        FROM job_details jd
+        JOIN jobs_job_details jjd ON jd.id = jjd.job_detail_id
+        WHERE jjd.job_id = $1
       `;
-      await client.query(orphanedJobDetailsQuery, [processedJobDetails.map(jd => jd.id)]);
+      const fetchResult = await client.query(fetchQuery, [jobId]);
 
       await client.query('COMMIT');
       res.json({ 
         message: 'Job details processed successfully', 
-        jobDetails: processedJobDetails
+        jobDetails: fetchResult.rows
       });
     } catch (error) {
       await client.query('ROLLBACK');

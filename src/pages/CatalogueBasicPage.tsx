@@ -24,6 +24,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
 }) => {
   const [items, setItems] = useState<CatalogueItem[]>([]);
   const [editedItems, setEditedItems] = useState<CatalogueItem[]>([]);
+  const [originalItems, setOriginalItems] = useState<CatalogueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -61,6 +62,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
   useEffect(() => {
     if (isEditing) {
       setEditedItems([...items]);
+      setOriginalItems([...items]);
     }
   }, [isEditing, items]);
 
@@ -127,6 +129,18 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
         return;
       }
 
+      // Check for changes
+      const itemsChanged = !_.isEqual(
+        editedItems.map((item) => _.omit(item, ["originalId"])),
+        originalItems.map((item) => _.omit(item, ["originalId"]))
+      );
+
+      if (!itemsChanged) {
+        toast("No changes detected");
+        setIsEditing(false);
+        return;
+      }
+
       const itemsToUpdate = editedItems.map((item) => ({
         ...item,
         newId: item.id !== item.originalId ? item.id : undefined,
@@ -164,7 +178,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
       console.error(`Error updating ${apiEndpoint}:`, error);
       toast.error((error as Error).message);
     }
-  }, [editedItems, apiEndpoint]);
+  }, [editedItems, originalItems, apiEndpoint]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
