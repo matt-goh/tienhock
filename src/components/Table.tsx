@@ -263,6 +263,8 @@ function Table<T extends Record<string, any>>({
       const sortedRows = table.getRowModel().rows;
       const currentRowIndex = sortedRows.findIndex((row) => row.id === rowId);
       const isLastPage = !table.getCanNextPage();
+      const isLastRow = currentRowIndex === sortedRows.length - 1;
+      const isLastColumn = cellIndex === allColumns.length - 1;
 
       const findNextEditableCell = (
         startRowIndex: number,
@@ -273,7 +275,9 @@ function Table<T extends Record<string, any>>({
         let colIndex = startColIndex;
 
         const totalRows = sortedRows.length;
-        const editableColumns = allColumns.filter(isEditableColumn);
+        const editableColumns = allColumns.filter(
+          (col) => isEditableColumn(col) && col.type !== "listbox"
+        );
         const totalEditableCols = editableColumns.length;
 
         if (moveToNextRow) {
@@ -294,7 +298,8 @@ function Table<T extends Record<string, any>>({
           const column = allColumns[colIndex];
           if (
             !sortedRows[rowIndex].original.isSubtotal &&
-            isEditableColumn(column)
+            isEditableColumn(column) &&
+            column.type !== "listbox"
           ) {
             return {
               rowIndex,
@@ -313,32 +318,42 @@ function Table<T extends Record<string, any>>({
         };
       };
 
-      const isLastColumn = cellIndex === allColumns.length - 1;
-      const isLastRow = currentRowIndex === sortedRows.length - 1;
       const moveToNextRow = e.key === "Enter" && isLastColumn;
 
-      if (e.key === "Enter" && isLastColumn && isLastRow) {
-        if (isLastPage) {
-          // Add new row only on the last page
-          handleAddRow();
-          setTimeout(() => {
-            const newRows = table.getRowModel().rows;
-            const newRowId = newRows[newRows.length - 1].id;
-            setSelectedRowId(newRowId);
-            setEditableRowId(newRowId);
-            setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-          }, 10);
-        } else {
-          // Move to the next page
-          table.nextPage();
-          setTimeout(() => {
-            const newRows = table.getRowModel().rows;
-            const newRowId = newRows[0].id;
-            setSelectedRowId(newRowId);
-            setEditableRowId(newRowId);
-            setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-          }, 10);
-        }
+      if (e.key === "Enter" && isLastColumn && isLastRow && isLastPage) {
+        // Add new row only on the last page
+        handleAddRow();
+        setTimeout(() => {
+          const newRows = table.getRowModel().rows;
+          const newRowId = newRows[newRows.length - 1].id;
+          setSelectedRowId(newRowId);
+          setEditableRowId(newRowId);
+          setEditableCellIndex(allColumns.findIndex(isEditableColumn));
+        }, 10);
+      } else if (e.key === "Tab" && isLastColumn && isLastRow && isLastPage) {
+        // Loop back to the first cell on the first page
+        table.setPageIndex(0);
+        setTimeout(() => {
+          const newRows = table.getRowModel().rows;
+          const newRowId = newRows[0].id;
+          setSelectedRowId(newRowId);
+          setEditableRowId(newRowId);
+          setEditableCellIndex(allColumns.findIndex(isEditableColumn));
+        }, 10);
+      } else if (
+        (e.key === "Enter" || e.key === "Tab") &&
+        isLastColumn &&
+        isLastRow
+      ) {
+        // Move to the next page
+        table.nextPage();
+        setTimeout(() => {
+          const newRows = table.getRowModel().rows;
+          const newRowId = newRows[0].id;
+          setSelectedRowId(newRowId);
+          setEditableRowId(newRowId);
+          setEditableCellIndex(allColumns.findIndex(isEditableColumn));
+        }, 10);
       } else {
         const { rowIndex: nextRowIndex, colIndex: nextColIndex } =
           findNextEditableCell(currentRowIndex, cellIndex, moveToNextRow);
