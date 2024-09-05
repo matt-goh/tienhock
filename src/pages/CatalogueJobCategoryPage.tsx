@@ -318,15 +318,20 @@ const CatalogueJobCategoryPage: React.FC = () => {
     <div className={`relative`}>
       <div className="flex flex-col items-start">
         <div className={`w-full flex justify-between items-center mb-4`}>
+          {isEditing ? (
+            <div></div>
+          ) : (
+            <div className="flex items-center">{renderSectionListbox()}</div>
+          )}
           <div
             className={`w-auto text-lg text-center font-medium text-gray-700`}
           >
             Job Category
           </div>
           {isEditing ? (
-            <></>
+            <div></div>
           ) : (
-            <div className="flex items-center">
+            <div className="flex items-center mr-20">
               <div className="flex">
                 <div className="relative w-full mx-3">
                   <IconSearch
@@ -342,10 +347,8 @@ const CatalogueJobCategoryPage: React.FC = () => {
                   />
                 </div>
               </div>
-              {renderSectionListbox()}
             </div>
           )}
-          <div className="w-48"></div>
         </div>
         <div className="w-full">
           <div className="relative">
@@ -361,6 +364,11 @@ const CatalogueJobCategoryPage: React.FC = () => {
               onCancel={handleCancel}
               tableKey="catalogueJobCategory"
             />
+            {filteredJobCategories.length === 0 && (
+              <p className="mt-4 text-center text-gray-700 w-full">
+                No job categories found.
+              </p>
+            )}
           </div>
         </div>
       </div>
