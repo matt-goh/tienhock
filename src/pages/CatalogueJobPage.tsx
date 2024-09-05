@@ -758,7 +758,7 @@ const CatalogueJobPage: React.FC = () => {
                 tableKey="catalogueJob"
               />
               {filteredJobDetails.length === 0 && (
-                <p className="mt-4 text-center w-full">No details found.</p>
+                <p className="mt-4 text-center text-gray-700 w-full">No details found.</p>
               )}
             </div>
           </div>
