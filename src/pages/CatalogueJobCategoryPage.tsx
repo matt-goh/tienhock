@@ -9,7 +9,7 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconCheck, IconChevronDown } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
 
 const CatalogueJobCategoryPage: React.FC = () => {
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
@@ -18,6 +18,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
   );
   const [sections, setSections] = useState<string[]>(["All Section"]);
   const [selectedSection, setSelectedSection] = useState<string>("All Section");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -229,14 +230,36 @@ const CatalogueJobCategoryPage: React.FC = () => {
     setIsEditing((prev) => !prev);
   }, []);
 
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+
   const filteredJobCategories = useMemo(() => {
-    if (selectedSection === "All Section") {
-      return isEditing ? editedJobCategories : jobCategories;
+    let filtered = isEditing ? editedJobCategories : jobCategories;
+
+    if (selectedSection !== "All Section") {
+      filtered = filtered.filter(
+        (category) => category.section === selectedSection
+      );
     }
-    return (isEditing ? editedJobCategories : jobCategories).filter(
-      (category) => category.section === selectedSection
-    );
-  }, [selectedSection, isEditing, editedJobCategories, jobCategories]);
+
+    if (searchTerm) {
+      const lowercasedSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (category) =>
+          category.id.toLowerCase().includes(lowercasedSearch) ||
+          category.category.toLowerCase().includes(lowercasedSearch)
+      );
+    }
+
+    return filtered;
+  }, [
+    selectedSection,
+    searchTerm,
+    isEditing,
+    editedJobCategories,
+    jobCategories,
+  ]);
 
   const renderSectionListbox = () => (
     <>
@@ -295,16 +318,33 @@ const CatalogueJobCategoryPage: React.FC = () => {
     <div className={`relative`}>
       <div className="flex flex-col items-start">
         <div className={`w-full flex justify-between items-center mb-4`}>
-          {isEditing ? (
-            <></>
-          ) : (
-            <div className="flex items-center">{renderSectionListbox()}</div>
-          )}
           <div
-            className={`w-full text-lg text-center font-medium text-gray-700`}
+            className={`w-auto text-lg text-center font-medium text-gray-700`}
           >
             Job Category
           </div>
+          {isEditing ? (
+            <></>
+          ) : (
+            <div className="flex items-center">
+              <div className="flex">
+                <div className="relative w-full mx-3">
+                  <IconSearch
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    size={22}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search"
+                    className="w-full pl-11 py-2 border focus:border-gray-500 rounded-full"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                  />
+                </div>
+              </div>
+              {renderSectionListbox()}
+            </div>
+          )}
           <div className="w-48"></div>
         </div>
         <div className="w-full">
