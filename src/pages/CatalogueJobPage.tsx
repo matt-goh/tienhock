@@ -1,9 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Combobox,
   ComboboxButton,
@@ -33,7 +28,8 @@ const CatalogueJobPage: React.FC = () => {
   const [jobType, setJobType] = useState<string>("Gaji");
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
   const [jobDetails, setJobDetails] = useState<JobDetail[]>([]);
-  const [originalJobDetails] = useState<JobDetail[]>([]);
+  const [filteredJobDetails, setFilteredJobDetails] = useState<JobDetail[]>([]);
+  const [originalJobDetails, setOriginalJobDetails] = useState<JobDetail[]>([]);
   const [originalJobState, setOriginalJobState] = useState<{
     job: Job | null;
     jobDetails: JobDetail[];
@@ -118,7 +114,7 @@ const CatalogueJobPage: React.FC = () => {
       if (!response.ok) throw new Error("Failed to fetch job details");
       const data = await response.json();
       setAllJobDetails(data);
-      setJobDetails(data);
+      setFilteredJobDetails(data);
     } catch (error) {
       console.error("Error fetching job details:", error);
       toast.error("Failed to fetch job details. Please try again.");
@@ -132,10 +128,21 @@ const CatalogueJobPage: React.FC = () => {
       fetchJobDetails(selectedJob.id);
       setEditedJob(selectedJob);
     } else {
-      setJobDetails([]);
+      setAllJobDetails([]);
+      setFilteredJobDetails([]);
       setEditedJob(null);
     }
   }, [selectedJob, fetchJobDetails]);
+
+  useEffect(() => {
+    if (jobType === "All") {
+      setFilteredJobDetails(allJobDetails);
+    } else {
+      setFilteredJobDetails(
+        allJobDetails.filter((detail) => detail.type === jobType)
+      );
+    }
+  }, [jobType, allJobDetails]);
 
   const handleJobAdded = useCallback(async (newJob: Omit<Job, "id">) => {
     try {
@@ -314,13 +321,6 @@ const CatalogueJobPage: React.FC = () => {
     setJobType(value);
   };
 
-  const filteredJobDetails = useMemo(() => {
-    if (jobType === "All") {
-      return jobDetails;
-    }
-    return jobDetails.filter((detail) => detail.type === jobType);
-  }, [jobDetails, jobType]);
-
   const renderJobTypeListbox = () => (
     <>
       <span className="font-semibold mr-2">Type:</span>
@@ -377,20 +377,27 @@ const CatalogueJobPage: React.FC = () => {
         // Entering edit mode
         setOriginalJobState({
           job: editedJob ? _.cloneDeep(editedJob) : null,
-          jobDetails: _.cloneDeep(jobDetails),
+          jobDetails: _.cloneDeep(allJobDetails),
         });
       }
       return !prev;
     });
-  }, [editedJob, jobDetails]);
+  }, [editedJob, allJobDetails]);
 
   const handleCancel = useCallback(() => {
     if (originalJobState) {
       setEditedJob(originalJobState.job);
-      setJobDetails(originalJobState.jobDetails);
+      setAllJobDetails(originalJobState.jobDetails);
+      setFilteredJobDetails(
+        jobType === "All"
+          ? originalJobState.jobDetails
+          : originalJobState.jobDetails.filter(
+              (detail) => detail.type === jobType
+            )
+      );
     }
     setIsEditing(false);
-  }, [originalJobState]);
+  }, [originalJobState, jobType]);
 
   // HS
   const handleSave = useCallback(async () => {
@@ -412,7 +419,7 @@ const CatalogueJobPage: React.FC = () => {
     }
 
     // Check for empty product IDs
-    const emptyDetailId = jobDetails.find((details) => !details.id.trim());
+    const emptyDetailId = allJobDetails.find((details) => !details.id.trim());
     if (emptyDetailId) {
       toast.error("Detail ID cannot be empty");
       return;
@@ -420,7 +427,7 @@ const CatalogueJobPage: React.FC = () => {
 
     // Check for duplicate product IDs
     const detailIds = new Set();
-    const duplicateDetailId = jobDetails.find((details) => {
+    const duplicateDetailId = allJobDetails.find((details) => {
       if (detailIds.has(details.id)) {
         return true;
       }
@@ -430,6 +437,28 @@ const CatalogueJobPage: React.FC = () => {
 
     if (duplicateDetailId) {
       toast.error(`Duplicate product ID: ${duplicateDetailId.id}`);
+      return;
+    }
+
+    // Check for changes in the job
+    const jobChanged = ["id", "name", "section"].some(
+      (key) =>
+        selectedJob &&
+        editedJob[key as keyof Job] !== selectedJob[key as keyof Job]
+    );
+
+    // Check for changes in job details
+    const detailsChanged = !_.isEqual(
+      allJobDetails.map((detail) => _.omit(detail, ["newId"])),
+      originalJobState?.jobDetails.map((detail) => _.omit(detail, ["newId"]))
+    );
+
+    // Detect if there are any changes
+    const hasChanges = jobChanged || detailsChanged;
+
+    if (!hasChanges) {
+      toast("No changes detected");
+      setIsEditing(false);
       return;
     }
 
@@ -463,11 +492,12 @@ const CatalogueJobPage: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jobId: updatedJob.job.id,
-            jobDetails: jobDetails.map((jobDetail) => ({
+            jobDetails: allJobDetails.map((jobDetail) => ({
               ...jobDetail,
               newId:
                 jobDetail.id !==
-                originalJobDetails.find((d) => d.id === jobDetail.id)?.id
+                originalJobState?.jobDetails.find((d) => d.id === jobDetail.id)
+                  ?.id
                   ? jobDetail.id
                   : undefined,
             })),
@@ -486,7 +516,11 @@ const CatalogueJobPage: React.FC = () => {
 
       // Update local state with the result from the server
       setAllJobDetails(result.jobDetails);
-      setJobDetails(result.jobDetails);
+      setFilteredJobDetails(
+        jobType === "All"
+          ? result.jobDetails
+          : result.jobDetails.filter((detail: { type: string; }) => detail.type === jobType)
+      );
       setSelectedJob(updatedJob.job);
       setJobs((jobs) =>
         jobs.map((job) => (job.id === selectedJob?.id ? updatedJob.job : job))
@@ -497,7 +531,7 @@ const CatalogueJobPage: React.FC = () => {
       console.error("Error in handleSave:", error);
       toast.error((error as Error).message);
     }
-  }, [editedJob, selectedJob, jobDetails, jobs, originalJobDetails]);
+  }, [editedJob, selectedJob, allJobDetails, jobs, originalJobDetails]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -519,46 +553,15 @@ const CatalogueJobPage: React.FC = () => {
   // HDC
   const handleDataChange = useCallback(
     (updatedData: JobDetail[]) => {
-
-      const updatedAllJobDetails = [
-        ...allJobDetails.filter((detail) =>
-          updatedData.some((d) => d.id === detail.id)
-        ),
-        ...updatedData.filter(
-          (detail) => !allJobDetails.some((d) => d.id === detail.id)
-        ),
-      ];
-
-      setTimeout(() => setAllJobDetails(updatedAllJobDetails), 0);
-      setTimeout(() => setJobDetails(updatedData), 0);
-
-      const newChangedJobDetails = new Set<string>();
-      updatedData.forEach((jobDetail) => {
-        const originalJobDetail = originalJobDetails.find(
-          (d) => d.id === jobDetail.id
-        );
-
-        if (!originalJobDetail) {
-          newChangedJobDetails.add(jobDetail.id);
-        } else {
-          const changes = Object.keys(jobDetail).filter(
-            (key) =>
-              !_.isEqual(
-                jobDetail[key as keyof JobDetail],
-                originalJobDetail[key as keyof JobDetail]
-              )
-          );
-
-          if (changes.length > 0) {
-            newChangedJobDetails.add(jobDetail.id);
-          }
-        }
+      const updatedAllJobDetails = allJobDetails.map((detail) => {
+        const updatedDetail = updatedData.find((d) => d.id === detail.id);
+        return updatedDetail || detail;
       });
 
-      // Trigger a re-render of the Table component
-      setTimeout(() => setJobDetails([...updatedData]), 0);
+      setAllJobDetails(updatedAllJobDetails);
+      setFilteredJobDetails(updatedData);
     },
-    [allJobDetails, originalJobDetails]
+    [allJobDetails]
   );
 
   return (
@@ -758,7 +761,9 @@ const CatalogueJobPage: React.FC = () => {
                 tableKey="catalogueJob"
               />
               {filteredJobDetails.length === 0 && (
-                <p className="mt-4 text-center text-gray-700 w-full">No details found.</p>
+                <p className="mt-4 text-center text-gray-700 w-full">
+                  No details found.
+                </p>
               )}
             </div>
           </div>

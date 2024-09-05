@@ -177,15 +177,29 @@ const CatalogueJobCategoryPage: React.FC = () => {
         return;
       }
 
-      const jobCategoriesToUpdate = editedJobCategories.map((category) => ({
+      // Find changed job categories
+      const changedJobCategories = editedJobCategories.filter(
+        (editedCategory) => {
+          const originalCategory = jobCategories.find(
+            (cat) => cat.id === editedCategory.id
+          );
+          if (!originalCategory) return true; // New category
+          return ["category", "section", "gaji", "ikut", "jv"].some(
+            (key) => editedCategory[key] !== originalCategory[key]
+          );
+        }
+      );
+
+      if (changedJobCategories.length === 0) {
+        toast("No changes detected");
+        setIsEditing(false);
+        return;
+      }
+
+      const jobCategoriesToUpdate = changedJobCategories.map((category) => ({
         ...category,
         newId: category.id !== category.originalId ? category.id : undefined,
         id: category.originalId || category.id,
-        category: category.category || "",
-        section: category.section || "",
-        gaji: category.gaji || "",
-        ikut: category.ikut || "",
-        jv: category.jv || "",
       }));
 
       const response = await fetch(
@@ -207,19 +221,36 @@ const CatalogueJobCategoryPage: React.FC = () => {
       }
 
       const result = await response.json();
-      setJobCategories(
-        result.jobCategories.map((category: JobCategory) => ({
-          ...category,
-          originalId: category.id,
-        }))
-      );
+
+      // Update local state with the changes
+      setJobCategories((prevCategories) => {
+        const updatedCategories = [...prevCategories];
+        result.jobCategories.forEach((updatedCategory: JobCategory) => {
+          const index = updatedCategories.findIndex(
+            (cat) => cat.id === updatedCategory.id
+          );
+          if (index !== -1) {
+            updatedCategories[index] = {
+              ...updatedCategory,
+              originalId: updatedCategory.id,
+            };
+          } else {
+            updatedCategories.push({
+              ...updatedCategory,
+              originalId: updatedCategory.id,
+            });
+          }
+        });
+        return updatedCategories;
+      });
+
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {
       console.error("Error updating job categories:", error);
       toast.error((error as Error).message);
     }
-  }, [editedJobCategories]);
+  }, [editedJobCategories, jobCategories]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);

@@ -62,4 +62,5 @@ export interface JobCategory {
   gaji: string;
   ikut: string;
   jv: string;
+  [key: string]: string | undefined;
 }

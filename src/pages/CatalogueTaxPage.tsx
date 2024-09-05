@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Table from "../components/Table";
 import { ColumnConfig } from "../types/types";
 import toast from "react-hot-toast";
+import _ from "lodash";
 
 interface Tax {
   id: number;
@@ -12,6 +13,7 @@ interface Tax {
 const CatalogueTaxPage: React.FC = () => {
   const [taxes, setTaxes] = useState<Tax[]>([]);
   const [editedTaxes, setEditedTaxes] = useState<Tax[]>([]);
+  const [originalTaxes, setOriginalTaxes] = useState<Tax[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -47,6 +49,7 @@ const CatalogueTaxPage: React.FC = () => {
   useEffect(() => {
     if (isEditing) {
       setEditedTaxes([...taxes]);
+      setOriginalTaxes([...taxes]);
     }
   }, [isEditing, taxes]);
 
@@ -88,6 +91,37 @@ const CatalogueTaxPage: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     try {
+      // Check for empty tax names
+      const emptyTaxName = editedTaxes.find((tax) => !tax.name.trim());
+      if (emptyTaxName) {
+        toast.error("Tax name cannot be empty");
+        return;
+      }
+
+      // Check for duplicate tax names
+      const taxNames = new Set();
+      const duplicateTaxName = editedTaxes.find((tax) => {
+        if (taxNames.has(tax.name)) {
+          return true;
+        }
+        taxNames.add(tax.name);
+        return false;
+      });
+
+      if (duplicateTaxName) {
+        toast.error(`Duplicate tax name: ${duplicateTaxName.name}`);
+        return;
+      }
+
+      // Check for changes
+      const taxesChanged = !_.isEqual(editedTaxes, originalTaxes);
+
+      if (!taxesChanged) {
+        toast("No changes detected");
+        setIsEditing(false);
+        return;
+      }
+
       const response = await fetch("http://localhost:5000/api/taxes/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,7 +145,7 @@ const CatalogueTaxPage: React.FC = () => {
       console.error("Error updating taxes:", error);
       toast.error((error as Error).message);
     }
-  }, [editedTaxes]);
+  }, [editedTaxes, originalTaxes]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
