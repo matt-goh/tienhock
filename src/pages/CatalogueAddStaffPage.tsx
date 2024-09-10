@@ -41,7 +41,7 @@ interface FormData {
   dateJoined: string;
   icNo: string;
   bankAccountNumber: string;
-  epcNo: string;
+  epfNo: string;
   incomeTaxNo: string;
   socsoNo: string;
   document: string;
@@ -68,7 +68,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     dateJoined: "",
     icNo: "",
     bankAccountNumber: "",
-    epcNo: "",
+    epfNo: "",
     incomeTaxNo: "",
     socsoNo: "",
     document: "",
@@ -92,7 +92,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     dateJoined: "",
     icNo: "",
     bankAccountNumber: "",
-    epcNo: "",
+    epfNo: "",
     incomeTaxNo: "",
     socsoNo: "",
     document: "",
@@ -527,7 +527,7 @@ const CatalogueAddStaffPage: React.FC = () => {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderInput("icNo", "IC Number")}
                   {renderInput("bankAccountNumber", "Bank Account Number")}
-                  {renderInput("epcNo", "EPC Number")}
+                  {renderInput("epfNo", "EPF Number")}
                   {renderInput("incomeTaxNo", "Income Tax Number")}
                   {renderInput("socsoNo", "SOCSO Number")}
                   {renderListbox("document", "Document", documentOptions)}
