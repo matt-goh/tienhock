@@ -19,7 +19,6 @@ import {
   getPaginationRowModel,
   PaginationState,
 } from "@tanstack/react-table";
-import "react-datepicker/dist/react-datepicker.css";
 import {
   IconArrowsSort,
   IconCancel,
