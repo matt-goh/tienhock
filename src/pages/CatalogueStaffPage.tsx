@@ -9,7 +9,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
-import e from "express";
 
 type Employee = {
   id: string;
@@ -27,8 +26,6 @@ const EmployeeCard = ({
   employee: Employee;
   onDeleteClick: (employee: Employee) => void;
 }) => {
-  const [displayLocations, setDisplayLocations] = useState<string[]>([]);
-  const [remainingLocationCount, setRemainingLocationCount] = useState(0);
   const [displayJobs, setDisplayJobs] = useState<string[]>([]);
   const [remainingJobCount, setRemainingJobCount] = useState(0);
   const [isCardHovered, setIsCardHovered] = useState(false);
@@ -83,13 +80,6 @@ const EmployeeCard = ({
         setRemainingCount(remaining);
       }
     };
-
-    calculateDisplay(
-      employee.location,
-      locationContainerRef,
-      setDisplayLocations,
-      setRemainingLocationCount
-    );
     calculateDisplay(
       employee.job,
       jobContainerRef,
@@ -98,12 +88,6 @@ const EmployeeCard = ({
     );
 
     window.addEventListener("resize", () => {
-      calculateDisplay(
-        employee.location,
-        locationContainerRef,
-        setDisplayLocations,
-        setRemainingLocationCount
-      );
       calculateDisplay(
         employee.job,
         jobContainerRef,
@@ -114,12 +98,6 @@ const EmployeeCard = ({
 
     return () => {
       window.removeEventListener("resize", () => {
-        calculateDisplay(
-          employee.location,
-          locationContainerRef,
-          setDisplayLocations,
-          setRemainingLocationCount
-        );
         calculateDisplay(
           employee.job,
           jobContainerRef,
@@ -151,20 +129,12 @@ const EmployeeCard = ({
     >
       <div className="mb-2">
         <h3 className="font-semibold">{employee.name}</h3>
-        <div ref={jobContainerRef} className="text-sm text-gray-500">
-          {displayJobs.map((job, index) => (
-            <React.Fragment key={index}>
-              {job}
-              {index < displayJobs.length - 1 && ", "}
-            </React.Fragment>
-          ))}
-          {remainingJobCount > 0 && (
-            <span className="text-sm text-gray-500">, +{remainingJobCount}</span>
-          )}
+        <div className="mb-2">
+          <div className="text-sm text-gray-500">{employee.id}</div>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 mb-2" ref={locationContainerRef}>
-        {displayLocations.map((location, index) => (
+      <div className="flex flex-wrap gap-2 mb-2" ref={jobContainerRef}>
+        {displayJobs.map((location, index) => (
           <span
             key={index}
             className="text-xs font-medium px-2.5 py-0.5 rounded bg-sky-100 text-sky-800"
@@ -172,9 +142,9 @@ const EmployeeCard = ({
             {location}
           </span>
         ))}
-        {remainingLocationCount > 0 && (
+        {remainingJobCount > 0 && (
           <span className="text-xs font-medium px-2.5 py-0.5 rounded bg-gray-100 text-gray-800">
-            +{remainingLocationCount}
+            +{remainingJobCount}
           </span>
         )}
       </div>
@@ -269,8 +239,10 @@ const CatalogueStaffPage = () => {
   };
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter((employee) =>
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase())
+    return employees.filter(
+      (employee) =>
+        employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        employee.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [employees, searchTerm]);
 
