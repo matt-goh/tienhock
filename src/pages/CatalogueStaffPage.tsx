@@ -9,15 +9,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
-
-type Employee = {
-  id: string;
-  name: string;
-  job: string[];
-  location: string[];
-  icNo: string;
-  telephoneNo: string;
-};
+import StaffFilterMenu from "../components/StaffFilterMenu";
+import { Employee, FilterOptions } from "../types/types";
 
 const EmployeeCard = ({
   employee,
@@ -30,7 +23,6 @@ const EmployeeCard = ({
   const [remainingJobCount, setRemainingJobCount] = useState(0);
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isTrashHovered, setIsTrashHovered] = useState(false);
-  const locationContainerRef = useRef<HTMLDivElement>(null);
   const jobContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -129,9 +121,7 @@ const EmployeeCard = ({
     >
       <div className="mb-2">
         <h3 className="font-semibold">{employee.name}</h3>
-        <div className="mb-2">
-          <div className="text-sm text-gray-500">{employee.id}</div>
-        </div>
+        <div className="text-sm text-gray-500">{employee.id}</div>
       </div>
       <div className="flex flex-wrap gap-2 mb-2" ref={jobContainerRef}>
         {displayJobs.map((location, index) => (
@@ -184,6 +174,9 @@ const CatalogueStaffPage = () => {
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
     null
   );
+  const [filters, setFilters] = useState<FilterOptions>({
+    showResigned: false,
+  });
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -239,12 +232,28 @@ const CatalogueStaffPage = () => {
   };
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter(
-      (employee) =>
+    console.log("Current filters:", filters); // Keep this log
+    return employees.filter((employee) => {
+      const matchesSearch =
         employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [employees, searchTerm]);
+        employee.id.toLowerCase().includes(searchTerm.toLowerCase());
+
+      console.log(
+        "Employee:",
+        employee.name,
+        "Date Resigned:",
+        employee.dateResigned
+      ); // Keep this log
+
+      const matchesResignedFilter = filters.showResigned
+        ? true // If showResigned is true, show all employees
+        : employee.dateResigned === undefined; // Show only non-resigned employees when showResigned is false
+
+      console.log("Matches Resigned Filter:", matchesResignedFilter); // Keep this log
+
+      return matchesSearch && matchesResignedFilter;
+    });
+  }, [employees, searchTerm, filters.showResigned]);
 
   const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
 
@@ -259,6 +268,10 @@ const CatalogueStaffPage = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+  };
+
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
   };
 
   const handlePageChange = (page: number) => {
@@ -381,6 +394,10 @@ const CatalogueStaffPage = () => {
               onChange={handleSearchChange}
             />
           </div>
+          <StaffFilterMenu
+            onFilterChange={handleFilterChange}
+            currentFilters={filters}
+          />
           <button
             className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
             onClick={() => navigate("/catalogue/staff/new")}

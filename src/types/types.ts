@@ -39,7 +39,7 @@ export interface TableProps<T> {
   tableKey: string;
 }
 
-export interface FormData {
+export interface Employee {
   id: string;
   name: string;
   telephoneNo: string;
@@ -63,6 +63,15 @@ export interface FormData {
   agama: string;
   dateResigned: string;
 }
+
+export type FilterOptions = {
+  showResigned?: boolean;
+  job?: string;
+  location?: string;
+  nationality?: string;
+  gender?: string;
+  race?: string;
+};
 
 export interface Job {
   id: string;
