@@ -9,6 +9,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
+import e from "express";
 
 type Employee = {
   id: string;
@@ -27,54 +28,107 @@ const EmployeeCard = ({
   onDeleteClick: (employee: Employee) => void;
 }) => {
   const [displayLocations, setDisplayLocations] = useState<string[]>([]);
-  const [remainingCount, setRemainingCount] = useState(0);
+  const [remainingLocationCount, setRemainingLocationCount] = useState(0);
+  const [displayJobs, setDisplayJobs] = useState<string[]>([]);
+  const [remainingJobCount, setRemainingJobCount] = useState(0);
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isTrashHovered, setIsTrashHovered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const locationContainerRef = useRef<HTMLDivElement>(null);
+  const jobContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const calculateDisplayLocations = () => {
+    const calculateDisplay = (
+      items: string[],
+      containerRef: React.RefObject<HTMLDivElement>,
+      setDisplayItems: React.Dispatch<React.SetStateAction<string[]>>,
+      setRemainingCount: React.Dispatch<React.SetStateAction<number>>
+    ) => {
       if (containerRef.current) {
         const container = containerRef.current;
         const containerWidth = container.offsetWidth;
         let currentWidth = 0;
-        const locations = [];
+        const displayItems = [];
         let remaining = 0;
 
-        for (let i = 0; i < employee.location.length; i++) {
-          const location = employee.location[i];
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
           const tempSpan = document.createElement("span");
           tempSpan.style.visibility = "hidden";
           tempSpan.style.position = "absolute";
-          tempSpan.className = "text-xs font-medium px-2.5 py-0.5 rounded";
-          tempSpan.textContent = location;
+          tempSpan.className = "text-xs font-medium";
+          tempSpan.textContent = item + (i < items.length - 1 ? ", " : "");
           document.body.appendChild(tempSpan);
           const spanWidth = tempSpan.offsetWidth;
           document.body.removeChild(tempSpan);
 
-          if (
-            currentWidth + spanWidth + (locations.length > 0 ? 8 : 0) >
-            containerWidth
-          ) {
-            remaining = employee.location.length - i;
+          if (currentWidth + spanWidth > containerWidth) {
+            remaining = items.length - i;
             break;
           }
 
-          locations.push(location);
-          currentWidth += spanWidth + (locations.length > 0 ? 8 : 0);
+          displayItems.push(item);
+          currentWidth += spanWidth;
         }
 
-        setDisplayLocations(locations);
+        // Check if we need to compress the last visible item
+        if (remaining > 0) {
+          const lastItem = displayItems.pop();
+          if (lastItem) {
+            remaining++;
+          }
+        }
+
+        setDisplayItems(displayItems);
         setRemainingCount(remaining);
       }
     };
 
-    calculateDisplayLocations();
-    window.addEventListener("resize", calculateDisplayLocations);
-    return () =>
-      window.removeEventListener("resize", calculateDisplayLocations);
-  }, [employee.location]);
+    calculateDisplay(
+      employee.location,
+      locationContainerRef,
+      setDisplayLocations,
+      setRemainingLocationCount
+    );
+    calculateDisplay(
+      employee.job,
+      jobContainerRef,
+      setDisplayJobs,
+      setRemainingJobCount
+    );
+
+    window.addEventListener("resize", () => {
+      calculateDisplay(
+        employee.location,
+        locationContainerRef,
+        setDisplayLocations,
+        setRemainingLocationCount
+      );
+      calculateDisplay(
+        employee.job,
+        jobContainerRef,
+        setDisplayJobs,
+        setRemainingJobCount
+      );
+    });
+
+    return () => {
+      window.removeEventListener("resize", () => {
+        calculateDisplay(
+          employee.location,
+          locationContainerRef,
+          setDisplayLocations,
+          setRemainingLocationCount
+        );
+        calculateDisplay(
+          employee.job,
+          jobContainerRef,
+          setDisplayJobs,
+          setRemainingJobCount
+        );
+      });
+    };
+  }, [employee.location, employee.job]);
 
   const handleClick = () => {
     navigate(`/catalogue/staff/${employee.id}`);
@@ -97,25 +151,37 @@ const EmployeeCard = ({
     >
       <div className="mb-2">
         <h3 className="font-semibold">{employee.name}</h3>
-        <p className="text-sm text-gray-500">{employee.job.join(", ")}</p>
+        <div ref={jobContainerRef} className="text-sm text-gray-500">
+          {displayJobs.map((job, index) => (
+            <React.Fragment key={index}>
+              {job}
+              {index < displayJobs.length - 1 && ", "}
+            </React.Fragment>
+          ))}
+          {remainingJobCount > 0 && (
+            <span className="text-sm text-gray-500">, +{remainingJobCount}</span>
+          )}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2 mb-2" ref={containerRef}>
+      <div className="flex flex-wrap gap-2 mb-2" ref={locationContainerRef}>
         {displayLocations.map((location, index) => (
           <span
             key={index}
-            className={`text-xs font-medium px-2.5 py-0.5 rounded bg-sky-100 text-sky-800`}
+            className="text-xs font-medium px-2.5 py-0.5 rounded bg-sky-100 text-sky-800"
           >
             {location}
           </span>
         ))}
-        {remainingCount > 0 && (
+        {remainingLocationCount > 0 && (
           <span className="text-xs font-medium px-2.5 py-0.5 rounded bg-gray-100 text-gray-800">
-            +{remainingCount}
+            +{remainingLocationCount}
           </span>
         )}
       </div>
       <p className="text-sm">IC: {employee.icNo}</p>
-      <p className="text-sm">Phone no: {employee.telephoneNo}</p>
+      <p className="text-sm">
+        Phone no: {employee.telephoneNo ? employee.telephoneNo : "-"}
+      </p>
       <div className="absolute inset-y-0 top-2 right-2">
         <div className="relative w-8 h-8">
           {isCardHovered && (
@@ -123,7 +189,7 @@ const EmployeeCard = ({
               onClick={handleDeleteClick}
               onMouseEnter={() => setIsTrashHovered(true)}
               onMouseLeave={() => setIsTrashHovered(false)}
-              className={`delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-gray-100 active:bg-gray-200 focus:outline-none`}
+              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-gray-100 active:bg-gray-200 focus:outline-none"
             >
               <IconTrash
                 className="text-gray-700 active:text-gray-800"
@@ -324,7 +390,7 @@ const CatalogueStaffPage = () => {
   }
 
   return (
-    <div className="relative w-full mx-24">
+    <div className="relative w-full mx-20">
       <div className="flex items-center justify-between mb-6">
         <h1 className="relative text-2xl text-gray-700 font-bold">
           Staffs ({filteredEmployees.length})
@@ -355,9 +421,7 @@ const CatalogueStaffPage = () => {
 
       {filteredEmployees.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500">
-            No employees found.
-          </p>
+          <p className="text-gray-500">No employees found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
