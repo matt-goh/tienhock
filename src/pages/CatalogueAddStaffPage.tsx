@@ -21,7 +21,7 @@ import Tab from "../components/Tab";
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
-import { FormData } from "../types/types";
+import { Employee } from "../types/types";
 
 interface SelectOption {
   id: string;
@@ -30,7 +30,7 @@ interface SelectOption {
 
 const CatalogueAddStaffPage: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<Employee>({
     id: "",
     name: "",
     telephoneNo: "",
@@ -54,7 +54,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     agama: "",
     dateResigned: "",
   });
-  const [initialFormData, setInitialFormData] = useState<FormData>({
+  const [initialFormData, setInitialFormData] = useState<Employee>({
     id: "",
     name: "",
     telephoneNo: "",
@@ -169,7 +169,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     }));
   };
 
-  const handleListboxChange = (name: keyof FormData, value: string) => {
+  const handleListboxChange = (name: keyof Employee, value: string) => {
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -191,7 +191,7 @@ const CatalogueAddStaffPage: React.FC = () => {
   );
 
   const validateForm = (): boolean => {
-    const requiredFields: (keyof FormData)[] = ["id", "name"];
+    const requiredFields: (keyof Employee)[] = ["id", "name"];
 
     for (const field of requiredFields) {
       if (!formData[field]) {
@@ -258,7 +258,7 @@ const CatalogueAddStaffPage: React.FC = () => {
   };
 
   const renderInput = (
-    name: keyof FormData,
+    name: keyof Employee,
     label: string,
     type: string = "text"
   ) => (
@@ -278,7 +278,7 @@ const CatalogueAddStaffPage: React.FC = () => {
   );
 
   const renderListbox = (
-    name: keyof FormData,
+    name: keyof Employee,
     label: string,
     options: SelectOption[]
   ) => (
