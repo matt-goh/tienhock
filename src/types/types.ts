@@ -39,6 +39,31 @@ export interface TableProps<T> {
   tableKey: string;
 }
 
+export interface FormData {
+  id: string;
+  name: string;
+  telephoneNo: string;
+  email: string;
+  gender: string;
+  nationality: string;
+  birthdate: string;
+  address: string;
+  job: string[];
+  location: string[];
+  dateJoined: string;
+  icNo: string;
+  bankAccountNumber: string;
+  epfNo: string;
+  incomeTaxNo: string;
+  socsoNo: string;
+  document: string;
+  paymentType: string;
+  paymentPreference: string;
+  race: string;
+  agama: string;
+  dateResigned: string;
+}
+
 export interface Job {
   id: string;
   name: string;

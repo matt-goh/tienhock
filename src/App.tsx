@@ -4,6 +4,7 @@ import { Toaster } from "react-hot-toast";
 import React from "react";
 import CatalogueStaffFormPage from "./pages/CatalogueStaffFormPage";
 import CatalogueProductPage from "./pages/CatalogueJobCategoryPage";
+import CatalogueAddStaffPage from "./pages/CatalogueAddStaffPage";
 import CatalogueBasicPage from "./pages/CatalogueBasicPage";
 import CatalogueStaffPage from "./pages/CatalogueStaffPage";
 import CatalogueJobPage from "./pages/CatalogueJobPage";
@@ -34,7 +35,7 @@ const App: React.FC = () => {
             <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
             <Route
               path="/catalogue/staff/new"
-              element={<CatalogueStaffFormPage />}
+              element={<CatalogueAddStaffPage />}
             />
             <Route
               path="/catalogue/staff/:id"
