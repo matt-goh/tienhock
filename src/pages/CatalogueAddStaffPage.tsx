@@ -21,35 +21,11 @@ import Tab from "../components/Tab";
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
+import { FormData } from "../types/types";
 
 interface SelectOption {
   id: string;
   name: string;
-}
-
-interface FormData {
-  id: string;
-  name: string;
-  telephoneNo: string;
-  email: string;
-  gender: string;
-  nationality: string;
-  birthdate: string;
-  address: string;
-  job: string[];
-  location: string[];
-  dateJoined: string;
-  icNo: string;
-  bankAccountNumber: string;
-  epfNo: string;
-  incomeTaxNo: string;
-  socsoNo: string;
-  document: string;
-  paymentType: string;
-  paymentPreference: string;
-  race: string;
-  agama: string;
-  dateResigned: string;
 }
 
 const CatalogueAddStaffPage: React.FC = () => {
@@ -486,10 +462,10 @@ const CatalogueAddStaffPage: React.FC = () => {
           <div className="pl-6 pt-5">
             <Tab
               labels={[
-                "Personal and contact data",
-                "Work data",
+                "Personal",
+                "Work",
                 "Documents",
-                "Additional data",
+                "Additional",
               ]}
             >
               <div className="space-y-6">

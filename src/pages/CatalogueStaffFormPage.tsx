@@ -21,35 +21,11 @@ import Tab from "../components/Tab";
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
+import { FormData } from "../types/types";
 
 interface SelectOption {
   id: string;
   name: string;
-}
-
-interface FormData {
-  id: string;
-  name: string;
-  telephoneNo: string;
-  email: string;
-  gender: string;
-  nationality: string;
-  birthdate: string;
-  address: string;
-  job: string[];
-  location: string[];
-  dateJoined: string;
-  icNo: string;
-  bankAccountNumber: string;
-  epcNo: string;
-  incomeTaxNo: string;
-  socsoNo: string;
-  document: string;
-  paymentType: string;
-  paymentPreference: string;
-  race: string;
-  agama: string;
-  dateResigned: string;
 }
 
 const CatalogueStaffFormPage: React.FC = () => {
@@ -71,7 +47,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     dateJoined: "",
     icNo: "",
     bankAccountNumber: "",
-    epcNo: "",
+    epfNo: "",
     incomeTaxNo: "",
     socsoNo: "",
     document: "",
@@ -574,7 +550,7 @@ const CatalogueStaffFormPage: React.FC = () => {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderInput("icNo", "IC Number")}
                   {renderInput("bankAccountNumber", "Bank Account Number")}
-                  {renderInput("epcNo", "EPC Number")}
+                  {renderInput("epfNo", "EPF Number")}
                   {renderInput("incomeTaxNo", "Income Tax Number")}
                   {renderInput("socsoNo", "SOCSO Number")}
                   {renderListbox("document", "Document", documentOptions)}
