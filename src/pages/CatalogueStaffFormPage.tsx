@@ -88,8 +88,8 @@ const CatalogueStaffFormPage: React.FC = () => {
 
   const paymentTypeOptions = [
     { id: "Delivery", name: "Delivery" },
-    { id: "M", name: "M" },
-    { id: "Cash", name: "Cash" },
+    { id: "Money", name: "Money" },
+    { id: "Commission", name: "Commission" },
   ];
 
   const paymentPreferenceOptions = [

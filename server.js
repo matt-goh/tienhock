@@ -104,7 +104,7 @@ app.post('/api/staffs', async (req, res) => {
     dateJoined,
     icNo,
     bankAccountNumber,
-    epcNo,
+    epfNo,
     incomeTaxNo,
     socsoNo,
     document,
@@ -125,7 +125,7 @@ app.post('/api/staffs', async (req, res) => {
     const query = `
       INSERT INTO staffs (
         id, name, telephone_no, email, gender, nationality, birthdate, address,
-        job, location, date_joined, ic_no, bank_account_number, epc_no,
+        job, location, date_joined, ic_no, bank_account_number, epf_no,
         income_tax_no, socso_no, document, payment_type, payment_preference,
         race, agama, date_resigned
       )
@@ -147,7 +147,7 @@ app.post('/api/staffs', async (req, res) => {
       dateJoined ? new Date(dateJoined) : null, 
       icNo,
       bankAccountNumber, 
-      epcNo, 
+      epfNo, 
       incomeTaxNo, 
       socsoNo, 
       document, 
@@ -183,7 +183,7 @@ app.get('/api/staffs/:id', async (req, res) => {
         s.address,
         s.date_joined as "dateJoined",
         s.bank_account_number as "bankAccountNumber",
-        s.epc_no as "epcNo",
+        s.epf_no as "epfNo",
         s.income_tax_no as "incomeTaxNo",
         s.socso_no as "socsoNo",
         s.document,
@@ -246,7 +246,7 @@ app.put('/api/staffs/:id', async (req, res) => {
     dateJoined,
     icNo,
     bankAccountNumber,
-    epcNo,
+    epfNo,
     incomeTaxNo,
     socsoNo,
     document,
@@ -262,7 +262,7 @@ app.put('/api/staffs/:id', async (req, res) => {
       UPDATE staffs
       SET name = $1, telephone_no = $2, email = $3, gender = $4, nationality = $5, 
           birthdate = $6, address = $7, job = $8, location = $9, date_joined = $10, 
-          ic_no = $11, bank_account_number = $12, epc_no = $13, income_tax_no = $14, 
+          ic_no = $11, bank_account_number = $12, epf_no = $13, income_tax_no = $14, 
           socso_no = $15, document = $16, payment_type = $17, payment_preference = $18, 
           race = $19, agama = $20, date_resigned = $21
       WHERE id = $22
@@ -282,7 +282,7 @@ app.put('/api/staffs/:id', async (req, res) => {
       dateJoined ? new Date(dateJoined) : null, 
       icNo,
       bankAccountNumber, 
-      epcNo, 
+      epfNo, 
       incomeTaxNo, 
       socsoNo, 
       document, 
