@@ -66,7 +66,8 @@ export interface Employee {
 
 export type FilterOptions = {
   showResigned?: boolean;
-  job?: string;
+  jobFilter?: string[] | null;
+  applyJobFilter?: boolean;
   location?: string;
   nationality?: string;
   gender?: string;

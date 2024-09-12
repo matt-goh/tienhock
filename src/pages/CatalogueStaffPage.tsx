@@ -176,6 +176,8 @@ const CatalogueStaffPage = () => {
   );
   const [filters, setFilters] = useState<FilterOptions>({
     showResigned: false,
+    jobFilter: null,
+    applyJobFilter: false,
   });
   const navigate = useNavigate();
 
@@ -232,28 +234,24 @@ const CatalogueStaffPage = () => {
   };
 
   const filteredEmployees = useMemo(() => {
-    console.log("Current filters:", filters); // Keep this log
     return employees.filter((employee) => {
       const matchesSearch =
         employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         employee.id.toLowerCase().includes(searchTerm.toLowerCase());
 
-      console.log(
-        "Employee:",
-        employee.name,
-        "Date Resigned:",
-        employee.dateResigned
-      ); // Keep this log
-
       const matchesResignedFilter = filters.showResigned
-        ? true // If showResigned is true, show all employees
-        : employee.dateResigned === undefined; // Show only non-resigned employees when showResigned is false
+        ? true
+        : employee.dateResigned === null;
 
-      console.log("Matches Resigned Filter:", matchesResignedFilter); // Keep this log
+      const matchesJobFilter =
+        !filters.applyJobFilter ||
+        !filters.jobFilter ||
+        filters.jobFilter.length === 0 ||
+        employee.job.some((job) => filters.jobFilter?.includes(job));
 
-      return matchesSearch && matchesResignedFilter;
+      return matchesSearch && matchesResignedFilter && matchesJobFilter;
     });
-  }, [employees, searchTerm, filters.showResigned]);
+  }, [employees, searchTerm, filters]);
 
   const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
 
@@ -397,6 +395,7 @@ const CatalogueStaffPage = () => {
           <StaffFilterMenu
             onFilterChange={handleFilterChange}
             currentFilters={filters}
+            jobOptions={employees.map((emp) => emp.job).flat()}
           />
           <button
             className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
