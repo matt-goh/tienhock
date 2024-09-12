@@ -58,6 +58,10 @@ app.get('/api/staffs', async (req, res) => {
         s.name, 
         s.ic_no as "icNo", 
         s.telephone_no as "telephoneNo",
+        s.date_resigned as "dateResigned",
+        s.nationality,
+        s.gender,
+        s.race,
         COALESCE(
           (SELECT array_agg(DISTINCT j.name) 
            FROM jobs j 
@@ -79,7 +83,8 @@ app.get('/api/staffs', async (req, res) => {
     const staffs = result.rows.map(staff => ({
       ...staff,
       job: staff.job || [],
-      location: staff.location || []
+      location: staff.location || [],
+      dateResigned: staff.dateResigned ? staff.dateResigned.toISOString().split('T')[0] : null
     }));
 
     res.json(staffs);
