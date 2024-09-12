@@ -38,6 +38,7 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "./ToolTip";
+import ColumnResizer from "./ColumnResizer";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -91,6 +92,9 @@ function Table<T extends Record<string, any>>({
     pageIndex: 0,
     pageSize: 10,
   });
+  const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
+    Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
+  );
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
@@ -101,15 +105,18 @@ function Table<T extends Record<string, any>>({
     [data.length, pagination.pageSize]
   );
 
-  const columnWidths: { [k: string]: number } = Object.fromEntries(
-    columns.map((col) => [col.id, col.width || 200])
-  );
-
   const isEditableColumn = (col: ColumnConfig) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
       col.type
     );
   };
+
+  const handleColumnResize = useCallback((columnId: string, width: number) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [columnId]: width,
+    }));
+  }, []);
 
   const disableAddRowBar = tableKey === "catalogueProduct";
   const isCatalogueProduct = tableKey === "catalogueProduct";
@@ -1005,8 +1012,6 @@ function Table<T extends Record<string, any>>({
   const tableColumns: ColumnDef<T>[] = useMemo(
     () =>
       allColumns.map((col): ColumnDef<T> => {
-        // CHC
-
         const commonHeaderContent = (column: any) => (
           <div
             className={`flex items-center group cursor-pointer w-full h-full ${
@@ -1065,7 +1070,7 @@ function Table<T extends Record<string, any>>({
         const commonCellContent = (info: any) => (
           <div
             onClick={(event) => {
-              event.stopPropagation(); // Add this line
+              event.stopPropagation();
               handleCellClick(info.row.id, info.cell.column.getIndex());
             }}
           >
@@ -1090,11 +1095,20 @@ function Table<T extends Record<string, any>>({
           </div>
         );
 
+        const baseColumn: Partial<ColumnDef<T>> = {
+          id: col.id,
+          size: columnWidths[col.id],
+          header: ({ column }) => (
+            <div className="relative flex items-center h-full">
+              {commonHeaderContent(column)}
+            </div>
+          ),
+        };
+
         switch (col.type) {
           case "action":
-            return columnHelper.display({
-              id: col.id,
-              header: col.header,
+            return {
+              ...baseColumn,
               cell: (info) => (
                 <div className="flex items-center justify-center h-full">
                   <button
@@ -1112,57 +1126,52 @@ function Table<T extends Record<string, any>>({
                   </button>
                 </div>
               ),
-            });
+            } as ColumnDef<T>;
           case "readonly":
           case "amount":
-            return columnHelper.accessor(
-              (row: T) => {
+            return {
+              ...baseColumn,
+              accessorFn: (row: T) => {
                 const amountValue = row[col.id as keyof T];
                 return typeof amountValue === "number" ||
                   typeof amountValue === "string"
                   ? amountValue
                   : 0;
               },
-              {
-                id: col.id,
-                header: ({ column }) => commonHeaderContent(column),
-                cell: (info) => {
-                  const value = info.getValue();
-                  return (
-                    <div className="px-6 py-3 text-right">
-                      {typeof value === "number" ? value.toFixed(2) : "0.00"}
-                    </div>
-                  );
-                },
-                sortingFn: (rowA, rowB, columnId) => {
-                  if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                    return rowA.index - rowB.index;
-                  }
-                  if (rowA.original.isSubtotal) return 1;
-                  if (rowB.original.isSubtotal) return -1;
+              cell: (info) => {
+                const value = info.getValue();
+                return (
+                  <div className="px-6 py-3 text-right">
+                    {typeof value === "number" ? value.toFixed(2) : "0.00"}
+                  </div>
+                );
+              },
+              sortingFn: (rowA, rowB, columnId) => {
+                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                  return rowA.index - rowB.index;
+                }
+                if (rowA.original.isSubtotal) return 1;
+                if (rowB.original.isSubtotal) return -1;
 
-                  const a = rowA.getValue(columnId);
-                  const b = rowB.getValue(columnId);
+                const a = rowA.getValue(columnId);
+                const b = rowB.getValue(columnId);
 
-                  const aNum =
-                    typeof a === "number" ? a : parseFloat(a as string);
-                  const bNum =
-                    typeof b === "number" ? b : parseFloat(b as string);
+                const aNum =
+                  typeof a === "number" ? a : parseFloat(a as string);
+                const bNum =
+                  typeof b === "number" ? b : parseFloat(b as string);
 
-                  if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return aNum - bNum;
-                  }
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                  return aNum - bNum;
+                }
 
-                  return (a?.toString() ?? "").localeCompare(
-                    b?.toString() ?? ""
-                  );
-                },
-              }
-            ) as ColumnDef<T>;
+                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
+              },
+            } as ColumnDef<T>;
           case "checkbox":
-            return columnHelper.accessor((row: T) => row[col.id as keyof T], {
-              id: col.id,
-              header: col.header,
+            return {
+              ...baseColumn,
+              accessorFn: (row: T) => row[col.id as keyof T],
               cell: (info) => (
                 <div className="flex items-center justify-center h-full">
                   <TableEditableCell
@@ -1179,33 +1188,28 @@ function Table<T extends Record<string, any>>({
                   />
                 </div>
               ),
-            }) as ColumnDef<T>;
+            } as ColumnDef<T>;
           default:
-            return columnHelper.accessor(
-              (row: T) => row[col.id as keyof T] as string,
-              {
-                id: col.id,
-                header: ({ column }) => commonHeaderContent(column),
-                cell: commonCellContent,
-                sortingFn: (rowA, rowB, columnId) => {
-                  if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                    return rowA.index - rowB.index;
-                  }
-                  if (rowA.original.isSubtotal) return 1;
-                  if (rowB.original.isSubtotal) return -1;
+            return {
+              ...baseColumn,
+              accessorFn: (row: T) => row[col.id as keyof T] as string,
+              cell: commonCellContent,
+              sortingFn: (rowA, rowB, columnId) => {
+                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                  return rowA.index - rowB.index;
+                }
+                if (rowA.original.isSubtotal) return 1;
+                if (rowB.original.isSubtotal) return -1;
 
-                  const a = rowA.getValue(columnId);
-                  const b = rowB.getValue(columnId);
+                const a = rowA.getValue(columnId);
+                const b = rowB.getValue(columnId);
 
-                  if (typeof a === "number" && typeof b === "number") {
-                    return a - b;
-                  }
-                  return (a?.toString() ?? "").localeCompare(
-                    b?.toString() ?? ""
-                  );
-                },
-              }
-            ) as ColumnDef<T>;
+                if (typeof a === "number" && typeof b === "number") {
+                  return a - b;
+                }
+                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
+              },
+            } as ColumnDef<T>;
         }
       }),
     [
@@ -1220,6 +1224,8 @@ function Table<T extends Record<string, any>>({
       handleCellChange,
       handleCellClick,
       handleKeyDown,
+      columnWidths,
+      handleColumnResize,
     ]
   );
 
@@ -1335,6 +1341,7 @@ function Table<T extends Record<string, any>>({
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"
           ref={tableContainerRef}
+          style={{ tableLayout: "fixed" }}
         >
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -1350,6 +1357,7 @@ function Table<T extends Record<string, any>>({
                 handleSelectAll={handleSelectAll}
                 isSortableColumn={isSortableColumn}
                 columnWidths={columnWidths}
+                onColumnResize={handleColumnResize}
               />
             ))}
           </thead>
