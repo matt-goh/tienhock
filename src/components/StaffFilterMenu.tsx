@@ -279,7 +279,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
           )}
 
           {/* Location Filter */}
-          <div className="px-1">
+          <div className="px-1 pb-1">
             <Combobox
               multiple
               value={currentFilters.locationFilter ?? []}
@@ -386,7 +386,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
           </div>
           {currentFilters.locationFilter &&
             currentFilters.locationFilter.length > 0 && (
-              <div className="px-2.5 py-1">
+              <div className="px-2.5 py-1 pb-2">
                 <div className="flex flex-wrap gap-2">
                   {currentFilters.locationFilter.map((location) => (
                     <span
