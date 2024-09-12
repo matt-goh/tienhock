@@ -68,7 +68,8 @@ export type FilterOptions = {
   showResigned?: boolean;
   jobFilter?: string[] | null;
   applyJobFilter?: boolean;
-  location?: string;
+  locationFilter: string[] | null;
+  applyLocationFilter: boolean;
   nationality?: string;
   gender?: string;
   race?: string;

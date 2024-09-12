@@ -15,17 +15,20 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { FilterOptions } from "../types/types";
+import { LOCATION_MAP } from "../constants/locationConstants";
 
 type StaffFilterMenuProps = {
   onFilterChange: (filters: FilterOptions) => void;
   currentFilters: FilterOptions;
   jobOptions: string[];
+  locationOptions: string[];
 };
 
 const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
   onFilterChange,
   currentFilters,
   jobOptions,
+  locationOptions,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -48,6 +51,44 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
     handleFilterChange("jobFilter", selectedJobs);
   };
 
+  const handleLocationSelection = (selectedLocationIds: string[]) => {
+    handleFilterChange("locationFilter", selectedLocationIds);
+  };
+
+  // Helper function to convert strings to Title Case
+  const toTitleCase = (str: string) => {
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  const getLocationName = (locationCode: string) => {
+    console.log("Processing location code:", locationCode);
+    // Remove any leading zeros and trim whitespace
+    const cleanedCode = locationCode.replace(/^0+/, "").trim();
+    // Find the matching entry in LOCATION_MAP
+    const matchingEntry = Object.entries(LOCATION_MAP).find(([key, value]) =>
+      value.toLowerCase().includes(cleanedCode.toLowerCase())
+    );
+
+    if (matchingEntry) {
+      console.log("Matched location:", matchingEntry[1]);
+      return toTitleCase(matchingEntry[1]);
+    } else {
+      console.log("No match found for:", cleanedCode);
+      return `Unknown (${locationCode})`;
+    }
+  };
+
+  const uniqueLocationOptions = Array.from(new Set(locationOptions)).map(
+    (location) => ({
+      id: location,
+      name: getLocationName(location),
+    })
+  );
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -65,7 +106,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
     <div className="relative inline-block text-left mr-2" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
+        className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 active:bg-gray-200 hover:text-gray-800 active:text-gray-900 transition-colors duration-200"
       >
         <IconFilter stroke={1.5} size={18} className="mr-2" />
         Filter
@@ -74,7 +115,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
         <div className="absolute space-y-1 right-0 mt-2 w-64 text-gray-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-10">
           <div className="px-1 pt-1">
             <button
-              className="group flex justify-between w-full items-center rounded-md px-2.5 py-2.5 hover:bg-gray-100 text-gray-700"
+              className="group flex justify-between w-full items-center rounded-md px-2.5 py-2.5 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 text-gray-700"
               onClick={() =>
                 handleFilterChange("showResigned", !currentFilters.showResigned)
               }
@@ -97,36 +138,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
             </button>
           </div>
 
-          {currentFilters.jobFilter && currentFilters.jobFilter.length > 0 && (
-            <div className="px-2.5">
-              <div className="flex flex-wrap gap-2">
-                {currentFilters.jobFilter.map((job) => (
-                  <span
-                    key={job}
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 cursor-pointer"
-                    onClick={() =>
-                      handleJobSelection(
-                        currentFilters.jobFilter
-                          ?.filter((j) => j !== job)
-                          .map(
-                            (j) =>
-                              uniqueJobOptions.find(
-                                (option) => option.name === j
-                              )?.id
-                          )
-                          .filter((id): id is string => id !== undefined) ?? []
-                      )
-                    }
-                  >
-                    {job}
-                    <button className="ml-1 text-sky-600 hover:text-sky-800">
-                      <IconX size={14} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Job Filter */}
           <div className="px-1">
             <Combobox
               multiple
@@ -141,7 +153,13 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
             >
               {({ open }) => (
                 <div className="relative">
-                  <div className="flex px-2.5 py-2.5 items-center justify-between rounded-md hover:bg-gray-100">
+                  <div
+                    className={`flex px-2.5 py-2.5 items-center justify-between rounded-md ${
+                      !currentFilters.applyJobFilter
+                        ? ""
+                        : "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
+                    }`}
+                  >
                     <ComboboxButton
                       className={`w-full text-left text-gray-900 focus:outline-none ${
                         !currentFilters.applyJobFilter
@@ -229,6 +247,168 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
               )}
             </Combobox>
           </div>
+          {currentFilters.jobFilter && currentFilters.jobFilter.length > 0 && (
+            <div className="px-2.5 py-1">
+              <div className="flex flex-wrap gap-2">
+                {currentFilters.jobFilter.map((job) => (
+                  <span
+                    key={job}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 cursor-pointer"
+                    onClick={() =>
+                      handleJobSelection(
+                        currentFilters.jobFilter
+                          ?.filter((j) => j !== job)
+                          .map(
+                            (j) =>
+                              uniqueJobOptions.find(
+                                (option) => option.name === j
+                              )?.id
+                          )
+                          .filter((id): id is string => id !== undefined) ?? []
+                      )
+                    }
+                  >
+                    {job}
+                    <button className="ml-1 text-sky-600 hover:text-sky-800">
+                      <IconX size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Location Filter */}
+          <div className="px-1">
+            <Combobox
+              multiple
+              value={currentFilters.locationFilter ?? []}
+              onChange={handleLocationSelection}
+              disabled={!currentFilters.applyLocationFilter}
+            >
+              {({ open }) => (
+                <div className="relative">
+                  <div
+                    className={`flex px-2.5 py-2.5 items-center justify-between rounded-md ${
+                      !currentFilters.applyLocationFilter
+                        ? ""
+                        : "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
+                    }`}
+                  >
+                    <ComboboxButton
+                      className={`w-full text-left text-gray-900 focus:outline-none ${
+                        !currentFilters.applyLocationFilter
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      } flex items-center`}
+                    >
+                      <span className="block truncate">
+                        Filter by location(s)
+                      </span>
+                      <IconChevronDown
+                        stroke={2}
+                        size={18}
+                        className="ml-2 text-gray-500"
+                      />
+                    </ComboboxButton>
+                    <button
+                      className="flex items-center ml-2"
+                      onClick={() =>
+                        handleFilterChange(
+                          "applyLocationFilter",
+                          !currentFilters.applyLocationFilter
+                        )
+                      }
+                    >
+                      {currentFilters.applyLocationFilter ? (
+                        <IconSquareCheckFilled
+                          width={18}
+                          height={18}
+                          className="text-blue-600"
+                        />
+                      ) : (
+                        <IconSquare
+                          width={18}
+                          height={18}
+                          stroke={2}
+                          className="text-gray-400"
+                        />
+                      )}
+                    </button>
+                  </div>
+                  <Transition
+                    show={open && currentFilters.applyLocationFilter}
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                      {uniqueLocationOptions.length === 0 ? (
+                        <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                          No locations found.
+                        </div>
+                      ) : (
+                        uniqueLocationOptions.map((option) => (
+                          <ComboboxOption
+                            key={option.id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-4 ${
+                                active ? "bg-gray-100" : "text-gray-900"
+                              }`
+                            }
+                            value={option.id}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {option.name}
+                                </span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                                    <IconCheck stroke={2} size={22} />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </ComboboxOption>
+                        ))
+                      )}
+                    </ComboboxOptions>
+                  </Transition>
+                </div>
+              )}
+            </Combobox>
+          </div>
+          {currentFilters.locationFilter &&
+            currentFilters.locationFilter.length > 0 && (
+              <div className="px-2.5 py-1">
+                <div className="flex flex-wrap gap-2">
+                  {currentFilters.locationFilter.map((location) => (
+                    <span
+                      key={location}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 cursor-pointer"
+                      onClick={() =>
+                        handleLocationSelection(
+                          currentFilters.locationFilter?.filter(
+                            (l) => l !== location
+                          ) ?? []
+                        )
+                      }
+                    >
+                      {getLocationName(location)}
+                      <button className="ml-1 text-sky-600 hover:text-sky-800">
+                        <IconX size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
         </div>
       )}
     </div>

@@ -178,6 +178,8 @@ const CatalogueStaffPage = () => {
     showResigned: false,
     jobFilter: null,
     applyJobFilter: false,
+    locationFilter: null,
+    applyLocationFilter: false,
   });
   const navigate = useNavigate();
 
@@ -233,6 +235,10 @@ const CatalogueStaffPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const locationOptions = useMemo(() => {
+    return Array.from(new Set(employees.map((emp) => String(emp.location))));
+  }, [employees]);
+
   const filteredEmployees = useMemo(() => {
     return employees.filter((employee) => {
       const matchesSearch =
@@ -249,7 +255,22 @@ const CatalogueStaffPage = () => {
         filters.jobFilter.length === 0 ||
         employee.job.some((job) => filters.jobFilter?.includes(job));
 
-      return matchesSearch && matchesResignedFilter && matchesJobFilter;
+      const matchesLocationFilter =
+        !filters.applyLocationFilter ||
+        !filters.locationFilter ||
+        filters.locationFilter.length === 0 ||
+        (Array.isArray(employee.location)
+          ? employee.location.some((loc) =>
+              filters.locationFilter?.includes(loc)
+            )
+          : filters.locationFilter?.includes(employee.location));
+
+      return (
+        matchesSearch &&
+        matchesResignedFilter &&
+        matchesJobFilter &&
+        matchesLocationFilter
+      );
     });
   }, [employees, searchTerm, filters]);
 
@@ -396,6 +417,7 @@ const CatalogueStaffPage = () => {
             onFilterChange={handleFilterChange}
             currentFilters={filters}
             jobOptions={employees.map((emp) => emp.job).flat()}
+            locationOptions={employees.map((emp) => emp.location).flat()}
           />
           <button
             className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
