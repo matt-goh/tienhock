@@ -1,3 +1,4 @@
+import React from "react";
 import { flexRender } from "@tanstack/react-table";
 import {
   IconSquareCheckFilled,
@@ -5,6 +6,7 @@ import {
   IconSquare,
 } from "@tabler/icons-react";
 import { ColumnType } from "../types/types";
+import ColumnResizer from "./ColumnResizer";
 
 interface TableHeaderProps<T> {
   headerGroup: any;
@@ -17,6 +19,7 @@ interface TableHeaderProps<T> {
   handleSelectAll: () => void;
   isSortableColumn: (columnId: string) => boolean | undefined;
   columnWidths: { [k: string]: number };
+  onColumnResize: (columnId: string, width: number) => void;
 }
 
 function TableHeader<T>({
@@ -28,6 +31,7 @@ function TableHeader<T>({
   handleSelectAll,
   isSortableColumn,
   columnWidths,
+  onColumnResize,
 }: TableHeaderProps<T>) {
   const getHeaderClass = (columnType: ColumnType) => {
     let baseClass = "cursor-pointer ";
@@ -47,15 +51,15 @@ function TableHeader<T>({
   };
 
   return (
-    <tr>
+    <tr className="bg-gray-100">
       {headerGroup.headers.map((header: any, index: number) => (
         <th
           key={header.id}
-          className={`px-6 py-2 bg-gray-100 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
+          className={`px-6 py-2 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
             columns.find((col) => col.id === header.id)?.type || "string"
-          )} ${index === 0 ? "border-l-0 rounded-tl-lg" : "border-gray-300"} ${
-            index === headerGroup.headers.length - 1 ? "border-r-0 rounded-tr-lg" : ""
-          } border-b border-gray-300`}
+          )} ${index === 0 ? "rounded-tl-lg" : ""} ${
+            index === headerGroup.headers.length - 1 ? "rounded-tr-lg" : ""
+          }`}
           onClick={() => {
             if (isSortableColumn(header.column.id)) {
               header.column.toggleSorting();
@@ -66,39 +70,47 @@ function TableHeader<T>({
             width: `${columnWidths[header.id]}px` || "auto",
           }}
         >
-          {header.column.id === "selection" && isEditing ? (
-            <div className="flex items-center justify-center h-full">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelectAll();
-                }}
-                className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
-              >
-                {isAllSelectedGlobal ? (
-                  <IconSquareCheckFilled
-                    width={20}
-                    height={20}
-                    className="text-blue-600"
-                  />
-                ) : isIndeterminateGlobal ? (
-                  <IconSquareMinusFilled
-                    width={20}
-                    height={20}
-                    className="text-blue-600"
-                  />
-                ) : (
-                  <IconSquare
-                    width={20}
-                    height={20}
-                    stroke={2}
-                    className="text-gray-400"
-                  />
-                )}
-              </button>
-            </div>
-          ) : (
-            flexRender(header.column.columnDef.header, header.getContext())
+          <div className="flex items-center h-full relative">
+            {header.column.id === "selection" && isEditing ? (
+              <div className="flex items-center justify-center h-full w-full">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectAll();
+                  }}
+                  className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
+                >
+                  {isAllSelectedGlobal ? (
+                    <IconSquareCheckFilled
+                      width={20}
+                      height={20}
+                      className="text-blue-600"
+                    />
+                  ) : isIndeterminateGlobal ? (
+                    <IconSquareMinusFilled
+                      width={20}
+                      height={20}
+                      className="text-blue-600"
+                    />
+                  ) : (
+                    <IconSquare
+                      width={20}
+                      height={20}
+                      stroke={2}
+                      className="text-gray-400"
+                    />
+                  )}
+                </button>
+              </div>
+            ) : (
+              flexRender(header.column.columnDef.header, header.getContext())
+            )}
+          </div>
+          {index < headerGroup.headers.length - 1 && (
+            <ColumnResizer
+              onResize={(width) => onColumnResize(header.id, width)}
+              initialWidth={columnWidths[header.id]}
+            />
           )}
         </th>
       ))}
