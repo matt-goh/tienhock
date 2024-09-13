@@ -18,6 +18,7 @@ import CatalogueJobPage from "../pages/CatalogueJobPage";
 import CatalogueJobCategoryPage from "../pages/CatalogueJobCategoryPage";
 import CatalogueBasicPage from "../pages/CatalogueBasicPage";
 import CatalogueTaxPage from "../pages/CatalogueTaxPage";
+import eInvoisPage from "../pages/eInvoisPage";
 
 export interface PopoverOption {
   name: string;
@@ -107,7 +108,7 @@ export const SidebarData: SidebarItem[] = [
       {
         name: "e-Invois",
         path: "/statement/e-invois",
-        component: CatalogueStaffPage,
+        component: eInvoisPage,
       },
     ],
     defaultOpen: true,

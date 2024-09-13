@@ -65,7 +65,6 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
   };
 
   const getLocationName = (locationCode: string) => {
-    console.log("Processing location code:", locationCode);
     // Remove any leading zeros and trim whitespace
     const cleanedCode = locationCode.replace(/^0+/, "").trim();
     // Find the matching entry in LOCATION_MAP
@@ -74,10 +73,8 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
     );
 
     if (matchingEntry) {
-      console.log("Matched location:", matchingEntry[1]);
       return toTitleCase(matchingEntry[1]);
     } else {
-      console.log("No match found for:", cleanedCode);
       return `Unknown (${locationCode})`;
     }
   };
