@@ -32,6 +32,7 @@ const App: React.FC = () => {
         </aside>
         <main className="flex justify-center w-full py-[60px]">
           <Routes>
+            <Route path="/statement/e-invois" element={<CatalogueStaffPage />} />
             <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
             <Route
               path="/catalogue/staff/new"

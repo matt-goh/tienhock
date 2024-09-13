@@ -81,9 +81,9 @@ export const SidebarData: SidebarItem[] = [
     name: "Statement",
     icon: IconFileInvoice,
     subItems: [
-      { name: "Option 1", link: "/statement/option1" },
-      { name: "Option 2", link: "/statement/option2" },
+      { name: "e-Invois", link: "/statement/e-invois" },
     ],
+    defaultOpen: true,
   },
   {
     name: "Catalogue",
