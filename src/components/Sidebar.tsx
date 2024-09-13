@@ -5,7 +5,7 @@ import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
-import "../index.css"
+import "../index.css";
 
 const Sidebar: React.FC = () => {
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -37,13 +37,13 @@ const Sidebar: React.FC = () => {
     let foundActiveRoute = false;
 
     const checkRouteMatch = (item: SidebarItem) => {
-      if (item.link && currentPath.startsWith(item.link)) {
+      if (item.path && currentPath.startsWith(item.path)) {
         setActiveRoute(item.name);
         foundActiveRoute = true;
       }
       if (item.popoverOptions) {
         item.popoverOptions.forEach((option) => {
-          if (option.link && currentPath.startsWith(option.link)) {
+          if (option.path && currentPath.startsWith(option.path)) {
             setActiveRoute(item.name);
             foundActiveRoute = true;
           }
@@ -179,7 +179,7 @@ const Sidebar: React.FC = () => {
       <React.Fragment key={item.name}>
         <SidebarOption
           name={item.name}
-          link={item.link}
+          path={item.path}
           onMouseEnter={() => handleMouseEnter(item.name)}
           onMouseLeave={handleMouseLeave}
           buttonRef={buttonRef}

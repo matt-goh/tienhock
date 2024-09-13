@@ -1,15 +1,8 @@
-// src/App.tsx
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import React from "react";
-import CatalogueStaffFormPage from "./pages/CatalogueStaffFormPage";
-import CatalogueProductPage from "./pages/CatalogueJobCategoryPage";
-import CatalogueAddStaffPage from "./pages/CatalogueAddStaffPage";
-import CatalogueBasicPage from "./pages/CatalogueBasicPage";
-import CatalogueStaffPage from "./pages/CatalogueStaffPage";
-import CatalogueJobPage from "./pages/CatalogueJobPage";
-import CatalogueTaxPage from "./pages/CatalogueTaxPage";
 import Sidebar from "./components/Sidebar";
+import { routes } from "./components/SidebarData";
 import "./index.css";
 
 const App: React.FC = () => {
@@ -32,82 +25,13 @@ const App: React.FC = () => {
         </aside>
         <main className="flex justify-center w-full py-[60px]">
           <Routes>
-            <Route path="/statement/e-invois" element={<CatalogueStaffPage />} />
-            <Route path="/catalogue/staff" element={<CatalogueStaffPage />} />
-            <Route
-              path="/catalogue/staff/new"
-              element={<CatalogueAddStaffPage />}
-            />
-            <Route
-              path="/catalogue/staff/:id"
-              element={<CatalogueStaffFormPage />}
-            />
-            <Route path="/catalogue/job" element={<CatalogueJobPage />} />
-            <Route
-              path="/catalogue/job_category"
-              element={<CatalogueProductPage />}
-            />
-            <Route
-              path="/catalogue/section"
-              element={
-                <CatalogueBasicPage
-                  title="Section Catalogue"
-                  apiEndpoint="sections"
-                  tableKey="catalogueSection"
-                />
-              }
-            />
-            <Route
-              path="/catalogue/location"
-              element={
-                <CatalogueBasicPage
-                  title="Location Catalogue"
-                  apiEndpoint="locations"
-                  tableKey="catalogueLocation"
-                />
-              }
-            />
-            <Route
-              path="/catalogue/bank"
-              element={
-                <CatalogueBasicPage
-                  title="Bank Catalogue"
-                  apiEndpoint="banks"
-                  tableKey="catalogueBank"
-                />
-              }
-            />
-            <Route path="/catalogue/tax" element={<CatalogueTaxPage />} />
-            <Route
-              path="/catalogue/nationality"
-              element={
-                <CatalogueBasicPage
-                  title="Nationality Catalogue"
-                  apiEndpoint="nationalities"
-                  tableKey="catalogueNationality"
-                />
-              }
-            />
-            <Route
-              path="/catalogue/race"
-              element={
-                <CatalogueBasicPage
-                  title="Race Catalogue"
-                  apiEndpoint="races"
-                  tableKey="catalogueRace"
-                />
-              }
-            />
-            <Route
-              path="/catalogue/agama"
-              element={
-                <CatalogueBasicPage
-                  title="Agama Catalogue"
-                  apiEndpoint="agamas"
-                  tableKey="catalogueAgama"
-                />
-              }
-            />
+            {routes.map((route: any) => (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={React.createElement(route.component)}
+              />
+            ))}
           </Routes>
         </main>
       </div>
