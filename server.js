@@ -3,8 +3,9 @@ import express from 'express';
 import pkg from 'body-parser';
 import pkg2 from 'pg';
 import cors from 'cors';
-import EInvoiceApiClient from './EInvoiceApiClient.js';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
+import EInvoiceApiClient from './EInvoiceApiClient.js';
 
 dotenv.config();
 
@@ -1147,6 +1148,163 @@ app.post('/api/einvoice/login', async (req, res) => {
       message: 'Failed to connect to MyInvois API', 
       apiEndpoint: `${process.env.MYINVOIS_API_BASE_URL}/connect/token`,
       error: error.message,
+      details: error.response ? error.response.data : null
+    });
+  }
+});
+
+// Function to generate a dummy invoice
+function generateDummyInvoice() {
+  const invoiceNumber = `INV-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+  const invoiceDate = new Date().toISOString().split('T')[0];
+  const invoiceTime = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
+
+  return {
+    "Invoice": [{
+      "ID": [{ "_": invoiceNumber }],
+      "IssueDate": [{ "_": invoiceDate }],
+      "IssueTime": [{ "_": invoiceTime }],
+      "InvoiceTypeCode": [{ "_": "01", "listVersionID": "1.1" }],
+      "DocumentCurrencyCode": [{ "_": "MYR" }],
+      "TaxCurrencyCode": [{ "_": "MYR" }],
+      "AccountingSupplierParty": [{
+        "Party": [{
+          "PartyName": [{ "Name": [{ "_": "Dummy Supplier Sdn Bhd" }] }],
+          "PostalAddress": [{ 
+            "StreetName": [{ "_": "123 Main St" }],
+            "CityName": [{ "_": "Kuala Lumpur" }],
+            "PostalZone": [{ "_": "50000" }],
+            "CountrySubentityCode": [{ "_": "14" }],
+            "Country": [{ "IdentificationCode": [{ "_": "MYS" }] }]
+          }],
+          "PartyTaxScheme": [{ "CompanyID": [{ "_": "IG7139779050" }] }],
+          "PartyLegalEntity": [{ "RegistrationName": [{ "_": "Dummy Supplier Sdn Bhd" }] }],
+          "Contact": [{
+            "Telephone": [{ "_": "+60123456789" }],
+            "ElectronicMail": [{ "_": "dummy@supplier.com" }]
+          }],
+          "PartyIdentification": [
+            { "ID": [{ "_": "IG7139779050", "schemeID": "TIN" }] },
+            { "ID": [{ "_": "202001234567", "schemeID": "BRN" }] },
+            { "ID": [{ "_": "A01-2345-67891012", "schemeID": "SST" }] },
+            { "ID": [{ "_": "NA", "schemeID": "TTX" }] }
+          ],
+          "IndustryClassificationCode": [{ "_": "46510", "name": "Wholesale of computer hardware, software and peripherals" }]
+        }]
+      }],
+      "AccountingCustomerParty": [{
+        "Party": [{
+          "PartyName": [{ "Name": [{ "_": "Dummy Customer Sdn Bhd" }] }],
+          "PostalAddress": [{ 
+            "StreetName": [{ "_": "456 Side St" }],
+            "CityName": [{ "_": "Penang" }],
+            "PostalZone": [{ "_": "10000" }],
+            "CountrySubentityCode": [{ "_": "07" }],
+            "Country": [{ "IdentificationCode": [{ "_": "MYS" }] }]
+          }],
+          "PartyTaxScheme": [{ "CompanyID": [{ "_": "C2584563200" }] }],
+          "PartyLegalEntity": [{ "RegistrationName": [{ "_": "Dummy Customer Sdn Bhd" }] }],
+          "Contact": [{
+            "Telephone": [{ "_": "+60187654321" }],
+            "ElectronicMail": [{ "_": "dummy@customer.com" }]
+          }],
+          "PartyIdentification": [
+            { "ID": [{ "_": "C2584563200", "schemeID": "TIN" }] },
+            { "ID": [{ "_": "202009876543", "schemeID": "BRN" }] },
+            { "ID": [{ "_": "NA", "schemeID": "SST" }] }
+          ]
+        }]
+      }],
+      "InvoiceLine": [{
+        "ID": [{ "_": "1" }],
+        "InvoicedQuantity": [{ "_": 1, "unitCode": "EA" }],
+        "LineExtensionAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
+        "Item": [{ 
+          "Name": [{ "_": "Dummy Product" }],
+          "Description": [{ "_": "High-quality dummy product" }],
+          "CommodityClassification": [{ "ItemClassificationCode": [{ "_": "001", "listID": "CLASS" }] }]
+        }],
+        "Price": [{ "PriceAmount": [{ "_": 1000.00, "currencyID": "MYR" }] }],
+        "TaxTotal": [{
+          "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
+          "TaxSubtotal": [{
+            "TaxableAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
+            "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
+            "TaxCategory": [{
+              "ID": [{ "_": "01" }],
+              "Percent": [{ "_": 6.00 }],
+              "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
+            }]
+          }]
+        }]
+      }],
+      "TaxTotal": [{
+        "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
+        "TaxSubtotal": [{
+          "TaxableAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
+          "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
+          "TaxCategory": [{
+            "ID": [{ "_": "01" }],
+            "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
+          }]
+        }]
+      }],
+      "LegalMonetaryTotal": [{
+        "LineExtensionAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
+        "TaxExclusiveAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
+        "TaxInclusiveAmount": [{ "_": 1060.00, "currencyID": "MYR" }],
+        "PayableAmount": [{ "_": 1060.00, "currencyID": "MYR" }]
+      }]
+    }]
+  };
+}
+
+// e-invoice submit endpoint
+app.post('/api/einvoice/submit', async (req, res) => {
+  try {
+    // Generate a dummy invoice
+    const invoice = generateDummyInvoice();
+    const invoiceJson = JSON.stringify(invoice);
+
+    console.log('Generated Invoice:', JSON.stringify(invoice, null, 2)); // Log the generated invoice
+
+    // Prepare the document submission
+    const documentHash = crypto.createHash('sha256').update(invoiceJson).digest('base64');
+    const submission = {
+      documents: [{
+        format: "JSON",
+        document: Buffer.from(invoiceJson).toString('base64'),
+        documentHash: documentHash,
+        codeNumber: invoice.Invoice[0].ID[0]._
+      }]
+    };
+
+    console.log('Submission Payload:', JSON.stringify(submission, null, 2)); // Log the submission payload
+
+    // Submit the document using the correct API endpoint
+    const response = await apiClient.makeApiCall('POST', '/api/v1.0/documentsubmissions/', submission);
+
+    console.log('MyInvois API Response:', JSON.stringify(response, null, 2)); // Log the full API response
+
+    // Check if the response contains the expected properties
+    if (response && response.submissionUID) {
+      res.json({
+        success: true,
+        submissionUID: response.submissionUID,
+        acceptedDocuments: response.acceptedDocuments || []
+      });
+    } else {
+      // If the response doesn't contain the expected properties, treat it as an error
+      throw new Error('Invalid response from MyInvois API: ' + JSON.stringify(response));
+    }
+  } catch (error) {
+    console.error('Error submitting invoice:', error);
+    console.error('Error stack:', error.stack); // Log the full error stack trace
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to submit invoice to MyInvois API', 
+      error: error.message,
+      stack: error.stack,
       details: error.response ? error.response.data : null
     });
   }
