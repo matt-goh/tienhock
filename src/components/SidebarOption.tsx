@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 interface SidebarOptionProps {
   name: string;
-  link?: string;
+  path?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   buttonRef?: React.RefObject<HTMLLIElement>;
@@ -13,7 +13,7 @@ interface SidebarOptionProps {
 
 const SidebarOption: React.FC<SidebarOptionProps> = ({
   name,
-  link,
+  path,
   onMouseEnter,
   onMouseLeave,
   buttonRef,
@@ -47,8 +47,8 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
       onMouseLeave={onMouseLeave}
       ref={buttonRef}
     >
-      {link ? (
-        <Link to={link} className={commonClasses}>
+      {path ? (
+        <Link to={path} className={commonClasses}>
           {content}
         </Link>
       ) : (

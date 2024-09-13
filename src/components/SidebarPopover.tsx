@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 interface SidebarPopoverProps {
-  options: { name: string; link: string }[];
+  options: { name: string; path: string }[];
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   buttonRef: React.RefObject<HTMLElement>;
@@ -59,7 +59,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
         {options.map((option, index) => (
           <li key={index}>
             <a
-              href={option.link}
+              href={option.path}
               className="block py-2 px-4 hover:bg-gray-200/90 active:bg-gray-300/90 transition-colors duration-200 rounded-lg"
             >
               {option.name}
