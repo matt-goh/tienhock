@@ -85,41 +85,60 @@ class EInvoiceApiClient {
 
   makeApiCall(method, endpoint, data = null) {
     return new Promise(async (resolve, reject) => {
-      await this.ensureValidToken();
+      try {
+        await this.ensureValidToken();
 
-      const options = {
-        hostname: new URL(this.baseUrl).hostname,
-        port: 443,
-        path: endpoint,
-        method: method,
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      };
-
-      const req = request(options, (res) => {
-        let responseData = '';
-        res.on('data', (chunk) => {
-          responseData += chunk;
-        });
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(responseData));
-          } catch (error) {
-            reject(new Error(`Failed to parse API response: ${error.message}`));
+        const options = {
+          hostname: new URL(this.baseUrl).hostname,
+          port: 443,
+          path: endpoint,
+          method: method,
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
           }
+        };
+
+        console.log('API Request Options:', JSON.stringify(options, null, 2)); // Log request options
+
+        const req = request(options, (res) => {
+          let responseData = '';
+          res.on('data', (chunk) => {
+            responseData += chunk;
+          });
+          res.on('end', () => {
+            console.log('API Response Status:', res.statusCode); // Log response status
+            console.log('API Response Headers:', JSON.stringify(res.headers, null, 2)); // Log response headers
+            console.log('API Response Body:', responseData); // Log raw response body
+
+            try {
+              const parsedData = JSON.parse(responseData);
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                resolve(parsedData);
+              } else {
+                reject(new Error(`API request failed with status ${res.statusCode}: ${JSON.stringify(parsedData)}`));
+              }
+            } catch (error) {
+              reject(new Error(`Failed to parse API response: ${error.message}\nRaw response: ${responseData}`));
+            }
+          });
         });
-      });
 
-      req.on('error', (error) => {
-        reject(new Error(`API request failed: ${error.message}`));
-      });
+        req.on('error', (error) => {
+          console.error('API Request Error:', error);
+          reject(new Error(`API request failed: ${error.message}`));
+        });
 
-      if (data) {
-        req.write(JSON.stringify(data));
+        if (data) {
+          const stringData = JSON.stringify(data);
+          console.log('API Request Body:', stringData); // Log request body
+          req.write(stringData);
+        }
+        req.end();
+      } catch (error) {
+        console.error('Error in makeApiCall:', error);
+        reject(error);
       }
-      req.end();
     });
   }
 }
