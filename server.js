@@ -3,11 +3,15 @@ import express from 'express';
 import pkg from 'body-parser';
 import pkg2 from 'pg';
 import cors from 'cors';
+import EInvoiceApiClient from './EInvoiceApiClient.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const { json } = pkg;
 const { Pool } = pkg2;
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -1105,5 +1109,45 @@ app.post('/api/job-categories/batch', async (req, res) => {
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ message: 'An unexpected error occurred' });
+  }
+});
+
+// MyInvois API client initialization
+const apiClient = new EInvoiceApiClient(
+  process.env.MYINVOIS_API_BASE_URL,
+  process.env.MYINVOIS_CLIENT_ID,
+  process.env.MYINVOIS_CLIENT_SECRET
+);
+
+// e-invoice login endpoint
+app.post('/api/einvoice/login', async (req, res) => {
+  try {
+    console.log('Attempting to connect to:', `${process.env.MYINVOIS_API_BASE_URL}/connect/token`);
+    const tokenResponse = await apiClient.refreshToken();
+    console.log('E-Invois API Response:', tokenResponse);
+    
+    if (tokenResponse && tokenResponse.access_token) {
+      res.json({ 
+        success: true, 
+        message: 'Successfully connected to MyInvois API',
+        apiEndpoint: `${process.env.MYINVOIS_API_BASE_URL}/connect/token`,
+        tokenInfo: {
+          accessToken: tokenResponse.access_token,
+          expiresIn: tokenResponse.expires_in,
+          tokenType: tokenResponse.token_type
+        }
+      });
+    } else {
+      throw new Error('Invalid token response from MyInvois API');
+    }
+  } catch (error) {
+    console.error('Error connecting to MyInvois API:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to connect to MyInvois API', 
+      apiEndpoint: `${process.env.MYINVOIS_API_BASE_URL}/connect/token`,
+      error: error.message,
+      details: error.response ? error.response.data : null
+    });
   }
 });
