@@ -57,7 +57,9 @@ async function checkDuplicateJobId(id) {
 // STAFF SERVER ENDPOINTS
 app.get('/api/staffs', async (req, res) => {
   try {
-    const query = `
+    const { salesmenOnly } = req.query;
+    
+    let query = `
       SELECT 
         s.id, 
         s.name, 
@@ -67,28 +69,22 @@ app.get('/api/staffs', async (req, res) => {
         s.nationality,
         s.gender,
         s.race,
-        COALESCE(
-          (SELECT array_agg(DISTINCT j.name) 
-           FROM jobs j 
-           WHERE j.id::text = ANY(SELECT jsonb_array_elements_text(s.job::jsonb))),
-          ARRAY[]::text[]
-        ) as job,
-        COALESCE(
-          (SELECT array_agg(DISTINCT l.name) 
-           FROM locations l 
-           WHERE l.id::text = ANY(SELECT jsonb_array_elements_text(s.location::jsonb))),
-          ARRAY[]::text[]
-        ) as location
+        s.job,
+        s.location
       FROM 
         staffs s
     `;
+    
+    if (salesmenOnly === 'true') {
+      query += ` WHERE s.job::jsonb ? 'SALESMAN'`;
+    }
     
     const result = await pool.query(query);
     
     const staffs = result.rows.map(staff => ({
       ...staff,
-      job: staff.job || [],
-      location: staff.location || [],
+      job: Array.isArray(staff.job) ? staff.job : [],
+      location: Array.isArray(staff.location) ? staff.location : [],
       dateResigned: staff.dateResigned ? staff.dateResigned.toISOString().split('T')[0] : null
     }));
 
@@ -264,53 +260,77 @@ app.put('/api/staffs/:id', async (req, res) => {
     paymentPreference,
     race,
     agama,
-    dateResigned
+    dateResigned,
+    newId
   } = req.body;
 
   try {
-    const query = `
-      UPDATE staffs
-      SET name = $1, telephone_no = $2, email = $3, gender = $4, nationality = $5, 
-          birthdate = $6, address = $7, job = $8, location = $9, date_joined = $10, 
-          ic_no = $11, bank_account_number = $12, epf_no = $13, income_tax_no = $14, 
-          socso_no = $15, document = $16, payment_type = $17, payment_preference = $18, 
-          race = $19, agama = $20, date_resigned = $21
-      WHERE id = $22
-      RETURNING *
-    `;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const values = [
-      name, 
-      telephoneNo, 
-      email || null, 
-      gender, 
-      nationality, 
-      birthdate ? new Date(birthdate) : null, 
-      address,
-      JSON.stringify(job), 
-      JSON.stringify(location), 
-      dateJoined ? new Date(dateJoined) : null, 
-      icNo,
-      bankAccountNumber, 
-      epfNo, 
-      incomeTaxNo, 
-      socsoNo, 
-      document, 
-      paymentType,
-      paymentPreference, 
-      race, 
-      agama, 
-      dateResigned ? new Date(dateResigned) : null,
-      id
-    ];
+      let updateId = id;
+      if (newId && newId !== id) {
+        // Check if the new ID already exists
+        const checkIdQuery = 'SELECT id FROM staffs WHERE id = $1';
+        const checkIdResult = await client.query(checkIdQuery, [newId]);
+        if (checkIdResult.rows.length > 0) {
+          throw new Error('A staff member with the new ID already exists');
+        }
+        updateId = newId;
+      }
 
-    const result = await pool.query(query, values);
+      const query = `
+        UPDATE staffs
+        SET id = $1, name = $2, telephone_no = $3, email = $4, gender = $5, nationality = $6, 
+            birthdate = $7, address = $8, job = $9, location = $10, date_joined = $11, 
+            ic_no = $12, bank_account_number = $13, epf_no = $14, income_tax_no = $15, 
+            socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
+            race = $20, agama = $21, date_resigned = $22
+        WHERE id = $23
+        RETURNING *
+      `;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Staff member not found' });
+      const values = [
+        updateId, 
+        name, 
+        telephoneNo, 
+        email || null, 
+        gender, 
+        nationality, 
+        birthdate ? new Date(birthdate) : null, 
+        address,
+        JSON.stringify(job), 
+        JSON.stringify(location), 
+        dateJoined ? new Date(dateJoined) : null, 
+        icNo,
+        bankAccountNumber, 
+        epfNo, 
+        incomeTaxNo, 
+        socsoNo, 
+        document, 
+        paymentType,
+        paymentPreference, 
+        race, 
+        agama, 
+        dateResigned ? new Date(dateResigned) : null,
+        id
+      ];
+
+      const result = await client.query(query, values);
+
+      if (result.rows.length === 0) {
+        throw new Error('Staff member not found');
+      }
+
+      await client.query('COMMIT');
+      res.json({ message: 'Staff member updated successfully', staff: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    res.json({ message: 'Staff member updated successfully', staff: result.rows[0] });
   } catch (error) {
     console.error('Error updating staff member:', error);
     res.status(500).json({ message: 'Error updating staff member', error: error.message });
@@ -332,6 +352,144 @@ app.delete('/api/staffs/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting staff member:', error);
     res.status(500).json({ message: 'Error deleting staff member', error: error.message });
+  }
+});
+
+// Customer Catalogue Endpoints
+// Get all customers
+app.get('/api/customers', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM customers';
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    res.status(500).json({ message: 'Error fetching customers', error: error.message });
+  }
+});
+
+// Create a new customer
+app.post('/api/customers', async (req, res) => {
+  const { id, name, closeness, salesman, tin_number } = req.body;
+
+  try {
+    const query = `
+      INSERT INTO customers (id, name, closeness, salesman, tin_number)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+    
+    const values = [id, name, closeness, salesman, tin_number];
+
+    const result = await pool.query(query, values);
+    res.status(201).json({ message: 'Customer created successfully', customer: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') { // unique_violation error code
+      return res.status(400).json({ message: 'A customer with this ID already exists' });
+    }
+    console.error('Error creating customer:', error);
+    res.status(500).json({ message: 'Error creating customer', error: error.message });
+  }
+});
+
+// Update a customer
+app.put('/api/customers/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, closeness, salesman, tin_number } = req.body;
+
+  try {
+    const query = `
+      UPDATE customers
+      SET name = $1, closeness = $2, salesman = $3, tin_number = $4
+      WHERE id = $5
+      RETURNING *
+    `;
+    
+    const values = [name, closeness, salesman, tin_number, id];
+
+    const result = await pool.query(query, values);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    res.json({ message: 'Customer updated successfully', customer: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating customer:', error);
+    res.status(500).json({ message: 'Error updating customer', error: error.message });
+  }
+});
+
+// Delete customers
+app.delete('/api/customers', async (req, res) => {
+  const { customerIds } = req.body;
+
+  if (!Array.isArray(customerIds) || customerIds.length === 0) {
+    return res.status(400).json({ message: 'Invalid customer IDs provided' });
+  }
+
+  try {
+    const query = 'DELETE FROM customers WHERE id = ANY($1) RETURNING id';
+    const result = await pool.query(query, [customerIds]);
+
+    const deletedIds = result.rows.map(row => row.id);
+    res.status(200).json({ 
+      message: 'Customers deleted successfully', 
+      deletedCustomerIds: deletedIds 
+    });
+  } catch (error) {
+    console.error('Error deleting customers:', error);
+    res.status(500).json({ message: 'Error deleting customers', error: error.message });
+  }
+});
+
+// Batch update/insert customers
+app.post('/api/customers/batch', async (req, res) => {
+  const { customers } = req.body;
+
+  if (!Array.isArray(customers)) {
+    return res.status(400).json({ message: 'Invalid input: customers must be an array' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const processedCustomers = [];
+
+      for (const customer of customers) {
+        const { id, name, closeness, salesman, tin_number } = customer;
+        
+        const upsertQuery = `
+          INSERT INTO customers (id, name, closeness, salesman, tin_number)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (id) DO UPDATE
+          SET name = EXCLUDED.name,
+              closeness = EXCLUDED.closeness,
+              salesman = EXCLUDED.salesman,
+              tin_number = EXCLUDED.tin_number
+          RETURNING *
+        `;
+        const upsertValues = [id, name, closeness, salesman, tin_number];
+        const result = await client.query(upsertQuery, upsertValues);
+        processedCustomers.push(result.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      res.json({ 
+        message: 'Customers processed successfully', 
+        customers: processedCustomers
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error processing customers:', error);
+    res.status(500).json({ message: 'Error processing customers', error: error.message });
   }
 });
 

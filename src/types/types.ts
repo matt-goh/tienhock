@@ -62,6 +62,7 @@ export interface Employee {
   race: string;
   agama: string;
   dateResigned: string;
+  newId: string;
 }
 
 export type FilterOptions = {
@@ -74,6 +75,15 @@ export type FilterOptions = {
   gender?: string;
   race?: string;
 };
+
+export interface Customer {
+  id: string;
+  name: string;
+  closeness: string;
+  salesman: string;
+  tin_number: number;
+  originalId?: string;
+}
 
 export interface Job {
   id: string;
