@@ -56,6 +56,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     race: "",
     agama: "",
     dateResigned: "",
+    newId: "",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     ...formData,
@@ -256,10 +257,21 @@ const CatalogueStaffFormPage: React.FC = () => {
     };
 
     try {
-      const url = isEditMode
-        ? `http://localhost:5000/api/staffs/${id}`
-        : "http://localhost:5000/api/staffs";
-      const method = isEditMode ? "PUT" : "POST";
+      let url = "http://localhost:5000/api/staffs";
+      let method = "POST";
+
+      if (isEditMode) {
+        if (id !== formData.id) {
+          // ID has changed, use PUT method with the new ID
+          url = `http://localhost:5000/api/staffs/${id}`;
+          method = "PUT";
+          dataToSend.newId = formData.id; // Add newId field to indicate ID change
+        } else {
+          // ID hasn't changed, use regular PUT
+          url = `http://localhost:5000/api/staffs/${id}`;
+          method = "PUT";
+        }
+      }
 
       const response = await fetch(url, {
         method: method,
@@ -507,14 +519,7 @@ const CatalogueStaffFormPage: React.FC = () => {
         </div>
         <form onSubmit={handleSubmit}>
           <div className="pl-6 pt-5">
-            <Tab
-              labels={[
-                "Personal",
-                "Work",
-                "Documents",
-                "Additional",
-              ]}
-            >
+            <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
               <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderInput("id", "ID")}

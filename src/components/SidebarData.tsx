@@ -19,6 +19,7 @@ import CatalogueJobCategoryPage from "../pages/CatalogueJobCategoryPage";
 import CatalogueBasicPage from "../pages/CatalogueBasicPage";
 import CatalogueTaxPage from "../pages/CatalogueTaxPage";
 import eInvoisPage from "../pages/eInvoisPage";
+import CatalogueCustomerPage from "../pages/CatalogueCustomerPage";
 
 export interface PopoverOption {
   name: string;
@@ -133,6 +134,11 @@ export const SidebarData: SidebarItem[] = [
             component: CatalogueStaffFormPage,
           },
         ],
+      },
+      {
+        name: "Customer",
+        path: "/catalogue/customer",
+        component: CatalogueCustomerPage,
       },
       {
         name: "Job",

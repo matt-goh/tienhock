@@ -53,6 +53,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     race: "",
     agama: "",
     dateResigned: "",
+    newId: "",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     id: "",
@@ -77,6 +78,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     race: "",
     agama: "",
     dateResigned: "",
+    newId: "",
   });
 
   const [isFormChanged, setIsFormChanged] = useState(false);
@@ -460,14 +462,7 @@ const CatalogueAddStaffPage: React.FC = () => {
         </div>
         <form onSubmit={handleSubmit}>
           <div className="pl-6 pt-5">
-            <Tab
-              labels={[
-                "Personal",
-                "Work",
-                "Documents",
-                "Additional",
-              ]}
-            >
+            <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
               <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderInput("id", "ID")}
