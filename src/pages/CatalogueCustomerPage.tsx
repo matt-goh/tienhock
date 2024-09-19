@@ -36,7 +36,7 @@ const CustomerCataloguePage: React.FC = () => {
       },
       {
         id: "closeness",
-        header: "Closeness",
+        header: "L/O",
         type: isEditing ? "listbox" : "readonly",
         width: 150,
         options: ["Local", "Outstation"],

@@ -83,10 +83,10 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         formatted = "0";
       }
 
-      // Limit to 99999
+      // Limit to 9999999999999999
       const numValue = parseFloat(formatted);
-      if (numValue > 99999) {
-        formatted = "99999";
+      if (numValue > 9999999999999999) {
+        formatted = "9999999999999999";
       }
 
       return formatted;
