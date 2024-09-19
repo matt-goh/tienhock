@@ -11,15 +11,16 @@ import { Icon } from "@tabler/icons-react";
 import React from "react";
 
 // Import your components here
-import CatalogueStaffPage from "../pages/CatalogueStaffPage";
-import CatalogueAddStaffPage from "../pages/CatalogueAddStaffPage";
-import CatalogueStaffFormPage from "../pages/CatalogueStaffFormPage";
-import CatalogueJobPage from "../pages/CatalogueJobPage";
 import CatalogueJobCategoryPage from "../pages/CatalogueJobCategoryPage";
+import CatalogueStaffFormPage from "../pages/CatalogueStaffFormPage";
+import CatalogueAddStaffPage from "../pages/CatalogueAddStaffPage";
+import CatalogueCustomerPage from "../pages/CatalogueCustomerPage";
+import CatalogueProductPage from "../pages/CatalogueProductPage";
 import CatalogueBasicPage from "../pages/CatalogueBasicPage";
+import CatalogueStaffPage from "../pages/CatalogueStaffPage";
+import CatalogueJobPage from "../pages/CatalogueJobPage";
 import CatalogueTaxPage from "../pages/CatalogueTaxPage";
 import eInvoisPage from "../pages/eInvoisPage";
-import CatalogueCustomerPage from "../pages/CatalogueCustomerPage";
 
 export interface PopoverOption {
   name: string;
@@ -139,6 +140,11 @@ export const SidebarData: SidebarItem[] = [
         name: "Customer",
         path: "/catalogue/customer",
         component: CatalogueCustomerPage,
+      },
+      {
+        name: "Product",
+        path: "/catalogue/product",
+        component: CatalogueProductPage,
       },
       {
         name: "Job",
