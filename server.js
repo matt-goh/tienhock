@@ -1403,6 +1403,39 @@ app.post('/api/job-categories/batch', async (req, res) => {
   }
 });
 
+// In-memory storage for uploaded invoices
+let uploadedInvoices = [];
+
+// Endpoint to receive uploaded invoice data
+app.post('/api/invoices/upload', (req, res) => {
+  const newInvoices = req.body;
+  if (Array.isArray(newInvoices)) {
+    uploadedInvoices = [...uploadedInvoices, ...newInvoices];
+    res.json({ message: `${newInvoices.length} invoices uploaded successfully` });
+  } else {
+    res.status(400).json({ message: 'Invalid data format. Expected an array of invoices.' });
+  }
+});
+
+// Endpoint to get all uploaded invoices with customer names
+app.get('/api/invoices', async (req, res) => {
+  try {
+    const customerQuery = 'SELECT id, name FROM customers';
+    const customerResult = await pool.query(customerQuery);
+    const customerMap = new Map(customerResult.rows.map(row => [row.id, row.name]));
+
+    const invoicesWithCustomerNames = uploadedInvoices.map(invoice => ({
+      ...invoice,
+      customerName: customerMap.get(invoice.customer) || invoice.customer
+    }));
+
+    res.json(invoicesWithCustomerNames);
+  } catch (error) {
+    console.error('Error fetching invoices with customer names:', error);
+    res.status(500).json({ message: 'Error fetching invoices', error: error.message });
+  }
+});
+
 // MyInvois API client initialization
 const apiClient = new EInvoiceApiClient(
   process.env.MYINVOIS_API_BASE_URL,

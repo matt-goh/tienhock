@@ -198,7 +198,7 @@ const CatalogueProductPage: React.FC = () => {
   return (
     <div className="relative">
       <div className="flex flex-col items-center justify-center w-auto">
-        <div className="relative w-full text-left text-lg text-gray-700 font-medium mb-6">
+        <div className="relative w-full text-center text-lg text-gray-700 font-medium mb-6">
           Product Catalogue
         </div>
         <div className="relative justify-center">

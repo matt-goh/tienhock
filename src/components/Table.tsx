@@ -818,6 +818,14 @@ function Table<T extends Record<string, any>>({
         !row.original.isSubtotal &&
         isEditableColumn(columnConfig);
 
+      // Custom cell renderer
+      if (columnConfig.cell) {
+        return columnConfig.cell({
+          getValue: () => cell.getValue(),
+          row: { original: { ...row.original, isSorting } },
+        });
+      }
+
       if (columnType === "selection") {
         return (
           <div className="flex items-center justify-center h-full">

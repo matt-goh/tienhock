@@ -18,6 +18,10 @@ export interface ColumnConfig {
   type: ColumnType;
   width?: number;
   options?: string[];
+  cell?: (info: {
+    getValue: () => any;
+    row: { original: any };
+  }) => React.ReactNode;
 }
 
 // Define data structure
