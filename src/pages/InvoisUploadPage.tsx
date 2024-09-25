@@ -2,40 +2,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconCloudUpload } from "@tabler/icons-react";
 import Table from "../components/Table";
 import toast from "react-hot-toast";
-import { ColumnConfig } from "../types/types";
+import { ColumnConfig, InvoiceData } from "../types/types";
 import { useNavigate } from "react-router-dom";
 
-interface OrderDetail {
-  code: string;
-  qty: string;
-  price: string;
-  total: string;
-  discount: string;
-  other: string;
-}
-
-interface InvoiceData {
-  id: string;
-  invoiceNo: string;
-  orderNo: string;
-  date: string;
-  type: string;
-  customer: string;
-  customerName: string;
-  salesman: string;
-  totalAmount: string;
-  discount: string;
-  netAmount: string;
-  rounding: string;
-  payableAmount: string;
-  cash: string;
-  balance: string;
-  time: string;
-  orderDetails: OrderDetail[];
-  isSorting?: boolean;
-}
-
-const InvoisPage: React.FC = () => {
+const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +190,7 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleInvoiceClick = (invoiceId: string, invoiceData: InvoiceData) => {
-    navigate(`/statement/invois/${invoiceId}`, { state: { invoiceData } });
+    navigate(`/stock/invois/${invoiceId}`, { state: { invoiceData } });
   };
 
   const handleDelete = async (selectedIds: number[]): Promise<void> => {
@@ -323,4 +293,4 @@ const InvoisPage: React.FC = () => {
   );
 };
 
-export default InvoisPage;
+export default InvoisUploadPage;

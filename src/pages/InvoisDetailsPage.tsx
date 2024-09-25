@@ -1,38 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams, Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Table from "../components/Table";
-import { ColumnConfig } from "../types/types";
-
-interface OrderDetail {
-  code: string;
-  productName: string;
-  qty: string;
-  price: string;
-  total: string;
-  discount: string;
-  other: string;
-  isTotal?: boolean;
-}
-
-interface InvoiceData {
-  id: string;
-  invoiceNo: string;
-  orderNo: string;
-  date: string;
-  type: string;
-  customer: string;
-  customerName: string;
-  salesman: string;
-  totalAmount: string;
-  discount: string;
-  netAmount: string;
-  rounding: string;
-  payableAmount: string;
-  cash: string;
-  balance: string;
-  time: string;
-  orderDetails: OrderDetail[];
-}
+import { ColumnConfig, InvoiceData, OrderDetail } from "../types/types";
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -92,7 +61,7 @@ const InvoisDetailsPage: React.FC = () => {
   return (
     <div className="p-4 max-w-6xl mx-auto">
       <Link
-        to="/statement/invois"
+        to="/stock/invois"
         className="text-blue-600 hover:text-blue-800 mb-4 inline-block"
       >
         &larr; Back to Invois
