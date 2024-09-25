@@ -263,7 +263,7 @@ const InvoisPage: React.FC = () => {
       id: "customerName",
       header: "Customer",
       type: "readonly",
-      width: 400,
+      width: 350,
       cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
         <div className="w-full h-full px-6 py-3 text-left outline-none bg-transparent">
           {info.row.original.customerName || info.row.original.customer}

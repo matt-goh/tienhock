@@ -1417,21 +1417,29 @@ app.post('/api/invoices/upload', (req, res) => {
   }
 });
 
-// Endpoint to get all uploaded invoices with customer names
+// Endpoint to get all uploaded invoices with customer names and product details
 app.get('/api/invoices', async (req, res) => {
   try {
     const customerQuery = 'SELECT id, name FROM customers';
     const customerResult = await pool.query(customerQuery);
     const customerMap = new Map(customerResult.rows.map(row => [row.id, row.name]));
 
-    const invoicesWithCustomerNames = uploadedInvoices.map(invoice => ({
+    const productQuery = 'SELECT id, description FROM products';
+    const productResult = await pool.query(productQuery);
+    const productMap = new Map(productResult.rows.map(row => [row.id, row.description]));
+
+    const invoicesWithDetails = uploadedInvoices.map(invoice => ({
       ...invoice,
-      customerName: customerMap.get(invoice.customer) || invoice.customer
+      customerName: customerMap.get(invoice.customer) || invoice.customer,
+      orderDetails: invoice.orderDetails.map(detail => ({
+        ...detail,
+        productName: productMap.get(detail.code) || detail.code
+      }))
     }));
 
-    res.json(invoicesWithCustomerNames);
+    res.json(invoicesWithDetails);
   } catch (error) {
-    console.error('Error fetching invoices with customer names:', error);
+    console.error('Error fetching invoices with details:', error);
     res.status(500).json({ message: 'Error fetching invoices', error: error.message });
   }
 });
