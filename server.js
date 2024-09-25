@@ -1406,9 +1406,41 @@ app.post('/api/job-categories/batch', async (req, res) => {
 // In-memory storage for uploaded invoices
 let uploadedInvoices = [];
 
+// Helper function to check if a value is empty or invalid
+const isEmptyOrInvalid = (value) => {
+  return value === '' || value === null || value === undefined || 
+         Number.isNaN(value) || value === '\r' || value === 'NaN';
+};
+
+// Helper function to check if a row should be removed
+const shouldRemoveRow = (row) => {
+  return isEmptyOrInvalid(row.code) && isEmptyOrInvalid(row.productName);
+};
+
+// Helper function to sanitize a single order detail
+const sanitizeOrderDetail = (detail) => {
+  const sanitized = { ...detail };
+  for (const key in sanitized) {
+    if (isEmptyOrInvalid(sanitized[key])) {
+      if (key === 'qty' || key === 'price' || key === 'total' || key === 'discount' || key === 'other') {
+        sanitized[key] = '0'; // Set numeric fields to '0' as a string if invalid
+      } else {
+        sanitized[key] = ''; // Set other fields to empty string if invalid
+      }
+    }
+  }
+  return sanitized;
+};
+
 // Endpoint to receive uploaded invoice data
 app.post('/api/invoices/upload', (req, res) => {
-  const newInvoices = req.body;
+  const newInvoices = req.body.map(invoice => ({
+    ...invoice,
+    orderDetails: invoice.orderDetails
+      .map(sanitizeOrderDetail)
+      .filter(detail => !shouldRemoveRow(detail))
+  }));
+
   if (Array.isArray(newInvoices)) {
     uploadedInvoices = [...uploadedInvoices, ...newInvoices];
     res.json({ message: `${newInvoices.length} invoices uploaded successfully` });
@@ -1431,10 +1463,12 @@ app.get('/api/invoices', async (req, res) => {
     const invoicesWithDetails = uploadedInvoices.map(invoice => ({
       ...invoice,
       customerName: customerMap.get(invoice.customer) || invoice.customer,
-      orderDetails: invoice.orderDetails.map(detail => ({
-        ...detail,
-        productName: productMap.get(detail.code) || detail.code
-      }))
+      orderDetails: invoice.orderDetails
+        .map(detail => ({
+          ...sanitizeOrderDetail(detail),
+          productName: productMap.get(detail.code) || detail.code
+        }))
+        .filter(detail => !shouldRemoveRow(detail))
     }));
 
     res.json(invoicesWithDetails);
@@ -1443,13 +1477,6 @@ app.get('/api/invoices', async (req, res) => {
     res.status(500).json({ message: 'Error fetching invoices', error: error.message });
   }
 });
-
-// MyInvois API client initialization
-const apiClient = new EInvoiceApiClient(
-  process.env.MYINVOIS_API_BASE_URL,
-  process.env.MYINVOIS_CLIENT_ID,
-  process.env.MYINVOIS_CLIENT_SECRET
-);
 
 // e-invoice login endpoint
 app.post('/api/einvoice/login', async (req, res) => {
