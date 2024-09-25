@@ -1478,6 +1478,13 @@ app.get('/api/invoices', async (req, res) => {
   }
 });
 
+// MyInvois API client initialization
+const apiClient = new EInvoiceApiClient(
+  process.env.MYINVOIS_API_BASE_URL,
+  process.env.MYINVOIS_CLIENT_ID,
+  process.env.MYINVOIS_CLIENT_SECRET
+);
+
 // e-invoice login endpoint
 app.post('/api/einvoice/login', async (req, res) => {
   try {
