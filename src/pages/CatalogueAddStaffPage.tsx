@@ -22,6 +22,7 @@ import clsx from "clsx";
 import toast from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
 import { Employee } from "../types/types";
+import BackButton from "../components/BackButton";
 
 interface SelectOption {
   id: string;
@@ -445,13 +446,7 @@ const CatalogueAddStaffPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4">
-      <button
-        onClick={handleBackClick}
-        className="ml-3 mb-6 pl-2.5 pr-4 py-2 flex items-center font-medium hover:bg-gray-100 active:bg-gray-200 rounded-full text-gray-700 hover:text-gray-800 transition-colors duration-200"
-      >
-        <IconChevronLeft className="mr-1" size={20} />
-        Back
-      </button>
+      <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
           <h1 className="text-xl font-semibold text-gray-900">Add New Staff</h1>

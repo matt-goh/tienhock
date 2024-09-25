@@ -10,7 +10,7 @@ import {
 import { Icon } from "@tabler/icons-react";
 import React from "react";
 
-// Import your components here
+// Import components here
 import CatalogueJobCategoryPage from "../pages/CatalogueJobCategoryPage";
 import CatalogueStaffFormPage from "../pages/CatalogueStaffFormPage";
 import CatalogueAddStaffPage from "../pages/CatalogueAddStaffPage";
@@ -103,12 +103,12 @@ export const SidebarData: SidebarItem[] = [
     subItems: [
       {
         name: "Invois",
-        path: "/stock/invois",
+        path: "/stock/invois/new",
         component: InvoisUploadPage,
         subItems: [
           {
             name: "Invois Details",
-            path: "/stock/invois/:id",
+            path: "/stock/invois/new/:id",
             component: InvoisDetailsPage,
           },
         ],
