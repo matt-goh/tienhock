@@ -204,7 +204,7 @@ function Table<T extends Record<string, any>>({
       if (isSorting || !rowId) return;
 
       const row = table.getRowModel().rows.find((r) => r.id === rowId);
-      if (!row || row.original.isSubtotal) return;
+      if (!row || row.original.isSubtotal || row.original.isTotal) return;
 
       const filteredCellIndex = isEditing ? cellIndex - 1 : cellIndex;
       const columnId = columns[filteredCellIndex]?.id;
@@ -803,6 +803,12 @@ function Table<T extends Record<string, any>>({
     return columns.some((col) => col.type === "number");
   }, [columns]);
 
+  const calculateRowAmount = useCallback((row: T) => {
+    const quantity = parseFloat(row.qty) || 0;
+    const price = parseFloat(row.price) || 0;
+    return (quantity * price).toFixed(2);
+  }, []);
+
   //RC
   const renderCell = (
     row: Row<T>,
@@ -816,6 +822,7 @@ function Table<T extends Record<string, any>>({
       const isEditable =
         !isSorting &&
         !row.original.isSubtotal &&
+        !row.original.isTotal &&
         isEditableColumn(columnConfig);
 
       // Custom cell renderer
@@ -862,22 +869,8 @@ function Table<T extends Record<string, any>>({
         );
       }
 
-      if (row.original.isSubtotal) {
-        if (columnType === "amount") {
-          return (
-            <React.Fragment>
-              <td
-                colSpan={columns.length - 1}
-                className="py-3 pr-6 text-right font-semibold border"
-              >
-                Subtotal:
-              </td>
-              <td className="py-3 pr-6 text-right font-semibold border">
-                {cell.getValue() as ReactNode}
-              </td>
-            </React.Fragment>
-          );
-        } else if (columnType === "action") {
+      if (row.original.isSubtotal || row.original.isTotal) {
+        if (columnType === "action") {
           return (
             <div className="flex items-center justify-center h-full">
               <button
@@ -937,19 +930,16 @@ function Table<T extends Record<string, any>>({
       }
 
       if (columnType === "amount") {
-        const jamPerDay = parseFloat(row.original.jamPerDay) || 0;
-        const rate = parseFloat(row.original.rate) || 0;
-        const amount = (jamPerDay * rate).toFixed(2);
         return (
           <TableEditableCell
-            value={amount}
+            value={cell.getValue()}
             onChange={() => {}}
             type={columnType}
             editable={false}
             focus={false}
             onKeyDown={() => {}}
             isSorting={isSorting}
-            previousCellValue={amount}
+            previousCellValue={cell.getValue()}
           />
         );
       }
@@ -1201,8 +1191,34 @@ function Table<T extends Record<string, any>>({
             return {
               ...baseColumn,
               accessorFn: (row: T) => row[col.id as keyof T] as string,
-              cell: commonCellContent,
+              cell: (info) => {
+                const row = info.row.original as T & {
+                  isTotal?: boolean;
+                  isSubtotal?: boolean;
+                };
+                if (row.isTotal || row.isSubtotal) {
+                  if (col.type === "amount") {
+                    return (
+                      <>
+                        <td
+                          colSpan={columns.length - 1}
+                          className="py-3 pr-6 text-right font-semibold border-t border-b"
+                        >
+                          {row.isTotal ? "Total:" : "Subtotal:"}
+                        </td>
+                        <td className="py-3 pr-6 text-right font-semibold border-t border-b">
+                          {info.getValue() as React.ReactNode}
+                        </td>
+                      </>
+                    );
+                  }
+                  return null;
+                }
+                return commonCellContent(info);
+              },
               sortingFn: (rowA, rowB, columnId) => {
+                if (rowA.original.isTotal) return 1;
+                if (rowB.original.isTotal) return -1;
                 if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
                   return rowA.index - rowB.index;
                 }
@@ -1387,7 +1403,9 @@ function Table<T extends Record<string, any>>({
                       : "hover:bg-gray-100"
                   } ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
-                    row.original.isSubtotal ? setSelectedRowId(row.id) : null
+                    row.original.isSubtotal || row.original.isTotal
+                      ? setSelectedRowId(row.id)
+                      : null
                   }
                 >
                   {row.getVisibleCells().map((cell, cellIndex) => {
@@ -1396,7 +1414,7 @@ function Table<T extends Record<string, any>>({
                     const isFirstCell = cellIndex === 0;
                     const isLastCell =
                       cellIndex === row.getVisibleCells().length - 1;
-                    if (row.original.isSubtotal) {
+                    if (row.original.isTotal || row.original.isSubtotal) {
                       if (cell.column.id === "selection") {
                         return (
                           <td
@@ -1413,10 +1431,11 @@ function Table<T extends Record<string, any>>({
                         return (
                           <td
                             key={cell.id}
-                            colSpan={columns.length - 1}
+                            colSpan={columns.length}
                             className={`py-3 pr-6 text-right font-semibold`}
                           >
-                            Subtotal: {cell.getValue() as ReactNode}
+                            {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
+                            {cell.getValue() as ReactNode}
                           </td>
                         );
                       } else if (cell.column.id === "actions") {
