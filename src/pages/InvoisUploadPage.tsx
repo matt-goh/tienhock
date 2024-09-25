@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { IconCloudUpload } from "@tabler/icons-react";
+import { IconCloudUpload, IconTrash } from "@tabler/icons-react";
 import Table from "../components/Table";
 import toast from "react-hot-toast";
-import { ColumnConfig, InvoiceData } from "../types/types";
+import { ColumnConfig, InvoiceData, OrderDetail } from "../types/types";
 import { useNavigate } from "react-router-dom";
 
 const InvoisUploadPage: React.FC = () => {
@@ -140,12 +140,12 @@ const InvoisUploadPage: React.FC = () => {
           customer,
           salesman,
           totalAmount,
-          discount,
-          netAmount,
-          rounding,
-          payableAmount,
-          cash,
-          balance,
+          filler, // Filler fields to comply with the imported data format from Tien Hock mobile app
+          filler2,
+          filler3,
+          filler4,
+          filler5,
+          filler6,
           time,
           orderDetailsString,
         ] = line.split("|");
@@ -156,14 +156,15 @@ const InvoisUploadPage: React.FC = () => {
           .split("E&")
           .filter(Boolean)
           .map((item) => {
-            const [code, qty, price, total, discount, other] = item.split("&&");
+            const [code, qty, price, total, foc, returned] = item.split("&&");
             return {
-              code,
-              qty,
+              code: code || "",
+              qty: qty || "0",
               price: (parseFloat(price) / 100).toFixed(2),
               total: (parseFloat(total) / 100).toFixed(2),
-              discount: discount || "0",
-              other: other || "0",
+              foc: parseInt(foc, 10) || 0,
+              returned: parseInt(returned, 10) || 0,
+              productName: "", // This will be filled by the server
             };
           });
 
@@ -177,12 +178,6 @@ const InvoisUploadPage: React.FC = () => {
           customerName: customerName || customerId,
           salesman,
           totalAmount,
-          discount,
-          netAmount,
-          rounding,
-          payableAmount,
-          cash,
-          balance,
           time,
           orderDetails,
         };
@@ -190,19 +185,34 @@ const InvoisUploadPage: React.FC = () => {
   };
 
   const handleInvoiceClick = (invoiceId: string, invoiceData: InvoiceData) => {
-    navigate(`/stock/invois/${invoiceId}`, { state: { invoiceData } });
+    navigate(`/stock/invois/new/${invoiceId}`, { state: { invoiceData } });
   };
 
-  const handleDelete = async (selectedIds: number[]): Promise<void> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        setFileData((prevData) =>
-          prevData.filter((_, index) => !selectedIds.includes(index))
-        );
-        toast.success(`Deleted ${selectedIds.length} item(s)`);
-        resolve();
-      }, 1000);
-    });
+  const handleClearData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("http://localhost:5000/api/invoices/clear", {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      setFileData([]);
+      toast.success("All data cleared successfully");
+    } catch (error) {
+      console.error("Error clearing data:", error);
+      setError(
+        error instanceof Error ? error.message : "An unknown error occurred"
+      );
+      toast.error(
+        `Failed to clear data: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const columns: ColumnConfig[] = [
@@ -254,8 +264,14 @@ const InvoisUploadPage: React.FC = () => {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Invois</h1>
-      <div className="mb-4">
+      <h1 className="text-2xl text-center font-medium text-gray-700 mb-4">
+        Import Invois
+      </h1>
+      <div
+        className={`flex mb-4 ${
+          fileData.length > 0 ? "justify-end" : "justify-center"
+        }`}
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -267,27 +283,35 @@ const InvoisUploadPage: React.FC = () => {
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 active:bg-gray-200 hover:text-gray-800 active:text-gray-900 transition-colors duration-200"
+          className={`flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 active:bg-gray-200 hover:text-gray-800 active:text-gray-900 transition-colors duration-200 ${
+            fileData.length > 0 ? "mr-2" : ""
+          }`}
         >
           <IconCloudUpload className="mr-2 h-4 w-4" /> Upload Documents
         </button>
+        {fileData.length > 0 && (
+          <button
+            onClick={handleClearData}
+            className="flex items-center px-4 py-2 font-medium text-red-600 border border-red-600 rounded-full hover:bg-red-50 active:bg-red-100 transition-colors duration-200"
+          >
+            <IconTrash className="mr-2 h-4 w-4" /> Clear
+          </button>
+        )}
       </div>
-      {fileData.length > 0 ? (
+      {fileData.length > 0 && (
         <Table<InvoiceData>
           initialData={fileData}
           columns={columns}
           onChange={(newData: InvoiceData[]) => {
             setFileData(newData);
           }}
-          onDelete={handleDelete}
+          onDelete={() => Promise.resolve()}
           isEditing={false}
           onToggleEditing={() => {}}
           onSave={() => {}}
           onCancel={() => {}}
           tableKey="invois"
         />
-      ) : (
-        <p>No invoice data available. Please upload some invoices.</p>
       )}
     </div>
   );

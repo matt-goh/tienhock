@@ -48,9 +48,9 @@ export interface OrderDetail {
   qty: string;
   price: string;
   total: string;
-  discount: string;
-  other: string;
   isTotal?: boolean;
+  foc: number;
+  returned: number;
 }
 
 export interface InvoiceData {
@@ -63,14 +63,11 @@ export interface InvoiceData {
   customerName: string;
   salesman: string;
   totalAmount: string;
-  discount: string;
-  netAmount: string;
-  rounding: string;
-  payableAmount: string;
-  cash: string;
-  balance: string;
   time: string;
   orderDetails: OrderDetail[];
+  discount?: string;
+  tax?: string;
+  rounding?: string;
   isSorting?: boolean;
 }
 

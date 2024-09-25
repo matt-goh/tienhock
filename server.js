@@ -1414,7 +1414,7 @@ const isEmptyOrInvalid = (value) => {
 
 // Helper function to check if a row should be removed
 const shouldRemoveRow = (row) => {
-  return isEmptyOrInvalid(row.code) && isEmptyOrInvalid(row.productName);
+  return isEmptyOrInvalid(row.code);
 };
 
 // Helper function to sanitize a single order detail
@@ -1422,8 +1422,10 @@ const sanitizeOrderDetail = (detail) => {
   const sanitized = { ...detail };
   for (const key in sanitized) {
     if (isEmptyOrInvalid(sanitized[key])) {
-      if (key === 'qty' || key === 'price' || key === 'total' || key === 'discount' || key === 'other') {
+      if (key === 'qty' || key === 'price' || key === 'total' || key === 'discount' || key === 'tax' || key === 'rounding') {
         sanitized[key] = '0'; // Set numeric fields to '0' as a string if invalid
+      } else if (key === 'foc' || key === 'returned') {
+        sanitized[key] = 0; // Set foc and returned to 0 if invalid
       } else {
         sanitized[key] = ''; // Set other fields to empty string if invalid
       }
@@ -1476,6 +1478,11 @@ app.get('/api/invoices', async (req, res) => {
     console.error('Error fetching invoices with details:', error);
     res.status(500).json({ message: 'Error fetching invoices', error: error.message });
   }
+});
+
+app.post('/api/invoices/clear', (req, res) => {
+  uploadedInvoices = []; // Clear the in-memory storage
+  res.status(200).json({ message: 'All invoices cleared successfully' });
 });
 
 // MyInvois API client initialization
