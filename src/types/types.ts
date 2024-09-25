@@ -43,6 +43,37 @@ export interface TableProps<T> {
   tableKey: string;
 }
 
+export interface OrderDetail {
+  code: string;
+  qty: string;
+  price: string;
+  total: string;
+  discount: string;
+  other: string;
+  isTotal?: boolean;
+}
+
+export interface InvoiceData {
+  id: string;
+  invoiceNo: string;
+  orderNo: string;
+  date: string;
+  type: string;
+  customer: string;
+  customerName: string;
+  salesman: string;
+  totalAmount: string;
+  discount: string;
+  netAmount: string;
+  rounding: string;
+  payableAmount: string;
+  cash: string;
+  balance: string;
+  time: string;
+  orderDetails: OrderDetail[];
+  isSorting?: boolean;
+}
+
 export interface Employee {
   id: string;
   name: string;

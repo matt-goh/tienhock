@@ -18,11 +18,11 @@ import CatalogueCustomerPage from "../pages/CatalogueCustomerPage";
 import CatalogueProductPage from "../pages/CatalogueProductPage";
 import CatalogueBasicPage from "../pages/CatalogueBasicPage";
 import CatalogueStaffPage from "../pages/CatalogueStaffPage";
+import InvoisDetailsPage from "../pages/InvoisDetailsPage";
+import InvoisUploadPage from "../pages/InvoisUploadPage";
 import CatalogueJobPage from "../pages/CatalogueJobPage";
 import CatalogueTaxPage from "../pages/CatalogueTaxPage";
 import eInvoisPage from "../pages/eInvoisPage";
-import InvoisPage from "../pages/InvoisPage";
-import InvoisDetailsPage from "../pages/InvoisDetailsPage";
 
 export interface PopoverOption {
   name: string;
@@ -101,33 +101,30 @@ export const SidebarData: SidebarItem[] = [
     name: "Stock",
     icon: IconPackage,
     subItems: [
-      { name: "Opening", path: "/stock/opening" },
-      { name: "Card", path: "/stock/card" },
-    ],
-  },
-  {
-    name: "Statement",
-    icon: IconFileInvoice,
-    subItems: [
       {
         name: "Invois",
-        path: "/statement/invois",
-        component: InvoisPage,
+        path: "/stock/invois",
+        component: InvoisUploadPage,
         subItems: [
           {
             name: "Invois Details",
-            path: "/statement/invois/:id",
+            path: "/stock/invois/:id",
             component: InvoisDetailsPage,
           },
         ],
       },
       {
         name: "e-Invois",
-        path: "/statement/e-invois",
+        path: "/stock/e-invois",
         component: eInvoisPage,
       },
     ],
     defaultOpen: true,
+  },
+  {
+    name: "Statement",
+    icon: IconFileInvoice,
+    subItems: [],
   },
   {
     name: "Catalogue",
