@@ -76,8 +76,6 @@ function Table<T extends Record<string, any>>({
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
   const [isIndeterminateGlobal, setIsIndeterminateGlobal] = useState(false);
-  const [isAllSelectedPage, setIsAllSelectedPage] = useState(false);
-  const [isIndeterminatePage, setIsIndeterminatePage] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
@@ -100,7 +98,7 @@ function Table<T extends Record<string, any>>({
     "orderDetails",
     "focItems",
     "returnedGoods",
-  ].includes(tableKey);
+  ].includes(tableKey || "");
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
@@ -701,7 +699,9 @@ function Table<T extends Record<string, any>>({
   // HDS
   const handleDeleteSelected = useCallback(async () => {
     const selectedIndices = Array.from(selectedRows);
-    await onDelete(selectedIndices);
+    if (onDelete) {
+      await onDelete(selectedIndices);
+    }
     // Clear selection after deletion
     setSelectedRows(new Set());
 
@@ -1328,16 +1328,6 @@ function Table<T extends Record<string, any>>({
       setIsAllSelectedGlobal(isAllSelected);
       setIsIndeterminateGlobal(isIndeterminate);
 
-      const currentPageRows = table.getRowModel().rows;
-      const selectedPageRows = currentPageRows.filter((row) =>
-        selectedRows.has(row.index)
-      );
-      setIsAllSelectedPage(selectedPageRows.length === currentPageRows.length);
-      setIsIndeterminatePage(
-        selectedPageRows.length > 0 &&
-          selectedPageRows.length < currentPageRows.length
-      );
-
       setShowDeleteButton(selectedRows.size > 0);
       setCanAddSubtotal(
         selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
@@ -1400,11 +1390,9 @@ function Table<T extends Record<string, any>>({
                 key={headerGroup.id}
                 headerGroup={headerGroup}
                 columns={columns}
-                isEditing={isEditing}
+                isEditing={isEditing ?? false}
                 isAllSelectedGlobal={isAllSelectedGlobal}
                 isIndeterminateGlobal={isIndeterminateGlobal}
-                isAllSelectedPage={isAllSelectedPage}
-                isIndeterminatePage={isIndeterminatePage}
                 handleSelectAll={handleSelectAll}
                 isSortableColumn={isSortableColumn}
                 columnWidths={columnWidths}
