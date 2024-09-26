@@ -33,8 +33,11 @@ function TableHeader<T>({
   columnWidths,
   onColumnResize,
 }: TableHeaderProps<T>) {
-  const getHeaderClass = (columnType: ColumnType) => {
-    let baseClass = "cursor-pointer ";
+  const getHeaderClass = (columnId: string, columnType: ColumnType) => {
+    let baseClass = "";
+    if (isSortableColumn(columnId)) {
+      baseClass += "cursor-pointer ";
+    }
     switch (columnType) {
       case "number":
       case "rate":
@@ -56,6 +59,7 @@ function TableHeader<T>({
         <th
           key={header.id}
           className={`px-6 py-2 text-base leading-4 font-bold text-gray-600 uppercase tracking-wider group ${getHeaderClass(
+            header.id,
             columns.find((col) => col.id === header.id)?.type || "string"
           )} ${index === 0 ? "rounded-tl-lg" : ""} ${
             index === headerGroup.headers.length - 1 ? "rounded-tr-lg" : ""

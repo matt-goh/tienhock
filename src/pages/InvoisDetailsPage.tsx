@@ -29,46 +29,47 @@ const InvoisDetailsPage: React.FC = () => {
     setOrderDetails(newData);
   };
 
-  const calculateTotal = useMemo(() => {
-    return orderDetails
-      .reduce((sum, detail) => sum + parseFloat(detail.total || "0"), 0)
+  const calculateTotal = (items: OrderDetail[], key: 'total' | 'foc' | 'returned') => {
+    return items
+      .reduce((sum, detail) => {
+        const value = key === 'total' ? detail.total : 
+                      key === 'foc' ? (parseFloat(detail.price) * detail.foc).toFixed(2) :
+                      (parseFloat(detail.price) * detail.returned).toFixed(2);
+        return sum + parseFloat(value || "0");
+      }, 0)
       .toFixed(2);
-  }, [orderDetails]);
+  };
 
-  const orderDetailsWithTotal = useMemo(() => {
+  const addTotalRow = (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
     return [
-      ...orderDetails,
+      ...items,
       {
-        id: "total-row",
         code: "",
-        productName: "",
         qty: "",
         price: "Total:",
-        total: calculateTotal,
-        discount: "",
+        total: totalAmount,
         isTotal: true,
         foc: 0,
         returned: 0,
       },
     ];
-  }, [orderDetails, calculateTotal]);
+  };
 
-  const focItems = useMemo(() => {
-    return orderDetails
-      .filter((item) => item.foc > 0)
-      .map((item) => ({
-        ...item,
-        calculatedAmount: (parseFloat(item.price) * item.foc).toFixed(2),
-      }));
+  const orderDetailsWithTotal = useMemo(() => {
+    const totalAmount = calculateTotal(orderDetails, 'total');
+    return addTotalRow(orderDetails, totalAmount);
   }, [orderDetails]);
 
-  const returnedGoods = useMemo(() => {
-    return orderDetails
-      .filter((item) => item.returned > 0)
-      .map((item) => ({
-        ...item,
-        calculatedAmount: (parseFloat(item.price) * item.returned).toFixed(2),
-      }));
+  const focItemsWithTotal = useMemo(() => {
+    const items = orderDetails.filter((item) => item.foc > 0);
+    const totalAmount = calculateTotal(items, 'foc');
+    return addTotalRow(items, totalAmount);
+  }, [orderDetails]);
+
+  const returnedGoodsWithTotal = useMemo(() => {
+    const items = orderDetails.filter((item) => item.returned > 0);
+    const totalAmount = calculateTotal(items, 'returned');
+    return addTotalRow(items, totalAmount);
   }, [orderDetails]);
 
   if (!invoiceData) {
@@ -85,15 +86,15 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "returned", header: "QUANTITY", type: "readonly", width: 150 },
     { id: "price", header: "PRICE", type: "readonly", width: 100 },
     {
-      id: "calculatedAmount",
+      id: "total",
       header: "AMOUNT",
       type: "amount",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: any } }) => (
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
         <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {typeof info.getValue() === "number"
-            ? info.getValue().toFixed(2)
-            : info.getValue()}
+          {info.row.original.isTotal
+            ? info.getValue()
+            : (parseFloat(info.row.original.price) * info.row.original.returned).toFixed(2)}
         </div>
       ),
     },
@@ -105,23 +106,23 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "foc", header: "QUANTITY", type: "readonly", width: 150 },
     { id: "price", header: "PRICE", type: "readonly", width: 100 },
     {
-      id: "calculatedAmount",
+      id: "total",
       header: "AMOUNT",
       type: "amount",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: any } }) => (
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
         <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {typeof info.getValue() === "number"
-            ? info.getValue().toFixed(2)
-            : info.getValue()}
+          {info.row.original.isTotal
+            ? info.getValue()
+            : (parseFloat(info.row.original.price) * info.row.original.foc).toFixed(2)}
         </div>
       ),
     },
   ];
 
   const renderActionButtons = () => {
-    const hasFOC = focItems.length > 0;
-    const hasReturned = returnedGoods.length > 0;
+    const hasFOC = focItemsWithTotal.length > 1;
+    const hasReturned = returnedGoodsWithTotal.length > 1;
 
     const renderButton = (text: string, onClick?: () => void) => (
       <Button onClick={onClick} variant="outline" size="md">
@@ -211,11 +212,11 @@ const InvoisDetailsPage: React.FC = () => {
         tableKey="orderDetails"
       />
 
-      {focItems.length > 0 && (
+      {focItemsWithTotal.length > 1 && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-4">FOC</h2>
-          <Table<OrderDetail & { calculatedAmount: string }>
-            initialData={focItems}
+          <Table<OrderDetail>
+            initialData={focItemsWithTotal}
             columns={focItemsColumns}
             onChange={() => {}}
             onDelete={() => Promise.resolve()}
@@ -228,11 +229,11 @@ const InvoisDetailsPage: React.FC = () => {
         </>
       )}
 
-      {returnedGoods.length > 0 && (
+      {returnedGoodsWithTotal.length > 1 && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-4">Returned Goods</h2>
-          <Table<OrderDetail & { calculatedAmount: string }>
-            initialData={returnedGoods}
+          <Table<OrderDetail>
+            initialData={returnedGoodsWithTotal}
             columns={returnedGoodsColumns}
             onChange={() => {}}
             onDelete={() => Promise.resolve()}

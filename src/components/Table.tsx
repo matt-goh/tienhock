@@ -96,6 +96,11 @@ function Table<T extends Record<string, any>>({
   );
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
+  const isSortingDisabled = [
+    "orderDetails",
+    "focItems",
+    "returnedGoods",
+  ].includes(tableKey);
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
@@ -761,6 +766,7 @@ function Table<T extends Record<string, any>>({
   );
 
   const isSortableColumn = (columnId: string) => {
+    if (isSortingDisabled) return false;
     const column = columns.find((col) => col.id === columnId);
     return column && column.type !== "action" && column.type !== "checkbox";
   };
@@ -770,6 +776,7 @@ function Table<T extends Record<string, any>>({
     columnType: ColumnType,
     isSorted: false | "asc" | "desc"
   ) => {
+    if (isSortingDisabled) return null;
     if (
       columnType === "number" ||
       columnType === "rate" ||
@@ -1011,13 +1018,19 @@ function Table<T extends Record<string, any>>({
       allColumns.map((col): ColumnDef<T> => {
         const commonHeaderContent = (column: any) => (
           <div
-            className={`flex items-center group cursor-pointer w-full h-full ${
+            className={`flex items-center w-full h-full ${
               ["number", "rate", "amount", "float"].includes(col.type)
                 ? "justify-end"
                 : ""
+            } ${
+              isSortingDisabled
+                ? ["number", "rate", "amount", "float"].includes(col.type)
+                  ? "pl-2"
+                  : "pr-2"
+                : "group cursor-pointer"
             }`}
             onClick={() => {
-              if (isSortableColumn(column.id)) {
+              if (!isSortingDisabled && isSortableColumn(column.id)) {
                 const currentIsSorted = column.getIsSorted();
                 column.toggleSorting();
                 const newIsSorted = column.getIsSorted();
@@ -1036,29 +1049,29 @@ function Table<T extends Record<string, any>>({
           >
             {["number", "rate", "amount", "float"].includes(col.type) ? (
               <>
+                {!isSortingDisabled && (
+                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full">
+                    {getSortIcon(col.id, col.type, column.getIsSorted())}
+                  </span>
+                )}
                 <span
-                  className={`mr-2 ${
-                    column.getIsSorted()
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  } transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full`}
+                  className={`select-none ${isSortingDisabled ? "pl-2" : ""}`}
                 >
-                  {getSortIcon(col.id, col.type, column.getIsSorted())}
+                  {col.header}
                 </span>
-                <span className="select-none">{col.header}</span>
               </>
             ) : (
               <>
-                <span className="select-none">{col.header}</span>
                 <span
-                  className={`ml-2 ${
-                    column.getIsSorted()
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  } transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full`}
+                  className={`select-none ${isSortingDisabled ? "pr-2" : ""}`}
                 >
-                  {getSortIcon(col.id, col.type, column.getIsSorted())}
+                  {col.header}
                 </span>
+                {!isSortingDisabled && (
+                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full">
+                    {getSortIcon(col.id, col.type, column.getIsSorted())}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -1096,7 +1109,11 @@ function Table<T extends Record<string, any>>({
           id: col.id,
           size: columnWidths[col.id],
           header: ({ column }) => (
-            <div className="relative flex items-center h-full">
+            <div
+              className={`relative flex items-center h-full ${
+                isSortingDisabled ? "py-2" : ""
+              }`}
+            >
               {commonHeaderContent(column)}
             </div>
           ),
@@ -1143,27 +1160,31 @@ function Table<T extends Record<string, any>>({
                   </div>
                 );
               },
-              sortingFn: (rowA, rowB, columnId) => {
-                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                  return rowA.index - rowB.index;
-                }
-                if (rowA.original.isSubtotal) return 1;
-                if (rowB.original.isSubtotal) return -1;
+              sortingFn: isSortingDisabled
+                ? undefined
+                : (rowA, rowB, columnId) => {
+                    if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                      return rowA.index - rowB.index;
+                    }
+                    if (rowA.original.isSubtotal) return 1;
+                    if (rowB.original.isSubtotal) return -1;
 
-                const a = rowA.getValue(columnId);
-                const b = rowB.getValue(columnId);
+                    const a = rowA.getValue(columnId);
+                    const b = rowB.getValue(columnId);
 
-                const aNum =
-                  typeof a === "number" ? a : parseFloat(a as string);
-                const bNum =
-                  typeof b === "number" ? b : parseFloat(b as string);
+                    const aNum =
+                      typeof a === "number" ? a : parseFloat(a as string);
+                    const bNum =
+                      typeof b === "number" ? b : parseFloat(b as string);
 
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                  return aNum - bNum;
-                }
+                    if (!isNaN(aNum) && !isNaN(bNum)) {
+                      return aNum - bNum;
+                    }
 
-                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
-              },
+                    return (a?.toString() ?? "").localeCompare(
+                      b?.toString() ?? ""
+                    );
+                  },
             } as ColumnDef<T>;
           case "checkbox":
             return {
@@ -1215,23 +1236,27 @@ function Table<T extends Record<string, any>>({
                 }
                 return commonCellContent(info);
               },
-              sortingFn: (rowA, rowB, columnId) => {
-                if (rowA.original.isTotal) return 1;
-                if (rowB.original.isTotal) return -1;
-                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                  return rowA.index - rowB.index;
-                }
-                if (rowA.original.isSubtotal) return 1;
-                if (rowB.original.isSubtotal) return -1;
+              sortingFn: isSortingDisabled
+                ? undefined
+                : (rowA, rowB, columnId) => {
+                    if (rowA.original.isTotal) return 1;
+                    if (rowB.original.isTotal) return -1;
+                    if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                      return rowA.index - rowB.index;
+                    }
+                    if (rowA.original.isSubtotal) return 1;
+                    if (rowB.original.isSubtotal) return -1;
 
-                const a = rowA.getValue(columnId);
-                const b = rowB.getValue(columnId);
+                    const a = rowA.getValue(columnId);
+                    const b = rowB.getValue(columnId);
 
-                if (typeof a === "number" && typeof b === "number") {
-                  return a - b;
-                }
-                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
-              },
+                    if (typeof a === "number" && typeof b === "number") {
+                      return a - b;
+                    }
+                    return (a?.toString() ?? "").localeCompare(
+                      b?.toString() ?? ""
+                    );
+                  },
             } as ColumnDef<T>;
         }
       }),
@@ -1240,15 +1265,16 @@ function Table<T extends Record<string, any>>({
       isEditing,
       isSorting,
       selectedRows,
+      columnWidths,
       editableRowId,
+      editableCellIndex,
+      isSortingDisabled,
       isAllSelectedGlobal,
       isIndeterminateGlobal,
-      editableCellIndex,
+      handleColumnResize,
       handleCellChange,
       handleCellClick,
       handleKeyDown,
-      columnWidths,
-      handleColumnResize,
     ]
   );
 
@@ -1257,37 +1283,39 @@ function Table<T extends Record<string, any>>({
     data,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getSortedRowModel: isSortingDisabled ? undefined : getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     autoResetPageIndex: false,
     onPaginationChange: setPagination,
     state: {
-      sorting,
+      sorting: isSortingDisabled ? [] : sorting,
       pagination,
     },
     //OSC
-    onSortingChange: (updater) => {
-      const newSorting =
-        typeof updater === "function" ? updater(sorting) : updater;
-      setSorting(newSorting);
-      const isSorted = newSorting.length > 0;
-      setIsSorting(isSorted);
-      if (isSorted) {
-        setData((prevData) => prevData.filter((row) => !row.isSubtotal));
-      } else {
-        setData((prevData) => {
-          const recalculatedData = originalData.map((row) => {
-            if (!row.isSubtotal) {
-              return { ...row };
-            }
-            return row;
-          });
-          const newData = recalculateSubtotals(recalculatedData);
-          setOriginalData(newData);
-          return newData;
-        });
-      }
-    },
+    onSortingChange: isSortingDisabled
+      ? undefined
+      : (updater) => {
+          const newSorting =
+            typeof updater === "function" ? updater(sorting) : updater;
+          setSorting(newSorting);
+          const isSorted = newSorting.length > 0;
+          setIsSorting(isSorted);
+          if (isSorted) {
+            setData((prevData) => prevData.filter((row) => !row.isSubtotal));
+          } else {
+            setData((prevData) => {
+              const recalculatedData = originalData.map((row) => {
+                if (!row.isSubtotal) {
+                  return { ...row };
+                }
+                return row;
+              });
+              const newData = recalculateSubtotals(recalculatedData);
+              setOriginalData(newData);
+              return newData;
+            });
+          }
+        },
   });
 
   // USS
