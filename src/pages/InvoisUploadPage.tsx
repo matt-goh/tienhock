@@ -4,6 +4,7 @@ import Table from "../components/Table";
 import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData, OrderDetail } from "../types/types";
 import { useNavigate } from "react-router-dom";
+import Button from "../components/Button";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
@@ -281,14 +282,16 @@ const InvoisUploadPage: React.FC = () => {
           id="fileUpload"
           multiple
         />
-        <button
+        <Button
           onClick={() => fileInputRef.current?.click()}
-          className={`flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 active:bg-gray-200 hover:text-gray-800 active:text-gray-900 transition-colors duration-200 ${
-            fileData.length > 0 ? "mr-2" : ""
-          }`}
+          icon={IconCloudUpload}
+          iconSize={16}
+          iconStroke={2}
+          variant="outline"
+          additionalClasses={fileData.length > 0 ? "mr-2" : ""}
         >
-          <IconCloudUpload className="mr-2 h-4 w-4" /> Upload Documents
-        </button>
+          Upload Documents
+        </Button>
         {fileData.length > 0 && (
           <button
             onClick={handleClearData}

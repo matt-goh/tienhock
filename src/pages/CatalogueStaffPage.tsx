@@ -11,6 +11,7 @@ import { toast } from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
 import StaffFilterMenu from "../components/StaffFilterMenu";
 import { Employee, FilterOptions } from "../types/types";
+import Button from "../components/Button";
 
 const EmployeeCard = ({
   employee,
@@ -419,13 +420,13 @@ const CatalogueStaffPage = () => {
             jobOptions={employees.map((emp) => emp.job).flat()}
             locationOptions={employees.map((emp) => emp.location).flat()}
           />
-          <button
-            className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
+          <Button
             onClick={() => navigate("/catalogue/staff/new")}
+            icon={IconPlus}
+            variant="outline"
           >
-            <IconPlus stroke={2} size={18} className="mr-2" />
             Add Staff
-          </button>
+          </Button>
         </div>
       </div>
 

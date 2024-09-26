@@ -16,6 +16,7 @@ import {
 } from "@tabler/icons-react";
 import { FilterOptions } from "../types/types";
 import { LOCATION_MAP } from "../constants/locationConstants";
+import Button from "./Button";
 
 type StaffFilterMenuProps = {
   onFilterChange: (filters: FilterOptions) => void;
@@ -101,13 +102,13 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
 
   return (
     <div className="relative inline-block text-left mr-2" ref={menuRef}>
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 active:bg-gray-200 hover:text-gray-800 active:text-gray-900 transition-colors duration-200"
+        icon={IconFilter}
+        variant="outline"
       >
-        <IconFilter stroke={1.5} size={18} className="mr-2" />
         Filter
-      </button>
+      </Button>
       {isOpen && (
         <div className="absolute space-y-1 right-0 mt-2 w-64 text-gray-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-10">
           <div className="px-1 pt-1">
