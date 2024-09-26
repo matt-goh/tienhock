@@ -308,11 +308,7 @@ const InvoisUploadPage: React.FC = () => {
           onChange={(newData: InvoiceData[]) => {
             setFileData(newData);
           }}
-          onDelete={() => Promise.resolve()}
           isEditing={false}
-          onToggleEditing={() => {}}
-          onSave={() => {}}
-          onCancel={() => {}}
           tableKey="invois"
         />
       )}

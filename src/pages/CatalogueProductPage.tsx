@@ -39,7 +39,7 @@ const CatalogueProductPage: React.FC = () => {
       return { ...col, type: "rate" };
     }
     if (col.id === "tax") {
-      return { ...col, type: "listbox", options: ["", "SR", "ZRL"] };
+      return { ...col, type: "listbox", options: ["None", "SR", "ZRL"] };
     }
     return { ...col, type: "string" };
   });
