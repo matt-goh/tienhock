@@ -23,6 +23,7 @@ import toast from "react-hot-toast";
 import DeleteDialog from "../components/DeleteDialog";
 import { Employee } from "../types/types";
 import BackButton from "../components/BackButton";
+import Button from "../components/Button";
 
 interface SelectOption {
   id: string;
@@ -519,12 +520,9 @@ const CatalogueAddStaffPage: React.FC = () => {
             </Tab>
           </div>
           <div className="mt-8 py-3 text-right">
-            <button
-              type="submit"
-              className="px-5 py-2 border border-gray-300 rounded-full font-medium text-base text-gray-700 hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
-            >
+            <Button type="submit" variant="boldOutline" size="lg">
               Save
-            </button>
+            </Button>
           </div>
         </form>
       </div>
