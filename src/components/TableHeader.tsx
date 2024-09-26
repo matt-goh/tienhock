@@ -14,12 +14,11 @@ interface TableHeaderProps<T> {
   isEditing: boolean;
   isAllSelectedGlobal: boolean;
   isIndeterminateGlobal: boolean;
-  isAllSelectedPage: boolean;
-  isIndeterminatePage: boolean;
   handleSelectAll: () => void;
   isSortableColumn: (columnId: string) => boolean | undefined;
   columnWidths: { [k: string]: number };
   onColumnResize: (columnId: string, width: number) => void;
+  disableSelection?: boolean; // New prop
 }
 
 function TableHeader<T>({
@@ -32,6 +31,7 @@ function TableHeader<T>({
   isSortableColumn,
   columnWidths,
   onColumnResize,
+  disableSelection, // New prop
 }: TableHeaderProps<T>) {
   const getHeaderClass = (columnId: string, columnType: ColumnType) => {
     let baseClass = "";
@@ -75,7 +75,7 @@ function TableHeader<T>({
           }}
         >
           <div className="flex items-center h-full relative">
-            {header.column.id === "selection" && isEditing ? (
+            {header.column.id === "selection" && isEditing && !disableSelection ? (
               <div className="flex items-center justify-center h-full w-full">
                 <button
                   onClick={(e) => {

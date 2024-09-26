@@ -34,19 +34,19 @@ export interface TableProps<T> {
   initialData: T[];
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;
-  onDelete: (selectedIds: number[]) => Promise<void>;
+  onDelete?: (selectedIds: number[]) => Promise<void>;
   onChange?: (changedData: T[]) => void;
-  isEditing: boolean;
-  onToggleEditing: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  tableKey: string;
+  isEditing?: boolean;
+  onToggleEditing?: () => void;
+  onSave?: () => void;
+  onCancel?: () => void;
+  tableKey?: string;
 }
 
 export interface OrderDetail {
   code: string;
-  qty: string;
-  price: string;
+  qty: number;
+  price: number;
   total: string;
   isTotal?: boolean;
   foc: number;

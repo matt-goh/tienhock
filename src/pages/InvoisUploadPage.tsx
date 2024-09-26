@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconCloudUpload, IconTrash } from "@tabler/icons-react";
 import Table from "../components/Table";
 import toast from "react-hot-toast";
-import { ColumnConfig, InvoiceData, OrderDetail } from "../types/types";
+import { ColumnConfig, InvoiceData } from "../types/types";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 
@@ -160,8 +160,8 @@ const InvoisUploadPage: React.FC = () => {
             const [code, qty, price, total, foc, returned] = item.split("&&");
             return {
               code: code || "",
-              qty: qty || "0",
-              price: (parseFloat(price) / 100).toFixed(2),
+              qty: Number(qty) || 0,
+              price: Number((parseFloat(price) / 100).toFixed(2)),
               total: (parseFloat(total) / 100).toFixed(2),
               foc: parseInt(foc, 10) || 0,
               returned: parseInt(returned, 10) || 0,
