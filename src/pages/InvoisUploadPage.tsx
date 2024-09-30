@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { IconCloudUpload, IconTrash } from "@tabler/icons-react";
-import Table from "../components/Table";
+import TableEditing from "../components/TableEditing";
 import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData } from "../types/types";
 import { useNavigate } from "react-router-dom";
@@ -216,6 +216,14 @@ const InvoisUploadPage: React.FC = () => {
     }
   };
 
+  const handleCustomerNameChange = (id: string, newName: string) => {
+    setFileData((prevData) =>
+      prevData.map((invoice) =>
+        invoice.id === id ? { ...invoice, customerName: newName } : invoice
+      )
+    );
+  };
+
   const columns: ColumnConfig[] = [
     {
       id: "invoiceNo",
@@ -239,19 +247,23 @@ const InvoisUploadPage: React.FC = () => {
         </button>
       ),
     },
-    { id: "date", header: "Date", type: "readonly", width: 150 },
+    { id: "date", header: "Date", type: "string", width: 150 },
     {
       id: "customerName",
       header: "Customer",
-      type: "readonly",
+      type: "string",
       width: 350,
       cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
-        <div className="w-full h-full px-6 py-3 text-left outline-none bg-transparent">
-          {info.row.original.customerName || info.row.original.customer}
-        </div>
+        <input
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent"
+          value={info.row.original.customerName || info.row.original.customer}
+          onChange={(e) =>
+            handleCustomerNameChange(info.row.original.id, e.target.value)
+          }
+        />
       ),
     },
-    { id: "salesman", header: "Salesman", type: "readonly", width: 150 },
+    { id: "salesman", header: "Salesman", type: "string", width: 150 },
     { id: "totalAmount", header: "Amount", type: "readonly", width: 150 },
   ];
 
@@ -302,7 +314,7 @@ const InvoisUploadPage: React.FC = () => {
         )}
       </div>
       {fileData.length > 0 && (
-        <Table<InvoiceData>
+        <TableEditing<InvoiceData>
           initialData={fileData}
           columns={columns}
           onChange={(newData: InvoiceData[]) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Table from "../components/Table";
+import TableEditing from "../components/TableEditing";
 import Button from "../components/Button";
 import { ColumnConfig, InvoiceData, OrderDetail } from "../types/types";
 import BackButton from "../components/BackButton";
@@ -32,7 +32,11 @@ const InvoisDetailsPage: React.FC = () => {
   ];
 
   const handleChange = (newData: OrderDetail[]) => {
-    setOrderDetails(newData);
+    // Remove the total row if it exists
+    const dataWithoutTotal = newData.filter((item) => !item.isTotal);
+    setTimeout(() => {
+      setOrderDetails(dataWithoutTotal);
+    }, 0);
   };
 
   const calculateTotal = (
@@ -166,11 +170,15 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   const handleFocChange = (newData: OrderDetail[]) => {
-    setFocItems(newData.filter((item) => !item.isTotal));
+    setTimeout(() => {
+      setFocItems(newData.filter((item) => !item.isTotal));
+    }, 0);
   };
 
   const handleReturnedGoodsChange = (newData: OrderDetail[]) => {
-    setReturnedGoods(newData.filter((item) => !item.isTotal));
+    setTimeout(() => {
+      setReturnedGoods(newData.filter((item) => !item.isTotal));
+    }, 0);
   };
 
   const renderActionButtons = () => {
@@ -234,7 +242,7 @@ const InvoisDetailsPage: React.FC = () => {
       </div>
 
       <h2 className="text-xl font-semibold mb-4">Order Details</h2>
-      <Table<OrderDetail>
+      <TableEditing<OrderDetail>
         initialData={orderDetailsWithTotal}
         columns={columns}
         onChange={handleChange}
@@ -244,7 +252,7 @@ const InvoisDetailsPage: React.FC = () => {
       {(focItems.length > 0 || focItemsWithTotal.length > 1) && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-4">FOC</h2>
-          <Table<OrderDetail>
+          <TableEditing<OrderDetail>
             initialData={focItemsWithTotal}
             columns={focItemsColumns}
             onChange={handleFocChange}
@@ -256,7 +264,7 @@ const InvoisDetailsPage: React.FC = () => {
       {(returnedGoods.length > 0 || returnedGoodsWithTotal.length > 1) && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-4">Returned Goods</h2>
-          <Table<OrderDetail>
+          <TableEditing<OrderDetail>
             initialData={returnedGoodsWithTotal}
             columns={returnedGoodsColumns}
             onChange={handleReturnedGoodsChange}
