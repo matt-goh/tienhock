@@ -253,15 +253,19 @@ const InvoisUploadPage: React.FC = () => {
       header: "Customer",
       type: "string",
       width: 350,
-      cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
-        <input
-          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent"
-          value={info.row.original.customerName || info.row.original.customer}
-          onChange={(e) =>
-            handleCustomerNameChange(info.row.original.id, e.target.value)
+      cellProps: (info: { getValue: () => any; row: { original: InvoiceData } }) => ({
+        value: info.row.original.customerName || info.row.original.customer,
+        onChange: (newValue: string) => handleCustomerNameChange(info.row.original.id, newValue),
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            const nextCellElement = e.currentTarget.parentElement?.nextElementSibling?.querySelector('input');
+            if (nextCellElement) {
+              (nextCellElement as HTMLInputElement).focus();
+            }
           }
-        />
-      ),
+        }
+      }),
     },
     { id: "salesman", header: "Salesman", type: "string", width: 150 },
     { id: "totalAmount", header: "Amount", type: "readonly", width: 150 },
@@ -322,7 +326,6 @@ const InvoisUploadPage: React.FC = () => {
               setFileData(newData);
             }, 0);
           }}
-          isEditing={false}
           tableKey="invois"
         />
       )}
