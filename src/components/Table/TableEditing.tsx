@@ -353,12 +353,22 @@ function TableEditing<T extends Record<string, any>>({
     } as T;
 
     setData((prevData) => {
-      // Insert the new row before the total row
-      const newData = [
-        ...prevData.slice(0, -1),
-        newRow,
-        prevData[prevData.length - 1],
-      ];
+      let newData;
+      const hasTotalRow =
+        prevData.length > 0 && prevData[prevData.length - 1].isTotal;
+
+      if (hasTotalRow) {
+        // Insert the new row before the total row
+        newData = [
+          ...prevData.slice(0, -1),
+          newRow,
+          prevData[prevData.length - 1],
+        ];
+      } else {
+        // No total row, just add the new row at the end
+        newData = [...prevData, newRow];
+      }
+
       if (onChange) {
         onChange(newData);
       }
