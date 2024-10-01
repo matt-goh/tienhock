@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import _ from "lodash";
-import Table from "../components/Table";
-import { ColumnConfig } from "../types/types";
+import Table from "../../components/Table/Table";
+import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 
 interface CatalogueItem {

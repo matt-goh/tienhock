@@ -1,7 +1,6 @@
 import React, { useState, useEffect, Fragment, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  IconChevronLeft,
   IconChevronDown,
   IconCheck,
 } from "@tabler/icons-react";
@@ -17,13 +16,13 @@ import {
   ListboxOptions,
   ListboxButton,
 } from "@headlessui/react";
-import Tab from "../components/Tab";
+import Tab from "../../components/Tab";
 import clsx from "clsx";
 import toast from "react-hot-toast";
-import DeleteDialog from "../components/DeleteDialog";
-import { Employee } from "../types/types";
-import BackButton from "../components/BackButton";
-import Button from "../components/Button";
+import DeleteDialog from "../../components/DeleteDialog";
+import { Employee } from "../../types/types";
+import BackButton from "../../components/BackButton";
+import Button from "../../components/Button";
 
 interface SelectOption {
   id: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Table from "../components/Table";
-import { ColumnConfig, Customer, Employee } from "../types/types";
+import Table from "../../components/Table/Table";
+import { ColumnConfig, Customer, Employee } from "../../types/types";
 import toast from "react-hot-toast";
 import {
   Listbox,
@@ -64,10 +64,12 @@ const CustomerCataloguePage: React.FC = () => {
 
   const fetchSalesmen = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/staffs?salesmenOnly=true");
+      const response = await fetch(
+        "http://localhost:5000/api/staffs?salesmenOnly=true"
+      );
       if (!response.ok) throw new Error("Failed to fetch salesmen");
       const data: Employee[] = await response.json();
-      const salesmenIds = data.map(employee => employee.id);
+      const salesmenIds = data.map((employee) => employee.id);
       setSalesmen(["All Salesmen", ...salesmenIds]);
     } catch (error) {
       console.error("Error fetching salesmen:", error);

@@ -11,18 +11,18 @@ import { Icon } from "@tabler/icons-react";
 import React from "react";
 
 // Import components here
-import CatalogueJobCategoryPage from "../pages/CatalogueJobCategoryPage";
-import CatalogueStaffFormPage from "../pages/CatalogueStaffFormPage";
-import CatalogueAddStaffPage from "../pages/CatalogueAddStaffPage";
-import CatalogueCustomerPage from "../pages/CatalogueCustomerPage";
-import CatalogueProductPage from "../pages/CatalogueProductPage";
-import CatalogueBasicPage from "../pages/CatalogueBasicPage";
-import CatalogueStaffPage from "../pages/CatalogueStaffPage";
-import InvoisDetailsPage from "../pages/InvoisDetailsPage";
-import InvoisUploadPage from "../pages/InvoisUploadPage";
-import CatalogueJobPage from "../pages/CatalogueJobPage";
-import CatalogueTaxPage from "../pages/CatalogueTaxPage";
-import eInvoisPage from "../pages/eInvoisPage";
+import CatalogueJobCategoryPage from "../../pages/Catalogue/CatalogueJobCategoryPage";
+import CatalogueStaffFormPage from "../../pages/Catalogue/CatalogueStaffFormPage";
+import CatalogueAddStaffPage from "../../pages/Catalogue/CatalogueAddStaffPage";
+import CatalogueCustomerPage from "../../pages/Catalogue/CatalogueCustomerPage";
+import CatalogueProductPage from "../../pages/Catalogue/CatalogueProductPage";
+import CatalogueBasicPage from "../../pages/Catalogue/CatalogueBasicPage";
+import CatalogueStaffPage from "../../pages/Catalogue/CatalogueStaffPage";
+import InvoisDetailsPage from "../../pages/Invois/InvoisDetailsPage";
+import InvoisUploadPage from "../../pages/Invois/InvoisUploadPage";
+import CatalogueJobPage from "../../pages/Catalogue/CatalogueJobPage";
+import CatalogueTaxPage from "../../pages/Catalogue/CatalogueTaxPage";
+import eInvoisPage from "../../pages/Invois/eInvoisPage";
 
 export interface PopoverOption {
   name: string;

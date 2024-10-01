@@ -13,10 +13,10 @@ import {
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconTrash } from "@tabler/icons-react";
 import _ from "lodash";
-import Table from "../components/Table";
-import { ColumnConfig, Job, JobDetail } from "../types/types";
-import NewJobModal from "../components/NewJobModal";
-import DeleteDialog from "../components/DeleteDialog";
+import Table from "../../components/Table/Table";
+import { ColumnConfig, Job, JobDetail } from "../../types/types";
+import NewJobModal from "../../components/NewJobModal";
+import DeleteDialog from "../../components/DeleteDialog";
 import toast from "react-hot-toast";
 
 type JobSelection = Job | null;
@@ -519,7 +519,9 @@ const CatalogueJobPage: React.FC = () => {
       setFilteredJobDetails(
         jobType === "All"
           ? result.jobDetails
-          : result.jobDetails.filter((detail: { type: string; }) => detail.type === jobType)
+          : result.jobDetails.filter(
+              (detail: { type: string }) => detail.type === jobType
+            )
       );
       setSelectedJob(updatedJob.job);
       setJobs((jobs) =>

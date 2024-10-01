@@ -1,7 +1,17 @@
 import React, { useState, useRef, useEffect, CSSProperties } from "react";
-import { ColumnType } from "../types/types";
-import { IconCheck, IconChevronDown, IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
+import { ColumnType } from "../../types/types";
+import {
+  IconCheck,
+  IconChevronDown,
+  IconSquare,
+  IconSquareCheckFilled,
+} from "@tabler/icons-react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
 
 interface TableEditableCellProps {
   value: any;

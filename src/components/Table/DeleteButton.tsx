@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import DeleteDialog from "./DeleteDialog";
+import DeleteDialog from "../DeleteDialog";
 
 interface DeleteButtonProps {
   onDelete: () => Promise<void>;

@@ -1,8 +1,8 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import React from "react";
-import Sidebar from "./components/Sidebar";
-import { routes } from "./components/SidebarData";
+import Sidebar from "./components/Sidebar/Sidebar";
+import { routes } from "./components/Sidebar/SidebarData";
 import "./index.css";
 
 const App: React.FC = () => {

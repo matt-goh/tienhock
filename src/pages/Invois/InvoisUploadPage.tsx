@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { IconCloudUpload, IconTrash } from "@tabler/icons-react";
-import TableEditing from "../components/TableEditing";
+import TableEditing from "../../components/Table/TableEditing";
 import toast from "react-hot-toast";
-import { ColumnConfig, InvoiceData } from "../types/types";
+import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useNavigate } from "react-router-dom";
-import Button from "../components/Button";
+import Button from "../../components/Button";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
