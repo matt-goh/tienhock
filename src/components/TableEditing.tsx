@@ -92,8 +92,6 @@ function TableEditing<T extends Record<string, any>>({
     "focItems",
     "returnedGoods",
   ].includes(tableKey || "");
-  const disableAddRowBar = tableKey === "catalogueProduct";
-  const isCatalogueProduct = tableKey === "catalogueProduct";
 
   const isEditableColumn = (col: ColumnConfig) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
@@ -334,7 +332,6 @@ function TableEditing<T extends Record<string, any>>({
 
   // HAR
   const handleAddRow = useCallback(() => {
-    if (disableAddRowBar) return false;
     const newRow = {
       id: `new_${Math.random().toString(36).substr(2, 9)}`,
       ...Object.fromEntries(
@@ -369,40 +366,29 @@ function TableEditing<T extends Record<string, any>>({
     });
 
     return true;
-  }, [columns, onChange, disableAddRowBar]);
-
-  const isRowEmpty = useCallback((row: T) => {
-    return Object.entries(row).every(([key, value]) => {
-      // Always consider 'id' field as non-empty
-      if (key === "id") return true;
-
-      // Treat 'isTotal' separately
-      if (key === "isTotal") return false;
-
-      // Check for empty string, 0, false, null, undefined
-      if (
-        value === "" ||
-        value === 0 ||
-        value === false ||
-        value === null ||
-        value === undefined
-      )
-        return true;
-
-      // Check for strings that start with "%new_"
-      if (typeof value === "string" && value.startsWith("%new_")) return true;
-
-      // If none of the above conditions are met, the field is not empty
-      return false;
-    });
-  }, []);
+  }, [columns, onChange]);
 
   // HMD
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (disableAddRowBar) return;
     e.preventDefault();
     setIsAddRowBarActive(true);
   }, []);
+
+  // HMU
+  const handleMouseUp = useCallback(() => {
+    setIsAddRowBarActive(false);
+    if (addRowBarRef.current) {
+      addRowBarRef.current.style.top = "0px";
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseUp]);
 
   //HASR
   const handleAddSubtotalRow = () => {
@@ -1363,7 +1349,7 @@ function TableEditing<T extends Record<string, any>>({
               } 
           }`}
               onMouseDown={handleMouseDown}
-              onClick={disableAddRowBar ? undefined : handleAddRow}
+              onClick={handleAddRow}
               onMouseEnter={() => setIsAddRowBarHovered(true)}
               onMouseLeave={() => setIsAddRowBarHovered(false)}
             ></div>
