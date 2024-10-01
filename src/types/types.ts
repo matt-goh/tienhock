@@ -22,6 +22,10 @@ export interface ColumnConfig {
     getValue: () => any;
     row: { original: any };
   }) => React.ReactNode;
+  cellProps?: (info: { getValue: () => any; row: { original: any } }) => {
+    value: any;
+    onChange: (newValue: any) => void;
+  };
 }
 
 // Define data structure

@@ -81,12 +81,10 @@ function TableEditing<T extends Record<string, any>>({
 
   // Refs
   const addRowBarRef = useRef<HTMLDivElement>(null);
-  const initialDragY = useRef(0);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
 
   // Constants
-  const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
   const isSortingDisabled = [
     "orderDetails",
     "focItems",
@@ -207,6 +205,59 @@ function TableEditing<T extends Record<string, any>>({
     [onChange, sorting]
   );
 
+  // Helper function to find the next editable cell
+  const findNextEditableCell = (
+    startRowIndex: number,
+    startColIndex: number,
+    moveToNextRow: boolean
+  ): { rowIndex: number; colIndex: number } | null => {
+    const sortedRows = table.getRowModel().rows;
+    let rowIndex = startRowIndex;
+    let colIndex = startColIndex;
+
+    const totalRows = sortedRows.length;
+    const editableColumns = allColumns.filter(
+      (col) => isEditableColumn(col) && col.type !== "listbox"
+    );
+    const totalEditableCols = editableColumns.length;
+
+    if (moveToNextRow) {
+      rowIndex = (rowIndex + 1) % totalRows;
+      colIndex = editableColumns[0]?.id
+        ? allColumns.findIndex((col) => col.id === editableColumns[0].id)
+        : 0;
+    } else {
+      colIndex++;
+    }
+
+    for (let i = 0; i < totalRows * totalEditableCols; i++) {
+      if (colIndex >= allColumns.length) {
+        colIndex = 0;
+        rowIndex = (rowIndex + 1) % totalRows;
+      }
+
+      const row = sortedRows[rowIndex].original;
+      if (row.isTotal) {
+        rowIndex = (rowIndex + 1) % totalRows;
+        colIndex = 0;
+        continue;
+      }
+
+      const column = allColumns[colIndex];
+      if (
+        !row.isSubtotal &&
+        isEditableColumn(column) &&
+        column.type !== "listbox"
+      ) {
+        return { rowIndex, colIndex };
+      }
+
+      colIndex++;
+    }
+
+    return null;
+  };
+
   // HKD
   const handleKeyDown = (
     e: React.KeyboardEvent,
@@ -222,6 +273,8 @@ function TableEditing<T extends Record<string, any>>({
           .rows.findIndex((row) => row.id === rowId);
         handleCellChange(rowIndex, columnId, previousValue);
       }
+      setEditableCellIndex(null);
+      setEditableRowId(null);
     } else if (e.key === "Tab" || e.key === "Enter") {
       e.preventDefault();
       const sortedRows = table.getRowModel().rows;
@@ -230,62 +283,16 @@ function TableEditing<T extends Record<string, any>>({
       const isLastRow = currentRowIndex === sortedRows.length - 1;
       const isLastColumn = cellIndex === allColumns.length - 1;
 
-      const findNextEditableCell = (
-        startRowIndex: number,
-        startColIndex: number,
-        moveToNextRow: boolean
-      ): { rowIndex: number; colIndex: number } => {
-        let rowIndex = startRowIndex;
-        let colIndex = startColIndex;
-
-        const totalRows = sortedRows.length;
-        const editableColumns = allColumns.filter(
-          (col) => isEditableColumn(col) && col.type !== "listbox"
-        );
-        const totalEditableCols = editableColumns.length;
-
-        if (moveToNextRow) {
-          rowIndex = (rowIndex + 1) % totalRows;
-          colIndex = editableColumns[0].id
-            ? allColumns.findIndex((col) => col.id === editableColumns[0].id)
-            : 0;
-        } else {
-          colIndex++;
-        }
-
-        for (let i = 0; i < totalRows * totalEditableCols; i++) {
-          if (colIndex >= allColumns.length) {
-            colIndex = 0;
-            rowIndex = (rowIndex + 1) % totalRows;
-          }
-
-          const column = allColumns[colIndex];
-          if (
-            !sortedRows[rowIndex].original.isSubtotal &&
-            isEditableColumn(column) &&
-            column.type !== "listbox"
-          ) {
-            return {
-              rowIndex,
-              colIndex,
-            };
-          }
-
-          colIndex++;
-        }
-
-        // If we've cycled through all cells and found nothing, return to the first editable cell
-        const firstEditableColIndex = allColumns.findIndex(isEditableColumn);
-        return {
-          rowIndex: 0,
-          colIndex: firstEditableColIndex,
-        };
-      };
-
       const moveToNextRow = e.key === "Enter" && isLastColumn;
 
-      if (e.key === "Enter" && isLastColumn && isLastRow && isLastPage) {
-        // Add new row only on the last page
+      if (
+        e.key === "Enter" &&
+        isLastColumn &&
+        isLastRow &&
+        isLastPage &&
+        !sortedRows[currentRowIndex].original.isTotal
+      ) {
+        // Add new row when Enter is pressed on the last cell of the last row (excluding total row)
         handleAddRow();
         setTimeout(() => {
           const newRows = table.getRowModel().rows;
@@ -294,38 +301,34 @@ function TableEditing<T extends Record<string, any>>({
           setEditableRowId(newRowId);
           setEditableCellIndex(allColumns.findIndex(isEditableColumn));
         }, 10);
-      } else if (e.key === "Tab" && isLastColumn && isLastRow && isLastPage) {
-        // Loop back to the first cell on the first page
-        table.setPageIndex(0);
-        setTimeout(() => {
-          const newRows = table.getRowModel().rows;
-          const newRowId = newRows[0].id;
-          setSelectedRowId(newRowId);
-          setEditableRowId(newRowId);
-          setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-        }, 10);
-      } else if (
-        (e.key === "Enter" || e.key === "Tab") &&
-        isLastColumn &&
-        isLastRow
-      ) {
-        // Move to the next page
-        table.nextPage();
-        setTimeout(() => {
-          const newRows = table.getRowModel().rows;
-          const newRowId = newRows[0].id;
-          setSelectedRowId(newRowId);
-          setEditableRowId(newRowId);
-          setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-        }, 10);
       } else {
-        const { rowIndex: nextRowIndex, colIndex: nextColIndex } =
-          findNextEditableCell(currentRowIndex, cellIndex, moveToNextRow);
+        const nextEditableCell = findNextEditableCell(
+          currentRowIndex,
+          cellIndex,
+          moveToNextRow
+        );
 
-        const nextRowId = sortedRows[nextRowIndex].id;
-        setSelectedRowId(nextRowId);
-        setEditableRowId(nextRowId);
-        setEditableCellIndex(nextColIndex);
+        if (nextEditableCell) {
+          const { rowIndex: nextRowIndex, colIndex: nextColIndex } =
+            nextEditableCell;
+          const nextRowId = sortedRows[nextRowIndex].id;
+          setSelectedRowId(nextRowId);
+          setEditableRowId(nextRowId);
+          setEditableCellIndex(nextColIndex);
+        } else if (isLastRow && isLastPage) {
+          // If we're on the last row of the last page and can't find next editable cell, do nothing
+          return;
+        } else if (isLastRow) {
+          // Move to the next page
+          table.nextPage();
+          setTimeout(() => {
+            const newRows = table.getRowModel().rows;
+            const newRowId = newRows[0].id;
+            setSelectedRowId(newRowId);
+            setEditableRowId(newRowId);
+            setEditableCellIndex(allColumns.findIndex(isEditableColumn));
+          }, 10);
+        }
       }
     }
   };
