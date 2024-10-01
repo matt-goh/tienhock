@@ -292,8 +292,6 @@ function TableEditing<T extends Record<string, any>>({
         isLastPage &&
         !sortedRows[currentRowIndex].original.isTotal
       ) {
-        // Add new row when Enter is pressed on the last cell of the last row (excluding total row)
-        handleAddRow();
         setTimeout(() => {
           const newRows = table.getRowModel().rows;
           const newRowId = newRows[newRows.length - 1].id;
@@ -318,16 +316,6 @@ function TableEditing<T extends Record<string, any>>({
         } else if (isLastRow && isLastPage) {
           // If we're on the last row of the last page and can't find next editable cell, do nothing
           return;
-        } else if (isLastRow) {
-          // Move to the next page
-          table.nextPage();
-          setTimeout(() => {
-            const newRows = table.getRowModel().rows;
-            const newRowId = newRows[0].id;
-            setSelectedRowId(newRowId);
-            setEditableRowId(newRowId);
-            setEditableCellIndex(allColumns.findIndex(isEditableColumn));
-          }, 10);
         }
       }
     }
