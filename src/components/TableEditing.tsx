@@ -68,12 +68,9 @@ function TableEditing<T extends Record<string, any>>({
   const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
   const [isIndeterminateGlobal, setIsIndeterminateGlobal] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
   const [isLastRowHovered, setIsLastRowHovered] = useState(false);
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
-  const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -97,11 +94,6 @@ function TableEditing<T extends Record<string, any>>({
   ].includes(tableKey || "");
   const disableAddRowBar = tableKey === "catalogueProduct";
   const isCatalogueProduct = tableKey === "catalogueProduct";
-
-  const totalPages = useMemo(
-    () => Math.ceil(data.length / pagination.pageSize),
-    [data.length, pagination.pageSize]
-  );
 
   const isEditableColumn = (col: ColumnConfig) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
@@ -364,175 +356,53 @@ function TableEditing<T extends Record<string, any>>({
     } as T;
 
     setData((prevData) => {
-      const newData = [...prevData, newRow];
+      // Insert the new row before the total row
+      const newData = [
+        ...prevData.slice(0, -1),
+        newRow,
+        prevData[prevData.length - 1],
+      ];
       if (onChange) {
         onChange(newData);
       }
-
-      // Calculate the correct page index for the new row
-      const currentLastItemIndex =
-        (pagination.pageIndex + 1) * pagination.pageSize;
-
-      // If the current page is full, move to the next page
-      if (currentLastItemIndex === prevData.length) {
-        table.nextPage();
-      }
-
       return newData;
     });
 
     return true;
-  }, [columns, onChange, pagination, disableAddRowBar]);
+  }, [columns, onChange, disableAddRowBar]);
 
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
-      if (key === "id" || key === "isSubtotal") return true;
-      return (
+      // Always consider 'id' field as non-empty
+      if (key === "id") return true;
+
+      // Treat 'isTotal' separately
+      if (key === "isTotal") return false;
+
+      // Check for empty string, 0, false, null, undefined
+      if (
         value === "" ||
         value === 0 ||
         value === false ||
         value === null ||
         value === undefined
-      );
+      )
+        return true;
+
+      // Check for strings that start with "%new_"
+      if (typeof value === "string" && value.startsWith("%new_")) return true;
+
+      // If none of the above conditions are met, the field is not empty
+      return false;
     });
   }, []);
-
-  const updateRemovableRowsAbove = useCallback(() => {
-    let count = 0;
-    for (let i = data.length - 1; i >= 0; i--) {
-      if (isRowEmpty(data[i])) {
-        count++;
-      } else {
-        break;
-      }
-    }
-    setRemovableRowsAbove(count);
-  }, [data, isRowEmpty]);
-
-  useEffect(() => {
-    updateRemovableRowsAbove();
-  }, [data, updateRemovableRowsAbove]);
-
-  // HRER
-  const handleRemoveEmptyRow = useCallback(() => {
-    setData((prevData) => {
-      const lastRow = prevData[prevData.length - 1];
-      if (lastRow && isRowEmpty(lastRow)) {
-        const newData = prevData.slice(0, -1);
-        if (onChange) {
-          onChange(newData);
-        }
-
-        return newData;
-      }
-      return prevData;
-    });
-  }, [onChange, isRowEmpty]);
 
   // HMD
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (disableAddRowBar) return;
     e.preventDefault();
-    setIsDragging(true);
     setIsAddRowBarActive(true);
-    setRowsToAddOrRemove(0);
-    initialDragY.current = e.clientY;
   }, []);
-
-  // HMM
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging) return;
-
-      const currentY = e.clientY;
-      const mouseDelta = currentY - initialDragY.current;
-
-      // Update the bar position
-      if (addRowBarRef.current) {
-        addRowBarRef.current.style.top = `${mouseDelta}px`;
-      }
-
-      // Check if we're on the last page and it's not full
-      const isLastPage = !table.getCanNextPage();
-      const isLastPageNotFull =
-        isLastPage && data.length % pagination.pageSize !== 0;
-
-      // Calculate rows to add or remove
-      const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
-
-      // Only allow adding rows if we're on the last page and it's not full
-      if (newRowsToAddOrRemove > 0 && !isLastPageNotFull) {
-        return;
-      }
-
-      setRowsToAddOrRemove(newRowsToAddOrRemove);
-
-      // Immediately add or remove rows
-      if (newRowsToAddOrRemove > 0 && isLastPageNotFull) {
-        handleAddRow();
-        initialDragY.current += DRAG_THRESHOLD;
-      } else if (newRowsToAddOrRemove < 0 && removableRowsAbove > 0) {
-        handleRemoveEmptyRow();
-        initialDragY.current -= DRAG_THRESHOLD;
-      }
-    },
-    [
-      isDragging,
-      removableRowsAbove,
-      handleAddRow,
-      handleRemoveEmptyRow,
-      totalPages,
-      data.length,
-      pagination,
-    ]
-  );
-
-  // UR
-  const updateRows = useCallback(() => {
-    if (rowsToAddOrRemove > 0) {
-      handleAddRow();
-      setRowsToAddOrRemove((prev) => prev - 1);
-    } else if (rowsToAddOrRemove < 0 && removableRowsAbove > 0) {
-      handleRemoveEmptyRow();
-      setRowsToAddOrRemove((prev) => prev + 1);
-      setRemovableRowsAbove((prev) => prev - 1);
-    }
-
-    if (rowsToAddOrRemove !== 0) {
-      requestAnimationFrame(updateRows);
-    }
-  }, [
-    rowsToAddOrRemove,
-    handleAddRow,
-    handleRemoveEmptyRow,
-    removableRowsAbove,
-  ]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    setIsAddRowBarActive(false);
-    setRowsToAddOrRemove(0);
-    if (addRowBarRef.current) {
-      addRowBarRef.current.style.top = "0px";
-    }
-    updateRemovableRowsAbove();
-  }, [updateRemovableRowsAbove]);
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    } else {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      updateRows();
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
   //HASR
   const handleAddSubtotalRow = () => {
@@ -1472,13 +1342,9 @@ function TableEditing<T extends Record<string, any>>({
       {isLastPage && (
         <>
           <ToolTip
-            content={
-              isCatalogueProduct
-                ? 'Sila tambah produk baharu dalam halaman "Job".'
-                : "Klik untuk menambah baris baharu\nSeret untuk menambah atau mengalih keluar baris"
-            }
+            content={"Klik untuk menambah baris baharu"}
             position="bottom"
-            visible={isAddRowBarHovered && !isDragging}
+            visible={isAddRowBarHovered}
           >
             <div
               ref={addRowBarRef}

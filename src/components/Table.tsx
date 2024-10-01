@@ -101,12 +101,7 @@ function Table<T extends Record<string, any>>({
   ].includes(tableKey || "");
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
-
-  const totalPages = useMemo(
-    () => Math.ceil(data.length / pagination.pageSize),
-    [data.length, pagination.pageSize]
-  );
-
+  
   const isEditableColumn = (col: ColumnConfig) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
       col.type
@@ -515,7 +510,6 @@ function Table<T extends Record<string, any>>({
       removableRowsAbove,
       handleAddRow,
       handleRemoveEmptyRow,
-      totalPages,
       data.length,
       pagination,
     ]

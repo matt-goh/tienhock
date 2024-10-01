@@ -318,7 +318,9 @@ const InvoisUploadPage: React.FC = () => {
           initialData={fileData}
           columns={columns}
           onChange={(newData: InvoiceData[]) => {
-            setFileData(newData);
+            setTimeout(() => {
+              setFileData(newData);
+            }, 0);
           }}
           isEditing={false}
           tableKey="invois"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import TableEditing from "../components/TableEditing";
 import Button from "../components/Button";
@@ -11,17 +11,8 @@ const InvoisDetailsPage: React.FC = () => {
   const invoiceData = location.state?.invoiceData as InvoiceData;
   const [orderDetails, setOrderDetails] = useState<OrderDetail[]>([]);
   const [focItems, setFocItems] = useState<OrderDetail[]>([]);
+  const [totalAmount, setTotalAmount] = useState<string>("0.00");
   const [returnedGoods, setReturnedGoods] = useState<OrderDetail[]>([]);
-
-  useEffect(() => {
-    if (invoiceData && invoiceData.orderDetails) {
-      setOrderDetails(invoiceData.orderDetails);
-      setFocItems(invoiceData.orderDetails.filter((item) => item.foc > 0));
-      setReturnedGoods(
-        invoiceData.orderDetails.filter((item) => item.returned > 0)
-      );
-    }
-  }, [invoiceData]);
 
   const columns: ColumnConfig[] = [
     { id: "code", header: "ID", type: "string", width: 120 },
@@ -31,55 +22,85 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "total", header: "AMOUNT", type: "amount", width: 100 },
   ];
 
-  const handleChange = (newData: OrderDetail[]) => {
-    // Remove the total row if it exists
-    const dataWithoutTotal = newData.filter((item) => !item.isTotal);
-    setTimeout(() => {
-      setOrderDetails(dataWithoutTotal);
-    }, 0);
-  };
+  const calculateTotal = useCallback(
+    (items: OrderDetail[], key: "total" | "foc" | "returned") => {
+      return items
+        .reduce((sum, detail) => {
+          const value =
+            key === "total"
+              ? detail.total
+              : key === "foc"
+              ? (parseFloat(detail.price.toString()) * detail.foc).toFixed(2)
+              : (parseFloat(detail.price.toString()) * detail.returned).toFixed(
+                  2
+                );
+          return sum + parseFloat(value || "0");
+        }, 0)
+        .toFixed(2);
+    },
+    []
+  );
 
-  const calculateTotal = (
-    items: OrderDetail[],
-    key: "total" | "foc" | "returned"
-  ) => {
-    return items
-      .reduce((sum, detail) => {
-        const value =
-          key === "total"
-            ? detail.total
-            : key === "foc"
-            ? (parseFloat(detail.price.toString()) * detail.foc).toFixed(2)
-            : (parseFloat(detail.price.toString()) * detail.returned).toFixed(
-                2
-              );
-        return sum + parseFloat(value || "0");
-      }, 0)
-      .toFixed(2);
-  };
+  useEffect(() => {
+    if (invoiceData && invoiceData.orderDetails) {
+      const initialOrderDetails = invoiceData.orderDetails;
+      setOrderDetails(initialOrderDetails);
+      setFocItems(initialOrderDetails.filter((item) => item.foc > 0));
+      setReturnedGoods(initialOrderDetails.filter((item) => item.returned > 0));
 
-  const addTotalRow = (
-    items: OrderDetail[],
-    totalAmount: string
-  ): OrderDetail[] => {
-    return [
-      ...items,
-      {
-        code: "Total:",
-        qty: 0,
-        price: 0,
-        total: totalAmount,
-        isTotal: true,
-        foc: 0,
-        returned: 0,
-      },
-    ];
-  };
+      // Calculate and set the initial total
+      const initialTotal = calculateTotal(initialOrderDetails, "total");
+      setTotalAmount(initialTotal);
+    }
+  }, [invoiceData, calculateTotal]);
+
+  // Recalculate total when orderDetails change
+  useEffect(() => {
+    const newTotal = calculateTotal(orderDetails, "total");
+    setTotalAmount(newTotal);
+  }, [orderDetails, calculateTotal]);
+
+  const addTotalRow = useCallback(
+    (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
+      const existingTotalRow = items.find((item) => item.isTotal);
+      if (existingTotalRow) {
+        return items.map((item) =>
+          item.isTotal ? { ...item, total: totalAmount } : item
+        );
+      } else {
+        return [
+          ...items,
+          {
+            code: "Total:",
+            qty: 0,
+            price: 0,
+            total: totalAmount,
+            isTotal: true,
+            foc: 0,
+            returned: 0,
+          },
+        ];
+      }
+    },
+    []
+  );
 
   const orderDetailsWithTotal = useMemo(() => {
-    const totalAmount = calculateTotal(orderDetails, "total");
     return addTotalRow(orderDetails, totalAmount);
-  }, [orderDetails]);
+  }, [orderDetails, totalAmount, addTotalRow]);
+
+  const handleChange = useCallback(
+    (newData: OrderDetail[]) => {
+      const dataWithoutTotal = newData.filter((item) => !item.isTotal);
+      const newTotalAmount = calculateTotal(dataWithoutTotal, "total");
+
+      setTimeout(() => {
+        setOrderDetails(dataWithoutTotal);
+        setTotalAmount(newTotalAmount);
+      }, 0);
+    },
+    [calculateTotal]
+  );
 
   const focItemsWithTotal = useMemo(() => {
     const totalAmount = calculateTotal(focItems, "foc");
