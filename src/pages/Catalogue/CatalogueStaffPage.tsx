@@ -8,10 +8,10 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import DeleteDialog from "../components/DeleteDialog";
-import StaffFilterMenu from "../components/StaffFilterMenu";
-import { Employee, FilterOptions } from "../types/types";
-import Button from "../components/Button";
+import DeleteDialog from "../../components/DeleteDialog";
+import StaffFilterMenu from "../../components/StaffFilterMenu";
+import { Employee, FilterOptions } from "../../types/types";
+import Button from "../../components/Button";
 
 const EmployeeCard = ({
   employee,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import Table from "../components/Table";
-import { ColumnConfig } from "../types/types";
+import Table from "../../components/Table/Table";
+import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import _ from "lodash";
 

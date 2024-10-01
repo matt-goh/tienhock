@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import {
+  createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -20,6 +21,9 @@ import {
 } from "@tanstack/react-table";
 import {
   IconArrowsSort,
+  IconCancel,
+  IconDeviceFloppy,
+  IconEdit,
   IconSortAscendingLetters,
   IconSortAscendingNumbers,
   IconSortDescendingLetters,
@@ -28,19 +32,23 @@ import {
   IconSquareCheckFilled,
   IconTrash,
 } from "@tabler/icons-react";
-import { ColumnType, TableProps, ColumnConfig } from "../types/types";
+import { ColumnType, TableProps, ColumnConfig } from "../../types/types";
 import TableEditableCell from "./TableEditableCell";
 import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
-import ToolTip from "./ToolTip";
+import ToolTip from "../ToolTip";
 
-function TableEditing<T extends Record<string, any>>({
+function Table<T extends Record<string, any>>({
   initialData,
   columns,
   onShowDeleteButton,
   onDelete,
   onChange,
+  isEditing,
+  onToggleEditing,
+  onSave,
+  onCancel,
   tableKey,
 }: TableProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
@@ -54,6 +62,7 @@ function TableEditing<T extends Record<string, any>>({
     [key: string]: any;
   }>({});
   const [originalData, setOriginalData] = useState<T[]>(initialData);
+  const [editingData, setEditingData] = useState<T[]>([]);
   const [canAddSubtotal, setCanAddSubtotal] = useState(true);
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
     number | null
@@ -68,9 +77,14 @@ function TableEditing<T extends Record<string, any>>({
   const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
   const [isIndeterminateGlobal, setIsIndeterminateGlobal] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [rowsToAddOrRemove, setRowsToAddOrRemove] = useState(0);
+  const addRowBarRef = useRef<HTMLDivElement>(null);
+  const initialDragY = useRef(0);
   const [isLastRowHovered, setIsLastRowHovered] = useState(false);
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
   const [isAddRowBarActive, setIsAddRowBarActive] = useState(false);
+  const [removableRowsAbove, setRemovableRowsAbove] = useState(0);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -78,20 +92,15 @@ function TableEditing<T extends Record<string, any>>({
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
-
-  // Refs
-  const addRowBarRef = useRef<HTMLDivElement>(null);
-  const initialDragY = useRef(0);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
-
-  // Constants
-  const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
   const isSortingDisabled = [
     "orderDetails",
     "focItems",
     "returnedGoods",
   ].includes(tableKey || "");
+
+  const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
 
   const isEditableColumn = (col: ColumnConfig) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
@@ -106,6 +115,9 @@ function TableEditing<T extends Record<string, any>>({
     }));
   }, []);
 
+  const disableAddRowBar = tableKey === "catalogueProduct";
+  const isCatalogueProduct = tableKey === "catalogueProduct";
+
   useEffect(() => {
     if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
       setPagination((prev) => ({
@@ -119,23 +131,16 @@ function TableEditing<T extends Record<string, any>>({
   }, [data.length, pagination.pageIndex, pagination.pageSize]);
 
   useEffect(() => {
-    setData(initialData);
-  }, [initialData]);
+    if (!isEditing) {
+      setData(initialData);
+    }
+  }, [initialData, isEditing]);
 
   useEffect(() => {
-    const updateTableWidth = () => {
-      if (tableContainerRef.current) {
-        setTableWidth(tableContainerRef.current.offsetWidth);
-      }
-    };
-
-    updateTableWidth();
-    window.addEventListener("resize", updateTableWidth);
-
-    return () => {
-      window.removeEventListener("resize", updateTableWidth);
-    };
-  }, []);
+    if (isEditing) {
+      setEditingData([...data]);
+    }
+  }, [isEditing, data]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -156,6 +161,40 @@ function TableEditing<T extends Record<string, any>>({
     setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
   }, [data]);
 
+  useEffect(() => {
+    setData((prevData) =>
+      recalculateSubtotals(
+        prevData.map((row) => {
+          if (!row.isSubtotal) {
+            return { ...row };
+          }
+          return row;
+        })
+      )
+    );
+  }, []);
+
+  useEffect(() => {
+    const updateTableWidth = () => {
+      if (tableContainerRef.current) {
+        setTableWidth(tableContainerRef.current.offsetWidth);
+      }
+    };
+
+    updateTableWidth();
+    window.addEventListener("resize", updateTableWidth);
+
+    return () => {
+      window.removeEventListener("resize", updateTableWidth);
+    };
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      setOriginalData([...initialData]);
+    }
+  }, [isEditing, initialData]);
+
   //HCC
   const handleCellClick = useCallback(
     (rowId: string | undefined, cellIndex: number) => {
@@ -164,7 +203,7 @@ function TableEditing<T extends Record<string, any>>({
       const row = table.getRowModel().rows.find((r) => r.id === rowId);
       if (!row || row.original.isSubtotal || row.original.isTotal) return;
 
-      const filteredCellIndex = cellIndex;
+      const filteredCellIndex = isEditing ? cellIndex - 1 : cellIndex;
       const columnId = columns[filteredCellIndex]?.id;
       if (!columnId) return;
 
@@ -332,6 +371,7 @@ function TableEditing<T extends Record<string, any>>({
 
   // HAR
   const handleAddRow = useCallback(() => {
+    if (disableAddRowBar) return false;
     const newRow = {
       id: `new_${Math.random().toString(36).substr(2, 9)}`,
       ...Object.fromEntries(
@@ -353,42 +393,174 @@ function TableEditing<T extends Record<string, any>>({
     } as T;
 
     setData((prevData) => {
-      // Insert the new row before the total row
-      const newData = [
-        ...prevData.slice(0, -1),
-        newRow,
-        prevData[prevData.length - 1],
-      ];
+      const newData = [...prevData, newRow];
       if (onChange) {
         onChange(newData);
       }
+
+      // Calculate the correct page index for the new row
+      const currentLastItemIndex =
+        (pagination.pageIndex + 1) * pagination.pageSize;
+
+      // If the current page is full, move to the next page
+      if (currentLastItemIndex === prevData.length) {
+        table.nextPage();
+      }
+
       return newData;
     });
 
     return true;
-  }, [columns, onChange]);
+  }, [columns, onChange, pagination, disableAddRowBar]);
+
+  const isRowEmpty = useCallback((row: T) => {
+    return Object.entries(row).every(([key, value]) => {
+      if (key === "id" || key === "isSubtotal") return true;
+      return (
+        value === "" ||
+        value === 0 ||
+        value === false ||
+        value === null ||
+        value === undefined
+      );
+    });
+  }, []);
+
+  const updateRemovableRowsAbove = useCallback(() => {
+    let count = 0;
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (isRowEmpty(data[i])) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    setRemovableRowsAbove(count);
+  }, [data, isRowEmpty]);
+
+  useEffect(() => {
+    updateRemovableRowsAbove();
+  }, [data, updateRemovableRowsAbove]);
+
+  // HRER
+  const handleRemoveEmptyRow = useCallback(() => {
+    setData((prevData) => {
+      const lastRow = prevData[prevData.length - 1];
+      if (lastRow && isRowEmpty(lastRow)) {
+        const newData = prevData.slice(0, -1);
+        if (onChange) {
+          onChange(newData);
+        }
+
+        return newData;
+      }
+      return prevData;
+    });
+  }, [onChange, isRowEmpty]);
 
   // HMD
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (disableAddRowBar) return;
     e.preventDefault();
+    setIsDragging(true);
     setIsAddRowBarActive(true);
+    setRowsToAddOrRemove(0);
+    initialDragY.current = e.clientY;
   }, []);
 
-  // HMU
+  // HMM
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const currentY = e.clientY;
+      const mouseDelta = currentY - initialDragY.current;
+
+      // Update the bar position
+      if (addRowBarRef.current) {
+        addRowBarRef.current.style.top = `${mouseDelta}px`;
+      }
+
+      // Check if we're on the last page and it's not full
+      const isLastPage = !table.getCanNextPage();
+      const isLastPageNotFull =
+        isLastPage && data.length % pagination.pageSize !== 0;
+
+      // Calculate rows to add or remove
+      const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
+
+      // Only allow adding rows if we're on the last page and it's not full
+      if (newRowsToAddOrRemove > 0 && !isLastPageNotFull) {
+        return;
+      }
+
+      setRowsToAddOrRemove(newRowsToAddOrRemove);
+
+      // Immediately add or remove rows
+      if (newRowsToAddOrRemove > 0 && isLastPageNotFull) {
+        handleAddRow();
+        initialDragY.current += DRAG_THRESHOLD;
+      } else if (newRowsToAddOrRemove < 0 && removableRowsAbove > 0) {
+        handleRemoveEmptyRow();
+        initialDragY.current -= DRAG_THRESHOLD;
+      }
+    },
+    [
+      isDragging,
+      removableRowsAbove,
+      handleAddRow,
+      handleRemoveEmptyRow,
+      data.length,
+      pagination,
+    ]
+  );
+
+  // UR
+  const updateRows = useCallback(() => {
+    if (rowsToAddOrRemove > 0) {
+      handleAddRow();
+      setRowsToAddOrRemove((prev) => prev - 1);
+    } else if (rowsToAddOrRemove < 0 && removableRowsAbove > 0) {
+      handleRemoveEmptyRow();
+      setRowsToAddOrRemove((prev) => prev + 1);
+      setRemovableRowsAbove((prev) => prev - 1);
+    }
+
+    if (rowsToAddOrRemove !== 0) {
+      requestAnimationFrame(updateRows);
+    }
+  }, [
+    rowsToAddOrRemove,
+    handleAddRow,
+    handleRemoveEmptyRow,
+    removableRowsAbove,
+  ]);
+
   const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
     setIsAddRowBarActive(false);
+    setRowsToAddOrRemove(0);
     if (addRowBarRef.current) {
       addRowBarRef.current.style.top = "0px";
     }
-  }, []);
+    updateRemovableRowsAbove();
+  }, [updateRemovableRowsAbove]);
 
   useEffect(() => {
-    document.addEventListener("mouseup", handleMouseUp);
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    } else {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      updateRows();
+    }
 
     return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [handleMouseUp]);
+  }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
   //HASR
   const handleAddSubtotalRow = () => {
@@ -442,33 +614,27 @@ function TableEditing<T extends Record<string, any>>({
     } as unknown as T);
 
   // RS
-  const recalculateSubtotals = useCallback(
-    (currentData: T[]): T[] => {
-      let currentSubtotal = 0;
-      const recalculatedData: T[] = [];
+  const recalculateSubtotals = (currentData: T[]): T[] => {
+    let currentSubtotal = 0;
 
-      currentData.forEach((row, index) => {
-        if (row.isSubtotal) {
-          const subtotalAmount = currentSubtotal.toFixed(2);
-          recalculatedData.push({
-            ...row,
-            id: row.id || `subtotal-${Math.random().toString(36).substr(2, 9)}`,
-            [columns.find((col) => col.type === "amount")?.id || "amount"]:
-              subtotalAmount,
-            subtotalEndIndex: index - 1,
-          });
-          currentSubtotal = 0;
-        } else {
-          const amount = parseFloat(row.amount) || 0;
-          currentSubtotal += amount;
-          recalculatedData.push(row);
-        }
-      });
-
-      return recalculatedData;
-    },
-    [columns]
-  );
+    return currentData.map((row, index) => {
+      if (row.isSubtotal) {
+        const subtotalAmount = currentSubtotal.toFixed(2);
+        currentSubtotal = 0;
+        return {
+          ...row,
+          id: row.id || `subtotal-${Math.random().toString(36).substr(2, 9)}`, // Preserve existing ID or create a new one
+          [columns.find((col) => col.type === "amount")?.id || "amount"]:
+            subtotalAmount,
+          subtotalEndIndex: index - 1,
+        };
+      } else {
+        const amount = parseFloat(row.amount) || 0;
+        currentSubtotal += amount;
+        return row;
+      }
+    });
+  };
 
   //HAV
   const hasAmountValuesAfterLastSubtotal = (data: T[]): boolean => {
@@ -556,7 +722,42 @@ function TableEditing<T extends Record<string, any>>({
     }
   }, [selectedRows, onDelete, data.length, pagination.pageSize]);
 
-  const allColumns = useMemo(() => columns, [columns]);
+  useEffect(() => {
+    updateSelectionState(selectedRows);
+  }, [selectedRows, data]);
+
+  const columnHelper = createColumnHelper<T>();
+
+  const checkboxColumn: ColumnConfig = {
+    id: "selection",
+    header: "",
+    type: "selection",
+    width: 10,
+  };
+
+  // HC
+  const handleCancel = useCallback(() => {
+    setEditingData([]);
+    setSelectedRows(new Set());
+    if (onCancel) {
+      onCancel();
+    }
+  }, [onCancel]);
+
+  // HS
+  const handleSave = useCallback(() => {
+    setData(editingData);
+    setEditingData([]);
+    setSelectedRows(new Set());
+    if (onSave) {
+      onSave();
+    }
+  }, [editingData, onSave]);
+
+  const allColumns = useMemo(
+    () => (isEditing ? [checkboxColumn, ...columns] : columns),
+    [columns, isEditing]
+  );
 
   const isSortableColumn = (columnId: string) => {
     if (isSortingDisabled) return false;
@@ -601,6 +802,12 @@ function TableEditing<T extends Record<string, any>>({
   const hasNumberColumn = useMemo(() => {
     return columns.some((col) => col.type === "number");
   }, [columns]);
+
+  const calculateRowAmount = useCallback((row: T) => {
+    const quantity = parseFloat(row.qty) || 0;
+    const price = parseFloat(row.price) || 0;
+    return (quantity * price).toFixed(2);
+  }, []);
 
   //RC
   const renderCell = (
@@ -1049,6 +1256,7 @@ function TableEditing<T extends Record<string, any>>({
       }),
     [
       columns,
+      isEditing,
       isSorting,
       selectedRows,
       columnWidths,
@@ -1122,12 +1330,8 @@ function TableEditing<T extends Record<string, any>>({
         onShowDeleteButton(selectedRows.size > 0);
       }
     },
-    [data, onShowDeleteButton]
+    [data, hasAmountValuesAfterLastSubtotal, onShowDeleteButton, table]
   );
-
-  useEffect(() => {
-    updateSelectionState(selectedRows);
-  }, [selectedRows, data, updateSelectionState]);
 
   // HSA
   const handleSelectAll = useCallback(() => {
@@ -1180,7 +1384,7 @@ function TableEditing<T extends Record<string, any>>({
                 key={headerGroup.id}
                 headerGroup={headerGroup}
                 columns={columns}
-                isEditing={true}
+                isEditing={isEditing ?? false}
                 isAllSelectedGlobal={isAllSelectedGlobal}
                 isIndeterminateGlobal={isIndeterminateGlobal}
                 handleSelectAll={handleSelectAll}
@@ -1202,11 +1406,11 @@ function TableEditing<T extends Record<string, any>>({
                       ? "border-b-0 rounded-b-lg"
                       : "border-b border-gray-300"
                   } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
-                    ${
-                      selectedRows.has(row.original.id)
-                        ? "bg-blue-50 hover:bg-blue-50"
-                        : "hover:bg-gray-100"
-                    } ${row.id === editableRowId ? "relative z-10" : ""}}`}
+                  ${
+                    selectedRows.has(row.original.id)
+                      ? "bg-blue-50 hover:bg-blue-50"
+                      : "hover:bg-gray-100"
+                  } ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
                     row.original.isSubtotal || row.original.isTotal
                       ? setSelectedRowId(row.id)
@@ -1272,12 +1476,10 @@ function TableEditing<T extends Record<string, any>>({
                               ? "border-l-0"
                               : "border-l border-gray-300"
                           }
-                          ${isLastCell ? "border-r-0" : ""}
-                          ${
-                            isLastRow
-                              ? "border-b-0"
-                              : "border-b border-gray-300"
-                          } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
+                        ${isLastCell ? "border-r-0" : ""}
+                        ${
+                          isLastRow ? "border-b-0" : "border-b border-gray-300"
+                        } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
                             isFirstCell && isLastRow ? "rounded-bl-lg" : ""
                           }`}
                           onClick={() => handleCellClick(row.id, cellIndex)}
@@ -1300,7 +1502,7 @@ function TableEditing<T extends Record<string, any>>({
         </table>
       </div>
       {/* SDB */}
-      {showDeleteButton && (
+      {showDeleteButton && isEditing && (
         <DeleteButton
           onDelete={handleDeleteSelected}
           selectedCount={selectedRows.size}
@@ -1312,7 +1514,7 @@ function TableEditing<T extends Record<string, any>>({
           }}
         />
       )}
-      {hasAmountColumn && hasNumberColumn && (
+      {hasAmountColumn && hasNumberColumn && isEditing && (
         <button
           onClick={handleAddSubtotalRow}
           className={`absolute top-[-57px] right-0 mr-[128px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
@@ -1325,12 +1527,40 @@ function TableEditing<T extends Record<string, any>>({
           Subtotal
         </button>
       )}
-      {isLastPage && (
+      {!isEditing ? (
+        <div
+          className="absolute top-[-57px] right-0 px-3 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+          onClick={onToggleEditing}
+        >
+          <IconEdit className="mr-1.5" />
+          <span>Edit</span>
+        </div>
+      ) : (
+        <div className="absolute top-[-57px] right-0 flex border border-gray-300 rounded-lg">
+          <div
+            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
+            onClick={handleSave}
+          >
+            <IconDeviceFloppy />
+          </div>
+          <div
+            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-r-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+            onClick={handleCancel}
+          >
+            <IconCancel />
+          </div>
+        </div>
+      )}
+      {isEditing && isLastPage && (
         <>
           <ToolTip
-            content={"Klik untuk menambah baris baharu"}
+            content={
+              isCatalogueProduct
+                ? 'Sila tambah produk baharu dalam halaman "Job".'
+                : "Klik untuk menambah baris baharu\nSeret untuk menambah atau mengalih keluar baris"
+            }
             position="bottom"
-            visible={isAddRowBarHovered}
+            visible={isAddRowBarHovered && !isDragging}
           >
             <div
               ref={addRowBarRef}
@@ -1347,21 +1577,21 @@ function TableEditing<T extends Record<string, any>>({
               className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
                 isAddRowBarActive ? "active-bg" : ""
               } 
-          }`}
+        }`}
               onMouseDown={handleMouseDown}
-              onClick={handleAddRow}
+              onClick={disableAddRowBar ? undefined : handleAddRow}
               onMouseEnter={() => setIsAddRowBarHovered(true)}
               onMouseLeave={() => setIsAddRowBarHovered(false)}
             ></div>
           </ToolTip>
           <style>{`
-          .active-bg {
-            background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
-          }
-          .active-bg:active {
-            background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
-          }
-        `}</style>
+        .active-bg {
+          background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+        }
+        .active-bg:active {
+          background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+        }
+      `}</style>
         </>
       )}
       <div className="flex justify-between items-center mt-4 w-full">
@@ -1371,4 +1601,4 @@ function TableEditing<T extends Record<string, any>>({
   );
 }
 
-export default TableEditing;
+export default Table;

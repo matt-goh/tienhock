@@ -5,7 +5,7 @@ import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
-import "../index.css";
+import "../../index.css";
 
 const Sidebar: React.FC = () => {
   const [openItems, setOpenItems] = useState<string[]>([]);

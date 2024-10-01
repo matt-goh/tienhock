@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import TableEditing from "../components/TableEditing";
-import Button from "../components/Button";
-import { ColumnConfig, InvoiceData, OrderDetail } from "../types/types";
-import BackButton from "../components/BackButton";
+import TableEditing from "../../components/Table/TableEditing";
+import Button from "../../components/Button";
+import { ColumnConfig, InvoiceData, OrderDetail } from "../../types/types";
+import BackButton from "../../components/BackButton";
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();

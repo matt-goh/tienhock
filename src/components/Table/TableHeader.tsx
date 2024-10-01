@@ -5,7 +5,7 @@ import {
   IconSquareMinusFilled,
   IconSquare,
 } from "@tabler/icons-react";
-import { ColumnType } from "../types/types";
+import { ColumnType } from "../../types/types";
 import ColumnResizer from "./ColumnResizer";
 
 interface TableHeaderProps<T> {
@@ -75,7 +75,9 @@ function TableHeader<T>({
           }}
         >
           <div className="flex items-center h-full relative">
-            {header.column.id === "selection" && isEditing && !disableSelection ? (
+            {header.column.id === "selection" &&
+            isEditing &&
+            !disableSelection ? (
               <div className="flex items-center justify-center h-full w-full">
                 <button
                   onClick={(e) => {
