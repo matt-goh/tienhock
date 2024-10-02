@@ -13,6 +13,8 @@ const InvoisDetailsPage: React.FC = () => {
   const [focItems, setFocItems] = useState<OrderDetail[]>([]);
   const [totalAmount, setTotalAmount] = useState<string>("0.00");
   const [returnedGoods, setReturnedGoods] = useState<OrderDetail[]>([]);
+  const [lessAmount, setLessAmount] = useState<string | null>(null);
+  const [taxAmount, setTaxAmount] = useState<string | null>(null);
 
   const columns: ColumnConfig[] = [
     { id: "code", header: "ID", type: "string", width: 120 },
@@ -88,17 +90,62 @@ const InvoisDetailsPage: React.FC = () => {
   );
 
   const orderDetailsWithTotal = useMemo(() => {
-    return addTotalRow(orderDetails, totalAmount);
-  }, [orderDetails, totalAmount, addTotalRow]);
+    let result = [...orderDetails];
+    let totalAmount = calculateTotal(orderDetails, "total");
+
+    if (lessAmount !== null) {
+      result.push({
+        code: "LESS",
+        productName: "Less",
+        qty: 0,
+        price: 0,
+        total: lessAmount,
+        isLess: true,
+        foc: 0,
+        returned: 0,
+        colspan: 3,
+      });
+      totalAmount = (parseFloat(totalAmount) - parseFloat(lessAmount)).toFixed(
+        2
+      );
+    }
+
+    if (taxAmount !== null) {
+      result.push({
+        code: "TAX",
+        productName: "Tax",
+        qty: 0,
+        price: 0,
+        total: taxAmount,
+        isTax: true,
+        foc: 0,
+        returned: 0,
+        colspan: 3,
+      });
+      totalAmount = (parseFloat(totalAmount) + parseFloat(taxAmount)).toFixed(
+        2
+      );
+    }
+
+    // Use addTotalRow to add or update the total row
+    return addTotalRow(result, totalAmount);
+  }, [orderDetails, lessAmount, taxAmount, calculateTotal, addTotalRow]);
 
   const handleChange = useCallback(
     (newData: OrderDetail[]) => {
-      const dataWithoutTotal = newData.filter((item) => !item.isTotal);
-      const newTotalAmount = calculateTotal(dataWithoutTotal, "total");
+      const dataWithoutSpecialRows = newData.filter(
+        (item) => !item.isTotal && !item.isLess && !item.isTax
+      );
+      const newTotalAmount = calculateTotal(dataWithoutSpecialRows, "total");
+
+      const lessRow = newData.find((item) => item.isLess);
+      const taxRow = newData.find((item) => item.isTax);
 
       setTimeout(() => {
-        setOrderDetails(dataWithoutTotal);
+        setOrderDetails(dataWithoutSpecialRows);
         setTotalAmount(newTotalAmount);
+        if (lessRow) setLessAmount(lessRow.total || "0.00");
+        if (taxRow) setTaxAmount(taxRow.total || "0.00");
       }, 0);
     },
     [calculateTotal]
@@ -208,6 +255,14 @@ const InvoisDetailsPage: React.FC = () => {
     }, 0);
   };
 
+  const handleAddLess = () => {
+    setLessAmount("0.00");
+  };
+
+  const handleAddTax = () => {
+    setTaxAmount("0.00");
+  };
+
   const renderActionButtons = () => {
     const hasFOC = focItems.length > 0;
     const hasReturned = returnedGoods.length > 0;
@@ -268,7 +323,17 @@ const InvoisDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">Order Details</h2>
+      <div className="relative mb-6">
+        <h2 className="text-xl font-semibold pt-2">Order Details</h2>
+        <div className="absolute top-0 right-0 space-x-2">
+          <Button onClick={handleAddLess} variant="outline" size="md">
+            Less
+          </Button>
+          <Button onClick={handleAddTax} variant="outline" size="md">
+            Tax
+          </Button>
+        </div>
+      </div>
       <TableEditing<OrderDetail>
         initialData={orderDetailsWithTotal}
         columns={columns}

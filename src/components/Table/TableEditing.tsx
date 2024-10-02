@@ -609,6 +609,69 @@ function TableEditing<T extends Record<string, any>>({
         });
       }
 
+      // Handle special rows (Less, Tax, and Total)
+      if (row.original.isLess || row.original.isTax || row.original.isTotal) {
+        if (cellIndex === 0) {
+          return (
+            <input
+              className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
+              tabIndex={-1}
+              type="text"
+              readOnly
+              value={cell.getValue() as string}
+              style={{ boxSizing: "border-box" }}
+            />
+          );
+        } else if (cellIndex === 1) {
+          const colspan = row.original.colspan || columns.length - 3;
+          return (
+            <input
+              className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
+              tabIndex={-1}
+              type="text"
+              readOnly
+              value={cell.getValue() as string}
+              style={{ boxSizing: "border-box" }}
+            />
+          );
+        } else if (cellIndex === columns.length - 2) {
+          const value = cell.getValue();
+          return (
+            <input
+              className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent text-right cursor-default"
+              tabIndex={-1}
+              type="text"
+              readOnly
+              value={
+                typeof value === "number" ? value.toFixed(2) : (value as string)
+              }
+              style={{ boxSizing: "border-box" }}
+            />
+          );
+        } else if (cellIndex === columns.length - 1) {
+          // Action column
+          return (
+            <div className="flex items-center justify-center h-full">
+              <button
+                className={`p-2 rounded-full text-gray-500 hover:bg-gray-200 active:bg-gray-300 hover:text-gray-600 ${
+                  isSorting ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                onClick={(event) => {
+                  if (!isSorting) {
+                    handleDeleteRow(row.index, event);
+                  }
+                }}
+                disabled={isSorting}
+              >
+                <IconTrash stroke={2} width={20} height={20} />
+              </button>
+            </div>
+          );
+        } else {
+          return null;
+        }
+      }
+
       if (columnType === "selection") {
         return (
           <div className="flex items-center justify-center h-full">
@@ -774,12 +837,12 @@ function TableEditing<T extends Record<string, any>>({
           onMouseEnter={() => setIsLastRowHovered(true)}
           onMouseLeave={() => setIsLastRowHovered(false)}
         >
-          {renderCellContent()}
+          {renderCellContent() as ReactNode}
         </div>
       );
     }
 
-    return renderCellContent();
+    return renderCellContent() as ReactNode;
   };
 
   // TC
@@ -1184,6 +1247,45 @@ function TableEditing<T extends Record<string, any>>({
                     const isFirstCell = cellIndex === 0;
                     const isLastCell =
                       cellIndex === row.getVisibleCells().length - 1;
+                    // Special handling for Less, Tax, and Total rows
+                    if (
+                      row.original.isLess ||
+                      row.original.isTax
+                    ) {
+                      if (
+                        cellIndex === 0 ||
+                        cellIndex === 1 ||
+                        cellIndex === columns.length - 2 ||
+                        cellIndex === columns.length - 1
+                      ) {
+                        return (
+                          <td
+                            key={cell.id}
+                            className={`relative px-6 py-4 whitespace-no-wrap cursor-default
+                        ${
+                          isFirstCell
+                            ? "border-l-0"
+                            : "border-l border-gray-300"
+                        }
+                        ${isLastCell ? "border-r-0" : ""}
+                        ${isLastRow ? "border-b-0" : "border-b border-gray-300"}
+                        ${isLastCell && isLastRow ? "rounded-br-lg" : ""}
+                        ${isFirstCell && isLastRow ? "rounded-bl-lg" : ""}`}
+                            colSpan={cellIndex === 1 ? columns.length - 3 : 1}
+                            style={{
+                              padding: "0",
+                              boxSizing: "border-box",
+                              width:
+                                `${columnWidths[cell.column.id]}px` || "auto",
+                            }}
+                          >
+                            {renderCell(row, cell, cellIndex, isLastRow)}
+                          </td>
+                        );
+                      } else {
+                        return null;
+                      }
+                    }
                     if (row.original.isTotal || row.original.isSubtotal) {
                       if (cell.column.id === "selection") {
                         return (

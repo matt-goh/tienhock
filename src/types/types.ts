@@ -58,6 +58,7 @@ export interface OrderDetail {
   isTotal?: boolean;
   isLess?: boolean;
   isTax?: boolean;
+  colspan?: number,
 }
 
 export interface InvoiceData {
