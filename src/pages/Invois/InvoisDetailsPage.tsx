@@ -11,7 +11,6 @@ const InvoisDetailsPage: React.FC = () => {
   const invoiceData = location.state?.invoiceData as InvoiceData;
   const [orderDetails, setOrderDetails] = useState<OrderDetail[]>([]);
   const [focItems, setFocItems] = useState<OrderDetail[]>([]);
-  const [totalAmount, setTotalAmount] = useState<string>("0.00");
   const [returnedGoods, setReturnedGoods] = useState<OrderDetail[]>([]);
   const [lessAmount, setLessAmount] = useState<string | null>(null);
   const [taxAmount, setTaxAmount] = useState<string | null>(null);
@@ -50,18 +49,8 @@ const InvoisDetailsPage: React.FC = () => {
       setOrderDetails(initialOrderDetails);
       setFocItems(initialOrderDetails.filter((item) => item.foc > 0));
       setReturnedGoods(initialOrderDetails.filter((item) => item.returned > 0));
-
-      // Calculate and set the initial total
-      const initialTotal = calculateTotal(initialOrderDetails, "total");
-      setTotalAmount(initialTotal);
     }
   }, [invoiceData, calculateTotal]);
-
-  // Recalculate total when orderDetails change
-  useEffect(() => {
-    const newTotal = calculateTotal(orderDetails, "total");
-    setTotalAmount(newTotal);
-  }, [orderDetails, calculateTotal]);
 
   const addTotalRow = useCallback(
     (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
@@ -136,20 +125,26 @@ const InvoisDetailsPage: React.FC = () => {
       const dataWithoutSpecialRows = newData.filter(
         (item) => !item.isTotal && !item.isLess && !item.isTax
       );
-      const newTotalAmount = calculateTotal(dataWithoutSpecialRows, "total");
 
       const lessRow = newData.find((item) => item.isLess);
       const taxRow = newData.find((item) => item.isTax);
 
       setTimeout(() => {
         setOrderDetails(dataWithoutSpecialRows);
-        setTotalAmount(newTotalAmount);
         if (lessRow) setLessAmount(lessRow.total || "0.00");
         if (taxRow) setTaxAmount(taxRow.total || "0.00");
       }, 0);
     },
     [calculateTotal]
   );
+
+  const handleSpecialRowDelete = useCallback((rowType: "less" | "tax") => {
+    if (rowType === "less") {
+      setLessAmount(null);
+    } else if (rowType === "tax") {
+      setTaxAmount(null);
+    }
+  }, []);
 
   const focItemsWithTotal = useMemo(() => {
     const totalAmount = calculateTotal(focItems, "foc");
@@ -338,6 +333,7 @@ const InvoisDetailsPage: React.FC = () => {
         initialData={orderDetailsWithTotal}
         columns={columns}
         onChange={handleChange}
+        onSpecialRowDelete={handleSpecialRowDelete}
         tableKey="orderDetails"
       />
 

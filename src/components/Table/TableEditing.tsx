@@ -30,7 +30,6 @@ import {
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, ColumnConfig } from "../../types/types";
 import TableEditableCell from "./TableEditableCell";
-import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
@@ -39,7 +38,7 @@ function TableEditing<T extends Record<string, any>>({
   initialData,
   columns,
   onShowDeleteButton,
-  onDelete,
+  onSpecialRowDelete,
   onChange,
   tableKey,
 }: TableProps<T>) {
@@ -58,11 +57,6 @@ function TableEditing<T extends Record<string, any>>({
   const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
     number | null
   >(null);
-  const [showDeleteButton, setShowDeleteButton] = useState(false);
-  const [rowToDelete, setRowToDelete] = useState<{
-    index: number;
-    id: string;
-  } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
@@ -483,61 +477,37 @@ function TableEditing<T extends Record<string, any>>({
     return remainingRows.some((row) => parseFloat(row.amount) > 0);
   };
 
-  // DR
-  const deleteRow = async (rowIndex: number) => {
-    setData((oldData) => {
-      const newData = oldData.filter((_, index) => index !== rowIndex);
-      const updatedData = recalculateSubtotals(newData);
-      setOriginalData(updatedData);
-      return updatedData;
-    });
-
-    setRowToDelete(null);
-  };
-
   // HDR
-  const handleDeleteRow = async (rowIndex: number, event: React.MouseEvent) => {
-    event.stopPropagation();
-    const rowData = data[rowIndex];
-    if (rowData.id) {
-      setRowToDelete({ index: rowIndex, id: rowData.id });
-    } else {
-      // For rows not in the database, delete immediately
-      deleteRow(rowIndex);
-    }
-  };
+  const handleDeleteRow = useCallback(
+    (rowIndex: number, event: React.MouseEvent) => {
+      event.stopPropagation();
+      const rowToDelete = data[rowIndex];
 
-  // HDS
-  const handleDeleteSelected = useCallback(async () => {
-    const selectedIndices = Array.from(selectedRows);
-    if (onDelete) {
-      await onDelete(selectedIndices);
-    }
-    // Clear selection after deletion
-    setSelectedRows(new Set());
-
-    // Update the table data
-    setData((prevData) => {
-      const updatedData = prevData.filter(
-        (_, index) => !selectedIndices.includes(index)
-      );
-      return updatedData;
-    });
-
-    // Recalculate subtotals if necessary
-    setData((prevData) => recalculateSubtotals(prevData));
-
-    // Update pagination if necessary
-    if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
-      setPagination((prev) => ({
-        ...prev,
-        pageIndex: Math.max(
-          0,
-          Math.ceil(data.length / pagination.pageSize) - 1
-        ),
-      }));
-    }
-  }, [selectedRows, onDelete, data.length, pagination.pageSize]);
+      if (rowToDelete.isLess || rowToDelete.isTax) {
+        // Handle special rows (Less or Tax)
+        if (onSpecialRowDelete) {
+          onSpecialRowDelete(rowToDelete.isLess ? "less" : "tax");
+        }
+        setData((prevData) => {
+          const newData = prevData.filter((_, index) => index !== rowIndex);
+          if (onChange) {
+            onChange(newData);
+          }
+          return newData;
+        });
+      } else {
+        // Handle regular rows
+        setData((prevData) => {
+          const newData = prevData.filter((_, index) => index !== rowIndex);
+          if (onChange) {
+            onChange(newData);
+          }
+          return newData;
+        });
+      }
+    },
+    [data, onChange, onSpecialRowDelete]
+  );
 
   const allColumns = useMemo(() => columns, [columns]);
 
@@ -1142,7 +1112,6 @@ function TableEditing<T extends Record<string, any>>({
       setIsAllSelectedGlobal(isAllSelected);
       setIsIndeterminateGlobal(isIndeterminate);
 
-      setShowDeleteButton(selectedRows.size > 0);
       setCanAddSubtotal(
         selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
       );
@@ -1248,10 +1217,7 @@ function TableEditing<T extends Record<string, any>>({
                     const isLastCell =
                       cellIndex === row.getVisibleCells().length - 1;
                     // Special handling for Less, Tax, and Total rows
-                    if (
-                      row.original.isLess ||
-                      row.original.isTax
-                    ) {
+                    if (row.original.isLess || row.original.isTax) {
                       if (
                         cellIndex === 0 ||
                         cellIndex === 1 ||
@@ -1366,19 +1332,6 @@ function TableEditing<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
-      {/* SDB */}
-      {showDeleteButton && (
-        <DeleteButton
-          onDelete={handleDeleteSelected}
-          selectedCount={selectedRows.size}
-          isAllSelected={isAllSelectedGlobal}
-          style={{
-            marginRight: `${
-              hasAmountColumn && hasNumberColumn ? "235px" : "128px"
-            }`,
-          }}
-        />
-      )}
       {hasAmountColumn && hasNumberColumn && (
         <button
           onClick={handleAddSubtotalRow}
