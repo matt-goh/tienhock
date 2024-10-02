@@ -49,12 +49,15 @@ export interface TableProps<T> {
 
 export interface OrderDetail {
   code: string;
+  productName: string;
   qty: number;
   price: number;
   total: string;
-  isTotal?: boolean;
   foc: number;
   returned: number;
+  isTotal?: boolean;
+  isLess?: boolean;
+  isTax?: boolean;
 }
 
 export interface InvoiceData {

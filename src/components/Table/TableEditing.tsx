@@ -485,24 +485,6 @@ function TableEditing<T extends Record<string, any>>({
 
   // DR
   const deleteRow = async (rowIndex: number) => {
-    if (rowToDelete && rowToDelete.id) {
-      try {
-        const response = await fetch(
-          `http://localhost:5000/api/jobs/${rowToDelete.id}`,
-          {
-            method: "DELETE",
-          }
-        );
-        if (!response.ok) {
-          throw new Error("Failed to delete job from the database");
-        }
-      } catch (error) {
-        console.error("Error deleting job:", error);
-        // Handle error (e.g., show error message to user)
-        return;
-      }
-    }
-
     setData((oldData) => {
       const newData = oldData.filter((_, index) => index !== rowIndex);
       const updatedData = recalculateSubtotals(newData);
@@ -1004,24 +986,6 @@ function TableEditing<T extends Record<string, any>>({
                   isTotal?: boolean;
                   isSubtotal?: boolean;
                 };
-                if (row.isTotal || row.isSubtotal) {
-                  if (col.type === "amount") {
-                    return (
-                      <>
-                        <td
-                          colSpan={columns.length - 1}
-                          className="py-3 pr-6 text-right font-semibold border-t border-b"
-                        >
-                          {row.isTotal ? "Total:" : "Subtotal:"}
-                        </td>
-                        <td className="py-3 pr-6 text-right font-semibold border-t border-b">
-                          {info.getValue() as React.ReactNode}
-                        </td>
-                      </>
-                    );
-                  }
-                  return null;
-                }
                 return commonCellContent(info);
               },
               sortingFn: isSortingDisabled
@@ -1238,7 +1202,7 @@ function TableEditing<T extends Record<string, any>>({
                           <td
                             key={cell.id}
                             colSpan={columns.length}
-                            className={`py-3 pr-6 text-right font-semibold`}
+                            className={`py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg`}
                           >
                             {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
                             {cell.getValue() as ReactNode}

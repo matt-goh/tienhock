@@ -20,6 +20,7 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "qty", header: "QUANTITY", type: "number", width: 100 },
     { id: "price", header: "PRICE", type: "float", width: 100 },
     { id: "total", header: "AMOUNT", type: "amount", width: 100 },
+    { id: "action", header: "", type: "action", width: 50 },
   ];
 
   const calculateTotal = useCallback(
@@ -71,7 +72,8 @@ const InvoisDetailsPage: React.FC = () => {
         return [
           ...items,
           {
-            code: "Total:",
+            code: "",
+            productName: "Total:",
             qty: 0,
             price: 0,
             total: totalAmount,
@@ -141,6 +143,7 @@ const InvoisDetailsPage: React.FC = () => {
         </div>
       ),
     },
+    { id: "action", header: "", type: "action", width: 50 },
   ];
 
   const focItemsColumns: ColumnConfig[] = [
@@ -164,11 +167,13 @@ const InvoisDetailsPage: React.FC = () => {
         </div>
       ),
     },
+    { id: "action", header: "", type: "action", width: 50 },
   ];
 
   const handleAddFOC = () => {
     const newFocItem: OrderDetail = {
       code: "",
+      productName: "",
       qty: 0,
       price: 0,
       total: "",
@@ -181,6 +186,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleAddReturnedGoods = () => {
     const newReturnedItem: OrderDetail = {
       code: "",
+      productName: "",
       qty: 0,
       price: 0,
       total: "",
