@@ -34,6 +34,14 @@ import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
 
+// Type guard to check if a property exists on an object
+function hasProperty<T extends object, K extends PropertyKey>(
+  obj: T,
+  prop: K
+): obj is T & Record<K, unknown> {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
 function TableEditing<T extends Record<string, any>>({
   initialData,
   columns,
@@ -174,29 +182,74 @@ function TableEditing<T extends Record<string, any>>({
     [isSorting, columns]
   );
 
-  //HCC
+  const calculateAmount = useCallback((row: T): number => {
+    const quantity = parseFloat(row.qty?.toString() || "0");
+    const price = parseFloat(row.price?.toString() || "0");
+    return quantity * price;
+  }, []);
+
+  const updateAmounts = useCallback(
+    (currentData: T[]): T[] => {
+      let total = 0;
+      const updatedData = currentData.map((row) => {
+        if (row.isTotal) return row;
+        if (row.isSubtotal) return row;
+
+        const amount = calculateAmount(row);
+        total += amount;
+
+        return {
+          ...row,
+          total: amount.toFixed(2),
+        };
+      });
+
+      // Update total row
+      const totalRowIndex = updatedData.findIndex((row) => row.isTotal);
+      if (totalRowIndex !== -1) {
+        updatedData[totalRowIndex] = {
+          ...updatedData[totalRowIndex],
+          total: total.toFixed(2),
+        };
+      }
+
+      return updatedData;
+    },
+    [calculateAmount]
+  );
+
   const handleCellChange = useCallback(
     (rowIndex: number, columnId: string, value: any) => {
       setData((prevData) => {
         const updatedData = prevData.map((row, index) => {
           if (index === rowIndex) {
-            return { ...row, [columnId]: value };
+            const updatedRow = { ...row, [columnId]: value };
+            if (columnId === "qty" || columnId === "price") {
+              const newAmount = calculateAmount(updatedRow);
+              return {
+                ...updatedRow,
+                total: newAmount.toFixed(2),
+              };
+            }
+            return updatedRow;
           }
           return row;
         });
 
+        const recalculatedData = updateAmounts(updatedData);
+
         if (onChange) {
-          onChange(updatedData);
+          onChange(recalculatedData);
         }
 
-        return updatedData;
+        return recalculatedData;
       });
 
       if (sorting.some((sort) => sort.id === columnId)) {
         table.setSorting([...sorting]);
       }
     },
-    [onChange, sorting]
+    [onChange, sorting, calculateAmount, updateAmounts]
   );
 
   // Helper function to find the next editable cell
@@ -949,17 +1002,18 @@ function TableEditing<T extends Record<string, any>>({
             return {
               ...baseColumn,
               accessorFn: (row: T) => {
-                const amountValue = row[col.id as keyof T];
-                return typeof amountValue === "number" ||
-                  typeof amountValue === "string"
-                  ? amountValue
-                  : 0;
+                if (hasProperty(row, col.id)) {
+                  return row[col.id];
+                }
+                return calculateAmount(row).toFixed(2);
               },
               cell: (info) => {
                 const value = info.getValue();
                 return (
                   <div className="px-6 py-3 text-right">
-                    {typeof value === "number" ? value.toFixed(2) : "0.00"}
+                    {typeof value === "number"
+                      ? value.toFixed(2)
+                      : String(value)}
                   </div>
                 );
               },
@@ -1013,7 +1067,8 @@ function TableEditing<T extends Record<string, any>>({
           default:
             return {
               ...baseColumn,
-              accessorFn: (row: T) => row[col.id as keyof T] as string,
+              accessorFn: (row: T) =>
+                hasProperty(row, col.id) ? row[col.id] : undefined,
               cell: (info) => {
                 const row = info.row.original as T & {
                   isTotal?: boolean;
