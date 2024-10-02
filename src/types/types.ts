@@ -45,6 +45,7 @@ export interface TableProps<T> {
   onSave?: () => void;
   onCancel?: () => void;
   tableKey?: string;
+  onSpecialRowDelete?: (rowType: 'less' | 'tax') => void; 
 }
 
 export interface OrderDetail {
