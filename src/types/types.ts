@@ -38,6 +38,7 @@ export interface TableProps<T> {
   initialData: T[];
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;
+  onSpecialRowDelete?: (rowType: "less" | "tax") => void;
   onDelete?: (selectedIds: number[]) => Promise<void>;
   onChange?: (changedData: T[]) => void;
   isEditing?: boolean;
@@ -45,7 +46,7 @@ export interface TableProps<T> {
   onSave?: () => void;
   onCancel?: () => void;
   tableKey?: string;
-  onSpecialRowDelete?: (rowType: 'less' | 'tax') => void; 
+  subtotal?: boolean;
 }
 
 export interface OrderDetail {
@@ -59,7 +60,7 @@ export interface OrderDetail {
   isTotal?: boolean;
   isLess?: boolean;
   isTax?: boolean;
-  colspan?: number,
+  colspan?: number;
 }
 
 export interface InvoiceData {

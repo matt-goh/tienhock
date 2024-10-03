@@ -52,6 +52,7 @@ function Table<T extends Record<string, any>>({
   tableKey,
 }: TableProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
+  const [editingData, setEditingData] = useState<T[]>([]);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [editableRowId, setEditableRowId] = useState<string | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
@@ -61,12 +62,6 @@ function Table<T extends Record<string, any>>({
   const [previousCellValues, setPreviousCellValues] = useState<{
     [key: string]: any;
   }>({});
-  const [originalData, setOriginalData] = useState<T[]>(initialData);
-  const [editingData, setEditingData] = useState<T[]>([]);
-  const [canAddSubtotal, setCanAddSubtotal] = useState(true);
-  const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
-    number | null
-  >(null);
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [rowToDelete, setRowToDelete] = useState<{
     index: number;
@@ -158,19 +153,13 @@ function Table<T extends Record<string, any>>({
   }, []);
 
   useEffect(() => {
-    setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
-  }, [data]);
-
-  useEffect(() => {
     setData((prevData) =>
-      recalculateSubtotals(
-        prevData.map((row) => {
-          if (!row.isSubtotal) {
-            return { ...row };
-          }
-          return row;
-        })
-      )
+      prevData.map((row) => {
+        if (!row.isSubtotal) {
+          return { ...row };
+        }
+        return row;
+      })
     );
   }, []);
 
@@ -188,12 +177,6 @@ function Table<T extends Record<string, any>>({
       window.removeEventListener("resize", updateTableWidth);
     };
   }, [isEditing]);
-
-  useEffect(() => {
-    if (isEditing) {
-      setOriginalData([...initialData]);
-    }
-  }, [isEditing, initialData]);
 
   //HCC
   const handleCellClick = useCallback(
@@ -562,92 +545,6 @@ function Table<T extends Record<string, any>>({
     };
   }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
-  //HASR
-  const handleAddSubtotalRow = () => {
-    if (!canAddSubtotal) return;
-
-    setData((prevData) => {
-      let insertIndex: number;
-      let subtotalEndIndex: number;
-
-      if (selectedRowForSubtotal) {
-        insertIndex =
-          prevData.findIndex((row) => row.id === selectedRowForSubtotal) + 1;
-        subtotalEndIndex = insertIndex - 1;
-      } else {
-        const lastNonSubtotalRowWithAmount = prevData.reduceRight(
-          (acc, row, index) => {
-            if (!row.isSubtotal && parseFloat(row.amount) > 0 && acc === -1) {
-              return index;
-            }
-            return acc;
-          },
-          -1
-        );
-        insertIndex = lastNonSubtotalRowWithAmount + 1;
-        subtotalEndIndex = lastNonSubtotalRowWithAmount;
-      }
-
-      if (insertIndex === 0) return prevData;
-
-      const newData = [...prevData];
-      const subtotalRow = createSubtotalRow(0, subtotalEndIndex);
-      newData.splice(insertIndex, 0, subtotalRow);
-
-      const recalculatedData = recalculateSubtotals(newData);
-      setOriginalData(recalculatedData);
-      return recalculatedData;
-    });
-
-    setSelectedRowForSubtotal(null);
-  };
-
-  // CS
-  const createSubtotalRow = (subtotalAmount: number, endIndex: number): T =>
-    ({
-      id: `subtotal-${Math.random().toString(36).substr(2, 9)}`,
-      ...Object.fromEntries(columns.map((col) => [col.id, ""])),
-      [columns.find((col) => col.type === "amount")?.id || "amount"]:
-        subtotalAmount.toFixed(2),
-      isSubtotal: true,
-      subtotalEndIndex: endIndex,
-    } as unknown as T);
-
-  // RS
-  const recalculateSubtotals = (currentData: T[]): T[] => {
-    let currentSubtotal = 0;
-
-    return currentData.map((row, index) => {
-      if (row.isSubtotal) {
-        const subtotalAmount = currentSubtotal.toFixed(2);
-        currentSubtotal = 0;
-        return {
-          ...row,
-          id: row.id || `subtotal-${Math.random().toString(36).substr(2, 9)}`, // Preserve existing ID or create a new one
-          [columns.find((col) => col.type === "amount")?.id || "amount"]:
-            subtotalAmount,
-          subtotalEndIndex: index - 1,
-        };
-      } else {
-        const amount = parseFloat(row.amount) || 0;
-        currentSubtotal += amount;
-        return row;
-      }
-    });
-  };
-
-  //HAV
-  const hasAmountValuesAfterLastSubtotal = (data: T[]): boolean => {
-    const lastSubtotalIndex = data.reduceRight((acc, row, index) => {
-      if (row.isSubtotal && acc === -1) return index;
-      return acc;
-    }, -1);
-
-    const remainingRows =
-      lastSubtotalIndex === -1 ? data : data.slice(lastSubtotalIndex + 1);
-    return remainingRows.some((row) => parseFloat(row.amount) > 0);
-  };
-
   // DR
   const deleteRow = async (rowIndex: number) => {
     if (rowToDelete && rowToDelete.id) {
@@ -670,9 +567,7 @@ function Table<T extends Record<string, any>>({
 
     setData((oldData) => {
       const newData = oldData.filter((_, index) => index !== rowIndex);
-      const updatedData = recalculateSubtotals(newData);
-      setOriginalData(updatedData);
-      return updatedData;
+      return newData;
     });
 
     setRowToDelete(null);
@@ -707,9 +602,6 @@ function Table<T extends Record<string, any>>({
       return updatedData;
     });
 
-    // Recalculate subtotals if necessary
-    setData((prevData) => recalculateSubtotals(prevData));
-
     // Update pagination if necessary
     if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
       setPagination((prev) => ({
@@ -725,8 +617,6 @@ function Table<T extends Record<string, any>>({
   useEffect(() => {
     updateSelectionState(selectedRows);
   }, [selectedRows, data]);
-
-  const columnHelper = createColumnHelper<T>();
 
   const checkboxColumn: ColumnConfig = {
     id: "selection",
@@ -1025,19 +915,9 @@ function Table<T extends Record<string, any>>({
             }`}
             onClick={() => {
               if (!isSortingDisabled && isSortableColumn(column.id)) {
-                const currentIsSorted = column.getIsSorted();
                 column.toggleSorting();
                 const newIsSorted = column.getIsSorted();
                 setIsSorting(newIsSorted !== false);
-                if (currentIsSorted !== false && newIsSorted === false) {
-                  // Sorting was cleared, recalculate subtotals
-                  setData((prevData) => recalculateSubtotals(prevData));
-                } else if (newIsSorted !== false) {
-                  // New sorting applied, remove subtotals
-                  setData((prevData) =>
-                    prevData.filter((row) => !row.isSubtotal)
-                  );
-                }
               }
             }}
           >
@@ -1294,21 +1174,6 @@ function Table<T extends Record<string, any>>({
           setSorting(newSorting);
           const isSorted = newSorting.length > 0;
           setIsSorting(isSorted);
-          if (isSorted) {
-            setData((prevData) => prevData.filter((row) => !row.isSubtotal));
-          } else {
-            setData((prevData) => {
-              const recalculatedData = originalData.map((row) => {
-                if (!row.isSubtotal) {
-                  return { ...row };
-                }
-                return row;
-              });
-              const newData = recalculateSubtotals(recalculatedData);
-              setOriginalData(newData);
-              return newData;
-            });
-          }
         },
   });
 
@@ -1323,14 +1188,11 @@ function Table<T extends Record<string, any>>({
       setIsIndeterminateGlobal(isIndeterminate);
 
       setShowDeleteButton(selectedRows.size > 0);
-      setCanAddSubtotal(
-        selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
-      );
       if (onShowDeleteButton) {
         onShowDeleteButton(selectedRows.size > 0);
       }
     },
-    [data, hasAmountValuesAfterLastSubtotal, onShowDeleteButton, table]
+    [data, onShowDeleteButton, table]
   );
 
   // HSA
@@ -1513,19 +1375,6 @@ function Table<T extends Record<string, any>>({
             }`,
           }}
         />
-      )}
-      {hasAmountColumn && hasNumberColumn && isEditing && (
-        <button
-          onClick={handleAddSubtotalRow}
-          className={`absolute top-[-57px] right-0 mr-[128px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
-            canAddSubtotal && !isSorting
-              ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
-              : "opacity-50 cursor-not-allowed"
-          }`}
-          disabled={!canAddSubtotal || isSorting}
-        >
-          Subtotal
-        </button>
       )}
       {!isEditing ? (
         <div

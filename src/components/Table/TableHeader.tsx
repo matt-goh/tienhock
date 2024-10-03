@@ -1,4 +1,3 @@
-import React from "react";
 import { flexRender } from "@tanstack/react-table";
 import {
   IconSquareCheckFilled,
@@ -12,9 +11,9 @@ interface TableHeaderProps<T> {
   headerGroup: any;
   columns: Array<{ id: string; type: ColumnType }>;
   isEditing: boolean;
-  isAllSelectedGlobal: boolean;
-  isIndeterminateGlobal: boolean;
-  handleSelectAll: () => void;
+  isAllSelectedGlobal?: boolean;
+  isIndeterminateGlobal?: boolean;
+  handleSelectAll?: () => void;
   isSortableColumn: (columnId: string) => boolean | undefined;
   columnWidths: { [k: string]: number };
   onColumnResize: (columnId: string, width: number) => void;
@@ -82,7 +81,7 @@ function TableHeader<T>({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleSelectAll();
+                    handleSelectAll && handleSelectAll();
                   }}
                   className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
                 >

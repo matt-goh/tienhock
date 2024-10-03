@@ -51,7 +51,6 @@ function TableEditing<T extends Record<string, any>>({
   tableKey,
 }: TableProps<T>) {
   const [data, setData] = useState<T[]>(initialData);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [editableRowId, setEditableRowId] = useState<string | null>(null);
   const [editableCellIndex, setEditableCellIndex] = useState<number | null>(
     null
@@ -67,8 +66,6 @@ function TableEditing<T extends Record<string, any>>({
   >(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
-  const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
-  const [isIndeterminateGlobal, setIsIndeterminateGlobal] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
   const [isLastRowHovered, setIsLastRowHovered] = useState(false);
   const [isAddRowBarHovered, setIsAddRowBarHovered] = useState(false);
@@ -227,10 +224,6 @@ function TableEditing<T extends Record<string, any>>({
     },
     [calculateAmount]
   );
-
-  useEffect(() => {
-    console.log(data);
-  }, [data]);
 
   // HCC
   const handleCellChange = useCallback(
@@ -773,43 +766,6 @@ function TableEditing<T extends Record<string, any>>({
           return null;
         }
       }
-
-      if (columnType === "selection") {
-        return (
-          <div className="flex items-center justify-center h-full">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRowSelection(row);
-              }}
-              className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
-              disabled={isSorting}
-            >
-              {isAllSelectedGlobal ? (
-                <IconSquareCheckFilled
-                  width={20}
-                  height={20}
-                  className="text-blue-600"
-                />
-              ) : selectedRows.has(row.index) ? (
-                <IconSquareCheckFilled
-                  width={20}
-                  height={20}
-                  className="text-blue-600"
-                />
-              ) : (
-                <IconSquare
-                  width={20}
-                  height={20}
-                  stroke={2}
-                  className="text-gray-400"
-                />
-              )}
-            </button>
-          </div>
-        );
-      }
-
       if (row.original.isSubtotal || row.original.isTotal) {
         if (columnType === "action") {
           return (
@@ -1182,13 +1138,10 @@ function TableEditing<T extends Record<string, any>>({
     [
       columns,
       isSorting,
-      selectedRows,
       columnWidths,
       editableRowId,
       editableCellIndex,
       isSortingDisabled,
-      isAllSelectedGlobal,
-      isIndeterminateGlobal,
       handleColumnResize,
       handleCellChange,
       handleCellClick,
@@ -1236,65 +1189,6 @@ function TableEditing<T extends Record<string, any>>({
         },
   });
 
-  // USS
-  const updateSelectionState = useCallback(
-    (selectedRows: Set<number>) => {
-      const allRowsCount = data.filter((row) => !row.isSubtotal).length;
-      const isAllSelected = selectedRows.size === allRowsCount;
-      const isIndeterminate = selectedRows.size > 0 && !isAllSelected;
-
-      setIsAllSelectedGlobal(isAllSelected);
-      setIsIndeterminateGlobal(isIndeterminate);
-
-      setCanAddSubtotal(
-        selectedRows.size <= 1 && hasAmountValuesAfterLastSubtotal(data)
-      );
-      if (onShowDeleteButton) {
-        onShowDeleteButton(selectedRows.size > 0);
-      }
-    },
-    [data, onShowDeleteButton]
-  );
-
-  useEffect(() => {
-    updateSelectionState(selectedRows);
-  }, [selectedRows, data, updateSelectionState]);
-
-  // HSA
-  const handleSelectAll = useCallback(() => {
-    setSelectedRows((prev) => {
-      let newSet: Set<number>;
-      if (isAllSelectedGlobal || isIndeterminateGlobal) {
-        // Deselect all rows across all pages
-        newSet = new Set();
-      } else {
-        // Select all rows across all pages
-        newSet = new Set(
-          data.filter((row) => !row.isSubtotal).map((_, index) => index)
-        );
-      }
-      updateSelectionState(newSet);
-      return newSet;
-    });
-  }, [isAllSelectedGlobal, isIndeterminateGlobal, data, updateSelectionState]);
-
-  // HRS
-  const handleRowSelection = useCallback(
-    (row: Row<T>) => {
-      setSelectedRows((prev) => {
-        const newSet = new Set(prev);
-        if (newSet.has(row.index)) {
-          newSet.delete(row.index);
-        } else {
-          newSet.add(row.index);
-        }
-        updateSelectionState(newSet);
-        return newSet;
-      });
-    },
-    [updateSelectionState]
-  );
-
   const isLastPage = table.getCanNextPage() === false;
 
   return (
@@ -1312,9 +1206,6 @@ function TableEditing<T extends Record<string, any>>({
                 headerGroup={headerGroup}
                 columns={columns}
                 isEditing={true}
-                isAllSelectedGlobal={isAllSelectedGlobal}
-                isIndeterminateGlobal={isIndeterminateGlobal}
-                handleSelectAll={handleSelectAll}
                 isSortableColumn={isSortableColumn}
                 columnWidths={columnWidths}
                 onColumnResize={handleColumnResize}
@@ -1333,11 +1224,7 @@ function TableEditing<T extends Record<string, any>>({
                       ? "border-b-0 rounded-b-lg"
                       : "border-b border-gray-300"
                   } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
-                    ${
-                      selectedRows.has(row.original.id)
-                        ? "bg-blue-50 hover:bg-blue-50"
-                        : "hover:bg-gray-100"
-                    } ${row.id === editableRowId ? "relative z-10" : ""}}`}
+                     ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
                     row.original.isSubtotal || row.original.isTotal
                       ? setSelectedRowId(row.id)
