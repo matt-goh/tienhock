@@ -48,10 +48,6 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
   useEffect(() => {
     if (editable && focus && inputRef.current && type !== "checkbox") {
       inputRef.current.focus();
-      if (type === "number" || type === "rate" || type === "float") {
-        const length = inputRef.current.value.length;
-        inputRef.current.setSelectionRange(length, length);
-      }
     }
   }, [editable, focus, type]);
 
@@ -95,8 +91,8 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
 
       // Limit to 9999999999999999
       const numValue = parseFloat(formatted);
-      if (numValue > 9999999999999999) {
-        formatted = "9999999999999999";
+      if (numValue > 99999999999999) {
+        formatted = "99999999999999";
       }
 
       return formatted;
