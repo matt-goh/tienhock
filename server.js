@@ -1485,6 +1485,18 @@ app.post('/api/invoices/clear', (req, res) => {
   res.status(200).json({ message: 'All invoices cleared successfully' });
 });
 
+// Fetch all products (id and description only)
+app.get('/api/products/combobox', async (req, res) => {
+  try {
+    const query = 'SELECT id, description FROM products';
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching products for combobox:', error);
+    res.status(500).json({ message: 'Error fetching products', error: error.message });
+  }
+});
+
 // MyInvois API client initialization
 const apiClient = new EInvoiceApiClient(
   process.env.MYINVOIS_API_BASE_URL,
