@@ -195,6 +195,16 @@ function TableEditing<T extends Record<string, any>>({
         if (row.isTotal) return row;
         if (row.isSubtotal) return row;
 
+        if (row.isLess) {
+          total -= parseFloat(row.total || "0");
+          return row;
+        }
+
+        if (row.isTax) {
+          total += parseFloat(row.total || "0");
+          return row;
+        }
+
         const amount = calculateAmount(row);
         total += amount;
 
@@ -218,18 +228,44 @@ function TableEditing<T extends Record<string, any>>({
     [calculateAmount]
   );
 
+  useEffect(() => {
+    console.log(data);
+  }, [data]);
+
+  // HCC
   const handleCellChange = useCallback(
     (rowIndex: number, columnId: string, value: any) => {
       setData((prevData) => {
         const updatedData = prevData.map((row, index) => {
           if (index === rowIndex) {
             const updatedRow = { ...row, [columnId]: value };
-            if (columnId === "qty" || columnId === "price") {
-              const newAmount = calculateAmount(updatedRow);
-              return {
-                ...updatedRow,
-                total: newAmount.toFixed(2),
-              };
+            if (
+              columnId === "qty" ||
+              columnId === "price" ||
+              updatedRow.isLess ||
+              updatedRow.isTax
+            ) {
+              if (updatedRow.isLess || updatedRow.isTax) {
+                if (columnId === "productName") {
+                  // Handle description change for special rows
+                  return {
+                    ...updatedRow,
+                    productName: value,
+                  };
+                } else {
+                  // Handle amount change for special rows
+                  return {
+                    ...updatedRow,
+                    total: parseFloat(value || "0").toFixed(2),
+                  };
+                }
+              } else {
+                const newAmount = calculateAmount(updatedRow);
+                return {
+                  ...updatedRow,
+                  total: newAmount.toFixed(2),
+                };
+              }
             }
             return updatedRow;
           }
@@ -621,7 +657,9 @@ function TableEditing<T extends Record<string, any>>({
         !isSorting &&
         !row.original.isSubtotal &&
         !row.original.isTotal &&
-        isEditableColumn(columnConfig);
+        (isEditableColumn(columnConfig) ||
+          row.original.isLess ||
+          row.original.isTax);
 
       // Custom cell renderer
       if (columnConfig.cell) {
@@ -645,31 +683,73 @@ function TableEditing<T extends Record<string, any>>({
             />
           );
         } else if (cellIndex === 1) {
-          const colspan = row.original.colspan || columns.length - 3;
-          return (
-            <input
-              className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
-              tabIndex={-1}
-              type="text"
-              readOnly
-              value={cell.getValue() as string}
-              style={{ boxSizing: "border-box" }}
-            />
-          );
+          // Make the description editable for Less and Tax rows
+          if (row.original.isLess || row.original.isTax) {
+            return (
+              <TableEditableCell
+                value={cell.getValue()}
+                onChange={(val) =>
+                  handleCellChange(row.index, cell.column.id, val)
+                }
+                type="string"
+                editable={!isSorting}
+                focus={
+                  row.id === editableRowId && cellIndex === editableCellIndex
+                }
+                onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
+                isSorting={isSorting}
+                previousCellValue={cell.getValue()}
+              />
+            );
+          } else {
+            // For Total row, keep it readonly
+            return (
+              <input
+                className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
+                tabIndex={-1}
+                type="text"
+                readOnly
+                value={cell.getValue() as string}
+                style={{ boxSizing: "border-box" }}
+              />
+            );
+          }
         } else if (cellIndex === columns.length - 2) {
-          const value = cell.getValue();
-          return (
-            <input
-              className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent text-right cursor-default"
-              tabIndex={-1}
-              type="text"
-              readOnly
-              value={
-                typeof value === "number" ? value.toFixed(2) : (value as string)
-              }
-              style={{ boxSizing: "border-box" }}
-            />
-          );
+          // Make the amount column editable for Less and Tax rows
+          if (row.original.isLess || row.original.isTax) {
+            return (
+              <TableEditableCell
+                value={cell.getValue()}
+                onChange={(val) =>
+                  handleCellChange(row.index, cell.column.id, val)
+                }
+                type="rate"
+                editable={!isSorting}
+                focus={
+                  row.id === editableRowId && cellIndex === editableCellIndex
+                }
+                onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
+                isSorting={isSorting}
+                previousCellValue={cell.getValue()}
+              />
+            );
+          } else {
+            // For Total row, keep it readonly
+            return (
+              <input
+                className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent text-right cursor-default"
+                tabIndex={-1}
+                type="text"
+                readOnly
+                value={
+                  typeof cell.getValue() === "number"
+                    ? (cell.getValue() as number).toFixed(2)
+                    : (cell.getValue() as string)
+                }
+                style={{ boxSizing: "border-box" }}
+              />
+            );
+          }
         } else if (cellIndex === columns.length - 1) {
           // Action column
           return (
@@ -1278,19 +1358,38 @@ function TableEditing<T extends Record<string, any>>({
                         cellIndex === columns.length - 2 ||
                         cellIndex === columns.length - 1
                       ) {
+                        const isCellHighlighted =
+                          row.id === editableRowId &&
+                          cellIndex === editableCellIndex &&
+                          !isSorting;
+
                         return (
                           <td
                             key={cell.id}
                             className={`relative px-6 py-4 whitespace-no-wrap cursor-default
-                        ${
-                          isFirstCell
-                            ? "border-l-0"
-                            : "border-l border-gray-300"
-                        }
-                        ${isLastCell ? "border-r-0" : ""}
-                        ${isLastRow ? "border-b-0" : "border-b border-gray-300"}
-                        ${isLastCell && isLastRow ? "rounded-br-lg" : ""}
-                        ${isFirstCell && isLastRow ? "rounded-bl-lg" : ""}`}
+                              ${
+                                isFirstCell
+                                  ? "border-l-0"
+                                  : "border-l border-gray-300"
+                              }
+                              ${isLastCell ? "border-r-0" : ""}
+                              ${
+                                isLastRow
+                                  ? "border-b-0"
+                                  : "border-b border-gray-300"
+                              }
+                              ${isLastCell && isLastRow ? "rounded-br-lg" : ""}
+                              ${isFirstCell && isLastRow ? "rounded-bl-lg" : ""}
+                              ${
+                                row.id === selectedRowId
+                                  ? "shadow-top-bottom"
+                                  : ""
+                              }
+                              ${
+                                isCellHighlighted
+                                  ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
+                                  : ""
+                              }`}
                             colSpan={cellIndex === 1 ? columns.length - 3 : 1}
                             style={{
                               padding: "0",
@@ -1298,6 +1397,7 @@ function TableEditing<T extends Record<string, any>>({
                               width:
                                 `${columnWidths[cell.column.id]}px` || "auto",
                             }}
+                            onClick={() => handleCellClick(row.id, cellIndex)}
                           >
                             {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
