@@ -371,7 +371,6 @@ function TableEditing<T extends Record<string, any>>({
   // HAR
   const handleAddRow = useCallback(() => {
     const newRow = {
-      id: `new_${Math.random().toString(36).substr(2, 9)}`,
       ...Object.fromEntries(
         columns.map((col) => {
           switch (col.type) {
@@ -391,20 +390,20 @@ function TableEditing<T extends Record<string, any>>({
     } as T;
 
     setData((prevData) => {
-      let newData;
-      const hasTotalRow =
-        prevData.length > 0 && prevData[prevData.length - 1].isTotal;
+      let newData = [...prevData];
+      let totalRow: T | undefined;
 
-      if (hasTotalRow) {
-        // Insert the new row before the total row
-        newData = [
-          ...prevData.slice(0, -1),
-          newRow,
-          prevData[prevData.length - 1],
-        ];
-      } else {
-        // No total row, just add the new row at the end
-        newData = [...prevData, newRow];
+      // Check if the last row is a Total row
+      if (newData.length > 0 && newData[newData.length - 1].isTotal) {
+        totalRow = newData.pop();
+      }
+
+      // Add the new row
+      newData.push(newRow);
+
+      // If there was a Total row, add it back at the end
+      if (totalRow) {
+        newData.push(totalRow);
       }
 
       if (onChange) {
