@@ -46,7 +46,6 @@ export interface TableProps<T> {
   onSave?: () => void;
   onCancel?: () => void;
   tableKey?: string;
-  subtotal?: boolean;
 }
 
 export interface OrderDetail {
@@ -58,6 +57,7 @@ export interface OrderDetail {
   foc: number;
   returned: number;
   isTotal?: boolean;
+  isSubtotal?: boolean;
   isLess?: boolean;
   isTax?: boolean;
   colspan?: number;

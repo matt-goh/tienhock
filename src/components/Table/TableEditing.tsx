@@ -24,8 +24,6 @@ import {
   IconSortAscendingNumbers,
   IconSortDescendingLetters,
   IconSortDescendingNumbers,
-  IconSquare,
-  IconSquareCheckFilled,
   IconTrash,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, ColumnConfig } from "../../types/types";
@@ -45,7 +43,6 @@ function hasProperty<T extends object, K extends PropertyKey>(
 function TableEditing<T extends Record<string, any>>({
   initialData,
   columns,
-  onShowDeleteButton,
   onSpecialRowDelete,
   onChange,
   tableKey,
@@ -662,8 +659,13 @@ function TableEditing<T extends Record<string, any>>({
         });
       }
 
-      // Handle special rows (Less, Tax, and Total)
-      if (row.original.isLess || row.original.isTax || row.original.isTotal) {
+      // Handle special rows (Less, Tax, Subtotal, and Total)
+      if (
+        row.original.isLess ||
+        row.original.isTax ||
+        row.original.isSubtotal ||
+        row.original.isTotal
+      ) {
         if (cellIndex === 0) {
           return (
             <input
@@ -676,8 +678,12 @@ function TableEditing<T extends Record<string, any>>({
             />
           );
         } else if (cellIndex === 1) {
-          // Make the description editable for Less and Tax rows
-          if (row.original.isLess || row.original.isTax) {
+          // Make the description editable for Less, Tax, and Subtotal rows
+          if (
+            row.original.isLess ||
+            row.original.isTax ||
+            row.original.isSubtotal
+          ) {
             return (
               <TableEditableCell
                 value={cell.getValue()}
@@ -727,7 +733,7 @@ function TableEditing<T extends Record<string, any>>({
               />
             );
           } else {
-            // For Total row, keep it readonly
+            // For Subtotal and Total rows, keep it readonly
             return (
               <input
                 className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent text-right cursor-default"
@@ -765,28 +771,6 @@ function TableEditing<T extends Record<string, any>>({
         } else {
           return null;
         }
-      }
-      if (row.original.isSubtotal || row.original.isTotal) {
-        if (columnType === "action") {
-          return (
-            <div className="flex items-center justify-center h-full">
-              <button
-                className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600 ${
-                  isSorting ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                onClick={(event) => {
-                  if (!isSorting) {
-                    handleDeleteRow(row.index, event);
-                  }
-                }}
-                disabled={isSorting}
-              >
-                <IconTrash stroke={2} width={20} height={20} />
-              </button>
-            </div>
-          );
-        }
-        return null;
       }
 
       // Non-subtotal rows
@@ -1294,30 +1278,28 @@ function TableEditing<T extends Record<string, any>>({
                       }
                     }
                     if (row.original.isTotal || row.original.isSubtotal) {
-                      if (cell.column.id === "selection") {
-                        return (
-                          <td
-                            key={cell.id}
-                            className="border-r border-gray-300"
-                          >
-                            {renderCell(row, cell, cellIndex, isLastRow)}
-                          </td>
-                        );
-                      } else if (
+                      if (
                         cell.column.id ===
                         columns.find((col) => col.type === "amount")?.id
                       ) {
                         return (
                           <td
                             key={cell.id}
-                            colSpan={columns.length}
+                            colSpan={
+                              row.original.isTotal
+                                ? columns.length
+                                : columns.length - 1
+                            }
                             className={`py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg`}
                           >
                             {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
                             {cell.getValue() as ReactNode}
                           </td>
                         );
-                      } else if (cell.column.id === "actions") {
+                      } else if (
+                        cell.column.id === columns[columns.length - 1].id &&
+                        !row.original.isTotal
+                      ) {
                         return (
                           <td
                             key={cell.id}
@@ -1373,19 +1355,6 @@ function TableEditing<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
-      {hasAmountColumn && hasNumberColumn && (
-        <button
-          onClick={handleAddSubtotalRow}
-          className={`absolute top-[-57px] right-0 mr-[128px] px-4 py-2 border border-gray-300 font-medium rounded-full ${
-            canAddSubtotal && !isSorting
-              ? "hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200"
-              : "opacity-50 cursor-not-allowed"
-          }`}
-          disabled={!canAddSubtotal || isSorting}
-        >
-          Subtotal
-        </button>
-      )}
       {isLastPage && (
         <>
           <ToolTip

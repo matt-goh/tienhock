@@ -32,6 +32,9 @@ const InvoisDetailsPage: React.FC = () => {
           if (detail.isTax) {
             return sum + parseFloat(detail.total || "0");
           }
+          if (detail.isSubtotal) {
+            return sum;
+          }
           const value =
             key === "total"
               ? detail.total
@@ -87,22 +90,54 @@ const InvoisDetailsPage: React.FC = () => {
     return addTotalRow(orderDetails, totalAmount);
   }, [orderDetails, calculateTotal, addTotalRow]);
 
-  const handleChange = useCallback((newData: OrderDetail[]) => {
-    setTimeout(() => {
-      setOrderDetails(newData.filter((item) => !item.isTotal));
-    }, 0);
-  }, []);
+  const recalculateSubtotals = useCallback(
+    (details: OrderDetail[]): OrderDetail[] => {
+      let runningTotal = 0;
+      let lastSubtotalIndex = -1;
 
-  const handleSpecialRowDelete = useCallback((rowType: "less" | "tax") => {
-    setOrderDetails((prevDetails) =>
-      prevDetails.filter(
-        (item) =>
-          (rowType === "less" && !item.isLess) ||
-          (rowType === "tax" && !item.isTax)
-      )
-    );
-  }, []);
+      return details.map((item, index) => {
+        if (item.isSubtotal) {
+          const subtotalItem = { ...item, total: runningTotal.toFixed(2) };
+          lastSubtotalIndex = index;
+          return subtotalItem;
+        } else if (item.isLess) {
+          runningTotal -= parseFloat(item.total || "0");
+        } else if (item.isTax) {
+          runningTotal += parseFloat(item.total || "0");
+        } else if (!item.isTotal) {
+          runningTotal += parseFloat(item.total || "0");
+        }
+        return item;
+      });
+    },
+    []
+  );
 
+  const handleSpecialRowDelete = useCallback(
+    (rowType: "less" | "tax" | "subtotal") => {
+      setOrderDetails((prevDetails) => {
+        const newDetails = prevDetails.filter(
+          (item) =>
+            (rowType === "less" && !item.isLess) ||
+            (rowType === "tax" && !item.isTax) ||
+            (rowType === "subtotal" && !item.isSubtotal)
+        );
+        return recalculateSubtotals(newDetails);
+      });
+    },
+    [recalculateSubtotals]
+  );
+
+  const handleChange = useCallback(
+    (newData: OrderDetail[]) => {
+      setTimeout(() => {
+        setOrderDetails(
+          recalculateSubtotals(newData.filter((item) => !item.isTotal))
+        );
+      }, 0);
+    },
+    [recalculateSubtotals]
+  );
   const handleAddLess = () => {
     setOrderDetails((prevDetails) => [
       ...prevDetails,
@@ -115,7 +150,6 @@ const InvoisDetailsPage: React.FC = () => {
         isLess: true,
         foc: 0,
         returned: 0,
-        colspan: 3,
       },
     ]);
   };
@@ -132,9 +166,30 @@ const InvoisDetailsPage: React.FC = () => {
         isTax: true,
         foc: 0,
         returned: 0,
-        colspan: 3,
       },
     ]);
+  };
+
+  const handleAddSubtotal = () => {
+    setOrderDetails((prevDetails) => {
+      const subtotalAmount = calculateTotal(
+        prevDetails.filter((item) => !item.isSubtotal),
+        "total"
+      );
+      return [
+        ...prevDetails,
+        {
+          code: "SUBTOTAL",
+          productName: "Subtotal",
+          qty: 0,
+          price: 0,
+          total: subtotalAmount,
+          isSubtotal: true,
+          foc: 0,
+          returned: 0,
+        },
+      ];
+    });
   };
 
   const focItemsWithTotal = useMemo(() => {
@@ -309,6 +364,9 @@ const InvoisDetailsPage: React.FC = () => {
           </Button>
           <Button onClick={handleAddTax} variant="outline" size="md">
             Tax
+          </Button>
+          <Button onClick={handleAddSubtotal} variant="outline" size="md">
+            Subtotal
           </Button>
         </div>
       </div>
