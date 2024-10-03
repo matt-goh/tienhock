@@ -247,11 +247,11 @@ const InvoisUploadPage: React.FC = () => {
         </button>
       ),
     },
-    { id: "date", header: "Date", type: "string", width: 150 },
+    { id: "date", header: "Date", type: "readonly", width: 150 },
     {
       id: "customerName",
       header: "Customer",
-      type: "string",
+      type: "readonly",
       width: 350,
       cellProps: (info: { getValue: () => any; row: { original: InvoiceData } }) => ({
         value: info.row.original.customerName || info.row.original.customer,
@@ -267,7 +267,7 @@ const InvoisUploadPage: React.FC = () => {
         }
       }),
     },
-    { id: "salesman", header: "Salesman", type: "string", width: 150 },
+    { id: "salesman", header: "Salesman", type: "readonly", width: 150 },
     { id: "totalAmount", header: "Amount", type: "readonly", width: 150 },
   ];
 

@@ -11,6 +11,11 @@ import {
   ListboxButton,
   ListboxOption,
   ListboxOptions,
+  Combobox,
+  ComboboxInput,
+  ComboboxButton,
+  ComboboxOptions,
+  ComboboxOption,
 } from "@headlessui/react";
 
 interface TableEditableCellProps {
@@ -38,6 +43,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
 }) => {
   const [cellValue, setCellValue] = useState(value?.toString() ?? "");
   const [editValue, setEditValue] = useState(value?.toString() ?? "");
+  const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -226,6 +232,72 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
     );
   }
 
+  if (type === "combobox") {
+    const filteredOptions =
+      query === ""
+        ? options
+        : options.filter((option) =>
+            option.toLowerCase().includes(query.toLowerCase())
+          );
+
+    return (
+        <Combobox value={value} onChange={onChange} disabled={isSorting}>
+          <div className="relative w-full overflow-visible">
+            <div className="flex items-center overflow-visible">
+              <ComboboxInput
+                className="w-full px-6 py-3 text-left focus:outline-none focus:border-gray-400 overflow-visible"
+                displayValue={(item: string) => item}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                <IconChevronDown
+                  className="text-gray-400 w-5 h-5"
+                  size={18}
+                  aria-hidden="true"
+                />
+              </ComboboxButton>
+            </div>
+            <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+              {filteredOptions.length === 0 && query !== "" ? (
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                  Nothing found.
+                </div>
+              ) : (
+                filteredOptions.map((option) => (
+                  <ComboboxOption
+                    key={option}
+                    value={option}
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                        active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                      }`
+                    }
+                  >
+                    {({ selected, active }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          {option}
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                            <IconCheck className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ComboboxOption>
+                ))
+              )}
+            </ComboboxOptions>
+          </div>
+        </Combobox>
+    );
+  }
+
   if (type === "listbox") {
     return (
       <Listbox
@@ -238,7 +310,8 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
             <span className="block truncate">{value}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-gray-400"
+                className="text-gray-400 w-5 h-5"
+                size={18}
                 aria-hidden="true"
               />
             </span>

@@ -4,6 +4,7 @@ import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
 import { ColumnConfig, InvoiceData, OrderDetail } from "../../types/types";
 import BackButton from "../../components/BackButton";
+import toast from "react-hot-toast";
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -12,13 +13,148 @@ const InvoisDetailsPage: React.FC = () => {
   const [orderDetails, setOrderDetails] = useState<OrderDetail[]>([]);
   const [focItems, setFocItems] = useState<OrderDetail[]>([]);
   const [returnedGoods, setReturnedGoods] = useState<OrderDetail[]>([]);
+  const [products, setProducts] = useState<
+    { id: string; description: string }[]
+  >([]);
 
-  const columns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "string", width: 120 },
-    { id: "productName", header: "PRODUCT", type: "string", width: 300 },
-    { id: "qty", header: "QUANTITY", type: "number", width: 100 },
+  const handleCellChange = useCallback(
+    (rowIndex: number, columnId: string, value: any) => {
+      setOrderDetails((prevDetails) => {
+        const newDetails = [...prevDetails];
+        newDetails[rowIndex] = { ...newDetails[rowIndex], [columnId]: value };
+        return newDetails;
+      });
+    },
+    []
+  );
+
+  const handleFocCellChange = useCallback(
+    (rowIndex: number, columnId: string, value: any) => {
+      setFocItems((prevItems) => {
+        const newItems = [...prevItems];
+        newItems[rowIndex] = { ...newItems[rowIndex], [columnId]: value };
+        return newItems;
+      });
+    },
+    []
+  );
+
+  const handleReturnedGoodsCellChange = useCallback(
+    (rowIndex: number, columnId: string, value: any) => {
+      setReturnedGoods((prevGoods) => {
+        const newGoods = [...prevGoods];
+        newGoods[rowIndex] = { ...newGoods[rowIndex], [columnId]: value };
+        return newGoods;
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    console.log(invoiceData);
+  }, [invoiceData]);
+
+  const columns: ColumnConfig[] = useMemo(
+    () => [
+      {
+        id: "code",
+        header: "ID",
+        type: "readonly",
+        width: 120,
+      },
+      {
+        id: "productName",
+        header: "PRODUCT",
+        type: "combobox",
+        width: 350,
+        options: products.map((p) => p.description),
+        onChange: (rowIndex: number, newValue: string) => {
+          const product = products.find((p) => p.description === newValue);
+          if (product) {
+            handleCellChange(rowIndex, "productName", newValue);
+            handleCellChange(rowIndex, "code", product.id);
+          }
+        },
+      },
+      { id: "qty", header: "QUANTITY", type: "number", width: 100 },
+      { id: "price", header: "PRICE", type: "float", width: 100 },
+      { id: "total", header: "AMOUNT", type: "amount", width: 100 },
+      { id: "action", header: "", type: "action", width: 50 },
+    ],
+    [products, handleCellChange]
+  );
+
+  const returnedGoodsColumns: ColumnConfig[] = [
+    { id: "code", header: "ID", type: "readonly", width: 120 },
+    {
+      id: "productName",
+      header: "PRODUCT",
+      type: "combobox",
+      width: 350,
+      options: products.map((p) => p.description),
+      onChange: (rowIndex: number, newValue: string) => {
+        const product = products.find((p) => p.description === newValue);
+        if (product) {
+          handleReturnedGoodsCellChange(rowIndex, "productName", newValue);
+          handleReturnedGoodsCellChange(rowIndex, "code", product.id);
+        }
+      },
+    },
+    { id: "returned", header: "QUANTITY", type: "number", width: 150 },
     { id: "price", header: "PRICE", type: "float", width: 100 },
-    { id: "total", header: "AMOUNT", type: "amount", width: 100 },
+    {
+      id: "total",
+      header: "AMOUNT",
+      type: "amount",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
+          {info.row.original.isTotal
+            ? info.getValue()
+            : (
+                parseFloat(info.row.original.price.toString()) *
+                info.row.original.returned
+              ).toFixed(2)}
+        </div>
+      ),
+    },
+    { id: "action", header: "", type: "action", width: 50 },
+  ];
+
+  const focItemsColumns: ColumnConfig[] = [
+    { id: "code", header: "ID", type: "readonly", width: 120 },
+    {
+      id: "productName",
+      header: "PRODUCT",
+      type: "combobox",
+      width: 350,
+      options: products.map((p) => p.description),
+      onChange: (rowIndex: number, newValue: string) => {
+        const product = products.find((p) => p.description === newValue);
+        if (product) {
+          handleFocCellChange(rowIndex, "productName", newValue);
+          handleFocCellChange(rowIndex, "code", product.id);
+        }
+      },
+    },
+    { id: "foc", header: "QUANTITY", type: "number", width: 150 },
+    { id: "price", header: "PRICE", type: "float", width: 100 },
+    {
+      id: "total",
+      header: "AMOUNT",
+      type: "amount",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
+          {info.row.original.isTotal
+            ? info.getValue()
+            : (
+                parseFloat(info.row.original.price.toString()) *
+                info.row.original.foc
+              ).toFixed(2)}
+        </div>
+      ),
+    },
     { id: "action", header: "", type: "action", width: 50 },
   ];
 
@@ -58,6 +194,25 @@ const InvoisDetailsPage: React.FC = () => {
       setReturnedGoods(initialOrderDetails.filter((item) => item.returned > 0));
     }
   }, [invoiceData, calculateTotal]);
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/products/combobox"
+      );
+      if (!response.ok) throw new Error("Failed to fetch products");
+      const data = await response.json();
+      setProducts(data);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      toast.error("Error fetching products");
+      // You might want to show an error message to the user here
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   const addTotalRow = useCallback(
     (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
@@ -209,54 +364,6 @@ const InvoisDetailsPage: React.FC = () => {
   const handleBackClick = () => {
     navigate("/stock/invois/new");
   };
-
-  const returnedGoodsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "string", width: 120 },
-    { id: "productName", header: "PRODUCT", type: "string", width: 300 },
-    { id: "returned", header: "QUANTITY", type: "number", width: 150 },
-    { id: "price", header: "PRICE", type: "float", width: 100 },
-    {
-      id: "total",
-      header: "AMOUNT",
-      type: "amount",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.isTotal
-            ? info.getValue()
-            : (
-                parseFloat(info.row.original.price.toString()) *
-                info.row.original.returned
-              ).toFixed(2)}
-        </div>
-      ),
-    },
-    { id: "action", header: "", type: "action", width: 50 },
-  ];
-
-  const focItemsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "string", width: 120 },
-    { id: "productName", header: "PRODUCT", type: "string", width: 300 },
-    { id: "foc", header: "QUANTITY", type: "number", width: 150 },
-    { id: "price", header: "PRICE", type: "float", width: 100 },
-    {
-      id: "total",
-      header: "AMOUNT",
-      type: "amount",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.isTotal
-            ? info.getValue()
-            : (
-                parseFloat(info.row.original.price.toString()) *
-                info.row.original.foc
-              ).toFixed(2)}
-        </div>
-      ),
-    },
-    { id: "action", header: "", type: "action", width: 50 },
-  ];
 
   const handleAddFOC = () => {
     const newFocItem: OrderDetail = {

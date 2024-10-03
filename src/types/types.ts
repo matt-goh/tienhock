@@ -9,7 +9,8 @@ export type ColumnType =
   | "amount"
   | "float"
   | "action"
-  | "listbox";
+  | "listbox"
+  | "combobox";
 
 // Define column configuration
 export interface ColumnConfig {
@@ -26,6 +27,7 @@ export interface ColumnConfig {
     value: any;
     onChange: (newValue: any) => void;
   };
+  onChange?: (rowIndex: number, newValue: string) => void;
 }
 
 // Define data structure

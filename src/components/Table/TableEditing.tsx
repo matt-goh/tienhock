@@ -290,7 +290,10 @@ function TableEditing<T extends Record<string, any>>({
 
     const totalRows = sortedRows.length;
     const editableColumns = allColumns.filter(
-      (col) => isEditableColumn(col) && col.type !== "listbox"
+      (col) =>
+        isEditableColumn(col) &&
+        col.type !== "listbox" &&
+        col.type !== "combobox"
     );
     const totalEditableCols = editableColumns.length;
 
@@ -320,7 +323,8 @@ function TableEditing<T extends Record<string, any>>({
       if (
         !row.isSubtotal &&
         isEditableColumn(column) &&
-        column.type !== "listbox"
+        column.type !== "listbox" && 
+        column.type !== "combobox"
       ) {
         return { rowIndex, colIndex };
       }
@@ -625,14 +629,6 @@ function TableEditing<T extends Record<string, any>>({
     }
   };
 
-  const hasAmountColumn = useMemo(() => {
-    return columns.some((col) => col.type === "amount");
-  }, [columns]);
-
-  const hasNumberColumn = useMemo(() => {
-    return columns.some((col) => col.type === "number");
-  }, [columns]);
-
   //RC
   const renderCell = (
     row: Row<T>,
@@ -779,9 +775,15 @@ function TableEditing<T extends Record<string, any>>({
       }
 
       if (
-        ["number", "rate", "string", "float", "date", "listbox"].includes(
-          columnType
-        )
+        [
+          "number",
+          "rate",
+          "string",
+          "float",
+          "date",
+          "listbox",
+          "combobox",
+        ].includes(columnType)
       ) {
         return (
           <TableEditableCell
