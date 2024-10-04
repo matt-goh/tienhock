@@ -34,6 +34,7 @@ const InvoisDetailsPage: React.FC = () => {
     (items: OrderDetail[], key: "total" | "foc" | "returned") => {
       return items
         .reduce((sum, detail) => {
+          if (detail.isTotal) return sum;
           if (detail.isLess) {
             return sum - parseFloat(detail.total || "0");
           }
