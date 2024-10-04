@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
+import { fetchInvoices, getInvoices, updateInvoice } from "./InvoisUtils";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
@@ -14,30 +15,22 @@ const InvoisUploadPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchInvoices();
+    loadInvoices();
   }, []);
 
-  const fetchInvoices = async () => {
+  const loadInvoices = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:5000/api/invoices");
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setFileData(data);
-      } else {
-        throw new Error("Received data is not an array");
-      }
+      await fetchInvoices();
+      setFileData(getInvoices());
     } catch (error) {
-      console.error("Error fetching invoices:", error);
+      console.error("Error loading invoices:", error);
       setError(
         error instanceof Error ? error.message : "An unknown error occurred"
       );
       toast.error(
-        `Failed to fetch invoices: ${
+        `Failed to load invoices: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
@@ -217,11 +210,12 @@ const InvoisUploadPage: React.FC = () => {
   };
 
   const handleCustomerNameChange = (id: string, newName: string) => {
-    setFileData((prevData) =>
-      prevData.map((invoice) =>
-        invoice.id === id ? { ...invoice, customerName: newName } : invoice
-      )
-    );
+    const updatedInvoice = fileData.find((invoice) => invoice.id === id);
+    if (updatedInvoice) {
+      const newInvoice = { ...updatedInvoice, customerName: newName };
+      updateInvoice(newInvoice);
+      setFileData(getInvoices());
+    }
   };
 
   const columns: ColumnConfig[] = [
@@ -253,18 +247,25 @@ const InvoisUploadPage: React.FC = () => {
       header: "Customer",
       type: "readonly",
       width: 350,
-      cellProps: (info: { getValue: () => any; row: { original: InvoiceData } }) => ({
+      cellProps: (info: {
+        getValue: () => any;
+        row: { original: InvoiceData };
+      }) => ({
         value: info.row.original.customerName || info.row.original.customer,
-        onChange: (newValue: string) => handleCustomerNameChange(info.row.original.id, newValue),
+        onChange: (newValue: string) =>
+          handleCustomerNameChange(info.row.original.id, newValue),
         onKeyDown: (e: React.KeyboardEvent) => {
-          if (e.key === 'Enter' || e.key === 'Tab') {
+          if (e.key === "Enter" || e.key === "Tab") {
             e.preventDefault();
-            const nextCellElement = e.currentTarget.parentElement?.nextElementSibling?.querySelector('input');
+            const nextCellElement =
+              e.currentTarget.parentElement?.nextElementSibling?.querySelector(
+                "input"
+              );
             if (nextCellElement) {
               (nextCellElement as HTMLInputElement).focus();
             }
           }
-        }
+        },
       }),
     },
     { id: "salesman", header: "Salesman", type: "readonly", width: 150 },
@@ -323,7 +324,8 @@ const InvoisUploadPage: React.FC = () => {
           columns={columns}
           onChange={(newData: InvoiceData[]) => {
             setTimeout(() => {
-              setFileData(newData);
+              newData.forEach((invoice) => updateInvoice(invoice));
+              setFileData(getInvoices());
             }, 0);
           }}
           tableKey="invois"
