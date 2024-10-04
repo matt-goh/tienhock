@@ -175,31 +175,38 @@ const InvoisDetailsPage: React.FC = () => {
     (updatedItems: OrderDetail[]) => {
       setTimeout(() => {
         setOrderDetails((prevDetails) => {
-          const newDetails = prevDetails.map((prevItem) => {
-            const updatedItem = updatedItems.find(
-              (item) => item.code === prevItem.code
-            );
-            if (updatedItem) {
-              return {
-                ...prevItem,
-                ...updatedItem,
-                total: (updatedItem.qty * updatedItem.price).toFixed(2),
-              };
-            }
-            return prevItem;
-          });
+          const newDetails = updatedItems
+            .filter((item) => !item.isTotal)
+            .map((updatedItem) => {
+              const existingItem = prevDetails.find(
+                (item) => item.code === updatedItem.code
+              );
+              if (existingItem) {
+                return {
+                  ...existingItem,
+                  ...updatedItem,
+                  total: (updatedItem.qty * updatedItem.price).toFixed(2),
+                };
+              }
+              return updatedItem;
+            });
 
           // Recalculate the total
-          const totalAmount = calculateTotal(
-            newDetails.filter((item) => !item.isTotal),
-            "total"
-          );
-          const totalRow = newDetails.find((item) => item.isTotal);
-          if (totalRow) {
-            totalRow.total = totalAmount;
-          }
+          const totalAmount = calculateTotal(newDetails, "total");
 
-          return newDetails;
+          // Add or update the total row
+          const totalRow = {
+            code: "",
+            productName: "Total:",
+            qty: 0,
+            price: 0,
+            total: totalAmount,
+            isTotal: true,
+            foc: 0,
+            returned: 0,
+          };
+
+          return [...newDetails, totalRow];
         });
       }, 0);
 
@@ -209,12 +216,7 @@ const InvoisDetailsPage: React.FC = () => {
           if (prevInvoiceData) {
             return {
               ...prevInvoiceData,
-              orderDetails: prevInvoiceData.orderDetails.map((item) => {
-                const updatedItem = updatedItems.find(
-                  (updated) => updated.code === item.code
-                );
-                return updatedItem ? { ...item, ...updatedItem } : item;
-              }),
+              orderDetails: updatedItems,
             };
           }
           return prevInvoiceData;
