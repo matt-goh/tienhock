@@ -172,45 +172,90 @@ const InvoisDetailsPage: React.FC = () => {
 
   // HC
   const handleChange = useCallback(
-    (newData: OrderDetail[]) => {
-      const updatedDetails = recalculateSubtotals(
-        newData.filter((item) => !item.isTotal)
-      );
+    (updatedItems: OrderDetail[]) => {
       setTimeout(() => {
-        setOrderDetails(updatedDetails);
+        setOrderDetails((prevDetails) => {
+          const newDetails = prevDetails.map((prevItem) => {
+            const updatedItem = updatedItems.find(
+              (item) => item.code === prevItem.code
+            );
+            if (updatedItem) {
+              return {
+                ...prevItem,
+                ...updatedItem,
+                total: (updatedItem.qty * updatedItem.price).toFixed(2),
+              };
+            }
+            return prevItem;
+          });
 
-        // Update FOC and returned items based on the changes in order details
-        setFocItems((prevFocItems) => {
-          const updatedFocItems = updatedDetails
-            .map((detail) => {
-              const existingFocItem = prevFocItems.find(
-                (item) => item.code === detail.code
-              );
-              return existingFocItem || (detail.foc > 0 ? detail : null);
-            })
-            .filter((item): item is OrderDetail => item !== null);
-          return updatedFocItems;
-        });
+          // Recalculate the total
+          const totalAmount = calculateTotal(
+            newDetails.filter((item) => !item.isTotal),
+            "total"
+          );
+          const totalRow = newDetails.find((item) => item.isTotal);
+          if (totalRow) {
+            totalRow.total = totalAmount;
+          }
 
-        setReturnedGoods((prevReturnedGoods) => {
-          const updatedReturnedGoods = updatedDetails
-            .map((detail) => {
-              const existingReturnedItem = prevReturnedGoods.find(
-                (item) => item.code === detail.code
-              );
-              return (
-                existingReturnedItem || (detail.returned > 0 ? detail : null)
-              );
-            })
-            .filter((item): item is OrderDetail => item !== null);
-          return updatedReturnedGoods;
+          return newDetails;
         });
       }, 0);
 
-      updateInvoiceData(updatedDetails);
+      setTimeout(() => {
+        // Update invoice data
+        setInvoiceData((prevInvoiceData) => {
+          if (prevInvoiceData) {
+            return {
+              ...prevInvoiceData,
+              orderDetails: prevInvoiceData.orderDetails.map((item) => {
+                const updatedItem = updatedItems.find(
+                  (updated) => updated.code === item.code
+                );
+                return updatedItem ? { ...item, ...updatedItem } : item;
+              }),
+            };
+          }
+          return prevInvoiceData;
+        });
+      }, 0);
+
+      setTimeout(() => {
+        // Update FOC and returned items
+        setFocItems((prevItems) =>
+          updateRelatedItems(prevItems, updatedItems, "foc")
+        );
+      }, 0);
+
+      setTimeout(() => {
+        setReturnedGoods((prevItems) =>
+          updateRelatedItems(prevItems, updatedItems, "returned")
+        );
+      }, 0);
     },
-    [recalculateSubtotals, updateInvoiceData]
+    [calculateTotal]
   );
+
+  const updateRelatedItems = (
+    prevItems: OrderDetail[],
+    updatedItems: OrderDetail[],
+    key: "foc" | "returned"
+  ) => {
+    return prevItems.map((prevItem) => {
+      const updatedItem = updatedItems.find(
+        (item) => item.code === prevItem.code
+      );
+      if (updatedItem) {
+        return {
+          ...prevItem,
+          [key]: updatedItem[key],
+          total: (updatedItem.price * updatedItem[key]).toFixed(2),
+        };
+      }
+      return prevItem;
+    });
+  };
 
   const handleAddLess = () => {
     setOrderDetails((prevDetails) => [
@@ -429,10 +474,7 @@ const InvoisDetailsPage: React.FC = () => {
               price: newValue,
               total: (info.row.original.qty * newValue).toFixed(2),
             };
-            handleChange([
-              ...orderDetails.filter((item) => item.code !== updatedItem.code),
-              updatedItem,
-            ]);
+            handleChange([updatedItem]);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
