@@ -5,11 +5,14 @@ import Button from "../../components/Button";
 import { ColumnConfig, InvoiceData, OrderDetail } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
+import { updateInvoice } from "./InvoisUtils";
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const invoiceData = location.state?.invoiceData as InvoiceData;
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(
+    location.state?.invoiceData || null
+  );
   const [orderDetails, setOrderDetails] = useState<OrderDetail[]>([]);
   const [focItems, setFocItems] = useState<OrderDetail[]>([]);
   const [returnedGoods, setReturnedGoods] = useState<OrderDetail[]>([]);
@@ -18,91 +21,14 @@ const InvoisDetailsPage: React.FC = () => {
   >([]);
 
   useEffect(() => {
-    console.log(invoiceData);
+    if (invoiceData) {
+      updateInvoice(invoiceData);
+    }
   }, [invoiceData]);
 
-  const columns: ColumnConfig[] = useMemo(
-    () => [
-      {
-        id: "code",
-        header: "ID",
-        type: "readonly",
-        width: 120,
-      },
-      {
-        id: "productName",
-        header: "PRODUCT",
-        type: "combobox",
-        width: 350,
-        options: products.map((p) => p.description),
-      },
-      { id: "qty", header: "QUANTITY", type: "number", width: 100 },
-      { id: "price", header: "PRICE", type: "float", width: 100 },
-      { id: "total", header: "AMOUNT", type: "amount", width: 100 },
-      { id: "action", header: "", type: "action", width: 50 },
-    ],
-    [products]
-  );
-
-  const returnedGoodsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "readonly", width: 120 },
-    {
-      id: "productName",
-      header: "PRODUCT",
-      type: "combobox",
-      width: 350,
-      options: products.map((p) => p.description),
-    },
-    { id: "returned", header: "QUANTITY", type: "number", width: 150 },
-    { id: "price", header: "PRICE", type: "float", width: 100 },
-    {
-      id: "total",
-      header: "AMOUNT",
-      type: "amount",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.isTotal
-            ? info.getValue()
-            : (
-                parseFloat(info.row.original.price.toString()) *
-                info.row.original.returned
-              ).toFixed(2)}
-        </div>
-      ),
-    },
-    { id: "action", header: "", type: "action", width: 50 },
-  ];
-
-  const focItemsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "readonly", width: 120 },
-    {
-      id: "productName",
-      header: "PRODUCT",
-      type: "combobox",
-      width: 350,
-      options: products.map((p) => p.description),
-    },
-    { id: "foc", header: "QUANTITY", type: "number", width: 150 },
-    { id: "price", header: "PRICE", type: "float", width: 100 },
-    {
-      id: "total",
-      header: "AMOUNT",
-      type: "amount",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.isTotal
-            ? info.getValue()
-            : (
-                parseFloat(info.row.original.price.toString()) *
-                info.row.original.foc
-              ).toFixed(2)}
-        </div>
-      ),
-    },
-    { id: "action", header: "", type: "action", width: 50 },
-  ];
+  useEffect(() => {
+    console.log(invoiceData);
+  }, [invoiceData]);
 
   const calculateTotal = useCallback(
     (items: OrderDetail[], key: "total" | "foc" | "returned") => {
@@ -152,7 +78,6 @@ const InvoisDetailsPage: React.FC = () => {
     } catch (error) {
       console.error("Error fetching products:", error);
       toast.error("Error fetching products");
-      // You might want to show an error message to the user here
     }
   };
 
@@ -229,16 +154,64 @@ const InvoisDetailsPage: React.FC = () => {
     [recalculateSubtotals]
   );
 
+  const updateInvoiceData = useCallback(
+    (updatedDetails: OrderDetail[]) => {
+      if (invoiceData) {
+        const updatedInvoiceData = {
+          ...invoiceData,
+          orderDetails: updatedDetails,
+        };
+        setTimeout(() => {
+          setInvoiceData(updatedInvoiceData);
+        }, 0);
+        updateInvoice(updatedInvoiceData);
+      }
+    },
+    [invoiceData]
+  );
+
+  // HC
   const handleChange = useCallback(
     (newData: OrderDetail[]) => {
+      const updatedDetails = recalculateSubtotals(
+        newData.filter((item) => !item.isTotal)
+      );
       setTimeout(() => {
-        setOrderDetails(
-          recalculateSubtotals(newData.filter((item) => !item.isTotal))
-        );
+        setOrderDetails(updatedDetails);
+
+        // Update FOC and returned items based on the changes in order details
+        setFocItems((prevFocItems) => {
+          const updatedFocItems = updatedDetails
+            .map((detail) => {
+              const existingFocItem = prevFocItems.find(
+                (item) => item.code === detail.code
+              );
+              return existingFocItem || (detail.foc > 0 ? detail : null);
+            })
+            .filter((item): item is OrderDetail => item !== null);
+          return updatedFocItems;
+        });
+
+        setReturnedGoods((prevReturnedGoods) => {
+          const updatedReturnedGoods = updatedDetails
+            .map((detail) => {
+              const existingReturnedItem = prevReturnedGoods.find(
+                (item) => item.code === detail.code
+              );
+              return (
+                existingReturnedItem || (detail.returned > 0 ? detail : null)
+              );
+            })
+            .filter((item): item is OrderDetail => item !== null);
+          return updatedReturnedGoods;
+        });
       }, 0);
+
+      updateInvoiceData(updatedDetails);
     },
-    [recalculateSubtotals]
+    [recalculateSubtotals, updateInvoiceData]
   );
+
   const handleAddLess = () => {
     setOrderDetails((prevDetails) => [
       ...prevDetails,
@@ -337,15 +310,44 @@ const InvoisDetailsPage: React.FC = () => {
     setReturnedGoods([...returnedGoods, newReturnedItem]);
   };
 
+  // HFC
   const handleFocChange = (newData: OrderDetail[]) => {
+    const updatedFocItems = newData.filter((item) => !item.isTotal);
     setTimeout(() => {
-      setFocItems(newData.filter((item) => !item.isTotal));
+      setFocItems(updatedFocItems);
+
+      setOrderDetails((prevDetails) => {
+        const updatedDetails = prevDetails.map((detail) => {
+          const updatedFocItem = updatedFocItems.find(
+            (focItem) => focItem.code === detail.code
+          );
+          return updatedFocItem
+            ? { ...detail, foc: updatedFocItem.foc }
+            : detail;
+        });
+        updateInvoiceData(updatedDetails);
+        return updatedDetails;
+      });
     }, 0);
   };
 
+  // HRGC
   const handleReturnedGoodsChange = (newData: OrderDetail[]) => {
+    const updatedReturnedGoods = newData.filter((item) => !item.isTotal);
     setTimeout(() => {
-      setReturnedGoods(newData.filter((item) => !item.isTotal));
+      setReturnedGoods(updatedReturnedGoods);
+      setOrderDetails((prevDetails) => {
+        const updatedDetails = prevDetails.map((detail) => {
+          const updatedReturnedItem = updatedReturnedGoods.find(
+            (returnedItem) => returnedItem.code === detail.code
+          );
+          return updatedReturnedItem
+            ? { ...detail, returned: updatedReturnedItem.returned }
+            : detail;
+        });
+        updateInvoiceData(updatedDetails);
+        return updatedDetails;
+      });
     }, 0);
   };
 
@@ -368,6 +370,191 @@ const InvoisDetailsPage: React.FC = () => {
       </div>
     );
   };
+
+  const columns: ColumnConfig[] = [
+    {
+      id: "code",
+      header: "ID",
+      type: "readonly",
+      width: 120,
+    },
+    {
+      id: "productName",
+      header: "PRODUCT",
+      type: "combobox",
+      width: 350,
+      options: products.map((p) => p.description),
+    },
+    {
+      id: "qty",
+      header: "QUANTITY",
+      type: "number",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <input
+          type="number"
+          min="1"
+          value={Math.max(1, info.getValue())}
+          onChange={(e) => {
+            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const updatedItem = {
+              ...info.row.original,
+              qty: newValue,
+              total: (newValue * info.row.original.price).toFixed(2),
+            };
+            handleChange(
+              orderDetails.map((item) =>
+                item.code === updatedItem.code ? updatedItem : item
+              )
+            );
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
+    {
+      id: "price",
+      header: "PRICE",
+      type: "float",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <input
+          type="number"
+          step="0.01"
+          value={info.getValue()}
+          onChange={(e) => {
+            const newValue = parseFloat(e.target.value) || 0;
+            const updatedItem = {
+              ...info.row.original,
+              price: newValue,
+              total: (info.row.original.qty * newValue).toFixed(2),
+            };
+            handleChange([
+              ...orderDetails.filter((item) => item.code !== updatedItem.code),
+              updatedItem,
+            ]);
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
+    {
+      id: "total",
+      header: "AMOUNT",
+      type: "amount",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
+          {(info.row.original.qty * info.row.original.price).toFixed(2)}
+        </div>
+      ),
+    },
+    { id: "action", header: "", type: "action", width: 50 },
+  ];
+
+  const focItemsColumns: ColumnConfig[] = [
+    { id: "code", header: "ID", type: "readonly", width: 120 },
+    {
+      id: "productName",
+      header: "PRODUCT",
+      type: "combobox",
+      width: 350,
+      options: products.map((p) => p.description),
+    },
+    {
+      id: "foc",
+      header: "QUANTITY",
+      type: "number",
+      width: 150,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <input
+          type="number"
+          min="1"
+          value={Math.max(1, info.getValue())}
+          onChange={(e) => {
+            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const updatedItem = { ...info.row.original, foc: newValue };
+            handleFocChange(
+              focItems.map((item) =>
+                item.code === updatedItem.code ? updatedItem : item
+              )
+            );
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
+    { id: "price", header: "PRICE", type: "float", width: 100 },
+    {
+      id: "total",
+      header: "AMOUNT",
+      type: "amount",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
+          {info.row.original.isTotal
+            ? info.getValue()
+            : (
+                parseFloat(info.row.original.price.toString()) *
+                info.row.original.foc
+              ).toFixed(2)}
+        </div>
+      ),
+    },
+    { id: "action", header: "", type: "action", width: 50 },
+  ];
+
+  const returnedGoodsColumns: ColumnConfig[] = [
+    { id: "code", header: "ID", type: "readonly", width: 120 },
+    {
+      id: "productName",
+      header: "PRODUCT",
+      type: "combobox",
+      width: 350,
+      options: products.map((p) => p.description),
+    },
+    {
+      id: "returned",
+      header: "QUANTITY",
+      type: "number",
+      width: 150,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <input
+          type="number"
+          min="1"
+          value={Math.max(1, info.getValue())}
+          onChange={(e) => {
+            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const updatedItem = { ...info.row.original, returned: newValue };
+            handleReturnedGoodsChange(
+              returnedGoods.map((item) =>
+                item.code === updatedItem.code ? updatedItem : item
+              )
+            );
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
+    { id: "price", header: "PRICE", type: "float", width: 100 },
+    {
+      id: "total",
+      header: "AMOUNT",
+      type: "amount",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
+          {info.row.original.isTotal
+            ? info.getValue()
+            : (
+                parseFloat(info.row.original.price.toString()) *
+                info.row.original.returned
+              ).toFixed(2)}
+        </div>
+      ),
+    },
+    { id: "action", header: "", type: "action", width: 50 },
+  ];
 
   return (
     <div className="px-4 max-w-6xl mx-auto">
