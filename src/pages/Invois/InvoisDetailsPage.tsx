@@ -17,39 +17,6 @@ const InvoisDetailsPage: React.FC = () => {
     { id: string; description: string }[]
   >([]);
 
-  const handleCellChange = useCallback(
-    (rowIndex: number, columnId: string, value: any) => {
-      setOrderDetails((prevDetails) => {
-        const newDetails = [...prevDetails];
-        newDetails[rowIndex] = { ...newDetails[rowIndex], [columnId]: value };
-        return newDetails;
-      });
-    },
-    []
-  );
-
-  const handleFocCellChange = useCallback(
-    (rowIndex: number, columnId: string, value: any) => {
-      setFocItems((prevItems) => {
-        const newItems = [...prevItems];
-        newItems[rowIndex] = { ...newItems[rowIndex], [columnId]: value };
-        return newItems;
-      });
-    },
-    []
-  );
-
-  const handleReturnedGoodsCellChange = useCallback(
-    (rowIndex: number, columnId: string, value: any) => {
-      setReturnedGoods((prevGoods) => {
-        const newGoods = [...prevGoods];
-        newGoods[rowIndex] = { ...newGoods[rowIndex], [columnId]: value };
-        return newGoods;
-      });
-    },
-    []
-  );
-
   useEffect(() => {
     console.log(invoiceData);
   }, [invoiceData]);
@@ -68,20 +35,13 @@ const InvoisDetailsPage: React.FC = () => {
         type: "combobox",
         width: 350,
         options: products.map((p) => p.description),
-        onChange: (rowIndex: number, newValue: string) => {
-          const product = products.find((p) => p.description === newValue);
-          if (product) {
-            handleCellChange(rowIndex, "productName", newValue);
-            handleCellChange(rowIndex, "code", product.id);
-          }
-        },
       },
       { id: "qty", header: "QUANTITY", type: "number", width: 100 },
       { id: "price", header: "PRICE", type: "float", width: 100 },
       { id: "total", header: "AMOUNT", type: "amount", width: 100 },
       { id: "action", header: "", type: "action", width: 50 },
     ],
-    [products, handleCellChange]
+    [products]
   );
 
   const returnedGoodsColumns: ColumnConfig[] = [
@@ -92,13 +52,6 @@ const InvoisDetailsPage: React.FC = () => {
       type: "combobox",
       width: 350,
       options: products.map((p) => p.description),
-      onChange: (rowIndex: number, newValue: string) => {
-        const product = products.find((p) => p.description === newValue);
-        if (product) {
-          handleReturnedGoodsCellChange(rowIndex, "productName", newValue);
-          handleReturnedGoodsCellChange(rowIndex, "code", product.id);
-        }
-      },
     },
     { id: "returned", header: "QUANTITY", type: "number", width: 150 },
     { id: "price", header: "PRICE", type: "float", width: 100 },
@@ -129,13 +82,6 @@ const InvoisDetailsPage: React.FC = () => {
       type: "combobox",
       width: 350,
       options: products.map((p) => p.description),
-      onChange: (rowIndex: number, newValue: string) => {
-        const product = products.find((p) => p.description === newValue);
-        if (product) {
-          handleFocCellChange(rowIndex, "productName", newValue);
-          handleFocCellChange(rowIndex, "code", product.id);
-        }
-      },
     },
     { id: "foc", header: "QUANTITY", type: "number", width: 150 },
     { id: "price", header: "PRICE", type: "float", width: 100 },
