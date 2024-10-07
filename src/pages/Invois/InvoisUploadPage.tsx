@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconCloudUpload, IconTrash } from "@tabler/icons-react";
 import TableEditing from "../../components/Table/TableEditing";
 import toast from "react-hot-toast";
-import { ColumnConfig, InvoiceData } from "../../types/types";
+import { ColumnConfig, InvoiceData, OrderDetail } from "../../types/types";
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { fetchInvoices, getInvoices, updateInvoice } from "./InvoisUtils";
@@ -149,17 +149,52 @@ const InvoisUploadPage: React.FC = () => {
         const orderDetails = orderDetailsString
           .split("E&")
           .filter(Boolean)
-          .map((item) => {
+          .flatMap((item) => {
             const [code, qty, price, total, foc, returned] = item.split("&&");
-            return {
+            const baseItem = {
               code: code || "",
-              qty: Number(qty) || 0,
-              price: Number((parseFloat(price) / 100).toFixed(2)),
-              total: (parseFloat(total) / 100).toFixed(2),
-              foc: parseInt(foc, 10) || 0,
-              returned: parseInt(returned, 10) || 0,
               productName: "", // This will be filled by the server
+              price: Number((parseFloat(price) / 100).toFixed(2)),
             };
+
+            const items: OrderDetail[] = [];
+
+            // Regular item
+            if (Number(qty) > 0) {
+              items.push({
+                ...baseItem,
+                qty: Number(qty),
+                total: (parseFloat(total) / 100).toFixed(2),
+              });
+            }
+
+            // FOC item
+            if (parseInt(foc, 10) > 0) {
+              items.push({
+                ...baseItem,
+                qty: parseInt(foc, 10),
+                total: (
+                  (parseFloat(price) * parseInt(foc, 10)) /
+                  100
+                ).toFixed(2),
+                isFoc: true,
+              });
+            }
+
+            // Returned item
+            if (parseInt(returned, 10) > 0) {
+              items.push({
+                ...baseItem,
+                qty: parseInt(returned, 10),
+                total: (
+                  (parseFloat(price) * parseInt(returned, 10)) /
+                  100
+                ).toFixed(2),
+                isReturned: true,
+              });
+            }
+
+            return items;
           });
 
         return {

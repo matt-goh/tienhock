@@ -56,13 +56,14 @@ export interface OrderDetail {
   qty: number;
   price: number;
   total: string;
-  foc: number;
-  returned: number;
+  isFoc?: boolean;
+  isReturned?: boolean;
   isTotal?: boolean;
   isSubtotal?: boolean;
   isLess?: boolean;
   isTax?: boolean;
   colspan?: number;
+  action?: string;
 }
 
 export interface InvoiceData {
