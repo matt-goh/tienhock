@@ -156,10 +156,14 @@ const InvoisDetailsPage: React.FC = () => {
   }, [products, invoiceData]);
 
   const newRowAddedRef = useRef(false);
+  const newFocRowAddedRef = useRef(false);
+  const newReturnedRowAddedRef = useRef(false);
 
   // Reset newRowAddedRef after each render
   useEffect(() => {
     newRowAddedRef.current = false;
+    newFocRowAddedRef.current = false;
+    newReturnedRowAddedRef.current = false;
   });
 
   // HC
@@ -169,14 +173,10 @@ const InvoisDetailsPage: React.FC = () => {
         setInvoiceData((prevInvoiceData) => {
           if (!prevInvoiceData) return null;
 
-          console.log("Previous orderDetails:", prevInvoiceData.orderDetails);
-
           let updatedOrderDetails = prevInvoiceData.orderDetails.filter(
             (item) => !item.isTotal
           );
           const newItems = updatedItems.filter((item) => !item.code);
-
-          console.log("New items:", newItems);
 
           // Update existing items
           updatedOrderDetails = updatedOrderDetails.map((item) => {
@@ -208,7 +208,6 @@ const InvoisDetailsPage: React.FC = () => {
             };
             updatedOrderDetails.push(newItem);
             newRowAddedRef.current = true;
-            console.log("Added new item:", newItem);
           }
 
           // Calculate total
@@ -227,8 +226,6 @@ const InvoisDetailsPage: React.FC = () => {
             isTotal: true,
           };
           updatedOrderDetails.push(totalRow);
-
-          console.log("Final updatedOrderDetails:", updatedOrderDetails);
 
           return {
             ...prevInvoiceData,
@@ -370,50 +367,57 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   // HFC
-  const handleFocChange = (newData: OrderDetail[]) => {
+  const handleFocChange = (updatedItems: OrderDetail[]) => {
     setTimeout(() => {
-      setInvoiceData((prevData) => {
-        if (!prevData) return null;
+      setInvoiceData((prevInvoiceData) => {
+        if (!prevInvoiceData) return null;
 
-        const regularItems = prevData.orderDetails.filter(
-          (item) => !item.isFoc && !item.isReturned && !item.isTotal
-        );
-        const returnedItems = prevData.orderDetails.filter(
-          (item) => item.isReturned
-        );
+        console.log("Previous orderDetails:", prevInvoiceData.orderDetails);
 
-        // Process updated FOC items
-        let updatedFocItems = newData.map((item) => {
-          if (!item.code) {
-            // This is a new item, assign a random product
-            const randomProduct = getRandomProduct();
+        let updatedOrderDetails = prevInvoiceData.orderDetails.filter(
+          (item) => !item.isTotal
+        );
+        const newItems = updatedItems.filter((item) => !item.code);
+
+        console.log("New FOC items:", newItems);
+
+        // Update existing items
+        updatedOrderDetails = updatedOrderDetails.map((item) => {
+          const updatedItem = updatedItems.find(
+            (updated) => updated.code === item.code && item.isFoc // Only update FOC items
+          );
+          if (updatedItem) {
             return {
               ...item,
-              code: randomProduct.id,
-              productName: randomProduct.description,
-              isFoc: true,
-              qty: item.qty || 1,
-              total: ((item.qty || 1) * item.price).toFixed(2),
-            };
-          } else {
-            // This is an existing item, just update its details
-            return {
-              ...item,
-              isFoc: true,
-              qty: item.qty || 1,
-              total: ((item.qty || 1) * item.price).toFixed(2),
+              ...updatedItem,
+              total: (updatedItem.qty * updatedItem.price).toFixed(2),
             };
           }
+          return item;
         });
 
-        // Combine all items
-        let allItems = [...regularItems, ...updatedFocItems, ...returnedItems];
+        // Add only one new item if there are any and we haven't added one in this render cycle
+        if (newItems.length > 0 && !newFocRowAddedRef.current) {
+          const randomProduct = getRandomProduct();
+          const newItem = {
+            ...newItems[0],
+            code: randomProduct.id,
+            productName: randomProduct.description,
+            qty: 1,
+            price: 0,
+            total: "0",
+            isFoc: true,
+          };
+          updatedOrderDetails.push(newItem);
+          newFocRowAddedRef.current = true;
+          console.log("Added new FOC item:", newItem);
+        }
 
-        // Calculate and add total
-        const totalAmount = calculateTotal(
-          allItems.filter((item) => !item.isTotal)
-        );
+        // Calculate total
+        const focItems = updatedOrderDetails.filter((item) => item.isFoc);
+        const totalAmount = calculateTotal(focItems);
 
+        // Add total row
         const totalRow = {
           code: "",
           productName: "Total:",
@@ -421,62 +425,76 @@ const InvoisDetailsPage: React.FC = () => {
           price: 0,
           total: totalAmount,
           isTotal: true,
+          isFoc: true,
         };
+        updatedOrderDetails = [
+          ...updatedOrderDetails.filter((item) => !item.isTotal),
+          totalRow,
+        ];
 
-        allItems = [...allItems.filter((item) => !item.isTotal), totalRow];
-
-        console.log("Final order details:", allItems);
+        console.log("Final updatedOrderDetails:", updatedOrderDetails);
 
         return {
-          ...prevData,
-          orderDetails: allItems,
+          ...prevInvoiceData,
+          orderDetails: updatedOrderDetails,
         };
       });
     }, 0);
   };
 
-  const handleReturnedChange = (newData: OrderDetail[]) => {
+  const handleReturnedChange = (updatedItems: OrderDetail[]) => {
     setTimeout(() => {
-      setInvoiceData((prevData) => {
-        if (!prevData) return null;
+      setInvoiceData((prevInvoiceData) => {
+        if (!prevInvoiceData) return null;
 
-        const regularItems = prevData.orderDetails.filter(
-          (item) => !item.isFoc && !item.isReturned && !item.isTotal
+        console.log("Previous orderDetails:", prevInvoiceData.orderDetails);
+
+        let updatedOrderDetails = prevInvoiceData.orderDetails.filter(
+          (item) => !item.isTotal
         );
-        const focItems = prevData.orderDetails.filter((item) => item.isFoc);
+        const newItems = updatedItems.filter((item) => !item.code);
 
-        // Process updated Returned items
-        let updatedReturnedItems = newData.map((item) => {
-          if (!item.code) {
-            // This is a new item, assign a random product
-            const randomProduct = getRandomProduct();
+        console.log("New returned items:", newItems);
+
+        // Update existing items
+        updatedOrderDetails = updatedOrderDetails.map((item) => {
+          const updatedItem = updatedItems.find(
+            (updated) => updated.code === item.code && item.isReturned // Only update returned items
+          );
+          if (updatedItem) {
             return {
               ...item,
-              code: randomProduct.id,
-              productName: randomProduct.description,
-              isReturned: true,
-              qty: item.qty || 1,
-              total: ((item.qty || 1) * item.price).toFixed(2),
-            };
-          } else {
-            // This is an existing item, just update its details
-            return {
-              ...item,
-              isReturned: true,
-              qty: item.qty || 1,
-              total: ((item.qty || 1) * item.price).toFixed(2),
+              ...updatedItem,
+              total: (updatedItem.qty * updatedItem.price).toFixed(2),
             };
           }
+          return item;
         });
 
-        // Combine all items
-        let allItems = [...regularItems, ...focItems, ...updatedReturnedItems];
+        // Add only one new item if there are any and we haven't added one in this render cycle
+        if (newItems.length > 0 && !newReturnedRowAddedRef.current) {
+          const randomProduct = getRandomProduct();
+          const newItem = {
+            ...newItems[0],
+            code: randomProduct.id,
+            productName: randomProduct.description,
+            qty: 1,
+            price: 0,
+            total: "0",
+            isReturned: true,
+          };
+          updatedOrderDetails.push(newItem);
+          newReturnedRowAddedRef.current = true;
+          console.log("Added new returned item:", newItem);
+        }
 
-        // Calculate and add total
-        const totalAmount = calculateTotal(
-          allItems.filter((item) => !item.isTotal)
+        // Calculate total
+        const returnedItems = updatedOrderDetails.filter(
+          (item) => item.isReturned
         );
+        const totalAmount = calculateTotal(returnedItems);
 
+        // Add total row
         const totalRow = {
           code: "",
           productName: "Total:",
@@ -484,15 +502,18 @@ const InvoisDetailsPage: React.FC = () => {
           price: 0,
           total: totalAmount,
           isTotal: true,
+          isReturned: true,
         };
+        updatedOrderDetails = [
+          ...updatedOrderDetails.filter((item) => !item.isTotal),
+          totalRow,
+        ];
 
-        allItems = [...allItems.filter((item) => !item.isTotal), totalRow];
-
-        console.log("Final order details:", allItems);
+        console.log("Final updatedOrderDetails:", updatedOrderDetails);
 
         return {
-          ...prevData,
-          orderDetails: allItems,
+          ...prevInvoiceData,
+          orderDetails: updatedOrderDetails,
         };
       });
     }, 0);
