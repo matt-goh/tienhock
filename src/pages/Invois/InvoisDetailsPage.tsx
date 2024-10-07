@@ -13,9 +13,6 @@ const InvoisDetailsPage: React.FC = () => {
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(
     location.state?.invoiceData || null
   );
-  const [orderDetails, setOrderDetails] = useState<OrderDetail[]>([]);
-  const [focItems, setFocItems] = useState<OrderDetail[]>([]);
-  const [returnedGoods, setReturnedGoods] = useState<OrderDetail[]>([]);
   const [products, setProducts] = useState<
     { id: string; description: string }[]
   >([]);
@@ -30,59 +27,41 @@ const InvoisDetailsPage: React.FC = () => {
     console.log(invoiceData);
   }, [invoiceData]);
 
-  const calculateTotal = useCallback(
-    (items: OrderDetail[], key: "total" | "foc" | "returned") => {
-      return items
-        .reduce((sum, detail) => {
-          if (detail.isTotal) return sum;
-          if (detail.isLess) {
-            return sum - parseFloat(detail.total || "0");
-          }
-          if (detail.isTax) {
-            return sum + parseFloat(detail.total || "0");
-          }
-          if (detail.isSubtotal) {
-            return sum;
-          }
-          const value =
-            key === "total"
-              ? detail.total
-              : key === "foc"
-              ? (parseFloat(detail.price.toString()) * detail.foc).toFixed(2)
-              : (parseFloat(detail.price.toString()) * detail.returned).toFixed(
-                  2
-                );
-          return sum + parseFloat(value || "0");
-        }, 0)
-        .toFixed(2);
-    },
-    []
-  );
+  const calculateTotal = useCallback((items: OrderDetail[]) => {
+    return items
+      .reduce((sum, detail) => {
+        if (detail.isTotal) {
+          return sum;
+        }
+        if (detail.isLess) {
+          return sum - parseFloat(detail.total || "0");
+        }
+        if (detail.isTax) {
+          return sum + parseFloat(detail.total || "0");
+        }
+        if (detail.isSubtotal || detail.isTotal) {
+          return sum;
+        }
+        return sum + parseFloat(detail.total || "0");
+      }, 0)
+      .toFixed(2);
+  }, []);
 
   useEffect(() => {
-    if (invoiceData && invoiceData.orderDetails) {
-      const initialOrderDetails = invoiceData.orderDetails;
-      setOrderDetails(initialOrderDetails);
-      setFocItems(initialOrderDetails.filter((item) => item.foc > 0));
-      setReturnedGoods(initialOrderDetails.filter((item) => item.returned > 0));
-    }
-  }, [invoiceData, calculateTotal]);
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/products/combobox"
+        );
+        if (!response.ok) throw new Error("Failed to fetch products");
+        const data = await response.json();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        toast.error("Error fetching products");
+      }
+    };
 
-  const fetchProducts = async () => {
-    try {
-      const response = await fetch(
-        "http://localhost:5000/api/products/combobox"
-      );
-      if (!response.ok) throw new Error("Failed to fetch products");
-      const data = await response.json();
-      setProducts(data);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      toast.error("Error fetching products");
-    }
-  };
-
-  useEffect(() => {
     fetchProducts();
   }, []);
 
@@ -103,8 +82,6 @@ const InvoisDetailsPage: React.FC = () => {
             price: 0,
             total: totalAmount,
             isTotal: true,
-            foc: 0,
-            returned: 0,
           },
         ];
       }
@@ -113,9 +90,13 @@ const InvoisDetailsPage: React.FC = () => {
   );
 
   const orderDetailsWithTotal = useMemo(() => {
-    const totalAmount = calculateTotal(orderDetails, "total");
-    return addTotalRow(orderDetails, totalAmount);
-  }, [orderDetails, calculateTotal, addTotalRow]);
+    if (!invoiceData) return [];
+    const regularItems = invoiceData.orderDetails.filter(
+      (item) => !item.isFoc && !item.isReturned
+    );
+    const totalAmount = calculateTotal(regularItems);
+    return addTotalRow(regularItems, totalAmount);
+  }, [invoiceData, calculateTotal, addTotalRow]);
 
   const recalculateSubtotals = useCallback(
     (details: OrderDetail[]): OrderDetail[] => {
@@ -142,187 +123,158 @@ const InvoisDetailsPage: React.FC = () => {
 
   const handleSpecialRowDelete = useCallback(
     (rowType: "less" | "tax" | "subtotal") => {
-      setOrderDetails((prevDetails) => {
-        const newDetails = prevDetails.filter(
+      setInvoiceData((prevData) => {
+        if (!prevData) return null;
+        const newDetails = prevData.orderDetails.filter(
           (item) =>
             (rowType === "less" && !item.isLess) ||
             (rowType === "tax" && !item.isTax) ||
             (rowType === "subtotal" && !item.isSubtotal)
         );
-        return recalculateSubtotals(newDetails);
+        return {
+          ...prevData,
+          orderDetails: recalculateSubtotals(newDetails),
+        };
       });
     },
     [recalculateSubtotals]
-  );
-
-  const updateInvoiceData = useCallback(
-    (updatedDetails: OrderDetail[]) => {
-      if (invoiceData) {
-        const updatedInvoiceData = {
-          ...invoiceData,
-          orderDetails: updatedDetails,
-        };
-        setTimeout(() => {
-          setInvoiceData(updatedInvoiceData);
-        }, 0);
-        updateInvoice(updatedInvoiceData);
-      }
-    },
-    [invoiceData]
   );
 
   // HC
   const handleChange = useCallback(
     (updatedItems: OrderDetail[]) => {
       setTimeout(() => {
-        setOrderDetails((prevDetails) => {
-          const newDetails = updatedItems
-            .filter((item) => !item.isTotal)
-            .map((updatedItem) => {
-              const existingItem = prevDetails.find(
-                (item) => item.code === updatedItem.code
-              );
-              if (existingItem) {
-                return {
-                  ...existingItem,
-                  ...updatedItem,
-                  total: (updatedItem.qty * updatedItem.price).toFixed(2),
-                };
-              }
-              return updatedItem;
-            });
-
-          // Recalculate the total
-          const totalAmount = calculateTotal(newDetails, "total");
-
-          // Add or update the total row
-          const totalRow = {
-            code: "",
-            productName: "Total:",
-            qty: 0,
-            price: 0,
-            total: totalAmount,
-            isTotal: true,
-            foc: 0,
-            returned: 0,
-          };
-
-          return [...newDetails, totalRow];
-        });
-      }, 0);
-
-      setTimeout(() => {
-        // Update invoice data
         setInvoiceData((prevInvoiceData) => {
-          if (prevInvoiceData) {
-            return {
-              ...prevInvoiceData,
-              orderDetails: updatedItems,
+          if (!prevInvoiceData) return null;
+
+          const existingItems = prevInvoiceData.orderDetails.filter(
+            (item) => item.isFoc || item.isReturned
+          );
+
+          const newOrderDetails = [
+            ...existingItems,
+            ...updatedItems
+              .filter((item) => !item.isTotal)
+              .map(({ action, ...item }) => ({
+                ...item,
+                total: (item.qty * item.price).toFixed(2),
+              })),
+          ];
+
+          const regularItems = newOrderDetails.filter(
+            (item) => !item.isTotal && !item.isFoc && !item.isReturned
+          );
+          const totalAmount = calculateTotal(regularItems);
+
+          const totalRowIndex = newOrderDetails.findIndex(
+            (item) => item.isTotal
+          );
+          if (totalRowIndex !== -1) {
+            newOrderDetails[totalRowIndex] = {
+              ...newOrderDetails[totalRowIndex],
+              total: totalAmount,
             };
+          } else {
+            newOrderDetails.push({
+              code: "",
+              productName: "Total:",
+              qty: 0,
+              price: 0,
+              total: totalAmount,
+              isTotal: true,
+            });
           }
-          return prevInvoiceData;
+
+          return {
+            ...prevInvoiceData,
+            orderDetails: newOrderDetails,
+          };
         });
-      }, 0);
-
-      setTimeout(() => {
-        // Update FOC and returned items
-        setFocItems((prevItems) =>
-          updateRelatedItems(prevItems, updatedItems, "foc")
-        );
-      }, 0);
-
-      setTimeout(() => {
-        setReturnedGoods((prevItems) =>
-          updateRelatedItems(prevItems, updatedItems, "returned")
-        );
       }, 0);
     },
     [calculateTotal]
   );
 
-  const updateRelatedItems = (
-    prevItems: OrderDetail[],
-    updatedItems: OrderDetail[],
-    key: "foc" | "returned"
-  ) => {
-    return prevItems.map((prevItem) => {
-      const updatedItem = updatedItems.find(
-        (item) => item.code === prevItem.code
-      );
-      if (updatedItem) {
-        return {
-          ...prevItem,
-          [key]: updatedItem[key],
-          total: (updatedItem.price * updatedItem[key]).toFixed(2),
-        };
-      }
-      return prevItem;
+  const handleAddLess = () => {
+    setInvoiceData((prevData) => {
+      if (!prevData) return null;
+      return {
+        ...prevData,
+        orderDetails: [
+          ...prevData.orderDetails,
+          {
+            code: "LESS",
+            productName: "Less",
+            qty: 0,
+            price: 0,
+            total: "0",
+            isLess: true,
+          },
+        ],
+      };
     });
   };
 
-  const handleAddLess = () => {
-    setOrderDetails((prevDetails) => [
-      ...prevDetails,
-      {
-        code: "LESS",
-        productName: "Less",
-        qty: 0,
-        price: 0,
-        total: "0",
-        isLess: true,
-        foc: 0,
-        returned: 0,
-      },
-    ]);
-  };
-
   const handleAddTax = () => {
-    setOrderDetails((prevDetails) => [
-      ...prevDetails,
-      {
-        code: "TAX",
-        productName: "Tax",
-        qty: 0,
-        price: 0,
-        total: "0",
-        isTax: true,
-        foc: 0,
-        returned: 0,
-      },
-    ]);
+    setInvoiceData((prevData) => {
+      if (!prevData) return null;
+      return {
+        ...prevData,
+        orderDetails: [
+          ...prevData.orderDetails,
+          {
+            code: "TAX",
+            productName: "Tax",
+            qty: 0,
+            price: 0,
+            total: "0",
+            isTax: true,
+          },
+        ],
+      };
+    });
   };
 
   const handleAddSubtotal = () => {
-    setOrderDetails((prevDetails) => {
+    setInvoiceData((prevData) => {
+      if (!prevData) return null;
       const subtotalAmount = calculateTotal(
-        prevDetails.filter((item) => !item.isSubtotal),
-        "total"
+        prevData.orderDetails.filter(
+          (item) => !item.isSubtotal && !item.isFoc && !item.isReturned
+        )
       );
-      return [
-        ...prevDetails,
-        {
-          code: "SUBTOTAL",
-          productName: "Subtotal",
-          qty: 0,
-          price: 0,
-          total: subtotalAmount,
-          isSubtotal: true,
-          foc: 0,
-          returned: 0,
-        },
-      ];
+      return {
+        ...prevData,
+        orderDetails: [
+          ...prevData.orderDetails,
+          {
+            code: "SUBTOTAL",
+            productName: "Subtotal",
+            qty: 0,
+            price: 0,
+            total: subtotalAmount,
+            isSubtotal: true,
+          },
+        ],
+      };
     });
   };
 
   const focItemsWithTotal = useMemo(() => {
-    const totalAmount = calculateTotal(focItems, "foc");
+    if (!invoiceData) return [];
+    const focItems = invoiceData.orderDetails.filter((item) => item.isFoc);
+    const totalAmount = calculateTotal(focItems);
     return addTotalRow(focItems, totalAmount);
-  }, [focItems]);
+  }, [invoiceData, calculateTotal, addTotalRow]);
 
-  const returnedGoodsWithTotal = useMemo(() => {
-    const totalAmount = calculateTotal(returnedGoods, "returned");
-    return addTotalRow(returnedGoods, totalAmount);
-  }, [returnedGoods]);
+  const returnedItemsWithTotal = useMemo(() => {
+    if (!invoiceData) return [];
+    const returnedItems = invoiceData.orderDetails.filter(
+      (item) => item.isReturned
+    );
+    const totalAmount = calculateTotal(returnedItems);
+    return addTotalRow(returnedItems, totalAmount);
+  }, [invoiceData, calculateTotal, addTotalRow]);
 
   if (!invoiceData) {
     return <div>No invoice data found.</div>;
@@ -333,75 +285,95 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   const handleAddFOC = () => {
-    const newFocItem: OrderDetail = {
-      code: "",
-      productName: "",
-      qty: 0,
-      price: 0,
-      total: "",
-      foc: 0,
-      returned: 0,
-    };
-    setFocItems([...focItems, newFocItem]);
+    setInvoiceData((prevData) => {
+      if (!prevData) return null;
+      return {
+        ...prevData,
+        orderDetails: [
+          ...prevData.orderDetails,
+          {
+            code: "",
+            productName: "",
+            qty: 1,
+            price: 0,
+            total: "0",
+            isFoc: true,
+          },
+        ],
+      };
+    });
   };
 
   const handleAddReturnedGoods = () => {
-    const newReturnedItem: OrderDetail = {
-      code: "",
-      productName: "",
-      qty: 0,
-      price: 0,
-      total: "",
-      foc: 0,
-      returned: 0,
-    };
-    setReturnedGoods([...returnedGoods, newReturnedItem]);
+    setInvoiceData((prevData) => {
+      if (!prevData) return null;
+      return {
+        ...prevData,
+        orderDetails: [
+          ...prevData.orderDetails,
+          {
+            code: "",
+            productName: "",
+            qty: 1,
+            price: 0,
+            total: "0",
+            isReturned: true,
+          },
+        ],
+      };
+    });
   };
 
   // HFC
   const handleFocChange = (newData: OrderDetail[]) => {
-    const updatedFocItems = newData.filter((item) => !item.isTotal);
     setTimeout(() => {
-      setFocItems(updatedFocItems);
-
-      setOrderDetails((prevDetails) => {
-        const updatedDetails = prevDetails.map((detail) => {
-          const updatedFocItem = updatedFocItems.find(
-            (focItem) => focItem.code === detail.code
-          );
-          return updatedFocItem
-            ? { ...detail, foc: updatedFocItem.foc }
-            : detail;
-        });
-        updateInvoiceData(updatedDetails);
-        return updatedDetails;
+      setInvoiceData((prevData) => {
+        if (!prevData) return null;
+        const updatedOrderDetails = prevData.orderDetails.filter(
+          (item) => !item.isFoc
+        );
+        const newFocItems = newData
+          .filter((item) => !item.isTotal)
+          .map(({ action, ...item }) => ({
+            ...item,
+            isFoc: true,
+            qty: item.qty || 1,
+          }));
+        return {
+          ...prevData,
+          orderDetails: [...updatedOrderDetails, ...newFocItems],
+        };
       });
     }, 0);
   };
 
-  // HRGC
-  const handleReturnedGoodsChange = (newData: OrderDetail[]) => {
-    const updatedReturnedGoods = newData.filter((item) => !item.isTotal);
+  const handleReturnedChange = (newData: OrderDetail[]) => {
     setTimeout(() => {
-      setReturnedGoods(updatedReturnedGoods);
-      setOrderDetails((prevDetails) => {
-        const updatedDetails = prevDetails.map((detail) => {
-          const updatedReturnedItem = updatedReturnedGoods.find(
-            (returnedItem) => returnedItem.code === detail.code
-          );
-          return updatedReturnedItem
-            ? { ...detail, returned: updatedReturnedItem.returned }
-            : detail;
-        });
-        updateInvoiceData(updatedDetails);
-        return updatedDetails;
+      setInvoiceData((prevData) => {
+        if (!prevData) return null;
+        const updatedOrderDetails = prevData.orderDetails.filter(
+          (item) => !item.isReturned
+        );
+        const newReturnedItems = newData
+          .filter((item) => !item.isTotal)
+          .map(({ action, ...item }) => ({
+            ...item,
+            isReturned: true,
+            qty: item.qty || 1,
+          }));
+        return {
+          ...prevData,
+          orderDetails: [...updatedOrderDetails, ...newReturnedItems],
+        };
       });
     }, 0);
   };
 
   const renderActionButtons = () => {
-    const hasFOC = focItems.length > 0;
-    const hasReturned = returnedGoods.length > 0;
+    const hasFOC = invoiceData.orderDetails.some((item) => item.isFoc);
+    const hasReturned = invoiceData.orderDetails.some(
+      (item) => item.isReturned
+    );
 
     const renderButton = (text: string, onClick?: () => void) => (
       <Button onClick={onClick} variant="outline" size="md">
@@ -450,11 +422,7 @@ const InvoisDetailsPage: React.FC = () => {
               qty: newValue,
               total: (newValue * info.row.original.price).toFixed(2),
             };
-            handleChange(
-              orderDetails.map((item) =>
-                item.code === updatedItem.code ? updatedItem : item
-              )
-            );
+            handleChange([updatedItem]);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -507,7 +475,7 @@ const InvoisDetailsPage: React.FC = () => {
       options: products.map((p) => p.description),
     },
     {
-      id: "foc",
+      id: "qty",
       header: "QUANTITY",
       type: "number",
       width: 150,
@@ -515,15 +483,11 @@ const InvoisDetailsPage: React.FC = () => {
         <input
           type="number"
           min="1"
-          value={Math.max(1, info.getValue())}
+          value={Math.max(1, Number(info.row.original.qty) || 1)}
           onChange={(e) => {
             const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
-            const updatedItem = { ...info.row.original, foc: newValue };
-            handleFocChange(
-              focItems.map((item) =>
-                item.code === updatedItem.code ? updatedItem : item
-              )
-            );
+            const updatedItem = { ...info.row.original, qty: newValue };
+            handleFocChange([updatedItem]);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -541,7 +505,7 @@ const InvoisDetailsPage: React.FC = () => {
             ? info.getValue()
             : (
                 parseFloat(info.row.original.price.toString()) *
-                info.row.original.foc
+                info.row.original.qty
               ).toFixed(2)}
         </div>
       ),
@@ -559,7 +523,7 @@ const InvoisDetailsPage: React.FC = () => {
       options: products.map((p) => p.description),
     },
     {
-      id: "returned",
+      id: "qty",
       header: "QUANTITY",
       type: "number",
       width: 150,
@@ -567,15 +531,11 @@ const InvoisDetailsPage: React.FC = () => {
         <input
           type="number"
           min="1"
-          value={Math.max(1, info.getValue())}
+          value={Math.max(1, Number(info.row.original.qty) || 1)}
           onChange={(e) => {
             const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
-            const updatedItem = { ...info.row.original, returned: newValue };
-            handleReturnedGoodsChange(
-              returnedGoods.map((item) =>
-                item.code === updatedItem.code ? updatedItem : item
-              )
-            );
+            const updatedItem = { ...info.row.original, qty: newValue };
+            handleReturnedChange([updatedItem]);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -593,7 +553,7 @@ const InvoisDetailsPage: React.FC = () => {
             ? info.getValue()
             : (
                 parseFloat(info.row.original.price.toString()) *
-                info.row.original.returned
+                info.row.original.qty
               ).toFixed(2)}
         </div>
       ),
@@ -663,7 +623,7 @@ const InvoisDetailsPage: React.FC = () => {
         tableKey="orderDetails"
       />
 
-      {(focItems.length > 0 || focItemsWithTotal.length > 1) && (
+      {focItemsWithTotal.length > 1 && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-4">FOC</h2>
           <TableEditing<OrderDetail>
@@ -675,13 +635,13 @@ const InvoisDetailsPage: React.FC = () => {
         </>
       )}
 
-      {(returnedGoods.length > 0 || returnedGoodsWithTotal.length > 1) && (
+      {returnedItemsWithTotal.length > 1 && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-4">Returned Goods</h2>
           <TableEditing<OrderDetail>
-            initialData={returnedGoodsWithTotal}
+            initialData={returnedItemsWithTotal}
             columns={returnedGoodsColumns}
-            onChange={handleReturnedGoodsChange}
+            onChange={handleReturnedChange}
             tableKey="returnedGoods"
           />
         </>
