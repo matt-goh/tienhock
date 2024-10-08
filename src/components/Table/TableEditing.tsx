@@ -57,10 +57,6 @@ function TableEditing<T extends Record<string, any>>({
     [key: string]: any;
   }>({});
   const [originalData, setOriginalData] = useState<T[]>(initialData);
-  const [canAddSubtotal, setCanAddSubtotal] = useState(true);
-  const [selectedRowForSubtotal, setSelectedRowForSubtotal] = useState<
-    number | null
-  >(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
   const [tableWidth, setTableWidth] = useState(0);
@@ -145,10 +141,6 @@ function TableEditing<T extends Record<string, any>>({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    setCanAddSubtotal(hasAmountValuesAfterLastSubtotal(data));
-  }, [data]);
 
   //HCC
   const handleCellClick = useCallback(
@@ -323,7 +315,7 @@ function TableEditing<T extends Record<string, any>>({
       if (
         !row.isSubtotal &&
         isEditableColumn(column) &&
-        column.type !== "listbox" && 
+        column.type !== "listbox" &&
         column.type !== "combobox"
       ) {
         return { rowIndex, colIndex };
@@ -417,6 +409,8 @@ function TableEditing<T extends Record<string, any>>({
           }
         })
       ),
+      ...(tableKey === "focItems" && { isFoc: true }),
+      ...(tableKey === "returnedGoods" && { isReturned: true }),
     } as T;
 
     setData((prevData) => {
@@ -466,46 +460,6 @@ function TableEditing<T extends Record<string, any>>({
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [handleMouseUp]);
-
-  //HASR
-  const handleAddSubtotalRow = () => {
-    if (!canAddSubtotal) return;
-
-    setData((prevData) => {
-      let insertIndex: number;
-      let subtotalEndIndex: number;
-
-      if (selectedRowForSubtotal) {
-        insertIndex =
-          prevData.findIndex((row) => row.id === selectedRowForSubtotal) + 1;
-        subtotalEndIndex = insertIndex - 1;
-      } else {
-        const lastNonSubtotalRowWithAmount = prevData.reduceRight(
-          (acc, row, index) => {
-            if (!row.isSubtotal && parseFloat(row.amount) > 0 && acc === -1) {
-              return index;
-            }
-            return acc;
-          },
-          -1
-        );
-        insertIndex = lastNonSubtotalRowWithAmount + 1;
-        subtotalEndIndex = lastNonSubtotalRowWithAmount;
-      }
-
-      if (insertIndex === 0) return prevData;
-
-      const newData = [...prevData];
-      const subtotalRow = createSubtotalRow(0, subtotalEndIndex);
-      newData.splice(insertIndex, 0, subtotalRow);
-
-      const recalculatedData = recalculateSubtotals(newData);
-      setOriginalData(recalculatedData);
-      return recalculatedData;
-    });
-
-    setSelectedRowForSubtotal(null);
-  };
 
   // CS
   const createSubtotalRow = (subtotalAmount: number, endIndex: number): T =>
