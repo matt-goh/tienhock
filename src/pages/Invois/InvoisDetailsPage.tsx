@@ -385,7 +385,6 @@ const InvoisDetailsPage: React.FC = () => {
     setTimeout(() => {
       setInvoiceData((prevInvoiceData) => {
         if (!prevInvoiceData) return null;
-
         const filteredItems = updatedItems.filter((item) => !item.isTotal);
         // Separate FOC items from regular and returned items
         const currentFocItems = prevInvoiceData.orderDetails.filter(
@@ -453,7 +452,6 @@ const InvoisDetailsPage: React.FC = () => {
           isTotal: true,
           isFoc: true,
         };
-
         // Combine updated FOC items with regular and returned items
         const combinedOrderDetails = [
           ...regularItems,
