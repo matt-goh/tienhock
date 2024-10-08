@@ -147,19 +147,43 @@ const InvoisUploadPage: React.FC = () => {
         const [customerId, customerName] = customer.split("\t");
 
         const orderDetails = orderDetailsString
-          .split("E&")
+          .split("&E&")
           .filter(Boolean)
-          .map((item) => {
+          .flatMap((item) => {
             const [code, qty, price, total, foc, returned] = item.split("&&");
-            return {
+            const baseItem = {
               code: code || "",
+              productName: "", // This will be filled by the server
               qty: Number(qty) || 0,
               price: Number((parseFloat(price) / 100).toFixed(2)),
               total: (parseFloat(total) / 100).toFixed(2),
-              foc: parseInt(foc, 10) || 0,
-              returned: parseInt(returned, 10) || 0,
-              productName: "", // This will be filled by the server
+              isFoc: false,
+              isReturned: false,
             };
+
+            const items = [baseItem];
+
+            if (Number(foc) > 0) {
+              items.push({
+                ...baseItem,
+                qty: Number(foc),
+                price: Number((parseFloat(price) / 100).toFixed(2)),
+                total: (Number(baseItem.price) * Number(foc)).toFixed(2),
+                isFoc: true,
+              });
+            }
+            
+            if (Number(returned) > 0) {
+              items.push({
+                ...baseItem,
+                qty: Number(returned),
+                price: Number((parseFloat(price) / 100).toFixed(2)),
+                total: (Number(baseItem.price) * Number(returned)).toFixed(2),
+                isReturned: true,
+              });
+            }
+
+            return items;
           });
 
         return {
