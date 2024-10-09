@@ -124,14 +124,11 @@ const InvoisDetailsPage: React.FC = () => {
   );
 
   const handleSpecialRowDelete = useCallback(
-    (rowType: "less" | "tax" | "subtotal") => {
+    (rowCode: string) => {
       setInvoiceData((prevData) => {
         if (!prevData) return null;
         const newDetails = prevData.orderDetails.filter(
-          (item) =>
-            (rowType === "less" && !item.isLess) ||
-            (rowType === "tax" && !item.isTax) ||
-            (rowType === "subtotal" && !item.isSubtotal)
+          (item) => item.code !== rowCode
         );
         return {
           ...prevData,
@@ -306,16 +303,33 @@ const InvoisDetailsPage: React.FC = () => {
     [calculateTotal, addNewRow, products] // Added products to the dependency array
   );
 
+  const getNextSpecialRowNumber = useCallback(
+    (type: string) => {
+      const existingRows =
+        invoiceData?.orderDetails.filter((item) =>
+          item.code?.startsWith(type)
+        ) || [];
+      const numbers = existingRows.map((item) => {
+        const match = item.code?.match(/-(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      });
+      const maxNumber = Math.max(0, ...numbers);
+      return maxNumber + 1;
+    },
+    [invoiceData]
+  );
+
   const handleAddLess = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
+      const nextNumber = getNextSpecialRowNumber("LESS");
       return {
         ...prevData,
         orderDetails: [
           ...prevData.orderDetails,
           {
-            code: "LESS",
-            productName: "Less",
+            code: `LESS-${nextNumber}`,
+            productName: `Less ${nextNumber}`,
             qty: 1,
             price: 0,
             total: "0",
@@ -329,13 +343,14 @@ const InvoisDetailsPage: React.FC = () => {
   const handleAddTax = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
+      const nextNumber = getNextSpecialRowNumber("TAX");
       return {
         ...prevData,
         orderDetails: [
           ...prevData.orderDetails,
           {
-            code: "TAX",
-            productName: "Tax",
+            code: `TAX-${nextNumber}`,
+            productName: `Tax ${nextNumber}`,
             qty: 1,
             price: 0,
             total: "0",
@@ -349,6 +364,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleAddSubtotal = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
+      const nextNumber = getNextSpecialRowNumber("SUBTOTAL");
       const subtotalAmount = calculateTotal(
         prevData.orderDetails.filter(
           (item) => !item.isSubtotal && !item.isFoc && !item.isReturned
@@ -359,8 +375,8 @@ const InvoisDetailsPage: React.FC = () => {
         orderDetails: [
           ...prevData.orderDetails,
           {
-            code: "SUBTOTAL",
-            productName: "Subtotal",
+            code: `SUBTOTAL-${nextNumber}`,
+            productName: `Subtotal ${nextNumber}`,
             qty: 0,
             price: 0,
             total: subtotalAmount,
