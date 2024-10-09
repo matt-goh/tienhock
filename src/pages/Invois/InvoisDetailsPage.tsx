@@ -247,11 +247,21 @@ const InvoisDetailsPage: React.FC = () => {
                     updatedItem.code = matchingProduct.id;
                   }
                 }
-                return {
-                  ...item,
-                  ...updatedItem,
-                  total: (updatedItem.qty * updatedItem.price).toFixed(2),
-                };
+                if (item.isLess || item.isTax) {
+                  // For Less and Tax rows, use the updated total directly
+                  return {
+                    ...item,
+                    ...updatedItem,
+                    total: updatedItem.total,
+                  };
+                } else {
+                  // For regular items, recalculate the total
+                  return {
+                    ...item,
+                    ...updatedItem,
+                    total: (updatedItem.qty * updatedItem.price).toFixed(2),
+                  };
+                }
               }
               return item;
             });
@@ -769,11 +779,36 @@ const InvoisDetailsPage: React.FC = () => {
       header: "AMOUNT",
       type: "amount",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {(info.row.original.qty * info.row.original.price).toFixed(2)}
-        </div>
-      ),
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => {
+        const isEditable = info.row.original.isLess || info.row.original.isTax;
+        return (
+          <input
+            type="float"
+            step="0.01"
+            value={
+              isEditable
+                ? info.getValue()
+                : (info.row.original.qty * info.row.original.price).toFixed(2)
+            }
+            onChange={(e) => {
+              if (isEditable) {
+                const updatedItem = {
+                  ...info.row.original,
+                  total: e.target.value,
+                };
+
+                const allOrderDetails = invoiceData.orderDetails.map((item) =>
+                  item.code === updatedItem.code ? updatedItem : item
+                );
+
+                handleChange(allOrderDetails);
+              }
+            }}
+            className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+            disabled={!isEditable}
+          />
+        );
+      },
     },
     { id: "action", header: "", type: "action", width: 50 },
   ];
