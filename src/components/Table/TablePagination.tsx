@@ -15,7 +15,7 @@ const TablePagination = <T extends Record<string, unknown>>({
 }: TablePaginationProps<T>) => {
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalPages = table.getPageCount();
-  const totalItems = table.getFilteredRowModel().rows.length;
+  const totalItems = table.getFilteredRowModel().rows.filter(row => !row.original.isTotal).length;
 
   useEffect(() => {
     const storedPageSize = localStorage.getItem('tablePageSize');
