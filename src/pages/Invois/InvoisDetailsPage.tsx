@@ -410,13 +410,24 @@ const InvoisDetailsPage: React.FC = () => {
           // Update existing items
           updatedFocItems = currentFocItems.map((item) => {
             const updatedItem = updatedItems.find(
-              (updated) => updated.code === item.code
+              (updated) => updated.code === item.code && updated.isFoc
             );
             if (updatedItem) {
               return {
                 ...item,
-                ...updatedItem,
-                total: (updatedItem.qty * updatedItem.price).toFixed(2),
+                qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
+                price:
+                  updatedItem.price !== undefined
+                    ? updatedItem.price
+                    : item.price,
+                productName: updatedItem.productName || item.productName,
+                total: (
+                  (updatedItem.qty !== undefined ? updatedItem.qty : item.qty) *
+                  (updatedItem.price !== undefined
+                    ? updatedItem.price
+                    : item.price)
+                ).toFixed(2),
+                isFoc: true, // Ensure isFoc remains true
               };
             }
             return item;
@@ -497,13 +508,24 @@ const InvoisDetailsPage: React.FC = () => {
           // Update existing items
           updatedReturnedItems = currentReturnedItems.map((item) => {
             const updatedItem = updatedItems.find(
-              (updated) => updated.code === item.code
+              (updated) => updated.code === item.code && updated.isReturned
             );
             if (updatedItem) {
               return {
                 ...item,
-                ...updatedItem,
-                total: (updatedItem.qty * updatedItem.price).toFixed(2),
+                qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
+                price:
+                  updatedItem.price !== undefined
+                    ? updatedItem.price
+                    : item.price,
+                productName: updatedItem.productName || item.productName,
+                total: (
+                  (updatedItem.qty !== undefined ? updatedItem.qty : item.qty) *
+                  (updatedItem.price !== undefined
+                    ? updatedItem.price
+                    : item.price)
+                ).toFixed(2),
+                isReturned: true, // Ensure isReturned remains true
               };
             }
             return item;
@@ -703,6 +725,38 @@ const InvoisDetailsPage: React.FC = () => {
               }
               return item;
             });
+            // Update all order details, including the modified item
+            handleFocChange(allOrderDetails);
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
+    {
+      id: "price",
+      header: "PRICE",
+      type: "float",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <input
+          type="number"
+          step="0.01"
+          value={info.getValue()}
+          onChange={(e) => {
+            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const updatedItem = {
+              ...info.row.original,
+              price: newValue,
+              total: (newValue * info.row.original.price).toFixed(2),
+            };
+
+            // Get all current order details
+            const allOrderDetails = invoiceData.orderDetails.map((item) => {
+              if (item.code === updatedItem.code) {
+                return updatedItem;
+              }
+              return item;
+            });
 
             // Update all order details, including the modified item
             handleFocChange(allOrderDetails);
@@ -711,7 +765,6 @@ const InvoisDetailsPage: React.FC = () => {
         />
       ),
     },
-    { id: "price", header: "PRICE", type: "float", width: 100 },
     {
       id: "total",
       header: "AMOUNT",
@@ -773,7 +826,39 @@ const InvoisDetailsPage: React.FC = () => {
         />
       ),
     },
-    { id: "price", header: "PRICE", type: "float", width: 100 },
+    {
+      id: "price",
+      header: "PRICE",
+      type: "float",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+        <input
+          type="number"
+          step="0.01"
+          value={info.getValue()}
+          onChange={(e) => {
+            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const updatedItem = {
+              ...info.row.original,
+              price: newValue,
+              total: (newValue * info.row.original.price).toFixed(2),
+            };
+
+            // Get all current order details
+            const allOrderDetails = invoiceData.orderDetails.map((item) => {
+              if (item.code === updatedItem.code) {
+                return updatedItem;
+              }
+              return item;
+            });
+
+            // Update all order details, including the modified item
+            handleReturnedChange(allOrderDetails);
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
     {
       id: "total",
       header: "AMOUNT",
