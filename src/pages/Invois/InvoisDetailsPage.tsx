@@ -273,6 +273,9 @@ const InvoisDetailsPage: React.FC = () => {
             }
           }
 
+          // Apply recalculateSubtotals here
+          updatedOrderDetails = recalculateSubtotals(updatedOrderDetails);
+
           // Calculate total for order details
           const totalAmount = calculateTotal(updatedOrderDetails);
 
