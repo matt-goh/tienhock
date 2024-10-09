@@ -1036,23 +1036,95 @@ const InvoisDetailsPage: React.FC = () => {
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="bg-gray-100 p-4 rounded-lg">
           <h2 className="text-lg font-semibold mb-2">Invoice Information</h2>
-          <p>
-            <strong>Invoice No:</strong> {invoiceData.type}
-            {invoiceData.invoiceNo}
-          </p>
-          <p>
-            <strong>Order No:</strong> {invoiceData.orderNo}
-          </p>
-          <p>
-            <strong>Date:</strong> {invoiceData.date}
-          </p>
-          <p>
-            <strong>Time:</strong> {invoiceData.time}
-          </p>
-          <p>
+          <div className="mb-2">
+            <strong>Invoice No:</strong>{" "}
+            <input
+              type="text"
+              value={`${invoiceData.type}${invoiceData.invoiceNo}`}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                setInvoiceData((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    type: newValue.charAt(0) as "C" | "I",
+                    invoiceNo: newValue.slice(1),
+                  };
+                });
+              }}
+              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+            />
+          </div>
+          <div className="mb-2">
+            <strong>Order No:</strong>{" "}
+            <input
+              type="text"
+              value={invoiceData.orderNo}
+              onChange={(e) => {
+                setInvoiceData((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    orderNo: e.target.value,
+                  };
+                });
+              }}
+              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+            />
+          </div>
+          <div className="mb-2">
+            <strong>Date:</strong>{" "}
+            <input
+              type="date"
+              value={invoiceData.date}
+              onChange={(e) => {
+                setInvoiceData((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    date: e.target.value,
+                  };
+                });
+              }}
+              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+            />
+          </div>
+          <div className="mb-2">
+            <strong>Time:</strong>{" "}
+            <input
+              type="time"
+              value={invoiceData.time}
+              onChange={(e) => {
+                setInvoiceData((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    time: e.target.value,
+                  };
+                });
+              }}
+              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+            />
+          </div>
+          <div className="mb-2">
             <strong>Type:</strong>{" "}
-            {invoiceData.type === "C" ? "Cash" : "Invoice"}
-          </p>
+            <select
+              value={invoiceData.type}
+              onChange={(e) => {
+                setInvoiceData((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    type: e.target.value as "C" | "I",
+                  };
+                });
+              }}
+              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+            >
+              <option value="C">Cash</option>
+              <option value="I">Invoice</option>
+            </select>
+          </div>
         </div>
         <div className="bg-gray-100 p-4 rounded-lg">
           <h2 className="text-lg font-semibold mb-2">Customer Information</h2>
