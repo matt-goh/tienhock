@@ -385,22 +385,57 @@ const InvoisDetailsPage: React.FC = () => {
     navigate("/stock/invois/new");
   };
 
+  const handleAddRegularItem = () => {
+    setInvoiceData((prevData) => {
+      if (!prevData) return null;
+      const newItem = addNewRow("details");
+      if (!newItem) return prevData;
+
+      const totalIndex = prevData.orderDetails.findIndex(
+        (item) => item.isTotal
+      );
+      const newOrderDetails = [...prevData.orderDetails];
+
+      if (totalIndex !== -1) {
+        newOrderDetails.splice(totalIndex, 0, newItem);
+      } else {
+        newOrderDetails.push(newItem);
+      }
+
+      return {
+        ...prevData,
+        orderDetails: newOrderDetails,
+      };
+    });
+  };
+
   const handleAddFOC = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
+      const newItem = addNewRow("foc");
+      if (!newItem) return prevData;
+
+      const totalIndex = prevData.orderDetails.findIndex(
+        (item) => item.isTotal && item.isFoc
+      );
+      const newOrderDetails = [...prevData.orderDetails];
+
+      if (totalIndex !== -1) {
+        newOrderDetails.splice(totalIndex, 0, newItem);
+      } else {
+        const lastFocIndex = newOrderDetails
+          .map((item) => item.isFoc)
+          .lastIndexOf(true);
+        if (lastFocIndex !== -1) {
+          newOrderDetails.splice(lastFocIndex + 1, 0, newItem);
+        } else {
+          newOrderDetails.push(newItem);
+        }
+      }
+
       return {
         ...prevData,
-        orderDetails: [
-          ...prevData.orderDetails,
-          {
-            code: "",
-            productName: "",
-            qty: 1,
-            price: 0,
-            total: "0",
-            isFoc: true,
-          },
-        ],
+        orderDetails: newOrderDetails,
       };
     });
   };
@@ -408,19 +443,30 @@ const InvoisDetailsPage: React.FC = () => {
   const handleAddReturnedGoods = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
+      const newItem = addNewRow("returned");
+      if (!newItem) return prevData;
+
+      const totalIndex = prevData.orderDetails.findIndex(
+        (item) => item.isTotal && item.isReturned
+      );
+      const newOrderDetails = [...prevData.orderDetails];
+
+      if (totalIndex !== -1) {
+        newOrderDetails.splice(totalIndex, 0, newItem);
+      } else {
+        const lastReturnedIndex = newOrderDetails
+          .map((item) => item.isReturned)
+          .lastIndexOf(true);
+        if (lastReturnedIndex !== -1) {
+          newOrderDetails.splice(lastReturnedIndex + 1, 0, newItem);
+        } else {
+          newOrderDetails.push(newItem);
+        }
+      }
+
       return {
         ...prevData,
-        orderDetails: [
-          ...prevData.orderDetails,
-          {
-            code: "",
-            productName: "",
-            qty: 1,
-            price: 0,
-            total: "0",
-            isReturned: true,
-          },
-        ],
+        orderDetails: newOrderDetails,
       };
     });
   };
@@ -616,6 +662,7 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   const renderActionButtons = () => {
+    const hasRegularItems = orderDetailsWithTotal.length > 1;
     const hasFOC = focItemsWithTotal.length > 1;
     const hasReturned = returnedItemsWithTotal.length > 1;
 
@@ -627,6 +674,8 @@ const InvoisDetailsPage: React.FC = () => {
 
     return (
       <div className="flex justify-center items-center space-x-2 mt-8 text-gray-700">
+        {!hasRegularItems && renderButton("Add Order", handleAddRegularItem)}
+        {!hasRegularItems && (!hasFOC || !hasReturned) && <span>or</span>}
         {!hasFOC && renderButton("Add FOC", handleAddFOC)}
         {!hasFOC && !hasReturned && <span>or</span>}
         {!hasReturned &&
@@ -640,7 +689,7 @@ const InvoisDetailsPage: React.FC = () => {
       id: "code",
       header: "ID",
       type: "readonly",
-      width: 120,
+      width: 150,
     },
     {
       id: "productName",
@@ -730,7 +779,7 @@ const InvoisDetailsPage: React.FC = () => {
   ];
 
   const focItemsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "readonly", width: 120 },
+    { id: "code", header: "ID", type: "readonly", width: 150 },
     {
       id: "productName",
       header: "PRODUCT",
@@ -823,7 +872,7 @@ const InvoisDetailsPage: React.FC = () => {
   ];
 
   const returnedGoodsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "readonly", width: 120 },
+    { id: "code", header: "ID", type: "readonly", width: 150 },
     {
       id: "productName",
       header: "PRODUCT",
@@ -956,27 +1005,31 @@ const InvoisDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="relative mb-6">
-        <h2 className="text-xl font-semibold pt-2">Order Details</h2>
-        <div className="absolute top-0 right-0 space-x-2">
-          <Button onClick={handleAddLess} variant="outline" size="md">
-            Less
-          </Button>
-          <Button onClick={handleAddTax} variant="outline" size="md">
-            Tax
-          </Button>
-          <Button onClick={handleAddSubtotal} variant="outline" size="md">
-            Subtotal
-          </Button>
-        </div>
-      </div>
-      <TableEditing<OrderDetail>
-        initialData={orderDetailsWithTotal}
-        columns={columns}
-        onChange={handleChange}
-        onSpecialRowDelete={handleSpecialRowDelete}
-        tableKey="orderDetails"
-      />
+      {orderDetailsWithTotal.length > 1 && (
+        <>
+          <div className="relative mb-6">
+            <h2 className="text-xl font-semibold pt-2">Order Details</h2>
+            <div className="absolute top-0 right-0 space-x-2">
+              <Button onClick={handleAddLess} variant="outline" size="md">
+                Less
+              </Button>
+              <Button onClick={handleAddTax} variant="outline" size="md">
+                Tax
+              </Button>
+              <Button onClick={handleAddSubtotal} variant="outline" size="md">
+                Subtotal
+              </Button>
+            </div>
+          </div>
+          <TableEditing<OrderDetail>
+            initialData={orderDetailsWithTotal}
+            columns={columns}
+            onChange={handleChange}
+            onSpecialRowDelete={handleSpecialRowDelete}
+            tableKey="orderDetails"
+          />
+        </>
+      )}
 
       {focItemsWithTotal.length > 1 && (
         <>
