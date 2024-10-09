@@ -142,14 +142,52 @@ const InvoisDetailsPage: React.FC = () => {
     [recalculateSubtotals]
   );
 
-  const getRandomProduct = useCallback(() => {
-    const availableProducts = products.filter(
-      (p) => !invoiceData?.orderDetails.some((item) => item.code === p.id)
-    );
-    return availableProducts[
-      Math.floor(Math.random() * availableProducts.length)
-    ];
-  }, [products, invoiceData]);
+  const getAvailableProducts = useCallback(
+    (tableType: "details" | "foc" | "returned") => {
+      const usedProducts = invoiceData?.orderDetails
+        .filter((item) => {
+          switch (tableType) {
+            case "details":
+              return !item.isFoc && !item.isReturned;
+            case "foc":
+              return item.isFoc;
+            case "returned":
+              return item.isReturned;
+          }
+        })
+        .map((item) => item.code);
+
+      return products.filter((p) => !usedProducts?.includes(p.id));
+    },
+    [products, invoiceData]
+  );
+
+  const addNewRow = useCallback(
+    (tableType: "details" | "foc" | "returned") => {
+      const availableProducts = getAvailableProducts(tableType);
+
+      if (availableProducts.length === 0) {
+        toast.error(`All products have been added to the ${tableType} table.`);
+        return null;
+      }
+
+      const randomProduct =
+        availableProducts[Math.floor(Math.random() * availableProducts.length)];
+
+      const newItem: OrderDetail = {
+        code: randomProduct.id,
+        productName: randomProduct.description,
+        qty: 1,
+        price: tableType === "details" ? 0 : 0,
+        total: "0",
+        isFoc: tableType === "foc",
+        isReturned: tableType === "returned",
+      };
+
+      return newItem;
+    },
+    [getAvailableProducts]
+  );
 
   const newRowAddedRef = useRef(false);
   const newFocRowAddedRef = useRef(false);
@@ -208,16 +246,11 @@ const InvoisDetailsPage: React.FC = () => {
 
             // Add only one new item if there are any and we haven't added one in this render cycle
             if (newItems.length > 0 && !newRowAddedRef.current) {
-              const randomProduct = getRandomProduct();
-              const newItem = {
-                ...newItems[0],
-                code: randomProduct.id,
-                productName: randomProduct.description,
-                qty: 1,
-                total: (newItems[0].qty * newItems[0].price).toFixed(2),
-              };
-              updatedOrderDetails.push(newItem);
-              newRowAddedRef.current = true;
+              const newItem = addNewRow("details");
+              if (newItem) {
+                updatedOrderDetails.push(newItem);
+                newRowAddedRef.current = true;
+              }
             }
           }
 
@@ -248,7 +281,7 @@ const InvoisDetailsPage: React.FC = () => {
         });
       }, 0);
     },
-    [calculateTotal, getRandomProduct]
+    [calculateTotal, addNewRow]
   );
 
   const handleAddLess = () => {
@@ -435,18 +468,11 @@ const InvoisDetailsPage: React.FC = () => {
 
           // Add only one new item if there are any and we haven't added one in this render cycle
           if (newItems.length > 0 && !newFocRowAddedRef.current) {
-            const randomProduct = getRandomProduct();
-            const newItem = {
-              ...newItems[0],
-              code: randomProduct.id,
-              productName: randomProduct.description,
-              qty: 1,
-              price: 0,
-              total: "0",
-              isFoc: true,
-            };
-            updatedFocItems.push(newItem);
-            newFocRowAddedRef.current = true;
+            const newItem = addNewRow("foc");
+            if (newItem) {
+              updatedFocItems.push(newItem);
+              newFocRowAddedRef.current = true;
+            }
           }
         }
 
@@ -533,18 +559,11 @@ const InvoisDetailsPage: React.FC = () => {
 
           // Add only one new item if there are any and we haven't added one in this render cycle
           if (newItems.length > 0 && !newReturnedRowAddedRef.current) {
-            const randomProduct = getRandomProduct();
-            const newItem = {
-              ...newItems[0],
-              code: randomProduct.id,
-              productName: randomProduct.description,
-              qty: 1,
-              price: 0,
-              total: "0",
-              isReturned: true,
-            };
-            updatedReturnedItems.push(newItem);
-            newReturnedRowAddedRef.current = true;
+            const newItem = addNewRow("returned");
+            if (newItem) {
+              updatedReturnedItems.push(newItem);
+              newReturnedRowAddedRef.current = true;
+            }
           }
         }
 
