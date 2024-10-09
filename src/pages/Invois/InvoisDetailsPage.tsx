@@ -219,6 +219,7 @@ const InvoisDetailsPage: React.FC = () => {
             (item) => item.isReturned
           );
           let updatedOrderDetails: OrderDetail[];
+
           // Check if it's a deletion operation
           if (filteredItems.length < currentOrderDetails.length) {
             // It's a deletion operation
@@ -235,6 +236,17 @@ const InvoisDetailsPage: React.FC = () => {
                 (updated) => updated.code === item.code
               );
               if (updatedItem) {
+                // Check if the product name has changed
+                if (updatedItem.productName !== item.productName) {
+                  // Find the matching product in the products array
+                  const matchingProduct = products.find(
+                    (p) => p.description === updatedItem.productName
+                  );
+                  if (matchingProduct) {
+                    // Update the code to match the new product
+                    updatedItem.code = matchingProduct.id;
+                  }
+                }
                 return {
                   ...item,
                   ...updatedItem,
@@ -281,7 +293,7 @@ const InvoisDetailsPage: React.FC = () => {
         });
       }, 0);
     },
-    [calculateTotal, addNewRow]
+    [calculateTotal, addNewRow, products] // Added products to the dependency array
   );
 
   const handleAddLess = () => {
@@ -419,7 +431,6 @@ const InvoisDetailsPage: React.FC = () => {
       setInvoiceData((prevInvoiceData) => {
         if (!prevInvoiceData) return null;
         const filteredItems = updatedItems.filter((item) => !item.isTotal);
-        // Separate FOC items from regular and returned items
         const currentFocItems = prevInvoiceData.orderDetails.filter(
           (item) => item.isFoc && !item.isTotal
         );
@@ -431,42 +442,49 @@ const InvoisDetailsPage: React.FC = () => {
         );
         let updatedFocItems: OrderDetail[];
 
-        // Check if it's a deletion operation
         if (filteredItems.length < currentFocItems.length) {
-          // It's a deletion operation
           updatedFocItems = filteredItems;
         } else {
-          // It's a regular update operation
           const newItems = updatedItems.filter(
             (item) => !item.code && !item.isTotal && item.isFoc
           );
-          // Update existing items
           updatedFocItems = currentFocItems.map((item) => {
             const updatedItem = updatedItems.find(
               (updated) => updated.code === item.code && updated.isFoc
             );
             if (updatedItem) {
+              // Check if the product name has changed
+              if (updatedItem.productName !== item.productName) {
+                // Find the matching product in the products array
+                const matchingProduct = products.find(
+                  (p) => p.description === updatedItem.productName
+                );
+                if (matchingProduct) {
+                  // Update the code to match the new product
+                  updatedItem.code = matchingProduct.id;
+                }
+              }
               return {
                 ...item,
+                code: updatedItem.code || item.code,
+                productName: updatedItem.productName || item.productName,
                 qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
                 price:
                   updatedItem.price !== undefined
                     ? updatedItem.price
                     : item.price,
-                productName: updatedItem.productName || item.productName,
                 total: (
                   (updatedItem.qty !== undefined ? updatedItem.qty : item.qty) *
                   (updatedItem.price !== undefined
                     ? updatedItem.price
                     : item.price)
                 ).toFixed(2),
-                isFoc: true, // Ensure isFoc remains true
+                isFoc: true,
               };
             }
             return item;
           });
 
-          // Add only one new item if there are any and we haven't added one in this render cycle
           if (newItems.length > 0 && !newFocRowAddedRef.current) {
             const newItem = addNewRow("foc");
             if (newItem) {
@@ -476,10 +494,8 @@ const InvoisDetailsPage: React.FC = () => {
           }
         }
 
-        // Calculate total for FOC items
         const totalAmount = calculateTotal(updatedFocItems);
 
-        // Add total row
         const totalRow = {
           code: "",
           productName: "Total:",
@@ -489,7 +505,7 @@ const InvoisDetailsPage: React.FC = () => {
           isTotal: true,
           isFoc: true,
         };
-        // Combine updated FOC items with regular and returned items
+
         const combinedOrderDetails = [
           ...regularItems,
           ...updatedFocItems,
@@ -510,7 +526,6 @@ const InvoisDetailsPage: React.FC = () => {
         if (!prevInvoiceData) return null;
 
         const filteredItems = updatedItems.filter((item) => !item.isTotal);
-        // Separate returned items from regular and FOC items
         const currentReturnedItems = prevInvoiceData.orderDetails.filter(
           (item) => item.isReturned && !item.isTotal
         );
@@ -522,42 +537,49 @@ const InvoisDetailsPage: React.FC = () => {
         );
         let updatedReturnedItems: OrderDetail[];
 
-        // Check if it's a deletion operation
         if (filteredItems.length < currentReturnedItems.length) {
-          // It's a deletion operation
           updatedReturnedItems = filteredItems;
         } else {
-          // It's a regular update operation
           const newItems = updatedItems.filter(
             (item) => !item.code && !item.isTotal && item.isReturned
           );
-          // Update existing items
           updatedReturnedItems = currentReturnedItems.map((item) => {
             const updatedItem = updatedItems.find(
               (updated) => updated.code === item.code && updated.isReturned
             );
             if (updatedItem) {
+              // Check if the product name has changed
+              if (updatedItem.productName !== item.productName) {
+                // Find the matching product in the products array
+                const matchingProduct = products.find(
+                  (p) => p.description === updatedItem.productName
+                );
+                if (matchingProduct) {
+                  // Update the code to match the new product
+                  updatedItem.code = matchingProduct.id;
+                }
+              }
               return {
                 ...item,
+                code: updatedItem.code || item.code,
+                productName: updatedItem.productName || item.productName,
                 qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
                 price:
                   updatedItem.price !== undefined
                     ? updatedItem.price
                     : item.price,
-                productName: updatedItem.productName || item.productName,
                 total: (
                   (updatedItem.qty !== undefined ? updatedItem.qty : item.qty) *
                   (updatedItem.price !== undefined
                     ? updatedItem.price
                     : item.price)
                 ).toFixed(2),
-                isReturned: true, // Ensure isReturned remains true
+                isReturned: true,
               };
             }
             return item;
           });
 
-          // Add only one new item if there are any and we haven't added one in this render cycle
           if (newItems.length > 0 && !newReturnedRowAddedRef.current) {
             const newItem = addNewRow("returned");
             if (newItem) {
@@ -567,10 +589,8 @@ const InvoisDetailsPage: React.FC = () => {
           }
         }
 
-        // Calculate total for returned items
         const totalAmount = calculateTotal(updatedReturnedItems);
 
-        // Add total row
         const totalRow = {
           code: "",
           productName: "Total:",
@@ -581,7 +601,6 @@ const InvoisDetailsPage: React.FC = () => {
           isReturned: true,
         };
 
-        // Combine updated returned items with regular and FOC items
         const combinedOrderDetails = [
           ...regularItems,
           ...focItems,
