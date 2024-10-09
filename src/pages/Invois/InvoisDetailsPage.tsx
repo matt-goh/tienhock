@@ -319,23 +319,36 @@ const InvoisDetailsPage: React.FC = () => {
     [invoiceData]
   );
 
+  const insertBeforeTotal = (
+    orderDetails: OrderDetail[],
+    newItem: OrderDetail
+  ) => {
+    const totalIndex = orderDetails.findIndex((item) => item.isTotal);
+    if (totalIndex !== -1) {
+      return [
+        ...orderDetails.slice(0, totalIndex),
+        newItem,
+        ...orderDetails.slice(totalIndex),
+      ];
+    }
+    return [...orderDetails, newItem];
+  };
+
   const handleAddLess = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
       const nextNumber = getNextSpecialRowNumber("LESS");
+      const newItem = {
+        code: `LESS-${nextNumber}`,
+        productName: `Less ${nextNumber}`,
+        qty: 1,
+        price: 0,
+        total: "0",
+        isLess: true,
+      };
       return {
         ...prevData,
-        orderDetails: [
-          ...prevData.orderDetails,
-          {
-            code: `LESS-${nextNumber}`,
-            productName: `Less ${nextNumber}`,
-            qty: 1,
-            price: 0,
-            total: "0",
-            isLess: true,
-          },
-        ],
+        orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
       };
     });
   };
@@ -344,19 +357,17 @@ const InvoisDetailsPage: React.FC = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
       const nextNumber = getNextSpecialRowNumber("TAX");
+      const newItem = {
+        code: `TAX-${nextNumber}`,
+        productName: `Tax ${nextNumber}`,
+        qty: 1,
+        price: 0,
+        total: "0",
+        isTax: true,
+      };
       return {
         ...prevData,
-        orderDetails: [
-          ...prevData.orderDetails,
-          {
-            code: `TAX-${nextNumber}`,
-            productName: `Tax ${nextNumber}`,
-            qty: 1,
-            price: 0,
-            total: "0",
-            isTax: true,
-          },
-        ],
+        orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
       };
     });
   };
@@ -370,19 +381,17 @@ const InvoisDetailsPage: React.FC = () => {
           (item) => !item.isSubtotal && !item.isFoc && !item.isReturned
         )
       );
+      const newItem = {
+        code: `SUBTOTAL-${nextNumber}`,
+        productName: `Subtotal ${nextNumber}`,
+        qty: 0,
+        price: 0,
+        total: subtotalAmount,
+        isSubtotal: true,
+      };
       return {
         ...prevData,
-        orderDetails: [
-          ...prevData.orderDetails,
-          {
-            code: `SUBTOTAL-${nextNumber}`,
-            productName: `Subtotal ${nextNumber}`,
-            qty: 0,
-            price: 0,
-            total: subtotalAmount,
-            isSubtotal: true,
-          },
-        ],
+        orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
       };
     });
   };
