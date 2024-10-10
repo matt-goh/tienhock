@@ -33,8 +33,19 @@ export const fetchInvoices = async () => {
   }
 };
 
-export const deleteInvoice = (id: string) => {
-  // Remove the invoice from the local storage
-  const invoices = getInvoices().filter(invoice => invoice.id !== id);
-  localStorage.setItem('invoices', JSON.stringify(invoices));
+export const deleteInvoice = async (id: string) => {
+  try {
+    const response = await fetch(`http://localhost:5000/api/invoices/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    // Remove the invoice from the local storage
+    invoices = invoices.filter((invoice) => invoice.id !== id);
+    return true;
+  } catch (error) {
+    console.error("Error deleting invoice:", error);
+    throw error;
+  }
 };
