@@ -68,7 +68,7 @@ export const FormListbox: React.FC<ListboxProps> = ({ name, label, value, onChan
           )}
         >
           <span className="block truncate">{value || "Select"}</span>
-          <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+          <span className="absolute inset-y-0 right-1.5 flex items-center pr-2 pointer-events-none">
             <IconChevronDown size={20} className="text-gray-500" />
           </span>
         </ListboxButton>

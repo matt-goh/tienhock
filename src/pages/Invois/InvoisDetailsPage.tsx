@@ -12,6 +12,7 @@ import { ColumnConfig, InvoiceData, OrderDetail } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
 import { updateInvoice } from "./InvoisUtils";
+import { FormInput, FormListbox } from "../../components/FormComponents";
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -1065,105 +1066,99 @@ const InvoisDetailsPage: React.FC = () => {
     return `${hours}:${minutes} ${ampm}`;
   };
 
+  // Add this function to map the type value to its display name
+  const getTypeDisplayName = (type: "C" | "I") => {
+    return type === "C" ? "Cash" : "Invoice";
+  };
+
   return (
     <div className="px-4 max-w-6xl mx-auto">
       <BackButton onClick={handleBackClick} className="" />
       <h1 className="text-2xl font-bold mb-4">Invoice Details</h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
-        <div className="bg-gray-100 p-4 rounded-lg">
+        <div className="rounded-lg space-y-2">
           <h2 className="text-lg font-semibold mb-2">Invoice Information</h2>
-          <div className="mb-2">
-            <strong>Invoice No:</strong>{" "}
-            <input
-              type="text"
-              value={`${invoiceData.type}${invoiceData.invoiceNo}`}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                setInvoiceData((prev) => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    type: newValue.charAt(0) as "C" | "I",
-                    invoiceNo: newValue.slice(1),
-                  };
-                });
-              }}
-              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
-            />
-          </div>
-          <div className="mb-2">
-            <strong>Order No:</strong>{" "}
-            <input
-              type="text"
-              value={invoiceData.orderNo}
-              onChange={(e) => {
-                setInvoiceData((prev) => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    orderNo: e.target.value,
-                  };
-                });
-              }}
-              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
-            />
-          </div>
-          <div className="mb-2">
-            <strong>Date:</strong>{" "}
-            <input
-              type="date"
-              value={formatDateForInput(invoiceData.date)}
-              onChange={(e) => {
-                setInvoiceData((prev) => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    date: formatDateForState(e.target.value),
-                  };
-                });
-              }}
-              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
-            />
-          </div>
-          <div className="mb-2">
-            <strong>Time:</strong>{" "}
-            <input
-              type="time"
-              value={formatTimeForInput(invoiceData.time)}
-              onChange={(e) => {
-                setInvoiceData((prev) => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    time: formatTimeForState(e.target.value),
-                  };
-                });
-              }}
-              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
-            />
-          </div>
-          <div className="mb-2">
-            <strong>Type:</strong>{" "}
-            <select
-              value={invoiceData.type}
-              onChange={(e) => {
-                setInvoiceData((prev) => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    type: e.target.value as "C" | "I",
-                  };
-                });
-              }}
-              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
-            >
-              <option value="C">Cash</option>
-              <option value="I">Invoice</option>
-            </select>
-          </div>
+          <FormInput
+            name="invoiceNo"
+            label="Invoice No"
+            value={`${invoiceData.type}${invoiceData.invoiceNo}`}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  type: newValue.charAt(0) as "C" | "I",
+                  invoiceNo: newValue.slice(1),
+                };
+              });
+            }}
+          />
+          <FormInput
+            name="orderNo"
+            label="Order No"
+            value={invoiceData.orderNo}
+            onChange={(e) => {
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  orderNo: e.target.value,
+                };
+              });
+            }}
+          />
+          <FormInput
+            name="date"
+            label="Date"
+            type="date"
+            value={formatDateForInput(invoiceData.date)}
+            onChange={(e) => {
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  date: formatDateForState(e.target.value),
+                };
+              });
+            }}
+          />
+          <FormInput
+            name="time"
+            label="Time"
+            type="time"
+            value={formatTimeForInput(invoiceData.time)}
+            onChange={(e) => {
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  time: formatTimeForState(e.target.value),
+                };
+              });
+            }}
+          />
+          <FormListbox
+            name="type"
+            label="Type"
+            value={getTypeDisplayName(invoiceData.type as "C" | "I")}
+            onChange={(value) => {
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  type: value === "Cash" ? "C" : "I",
+                };
+              });
+            }}
+            options={[
+              { id: "C", name: "Cash" },
+              { id: "I", name: "Invoice" },
+            ]}
+          />
         </div>
-        <div className="bg-gray-100 p-4 rounded-lg">
+        <div className="rounded-lg">
           <h2 className="text-lg font-semibold mb-2">Customer Information</h2>
           <p>
             <strong>Customer ID:</strong> {invoiceData.customer}
