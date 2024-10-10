@@ -203,6 +203,16 @@ const InvoisDetailsPage: React.FC = () => {
       .toFixed(2);
   }, []);
 
+  const calculateOverallTotal = useCallback(
+    (orderDetails: OrderDetail[]) => {
+      const regularItems = orderDetails.filter(
+        (item) => !item.isFoc && !item.isReturned && !item.isTotal
+      );
+      return calculateTotal(regularItems);
+    },
+    [calculateTotal]
+  );
+
   const fetchCustomers = useCallback(
     async (search: string, page: number) => {
       setIsFetchingCustomers(true);
@@ -529,14 +539,20 @@ const InvoisDetailsPage: React.FC = () => {
             ...returnedItems,
             totalRow,
           ];
+
+          // Calculate the overall total amount for the invoice
+          const overallTotalAmount =
+            calculateOverallTotal(combinedOrderDetails);
+
           return {
             ...prevInvoiceData,
             orderDetails: combinedOrderDetails,
+            totalAmount: overallTotalAmount,
           };
         });
       }, 0);
     },
-    [calculateTotal, addNewRow, products] // Added products to the dependency array
+    [calculateTotal, addNewRow, products, calculateOverallTotal] // Added products to the dependency array
   );
 
   const getNextSpecialRowNumber = useCallback(

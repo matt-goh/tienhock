@@ -18,6 +18,10 @@ const InvoisUploadPage: React.FC = () => {
     loadInvoices();
   }, []);
 
+  useEffect(() => {
+    console.log(fileData);
+  }, [fileData]);
+
   const loadInvoices = async () => {
     setIsLoading(true);
     setError(null);
