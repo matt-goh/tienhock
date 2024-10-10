@@ -1,20 +1,6 @@
-import React, { useState, useEffect, Fragment, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
-import {
-  Listbox,
-  Transition,
-  Combobox,
-  ComboboxInput,
-  ComboboxButton,
-  ComboboxOptions,
-  ComboboxOption,
-  ListboxOption,
-  ListboxOptions,
-  ListboxButton,
-} from "@headlessui/react";
 import Tab from "../../components/Tab";
-import clsx from "clsx";
 import toast from "react-hot-toast";
 import DeleteDialog from "../../components/DeleteDialog";
 import { Employee } from "../../types/types";

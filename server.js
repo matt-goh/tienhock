@@ -1497,6 +1497,58 @@ app.get('/api/products/combobox', async (req, res) => {
   }
 });
 
+// Fetch customers by salesman
+app.get('/api/customers/combobox', async (req, res) => {
+  const { salesman, search, page = 1, limit = 20 } = req.query;
+  const offset = (page - 1) * limit;
+
+  try {
+    let query = 'SELECT id, name FROM customers';
+    let countQuery = 'SELECT COUNT(*) FROM customers';
+    let whereClause = [];
+    let values = [];
+    let valueIndex = 1;
+
+    if (salesman && salesman !== 'All Salesmen') {
+      whereClause.push(`salesman = $${valueIndex}`);
+      values.push(salesman);
+      valueIndex++;
+    }
+
+    if (search) {
+      whereClause.push(`(name ILIKE $${valueIndex} OR id ILIKE $${valueIndex})`);
+      values.push(`%${search}%`);
+      valueIndex++;
+    }
+
+    if (whereClause.length > 0) {
+      query += ' WHERE ' + whereClause.join(' AND ');
+      countQuery += ' WHERE ' + whereClause.join(' AND ');
+    }
+
+    query += ` ORDER BY name LIMIT $${valueIndex} OFFSET $${valueIndex + 1}`;
+    values.push(limit, offset);
+
+    const [resultCount, resultData] = await Promise.all([
+      pool.query(countQuery, values.slice(0, -2)),
+      pool.query(query, values)
+    ]);
+
+    const totalCount = parseInt(resultCount.rows[0].count);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.json({
+      customers: resultData.rows,
+      totalCount,
+      totalPages,
+      currentPage: parseInt(page)
+    });
+  } catch (error) {
+    console.error('Error fetching customers for combobox:', error);
+    res.status(500).json({ message: 'Error fetching customers for combobox', error: error.message });
+  }
+});
+
 // MyInvois API client initialization
 const apiClient = new EInvoiceApiClient(
   process.env.MYINVOIS_API_BASE_URL,

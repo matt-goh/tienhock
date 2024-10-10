@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import React, { Fragment } from "react";
 import {
   Listbox,
   Transition,
@@ -23,11 +23,19 @@ interface InputProps {
   name: string;
   label: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
   type?: string;
 }
 
-export const FormInput: React.FC<InputProps> = ({ name, label, value, onChange, type = "text" }) => (
+export const FormInput: React.FC<InputProps> = ({
+  name,
+  label,
+  value,
+  onChange,
+  disabled = false,
+  type = "text",
+}) => (
   <div className="space-y-2">
     <label htmlFor={name} className="text-sm font-medium text-gray-700">
       {label}
@@ -38,6 +46,7 @@ export const FormInput: React.FC<InputProps> = ({ name, label, value, onChange, 
       name={name}
       value={value}
       onChange={onChange}
+      disabled={disabled}
       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-500"
     />
   </div>
@@ -51,15 +60,18 @@ interface ListboxProps {
   options: SelectOption[];
 }
 
-export const FormListbox: React.FC<ListboxProps> = ({ name, label, value, onChange, options }) => (
+export const FormListbox: React.FC<ListboxProps> = ({
+  name,
+  label,
+  value,
+  onChange,
+  options,
+}) => (
   <div className="space-y-2">
     <label htmlFor={name} className="text-sm font-medium text-gray-700">
       {label}
     </label>
-    <Listbox
-      value={value}
-      onChange={onChange}
-    >
+    <Listbox value={value} onChange={onChange}>
       <div className="relative mt-1">
         <ListboxButton
           className={clsx(
@@ -124,16 +136,20 @@ interface ComboboxProps {
   setQuery: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export const FormCombobox: React.FC<ComboboxProps> = ({ name, label, value, onChange, options, query, setQuery }) => (
+export const FormCombobox: React.FC<ComboboxProps> = ({
+  name,
+  label,
+  value,
+  onChange,
+  options,
+  query,
+  setQuery,
+}) => (
   <div className="space-y-2">
     <label htmlFor={name} className="text-sm font-medium text-gray-700">
       {label}
     </label>
-    <Combobox
-      multiple
-      value={value}
-      onChange={onChange}
-    >
+    <Combobox multiple value={value} onChange={onChange}>
       {({ open }) => (
         <div className="relative mt-1">
           <ComboboxInput
@@ -148,7 +164,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({ name, label, value, onCh
             }
             onChange={(event) => setQuery(event.target.value)}
           />
-          <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-500">
+          <ComboboxButton className="absolute inset-y-0 right-1.5 flex items-center pr-2 text-gray-500">
             <IconChevronDown stroke={2} size={20} />
           </ComboboxButton>
           <Transition
