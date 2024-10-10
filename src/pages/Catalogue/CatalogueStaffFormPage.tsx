@@ -52,6 +52,7 @@ const CatalogueStaffFormPage: React.FC = () => {
   });
 
   const [isFormChanged, setIsFormChanged] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [nationalities, setNationalities] = useState<SelectOption[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -237,6 +238,8 @@ const CatalogueStaffFormPage: React.FC = () => {
     if (!validateForm()) {
       return;
     }
+    
+    setIsSaving(true);
 
     const dataToSend = {
       ...formData,
@@ -291,6 +294,8 @@ const CatalogueStaffFormPage: React.FC = () => {
       } else {
         toast.error("An unexpected error occurred.");
       }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -434,7 +439,12 @@ const CatalogueStaffFormPage: React.FC = () => {
                 Delete
               </button>
             )}
-            <Button type="submit" variant="boldOutline" size="lg">
+            <Button
+              type="submit"
+              variant="boldOutline"
+              size="lg"
+              disabled={isSaving || !isFormChanged}
+            >
               Save
             </Button>
           </div>
