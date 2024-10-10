@@ -11,6 +11,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "sm" | "md" | "lg";
   color?: string;
   additionalClasses?: string;
+  disabled?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -24,27 +25,28 @@ const Button: React.FC<ButtonProps> = ({
   color = "gray",
   className = "",
   additionalClasses = "",
+  disabled = false,
   ...props
 }) => {
   const baseClasses =
-    "font-medium rounded-full transition-colors duration-200 focus:outline-none";
+    "font-medium rounded-full transition-colors duration-200 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 
   const colorClasses = {
     gray: {
       default:
-        "bg-gray-100 text-gray-700 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-200",
+        "bg-gray-100 text-gray-700 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-200 disabled:hover:bg-gray-100 disabled:hover:text-gray-700",
       outline:
-        "border border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200",
+        "border border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
       boldOutline:
-        "border-2 border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-200",
+        "border-2 border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
     },
     rose: {
       default:
-        "bg-rose-100 text-rose-700 hover:text-rose-800 hover:bg-rose-200 active:bg-rose-200",
+        "bg-rose-100 text-rose-700 hover:text-rose-800 hover:bg-rose-200 active:bg-rose-200 disabled:hover:bg-rose-100 disabled:hover:text-rose-700",
       outline:
-        "border border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200",
+        "border border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
       boldOutline:
-        "border-2 border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-50 active:bg-rose-200",
+        "border-2 border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-50 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
     },
   };
 
@@ -67,7 +69,7 @@ const Button: React.FC<ButtonProps> = ({
   } ${className} ${additionalClasses}`;
 
   return (
-    <button className={classes} {...props}>
+    <button className={classes} disabled={disabled} {...props}>
       <span className="flex items-center justify-center">
         {Icon && iconPosition === "left" && (
           <Icon stroke={iconStroke} size={iconSize} className="mr-2" />

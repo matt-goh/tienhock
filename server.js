@@ -1492,6 +1492,20 @@ app.delete('/api/invoices/:id', (req, res) => {
   }
 });
 
+app.put('/api/invoices/:id', (req, res) => {
+  const { id } = req.params;
+  const updatedInvoice = req.body;
+  
+  const index = uploadedInvoices.findIndex(invoice => invoice.id === id);
+  
+  if (index !== -1) {
+    uploadedInvoices[index] = updatedInvoice;
+    res.status(200).json({ message: 'Invoice updated successfully' });
+  } else {
+    res.status(404).json({ message: 'Invoice not found' });
+  }
+});
+
 app.post('/api/invoices/clear', (req, res) => {
   uploadedInvoices = []; // Clear the in-memory storage
   res.status(200).json({ message: 'All invoices cleared successfully' });
