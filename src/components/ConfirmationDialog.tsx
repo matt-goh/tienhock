@@ -7,7 +7,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 
-interface DeleteDialogProps {
+interface ConfirmationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -16,7 +16,7 @@ interface DeleteDialogProps {
   confirmButtonText?: string;
 }
 
-const DeleteDialog: React.FC<DeleteDialogProps> = ({
+const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
@@ -98,4 +98,4 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
   );
 };
 
-export default DeleteDialog;
+export default ConfirmationDialog;

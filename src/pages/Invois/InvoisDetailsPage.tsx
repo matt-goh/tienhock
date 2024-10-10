@@ -28,6 +28,7 @@ import {
   ComboboxOption,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 
 interface SelectOption {
   id: string;
@@ -162,12 +163,22 @@ const InvoisDetailsPage: React.FC = () => {
   const [customerPage, setCustomerPage] = useState(1);
   const [totalCustomerPages, setTotalCustomerPages] = useState(1);
   const [isFetchingCustomers, setIsFetchingCustomers] = useState(false);
+  const [initialInvoiceData, setInitialInvoiceData] =
+    useState<InvoiceData | null>(location.state?.invoiceData || null);
+  const [isFormChanged, setIsFormChanged] = useState(false);
+  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
 
   useEffect(() => {
     if (invoiceData) {
       updateInvoice(invoiceData);
     }
   }, [invoiceData]);
+
+  useEffect(() => {
+    const hasChanged =
+      JSON.stringify(invoiceData) !== JSON.stringify(initialInvoiceData);
+    setIsFormChanged(hasChanged);
+  }, [invoiceData, initialInvoiceData]);
 
   const calculateTotal = useCallback((items: OrderDetail[]) => {
     return items
@@ -639,6 +650,15 @@ const InvoisDetailsPage: React.FC = () => {
   }
 
   const handleBackClick = () => {
+    if (isFormChanged) {
+      setShowBackConfirmation(true);
+    } else {
+      navigate("/stock/invois/new");
+    }
+  };
+
+  const handleConfirmBack = () => {
+    setShowBackConfirmation(false);
     navigate("/stock/invois/new");
   };
 
@@ -1296,7 +1316,6 @@ const InvoisDetailsPage: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="rounded-lg space-y-2">
-          <h2 className="text-lg font-semibold mb-2">Invoice Information</h2>
           <FormInput
             name="invoiceNo"
             label="Invoice No"
@@ -1377,7 +1396,6 @@ const InvoisDetailsPage: React.FC = () => {
           />
         </div>
         <div className="rounded-lg">
-          <h2 className="text-lg font-semibold mb-2">Customer Information</h2>
           <FormInput
             name="customerId"
             label="Customer ID"
@@ -1477,6 +1495,14 @@ const InvoisDetailsPage: React.FC = () => {
         </>
       )}
       {renderActionButtons()}
+      <ConfirmationDialog
+        isOpen={showBackConfirmation}
+        onClose={() => setShowBackConfirmation(false)}
+        onConfirm={handleConfirmBack}
+        title="Discard Changes"
+        message="Are you sure you want to go back? All unsaved changes will be lost."
+        confirmButtonText="Confirm"
+      />
     </div>
   );
 };

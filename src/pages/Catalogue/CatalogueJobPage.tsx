@@ -16,7 +16,7 @@ import _ from "lodash";
 import Table from "../../components/Table/Table";
 import { ColumnConfig, Job, JobDetail } from "../../types/types";
 import NewJobModal from "../../components/NewJobModal";
-import DeleteDialog from "../../components/DeleteDialog";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
 
 type JobSelection = Job | null;
@@ -29,7 +29,7 @@ const CatalogueJobPage: React.FC = () => {
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
   const [jobDetails, setJobDetails] = useState<JobDetail[]>([]);
   const [filteredJobDetails, setFilteredJobDetails] = useState<JobDetail[]>([]);
-  const [originalJobDetails, setOriginalJobDetails] = useState<JobDetail[]>([]);
+  const [originalJobDetails] = useState<JobDetail[]>([]);
   const [originalJobState, setOriginalJobState] = useState<{
     job: Job | null;
     jobDetails: JobDetail[];
@@ -738,7 +738,7 @@ const CatalogueJobPage: React.FC = () => {
           onClose={handleNewJobModalClose}
           onJobAdded={handleJobAdded}
         />
-        <DeleteDialog
+        <ConfirmationDialog
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
           onConfirm={confirmDeleteJob}
