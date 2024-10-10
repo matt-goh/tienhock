@@ -9,6 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   iconStroke?: number;
   variant?: "default" | "outline" | "boldOutline";
   size?: "sm" | "md" | "lg";
+  color?: string;
   additionalClasses?: string;
 }
 
@@ -20,28 +21,50 @@ const Button: React.FC<ButtonProps> = ({
   iconStroke = 1.5,
   variant = "default",
   size = "md",
+  color = "gray",
   className = "",
   additionalClasses = "",
   ...props
 }) => {
-  const baseClasses = "font-medium rounded-full transition-colors duration-200";
+  const baseClasses =
+    "font-medium rounded-full transition-colors duration-200 focus:outline-none";
 
-  const variantClasses = {
-    default:
-      "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 active:text-gray-900",
-    outline:
-      "border text-gray-700 hover:bg-gray-100 hover:text-gray-800 active:bg-gray-200 active:text-gray-900",
-    boldOutline:
-      "border border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-800 active:bg-gray-200 active:text-gray-900",
+  const colorClasses = {
+    gray: {
+      default:
+        "bg-gray-100 text-gray-700 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-200",
+      outline:
+        "border border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200",
+      boldOutline:
+        "border-2 border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-200",
+    },
+    rose: {
+      default:
+        "bg-rose-100 text-rose-700 hover:text-rose-800 hover:bg-rose-200 active:bg-rose-200",
+      outline:
+        "border border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200",
+      boldOutline:
+        "border-2 border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-50 active:bg-rose-200",
+    },
   };
 
   const sizeClasses = {
     sm: "px-3 py-1 text-sm",
     md: "px-4 py-2 text-base",
-    lg: "px-5 py-2",
+    lg: "px-5 py-3 text-lg",
   };
 
-  const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${additionalClasses}`;
+  const getColorClasses = (color: string, variant: string) => {
+    return (
+      colorClasses[color as keyof typeof colorClasses]?.[
+        variant as keyof (typeof colorClasses)[keyof typeof colorClasses]
+      ] || colorClasses.gray[variant as keyof typeof colorClasses.gray]
+    );
+  };
+
+  const classes = `${baseClasses} ${getColorClasses(color, variant)} ${
+    sizeClasses[size]
+  } ${className} ${additionalClasses}`;
 
   return (
     <button className={classes} {...props}>
