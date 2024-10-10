@@ -8,11 +8,144 @@ import React, {
 import { useLocation, useNavigate } from "react-router-dom";
 import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
-import { ColumnConfig, InvoiceData, OrderDetail } from "../../types/types";
+import {
+  ColumnConfig,
+  Customer,
+  Employee,
+  InvoiceData,
+  OrderDetail,
+} from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
 import { updateInvoice } from "./InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import { debounce } from "lodash";
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxButton,
+  ComboboxOptions,
+  ComboboxOption,
+} from "@headlessui/react";
+import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+
+interface SelectOption {
+  id: string;
+  name: string;
+}
+
+interface ComboboxProps {
+  name: string;
+  label: string;
+  value: string[];
+  onChange: (value: string[] | null) => void;
+  options: SelectOption[];
+  query: string;
+  setQuery: React.Dispatch<React.SetStateAction<string>>;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoading: boolean;
+}
+
+const CustomerCombobox: React.FC<ComboboxProps> = ({
+  name,
+  label,
+  value,
+  onChange,
+  options,
+  setQuery,
+  onLoadMore,
+  hasMore,
+  isLoading,
+}) => {
+  const [selectedCustomer, setSelectedCustomer] = useState<SelectOption | null>(
+    value.length > 0 ? { id: value[0], name: value[0] } : null
+  );
+
+  const handleCustomerSelection = (customer: SelectOption | null) => {
+    setSelectedCustomer(customer);
+    onChange(customer ? [customer.name] : null);
+  };
+
+  return (
+    <div className="my-2 space-y-2">
+      <label htmlFor={name} className="text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <Combobox value={selectedCustomer} onChange={handleCustomerSelection}>
+        <div className="relative">
+          <ComboboxInput
+            className="w-full cursor-input rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400"
+            displayValue={(customer: SelectOption | null) =>
+              customer?.name || ""
+            }
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Select a customer"
+          />
+          <ComboboxButton className="absolute inset-y-0 right-2 flex items-center pr-2">
+            <IconChevronDown
+              className="h-5 w-5 text-gray-400"
+              aria-hidden="true"
+            />
+          </ComboboxButton>
+          <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            {options.length === 0 ? (
+              <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                No customers found.
+              </div>
+            ) : (
+              <>
+                {options.map((customer) => (
+                  <ComboboxOption
+                    key={customer.id}
+                    value={customer}
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 ${
+                        active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                      }`
+                    }
+                  >
+                    {({ selected, active }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          {customer.name}
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3">
+                            <IconCheck
+                              className="h-5 w-5 text-gray-600"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ComboboxOption>
+                ))}
+                {hasMore && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onLoadMore();
+                    }}
+                    className="w-full py-2 text-center text-sm rounded text-sky-500 hover:text-sky-600 hover:bg-gray-100 focus:outline-none"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Loading more..." : "Load More"}
+                  </button>
+                )}
+              </>
+            )}
+          </ComboboxOptions>
+        </div>
+      </Combobox>
+    </div>
+  );
+};
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -23,6 +156,12 @@ const InvoisDetailsPage: React.FC = () => {
   const [products, setProducts] = useState<
     { id: string; description: string }[]
   >([]);
+  const [salesmen, setSalesmen] = useState<string[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerPage, setCustomerPage] = useState(1);
+  const [totalCustomerPages, setTotalCustomerPages] = useState(1);
+  const [isFetchingCustomers, setIsFetchingCustomers] = useState(false);
 
   useEffect(() => {
     if (invoiceData) {
@@ -50,6 +189,66 @@ const InvoisDetailsPage: React.FC = () => {
       .toFixed(2);
   }, []);
 
+  const fetchCustomers = useCallback(
+    async (search: string, page: number) => {
+      setIsFetchingCustomers(true);
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/customers/combobox?salesman=${
+            invoiceData?.salesman || ""
+          }&search=${search}&page=${page}&limit=20`
+        );
+        if (!response.ok) throw new Error("Failed to fetch customers");
+        const data = await response.json();
+        setCustomers((prevCustomers) =>
+          page === 1 ? data.customers : [...prevCustomers, ...data.customers]
+        );
+        setTotalCustomerPages(data.totalPages);
+        setIsFetchingCustomers(false);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        toast.error("Failed to fetch customers. Please try again.");
+        setIsFetchingCustomers(false);
+      }
+    },
+    [invoiceData?.salesman]
+  );
+
+  const debouncedFetchCustomers = useMemo(
+    () =>
+      debounce((search: string) => {
+        setCustomerPage(1);
+        fetchCustomers(search, 1);
+      }, 300),
+    [fetchCustomers]
+  );
+
+  useEffect(() => {
+    debouncedFetchCustomers(customerQuery);
+  }, [customerQuery, debouncedFetchCustomers]);
+
+  useEffect(() => {
+    // Reset customer data when salesman changes
+    setCustomers([]);
+    setCustomerPage(1);
+    setCustomerQuery("");
+    fetchCustomers("", 1);
+  }, [invoiceData?.salesman, fetchCustomers]);
+
+  const loadMoreCustomers = useCallback(() => {
+    if (customerPage < totalCustomerPages && !isFetchingCustomers) {
+      const nextPage = customerPage + 1;
+      setCustomerPage(nextPage);
+      fetchCustomers(customerQuery, nextPage);
+    }
+  }, [
+    customerPage,
+    totalCustomerPages,
+    isFetchingCustomers,
+    customerQuery,
+    fetchCustomers,
+  ]);
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -67,6 +266,25 @@ const InvoisDetailsPage: React.FC = () => {
 
     fetchProducts();
   }, []);
+
+  const fetchSalesmen = useCallback(async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/staffs?salesmenOnly=true"
+      );
+      if (!response.ok) throw new Error("Failed to fetch salesmen");
+      const data: Employee[] = await response.json();
+      const salesmenIds = data.map((employee) => employee.id);
+      setSalesmen(["All Salesmen", ...salesmenIds]);
+    } catch (error) {
+      console.error("Error fetching salesmen:", error);
+      toast.error("Failed to fetch salesmen. Please try again.");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSalesmen();
+  }, [fetchSalesmen]);
 
   const addTotalRow = useCallback(
     (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
@@ -1160,15 +1378,52 @@ const InvoisDetailsPage: React.FC = () => {
         </div>
         <div className="rounded-lg">
           <h2 className="text-lg font-semibold mb-2">Customer Information</h2>
-          <p>
-            <strong>Customer ID:</strong> {invoiceData.customer}
-          </p>
-          <p>
-            <strong>Customer:</strong> {invoiceData.customerName}
-          </p>
-          <p>
-            <strong>Salesman:</strong> {invoiceData.salesman}
-          </p>
+          <FormInput
+            name="customerId"
+            label="Customer ID"
+            value={invoiceData.customer}
+            disabled
+          />
+          <CustomerCombobox
+            name="customer"
+            label="Customer"
+            value={invoiceData?.customerName ? [invoiceData.customerName] : []}
+            onChange={(value: string[] | null) => {
+              const selectedCustomerName = value ? value[0] : "";
+              const selectedCustomer = customers.find(
+                (c) => c.name === selectedCustomerName
+              );
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  customer: selectedCustomer?.id || "",
+                  customerName: selectedCustomerName,
+                };
+              });
+            }}
+            options={customers.map((c) => ({ id: c.id, name: c.name }))}
+            query={customerQuery}
+            setQuery={setCustomerQuery}
+            onLoadMore={loadMoreCustomers}
+            hasMore={customerPage < totalCustomerPages}
+            isLoading={isFetchingCustomers}
+          />
+          <FormListbox
+            name="salesman"
+            label="Salesman"
+            value={invoiceData.salesman}
+            onChange={(value) => {
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  salesman: value,
+                };
+              });
+            }}
+            options={salesmen.map((id) => ({ id, name: id }))}
+          />
         </div>
       </div>
 
