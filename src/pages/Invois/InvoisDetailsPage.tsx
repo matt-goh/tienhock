@@ -1028,6 +1028,43 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "action", header: "", type: "action", width: 50 },
   ];
 
+  // Function to convert date from "DD/MM/YYYY" to "YYYY-MM-DD"
+  const formatDateForInput = (dateString: string) => {
+    if (!dateString) return "";
+    const [day, month, year] = dateString.split("/");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  };
+
+  // Function to convert date from "YYYY-MM-DD" to "DD/MM/YYYY"
+  const formatDateForState = (dateString: string) => {
+    if (!dateString) return "";
+    const [year, month, day] = dateString.split("-");
+    return `${day}/${month}/${year}`;
+  };
+
+  // Function to convert time from "HH:MM am/pm" to "HH:MM" (24-hour format)
+  const formatTimeForInput = (timeString: string) => {
+    if (!timeString) return "";
+    const [time, period] = timeString.toLowerCase().split(" ");
+    let [hours, minutes] = time.split(":");
+    if (period === "pm" && hours !== "12") {
+      hours = String(parseInt(hours) + 12);
+    } else if (period === "am" && hours === "12") {
+      hours = "00";
+    }
+    return `${hours.padStart(2, "0")}:${minutes}`;
+  };
+
+  // Function to convert time from "HH:MM" (24-hour format) to "HH:MM am/pm"
+  const formatTimeForState = (timeString: string) => {
+    if (!timeString) return "";
+    let [hours, minutes] = timeString.split(":");
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? "pm" : "am";
+    hours = String(hour % 12 || 12);
+    return `${hours}:${minutes} ${ampm}`;
+  };
+
   return (
     <div className="px-4 max-w-6xl mx-auto">
       <BackButton onClick={handleBackClick} className="" />
@@ -1052,7 +1089,7 @@ const InvoisDetailsPage: React.FC = () => {
                   };
                 });
               }}
-              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
             />
           </div>
           <div className="mb-2">
@@ -1069,41 +1106,41 @@ const InvoisDetailsPage: React.FC = () => {
                   };
                 });
               }}
-              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
             />
           </div>
           <div className="mb-2">
             <strong>Date:</strong>{" "}
             <input
               type="date"
-              value={invoiceData.date}
+              value={formatDateForInput(invoiceData.date)}
               onChange={(e) => {
                 setInvoiceData((prev) => {
                   if (!prev) return null;
                   return {
                     ...prev,
-                    date: e.target.value,
+                    date: formatDateForState(e.target.value),
                   };
                 });
               }}
-              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
             />
           </div>
           <div className="mb-2">
             <strong>Time:</strong>{" "}
             <input
               type="time"
-              value={invoiceData.time}
+              value={formatTimeForInput(invoiceData.time)}
               onChange={(e) => {
                 setInvoiceData((prev) => {
                   if (!prev) return null;
                   return {
                     ...prev,
-                    time: e.target.value,
+                    time: formatTimeForState(e.target.value),
                   };
                 });
               }}
-              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
             />
           </div>
           <div className="mb-2">
@@ -1119,7 +1156,7 @@ const InvoisDetailsPage: React.FC = () => {
                   };
                 });
               }}
-              className="w-full h-full px-2 py-1 text-right outline-none bg-transparent border-b border-gray-300"
+              className="w-full h-full px-2 py-1 text-left outline-none bg-transparent border-b border-gray-300"
             >
               <option value="C">Cash</option>
               <option value="I">Invoice</option>
