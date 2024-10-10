@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Tab from "../../components/Tab";
 import toast from "react-hot-toast";
-import DeleteDialog from "../../components/DeleteDialog";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
@@ -440,7 +440,7 @@ const CatalogueStaffFormPage: React.FC = () => {
           </div>
         </form>
       </div>
-      <DeleteDialog
+      <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
@@ -448,7 +448,7 @@ const CatalogueStaffFormPage: React.FC = () => {
         message={`Are you sure you want to remove ${formData.name} from the staff list? This action cannot be undone.`}
         confirmButtonText="Delete"
       />
-      <DeleteDialog
+      <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}

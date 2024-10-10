@@ -692,12 +692,6 @@ function Table<T extends Record<string, any>>({
     return columns.some((col) => col.type === "number");
   }, [columns]);
 
-  const calculateRowAmount = useCallback((row: T) => {
-    const quantity = parseFloat(row.qty) || 0;
-    const price = parseFloat(row.price) || 0;
-    return (quantity * price).toFixed(2);
-  }, []);
-
   //RC
   const renderCell = (
     row: Row<T>,
@@ -1384,18 +1378,18 @@ function Table<T extends Record<string, any>>({
           <span>Edit</span>
         </div>
       ) : (
-        <div className="absolute top-[-57px] right-0 flex border border-gray-300 rounded-lg">
+        <div className="absolute top-[-57px] right-0 flex border-gray-300 space-x-2">
           <div
-            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-l-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border-r border-gray-300 transition-colors duration-200"
+            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border border-gray-300 transition-colors duration-200"
             onClick={handleSave}
           >
-            <IconDeviceFloppy />
+            Save
           </div>
           <div
-            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-r-lg hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border border-gray-300 transition-colors duration-200"
             onClick={handleCancel}
           >
-            <IconCancel />
+            Cancel
           </div>
         </div>
       )}

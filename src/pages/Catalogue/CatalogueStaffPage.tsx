@@ -8,7 +8,7 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import DeleteDialog from "../../components/DeleteDialog";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 import StaffFilterMenu from "../../components/StaffFilterMenu";
 import { Employee, FilterOptions } from "../../types/types";
 import Button from "../../components/Button";
@@ -465,7 +465,7 @@ const CatalogueStaffPage = () => {
           </button>
         </div>
       )}
-      <DeleteDialog
+      <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
