@@ -18,6 +18,10 @@ const InvoisUploadPage: React.FC = () => {
     loadInvoices();
   }, []);
 
+  useEffect(() => {
+    console.log(fileData);
+  }, [fileData]);
+
   const loadInvoices = async () => {
     setIsLoading(true);
     setError(null);
@@ -172,7 +176,7 @@ const InvoisUploadPage: React.FC = () => {
                 isFoc: true,
               });
             }
-            
+
             if (Number(returned) > 0) {
               items.push({
                 ...baseItem,

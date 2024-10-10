@@ -17,7 +17,7 @@ import {
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
-import { updateInvoice } from "./InvoisUtils";
+import { updateInvoice, deleteInvoice } from "./InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { debounce } from "lodash";
 import {
@@ -27,7 +27,7 @@ import {
   ComboboxOptions,
   ComboboxOption,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconTrash } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 
 interface SelectOption {
@@ -163,10 +163,12 @@ const InvoisDetailsPage: React.FC = () => {
   const [customerPage, setCustomerPage] = useState(1);
   const [totalCustomerPages, setTotalCustomerPages] = useState(1);
   const [isFetchingCustomers, setIsFetchingCustomers] = useState(false);
-  const [initialInvoiceData, setInitialInvoiceData] =
-    useState<InvoiceData | null>(location.state?.invoiceData || null);
+  const [initialInvoiceData] = useState<InvoiceData | null>(
+    location.state?.invoiceData || null
+  );
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   useEffect(() => {
     if (invoiceData) {
@@ -660,6 +662,18 @@ const InvoisDetailsPage: React.FC = () => {
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
     navigate("/stock/invois/new");
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (invoiceData) {
+      deleteInvoice(invoiceData.id);
+      toast.success("Invoice deleted successfully");
+      navigate("/stock/invois/new");
+    }
   };
 
   const handleAddRegularItem = () => {
@@ -1311,7 +1325,16 @@ const InvoisDetailsPage: React.FC = () => {
 
   return (
     <div className="px-4 max-w-6xl mx-auto">
-      <BackButton onClick={handleBackClick} className="" />
+      <div className="flex justify-between items-center mb-4">
+        <BackButton onClick={handleBackClick} />
+        <Button
+          onClick={handleDeleteClick}
+          variant="outline"
+          color="rose"
+        >
+          Delete
+        </Button>
+      </div>
       <h1 className="text-2xl font-bold mb-4">Invoice Details</h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
@@ -1502,6 +1525,14 @@ const InvoisDetailsPage: React.FC = () => {
         title="Discard Changes"
         message="Are you sure you want to go back? All unsaved changes will be lost."
         confirmButtonText="Confirm"
+      />
+      <ConfirmationDialog
+        isOpen={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Invoice"
+        message="Are you sure you want to delete this invoice? This action cannot be undone."
+        confirmButtonText="Delete"
       />
     </div>
   );

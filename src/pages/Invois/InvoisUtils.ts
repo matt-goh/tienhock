@@ -32,3 +32,9 @@ export const fetchInvoices = async () => {
     throw error;
   }
 };
+
+export const deleteInvoice = (id: string) => {
+  // Remove the invoice from the local storage
+  const invoices = getInvoices().filter(invoice => invoice.id !== id);
+  localStorage.setItem('invoices', JSON.stringify(invoices));
+};
