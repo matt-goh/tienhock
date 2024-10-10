@@ -45,32 +45,11 @@ const CatalogueAddStaffPage: React.FC = () => {
     newId: "",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
-    id: "",
-    name: "",
-    telephoneNo: "",
-    email: "",
-    gender: "",
-    nationality: "",
-    birthdate: "",
-    address: "",
-    job: [],
-    location: [],
-    dateJoined: "",
-    icNo: "",
-    bankAccountNumber: "",
-    epfNo: "",
-    incomeTaxNo: "",
-    socsoNo: "",
-    document: "",
-    paymentType: "",
-    paymentPreference: "",
-    race: "",
-    agama: "",
-    dateResigned: "",
-    newId: "",
+    ...formData,
   });
 
   const [isFormChanged, setIsFormChanged] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [nationalities, setNationalities] = useState<SelectOption[]>([]);
   const [races, setRaces] = useState<SelectOption[]>([]);
@@ -212,6 +191,8 @@ const CatalogueAddStaffPage: React.FC = () => {
       return;
     }
 
+    setIsSaving(true);
+
     const dataToSend = {
       ...formData,
       birthdate: formData.birthdate || null,
@@ -245,6 +226,8 @@ const CatalogueAddStaffPage: React.FC = () => {
       } else {
         toast.error("An unexpected error occurred.");
       }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -369,7 +352,12 @@ const CatalogueAddStaffPage: React.FC = () => {
             </Tab>
           </div>
           <div className="mt-8 py-3 text-right">
-            <Button type="submit" variant="boldOutline" size="lg">
+            <Button
+              type="submit"
+              variant="boldOutline"
+              size="lg"
+              disabled={isSaving || !isFormChanged}
+            >
               Save
             </Button>
           </div>

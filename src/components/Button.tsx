@@ -38,7 +38,7 @@ const Button: React.FC<ButtonProps> = ({
       outline:
         "border border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
       boldOutline:
-        "border-2 border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
+        "border-2 border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
     },
     rose: {
       default:
@@ -46,14 +46,14 @@ const Button: React.FC<ButtonProps> = ({
       outline:
         "border border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
       boldOutline:
-        "border-2 border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-50 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
+        "border-2 border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
     },
   };
 
   const sizeClasses = {
     sm: "px-3 py-1 text-sm",
     md: "px-4 py-2 text-base",
-    lg: "px-5 py-3 text-lg",
+    lg: "px-5 py-2 text-base",
   };
 
   const getColorClasses = (color: string, variant: string) => {
