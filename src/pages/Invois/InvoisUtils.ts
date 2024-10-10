@@ -49,3 +49,27 @@ export const deleteInvoice = async (id: string) => {
     throw error;
   }
 };
+
+export const saveInvoice = async (invoice: InvoiceData) => {
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/invoices/${invoice.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoice),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    // Update the invoice in the local storage
+    updateInvoice(invoice);
+    return true;
+  } catch (error) {
+    console.error("Error saving invoice:", error);
+    throw error;
+  }
+};

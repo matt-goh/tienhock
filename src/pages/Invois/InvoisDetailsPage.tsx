@@ -17,7 +17,7 @@ import {
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
-import { updateInvoice, deleteInvoice } from "./InvoisUtils";
+import { updateInvoice, deleteInvoice, saveInvoice } from "./InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { debounce } from "lodash";
 import {
@@ -169,6 +169,7 @@ const InvoisDetailsPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (invoiceData) {
@@ -666,6 +667,23 @@ const InvoisDetailsPage: React.FC = () => {
 
   const handleDeleteClick = () => {
     setShowDeleteConfirmation(true);
+  };
+
+  const handleSaveClick = async () => {
+    if (!invoiceData) return;
+
+    setIsSaving(true);
+    try {
+      await saveInvoice(invoiceData);
+      toast.success("Invoice saved successfully");
+      setIsFormChanged(false);
+      navigate("/stock/invois/new");
+    } catch (error) {
+      console.error("Error saving invoice:", error);
+      toast.error("Failed to save invoice. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -1333,9 +1351,18 @@ const InvoisDetailsPage: React.FC = () => {
     <div className="px-4 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <BackButton onClick={handleBackClick} />
-        <Button onClick={handleDeleteClick} variant="outline" color="rose">
-          Delete
-        </Button>
+        <div className="space-x-2">
+          <Button onClick={handleDeleteClick} variant="outline" color="rose">
+            Delete
+          </Button>
+          <Button
+            onClick={handleSaveClick}
+            variant="outline"
+            disabled={isSaving || !isFormChanged}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </Button>
+        </div>
       </div>
       <h1 className="text-2xl font-bold mb-4">Invoice Details</h1>
 
