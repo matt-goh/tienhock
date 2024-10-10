@@ -668,12 +668,18 @@ const InvoisDetailsPage: React.FC = () => {
     setShowDeleteConfirmation(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (invoiceData) {
-      deleteInvoice(invoiceData.id);
-      toast.success("Invoice deleted successfully");
-      navigate("/stock/invois/new");
+      try {
+        await deleteInvoice(invoiceData.id);
+        toast.success("Invoice deleted successfully");
+        navigate("/stock/invois/new");
+      } catch (error) {
+        console.error("Error deleting invoice:", error);
+        toast.error("Failed to delete invoice. Please try again.");
+      }
     }
+    setShowDeleteConfirmation(false);
   };
 
   const handleAddRegularItem = () => {
@@ -1327,11 +1333,7 @@ const InvoisDetailsPage: React.FC = () => {
     <div className="px-4 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <BackButton onClick={handleBackClick} />
-        <Button
-          onClick={handleDeleteClick}
-          variant="outline"
-          color="rose"
-        >
+        <Button onClick={handleDeleteClick} variant="outline" color="rose">
           Delete
         </Button>
       </div>

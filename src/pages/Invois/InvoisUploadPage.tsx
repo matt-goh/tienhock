@@ -95,6 +95,8 @@ const InvoisUploadPage: React.FC = () => {
 
       // Fetch updated invoice list
       await fetchInvoices();
+      const updatedInvoices = getInvoices();
+      setFileData(updatedInvoices);
 
       toast.success(`Successfully processed ${validFiles.length} file(s)`);
     } catch (error) {
