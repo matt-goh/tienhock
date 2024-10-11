@@ -184,6 +184,13 @@ const InvoisDetailsPage: React.FC = () => {
   const [initialInvoiceData] = useState<InvoiceData | null>(
     location.state?.invoiceData || null
   );
+  const [isNewInvoice, setIsNewInvoice] = useState(() => {
+    if (location.state?.isNewInvoice) {
+      return true;
+    }
+    // Check if the invoice has an id, if not, it's a new invoice
+    return !location.state?.invoiceData?.id;
+  });
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -687,7 +694,7 @@ const InvoisDetailsPage: React.FC = () => {
   }
 
   const handleBackClick = () => {
-    if (isFormChanged) {
+    if (isFormChanged && !isNewInvoice) {
       setShowBackConfirmation(true);
     } else {
       navigate("/stock/invois/new");
@@ -713,20 +720,16 @@ const InvoisDetailsPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await saveInvoice(invoiceData);
-      toast.success("Invoice saved successfully");
+      const savedInvoice = await saveInvoice(invoiceData);
+      setInvoiceData(savedInvoice);
       setIsFormChanged(false);
+      setIsNewInvoice(false);
+      toast.success("Invoice saved successfully");
       navigate("/stock/invois/new");
     } catch (error) {
       console.error("Error saving invoice:", error);
       if (error instanceof Error) {
-        if (error.message.includes("404")) {
-          toast.error(
-            "Failed to save invoice. The server endpoint was not found. Please check your API configuration."
-          );
-        } else {
-          toast.error(`Failed to save invoice: ${error.message}`);
-        }
+        toast.error(`Failed to save invoice: ${error.message}`);
       } else {
         toast.error("An unknown error occurred while saving the invoice.");
       }
@@ -1401,9 +1404,11 @@ const InvoisDetailsPage: React.FC = () => {
       <div className="flex justify-between items-center mb-4">
         <BackButton onClick={handleBackClick} />
         <div className="space-x-2">
-          <Button onClick={handleDeleteClick} variant="outline" color="rose">
-            Delete
-          </Button>
+          {!isNewInvoice && (
+            <Button onClick={handleDeleteClick} variant="outline" color="rose">
+              Delete
+            </Button>
+          )}
           <Button
             onClick={handleSaveClick}
             variant="outline"
