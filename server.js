@@ -1702,11 +1702,16 @@ app.post('/api/invoices/submit', async (req, res) => {
 
 // Endpoint to bulk submit invoices to the database
 app.post('/api/invoices/bulk-submit', async (req, res) => {
+  const invoices = req.body;
+
+  if (!Array.isArray(invoices) || invoices.length === 0) {
+    return res.status(400).json({ message: 'Invalid invoices data provided' });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const invoices = req.body;
     const insertedInvoices = [];
 
     for (const invoice of invoices) {
@@ -1775,13 +1780,10 @@ app.post('/api/invoices/bulk-submit', async (req, res) => {
     }
 
     await client.query('COMMIT');
-    
-    // Clear the in-memory storage after successful submission
     uploadedInvoices = [];
-
+    
     res.json({ 
       message: `Successfully submitted ${insertedInvoices.length} invoices to the database.`,
-      clearMessage: 'In-memory storage has been cleared.',
       invoices: insertedInvoices
     });
   } catch (error) {
@@ -1888,6 +1890,68 @@ app.put('/api/invoices/:id', (req, res) => {
 app.post('/api/invoices/clear', (req, res) => {
   uploadedInvoices = []; // Clear the in-memory storage
   res.status(200).json({ message: 'All invoices cleared successfully' });
+});
+
+// Check for duplicate invoice number
+app.get('/api/invoices/check-duplicate', async (req, res) => {
+  const { invoiceNo } = req.query;
+
+  if (!invoiceNo) {
+    return res.status(400).json({ message: 'Invoice number is required' });
+  }
+
+  try {
+    const query = 'SELECT COUNT(*) FROM invoices WHERE invoiceno = $1';
+    const result = await pool.query(query, [invoiceNo]);
+    const count = parseInt(result.rows[0].count);
+
+    res.json({ isDuplicate: count > 0 });
+  } catch (error) {
+    console.error('Error checking for duplicate invoice number:', error);
+    res.status(500).json({ message: 'Error checking for duplicate invoice number', error: error.message });
+  }
+});
+
+// Check for duplicate invoice numbers in bulk
+app.post('/api/invoices/check-bulk-duplicates', async (req, res) => {
+  const { invoiceNumbers } = req.body;
+
+  if (!Array.isArray(invoiceNumbers) || invoiceNumbers.length === 0) {
+    return res.status(400).json({ message: 'Invalid invoice numbers provided' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Check for duplicates in the database
+      const dbQuery = `
+        SELECT invoiceno
+        FROM invoices
+        WHERE invoiceno = ANY($1)
+      `;
+      const dbResult = await client.query(dbQuery, [invoiceNumbers]);
+
+      // Check for duplicates in the provided list itself
+      const duplicatesInList = invoiceNumbers.filter((item, index) => invoiceNumbers.indexOf(item) !== index);
+
+      // Combine duplicates from database and list
+      const allDuplicates = [...new Set([...dbResult.rows.map(row => row.invoiceno), ...duplicatesInList])];
+
+      await client.query('COMMIT');
+
+      res.json({ duplicates: allDuplicates });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error checking for duplicate invoice numbers:', error);
+    res.status(500).json({ message: 'Error checking for duplicate invoice numbers', error: error.message });
+  }
 });
 
 // Fetch all products (id and description only)

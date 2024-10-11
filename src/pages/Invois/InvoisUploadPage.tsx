@@ -50,6 +50,35 @@ const InvoisUploadPage: React.FC = () => {
     setError(null);
 
     try {
+      // First, check for duplicate invoice numbers
+      const invoiceNumbers = fileData.map((invoice) => invoice.invoiceno);
+      const checkDuplicatesResponse = await fetch(
+        "http://localhost:5000/api/invoices/check-bulk-duplicates",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ invoiceNumbers }),
+        }
+      );
+
+      if (!checkDuplicatesResponse.ok) {
+        throw new Error(
+          `HTTP error! status: ${checkDuplicatesResponse.status}`
+        );
+      }
+
+      const duplicatesResult = await checkDuplicatesResponse.json();
+
+      if (duplicatesResult.duplicates.length > 0) {
+        const duplicateList = duplicatesResult.duplicates.join(", ");
+        toast.error(`Duplicate invoice numbers found: ${duplicateList}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // If no duplicates, proceed with submission
       const response = await fetch(
         "http://localhost:5000/api/invoices/bulk-submit",
         {
