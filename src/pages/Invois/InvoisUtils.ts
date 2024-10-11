@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { InvoiceData } from "../../types/types";
 
 let invoices: InvoiceData[] = [];
@@ -88,11 +89,36 @@ export const deleteInvoice = async (id: string) => {
   }
 };
 
+const checkDuplicateInvoiceNo = async (invoiceNo: string): Promise<boolean> => {
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.isDuplicate;
+  } catch (error) {
+    console.error("Error checking for duplicate invoice number:", error);
+    throw error;
+  }
+};
+
 export const saveInvoice = async (
   invoice: InvoiceData,
   saveToDb: boolean = true
 ): Promise<InvoiceData> => {
   try {
+    // Check for duplicate invoice number
+    const isDuplicate = await checkDuplicateInvoiceNo(invoice.invoiceno);
+    if (isDuplicate) {
+      toast.error(
+        "Duplicate invoice number. Please use a unique invoice number."
+      );
+      throw new Error("Duplicate invoice number");
+    }
+
     const url = `http://localhost:5000/api/invoices/submit?saveToDb=${saveToDb}`;
 
     const response = await fetch(url, {
@@ -135,6 +161,15 @@ export const createInvoice = async (
   invoiceData: InvoiceData
 ): Promise<InvoiceData> => {
   try {
+    // Check for duplicate invoice number
+    const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.invoiceno);
+    if (isDuplicate) {
+      toast.error(
+        "Duplicate invoice number. Please use a unique invoice number."
+      );
+      throw new Error("Duplicate invoice number");
+    }
+
     const response = await fetch(
       "http://localhost:5000/api/invoices/submit?saveToDb=true",
       {
