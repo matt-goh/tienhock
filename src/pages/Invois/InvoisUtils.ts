@@ -50,7 +50,9 @@ export const deleteInvoice = async (id: string) => {
   }
 };
 
-export const saveInvoice = async (invoice: InvoiceData): Promise<void> => {
+export const saveInvoice = async (
+  invoice: InvoiceData
+): Promise<InvoiceData> => {
   try {
     const url = invoice.id
       ? `http://localhost:5000/api/invoices/${invoice.id}`
@@ -75,18 +77,19 @@ export const saveInvoice = async (invoice: InvoiceData): Promise<void> => {
       );
     }
 
-    const result = await response.json();
-    console.log("Invoice saved successfully:", result);
+    const savedInvoice: InvoiceData = await response.json();
 
     // Update the local cache
     const invoices = getInvoices();
-    const index = invoices.findIndex((inv) => inv.id === invoice.id);
+    const index = invoices.findIndex((inv) => inv.id === savedInvoice.id);
     if (index !== -1) {
-      invoices[index] = result;
+      invoices[index] = savedInvoice;
     } else {
-      invoices.push(result);
+      invoices.push(savedInvoice);
     }
     localStorage.setItem("invoices", JSON.stringify(invoices));
+
+    return savedInvoice;
   } catch (error) {
     console.error("Error saving invoice:", error);
     throw error;
