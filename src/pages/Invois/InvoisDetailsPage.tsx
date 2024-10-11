@@ -27,7 +27,7 @@ import {
   ComboboxOptions,
   ComboboxOption,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck, IconTrash } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 
 interface SelectOption {
@@ -151,9 +151,27 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(
-    location.state?.invoiceData || null
-  );
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(() => {
+    if (location.state?.isNewInvoice) {
+      return {
+        id: "",
+        invoiceNo: "",
+        orderNo: "",
+        date: new Date().toLocaleDateString("en-GB"),
+        time: new Date().toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        type: "I",
+        customer: "",
+        customerName: "",
+        salesman: "",
+        totalAmount: "0",
+        orderDetails: [],
+      };
+    }
+    return location.state?.invoiceData || null;
+  });
   const [products, setProducts] = useState<
     { id: string; description: string }[]
   >([]);
@@ -688,6 +706,11 @@ const InvoisDetailsPage: React.FC = () => {
   const handleSaveClick = async () => {
     if (!invoiceData) return;
 
+    if (!invoiceData.invoiceNo.trim()) {
+      toast.error("Please enter an invoice number before saving.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       await saveInvoice(invoiceData);
@@ -696,7 +719,17 @@ const InvoisDetailsPage: React.FC = () => {
       navigate("/stock/invois/new");
     } catch (error) {
       console.error("Error saving invoice:", error);
-      toast.error("Failed to save invoice. Please try again.");
+      if (error instanceof Error) {
+        if (error.message.includes("404")) {
+          toast.error(
+            "Failed to save invoice. The server endpoint was not found. Please check your API configuration."
+          );
+        } else {
+          toast.error(`Failed to save invoice: ${error.message}`);
+        }
+      } else {
+        toast.error("An unknown error occurred while saving the invoice.");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -1387,7 +1420,9 @@ const InvoisDetailsPage: React.FC = () => {
           <FormInput
             name="invoiceNo"
             label="Invoice No"
-            value={`${invoiceData.type}${invoiceData.invoiceNo}`}
+            value={
+              invoiceData ? `${invoiceData.type}${invoiceData.invoiceNo}` : ""
+            }
             onChange={(e) => {
               const newValue = e.target.value;
               setInvoiceData((prev) => {

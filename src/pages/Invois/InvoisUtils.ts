@@ -50,24 +50,43 @@ export const deleteInvoice = async (id: string) => {
   }
 };
 
-export const saveInvoice = async (invoice: InvoiceData) => {
+export const saveInvoice = async (invoice: InvoiceData): Promise<void> => {
   try {
-    const response = await fetch(
-      `http://localhost:5000/api/invoices/${invoice.id}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(invoice),
-      }
-    );
+    const url = invoice.id
+      ? `http://localhost:5000/api/invoices/${invoice.id}`
+      : "http://localhost:5000/api/invoices";
+
+    const method = invoice.id ? "PUT" : "POST";
+
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invoice),
+    });
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${
+          errorData.message || "Unknown error"
+        }`
+      );
     }
-    // Update the invoice in the local storage
-    updateInvoice(invoice);
-    return true;
+
+    const result = await response.json();
+    console.log("Invoice saved successfully:", result);
+
+    // Update the local cache
+    const invoices = getInvoices();
+    const index = invoices.findIndex((inv) => inv.id === invoice.id);
+    if (index !== -1) {
+      invoices[index] = result;
+    } else {
+      invoices.push(result);
+    }
+    localStorage.setItem("invoices", JSON.stringify(invoices));
   } catch (error) {
     console.error("Error saving invoice:", error);
     throw error;

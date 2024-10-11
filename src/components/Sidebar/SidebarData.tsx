@@ -111,6 +111,11 @@ export const SidebarData: SidebarItem[] = [
             path: "/stock/invois/new/:id",
             component: InvoisDetailsPage,
           },
+          {
+            name: "Create New Invois",
+            path: "/stock/invois/new/create",
+            component: InvoisDetailsPage,
+          },
         ],
       },
       {

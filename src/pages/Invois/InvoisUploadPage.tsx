@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { IconCloudUpload, IconSend, IconTrash } from "@tabler/icons-react";
+import {
+  IconCloudUpload,
+  IconPlus,
+  IconSend,
+  IconTrash,
+} from "@tabler/icons-react";
 import TableEditing from "../../components/Table/TableEditing";
 import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData } from "../../types/types";
@@ -248,6 +253,10 @@ const InvoisUploadPage: React.FC = () => {
       });
   };
 
+  const handleCreateNewInvoice = () => {
+    navigate("/stock/invois/new/create", { state: { isNewInvoice: true } });
+  };
+
   const handleInvoiceClick = (invoiceId: string, invoiceData: InvoiceData) => {
     navigate(`/stock/invois/new/${invoiceId}`, { state: { invoiceData } });
   };
@@ -353,13 +362,9 @@ const InvoisUploadPage: React.FC = () => {
   return (
     <div className="p-4">
       <h1 className="text-2xl text-center font-medium text-gray-700 mb-4">
-        Import Invois
+        Add Invois
       </h1>
-      <div
-        className={`flex mb-4 space-x-2 ${
-          fileData.length > 0 ? "justify-end" : "justify-center"
-        }`}
-      >
+      <div className={`flex mb-4 space-x-2 justify-center`}>
         {fileData.length > 0 && (
           <button
             onClick={handleClearData}
@@ -368,6 +373,15 @@ const InvoisUploadPage: React.FC = () => {
             <IconTrash className="mr-2 h-4 w-4" /> Clear
           </button>
         )}
+        <Button
+          onClick={handleCreateNewInvoice}
+          icon={IconPlus}
+          iconSize={16}
+          iconStroke={2}
+          variant="outline"
+        >
+          Create
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -384,7 +398,7 @@ const InvoisUploadPage: React.FC = () => {
           iconStroke={2}
           variant="outline"
         >
-          Upload Documents
+          Import
         </Button>
         <Button
           onClick={handleSubmit}
