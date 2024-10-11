@@ -1523,6 +1523,116 @@ app.get('/api/products/combobox', async (req, res) => {
   }
 });
 
+// Helper function to sanitize numeric values
+const sanitizeNumeric = (value) => {
+  if (typeof value === 'string') {
+    // Remove commas and any other non-numeric characters except for the decimal point
+    return value.replace(/[^\d.-]/g, '');
+  }
+  return value;
+};
+
+app.post('/api/invoices/submit', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const invoices = req.body;
+    let insertedCount = 0;
+
+    for (const invoice of invoices) {
+      // Convert date from DD/MM/YYYY to YYYY-MM-DD
+      const [day, month, year] = invoice.date.split('/');
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      // Convert time from "HH:MM am/pm" to "HH:MM:SS" format
+      const [time, period] = invoice.time.split(' ');
+      let [hours, minutes] = time.split(':');
+      hours = parseInt(hours);
+      if (period.toLowerCase() === 'pm' && hours !== 12) {
+        hours += 12;
+      } else if (period.toLowerCase() === 'am' && hours === 12) {
+        hours = 0;
+      }
+      const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}:00`;
+
+      // Sanitize totalAmount
+      const sanitizedTotalAmount = sanitizeNumeric(invoice.totalAmount);
+
+      // Insert invoice
+      const invoiceQuery = `
+        INSERT INTO Invoices (id, invoiceNo, orderNo, date, time, type, customer, customerName, salesman, totalAmount)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id) DO UPDATE SET
+          invoiceNo = EXCLUDED.invoiceNo,
+          orderNo = EXCLUDED.orderNo,
+          date = EXCLUDED.date,
+          time = EXCLUDED.time,
+          type = EXCLUDED.type,
+          customer = EXCLUDED.customer,
+          customerName = EXCLUDED.customerName,
+          salesman = EXCLUDED.salesman,
+          totalAmount = EXCLUDED.totalAmount
+      `;
+      await client.query(invoiceQuery, [
+        invoice.id,
+        invoice.invoiceNo,
+        invoice.orderNo,
+        formattedDate,
+        formattedTime,
+        invoice.type,
+        invoice.customer,
+        invoice.customerName,
+        invoice.salesman,
+        sanitizedTotalAmount
+      ]);
+
+      // Insert order details
+      for (const detail of invoice.orderDetails) {
+        const detailQuery = `
+          INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (invoiceId, code) DO UPDATE SET
+            productName = EXCLUDED.productName,
+            qty = EXCLUDED.qty,
+            price = EXCLUDED.price,
+            total = EXCLUDED.total,
+            isFoc = EXCLUDED.isFoc,
+            isReturned = EXCLUDED.isReturned
+        `;
+        await client.query(detailQuery, [
+          invoice.id,
+          detail.code,
+          detail.productName,
+          sanitizeNumeric(detail.qty),
+          sanitizeNumeric(detail.price),
+          sanitizeNumeric(detail.total),
+          detail.isFoc || false,
+          detail.isReturned || false
+        ]);
+      }
+
+      insertedCount++;
+    }
+
+    await client.query('COMMIT');
+    
+    // Clear the in-memory storage after successful submission
+    uploadedInvoices = [];
+
+    res.json({ 
+      message: `Successfully submitted ${insertedCount} invoices to the database.`,
+      clearMessage: 'In-memory storage has been cleared.'
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error submitting invoices:', error);
+    res.status(500).json({ message: 'Error submitting invoices', error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Fetch customers by salesman
 app.get('/api/customers/combobox', async (req, res) => {
   const { salesman, search, page = 1, limit = 20 } = req.query;
