@@ -68,12 +68,12 @@ export interface OrderDetail {
 
 export interface InvoiceData {
   id: string;
-  invoiceNo: string;
-  orderNo: string;
+  invoiceno: string;
+  orderno: string;
   date: string;
   type: string;
   customer: string;
-  customerName: string;
+  customername: string;
   salesman: string;
   totalAmount: string;
   time: string;

@@ -1311,7 +1311,7 @@ function TableEditing<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
-      {isLastPage && (
+      {isLastPage && !(tableKey === "invois") && (
         <>
           <ToolTip
             content={"Klik untuk menambah baris baharu"}

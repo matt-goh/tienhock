@@ -23,6 +23,7 @@ import InvoisUploadPage from "../../pages/Invois/InvoisUploadPage";
 import CatalogueJobPage from "../../pages/Catalogue/CatalogueJobPage";
 import CatalogueTaxPage from "../../pages/Catalogue/CatalogueTaxPage";
 import eInvoisPage from "../../pages/Invois/eInvoisPage";
+import InvoisPage from "../../pages/Invois/InvoisPage";
 
 export interface PopoverOption {
   name: string;
@@ -103,17 +104,27 @@ export const SidebarData: SidebarItem[] = [
     subItems: [
       {
         name: "Invois",
-        path: "/stock/invois/new",
-        component: InvoisUploadPage,
+        path: "/stock/invois",
+        component: InvoisPage,
         subItems: [
           {
             name: "Invois Details",
-            path: "/stock/invois/new/:id",
+            path: "/stock/invois/:id",
             component: InvoisDetailsPage,
           },
           {
-            name: "Create New Invois",
-            path: "/stock/invois/new/create",
+            name: "Imported Invois Page",
+            path: "/stock/invois/imported",
+            component: InvoisUploadPage,
+          },
+          {
+            name: "Imported Invois Details",
+            path: "/stock/invois/imported/:id",
+            component: InvoisDetailsPage,
+          },
+          {
+            name: "Create New Invois Page",
+            path: "/stock/invois/create",
             component: InvoisDetailsPage,
           },
         ],
