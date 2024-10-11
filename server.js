@@ -1434,6 +1434,18 @@ const sanitizeOrderDetail = (detail) => {
   return sanitized;
 };
 
+// Endpoint to create a new invoice
+app.post('/api/invoices', (req, res) => {
+  const newInvoice = req.body;
+  newInvoice.id = newInvoice.invoiceNo;
+  newInvoice.orderDetails = newInvoice.orderDetails
+    .map(sanitizeOrderDetail)
+    .filter(detail => !shouldRemoveRow(detail));
+
+  uploadedInvoices.push(newInvoice);
+  res.status(201).json(newInvoice);
+});
+
 // Endpoint to receive uploaded invoice data
 app.post('/api/invoices/upload', (req, res) => {
   const newInvoices = req.body.map(invoice => ({
@@ -1499,8 +1511,11 @@ app.put('/api/invoices/:id', (req, res) => {
   const index = uploadedInvoices.findIndex(invoice => invoice.id === id);
   
   if (index !== -1) {
+    updatedInvoice.orderDetails = updatedInvoice.orderDetails
+      .map(sanitizeOrderDetail)
+      .filter(detail => !shouldRemoveRow(detail));
     uploadedInvoices[index] = updatedInvoice;
-    res.status(200).json({ message: 'Invoice updated successfully' });
+    res.status(200).json(updatedInvoice);
   } else {
     res.status(404).json({ message: 'Invoice not found' });
   }
