@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { IconCloudUpload, IconTrash } from "@tabler/icons-react";
+import { IconCloudUpload, IconSend, IconTrash } from "@tabler/icons-react";
 import TableEditing from "../../components/Table/TableEditing";
 import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData } from "../../types/types";
@@ -10,6 +10,7 @@ import { fetchInvoices, getInvoices, updateInvoice } from "./InvoisUtils";
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -110,6 +111,49 @@ const InvoisUploadPage: React.FC = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (fileData.length === 0) {
+      toast.error("No invoices to submit");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/invoices/submit",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(fileData),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast.success(result.message);
+      setFileData([]); // Clear the file data after successful submission
+    } catch (error) {
+      console.error("Error submitting invoices:", error);
+      setError(
+        error instanceof Error ? error.message : "An unknown error occurred"
+      );
+      toast.error(
+        `Failed to submit invoices: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -312,10 +356,18 @@ const InvoisUploadPage: React.FC = () => {
         Import Invois
       </h1>
       <div
-        className={`flex mb-4 ${
+        className={`flex mb-4 space-x-2 ${
           fileData.length > 0 ? "justify-end" : "justify-center"
         }`}
       >
+        {fileData.length > 0 && (
+          <button
+            onClick={handleClearData}
+            className="flex items-center px-4 py-2 font-medium text-red-600 border border-red-600 rounded-full hover:bg-red-50 active:bg-red-100 transition-colors duration-200"
+          >
+            <IconTrash className="mr-2 h-4 w-4" /> Clear
+          </button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -331,18 +383,19 @@ const InvoisUploadPage: React.FC = () => {
           iconSize={16}
           iconStroke={2}
           variant="outline"
-          additionalClasses={fileData.length > 0 ? "mr-2" : ""}
         >
           Upload Documents
         </Button>
-        {fileData.length > 0 && (
-          <button
-            onClick={handleClearData}
-            className="flex items-center px-4 py-2 font-medium text-red-600 border border-red-600 rounded-full hover:bg-red-50 active:bg-red-100 transition-colors duration-200"
-          >
-            <IconTrash className="mr-2 h-4 w-4" /> Clear
-          </button>
-        )}
+        <Button
+          onClick={handleSubmit}
+          icon={IconSend}
+          iconSize={16}
+          iconStroke={2}
+          variant="outline"
+          disabled={isSubmitting || fileData.length === 0}
+        >
+          {isSubmitting ? "Submitting..." : "Submit"}
+        </Button>
       </div>
       {fileData.length > 0 && (
         <TableEditing<InvoiceData>
