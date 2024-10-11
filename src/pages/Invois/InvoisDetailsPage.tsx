@@ -17,7 +17,12 @@ import {
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
-import { updateInvoice, deleteInvoice, saveInvoice } from "./InvoisUtils";
+import {
+  updateInvoice,
+  deleteInvoice,
+  saveInvoice,
+  createInvoice,
+} from "./InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { debounce } from "lodash";
 import {
@@ -151,6 +156,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [previousPath, setPreviousPath] = useState("/stock/invois");
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(() => {
     if (location.state?.isNewInvoice) {
       return {
@@ -164,7 +170,7 @@ const InvoisDetailsPage: React.FC = () => {
         }),
         type: "I",
         customer: "",
-        customerName: "",
+        customername: "",
         salesman: "",
         totalAmount: "0",
         orderDetails: [],
@@ -201,6 +207,12 @@ const InvoisDetailsPage: React.FC = () => {
       updateInvoice(invoiceData);
     }
   }, [invoiceData]);
+
+  useEffect(() => {
+    if (location.state?.previousPath) {
+      setPreviousPath(location.state.previousPath);
+    }
+  }, [location]);
 
   useEffect(() => {
     const hasChanged =
@@ -697,13 +709,13 @@ const InvoisDetailsPage: React.FC = () => {
     if (isFormChanged && !isNewInvoice) {
       setShowBackConfirmation(true);
     } else {
-      navigate("/stock/invois/new");
+      navigate(previousPath);
     }
   };
 
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
-    navigate("/stock/invois/new");
+    navigate(previousPath);
   };
 
   const handleDeleteClick = () => {
@@ -713,25 +725,44 @@ const InvoisDetailsPage: React.FC = () => {
   const handleSaveClick = async () => {
     if (!invoiceData) return;
 
-    if (!invoiceData.invoiceNo.trim()) {
+    if (!invoiceData.invoiceno.trim()) {
       toast.error("Please enter an invoice number before saving.");
       return;
     }
 
     setIsSaving(true);
     try {
-      const savedInvoice = await saveInvoice(invoiceData);
+      let savedInvoice;
+      if (isNewInvoice) {
+        savedInvoice = await createInvoice(invoiceData);
+        toast.success("New invoice created successfully");
+      } else {
+        // Determine if we're saving to the database or server memory
+        const saveToDb = location.pathname.includes("/stock/invois/details");
+        savedInvoice = await saveInvoice(invoiceData, saveToDb);
+        toast.success(
+          saveToDb
+            ? "Invoice updated successfully in database"
+            : "Invoice updated successfully in memory"
+        );
+      }
+      navigate(previousPath);
       setInvoiceData(savedInvoice);
       setIsFormChanged(false);
       setIsNewInvoice(false);
-      toast.success("Invoice saved successfully");
-      navigate("/stock/invois/new");
     } catch (error) {
-      console.error("Error saving invoice:", error);
       if (error instanceof Error) {
-        toast.error(`Failed to save invoice: ${error.message}`);
+        toast.error(
+          `Failed to ${isNewInvoice ? "create" : "save"} invoice: ${
+            error.message
+          }`
+        );
       } else {
-        toast.error("An unknown error occurred while saving the invoice.");
+        toast.error(
+          `An unknown error occurred while ${
+            isNewInvoice ? "creating" : "saving"
+          } the invoice.`
+        );
       }
     } finally {
       setIsSaving(false);
@@ -743,7 +774,7 @@ const InvoisDetailsPage: React.FC = () => {
       try {
         await deleteInvoice(invoiceData.id);
         toast.success("Invoice deleted successfully");
-        navigate("/stock/invois/new");
+        navigate(previousPath);
       } catch (error) {
         console.error("Error deleting invoice:", error);
         toast.error("Failed to delete invoice. Please try again.");
@@ -1412,9 +1443,9 @@ const InvoisDetailsPage: React.FC = () => {
           <Button
             onClick={handleSaveClick}
             variant="outline"
-            disabled={isSaving || !isFormChanged}
+            disabled={isSaving || (!isNewInvoice && !isFormChanged)}
           >
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? "Saving..." : isNewInvoice ? "Create" : "Save"}
           </Button>
         </div>
       </div>
@@ -1423,10 +1454,12 @@ const InvoisDetailsPage: React.FC = () => {
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="rounded-lg space-y-2">
           <FormInput
-            name="invoiceNo"
+            name="invoiceno"
             label="Invoice No"
             value={
-              invoiceData ? `${invoiceData.type}${invoiceData.invoiceNo}` : ""
+              invoiceData
+                ? `${invoiceData.type || ""}${invoiceData.invoiceno || ""}`
+                : ""
             }
             onChange={(e) => {
               const newValue = e.target.value;
@@ -1434,22 +1467,22 @@ const InvoisDetailsPage: React.FC = () => {
                 if (!prev) return null;
                 return {
                   ...prev,
-                  type: newValue.charAt(0) as "C" | "I",
-                  invoiceNo: newValue.slice(1),
+                  type: (newValue.charAt(0) as "C" | "I") || prev.type,
+                  invoiceno: newValue.slice(1),
                 };
               });
             }}
           />
           <FormInput
-            name="orderNo"
+            name="orderno"
             label="Order No"
-            value={invoiceData.orderNo}
+            value={invoiceData.orderno}
             onChange={(e) => {
               setInvoiceData((prev) => {
                 if (!prev) return null;
                 return {
                   ...prev,
-                  orderNo: e.target.value,
+                  orderno: e.target.value,
                 };
               });
             }}
@@ -1513,7 +1546,7 @@ const InvoisDetailsPage: React.FC = () => {
           <CustomerCombobox
             name="customer"
             label="Customer"
-            value={invoiceData?.customerName ? [invoiceData.customerName] : []}
+            value={invoiceData?.customername ? [invoiceData.customername] : []}
             onChange={(value: string[] | null) => {
               const selectedCustomerName = value ? value[0] : "";
               const selectedCustomer = customers.find(
@@ -1524,7 +1557,7 @@ const InvoisDetailsPage: React.FC = () => {
                 return {
                   ...prev,
                   customer: selectedCustomer?.id || "",
-                  customerName: selectedCustomerName,
+                  customername: selectedCustomerName,
                 };
               });
             }}

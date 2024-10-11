@@ -1422,7 +1422,7 @@ const sanitizeOrderDetail = (detail) => {
   const sanitized = { ...detail };
   for (const key in sanitized) {
     if (isEmptyOrInvalid(sanitized[key])) {
-      if (key === 'qty' || key === 'price' || key === 'total' || key === 'discount' || key === 'tax' || key === 'rounding') {
+      if (key === 'qty' || key === 'price' || key === 'total' || key === 'discount' || key === 'tax') {
         sanitized[key] = '0'; // Set numeric fields to '0' as a string if invalid
       } else if (key === 'foc' || key === 'returned') {
         sanitized[key] = 0; // Set foc and returned to 0 if invalid
@@ -1434,17 +1434,14 @@ const sanitizeOrderDetail = (detail) => {
   return sanitized;
 };
 
-// Endpoint to create a new invoice
-app.post('/api/invoices', (req, res) => {
-  const newInvoice = req.body;
-  newInvoice.id = newInvoice.invoiceNo;
-  newInvoice.orderDetails = newInvoice.orderDetails
-    .map(sanitizeOrderDetail)
-    .filter(detail => !shouldRemoveRow(detail));
-
-  uploadedInvoices.push(newInvoice);
-  res.status(201).json(newInvoice);
-});
+// Helper function to sanitize numeric values
+const sanitizeNumeric = (value) => {
+  if (typeof value === 'string') {
+    // Remove commas and any other non-numeric characters except for the decimal point
+    return value.replace(/[^\d.-]/g, '');
+  }
+  return value;
+};
 
 // Endpoint to receive uploaded invoice data
 app.post('/api/invoices/upload', (req, res) => {
@@ -1463,6 +1460,339 @@ app.post('/api/invoices/upload', (req, res) => {
   }
 });
 
+// Endpoint to fetch invoices from database
+app.get('/api/db/invoices', async (req, res) => {
+  try {
+    const invoiceQuery = `
+      SELECT 
+        i.id, i.invoiceno, i.orderno, i.date, i.type, 
+        i.customer, c.name as customername, 
+        i.salesman, i.totalamount, i.time
+      FROM 
+        invoices i
+      LEFT JOIN 
+        customers c ON i.customer = c.id
+    `;
+    const invoiceResult = await pool.query(invoiceQuery);
+
+    const orderDetailsQuery = `
+      SELECT 
+        od.invoiceid, od.code, p.description as productname, 
+        od.qty, od.price, od.total, od.isfoc, od.isreturned,
+        od.istotal, od.issubtotal, od.isless, od.istax
+      FROM 
+        order_details od
+      LEFT JOIN 
+        products p ON od.code = p.id
+    `;
+    const orderDetailsResult = await pool.query(orderDetailsQuery);
+
+    const invoicesWithDetails = invoiceResult.rows.map(invoice => {
+      // Handle date conversion
+      let formattedDate;
+      if (invoice.date instanceof Date) {
+        formattedDate = `${invoice.date.getDate().toString().padStart(2, '0')}/${(invoice.date.getMonth() + 1).toString().padStart(2, '0')}/${invoice.date.getFullYear()}`;
+      } else if (typeof invoice.date === 'string') {
+        // Assuming the date string is in ISO format (YYYY-MM-DD)
+        const [year, month, day] = invoice.date.split('T')[0].split('-');
+        formattedDate = `${day}/${month}/${year}`;
+      } else {
+        console.error('Unexpected date format:', invoice.date);
+        formattedDate = 'Invalid Date';
+      }
+
+      // Handle time conversion
+      let formattedTime;
+      if (typeof invoice.time === 'string') {
+        let [hours, minutes] = invoice.time.split(':');
+        hours = parseInt(hours);
+        const period = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12 || 12; // Convert 24h to 12h format
+        formattedTime = `${hours}:${minutes} ${period}`;
+      } else {
+        console.error('Unexpected time format:', invoice.time);
+        formattedTime = 'Invalid Time';
+      }
+
+      return {
+        ...invoice,
+        date: formattedDate,
+        time: formattedTime,
+        totalAmount: invoice.totalamount,
+        orderDetails: orderDetailsResult.rows
+          .filter(detail => detail.invoiceid === invoice.id)
+          .map(detail => ({
+            code: detail.code,
+            productName: detail.productname,
+            qty: detail.qty,
+            price: detail.price,
+            total: detail.total,
+            isFoc: detail.isfoc,
+            isReturned: detail.isreturned,
+            isTotal: detail.istotal,
+            isSubtotal: detail.issubtotal,
+            isLess: detail.isless,
+            isTax: detail.istax
+          }))
+      };
+    });
+
+    res.json(invoicesWithDetails);
+  } catch (error) {
+    console.error('Error fetching invoices from database:', error);
+    res.status(500).json({ message: 'Error fetching invoices', error: error.message });
+  }
+});
+
+// Endpoint to save edited invoices to the database or server memory
+app.post('/api/invoices/submit', async (req, res) => {
+  const { saveToDb } = req.query;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const invoices = Array.isArray(req.body) ? req.body : [req.body];
+    const processedInvoices = invoices.map(invoice => ({
+      ...invoice,
+      orderDetails: invoice.orderDetails.map(sanitizeOrderDetail)
+    }));
+
+    let insertedInvoices = [];
+
+    if (saveToDb === 'true') {
+      // Save to database
+      for (const invoice of processedInvoices) {
+        // Convert date from DD/MM/YYYY to YYYY-MM-DD
+        const [day, month, year] = invoice.date.split('/');
+        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        // Convert time from "HH:MM am/pm" to "HH:MM:SS" format
+        const [time, period] = invoice.time.split(' ');
+        let [hours, minutes] = time.split(':');
+        hours = parseInt(hours);
+        if (period.toLowerCase() === 'pm' && hours !== 12) {
+          hours += 12;
+        } else if (period.toLowerCase() === 'am' && hours === 12) {
+          hours = 0;
+        }
+        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}:00`;
+
+        // Sanitize totalAmount
+        const sanitizedTotalAmount = sanitizeNumeric(invoice.totalAmount);
+
+        // Check if the invoice already exists
+        const checkInvoiceQuery = 'SELECT id FROM Invoices WHERE id = $1';
+        const checkInvoiceResult = await client.query(checkInvoiceQuery, [invoice.id]);
+
+        let invoiceResult;
+        if (checkInvoiceResult.rows.length > 0) {
+          // Update existing invoice
+          const updateInvoiceQuery = `
+            UPDATE Invoices
+            SET invoiceno = $1, orderno = $2, date = $3, time = $4, type = $5,
+                customer = $6, customername = $7, salesman = $8, totalAmount = $9
+            WHERE id = $10
+            RETURNING *
+          `;
+          invoiceResult = await client.query(updateInvoiceQuery, [
+            invoice.invoiceno,
+            invoice.orderno,
+            formattedDate,
+            formattedTime,
+            invoice.type,
+            invoice.customer,
+            invoice.customername,
+            invoice.salesman,
+            sanitizedTotalAmount,
+            invoice.id
+          ]);
+        } else {
+          // Insert new invoice
+          const insertInvoiceQuery = `
+            INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING *
+          `;
+          invoiceResult = await client.query(insertInvoiceQuery, [
+            invoice.invoiceno, // Use invoiceno as the new id
+            invoice.invoiceno,
+            invoice.orderno,
+            formattedDate,
+            formattedTime,
+            invoice.type,
+            invoice.customer,
+            invoice.customername,
+            invoice.salesman,
+            sanitizedTotalAmount
+          ]);
+        }
+
+        const insertedInvoice = invoiceResult.rows[0];
+
+        // Delete existing order details
+        await client.query('DELETE FROM order_details WHERE invoiceId = $1', [insertedInvoice.id]);
+
+        // Insert new order details
+        for (const detail of invoice.orderDetails) {
+          const detailQuery = `
+            INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned, isTotal, isSubtotal, isLess, isTax)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `;
+          await client.query(detailQuery, [
+            insertedInvoice.id,
+            detail.code,
+            detail.productName,
+            detail.qty,
+            detail.price,
+            detail.total,
+            detail.isFoc || false,
+            detail.isReturned || false,
+            detail.isTotal || false,
+            detail.isSubtotal || false,
+            detail.isLess || false,
+            detail.isTax || false
+          ]);
+        }
+
+        insertedInvoices.push(insertedInvoice);
+      }
+    } else {
+      // Save to server memory
+      for (const invoice of processedInvoices) {
+        const existingIndex = uploadedInvoices.findIndex(inv => inv.id === invoice.id);
+        if (existingIndex !== -1) {
+          uploadedInvoices[existingIndex] = invoice;
+        } else {
+          uploadedInvoices.push(invoice);
+        }
+        insertedInvoices.push(invoice);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    if (Array.isArray(req.body)) {
+      res.json({ 
+        message: `Successfully ${saveToDb === 'true' ? 'saved' : 'updated'} ${insertedInvoices.length} invoices.`,
+        invoices: insertedInvoices
+      });
+    } else {
+      // For single invoice creation/update, return the invoice
+      const savedInvoice = insertedInvoices[0];
+      
+      if (saveToDb === 'true') {
+        // Fetch order details for the saved invoice
+        const orderDetailsQuery = `
+          SELECT * FROM order_details WHERE invoiceId = $1
+        `;
+        const orderDetailsResult = await client.query(orderDetailsQuery, [savedInvoice.id]);
+        savedInvoice.orderDetails = orderDetailsResult.rows;
+      }
+
+      res.status(201).json(savedInvoice);
+    }
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error submitting invoices:', error);
+    res.status(500).json({ message: 'Error submitting invoices', error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Endpoint to bulk submit invoices to the database
+app.post('/api/invoices/bulk-submit', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const invoices = req.body;
+    const insertedInvoices = [];
+
+    for (const invoice of invoices) {
+      // Convert date from DD/MM/YYYY to YYYY-MM-DD
+      const [day, month, year] = invoice.date.split('/');
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      // Convert time from "HH:MM am/pm" to "HH:MM:SS" format
+      const [time, period] = invoice.time.split(' ');
+      let [hours, minutes] = time.split(':');
+      hours = parseInt(hours);
+      if (period.toLowerCase() === 'pm' && hours !== 12) {
+        hours += 12;
+      } else if (period.toLowerCase() === 'am' && hours === 12) {
+        hours = 0;
+      }
+      const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}:00`;
+
+      // Sanitize totalAmount
+      const sanitizedTotalAmount = sanitizeNumeric(invoice.totalAmount);
+
+      // Insert new invoice
+      const insertInvoiceQuery = `
+        INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `;
+      const invoiceResult = await client.query(insertInvoiceQuery, [
+        invoice.invoiceno, // Use invoiceno as the id
+        invoice.invoiceno,
+        invoice.orderno,
+        formattedDate,
+        formattedTime,
+        invoice.type,
+        invoice.customer,
+        invoice.customername,
+        invoice.salesman,
+        sanitizedTotalAmount
+      ]);
+
+      const insertedInvoice = invoiceResult.rows[0];
+
+      // Insert order details
+      for (const detail of invoice.orderDetails) {
+        const detailQuery = `
+          INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned, isTotal, isSubtotal, isLess, isTax)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `;
+        await client.query(detailQuery, [
+          insertedInvoice.id,
+          detail.code,
+          detail.productName,
+          detail.qty,
+          detail.price,
+          detail.total,
+          detail.isFoc || false,
+          detail.isReturned || false,
+          detail.isTotal || false,
+          detail.isSubtotal || false,
+          detail.isLess || false,
+          detail.isTax || false
+        ]);
+      }
+
+      insertedInvoices.push(insertedInvoice);
+    }
+
+    await client.query('COMMIT');
+    
+    // Clear the in-memory storage after successful submission
+    uploadedInvoices = [];
+
+    res.json({ 
+      message: `Successfully submitted ${insertedInvoices.length} invoices to the database.`,
+      clearMessage: 'In-memory storage has been cleared.',
+      invoices: insertedInvoices
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error submitting invoices:', error);
+    res.status(500).json({ message: 'Error submitting invoices', error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Endpoint to get all uploaded invoices with customer names and product details
 app.get('/api/invoices', async (req, res) => {
   try {
@@ -1476,7 +1806,7 @@ app.get('/api/invoices', async (req, res) => {
 
     const invoicesWithDetails = uploadedInvoices.map(invoice => ({
       ...invoice,
-      customerName: customerMap.get(invoice.customer) || invoice.customer,
+      customername: customerMap.get(invoice.customer) || invoice.customer,
       orderDetails: invoice.orderDetails
         .map(detail => ({
           ...sanitizeOrderDetail(detail),
@@ -1492,13 +1822,47 @@ app.get('/api/invoices', async (req, res) => {
   }
 });
 
+// Delete an invoice from the database
+app.delete('/api/db/invoices/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Delete order details first
+      await client.query('DELETE FROM order_details WHERE invoiceId = $1', [id]);
+
+      // Then delete the invoice
+      const result = await client.query('DELETE FROM invoices WHERE id = $1 RETURNING *', [id]);
+
+      await client.query('COMMIT');
+
+      if (result.rows.length === 0) {
+        res.status(404).json({ message: 'Invoice not found' });
+      } else {
+        res.status(200).json({ message: 'Invoice deleted successfully', deletedInvoice: result.rows[0] });
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error deleting invoice from database:', error);
+    res.status(500).json({ message: 'Error deleting invoice', error: error.message });
+  }
+});
+
 app.delete('/api/invoices/:id', (req, res) => {
   const { id } = req.params;
   const index = uploadedInvoices.findIndex(invoice => invoice.id === id);
   
   if (index !== -1) {
-    uploadedInvoices.splice(index, 1);
-    res.status(200).json({ message: 'Invoice deleted successfully' });
+    const deletedInvoice = uploadedInvoices.splice(index, 1)[0];
+    res.status(200).json({ message: 'Invoice deleted successfully', deletedInvoice });
   } else {
     res.status(404).json({ message: 'Invoice not found' });
   }
@@ -1535,116 +1899,6 @@ app.get('/api/products/combobox', async (req, res) => {
   } catch (error) {
     console.error('Error fetching products for combobox:', error);
     res.status(500).json({ message: 'Error fetching products', error: error.message });
-  }
-});
-
-// Helper function to sanitize numeric values
-const sanitizeNumeric = (value) => {
-  if (typeof value === 'string') {
-    // Remove commas and any other non-numeric characters except for the decimal point
-    return value.replace(/[^\d.-]/g, '');
-  }
-  return value;
-};
-
-app.post('/api/invoices/submit', async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const invoices = req.body;
-    let insertedCount = 0;
-
-    for (const invoice of invoices) {
-      // Convert date from DD/MM/YYYY to YYYY-MM-DD
-      const [day, month, year] = invoice.date.split('/');
-      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-      // Convert time from "HH:MM am/pm" to "HH:MM:SS" format
-      const [time, period] = invoice.time.split(' ');
-      let [hours, minutes] = time.split(':');
-      hours = parseInt(hours);
-      if (period.toLowerCase() === 'pm' && hours !== 12) {
-        hours += 12;
-      } else if (period.toLowerCase() === 'am' && hours === 12) {
-        hours = 0;
-      }
-      const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}:00`;
-
-      // Sanitize totalAmount
-      const sanitizedTotalAmount = sanitizeNumeric(invoice.totalAmount);
-
-      // Insert invoice
-      const invoiceQuery = `
-        INSERT INTO Invoices (id, invoiceNo, orderNo, date, time, type, customer, customerName, salesman, totalAmount)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT (id) DO UPDATE SET
-          invoiceNo = EXCLUDED.invoiceNo,
-          orderNo = EXCLUDED.orderNo,
-          date = EXCLUDED.date,
-          time = EXCLUDED.time,
-          type = EXCLUDED.type,
-          customer = EXCLUDED.customer,
-          customerName = EXCLUDED.customerName,
-          salesman = EXCLUDED.salesman,
-          totalAmount = EXCLUDED.totalAmount
-      `;
-      await client.query(invoiceQuery, [
-        invoice.id,
-        invoice.invoiceNo,
-        invoice.orderNo,
-        formattedDate,
-        formattedTime,
-        invoice.type,
-        invoice.customer,
-        invoice.customerName,
-        invoice.salesman,
-        sanitizedTotalAmount
-      ]);
-
-      // Insert order details
-      for (const detail of invoice.orderDetails) {
-        const detailQuery = `
-          INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          ON CONFLICT (invoiceId, code) DO UPDATE SET
-            productName = EXCLUDED.productName,
-            qty = EXCLUDED.qty,
-            price = EXCLUDED.price,
-            total = EXCLUDED.total,
-            isFoc = EXCLUDED.isFoc,
-            isReturned = EXCLUDED.isReturned
-        `;
-        await client.query(detailQuery, [
-          invoice.id,
-          detail.code,
-          detail.productName,
-          sanitizeNumeric(detail.qty),
-          sanitizeNumeric(detail.price),
-          sanitizeNumeric(detail.total),
-          detail.isFoc || false,
-          detail.isReturned || false
-        ]);
-      }
-
-      insertedCount++;
-    }
-
-    await client.query('COMMIT');
-    
-    // Clear the in-memory storage after successful submission
-    uploadedInvoices = [];
-
-    res.json({ 
-      message: `Successfully submitted ${insertedCount} invoices to the database.`,
-      clearMessage: 'In-memory storage has been cleared.'
-    });
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error submitting invoices:', error);
-    res.status(500).json({ message: 'Error submitting invoices', error: error.message });
-  } finally {
-    client.release();
   }
 });
 

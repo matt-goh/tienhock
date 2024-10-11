@@ -14,6 +14,24 @@ export const updateInvoice = (updatedInvoice: InvoiceData) => {
   );
 };
 
+export const fetchDbInvoices = async (): Promise<InvoiceData[]> => {
+  try {
+    const response = await fetch("http://localhost:5000/api/db/invoices");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (Array.isArray(data)) {
+      return data;
+    } else {
+      throw new Error("Received data is not an array");
+    }
+  } catch (error) {
+    console.error("Error fetching invoices:", error);
+    throw error;
+  }
+};
+
 export const fetchInvoices = async () => {
   try {
     const response = await fetch("http://localhost:5000/api/invoices");
@@ -35,12 +53,32 @@ export const fetchInvoices = async () => {
 
 export const deleteInvoice = async (id: string) => {
   try {
-    const response = await fetch(`http://localhost:5000/api/invoices/${id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // First, try to delete from the database
+    const dbResponse = await fetch(
+      `http://localhost:5000/api/db/invoices/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (dbResponse.ok) {
+      // If successful, remove from local storage as well
+      invoices = invoices.filter((invoice) => invoice.id !== id);
+      return true;
     }
+
+    // If not found in database, try to delete from server memory
+    const memoryResponse = await fetch(
+      `http://localhost:5000/api/invoices/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!memoryResponse.ok) {
+      throw new Error(`HTTP error! status: ${memoryResponse.status}`);
+    }
+
     // Remove the invoice from the local storage
     invoices = invoices.filter((invoice) => invoice.id !== id);
     return true;
@@ -51,17 +89,14 @@ export const deleteInvoice = async (id: string) => {
 };
 
 export const saveInvoice = async (
-  invoice: InvoiceData
+  invoice: InvoiceData,
+  saveToDb: boolean = true
 ): Promise<InvoiceData> => {
   try {
-    const url = invoice.id
-      ? `http://localhost:5000/api/invoices/${invoice.id}`
-      : "http://localhost:5000/api/invoices";
-
-    const method = invoice.id ? "PUT" : "POST";
+    const url = `http://localhost:5000/api/invoices/submit?saveToDb=${saveToDb}`;
 
     const response = await fetch(url, {
-      method: method,
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
@@ -79,19 +114,48 @@ export const saveInvoice = async (
 
     const savedInvoice: InvoiceData = await response.json();
 
-    // Update the local cache
-    const invoices = getInvoices();
-    const index = invoices.findIndex((inv) => inv.id === savedInvoice.id);
-    if (index !== -1) {
-      invoices[index] = savedInvoice;
-    } else {
-      invoices.push(savedInvoice);
+    // Update the local cache if saving to memory
+    if (!saveToDb) {
+      const index = invoices.findIndex((inv) => inv.id === savedInvoice.id);
+      if (index !== -1) {
+        invoices[index] = savedInvoice;
+      } else {
+        invoices.push(savedInvoice);
+      }
     }
-    localStorage.setItem("invoices", JSON.stringify(invoices));
 
     return savedInvoice;
   } catch (error) {
     console.error("Error saving invoice:", error);
+    throw error;
+  }
+};
+
+export const createInvoice = async (
+  invoiceData: InvoiceData
+): Promise<InvoiceData> => {
+  try {
+    const response = await fetch(
+      "http://localhost:5000/api/invoices/submit?saveToDb=true",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoiceData),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to create invoice");
+    }
+
+    const createdInvoice: InvoiceData = await response.json();
+
+    return createdInvoice;
+  } catch (error) {
+    console.error("Error creating invoice:", error);
     throw error;
   }
 };
