@@ -179,9 +179,9 @@ const CatalogueStaffPage = () => {
   const [filters, setFilters] = useState<FilterOptions>({
     showResigned: false,
     jobFilter: null,
-    applyJobFilter: false,
+    applyJobFilter: true,
     locationFilter: null,
-    applyLocationFilter: false,
+    applyLocationFilter: true,
   });
   const navigate = useNavigate();
 

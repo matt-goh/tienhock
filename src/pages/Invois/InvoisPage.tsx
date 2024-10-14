@@ -1,22 +1,41 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
-import { ColumnConfig, InvoiceData } from "../../types/types";
+import {
+  ColumnConfig,
+  InvoiceData,
+  InvoiceFilterOptions,
+} from "../../types/types";
 import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
 import { IconCloudUpload, IconPlus } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
 import { API_BASE_URL } from "../../config";
 
 const InvoisPage: React.FC = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null
   );
+  const [filters, setFilters] = useState<InvoiceFilterOptions>({
+    salesmanFilter: null,
+    applySalesmanFilter: true,
+    customerFilter: null,
+    applyCustomerFilter: true,
+    dateRangeFilter: { start: today, end: tomorrow },
+    applyDateRangeFilter: true,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,6 +43,10 @@ const InvoisPage: React.FC = () => {
   useEffect(() => {
     loadInvoices();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [invoices, filters]);
 
   const loadInvoices = async () => {
     setIsLoading(true);
@@ -44,6 +67,53 @@ const InvoisPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const parseDate = (dateString: string): Date => {
+    const [day, month, year] = dateString.split("/").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const applyFilters = () => {
+    let filtered = [...invoices];
+
+    if (
+      filters.applySalesmanFilter &&
+      filters.salesmanFilter &&
+      filters.salesmanFilter.length > 0
+    ) {
+      filtered = filtered.filter((invoice) =>
+        filters.salesmanFilter!.includes(invoice.salesman)
+      );
+    }
+
+    if (
+      filters.applyCustomerFilter &&
+      filters.customerFilter &&
+      filters.customerFilter.length > 0
+    ) {
+      filtered = filtered.filter((invoice) =>
+        filters.customerFilter!.includes(invoice.customername)
+      );
+    }
+
+    if (filters.applyDateRangeFilter && filters.dateRangeFilter) {
+      filtered = filtered.filter((invoice) => {
+        const invoiceDate = parseDate(invoice.date);
+        return (
+          (!filters.dateRangeFilter!.start ||
+            invoiceDate >= filters.dateRangeFilter!.start) &&
+          (!filters.dateRangeFilter!.end ||
+            invoiceDate < filters.dateRangeFilter!.end)
+        );
+      });
+    }
+
+    setFilteredInvoices(filtered);
+  };
+
+  const handleFilterChange = (newFilters: InvoiceFilterOptions) => {
+    setFilters(newFilters);
   };
 
   const handleFileUpload = async (
@@ -79,16 +149,13 @@ const InvoisPage: React.FC = () => {
       }
 
       // Upload parsed data to the server
-      const response = await fetch(
-        `${API_BASE_URL}/api/invoices/upload`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newFileData),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/invoices/upload`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newFileData),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -272,6 +339,14 @@ const InvoisPage: React.FC = () => {
     { id: "totalamount", header: "Amount", type: "readonly", width: 150 },
   ];
 
+  const salesmanOptions = useMemo(() => {
+    return Array.from(new Set(invoices.map((invoice) => invoice.salesman)));
+  }, [invoices]);
+
+  const customerOptions = useMemo(() => {
+    return Array.from(new Set(invoices.map((invoice) => invoice.customername)));
+  }, [invoices]);
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -313,10 +388,16 @@ const InvoisPage: React.FC = () => {
         >
           Import
         </Button>
+        <InvoiceFilterMenu
+          onFilterChange={handleFilterChange}
+          currentFilters={filters}
+          salesmanOptions={salesmanOptions}
+          customerOptions={customerOptions}
+        />
       </div>
-      {invoices.length > 0 ? (
+      {filteredInvoices.length > 0 ? (
         <TableEditing<InvoiceData>
-          initialData={invoices}
+          initialData={filteredInvoices}
           columns={columns}
           onChange={setInvoices}
           tableKey="invois"
