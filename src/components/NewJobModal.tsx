@@ -138,15 +138,15 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                 <DialogPanel className="text-left align-middle shadow-xl w-full max-w-lg">
                   <form onSubmit={handleSubmit} className="">
                     <Fieldset className="transform space-y-4 rounded-xl bg-white p-8 transition-all">
-                      <Legend className="text-lg font-bold text-gray-900">
+                      <Legend className="text-lg font-bold text-default-900">
                         Job Entry
                       </Legend>
                       <Field>
-                        <Label className="font-medium text-gray-900">ID</Label>
+                        <Label className="font-medium text-default-900">ID</Label>
                         <Input
                           className={clsx(
-                            "mt-3 block w-full rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-900",
-                            "focus:outline-none focus:border-gray-400"
+                            "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 px-4 text-default-900",
+                            "focus:outline-none focus:border-default-400"
                           )}
                           name="id"
                           value={formData.id}
@@ -155,13 +155,13 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         />
                       </Field>
                       <Field>
-                        <Label className="font-medium text-gray-900">
+                        <Label className="font-medium text-default-900">
                           Name
                         </Label>
                         <Input
                           className={clsx(
-                            "mt-3 block w-full rounded-lg border border-gray-300 bg-white py-2 px-4 text-gray-900",
-                            "focus:outline-none focus:border-gray-400"
+                            "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 px-4 text-default-900",
+                            "focus:outline-none focus:border-default-400"
                           )}
                           name="name"
                           value={formData.name}
@@ -170,7 +170,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         />
                       </Field>
                       <Field>
-                        <Label className="font-medium text-gray-900">
+                        <Label className="font-medium text-default-900">
                           Section
                         </Label>
                         <Combobox
@@ -187,8 +187,8 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                             <div className="relative mt-3">
                               <ComboboxInput
                                 className={clsx(
-                                  "mt-3 block w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-gray-900",
-                                  "focus:outline-none focus:border-gray-400"
+                                  "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",
+                                  "focus:outline-none focus:border-default-400"
                                 )}
                                 displayValue={(sections: string[]) =>
                                   sections.join(", ")
@@ -197,7 +197,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                   setQuery(event.target.value)
                                 }
                               />
-                              <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
+                              <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-500">
                                 <IconChevronDown stroke={2} size={22} />
                               </ComboboxButton>
                               <Transition
@@ -213,14 +213,14 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                 >
                                   {filteredSections.length === 0 &&
                                   query !== "" ? (
-                                    <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                                    <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                                       No sections found.
                                     </div>
                                   ) : (
                                     filteredSections.map((section) => (
                                       <ComboboxOption
                                         key={section.id}
-                                        className={`relative cursor-pointer select-none rounded py-2 px-4 text-gray-900 hover:bg-gray-100 active:bg-gray-200 transition-all duration-200`}
+                                        className={`relative cursor-pointer select-none rounded py-2 px-4 text-default-900 hover:bg-default-100 active:bg-default-200 transition-all duration-200`}
                                         value={section.name}
                                       >
                                         {({ selected }) => (
@@ -235,7 +235,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                               {section.name}
                                             </span>
                                             {selected && (
-                                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                                                 <IconCheck
                                                   stroke={2}
                                                   size={22}
@@ -260,13 +260,13 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         <button
                           type="button"
                           onClick={onClose}
-                          className="mr-2 px-6 py-3 text-sm font-medium text-gray-700 bg-gray-200 rounded-full hover:bg-gray-300/75 active:bg-gray-300 focus:outline-none"
+                          className="mr-2 px-6 py-3 text-sm font-medium text-default-700 bg-default-200 rounded-full hover:bg-default-300/75 active:bg-default-300 focus:outline-none"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="px-6 py-3 text-sm font-medium text-white bg-gray-500 rounded-full hover:bg-gray-600/90 active:bg-gray-600 focus:outline-none"
+                          className="px-6 py-3 text-sm font-medium text-white bg-default-500 rounded-full hover:bg-default-600/90 active:bg-default-600 focus:outline-none"
                         >
                           Submit
                         </button>

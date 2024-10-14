@@ -131,7 +131,7 @@ const EInvoisPage: React.FC = () => {
       )}
 
       <button
-        className="flex items-center mt-4 px-4 py-2 font-medium text-gray-700 border rounded-full hover:bg-gray-100 hover:text-gray-800 active:text-gray-900 active:bg-gray-200 transition-colors duration-200"
+        className="flex items-center mt-4 px-4 py-2 font-medium text-default-700 border rounded-full hover:bg-default-100 hover:text-default-800 active:text-default-900 active:bg-default-200 transition-colors duration-200"
         onClick={handleSubmitInvoice}
         disabled={!isLoggedIn || isSubmitting}
       >

@@ -209,7 +209,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
               onChange(newValue);
             }
           }}
-          className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
+          className="p-2 rounded-full hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
           disabled={isSorting}
         >
           {cellValue === "true" ? (
@@ -223,7 +223,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
               width={18}
               height={18}
               stroke={2}
-              className="text-gray-400"
+              className="text-default-400"
             />
           )}
         </button>
@@ -245,13 +245,13 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
           <div className="relative w-full overflow-visible">
             <div className="flex items-center overflow-visible">
               <ComboboxInput
-                className="w-full px-6 py-3 text-left focus:outline-none focus:border-gray-400 overflow-visible"
+                className="w-full px-6 py-3 text-left focus:outline-none focus:border-default-400 overflow-visible"
                 displayValue={(item: string) => item}
                 onChange={(event) => setQuery(event.target.value)}
               />
               <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                 <IconChevronDown
-                  className="text-gray-400 w-5 h-5"
+                  className="text-default-400 w-5 h-5"
                   size={18}
                   aria-hidden="true"
                 />
@@ -259,7 +259,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
             </div>
             <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
               {filteredOptions.length === 0 && query !== "" ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                   Nothing found.
                 </div>
               ) : (
@@ -269,7 +269,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                     value={option}
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                        active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                        active ? "bg-default-100 text-default-900" : "text-default-900"
                       }`
                     }
                   >
@@ -283,7 +283,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                           {option}
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                             <IconCheck className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
@@ -306,11 +306,11 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
         disabled={!editable || isSorting}
       >
         <div className="relative w-full">
-          <ListboxButton className="w-full px-6 py-3 text-left focus:outline-none focus:border-gray-400">
+          <ListboxButton className="w-full px-6 py-3 text-left focus:outline-none focus:border-default-400">
             <span className="block truncate">{value}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="text-gray-400 w-5 h-5"
+                className="text-default-400 w-5 h-5"
                 size={18}
                 aria-hidden="true"
               />
@@ -322,7 +322,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                 key={option}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                    active ? "bg-default-100 text-default-900" : "text-default-900"
                   }`
                 }
                 value={option}
@@ -337,7 +337,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                       {option}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                         <IconCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}

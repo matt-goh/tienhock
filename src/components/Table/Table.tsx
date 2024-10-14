@@ -725,7 +725,7 @@ function Table<T extends Record<string, any>>({
                 e.stopPropagation();
                 handleRowSelection(row);
               }}
-              className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200"
+              className="p-2 rounded-full hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
               disabled={isSorting}
             >
               {isAllSelectedGlobal ? (
@@ -745,7 +745,7 @@ function Table<T extends Record<string, any>>({
                   width={20}
                   height={20}
                   stroke={2}
-                  className="text-gray-400"
+                  className="text-default-400"
                 />
               )}
             </button>
@@ -758,7 +758,7 @@ function Table<T extends Record<string, any>>({
           return (
             <div className="flex items-center justify-center h-full">
               <button
-                className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 active:bg-gray-200 hover:text-gray-600 ${
+                className={`p-2 rounded-full text-default-500 hover:bg-default-100 active:bg-default-200 hover:text-default-600 ${
                   isSorting ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 onClick={(event) => {
@@ -918,7 +918,7 @@ function Table<T extends Record<string, any>>({
             {["number", "rate", "amount", "float"].includes(col.type) ? (
               <>
                 {!isSortingDisabled && (
-                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full">
+                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
                     {getSortIcon(col.id, col.type, column.getIsSorted())}
                   </span>
                 )}
@@ -936,7 +936,7 @@ function Table<T extends Record<string, any>>({
                   {col.header}
                 </span>
                 {!isSortingDisabled && (
-                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full">
+                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
                     {getSortIcon(col.id, col.type, column.getIsSorted())}
                   </span>
                 )}
@@ -994,7 +994,7 @@ function Table<T extends Record<string, any>>({
               cell: (info) => (
                 <div className="flex items-center justify-center h-full">
                   <button
-                    className={`p-2 rounded-full text-gray-500 hover:bg-gray-200 active:bg-gray-300 hover:text-gray-600 ${
+                    className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
                       isSorting ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                     onClick={(event) => {
@@ -1228,7 +1228,7 @@ function Table<T extends Record<string, any>>({
 
   return (
     <div ref={tableRef} className="flex flex-col items-center w-auto">
-      <div className="rounded-lg border border-gray-300 w-fit">
+      <div className="rounded-lg border border-default-300 w-fit">
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"
           ref={tableContainerRef}
@@ -1260,12 +1260,12 @@ function Table<T extends Record<string, any>>({
                   className={`border-t ${
                     isLastRow
                       ? "border-b-0 rounded-b-lg"
-                      : "border-b border-gray-300"
+                      : "border-b border-default-300"
                   } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
                   ${
                     selectedRows.has(row.original.id)
                       ? "bg-blue-50 hover:bg-blue-50"
-                      : "hover:bg-gray-100"
+                      : "hover:bg-default-100"
                   } ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
                     row.original.isSubtotal || row.original.isTotal
@@ -1284,7 +1284,7 @@ function Table<T extends Record<string, any>>({
                         return (
                           <td
                             key={cell.id}
-                            className="border-r border-gray-300"
+                            className="border-r border-default-300"
                           >
                             {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
@@ -1307,7 +1307,7 @@ function Table<T extends Record<string, any>>({
                         return (
                           <td
                             key={cell.id}
-                            className="border-l border-gray-300"
+                            className="border-l border-default-300"
                           >
                             {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
@@ -1320,21 +1320,21 @@ function Table<T extends Record<string, any>>({
                         <td
                           key={cell.id}
                           className={`relative px-6 py-4 whitespace-no-wrap ${
-                            isSorting ? "bg-gray-50" : "cursor-default"
+                            isSorting ? "bg-default-50" : "cursor-default"
                           } ${
                             row.id === editableRowId &&
                             cellIndex === editableCellIndex &&
                             !isSorting
-                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
+                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
                               : ""
                           } ${
                             isFirstCell
                               ? "border-l-0"
-                              : "border-l border-gray-300"
+                              : "border-l border-default-300"
                           }
                         ${isLastCell ? "border-r-0" : ""}
                         ${
-                          isLastRow ? "border-b-0" : "border-b border-gray-300"
+                          isLastRow ? "border-b-0" : "border-b border-default-300"
                         } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
                             isFirstCell && isLastRow ? "rounded-bl-lg" : ""
                           }`}
@@ -1372,22 +1372,22 @@ function Table<T extends Record<string, any>>({
       )}
       {!isEditing ? (
         <div
-          className="absolute top-[-57px] right-0 px-3 py-2 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center transition-colors duration-200"
+          className="absolute top-[-57px] right-0 px-3 py-2 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center transition-colors duration-200"
           onClick={onToggleEditing}
         >
           <IconEdit className="mr-1.5" />
           <span>Edit</span>
         </div>
       ) : (
-        <div className="absolute top-[-57px] right-0 flex border-gray-300 space-x-2">
+        <div className="absolute top-[-57px] right-0 flex border-default-300 space-x-2">
           <div
-            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border border-gray-300 transition-colors duration-200"
+            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
             onClick={handleSave}
           >
             Save
           </div>
           <div
-            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-gray-600 font-medium flex items-center border border-gray-300 transition-colors duration-200"
+            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
             onClick={handleCancel}
           >
             Cancel
@@ -1417,7 +1417,7 @@ function Table<T extends Record<string, any>>({
                     : 0,
                 transition: "opacity 0.2s ease-in-out",
               }}
-              className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
+              className={`bg-default-200 rounded-full hover:bg-default-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
                 isAddRowBarActive ? "active-bg" : ""
               } 
         }`}
@@ -1429,10 +1429,10 @@ function Table<T extends Record<string, any>>({
           </ToolTip>
           <style>{`
         .active-bg {
-          background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+          background-color: rgba(156, 163, 175, 0.75); /* bg-default-400/75 */
         }
         .active-bg:active {
-          background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+          background-color: rgba(156, 163, 175, 0.75); /* bg-default-400/75 */
         }
       `}</style>
         </>

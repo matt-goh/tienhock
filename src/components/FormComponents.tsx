@@ -37,7 +37,7 @@ export const FormInput: React.FC<InputProps> = ({
   type = "text",
 }) => (
   <div className="space-y-2">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700">
+    <label htmlFor={name} className="text-sm font-medium text-default-700">
       {label}
     </label>
     <input
@@ -47,7 +47,7 @@ export const FormInput: React.FC<InputProps> = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-500"
+      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
     />
   </div>
 );
@@ -68,20 +68,20 @@ export const FormListbox: React.FC<ListboxProps> = ({
   options,
 }) => (
   <div className="space-y-2">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700">
+    <label htmlFor={name} className="text-sm font-medium text-default-700">
       {label}
     </label>
     <Listbox value={value} onChange={onChange}>
       <div className="relative mt-1">
         <ListboxButton
           className={clsx(
-            "relative w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-left",
-            "focus:outline-none focus:border-gray-400"
+            "relative w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left",
+            "focus:outline-none focus:border-default-400"
           )}
         >
           <span className="block truncate">{value || "Select"}</span>
           <span className="absolute inset-y-0 right-1.5 flex items-center pr-2 pointer-events-none">
-            <IconChevronDown size={20} className="text-gray-500" />
+            <IconChevronDown size={20} className="text-default-500" />
           </span>
         </ListboxButton>
         <Transition
@@ -96,7 +96,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
                 key={option.id}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 px-4 ${
-                    active ? "bg-gray-100" : "text-gray-900"
+                    active ? "bg-default-100" : "text-default-900"
                   }`
                 }
                 value={option.name}
@@ -111,7 +111,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
                       {option.name}
                     </span>
                     {selected ? (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                         <IconCheck stroke={2} size={22} />
                       </span>
                     ) : null}
@@ -146,7 +146,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   setQuery,
 }) => (
   <div className="space-y-2">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700">
+    <label htmlFor={name} className="text-sm font-medium text-default-700">
       {label}
     </label>
     <Combobox multiple value={value} onChange={onChange}>
@@ -154,8 +154,8 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
         <div className="relative mt-1">
           <ComboboxInput
             className={clsx(
-              "w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-gray-900",
-              "focus:outline-none focus:border-gray-400"
+              "w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",
+              "focus:outline-none focus:border-default-400"
             )}
             displayValue={(selected: string[]) =>
               selected
@@ -164,7 +164,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             }
             onChange={(event) => setQuery(event.target.value)}
           />
-          <ComboboxButton className="absolute inset-y-0 right-1.5 flex items-center pr-2 text-gray-500">
+          <ComboboxButton className="absolute inset-y-0 right-1.5 flex items-center pr-2 text-default-500">
             <IconChevronDown stroke={2} size={20} />
           </ComboboxButton>
           <Transition
@@ -181,7 +181,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                 options.filter((option) =>
                   option.name.toLowerCase().includes(query.toLowerCase())
                 ).length === 0) ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                   No {name}s found.
                 </div>
               ) : (
@@ -194,7 +194,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                       key={option.id}
                       className={({ active }) =>
                         `relative cursor-pointer select-none rounded py-2 px-4 ${
-                          active ? "bg-gray-100" : "text-gray-900"
+                          active ? "bg-default-100" : "text-default-900"
                         }`
                       }
                       value={option.id}
@@ -209,7 +209,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                             {option.name}
                           </span>
                           {selected ? (
-                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                               <IconCheck stroke={2} size={22} />
                             </span>
                           ) : null}

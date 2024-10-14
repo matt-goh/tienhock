@@ -358,10 +358,10 @@ const CatalogueStaffFormPage: React.FC = () => {
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-xl font-semibold text-default-900">
             {isEditMode ? "Edit Staff" : "Add New Staff"}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-default-500">
             {isEditMode
               ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
               : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
@@ -434,7 +434,7 @@ const CatalogueStaffFormPage: React.FC = () => {
             {isEditMode && (
               <button
                 type="button"
-                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-gray-100 active:text-gray-200 transition-colors duration-200"
+                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
                 onClick={handleDeleteClick}
               >
                 Delete

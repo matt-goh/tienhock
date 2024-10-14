@@ -15,7 +15,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    "mb-6 flex items-center font-medium rounded-full text-gray-600/90 hover:text-gray-900 hover:font-semibold";
+    "mb-6 flex items-center font-medium rounded-full text-default-600/90 hover:text-default-900 hover:font-semibold";
   const combinedClasses = `${baseClasses} ${className}`.trim();
 
   return (

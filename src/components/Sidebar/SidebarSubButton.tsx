@@ -19,7 +19,7 @@ const SidebarSubButton: React.FC<SidebarSubButtonProps> = ({
     <li className="relative">
       <button
         onClick={onToggle}
-        className="flex group items-center w-full py-2 pl-4 pr-2 text-left hover:bg-gray-200/90 active:bg-gray-300/90 hover:text-gray-800 transition-colors duration-200 rounded-lg focus:outline-none"
+        className="flex group items-center w-full py-2 pl-4 pr-2 text-left hover:bg-default-200/90 active:bg-default-300/90 hover:text-default-800 transition-colors duration-200 rounded-lg focus:outline-none"
       >
         <span className="flex items-center">
           {icon}

@@ -285,11 +285,11 @@ const CustomerCataloguePage: React.FC = () => {
       <span className="font-semibold mr-2">Salesman:</span>
       <Listbox value={selectedSalesman} onChange={setSelectedSalesman}>
         <div className="relative">
-          <ListboxButton className="w-48 rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-gray-400">
+          <ListboxButton className="w-48 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-400">
             <span className="block truncate">{selectedSalesman}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-gray-400"
+                className="h-5 w-5 text-default-400"
                 aria-hidden="true"
               />
             </span>
@@ -300,7 +300,7 @@ const CustomerCataloguePage: React.FC = () => {
                 key={salesman}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                    active ? "bg-default-100 text-default-900" : "text-default-900"
                   }`
                 }
                 value={salesman}
@@ -315,7 +315,7 @@ const CustomerCataloguePage: React.FC = () => {
                       {salesman}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                         <IconCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}
@@ -343,7 +343,7 @@ const CustomerCataloguePage: React.FC = () => {
             <div className="flex items-center">{renderSalesmanListbox()}</div>
           )}
           <div
-            className={`w-auto text-lg text-center font-medium text-gray-700`}
+            className={`w-auto text-lg text-center font-medium text-default-700`}
           >
             Customer Catalogue
           </div>
@@ -354,13 +354,13 @@ const CustomerCataloguePage: React.FC = () => {
               <div className="flex">
                 <div className="relative w-full mx-3">
                   <IconSearch
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
                     size={22}
                   />
                   <input
                     type="text"
                     placeholder="Search"
-                    className="w-full pl-11 py-2 border focus:border-gray-500 rounded-full"
+                    className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
                     value={searchTerm}
                     onChange={handleSearchChange}
                   />
@@ -384,7 +384,7 @@ const CustomerCataloguePage: React.FC = () => {
               tableKey="customerCatalogue"
             />
             {filteredCustomers.length === 0 && (
-              <p className="mt-4 text-center text-gray-700 w-full">
+              <p className="mt-4 text-center text-default-700 w-full">
                 No customers found.
               </p>
             )}

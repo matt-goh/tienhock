@@ -10,7 +10,7 @@ const Tab: React.FC<TabProps> = ({ children, labels }) => {
 
   return (
     <div className="w-full">
-      <div className={`flex px-1 w-fit bg-gray-100 rounded-lg`}>
+      <div className={`flex px-1 w-fit bg-default-100 rounded-lg`}>
         {labels.map((label, index) => (
           <button
             key={index}
@@ -18,7 +18,7 @@ const Tab: React.FC<TabProps> = ({ children, labels }) => {
             className={`px-4 py-2 my-1 text-sm font-medium transition-all duration-200 w-[8rem] ${
               index === activeTab
                 ? 'bg-white rounded-lg'
-                : 'text-gray-700 hover:text-gray-800'
+                : 'text-default-700 hover:text-default-800'
             }`}
             onClick={() => setActiveTab(index)}
           >

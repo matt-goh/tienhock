@@ -76,13 +76,13 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
 
   return (
     <div className="my-2 space-y-2">
-      <label htmlFor={name} className="text-sm font-medium text-gray-700">
+      <label htmlFor={name} className="text-sm font-medium text-default-700">
         {label}
       </label>
       <Combobox value={selectedCustomer} onChange={handleCustomerSelection}>
         <div className="relative">
           <ComboboxInput
-            className="w-full cursor-input rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400"
+            className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-400"
             displayValue={(customer: SelectOption | null) =>
               customer?.name || ""
             }
@@ -91,13 +91,13 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
           />
           <ComboboxButton className="absolute inset-y-0 right-2 flex items-center pr-2">
             <IconChevronDown
-              className="h-5 w-5 text-gray-400"
+              className="h-5 w-5 text-default-400"
               aria-hidden="true"
             />
           </ComboboxButton>
           <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {options.length === 0 ? (
-              <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+              <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                 No customers found.
               </div>
             ) : (
@@ -108,7 +108,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
                     value={customer}
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 ${
-                        active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                        active ? "bg-default-100 text-default-900" : "text-default-900"
                       }`
                     }
                   >
@@ -124,7 +124,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
                         {selected && (
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3">
                             <IconCheck
-                              className="h-5 w-5 text-gray-600"
+                              className="h-5 w-5 text-default-600"
                               aria-hidden="true"
                             />
                           </span>
@@ -139,7 +139,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
                       e.preventDefault();
                       onLoadMore();
                     }}
-                    className="w-full py-2 text-center text-sm rounded text-sky-500 hover:text-sky-600 hover:bg-gray-100 focus:outline-none"
+                    className="w-full py-2 text-center text-sm rounded text-sky-500 hover:text-sky-600 hover:bg-default-100 focus:outline-none"
                     disabled={isLoading}
                   >
                     {isLoading ? "Loading more..." : "Load More"}
@@ -1072,7 +1072,7 @@ const InvoisDetailsPage: React.FC = () => {
     );
 
     return (
-      <div className="flex justify-center items-center space-x-2 mt-8 text-gray-700">
+      <div className="flex justify-center items-center space-x-2 mt-8 text-default-700">
         {!hasRegularItems && renderButton("Add Order", handleAddRegularItem)}
         {!hasRegularItems && (!hasFOC || !hasReturned) && <span>or</span>}
         {!hasFOC && renderButton("Add FOC", handleAddFOC)}
