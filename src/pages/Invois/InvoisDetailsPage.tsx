@@ -726,7 +726,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleSaveClick = async () => {
     if (!invoiceData) return;
 
-    if (!invoiceData.invoiceno.trim()) {
+    if (!invoiceData.invoiceno) {
       toast.error("Please enter an invoice number before saving.");
       return;
     }

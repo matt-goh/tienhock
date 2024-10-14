@@ -66,15 +66,14 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
   };
 
   const getLocationName = (locationCode: string) => {
-    // Remove any leading zeros and trim whitespace
-    const cleanedCode = locationCode.replace(/^0+/, "").trim();
-    // Find the matching entry in LOCATION_MAP
-    const matchingEntry = Object.entries(LOCATION_MAP).find(([key, value]) =>
-      value.toLowerCase().includes(cleanedCode.toLowerCase())
-    );
+    // Ensure the locationCode is padded to two digits
+    const paddedCode = locationCode.padStart(2, "0");
 
-    if (matchingEntry) {
-      return toTitleCase(matchingEntry[1]);
+    // Directly look up the location name in LOCATION_MAP
+    const locationName = LOCATION_MAP[paddedCode];
+
+    if (locationName) {
+      return toTitleCase(locationName);
     } else {
       return `Unknown (${locationCode})`;
     }
