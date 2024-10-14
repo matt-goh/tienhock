@@ -34,6 +34,7 @@ import {
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { API_BASE_URL } from "../../config";
 
 interface SelectOption {
   id: string;
@@ -255,7 +256,7 @@ const InvoisDetailsPage: React.FC = () => {
       setIsFetchingCustomers(true);
       try {
         const response = await fetch(
-          `http://localhost:5000/api/customers/combobox?salesman=${
+          `${API_BASE_URL}/api/customers/combobox?salesman=${
             invoiceData?.salesman || ""
           }&search=${search}&page=${page}&limit=20`
         );
@@ -314,7 +315,7 @@ const InvoisDetailsPage: React.FC = () => {
     const fetchProducts = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/products/combobox"
+          `${API_BASE_URL}/api/products/combobox`
         );
         if (!response.ok) throw new Error("Failed to fetch products");
         const data = await response.json();
@@ -331,7 +332,7 @@ const InvoisDetailsPage: React.FC = () => {
   const fetchSalesmen = useCallback(async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/staffs?salesmenOnly=true"
+        `${API_BASE_URL}/api/staffs?salesmenOnly=true`
       );
       if (!response.ok) throw new Error("Failed to fetch salesmen");
       const data: Employee[] = await response.json();

@@ -10,6 +10,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
+import { API_BASE_URL } from "../../config";
 
 const CatalogueJobCategoryPage: React.FC = () => {
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
@@ -71,7 +72,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
 
   const fetchSections = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/sections");
+      const response = await fetch(`${API_BASE_URL}/api/sections`);
       if (!response.ok) throw new Error("Failed to fetch sections");
       const data = await response.json();
       setSections([...data.map((section: { name: string }) => section.name)]);
@@ -84,7 +85,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
   const fetchJobCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/job-categories");
+      const response = await fetch(`${API_BASE_URL}/api/job-categories`);
       if (!response.ok) throw new Error("Failed to fetch job categories");
       const data = await response.json();
       setJobCategories(data);
@@ -122,7 +123,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
 
       try {
         const response = await fetch(
-          `http://localhost:5000/api/job-categories`,
+          `${API_BASE_URL}/api/job-categories`,
           {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
@@ -203,7 +204,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
       }));
 
       const response = await fetch(
-        "http://localhost:5000/api/job-categories/batch",
+        `${API_BASE_URL}/api/job-categories/batch`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

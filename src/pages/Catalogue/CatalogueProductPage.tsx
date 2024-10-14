@@ -3,6 +3,7 @@ import _ from "lodash";
 import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
+import { API_BASE_URL } from "../../config";
 
 interface Product {
   originalId: string;
@@ -47,7 +48,7 @@ const CatalogueProductPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/products");
+      const response = await fetch(`${API_BASE_URL}/api/products`);
       if (!response.ok) throw new Error("Failed to fetch products");
       const data = await response.json();
       setProducts(
@@ -82,7 +83,7 @@ const CatalogueProductPage: React.FC = () => {
       const productIdsToDelete = productsToDelete.map((product) => product.id);
 
       try {
-        const response = await fetch("http://localhost:5000/api/products", {
+        const response = await fetch(`${API_BASE_URL}/api/products`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ products: productIdsToDelete }),
@@ -152,7 +153,7 @@ const CatalogueProductPage: React.FC = () => {
         id: product.originalId,
       }));
 
-      const response = await fetch("http://localhost:5000/api/products/batch", {
+      const response = await fetch(`${API_BASE_URL}/api/products/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

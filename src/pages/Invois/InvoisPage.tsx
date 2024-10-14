@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
 import { IconCloudUpload, IconPlus } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { API_BASE_URL } from "../../config";
 
 const InvoisPage: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
@@ -79,7 +80,7 @@ const InvoisPage: React.FC = () => {
 
       // Upload parsed data to the server
       const response = await fetch(
-        "http://localhost:5000/api/invoices/upload",
+        `${API_BASE_URL}/api/invoices/upload`,
         {
           method: "POST",
           headers: {

@@ -3,6 +3,7 @@ import _ from "lodash";
 import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
+import { API_BASE_URL } from "../../config";
 
 interface CatalogueItem {
   originalId: string;
@@ -41,7 +42,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
   const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/${apiEndpoint}`);
+      const response = await fetch(`${API_BASE_URL}/api/${apiEndpoint}`);
       if (!response.ok) throw new Error(`Failed to fetch ${apiEndpoint}`);
       const data = await response.json();
       setItems(
@@ -76,14 +77,11 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
       const itemIdsToDelete = itemsToDelete.map((item) => item.id);
 
       try {
-        const response = await fetch(
-          `http://localhost:5000/api/${apiEndpoint}`,
-          {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ [`${apiEndpoint}`]: itemIdsToDelete }),
-          }
-        );
+        const response = await fetch(`${API_BASE_URL}/api/${apiEndpoint}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [`${apiEndpoint}`]: itemIdsToDelete }),
+        });
 
         if (!response.ok) {
           throw new Error(`Failed to delete ${apiEndpoint} on the server`);
@@ -147,16 +145,13 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
         id: item.originalId,
       }));
 
-      const response = await fetch(
-        `http://localhost:5000/api/${apiEndpoint}/batch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            [apiEndpoint]: itemsToUpdate,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/${apiEndpoint}/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          [apiEndpoint]: itemsToUpdate,
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
