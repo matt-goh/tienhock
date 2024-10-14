@@ -165,7 +165,7 @@ const CatalogueTaxPage: React.FC = () => {
     <div className={`relative`}>
       <div className="flex flex-col items-center justify-center w-auto">
         <div
-          className={`relative w-full text-left text-lg font-medium text-gray-700 mb-6`}
+          className={`relative w-full text-left text-lg font-medium text-default-700 mb-6`}
         >
           Tax Catalogue
         </div>

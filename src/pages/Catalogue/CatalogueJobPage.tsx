@@ -327,11 +327,11 @@ const CatalogueJobPage: React.FC = () => {
       <span className="font-semibold mr-2">Type:</span>
       <Listbox value={jobType} onChange={handleJobTypeChange}>
         <div className="relative">
-          <ListboxButton className="w-40 rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-gray-400">
+          <ListboxButton className="w-40 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-400">
             <span className="block truncate">{jobType}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-gray-400"
+                className="h-5 w-5 text-default-400"
                 aria-hidden="true"
               />
             </span>
@@ -342,7 +342,7 @@ const CatalogueJobPage: React.FC = () => {
                 key={type}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active ? "bg-gray-100 text-gray-900" : "text-gray-900"
+                    active ? "bg-default-100 text-default-900" : "text-default-900"
                   }`
                 }
                 value={type}
@@ -357,7 +357,7 @@ const CatalogueJobPage: React.FC = () => {
                       {type}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                         <IconCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}
@@ -571,7 +571,7 @@ const CatalogueJobPage: React.FC = () => {
     <div className={`relative`}>
       <div className="flex flex-col items-start">
         <div
-          className={`w-full text-lg text-center font-medium text-gray-700 mb-4`}
+          className={`w-full text-lg text-center font-medium text-default-700 mb-4`}
         >
           Job Catalogue
         </div>
@@ -582,14 +582,14 @@ const CatalogueJobPage: React.FC = () => {
                 <Combobox value={selectedJob} onChange={handleJobSelection}>
                   <div className="relative">
                     <ComboboxInput
-                      className="w-full cursor-input rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-gray-400"
+                      className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-400"
                       displayValue={(job: Job | null) => job?.name || ""}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Select a job"
                     />
                     <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                       <IconChevronDown
-                        className="h-5 w-5 text-gray-400"
+                        className="h-5 w-5 text-default-400"
                         aria-hidden="true"
                       />
                     </ComboboxButton>
@@ -598,8 +598,8 @@ const CatalogueJobPage: React.FC = () => {
                         className={({ active }) =>
                           `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 text-left ${
                             active
-                              ? "bg-gray-100 text-gray-900"
-                              : "text-gray-900"
+                              ? "bg-default-100 text-default-900"
+                              : "text-default-900"
                           }`
                         }
                         value={undefined}
@@ -607,10 +607,10 @@ const CatalogueJobPage: React.FC = () => {
                         + Add Job
                       </ComboboxOption>
                       {jobs.length !== 0 && (
-                        <div className="border-t border-gray-150 w-full my-1"></div>
+                        <div className="border-t border-default-150 w-full my-1"></div>
                       )}
                       {filteredJobs.length === 0 && query !== "" ? (
-                        <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                        <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                           No jobs found.
                         </div>
                       ) : (
@@ -627,8 +627,8 @@ const CatalogueJobPage: React.FC = () => {
                               className={({ active }) =>
                                 `cursor-pointer select-none rounded text-left py-2 pl-4 pr-12 ${
                                   active
-                                    ? "bg-gray-100 text-gray-900"
-                                    : "text-gray-900"
+                                    ? "bg-default-100 text-default-900"
+                                    : "text-default-900"
                                 }`
                               }
                             >
@@ -645,7 +645,7 @@ const CatalogueJobPage: React.FC = () => {
                                     <div className="relative w-6 h-6 flex items-center justify-center">
                                       {selected && (
                                         <IconCheck
-                                          className="text-gray-600"
+                                          className="text-default-600"
                                           stroke={2}
                                           size={22}
                                         />
@@ -660,10 +660,10 @@ const CatalogueJobPage: React.FC = () => {
                                 {hoveredJob === job.id && (
                                   <button
                                     onClick={(e) => handleDeleteJob(job, e)}
-                                    className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-100 active:bg-gray-200 focus:outline-none"
+                                    className="delete-button absolute inset-0 flex items-center justify-center rounded-lg bg-default-100 hover:bg-default-100 active:bg-default-200 focus:outline-none"
                                   >
                                     <IconTrash
-                                      className="text-gray-700 active:text-gray-800"
+                                      className="text-default-700 active:text-default-800"
                                       stroke={1.5}
                                       size={20}
                                     />
@@ -687,7 +687,7 @@ const CatalogueJobPage: React.FC = () => {
                   onChange={(e) =>
                     handleJobPropertyChange("name", e.target.value)
                   }
-                  className="w-48 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400"
+                  className="w-48 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-400"
                 />
               </>
             )}
@@ -703,7 +703,7 @@ const CatalogueJobPage: React.FC = () => {
                     onChange={(e) =>
                       handleJobPropertyChange("id", e.target.value)
                     }
-                    className="w-36 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400 mr-4"
+                    className="w-36 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-400 mr-4"
                   />
                 ) : (
                   <span className="mr-4">{selectedJob.id}</span>
@@ -718,7 +718,7 @@ const CatalogueJobPage: React.FC = () => {
                     onChange={(e) =>
                       handleJobPropertyChange("section", e.target.value)
                     }
-                    className="w-24 rounded-lg border border-gray-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-gray-400 mr-4"
+                    className="w-24 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-400 mr-4"
                   />
                 ) : (
                   <span className="mr-4">{selectedJob.section}</span>
@@ -764,7 +764,7 @@ const CatalogueJobPage: React.FC = () => {
                 tableKey="catalogueJob"
               />
               {filteredJobDetails.length === 0 && (
-                <p className="mt-4 text-center text-gray-700 w-full">
+                <p className="mt-4 text-center text-default-700 w-full">
                   No details found.
                 </p>
               )}

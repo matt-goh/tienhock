@@ -22,7 +22,7 @@ const Button: React.FC<ButtonProps> = ({
   iconStroke = 1.5,
   variant = "default",
   size = "md",
-  color = "gray",
+  color = "default",
   className = "",
   additionalClasses = "",
   disabled = false,
@@ -32,13 +32,13 @@ const Button: React.FC<ButtonProps> = ({
     "font-medium rounded-full transition-colors duration-200 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 
   const colorClasses = {
-    gray: {
+    default: {
       default:
-        "bg-gray-100 text-gray-700 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-200 disabled:hover:bg-gray-100 disabled:hover:text-gray-700",
+        "bg-default-100 text-default-700 hover:text-default-800 hover:bg-default-200 active:bg-default-200 disabled:hover:bg-default-100 disabled:hover:text-default-700",
       outline:
-        "border border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
+        "border border-default-300 text-default-700 hover:text-default-800 hover:bg-default-100 active:bg-default-200 disabled:hover:bg-transparent disabled:hover:text-default-700",
       boldOutline:
-        "border-2 border-gray-300 text-gray-700 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-700",
+        "border-2 border-default-300 text-default-700 hover:text-default-800 hover:bg-default-100 active:bg-default-200 disabled:hover:bg-transparent disabled:hover:text-default-700",
     },
     rose: {
       default:
@@ -60,7 +60,7 @@ const Button: React.FC<ButtonProps> = ({
     return (
       colorClasses[color as keyof typeof colorClasses]?.[
         variant as keyof (typeof colorClasses)[keyof typeof colorClasses]
-      ] || colorClasses.gray[variant as keyof typeof colorClasses.gray]
+      ] || colorClasses.default[variant as keyof typeof colorClasses.default]
     );
   };
 

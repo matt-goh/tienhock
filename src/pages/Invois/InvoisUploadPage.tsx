@@ -195,7 +195,7 @@ const InvoisUploadPage: React.FC = () => {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl text-center font-medium text-gray-700 mb-4">
+      <h1 className="text-2xl text-center font-medium text-default-700 mb-4">
         Imported Invoices
       </h1>
       <div className={`flex mb-4 space-x-2 justify-center`}>

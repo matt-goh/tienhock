@@ -115,7 +115,7 @@ const EmployeeCard = ({
   return (
     <div
       className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered ? "bg-gray-100" : ""
+        isCardHovered && !isTrashHovered ? "bg-default-100" : ""
       }`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
@@ -123,7 +123,7 @@ const EmployeeCard = ({
     >
       <div className="mb-2">
         <h3 className="font-semibold">{employee.name}</h3>
-        <div className="text-sm text-gray-500">{employee.id}</div>
+        <div className="text-sm text-default-500">{employee.id}</div>
       </div>
       <div className="flex flex-wrap gap-2 mb-2" ref={jobContainerRef}>
         {displayJobs.map((location, index) => (
@@ -135,7 +135,7 @@ const EmployeeCard = ({
           </span>
         ))}
         {remainingJobCount > 0 && (
-          <span className="text-xs font-medium px-2.5 py-0.5 rounded bg-gray-100 text-gray-800">
+          <span className="text-xs font-medium px-2.5 py-0.5 rounded bg-default-100 text-default-800">
             +{remainingJobCount}
           </span>
         )}
@@ -151,10 +151,10 @@ const EmployeeCard = ({
               onClick={handleDeleteClick}
               onMouseEnter={() => setIsTrashHovered(true)}
               onMouseLeave={() => setIsTrashHovered(false)}
-              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-gray-100 active:bg-gray-200 focus:outline-none"
+              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-default-100 active:bg-default-200 focus:outline-none"
             >
               <IconTrash
-                className="text-gray-700 active:text-gray-800"
+                className="text-default-700 active:text-default-800"
                 stroke={1.5}
                 size={18}
               />
@@ -309,9 +309,9 @@ const CatalogueStaffPage = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-gray-100 active:bg-gray-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
               i === currentPage
-                ? "border border-gray-200 font-semibold"
+                ? "border border-default-200 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -324,9 +324,9 @@ const CatalogueStaffPage = () => {
         <button
           key={1}
           onClick={() => handlePageChange(1)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-gray-100 active:bg-gray-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
             1 === currentPage
-              ? "border border-gray-200 font-semibold"
+              ? "border border-default-200 font-semibold"
               : "font-medium"
           }`}
         >
@@ -350,9 +350,9 @@ const CatalogueStaffPage = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-gray-100 active:bg-gray-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
               i === currentPage
-                ? "border border-gray-200 font-semibold"
+                ? "border border-default-200 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -373,9 +373,9 @@ const CatalogueStaffPage = () => {
         <button
           key={totalPages}
           onClick={() => handlePageChange(totalPages)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-gray-100 active:bg-gray-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
             totalPages === currentPage
-              ? "border border-gray-200 font-semibold"
+              ? "border border-default-200 font-semibold"
               : "font-medium"
           }`}
         >
@@ -398,19 +398,19 @@ const CatalogueStaffPage = () => {
   return (
     <div className="relative w-full mx-20">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="relative text-2xl text-gray-700 font-bold">
+        <h1 className="relative text-2xl text-default-700 font-bold">
           Staffs ({filteredEmployees.length})
         </h1>
         <div className="flex">
           <div className="relative mx-3">
             <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
               size={22}
             />
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-gray-500 rounded-full"
+              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
               value={searchTerm}
               onChange={handleSearchChange}
             />
@@ -433,7 +433,7 @@ const CatalogueStaffPage = () => {
 
       {filteredEmployees.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500">No employees found.</p>
+          <p className="text-default-500">No employees found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -448,9 +448,9 @@ const CatalogueStaffPage = () => {
       )}
 
       {filteredEmployees.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-gray-700">
+        <div className="mt-6 flex justify-between items-center text-default-700">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200 hover:bg-accent hover:text-accent-foreground"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -458,7 +458,7 @@ const CatalogueStaffPage = () => {
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-gray-100 active:bg-gray-200 hover:bg-accent hover:text-accent-foreground"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200 hover:bg-accent hover:text-accent-foreground"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >

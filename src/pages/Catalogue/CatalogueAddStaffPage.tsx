@@ -283,8 +283,8 @@ const CatalogueAddStaffPage: React.FC = () => {
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
-          <h1 className="text-xl font-semibold text-gray-900">Add New Staff</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-xl font-semibold text-default-900">Add New Staff</h1>
+          <p className="mt-1 text-sm text-default-500">
             Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
             anda selesai.
           </p>

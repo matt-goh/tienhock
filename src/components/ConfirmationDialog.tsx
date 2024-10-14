@@ -66,18 +66,18 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             >
               <DialogTitle
                 as="h3"
-                className="text-lg font-medium leading-6 text-gray-900"
+                className="text-lg font-medium leading-6 text-default-900"
               >
                 {title}
               </DialogTitle>
               <div className="mt-2">
-                <p className="text-sm text-gray-500">{message}</p>
+                <p className="text-sm text-default-500">{message}</p>
               </div>
 
               <div className="mt-4 flex justify-end space-x-2">
                 <button
                   type="button"
-                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-transparent rounded-full hover:bg-gray-200 active:bg-gray-300 focus:outline-none"
+                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 bg-default-100 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
                   onClick={onClose}
                 >
                   Cancel

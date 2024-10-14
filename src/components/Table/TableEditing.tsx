@@ -704,7 +704,7 @@ function TableEditing<T extends Record<string, any>>({
           return (
             <div className="flex items-center justify-center h-full">
               <button
-                className={`p-2 rounded-full text-gray-500 hover:bg-gray-200 active:bg-gray-300 hover:text-gray-600 ${
+                className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
                   isSorting ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 onClick={(event) => {
@@ -881,7 +881,7 @@ function TableEditing<T extends Record<string, any>>({
             {["number", "rate", "amount", "float"].includes(col.type) ? (
               <>
                 {!isSortingDisabled && (
-                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full">
+                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
                     {getSortIcon(col.id, col.type, column.getIsSorted())}
                   </span>
                 )}
@@ -899,7 +899,7 @@ function TableEditing<T extends Record<string, any>>({
                   {col.header}
                 </span>
                 {!isSortingDisabled && (
-                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-200 active:bg-gray-300 duration-200 rounded-full">
+                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
                     {getSortIcon(col.id, col.type, column.getIsSorted())}
                   </span>
                 )}
@@ -957,7 +957,7 @@ function TableEditing<T extends Record<string, any>>({
               cell: (info) => (
                 <div className="flex items-center justify-center h-full">
                   <button
-                    className={`p-2 rounded-full text-gray-500 hover:bg-gray-200 active:bg-gray-300 hover:text-gray-600 ${
+                    className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
                       isSorting ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                     onClick={(event) => {
@@ -1133,7 +1133,7 @@ function TableEditing<T extends Record<string, any>>({
 
   return (
     <div ref={tableRef} className="flex flex-col items-center w-auto">
-      <div className="rounded-lg border border-gray-300 w-fit">
+      <div className="rounded-lg border border-default-300 w-fit">
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"
           ref={tableContainerRef}
@@ -1162,7 +1162,7 @@ function TableEditing<T extends Record<string, any>>({
                   className={`border-t ${
                     isLastRow
                       ? "border-b-0 rounded-b-lg"
-                      : "border-b border-gray-300"
+                      : "border-b border-default-300"
                   } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
                      ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
@@ -1197,13 +1197,13 @@ function TableEditing<T extends Record<string, any>>({
                               ${
                                 isFirstCell
                                   ? "border-l-0"
-                                  : "border-l border-gray-300"
+                                  : "border-l border-default-300"
                               }
                               ${isLastCell ? "border-r-0" : ""}
                               ${
                                 isLastRow
                                   ? "border-b-0"
-                                  : "border-b border-gray-300"
+                                  : "border-b border-default-300"
                               }
                               ${isLastCell && isLastRow ? "rounded-br-lg" : ""}
                               ${isFirstCell && isLastRow ? "rounded-bl-lg" : ""}
@@ -1214,7 +1214,7 @@ function TableEditing<T extends Record<string, any>>({
                               }
                               ${
                                 isCellHighlighted
-                                  ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
+                                  ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
                                   : ""
                               }`}
                             colSpan={cellIndex === 1 ? columns.length - 3 : 1}
@@ -1259,7 +1259,7 @@ function TableEditing<T extends Record<string, any>>({
                         return (
                           <td
                             key={cell.id}
-                            className="border-l border-gray-300"
+                            className="border-l border-default-300"
                           >
                             {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
@@ -1272,23 +1272,23 @@ function TableEditing<T extends Record<string, any>>({
                         <td
                           key={cell.id}
                           className={`relative px-6 py-4 whitespace-no-wrap ${
-                            isSorting ? "bg-gray-50" : "cursor-default"
+                            isSorting ? "bg-default-50" : "cursor-default"
                           } ${
                             row.id === editableRowId &&
                             cellIndex === editableCellIndex &&
                             !isSorting
-                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-gray-400 before:pointer-events-none before:z-10"
+                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
                               : ""
                           } ${
                             isFirstCell
                               ? "border-l-0"
-                              : "border-l border-gray-300"
+                              : "border-l border-default-300"
                           }
                           ${isLastCell ? "border-r-0" : ""}
                           ${
                             isLastRow
                               ? "border-b-0"
-                              : "border-b border-gray-300"
+                              : "border-b border-default-300"
                           } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
                             isFirstCell && isLastRow ? "rounded-bl-lg" : ""
                           }`}
@@ -1330,7 +1330,7 @@ function TableEditing<T extends Record<string, any>>({
                     : 0,
                 transition: "opacity 0.2s ease-in-out",
               }}
-              className={`bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
+              className={`bg-default-200 rounded-full hover:bg-default-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
                 isAddRowBarActive ? "active-bg" : ""
               } 
           }`}
@@ -1342,10 +1342,10 @@ function TableEditing<T extends Record<string, any>>({
           </ToolTip>
           <style>{`
           .active-bg {
-            background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+            background-color: rgba(156, 163, 175, 0.75); /* bg-default-400/75 */
           }
           .active-bg:active {
-            background-color: rgba(156, 163, 175, 0.75); /* bg-gray-400/75 */
+            background-color: rgba(156, 163, 175, 0.75); /* bg-default-400/75 */
           }
         `}</style>
         </>
