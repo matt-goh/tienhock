@@ -3,6 +3,7 @@ import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import _ from "lodash";
+import { API_BASE_URL } from "../../config";
 
 interface Tax {
   id: number;
@@ -30,7 +31,7 @@ const CatalogueTaxPage: React.FC = () => {
   const fetchTaxes = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/taxes");
+      const response = await fetch(`${API_BASE_URL}/api/taxes`);
       if (!response.ok) throw new Error("Failed to fetch taxes");
       const data = await response.json();
       setTaxes(data);
@@ -63,7 +64,7 @@ const CatalogueTaxPage: React.FC = () => {
       const taxNamesToDelete = taxesToDelete.map((tax) => tax.name);
 
       try {
-        const response = await fetch(`http://localhost:5000/api/taxes`, {
+        const response = await fetch(`${API_BASE_URL}/api/taxes`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ taxIds: taxNamesToDelete }),
@@ -122,7 +123,7 @@ const CatalogueTaxPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:5000/api/taxes/batch", {
+      const response = await fetch(`${API_BASE_URL}/api/taxes/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

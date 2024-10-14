@@ -1,5 +1,6 @@
 import toast from "react-hot-toast";
 import { InvoiceData } from "../../types/types";
+import { API_BASE_URL } from "../../config";
 
 let invoices: InvoiceData[] = [];
 
@@ -17,7 +18,7 @@ export const updateInvoice = (updatedInvoice: InvoiceData) => {
 
 export const fetchDbInvoices = async (): Promise<InvoiceData[]> => {
   try {
-    const response = await fetch("http://localhost:5000/api/db/invoices");
+    const response = await fetch(`${API_BASE_URL}/api/db/invoices`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -35,7 +36,7 @@ export const fetchDbInvoices = async (): Promise<InvoiceData[]> => {
 
 export const fetchInvoices = async () => {
   try {
-    const response = await fetch("http://localhost:5000/api/invoices");
+    const response = await fetch(`${API_BASE_URL}/api/invoices`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -56,7 +57,7 @@ export const deleteInvoice = async (id: string) => {
   try {
     // First, try to delete from the database
     const dbResponse = await fetch(
-      `http://localhost:5000/api/db/invoices/${id}`,
+      `${API_BASE_URL}/api/db/invoices/${id}`,
       {
         method: "DELETE",
       }
@@ -70,7 +71,7 @@ export const deleteInvoice = async (id: string) => {
 
     // If not found in database, try to delete from server memory
     const memoryResponse = await fetch(
-      `http://localhost:5000/api/invoices/${id}`,
+      `${API_BASE_URL}/api/invoices/${id}`,
       {
         method: "DELETE",
       }
@@ -92,7 +93,7 @@ export const deleteInvoice = async (id: string) => {
 const checkDuplicateInvoiceNo = async (invoiceNo: string): Promise<boolean> => {
   try {
     const response = await fetch(
-      `http://localhost:5000/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
+      `${API_BASE_URL}/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
     );
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -119,7 +120,7 @@ export const saveInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
-    const url = `http://localhost:5000/api/invoices/submit?saveToDb=${saveToDb}`;
+    const url = `${API_BASE_URL}/api/invoices/submit?saveToDb=${saveToDb}`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -171,7 +172,7 @@ export const createInvoice = async (
     }
 
     const response = await fetch(
-      "http://localhost:5000/api/invoices/submit?saveToDb=true",
+      `${API_BASE_URL}/api/invoices/submit?saveToDb=true`,
       {
         method: "POST",
         headers: {

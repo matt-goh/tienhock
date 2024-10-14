@@ -6,6 +6,7 @@ import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { fetchInvoices, getInvoices, updateInvoice } from "./InvoisUtils";
+import { API_BASE_URL } from "../../config";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
@@ -53,7 +54,7 @@ const InvoisUploadPage: React.FC = () => {
       // First, check for duplicate invoice numbers
       const invoiceNumbers = fileData.map((invoice) => invoice.invoiceno);
       const checkDuplicatesResponse = await fetch(
-        "http://localhost:5000/api/invoices/check-bulk-duplicates",
+        `${API_BASE_URL}/api/invoices/check-bulk-duplicates`,
         {
           method: "POST",
           headers: {
@@ -80,7 +81,7 @@ const InvoisUploadPage: React.FC = () => {
 
       // If no duplicates, proceed with submission
       const response = await fetch(
-        "http://localhost:5000/api/invoices/bulk-submit",
+        `${API_BASE_URL}/api/invoices/bulk-submit`,
         {
           method: "POST",
           headers: {
@@ -126,7 +127,7 @@ const InvoisUploadPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:5000/api/invoices/clear", {
+      const response = await fetch(`${API_BASE_URL}/api/invoices/clear`, {
         method: "POST",
       });
       if (!response.ok) {

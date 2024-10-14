@@ -6,6 +6,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
+import { API_BASE_URL } from "../../config";
 import {
   FormInput,
   FormListbox,
@@ -120,7 +121,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
   ) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/${endpoint}`);
+      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -201,7 +202,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     };
 
     try {
-      const response = await fetch("http://localhost:5000/api/staffs", {
+      const response = await fetch(`${API_BASE_URL}/api/staffs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

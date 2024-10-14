@@ -12,6 +12,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import StaffFilterMenu from "../../components/StaffFilterMenu";
 import { Employee, FilterOptions } from "../../types/types";
 import Button from "../../components/Button";
+import { API_BASE_URL } from "../../config";
 
 const EmployeeCard = ({
   employee,
@@ -193,7 +194,7 @@ const CatalogueStaffPage = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/staffs");
+      const response = await fetch(`${API_BASE_URL}/api/staffs`);
       if (!response.ok) {
         throw new Error("Failed to fetch employees");
       }
@@ -212,7 +213,7 @@ const CatalogueStaffPage = () => {
     if (employeeToDelete) {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/staffs/${employeeToDelete.id}`,
+          `${API_BASE_URL}/api/staffs/${employeeToDelete.id}`,
           {
             method: "DELETE",
           }

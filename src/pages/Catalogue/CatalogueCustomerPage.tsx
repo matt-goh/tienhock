@@ -9,6 +9,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
+import { API_BASE_URL } from "../../config";
 
 const CustomerCataloguePage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -65,7 +66,7 @@ const CustomerCataloguePage: React.FC = () => {
   const fetchSalesmen = useCallback(async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/staffs?salesmenOnly=true"
+        `${API_BASE_URL}/api/staffs?salesmenOnly=true`
       );
       if (!response.ok) throw new Error("Failed to fetch salesmen");
       const data: Employee[] = await response.json();
@@ -80,7 +81,7 @@ const CustomerCataloguePage: React.FC = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/customers");
+      const response = await fetch(`${API_BASE_URL}/api/customers`);
       if (!response.ok) throw new Error("Failed to fetch customers");
       const data = await response.json();
       setCustomers(data);
@@ -117,7 +118,7 @@ const CustomerCataloguePage: React.FC = () => {
       );
 
       try {
-        const response = await fetch(`http://localhost:5000/api/customers`, {
+        const response = await fetch(`${API_BASE_URL}/api/customers`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ customerIds: customerIdsToDelete }),
@@ -196,7 +197,7 @@ const CustomerCataloguePage: React.FC = () => {
       }));
 
       const response = await fetch(
-        "http://localhost:5000/api/customers/batch",
+        `${API_BASE_URL}/api/customers/batch`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

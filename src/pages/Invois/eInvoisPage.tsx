@@ -1,6 +1,7 @@
 // EInvoisPage.tsx
 
 import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "../../config";
 
 interface TokenInfo {
   accessToken: string;
@@ -41,7 +42,7 @@ const EInvoisPage: React.FC = () => {
     const connectToMyInvois = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/einvoice/login",
+          `${API_BASE_URL}/api/einvoice/login`,
           {
             method: "POST",
             headers: {
@@ -71,7 +72,7 @@ const EInvoisPage: React.FC = () => {
     setSubmissionResponse(null);
     try {
       const response = await fetch(
-        "http://localhost:5000/api/einvoice/submit",
+        `${API_BASE_URL}/api/einvoice/submit`,
         {
           method: "POST",
           headers: {

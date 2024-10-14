@@ -11,6 +11,7 @@ import {
   FormListbox,
   FormCombobox,
 } from "../../components/FormComponents";
+import { API_BASE_URL } from "../../config";
 
 interface SelectOption {
   id: string;
@@ -111,7 +112,7 @@ const CatalogueStaffFormPage: React.FC = () => {
   const fetchStaffDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/staffs/${id}`);
+      const response = await fetch(`${API_BASE_URL}/api/staffs/${id}`);
       if (!response.ok) {
         throw new Error("Failed to fetch staff details");
       }
@@ -134,7 +135,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
   ) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/${endpoint}`);
+      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -152,7 +153,7 @@ const CatalogueStaffFormPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (id) {
       try {
-        const response = await fetch(`http://localhost:5000/api/staffs/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/staffs/${id}`, {
           method: "DELETE",
         });
         if (!response.ok) {
@@ -249,18 +250,18 @@ const CatalogueStaffFormPage: React.FC = () => {
     };
 
     try {
-      let url = "http://localhost:5000/api/staffs";
+      let url = `${API_BASE_URL}/api/staffs`;
       let method = "POST";
 
       if (isEditMode) {
         if (id !== formData.id) {
           // ID has changed, use PUT method with the new ID
-          url = `http://localhost:5000/api/staffs/${id}`;
+          url = `${API_BASE_URL}/api/staffs/${id}`;
           method = "PUT";
           dataToSend.newId = formData.id; // Add newId field to indicate ID change
         } else {
           // ID hasn't changed, use regular PUT
-          url = `http://localhost:5000/api/staffs/${id}`;
+          url = `${API_BASE_URL}/api/staffs/${id}`;
           method = "PUT";
         }
       }

@@ -37,6 +37,7 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
+import { API_BASE_URL } from "../../config";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -549,7 +550,7 @@ function Table<T extends Record<string, any>>({
     if (rowToDelete && rowToDelete.id) {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/jobs/${rowToDelete.id}`,
+          `${API_BASE_URL}/api/jobs/${rowToDelete.id}`,
           {
             method: "DELETE",
           }

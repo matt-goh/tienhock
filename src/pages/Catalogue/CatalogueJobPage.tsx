@@ -18,6 +18,7 @@ import { ColumnConfig, Job, JobDetail } from "../../types/types";
 import NewJobModal from "../../components/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
+import { API_BASE_URL } from "../../config";
 
 type JobSelection = Job | null;
 
@@ -86,7 +87,7 @@ const CatalogueJobPage: React.FC = () => {
   const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/jobs");
+      const response = await fetch(`${API_BASE_URL}/api/jobs`);
       if (!response.ok) throw new Error("Failed to fetch jobs");
       const data = await response.json();
       setJobs(data);
@@ -109,7 +110,7 @@ const CatalogueJobPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:5000/api/jobs/${jobId}/details`
+        `${API_BASE_URL}/api/jobs/${jobId}/details`
       );
       if (!response.ok) throw new Error("Failed to fetch job details");
       const data = await response.json();
@@ -146,7 +147,7 @@ const CatalogueJobPage: React.FC = () => {
 
   const handleJobAdded = useCallback(async (newJob: Omit<Job, "id">) => {
     try {
-      const response = await fetch("http://localhost:5000/api/jobs", {
+      const response = await fetch(`${API_BASE_URL}/api/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newJob),
@@ -193,7 +194,7 @@ const CatalogueJobPage: React.FC = () => {
     e.stopPropagation();
     try {
       const response = await fetch(
-        `http://localhost:5000/api/jobs/${job.id}/details/count`
+        `${API_BASE_URL}/api/jobs/${job.id}/details/count`
       );
       if (!response.ok)
         throw new Error("Failed to check associated job details");
@@ -218,7 +219,7 @@ const CatalogueJobPage: React.FC = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/jobs/${jobToDelete.id}`,
+        `${API_BASE_URL}/api/jobs/${jobToDelete.id}`,
         {
           method: "DELETE",
         }
@@ -271,7 +272,7 @@ const CatalogueJobPage: React.FC = () => {
       if (jobDetailsToDeleteFromDB.length > 0) {
         try {
           const response = await fetch(
-            `http://localhost:5000/api/job-details`,
+            `${API_BASE_URL}/api/job-details`,
             {
               method: "DELETE",
               headers: { "Content-Type": "application/json" },
@@ -465,7 +466,7 @@ const CatalogueJobPage: React.FC = () => {
     try {
       // Update job
       const jobResponse = await fetch(
-        `http://localhost:5000/api/jobs/${selectedJob?.id}`,
+        `${API_BASE_URL}/api/jobs/${selectedJob?.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -486,7 +487,7 @@ const CatalogueJobPage: React.FC = () => {
 
       // Send all job details to the server
       const jobDetailsResponse = await fetch(
-        "http://localhost:5000/api/job-details/batch",
+        `${API_BASE_URL}/api/job-details/batch`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
