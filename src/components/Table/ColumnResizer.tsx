@@ -43,7 +43,7 @@ const ColumnResizer: React.FC<ColumnResizerProps> = ({
 
   return (
     <div
-      className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent z-10"
+      className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent"
       style={{
         transform: "translateX(50%)",
         transition: "background-color 0.2s ease",

@@ -17,7 +17,7 @@ interface TableHeaderProps<T> {
   isSortableColumn: (columnId: string) => boolean | undefined;
   columnWidths: { [k: string]: number };
   onColumnResize: (columnId: string, width: number) => void;
-  disableSelection?: boolean; // New prop
+  disableSelection?: boolean;
 }
 
 function TableHeader<T>({
