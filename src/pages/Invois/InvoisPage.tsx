@@ -51,7 +51,19 @@ const InvoisPage: React.FC = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [invoices, filters]);
+  }, [invoices, filters, productData]);
+
+  useEffect(() => {
+    const handleInvoicesUpdated = () => {
+      setInvoices([...invoices]); // This will trigger a re-render
+    };
+
+    window.addEventListener("invoicesUpdated", handleInvoicesUpdated);
+
+    return () => {
+      window.removeEventListener("invoicesUpdated", handleInvoicesUpdated);
+    };
+  }, [invoices]);
 
   const loadInvoices = async () => {
     setIsLoading(true);
@@ -143,6 +155,9 @@ const InvoisPage: React.FC = () => {
       });
 
       const sortedProducts = Object.values(products)
+        .filter(
+          (product) => product.productName != null && product.productName !== ""
+        )
         .map((product) => ({
           ...product,
           qty: Number(product.qty.toFixed(2)),

@@ -108,7 +108,9 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
                     value={customer}
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 ${
-                        active ? "bg-default-100 text-default-900" : "text-default-900"
+                        active
+                          ? "bg-default-100 text-default-900"
+                          : "text-default-900"
                       }`
                     }
                   >
@@ -314,9 +316,7 @@ const InvoisDetailsPage: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/products/combobox`
-        );
+        const response = await fetch(`${API_BASE_URL}/api/products/combobox`);
         if (!response.ok) throw new Error("Failed to fetch products");
         const data = await response.json();
         setProducts(data);
@@ -485,7 +485,9 @@ const InvoisDetailsPage: React.FC = () => {
         setInvoiceData((prevInvoiceData) => {
           if (!prevInvoiceData) return null;
 
-          const filteredItems = updatedItems.filter((item) => !item.isTotal);
+          const filteredItems = updatedItems.filter(
+            (item) => !item.isTotal && item.productName != null
+          );
           // Separate order details from FOC and returned items
           const currentOrderDetails = prevInvoiceData.orderDetails.filter(
             (item) => !item.isTotal && !item.isFoc && !item.isReturned
@@ -582,6 +584,13 @@ const InvoisDetailsPage: React.FC = () => {
           const overallTotalAmount =
             calculateOverallTotal(combinedOrderDetails);
 
+          // Update the global invoice data
+          updateInvoice({
+            ...prevInvoiceData,
+            orderDetails: combinedOrderDetails,
+            totalAmount: overallTotalAmount,
+          });
+
           return {
             ...prevInvoiceData,
             orderDetails: combinedOrderDetails,
@@ -590,7 +599,7 @@ const InvoisDetailsPage: React.FC = () => {
         });
       }, 0);
     },
-    [calculateTotal, addNewRow, products, calculateOverallTotal] // Added products to the dependency array
+    [calculateTotal, addNewRow, products, calculateOverallTotal, updateInvoice]
   );
 
   const getNextSpecialRowNumber = useCallback(
@@ -1141,7 +1150,7 @@ const InvoisDetailsPage: React.FC = () => {
           step="0.01"
           value={info.getValue()}
           onChange={(e) => {
-            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const newValue = parseFloat(e.target.value) || 0;
             const updatedItem = {
               ...info.row.original,
               price: newValue,
