@@ -660,18 +660,6 @@ function TableEditing<T extends Record<string, any>>({
                 previousCellValue={cell.getValue()}
               />
             );
-          } else {
-            // For Total and SubtotalQty rows, keep it readonly
-            return (
-              <input
-                className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
-                tabIndex={-1}
-                type="text"
-                readOnly
-                value={cell.getValue() as string}
-                style={{ boxSizing: "border-box" }}
-              />
-            );
           }
         } else if (cellIndex === columns.length - 2) {
           // Make the amount column editable for Less and Tax rows
@@ -1291,7 +1279,10 @@ function TableEditing<T extends Record<string, any>>({
                         } else {
                           return null;
                         }
-                      } else if (cell.column.id === amountColumnId) {
+                      } else if (
+                        cell.column.id ===
+                        columns.find((col) => col.type === "amount")?.id
+                      ) {
                         return (
                           <td
                             key={cell.id}

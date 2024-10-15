@@ -1625,7 +1625,7 @@ app.post('/api/invoices/submit', async (req, res) => {
       ]);
       savedInvoice = upsertResult.rows[0];
 
-      // Delete existing order details for the new/updated invoice
+      // Delete existing order details and total rows for the new/updated invoice
       await client.query('DELETE FROM order_details WHERE invoiceId = $1', [savedInvoice.id]);
 
       // Insert new order details
@@ -1653,8 +1653,23 @@ app.post('/api/invoices/submit', async (req, res) => {
       // Fetch order details for the saved invoice
       const orderDetailsQuery = `
         SELECT * FROM order_details WHERE invoiceId = $1
+        ORDER BY 
+          CASE 
+            WHEN istotal = true THEN 1
+            WHEN issubtotal = true THEN 2
+            WHEN isless = true THEN 3
+            WHEN istax = true THEN 4
+            WHEN isfoc = true THEN 5
+            WHEN isreturned = true THEN 6
+            ELSE 0
+          END,
+          id
       `;
       const orderDetailsResult = await client.query(orderDetailsQuery, [savedInvoice.id]);
+
+      // Cleanup any orphaned total rows
+      await cleanupOrphanedTotalRows(client);
+
       savedInvoice.orderDetails = orderDetailsResult.rows;
     } else {
       // Save to server memory
@@ -1681,6 +1696,34 @@ app.post('/api/invoices/submit', async (req, res) => {
     client.release();
   }
 });
+
+async function cleanupOrphanedTotalRows(client) {
+  const query = `
+    DELETE FROM order_details
+    WHERE (
+      isTotal = true OR 
+      isSubtotal = true OR 
+      isLess = true OR 
+      isTax = true OR
+      isFoc = true OR
+      isReturned = true OR
+      code = '' OR code IS NULL
+    ) AND (
+      invoiceId NOT IN (SELECT id FROM invoices)
+      OR
+      invoiceId IN (
+        SELECT invoiceId
+        FROM order_details
+        GROUP BY invoiceId
+        HAVING COUNT(*) = SUM(
+          CASE WHEN isTotal OR isSubtotal OR isLess OR isTax OR isFoc OR isReturned 
+               OR code = '' OR code IS NULL THEN 1 ELSE 0 END
+        )
+      )
+    )
+  `;
+  await client.query(query);
+}
 
 // Endpoint to bulk submit invoices to the database
 app.post('/api/invoices/bulk-submit', async (req, res) => {
@@ -1805,7 +1848,6 @@ app.get('/api/invoices', async (req, res) => {
     res.status(500).json({ message: 'Error fetching invoices', error: error.message });
   }
 });
-
 // Delete an invoice from the database
 app.delete('/api/db/invoices/:id', async (req, res) => {
   const { id } = req.params;
@@ -1815,7 +1857,7 @@ app.delete('/api/db/invoices/:id', async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // Delete order details first
+      // Then delete the remaining order details
       await client.query('DELETE FROM order_details WHERE invoiceId = $1', [id]);
 
       // Then delete the invoice

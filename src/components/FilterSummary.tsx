@@ -45,7 +45,7 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
   }
 
   if (filters.applyProductFilter) {
-    summaries.push("Displaying sales by products");
+    summaries.push("Sales by products");
   }
 
   if (summaries.length === 0) {

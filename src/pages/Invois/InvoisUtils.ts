@@ -1,5 +1,5 @@
 import toast from "react-hot-toast";
-import { InvoiceData } from "../../types/types";
+import { InvoiceData, OrderDetail } from "../../types/types";
 import { API_BASE_URL } from "../../config";
 
 let invoices: InvoiceData[] = [];
@@ -107,6 +107,16 @@ export const saveInvoice = async (
   saveToDb: boolean = true
 ): Promise<InvoiceData> => {
   try {
+    // Filter out total rows and other calculated rows
+    const filteredOrderDetails = invoice.orderDetails.filter(
+      (detail) =>
+        !detail.isTotal && !detail.isSubtotal && !detail.isLess && !detail.isTax
+    );
+
+    const invoiceToSave = {
+      ...invoice,
+      orderDetails: filteredOrderDetails,
+    };
     const url = `${API_BASE_URL}/api/invoices/submit?saveToDb=${saveToDb}`;
 
     const response = await fetch(url, {
@@ -114,7 +124,7 @@ export const saveInvoice = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(invoice),
+      body: JSON.stringify(invoiceToSave),
     });
 
     if (!response.ok) {
@@ -127,6 +137,11 @@ export const saveInvoice = async (
     }
 
     const savedInvoice: InvoiceData = await response.json();
+
+    // Recalculate total rows for the returned data
+    savedInvoice.orderDetails = addCalculatedTotalRows(
+      savedInvoice.orderDetails
+    );
 
     // Update the local cache if saving to memory
     if (!saveToDb) {
@@ -145,6 +160,72 @@ export const saveInvoice = async (
   }
 };
 
+function addCalculatedTotalRows(orderDetails: OrderDetail[]): OrderDetail[] {
+  let subtotal = 0;
+  let focTotal = 0;
+  let returnedTotal = 0;
+  const detailsWithTotals = [...orderDetails];
+
+  // Calculate totals
+  orderDetails.forEach((detail) => {
+    if (!detail.isFoc && !detail.isReturned) {
+      subtotal += parseFloat(detail.total) || 0;
+    } else if (detail.isFoc) {
+      focTotal += parseFloat(detail.total) || 0;
+    } else if (detail.isReturned) {
+      returnedTotal += parseFloat(detail.total) || 0;
+    }
+  });
+
+  // Add subtotal row
+  detailsWithTotals.push({
+    code: "SUBTOTAL",
+    productName: "Subtotal",
+    qty: 0,
+    price: 0,
+    total: subtotal.toFixed(2),
+    isSubtotal: true,
+  });
+
+  // Add FOC total row if applicable
+  if (focTotal > 0) {
+    detailsWithTotals.push({
+      code: "FOC-TOTAL",
+      productName: "FOC Total",
+      qty: 0,
+      price: 0,
+      total: focTotal.toFixed(2),
+      isFoc: true,
+      isTotal: true,
+    });
+  }
+
+  // Add Returned total row if applicable
+  if (returnedTotal > 0) {
+    detailsWithTotals.push({
+      code: "RETURNED-TOTAL",
+      productName: "Returned Total",
+      qty: 0,
+      price: 0,
+      total: returnedTotal.toFixed(2),
+      isReturned: true,
+      isTotal: true,
+    });
+  }
+
+  // Add grand total row
+  detailsWithTotals.push({
+    code: "GRAND-TOTAL",
+    productName: "Total",
+    qty: 0,
+    price: 0,
+    total: (subtotal - returnedTotal).toFixed(2),
+    isTotal: true,
+  });
+
+  return detailsWithTotals;
+}
+
 export const createInvoice = async (
   invoiceData: InvoiceData
 ): Promise<InvoiceData> => {
@@ -158,6 +239,17 @@ export const createInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
+    // Filter out total rows and other calculated rows
+    const filteredOrderDetails = invoiceData.orderDetails.filter(
+      (detail) =>
+        !detail.isTotal && !detail.isSubtotal && !detail.isLess && !detail.isTax
+    );
+
+    const invoiceToCreate = {
+      ...invoiceData,
+      orderDetails: filteredOrderDetails,
+    };
+
     const response = await fetch(
       `${API_BASE_URL}/api/invoices/submit?saveToDb=true`,
       {
@@ -165,7 +257,7 @@ export const createInvoice = async (
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(invoiceData),
+        body: JSON.stringify(invoiceToCreate),
       }
     );
 
@@ -175,6 +267,11 @@ export const createInvoice = async (
     }
 
     const createdInvoice: InvoiceData = await response.json();
+
+    // Recalculate total rows for the returned data
+    createdInvoice.orderDetails = addCalculatedTotalRows(
+      createdInvoice.orderDetails
+    );
 
     return createdInvoice;
   } catch (error) {
