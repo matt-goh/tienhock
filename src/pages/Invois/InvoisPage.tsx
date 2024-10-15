@@ -14,6 +14,7 @@ import { IconCloudUpload, IconPlus } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
 import { API_BASE_URL } from "../../config";
+import FilterSummary from "../../components/FilterSummary";
 
 const InvoisPage: React.FC = () => {
   const today = new Date();
@@ -510,6 +511,7 @@ const InvoisPage: React.FC = () => {
           customerOptions={customerOptions}
         />
       </div>
+      <FilterSummary filters={filters} />
       {filters.applyProductFilter ? (
         productData.length > 0 ? (
           <TableEditing<ProductData>
