@@ -142,13 +142,15 @@ const InvoisPage: React.FC = () => {
         });
       });
 
-      setProductData(
-        Object.values(products).map((product) => ({
+      const sortedProducts = Object.values(products)
+        .map((product) => ({
           ...product,
           qty: Number(product.qty.toFixed(2)),
           amount: Number(product.amount.toFixed(2)),
         }))
-      );
+        .sort((a, b) => a.productName.localeCompare(b.productName));
+
+      setProductData(sortedProducts);
     } else {
       setFilteredInvoices(filtered);
     }
