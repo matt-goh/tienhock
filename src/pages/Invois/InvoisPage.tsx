@@ -450,7 +450,7 @@ const InvoisPage: React.FC = () => {
             initialData={productData}
             columns={productColumns}
             onChange={() => {}} // Product data is read-only
-            tableKey="product-sales"
+            tableKey="invois-products"
           />
         ) : (
           <p className="text-center text-default-500">No product data found.</p>
