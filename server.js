@@ -1551,150 +1551,129 @@ app.post('/api/invoices/submit', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const invoices = Array.isArray(req.body) ? req.body : [req.body];
-    const processedInvoices = invoices.map(invoice => ({
+    const invoice = req.body;
+    const processedInvoice = {
       ...invoice,
       orderDetails: invoice.orderDetails.map(sanitizeOrderDetail)
-    }));
+    };
 
-    let insertedInvoices = [];
+    // Convert date from DD/MM/YYYY to YYYY-MM-DD
+    const [day, month, year] = processedInvoice.date.split('/');
+    const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+    // Convert time from "HH:MM am/pm" to "HH:MM:SS" format
+    const [time, period] = processedInvoice.time.split(' ');
+    let [hours, minutes] = time.split(':');
+    hours = parseInt(hours);
+    if (period.toLowerCase() === 'pm' && hours !== 12) {
+      hours += 12;
+    } else if (period.toLowerCase() === 'am' && hours === 12) {
+      hours = 0;
+    }
+    const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}:00`;
+
+    // Sanitize totalAmount
+    const sanitizedTotalAmount = sanitizeNumeric(processedInvoice.totalAmount);
+
+    let savedInvoice;
 
     if (saveToDb === 'true') {
-      // Save to database
-      for (const invoice of processedInvoices) {
-        // Convert date from DD/MM/YYYY to YYYY-MM-DD
-        const [day, month, year] = invoice.date.split('/');
-        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      // Check if the invoice already exists
+      const checkInvoiceQuery = 'SELECT id FROM Invoices WHERE id = $1';
+      const checkInvoiceResult = await client.query(checkInvoiceQuery, [processedInvoice.id]);
 
-        // Convert time from "HH:MM am/pm" to "HH:MM:SS" format
-        const [time, period] = invoice.time.split(' ');
-        let [hours, minutes] = time.split(':');
-        hours = parseInt(hours);
-        if (period.toLowerCase() === 'pm' && hours !== 12) {
-          hours += 12;
-        } else if (period.toLowerCase() === 'am' && hours === 12) {
-          hours = 0;
-        }
-        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}:00`;
-
-        // Sanitize totalAmount
-        const sanitizedTotalAmount = sanitizeNumeric(invoice.totalAmount);
-
-        // Check if the invoice already exists
-        const checkInvoiceQuery = 'SELECT id FROM Invoices WHERE id = $1';
-        const checkInvoiceResult = await client.query(checkInvoiceQuery, [invoice.id]);
-
-        let invoiceResult;
-        if (checkInvoiceResult.rows.length > 0) {
-          // Update existing invoice
-          const updateInvoiceQuery = `
-            UPDATE Invoices
-            SET invoiceno = $1, orderno = $2, date = $3, time = $4, type = $5,
-                customer = $6, customername = $7, salesman = $8, totalAmount = $9
-            WHERE id = $10
-            RETURNING *
-          `;
-          invoiceResult = await client.query(updateInvoiceQuery, [
-            invoice.invoiceno,
-            invoice.orderno,
-            formattedDate,
-            formattedTime,
-            invoice.type,
-            invoice.customer,
-            invoice.customername,
-            invoice.salesman,
-            sanitizedTotalAmount,
-            invoice.id
-          ]);
-        } else {
-          // Insert new invoice
-          const insertInvoiceQuery = `
-            INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING *
-          `;
-          invoiceResult = await client.query(insertInvoiceQuery, [
-            invoice.invoiceno, // Use invoiceno as the new id
-            invoice.invoiceno,
-            invoice.orderno,
-            formattedDate,
-            formattedTime,
-            invoice.type,
-            invoice.customer,
-            invoice.customername,
-            invoice.salesman,
-            sanitizedTotalAmount
-          ]);
-        }
-
-        const insertedInvoice = invoiceResult.rows[0];
-
-        // Delete existing order details
-        await client.query('DELETE FROM order_details WHERE invoiceId = $1', [insertedInvoice.id]);
-
-        // Insert new order details
-        for (const detail of invoice.orderDetails) {
-          const detailQuery = `
-            INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned, isTotal, isSubtotal, isLess, isTax)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          `;
-          await client.query(detailQuery, [
-            insertedInvoice.id,
-            detail.code,
-            detail.productName,
-            detail.qty,
-            detail.price,
-            detail.total,
-            detail.isFoc || false,
-            detail.isReturned || false,
-            detail.isTotal || false,
-            detail.isSubtotal || false,
-            detail.isLess || false,
-            detail.isTax || false
-          ]);
-        }
-
-        insertedInvoices.push(insertedInvoice);
+      if (checkInvoiceResult.rows.length > 0) {
+        // Update existing invoice
+        const updateInvoiceQuery = `
+          UPDATE Invoices
+          SET invoiceno = $1, orderno = $2, date = $3, time = $4, type = $5,
+              customer = $6, customername = $7, salesman = $8, totalAmount = $9
+          WHERE id = $10
+          RETURNING *
+        `;
+        const updateResult = await client.query(updateInvoiceQuery, [
+          processedInvoice.invoiceno,
+          processedInvoice.orderno,
+          formattedDate,
+          formattedTime,
+          processedInvoice.type,
+          processedInvoice.customer,
+          processedInvoice.customername,
+          processedInvoice.salesman,
+          sanitizedTotalAmount,
+          processedInvoice.id
+        ]);
+        savedInvoice = updateResult.rows[0];
+      } else {
+        // Insert new invoice
+        const insertInvoiceQuery = `
+          INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
+        const insertResult = await client.query(insertInvoiceQuery, [
+          processedInvoice.id,
+          processedInvoice.invoiceno,
+          processedInvoice.orderno,
+          formattedDate,
+          formattedTime,
+          processedInvoice.type,
+          processedInvoice.customer,
+          processedInvoice.customername,
+          processedInvoice.salesman,
+          sanitizedTotalAmount
+        ]);
+        savedInvoice = insertResult.rows[0];
       }
+
+      // Delete existing order details
+      await client.query('DELETE FROM order_details WHERE invoiceId = $1', [savedInvoice.id]);
+
+      // Insert new order details
+      for (const detail of processedInvoice.orderDetails) {
+        const detailQuery = `
+          INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned, isTotal, isSubtotal, isLess, isTax)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `;
+        await client.query(detailQuery, [
+          savedInvoice.id,
+          detail.code,
+          detail.productName,
+          detail.qty,
+          detail.price,
+          detail.total,
+          detail.isFoc || false,
+          detail.isReturned || false,
+          detail.isTotal || false,
+          detail.isSubtotal || false,
+          detail.isLess || false,
+          detail.isTax || false
+        ]);
+      }
+
+      // Fetch order details for the saved invoice
+      const orderDetailsQuery = `
+        SELECT * FROM order_details WHERE invoiceId = $1
+      `;
+      const orderDetailsResult = await client.query(orderDetailsQuery, [savedInvoice.id]);
+      savedInvoice.orderDetails = orderDetailsResult.rows;
     } else {
       // Save to server memory
-      for (const invoice of processedInvoices) {
-        const existingIndex = uploadedInvoices.findIndex(inv => inv.id === invoice.id);
-        if (existingIndex !== -1) {
-          uploadedInvoices[existingIndex] = invoice;
-        } else {
-          uploadedInvoices.push(invoice);
-        }
-        insertedInvoices.push(invoice);
+      const existingIndex = uploadedInvoices.findIndex(inv => inv.id === processedInvoice.id);
+      if (existingIndex !== -1) {
+        uploadedInvoices[existingIndex] = processedInvoice;
+      } else {
+        uploadedInvoices.push(processedInvoice);
       }
+      savedInvoice = processedInvoice;
     }
 
     await client.query('COMMIT');
-
-    if (Array.isArray(req.body)) {
-      res.json({ 
-        message: `Successfully ${saveToDb === 'true' ? 'saved' : 'updated'} ${insertedInvoices.length} invoices.`,
-        invoices: insertedInvoices
-      });
-    } else {
-      // For single invoice creation/update, return the invoice
-      const savedInvoice = insertedInvoices[0];
-      
-      if (saveToDb === 'true') {
-        // Fetch order details for the saved invoice
-        const orderDetailsQuery = `
-          SELECT * FROM order_details WHERE invoiceId = $1
-        `;
-        const orderDetailsResult = await client.query(orderDetailsQuery, [savedInvoice.id]);
-        savedInvoice.orderDetails = orderDetailsResult.rows;
-      }
-
-      res.status(201).json(savedInvoice);
-    }
+    res.status(201).json(savedInvoice);
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error submitting invoices:', error);
-    res.status(500).json({ message: 'Error submitting invoices', error: error.message });
+    console.error('Error submitting invoice:', error);
+    res.status(500).json({ message: 'Error submitting invoice', error: error.message });
   } finally {
     client.release();
   }

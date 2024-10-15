@@ -56,12 +56,9 @@ export const fetchInvoices = async () => {
 export const deleteInvoice = async (id: string) => {
   try {
     // First, try to delete from the database
-    const dbResponse = await fetch(
-      `${API_BASE_URL}/api/db/invoices/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    const dbResponse = await fetch(`${API_BASE_URL}/api/db/invoices/${id}`, {
+      method: "DELETE",
+    });
 
     if (dbResponse.ok) {
       // If successful, remove from local storage as well
@@ -70,12 +67,9 @@ export const deleteInvoice = async (id: string) => {
     }
 
     // If not found in database, try to delete from server memory
-    const memoryResponse = await fetch(
-      `${API_BASE_URL}/api/invoices/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    const memoryResponse = await fetch(`${API_BASE_URL}/api/invoices/${id}`, {
+      method: "DELETE",
+    });
 
     if (!memoryResponse.ok) {
       throw new Error(`HTTP error! status: ${memoryResponse.status}`);
@@ -111,15 +105,6 @@ export const saveInvoice = async (
   saveToDb: boolean = true
 ): Promise<InvoiceData> => {
   try {
-    // Check for duplicate invoice number
-    const isDuplicate = await checkDuplicateInvoiceNo(invoice.invoiceno);
-    if (isDuplicate) {
-      toast.error(
-        "Duplicate invoice number. Please use a unique invoice number."
-      );
-      throw new Error("Duplicate invoice number");
-    }
-
     const url = `${API_BASE_URL}/api/invoices/submit?saveToDb=${saveToDb}`;
 
     const response = await fetch(url, {
