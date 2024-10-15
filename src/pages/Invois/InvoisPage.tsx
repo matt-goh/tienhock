@@ -150,10 +150,59 @@ const InvoisPage: React.FC = () => {
         }))
         .sort((a, b) => a.productName.localeCompare(b.productName));
 
-      setProductData(sortedProducts);
+      const groupedProducts: ProductData[] = [];
+      let currentGroup = "";
+      let groupQty = 0;
+      let groupAmount = 0;
+
+      sortedProducts.forEach((product) => {
+        const productGroup = getProductGroup(product.code);
+
+        if (productGroup !== currentGroup) {
+          if (currentGroup !== "") {
+            groupedProducts.push({
+              code: `${currentGroup} Subtotal`,
+              productName: `${currentGroup} Subtotal`,
+              qty: groupQty,
+              amount: groupAmount,
+              isSubtotalQty: true,
+            });
+          }
+          currentGroup = productGroup;
+          groupQty = 0;
+          groupAmount = 0;
+        }
+
+        groupedProducts.push(product);
+        groupQty += product.qty;
+        groupAmount += product.amount;
+      });
+
+      // Add the last group's subtotal
+      if (currentGroup !== "") {
+        groupedProducts.push({
+          code: `${currentGroup} Subtotal`,
+          productName: `${currentGroup} Subtotal`,
+          qty: groupQty,
+          amount: groupAmount,
+          isSubtotalQty: true,
+        });
+      }
+
+      setProductData(groupedProducts);
     } else {
       setFilteredInvoices(filtered);
     }
+  };
+
+  const getProductGroup = (code: string): string => {
+    if (code.startsWith("1-")) return "1";
+    if (code.startsWith("2-")) return "2";
+    if (code.startsWith("MEQ-")) return "MEQ";
+    if (code.startsWith("OTH")) return "OTH";
+    if (code.startsWith("S-")) return "S";
+    if (code.startsWith("WE-")) return "WE";
+    return "Other";
   };
 
   const handleFilterChange = (newFilters: InvoiceFilterOptions) => {

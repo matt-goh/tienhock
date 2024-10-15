@@ -150,7 +150,13 @@ function TableEditing<T extends Record<string, any>>({
       if (isSorting || !rowId) return;
 
       const row = table.getRowModel().rows.find((r) => r.id === rowId);
-      if (!row || row.original.isSubtotal || row.original.isTotal) return;
+      if (
+        !row ||
+        row.original.isSubtotal ||
+        row.original.isTotal ||
+        row.original.isSubtotalQty
+      )
+        return;
 
       const filteredCellIndex = cellIndex;
       const columnId = columns[filteredCellIndex]?.id;
@@ -599,6 +605,7 @@ function TableEditing<T extends Record<string, any>>({
         !isSorting &&
         !row.original.isSubtotal &&
         !row.original.isTotal &&
+        !row.original.isSubtotalQty &&
         (isEditableColumn(columnConfig) ||
           row.original.isLess ||
           row.original.isTax);
@@ -616,7 +623,8 @@ function TableEditing<T extends Record<string, any>>({
         row.original.isLess ||
         row.original.isTax ||
         row.original.isSubtotal ||
-        row.original.isTotal
+        row.original.isTotal ||
+        row.original.isSubtotalQty
       ) {
         if (cellIndex === 0) {
           return (
@@ -653,7 +661,7 @@ function TableEditing<T extends Record<string, any>>({
               />
             );
           } else {
-            // For Total row, keep it readonly
+            // For Total and SubtotalQty rows, keep it readonly
             return (
               <input
                 className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
@@ -1168,7 +1176,9 @@ function TableEditing<T extends Record<string, any>>({
                   } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
                      ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
-                    row.original.isSubtotal || row.original.isTotal
+                    row.original.isSubtotal ||
+                    row.original.isSubtotalQty ||
+                    row.original.isTotal
                       ? setSelectedRowId(row.id)
                       : null
                   }
@@ -1235,11 +1245,53 @@ function TableEditing<T extends Record<string, any>>({
                         return null;
                       }
                     }
-                    if (row.original.isTotal || row.original.isSubtotal) {
-                      if (
-                        cell.column.id ===
-                        columns.find((col) => col.type === "amount")?.id
-                      ) {
+                    if (
+                      row.original.isTotal ||
+                      row.original.isSubtotal ||
+                      row.original.isSubtotalQty
+                    ) {
+                      const amountColumnId = columns.find(
+                        (col) => col.id === "amount"
+                      )?.id;
+                      const qtyColumnId = columns.find(
+                        (col) => col.id === "qty"
+                      )?.id;
+
+                      if (row.original.isSubtotalQty) {
+                        if (
+                          !(cell.column.id === qtyColumnId) &&
+                          !(cell.column.id === amountColumnId)
+                        ) {
+                          return (
+                            <td
+                              key={cell.id}
+                              className="py-3 pr-6 text-right font-semibold rounded-bl-lg"
+                            ></td>
+                          );
+                        }
+                        if (cell.column.id === qtyColumnId) {
+                          return (
+                            <td
+                              key={cell.id}
+                              className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                            >
+                              {row.original.qty}
+                            </td>
+                          );
+                        }
+                        if (cell.column.id === amountColumnId) {
+                          return (
+                            <td
+                              key={cell.id}
+                              className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                            >
+                              {row.original.amount.toFixed(2)}
+                            </td>
+                          );
+                        } else {
+                          return null;
+                        }
+                      } else if (cell.column.id === amountColumnId) {
                         return (
                           <td
                             key={cell.id}
@@ -1248,7 +1300,7 @@ function TableEditing<T extends Record<string, any>>({
                                 ? columns.length
                                 : columns.length - 1
                             }
-                            className={`py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg`}
+                            className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
                           >
                             {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
                             {cell.getValue() as ReactNode}
