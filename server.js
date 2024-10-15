@@ -1557,6 +1557,12 @@ app.post('/api/invoices/submit', async (req, res) => {
       orderDetails: invoice.orderDetails.map(sanitizeOrderDetail)
     };
 
+    // Store the original id (which is the old invoiceno) before potentially changing it
+    const originalId = processedInvoice.id;
+
+    // Update the id to the new invoiceno
+    processedInvoice.id = processedInvoice.invoiceno;
+
     // Convert date from DD/MM/YYYY to YYYY-MM-DD
     const [day, month, year] = processedInvoice.date.split('/');
     const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -1578,55 +1584,48 @@ app.post('/api/invoices/submit', async (req, res) => {
     let savedInvoice;
 
     if (saveToDb === 'true') {
-      // Check if the invoice already exists
-      const checkInvoiceQuery = 'SELECT id FROM Invoices WHERE id = $1';
-      const checkInvoiceResult = await client.query(checkInvoiceQuery, [processedInvoice.id]);
+      // Check if the invoice with the original id exists
+      const checkOriginalInvoiceQuery = 'SELECT id FROM Invoices WHERE id = $1';
+      const checkOriginalInvoiceResult = await client.query(checkOriginalInvoiceQuery, [originalId]);
 
-      if (checkInvoiceResult.rows.length > 0) {
-        // Update existing invoice
-        const updateInvoiceQuery = `
-          UPDATE Invoices
-          SET invoiceno = $1, orderno = $2, date = $3, time = $4, type = $5,
-              customer = $6, customername = $7, salesman = $8, totalAmount = $9
-          WHERE id = $10
-          RETURNING *
-        `;
-        const updateResult = await client.query(updateInvoiceQuery, [
-          processedInvoice.invoiceno,
-          processedInvoice.orderno,
-          formattedDate,
-          formattedTime,
-          processedInvoice.type,
-          processedInvoice.customer,
-          processedInvoice.customername,
-          processedInvoice.salesman,
-          sanitizedTotalAmount,
-          processedInvoice.id
-        ]);
-        savedInvoice = updateResult.rows[0];
-      } else {
-        // Insert new invoice
-        const insertInvoiceQuery = `
-          INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          RETURNING *
-        `;
-        const insertResult = await client.query(insertInvoiceQuery, [
-          processedInvoice.id,
-          processedInvoice.invoiceno,
-          processedInvoice.orderno,
-          formattedDate,
-          formattedTime,
-          processedInvoice.type,
-          processedInvoice.customer,
-          processedInvoice.customername,
-          processedInvoice.salesman,
-          sanitizedTotalAmount
-        ]);
-        savedInvoice = insertResult.rows[0];
+      if (checkOriginalInvoiceResult.rows.length > 0 && originalId !== processedInvoice.id) {
+        // The invoice exists and the invoice number has changed
+        // Delete the old invoice and its details
+        await client.query('DELETE FROM order_details WHERE invoiceId = $1', [originalId]);
+        await client.query('DELETE FROM Invoices WHERE id = $1', [originalId]);
       }
 
-      // Delete existing order details
+      // Now, either insert a new invoice or update the existing one
+      const upsertInvoiceQuery = `
+        INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id) DO UPDATE
+        SET invoiceno = EXCLUDED.invoiceno,
+            orderno = EXCLUDED.orderno,
+            date = EXCLUDED.date,
+            time = EXCLUDED.time,
+            type = EXCLUDED.type,
+            customer = EXCLUDED.customer,
+            customername = EXCLUDED.customername,
+            salesman = EXCLUDED.salesman,
+            totalAmount = EXCLUDED.totalAmount
+        RETURNING *
+      `;
+      const upsertResult = await client.query(upsertInvoiceQuery, [
+        processedInvoice.id,
+        processedInvoice.invoiceno,
+        processedInvoice.invoiceno,
+        formattedDate,
+        formattedTime,
+        processedInvoice.type,
+        processedInvoice.customer,
+        processedInvoice.customername,
+        processedInvoice.salesman,
+        sanitizedTotalAmount
+      ]);
+      savedInvoice = upsertResult.rows[0];
+
+      // Delete existing order details for the new/updated invoice
       await client.query('DELETE FROM order_details WHERE invoiceId = $1', [savedInvoice.id]);
 
       // Insert new order details
@@ -1659,6 +1658,10 @@ app.post('/api/invoices/submit', async (req, res) => {
       savedInvoice.orderDetails = orderDetailsResult.rows;
     } else {
       // Save to server memory
+      // Remove the old invoice if the invoice number has changed
+      if (originalId !== processedInvoice.id) {
+        uploadedInvoices = uploadedInvoices.filter(inv => inv.id !== originalId);
+      }
       const existingIndex = uploadedInvoices.findIndex(inv => inv.id === processedInvoice.id);
       if (existingIndex !== -1) {
         uploadedInvoices[existingIndex] = processedInvoice;
