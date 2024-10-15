@@ -14,6 +14,8 @@ export const updateInvoice = (updatedInvoice: InvoiceData) => {
   invoices = invoices.map((invoice) =>
     invoice.id === updatedInvoice.id ? updatedInvoice : invoice
   );
+  // Dispatch an event to notify that invoices have been updated
+  window.dispatchEvent(new CustomEvent("invoicesUpdated"));
 };
 
 export const fetchDbInvoices = async (): Promise<InvoiceData[]> => {
