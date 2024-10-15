@@ -34,7 +34,9 @@ const InvoisPage: React.FC = () => {
     customerFilter: null,
     applyCustomerFilter: true,
     dateRangeFilter: { start: today, end: tomorrow },
-    applyDateRangeFilter: true,
+    applyDateRangeFilter: false,
+    invoiceTypeFilter: null,
+    applyInvoiceTypeFilter: true,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
@@ -107,6 +109,12 @@ const InvoisPage: React.FC = () => {
             invoiceDate < filters.dateRangeFilter!.end)
         );
       });
+    }
+
+    if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
+      filtered = filtered.filter(
+        (invoice) => invoice.type === filters.invoiceTypeFilter
+      );
     }
 
     setFilteredInvoices(filtered);
