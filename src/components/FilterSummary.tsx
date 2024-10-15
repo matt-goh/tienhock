@@ -16,10 +16,25 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
     return `${day}/${month}/${year}`;
   };
 
+  const isNextDay = (start: Date, end: Date): boolean => {
+    const oneDayInMs = 24 * 60 * 60 * 1000; // One day in milliseconds
+    return end.getTime() - start.getTime() <= oneDayInMs;
+  };
+
   if (filters.applyDateRangeFilter && filters.dateRangeFilter) {
-    const startDate = formatDate(filters.dateRangeFilter.start);
-    const endDate = formatDate(filters.dateRangeFilter.end);
-    summaries.push(`Date: ${startDate} to ${endDate}`);
+    const { start, end } = filters.dateRangeFilter;
+    if (start && end) {
+      const startDate = formatDate(start);
+      const endDate = formatDate(end);
+      
+      if (startDate === endDate || isNextDay(start, end)) {
+        summaries.push(`Date: ${startDate}`);
+      } else {
+        summaries.push(`Date: ${startDate} to ${endDate}`);
+      }
+    } else if (start) {
+      summaries.push(`Date: ${formatDate(start)}`);
+    }
   }
 
   if (

@@ -222,6 +222,18 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleFilterChange = (newFilters: InvoiceFilterOptions) => {
+    if (
+      newFilters.dateRangeFilter &&
+      newFilters.dateRangeFilter.start &&
+      newFilters.dateRangeFilter.end
+    ) {
+      const { start, end } = newFilters.dateRangeFilter;
+      if (start.getTime() === end.getTime()) {
+        const adjustedEnd = new Date(start);
+        adjustedEnd.setDate(adjustedEnd.getDate() + 1);
+        newFilters.dateRangeFilter.end = adjustedEnd;
+      }
+    }
     setFilters(newFilters);
   };
 
