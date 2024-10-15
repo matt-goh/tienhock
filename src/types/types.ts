@@ -121,14 +121,16 @@ export type FilterOptions = {
   race?: string;
 };
 
-export type InvoiceFilterOptions = {
+export interface InvoiceFilterOptions {
   salesmanFilter: string[] | null;
   applySalesmanFilter: boolean;
   customerFilter: string[] | null;
   applyCustomerFilter: boolean;
-  dateRangeFilter: { start: Date; end: Date } | null;
+  dateRangeFilter: { start: Date | null; end: Date | null };
   applyDateRangeFilter: boolean;
-};
+  invoiceTypeFilter: "C" | "I" | null;
+  applyInvoiceTypeFilter: boolean;
+}
 
 export interface Customer {
   id: string;

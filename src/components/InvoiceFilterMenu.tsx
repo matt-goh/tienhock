@@ -5,6 +5,10 @@ import {
   ComboboxOption,
   ComboboxOptions,
   Transition,
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
 } from "@headlessui/react";
 import {
   IconFilter,
@@ -16,6 +20,8 @@ import {
 } from "@tabler/icons-react";
 import { InvoiceFilterOptions } from "../types/types";
 import Button from "./Button";
+
+type InvoiceType = "C" | "I" | null;
 
 type InvoiceFilterMenuProps = {
   onFilterChange: (filters: InvoiceFilterOptions) => void;
@@ -94,6 +100,10 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       [type]: newDate,
     };
     handleFilterChange("dateRangeFilter", newDateRange);
+  };
+
+  const handleInvoiceTypeSelection = (selectedType: InvoiceType) => {
+    handleFilterChange("invoiceTypeFilter", selectedType);
   };
 
   useEffect(() => {
@@ -469,6 +479,112 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 </div>
               </div>
             )}
+          {/* Invoice Type Filter */}
+          <div className="px-1">
+            <Listbox
+              value={currentFilters.invoiceTypeFilter}
+              onChange={handleInvoiceTypeSelection}
+              disabled={!currentFilters.applyInvoiceTypeFilter}
+            >
+              {({ open }) => (
+                <div className="relative">
+                  <div
+                    className={`flex px-2.5 py-2.5 items-center justify-between rounded-md ${
+                      !currentFilters.applyInvoiceTypeFilter
+                        ? ""
+                        : "hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+                    }`}
+                  >
+                    <ListboxButton
+                      className={`w-full text-left text-default-900 focus:outline-none ${
+                        !currentFilters.applyInvoiceTypeFilter
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      } flex items-center`}
+                    >
+                      <span className="block truncate">
+                        {currentFilters.invoiceTypeFilter === "C"
+                          ? "Cash"
+                          : currentFilters.invoiceTypeFilter === "I"
+                          ? "Invoice"
+                          : "Sales by type"}
+                      </span>
+                      <IconChevronDown
+                        stroke={2}
+                        size={18}
+                        className="ml-2 text-default-500"
+                      />
+                    </ListboxButton>
+                    <button
+                      className="flex items-center ml-2"
+                      onClick={() =>
+                        handleFilterChange(
+                          "applyInvoiceTypeFilter",
+                          !currentFilters.applyInvoiceTypeFilter
+                        )
+                      }
+                    >
+                      {currentFilters.applyInvoiceTypeFilter ? (
+                        <IconSquareCheckFilled
+                          width={18}
+                          height={18}
+                          className="text-blue-600"
+                        />
+                      ) : (
+                        <IconSquare
+                          width={18}
+                          height={18}
+                          stroke={2}
+                          className="text-default-400"
+                        />
+                      )}
+                    </button>
+                  </div>
+                  <Transition
+                    show={open && currentFilters.applyInvoiceTypeFilter}
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                      {[
+                        { id: "C", name: "Cash" },
+                        { id: "I", name: "Invoice" },
+                      ].map((option) => (
+                        <ListboxOption
+                          key={option.id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 px-4 ${
+                              active ? "bg-default-100" : "text-default-900"
+                            }`
+                          }
+                          value={option.id}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {option.name}
+                              </span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck stroke={2} size={22} />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              )}
+            </Listbox>
+          </div>
         </div>
       )}
     </div>
