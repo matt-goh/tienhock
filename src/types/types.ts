@@ -138,6 +138,7 @@ export interface ProductData {
   productName: string;
   qty: number;
   amount: number;
+  isSubtotalQty?: boolean;
 }
 
 export interface Customer {
