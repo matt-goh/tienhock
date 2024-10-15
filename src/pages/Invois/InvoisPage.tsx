@@ -6,6 +6,7 @@ import {
   ColumnConfig,
   InvoiceData,
   InvoiceFilterOptions,
+  ProductData,
 } from "../../types/types";
 import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
@@ -37,7 +38,9 @@ const InvoisPage: React.FC = () => {
     applyDateRangeFilter: false,
     invoiceTypeFilter: null,
     applyInvoiceTypeFilter: true,
+    applyProductFilter: false,
   });
+  const [productData, setProductData] = useState<ProductData[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -117,7 +120,38 @@ const InvoisPage: React.FC = () => {
       );
     }
 
-    setFilteredInvoices(filtered);
+    if (filters.applyProductFilter) {
+      const products: { [key: string]: ProductData } = {};
+
+      filtered.forEach((invoice) => {
+        invoice.orderDetails.forEach((detail) => {
+          if (!detail.isFoc && !detail.isReturned) {
+            const key = `${detail.code}-${detail.productName}`;
+            if (products[key]) {
+              products[key].qty += parseFloat(detail.qty.toString()) || 0;
+              products[key].amount += parseFloat(detail.total) || 0;
+            } else {
+              products[key] = {
+                code: detail.code,
+                productName: detail.productName,
+                qty: parseFloat(detail.qty.toString()) || 0,
+                amount: parseFloat(detail.total) || 0,
+              };
+            }
+          }
+        });
+      });
+
+      setProductData(
+        Object.values(products).map((product) => ({
+          ...product,
+          qty: Number(product.qty.toFixed(2)),
+          amount: Number(product.amount.toFixed(2)),
+        }))
+      );
+    } else {
+      setFilteredInvoices(filtered);
+    }
   };
 
   const handleFilterChange = (newFilters: InvoiceFilterOptions) => {
@@ -323,7 +357,7 @@ const InvoisPage: React.FC = () => {
     setSelectedInvoiceId(null);
   };
 
-  const columns: ColumnConfig[] = [
+  const invoiceColumns: ColumnConfig[] = [
     {
       id: "invoiceno",
       header: "Invoice",
@@ -345,6 +379,13 @@ const InvoisPage: React.FC = () => {
     { id: "customername", header: "Customer", type: "readonly", width: 350 },
     { id: "salesman", header: "Salesman", type: "readonly", width: 150 },
     { id: "totalamount", header: "Amount", type: "readonly", width: 150 },
+  ];
+
+  const productColumns: ColumnConfig[] = [
+    { id: "code", header: "Code", type: "readonly", width: 150 },
+    { id: "productName", header: "Product Name", type: "readonly", width: 350 },
+    { id: "qty", header: "Quantity", type: "readonly", width: 150 },
+    { id: "amount", header: "Amount", type: "readonly", width: 150 },
   ];
 
   const salesmanOptions = useMemo(() => {
@@ -403,10 +444,21 @@ const InvoisPage: React.FC = () => {
           customerOptions={customerOptions}
         />
       </div>
-      {filteredInvoices.length > 0 ? (
+      {filters.applyProductFilter ? (
+        productData.length > 0 ? (
+          <TableEditing<ProductData>
+            initialData={productData}
+            columns={productColumns}
+            onChange={() => {}} // Product data is read-only
+            tableKey="product-sales"
+          />
+        ) : (
+          <p className="text-center text-default-500">No product data found.</p>
+        )
+      ) : filteredInvoices.length > 0 ? (
         <TableEditing<InvoiceData>
           initialData={filteredInvoices}
-          columns={columns}
+          columns={invoiceColumns}
           onChange={setInvoices}
           tableKey="invois"
         />

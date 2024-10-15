@@ -130,6 +130,14 @@ export interface InvoiceFilterOptions {
   applyDateRangeFilter: boolean;
   invoiceTypeFilter: "C" | "I" | null;
   applyInvoiceTypeFilter: boolean;
+  applyProductFilter: boolean;
+}
+
+export interface ProductData {
+  code: string;
+  productName: string;
+  qty: number;
+  amount: number;
 }
 
 export interface Customer {

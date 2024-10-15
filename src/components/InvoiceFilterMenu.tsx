@@ -192,6 +192,36 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               </div>
             )}
           </div>
+          {/* Sales by Product Filter */}
+          <div className="px-1">
+            <div
+              className="flex px-2.5 py-2.5 items-center justify-between rounded-md hover:bg-default-100 active:bg-default-200 transition-colors duration-200 cursor-pointer"
+              onClick={() =>
+                handleFilterChange(
+                  "applyProductFilter",
+                  !currentFilters.applyProductFilter
+                )
+              }
+            >
+              <span className="block truncate">Sales by product</span>
+              <button className="flex items-center ml-2">
+                {currentFilters.applyProductFilter ? (
+                  <IconSquareCheckFilled
+                    width={18}
+                    height={18}
+                    className="text-blue-600"
+                  />
+                ) : (
+                  <IconSquare
+                    width={18}
+                    height={18}
+                    stroke={2}
+                    className="text-default-400"
+                  />
+                )}
+              </button>
+            </div>
+          </div>
           {/* Salesman Filter */}
           <div className="px-1">
             <Combobox
