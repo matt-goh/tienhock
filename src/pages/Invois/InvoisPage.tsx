@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
@@ -51,10 +51,6 @@ const InvoisPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    applyFilters();
-  }, [invoices, filters, productData]);
-
-  useEffect(() => {
     const handleInvoicesUpdated = () => {
       setInvoices([...invoices]); // This will trigger a re-render
     };
@@ -70,7 +66,7 @@ const InvoisPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const fetchedInvoices = await fetchDbInvoices();
+      const fetchedInvoices = await fetchDbInvoices(filters);
       setInvoices(fetchedInvoices);
     } catch (error) {
       console.error("Error loading invoices:", error);
@@ -92,7 +88,7 @@ const InvoisPage: React.FC = () => {
     return new Date(year, month - 1, day);
   };
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...invoices];
 
     if (
@@ -209,7 +205,11 @@ const InvoisPage: React.FC = () => {
     } else {
       setFilteredInvoices(filtered);
     }
-  };
+  }, [invoices, filters]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const getProductGroup = (code: string): string => {
     if (code.startsWith("1-")) return "1";

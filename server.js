@@ -1463,7 +1463,9 @@ app.post('/api/invoices/upload', (req, res) => {
 // Endpoint to fetch invoices from database
 app.get('/api/db/invoices', async (req, res) => {
   try {
-    const invoiceQuery = `
+    const { salesmen, customers, startDate, endDate, invoiceType } = req.query;
+    
+    let invoiceQuery = `
       SELECT 
         i.id, i.invoiceno, i.orderno, i.date, i.type, 
         i.customer, c.name as customername, 
@@ -1472,8 +1474,43 @@ app.get('/api/db/invoices', async (req, res) => {
         invoices i
       LEFT JOIN 
         customers c ON i.customer = c.id
+      WHERE 1=1
     `;
-    const invoiceResult = await pool.query(invoiceQuery);
+
+    const queryParams = [];
+    let paramCounter = 1;
+
+    if (salesmen) {
+      const salesmenArray = salesmen.split(',');
+      invoiceQuery += ` AND i.salesman = ANY($${paramCounter})`;
+      queryParams.push(salesmenArray);
+      paramCounter++;
+    }
+
+    if (customers) {
+      const customersArray = customers.split(',');
+      invoiceQuery += ` AND i.customer = ANY($${paramCounter})`;
+      queryParams.push(customersArray);
+      paramCounter++;
+    }
+
+    if (startDate && endDate) {
+      invoiceQuery += ` AND i.date BETWEEN $${paramCounter} AND $${paramCounter + 1}`;
+      queryParams.push(startDate, endDate);
+      paramCounter += 2;
+    }
+
+    if (invoiceType) {
+      invoiceQuery += ` AND i.type = $${paramCounter}`;
+      queryParams.push(invoiceType);
+      paramCounter++;
+    }
+
+    const invoiceResult = await pool.query(invoiceQuery, queryParams);
+
+    if (invoiceResult.rows.length === 0) {
+      return res.json([]);  // Return an empty array if no invoices found
+    }
 
     const orderDetailsQuery = `
       SELECT 
@@ -1484,8 +1521,10 @@ app.get('/api/db/invoices', async (req, res) => {
         order_details od
       LEFT JOIN 
         products p ON od.code = p.id
+      WHERE
+        od.invoiceid = ANY($1)
     `;
-    const orderDetailsResult = await pool.query(orderDetailsQuery);
+    const orderDetailsResult = await pool.query(orderDetailsQuery, [invoiceResult.rows.map(inv => inv.id)]);
 
     const invoicesWithDetails = invoiceResult.rows.map(invoice => {
       // Handle date conversion

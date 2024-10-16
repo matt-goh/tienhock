@@ -1,5 +1,9 @@
 import toast from "react-hot-toast";
-import { InvoiceData, OrderDetail } from "../../types/types";
+import {
+  InvoiceData,
+  InvoiceFilterOptions,
+  OrderDetail,
+} from "../../types/types";
 import { API_BASE_URL } from "../../config";
 
 let invoices: InvoiceData[] = [];
@@ -18,9 +22,48 @@ export const updateInvoice = (updatedInvoice: InvoiceData) => {
   window.dispatchEvent(new CustomEvent("invoicesUpdated"));
 };
 
-export const fetchDbInvoices = async (): Promise<InvoiceData[]> => {
+export const fetchDbInvoices = async (
+  filters: InvoiceFilterOptions
+): Promise<InvoiceData[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/db/invoices`);
+    const queryParams = new URLSearchParams();
+
+    if (
+      filters.applySalesmanFilter &&
+      filters.salesmanFilter &&
+      filters.salesmanFilter.length > 0
+    ) {
+      queryParams.append("salesmen", filters.salesmanFilter.join(","));
+    }
+    if (
+      filters.applyCustomerFilter &&
+      filters.customerFilter &&
+      filters.customerFilter.length > 0
+    ) {
+      queryParams.append("customers", filters.customerFilter.join(","));
+    }
+    if (
+      filters.applyDateRangeFilter &&
+      filters.dateRangeFilter &&
+      filters.dateRangeFilter.start &&
+      filters.dateRangeFilter.end
+    ) {
+      queryParams.append(
+        "startDate",
+        filters.dateRangeFilter.start.toISOString().split("T")[0]
+      );
+      queryParams.append(
+        "endDate",
+        filters.dateRangeFilter.end.toISOString().split("T")[0]
+      );
+    }
+    if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
+      queryParams.append("invoiceType", filters.invoiceTypeFilter);
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/db/invoices?${queryParams.toString()}`
+    );
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
