@@ -521,6 +521,8 @@ const InvoisPage: React.FC = () => {
           currentFilters={filters}
           salesmanOptions={salesmanOptions}
           customerOptions={customerOptions}
+          today={today}
+          tomorrow={tomorrow}
         />
       </div>
       <FilterSummary filters={filters} />

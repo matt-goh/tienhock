@@ -17,6 +17,7 @@ import {
   IconChevronDown,
   IconCheck,
   IconX,
+  IconTrash,
 } from "@tabler/icons-react";
 import { InvoiceFilterOptions } from "../types/types";
 import Button from "./Button";
@@ -28,6 +29,8 @@ type InvoiceFilterMenuProps = {
   currentFilters: InvoiceFilterOptions;
   salesmanOptions: string[];
   customerOptions: string[];
+  today: Date | null;
+  tomorrow: Date | null;
 };
 
 const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
@@ -35,6 +38,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   currentFilters,
   salesmanOptions,
   customerOptions,
+  today,
+  tomorrow,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -55,6 +60,21 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
   const handleFilterChange = (key: keyof InvoiceFilterOptions, value: any) => {
     onFilterChange({ ...currentFilters, [key]: value });
+  };
+
+  const clearAllFilters = () => {
+    const clearedFilters: InvoiceFilterOptions = {
+      salesmanFilter: null,
+      applySalesmanFilter: true,
+      customerFilter: null,
+      applyCustomerFilter: true,
+      dateRangeFilter: { start: today, end: tomorrow },
+      applyDateRangeFilter: false,
+      invoiceTypeFilter: null,
+      applyInvoiceTypeFilter: true,
+      applyProductFilter: false,
+    };
+    onFilterChange(clearedFilters);
   };
 
   const handleSalesmanSelection = (selectedSalesmanIds: string[]) => {
@@ -614,6 +634,16 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 </div>
               )}
             </Listbox>
+          </div>
+          {/* Clear Filters Button */}
+          <div className="px-1">
+            <button
+              onClick={clearAllFilters}
+              className="w-full flex justify-between items-center px-2.5 py-2.5 text-left text-default-900 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+            >
+              <span>Clear All Filters</span>
+              <IconTrash size={18} />
+            </button>
           </div>
         </div>
       )}
