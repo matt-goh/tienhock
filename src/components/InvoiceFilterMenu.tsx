@@ -140,7 +140,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   }, []);
 
   return (
-    <div className="relative inline-block text-left mr-2" ref={menuRef}>
+    <div className="relative inline-block text-left ml-2" ref={menuRef}>
       <Button
         onClick={() => setIsOpen(!isOpen)}
         icon={IconFilter}

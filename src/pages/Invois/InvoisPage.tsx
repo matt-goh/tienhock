@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
@@ -10,7 +16,7 @@ import {
 } from "../../types/types";
 import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
-import { IconCloudUpload, IconPlus } from "@tabler/icons-react";
+import { IconCloudUpload, IconPlus, IconSearch } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
 import { API_BASE_URL } from "../../config";
@@ -41,6 +47,7 @@ const InvoisPage: React.FC = () => {
     applyInvoiceTypeFilter: true,
     applyProductFilter: false,
   });
+  const [searchTerm, setSearchTerm] = useState("");
   const [productData, setProductData] = useState<ProductData[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
@@ -90,6 +97,16 @@ const InvoisPage: React.FC = () => {
 
   const applyFilters = useCallback(() => {
     let filtered = [...invoices];
+
+    // Apply search filter
+    if (searchTerm) {
+      const lowercasedSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter((invoice) =>
+        Object.values(invoice).some((value) =>
+          String(value).toLowerCase().includes(lowercasedSearch)
+        )
+      );
+    }
 
     if (
       filters.applySalesmanFilter &&
@@ -205,7 +222,7 @@ const InvoisPage: React.FC = () => {
     } else {
       setFilteredInvoices(filtered);
     }
-  }, [invoices, filters]);
+  }, [invoices, filters, searchTerm]);
 
   useEffect(() => {
     applyFilters();
@@ -235,6 +252,10 @@ const InvoisPage: React.FC = () => {
       }
     }
     setFilters(newFilters);
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
   };
 
   const handleFileUpload = async (
@@ -484,69 +505,89 @@ const InvoisPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
+    <div className="px-4">
       <h1 className="text-2xl text-center font-medium text-default-700 mb-4">
         Invois
       </h1>
-      <div className="flex mb-4 space-x-2 justify-center">
-        <Button
-          onClick={handleCreateNewInvoice}
-          icon={IconPlus}
-          iconSize={16}
-          iconStroke={2}
-          variant="outline"
-        >
-          Create
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".txt"
-          onChange={handleFileUpload}
-          className="hidden"
-          id="fileUpload"
-          multiple
-        />
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          icon={IconCloudUpload}
-          iconSize={16}
-          iconStroke={2}
-          variant="outline"
-        >
-          Import
-        </Button>
-        <InvoiceFilterMenu
-          onFilterChange={handleFilterChange}
-          currentFilters={filters}
-          salesmanOptions={salesmanOptions}
-          customerOptions={customerOptions}
-          today={today}
-          tomorrow={tomorrow}
-        />
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative flex">
+          <IconSearch
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
+            size={22}
+          />
+          <input
+            type="text"
+            placeholder="Search"
+            className="w-full pl-11 py-2 border border-default-300 focus:border-default-400 rounded-full"
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+        </div>
+        <div className="flex space-x-2 justify-center">
+          <InvoiceFilterMenu
+            onFilterChange={handleFilterChange}
+            currentFilters={filters}
+            salesmanOptions={salesmanOptions}
+            customerOptions={customerOptions}
+            today={today}
+            tomorrow={tomorrow}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt"
+            onChange={handleFileUpload}
+            className="hidden"
+            id="fileUpload"
+            multiple
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            icon={IconCloudUpload}
+            iconSize={16}
+            iconStroke={2}
+            variant="outline"
+          >
+            Import
+          </Button>
+
+          <Button
+            onClick={handleCreateNewInvoice}
+            icon={IconPlus}
+            iconSize={16}
+            iconStroke={2}
+            variant="outline"
+          >
+            Create
+          </Button>
+        </div>
       </div>
-      <FilterSummary filters={filters} />
-      {filters.applyProductFilter ? (
-        productData.length > 0 ? (
-          <TableEditing<ProductData>
-            initialData={productData}
-            columns={productColumns}
-            onChange={() => {}} // Product data is read-only
-            tableKey="invois-products"
+      <div className="w-auto max-w-full">
+        <FilterSummary filters={filters} />
+        {filters.applyProductFilter ? (
+          productData.length > 0 ? (
+            <TableEditing<ProductData>
+              initialData={productData}
+              columns={productColumns}
+              onChange={() => {}} // Product data is read-only
+              tableKey="invois-products"
+            />
+          ) : (
+            <p className="text-center text-default-500">
+              No product data found.
+            </p>
+          )
+        ) : filteredInvoices.length > 0 ? (
+          <TableEditing<InvoiceData>
+            initialData={filteredInvoices}
+            columns={invoiceColumns}
+            onChange={setInvoices}
+            tableKey="invois"
           />
         ) : (
-          <p className="text-center text-default-500">No product data found.</p>
-        )
-      ) : filteredInvoices.length > 0 ? (
-        <TableEditing<InvoiceData>
-          initialData={filteredInvoices}
-          columns={invoiceColumns}
-          onChange={setInvoices}
-          tableKey="invois"
-        />
-      ) : (
-        <p className="text-center text-default-500">No invoices found.</p>
-      )}
+          <p className="text-center text-default-500">No invoices found.</p>
+        )}
+      </div>
       <ConfirmationDialog
         isOpen={showDeleteConfirmation}
         onClose={() => setShowDeleteConfirmation(false)}
