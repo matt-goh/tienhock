@@ -26,7 +26,7 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
     if (start && end) {
       const startDate = formatDate(start);
       const endDate = formatDate(end);
-      
+
       if (startDate === endDate || isNextDay(start, end)) {
         summaries.push(`Date: ${startDate}`);
       } else {
@@ -68,8 +68,13 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
   }
 
   return (
-    <div className="text-sm text-default-500 mt-2 mb-4">
-      <strong>Applied Filters:</strong> {summaries.join(" | ")}
+    <div
+      className={`flex flex-wrap ${
+        filters.applyProductFilter ? "w-[760px]" : "w-[960px]"
+      } max-w-full text-sm text-default-500 mt-2 mb-4`}
+    >
+      <strong className="mr-1">Applied Filters:</strong>
+      {summaries.join(" | ")}
     </div>
   );
 };
