@@ -469,17 +469,6 @@ function TableEditing<T extends Record<string, any>>({
     };
   }, [handleMouseUp]);
 
-  // CS
-  const createSubtotalRow = (subtotalAmount: number, endIndex: number): T =>
-    ({
-      id: `subtotal-${Math.random().toString(36).substr(2, 9)}`,
-      ...Object.fromEntries(columns.map((col) => [col.id, ""])),
-      [columns.find((col) => col.type === "amount")?.id || "amount"]:
-        subtotalAmount.toFixed(2),
-      isSubtotal: true,
-      subtotalEndIndex: endIndex,
-    } as unknown as T);
-
   // RS
   const recalculateSubtotals = useCallback(
     (currentData: T[]): T[] => {
