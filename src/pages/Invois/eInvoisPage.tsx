@@ -1,8 +1,11 @@
 // EInvoisPage.tsx
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { API_BASE_URL } from "../../config";
+import Button from "../../components/Button";
+import toast from "react-hot-toast";
 
+// Types
 interface TokenInfo {
   accessToken: string;
   expiresIn: number;
@@ -19,157 +22,152 @@ interface LoginResponse {
 }
 
 interface SubmissionResponse {
-  details(arg0: string, error: string | undefined, details: any): unknown;
-  submissionUID?: string;
-  acceptedDocuments?: Array<{
-    uuid: string;
-    invoiceCodeNumber: string;
-  }>;
-  success?: boolean;
-  message?: string;
-  error?: string;
+  message: string;
+  submissionUid: string;
+  success: boolean;
 }
 
+// Reusable components
+const StatusMessage: React.FC<{ success: boolean; message: string }> = ({
+  success,
+  message,
+}) => (
+  <p className={`mt-2 ${success ? "text-green-600" : "text-red-600"}`}>
+    {message}
+  </p>
+);
+
+const TokenInfo: React.FC<{ tokenInfo: TokenInfo }> = ({ tokenInfo }) => (
+  <div className="mt-4 p-4 bg-default-100 border border-default-400 rounded">
+    <h2 className="font-bold text-default-800">Token Information:</h2>
+    <p>Access Token: {tokenInfo.accessToken.substring(0, 10)}...</p>
+    <p>Expires In: {tokenInfo.expiresIn} seconds</p>
+    <p>Token Type: {tokenInfo.tokenType}</p>
+  </div>
+);
+
+const ErrorDetails: React.FC<{ error?: string; details?: any }> = ({
+  error,
+  details,
+}) => (
+  <div className="mt-4 p-4 bg-red-100 border border-red-400 rounded">
+    <h2 className="font-bold text-red-800">Error Details:</h2>
+    <p>{error}</p>
+    {details && (
+      <pre className="mt-2 overflow-x-auto">
+        {JSON.stringify(details, null, 2)}
+      </pre>
+    )}
+  </div>
+);
+
+const SubmissionResult: React.FC<{ response: SubmissionResponse }> = ({
+  response,
+}) => (
+  <div className="mt-4 p-4 bg-green-100 border border-green-400 rounded">
+    <h3 className="font-bold text-green-800">Submission Details</h3>
+    <p>Message: {response.message}</p>
+    <p>Submission ID: {response.submissionUid}</p>
+  </div>
+);
+
+// Main component
 const EInvoisPage: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [responseData, setResponseData] = useState<LoginResponse | null>(null);
+  const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
+    null
+  );
   const [submissionResponse, setSubmissionResponse] =
     useState<SubmissionResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const connectToMyInvois = async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/einvoice/login`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        const data: LoginResponse = await response.json();
-        setResponseData(data);
-        setIsLoggedIn(data.success);
-      } catch (err) {
-        setResponseData({
-          success: false,
-          message: "An error occurred while connecting to MyInvois API.",
-          apiEndpoint: "Unknown",
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
-    };
-
-    connectToMyInvois();
+  const connectToMyInvois = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/einvoice/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data: LoginResponse = await response.json();
+      setLoginResponse(data);
+    } catch (err) {
+      setLoginResponse({
+        success: false,
+        message: "An error occurred while connecting to MyInvois API.",
+        apiEndpoint: "Unknown",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
   }, []);
+
+  useEffect(() => {
+    connectToMyInvois();
+  }, [connectToMyInvois]);
 
   const handleSubmitInvoice = async () => {
     setIsSubmitting(true);
-    setSubmissionError(null);
     setSubmissionResponse(null);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/einvoice/submit`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/einvoice/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
       const data: SubmissionResponse = await response.json();
       if (data.success) {
+        toast.success(data.message);
         setSubmissionResponse(data);
       } else {
-        setSubmissionError(
-          data.message || "Unknown error occurred during submission"
-        );
-        console.error("Submission error details:", data.error, data.details);
+        toast.error(data.message || "Submission failed. Please try again.");
       }
     } catch (err) {
-      setSubmissionError(
+      const errorMessage =
         err instanceof Error
           ? err.message
-          : "Unknown error occurred during submission"
-      );
+          : "Unknown error occurred during submission";
+      toast.error(errorMessage);
       console.error("Submission error:", err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!responseData) {
-    return <div>Connecting to MyInvois API...</div>;
+  if (!loginResponse) {
+    return (
+      <div className="text-center mt-8">Connecting to MyInvois API...</div>
+    );
   }
 
   return (
-    <div>
-      <h1>MyInvois API Connection Status</h1>
-      <p>Status: {responseData.success ? "Connected" : "Connection Failed"}</p>
-      <p>Message: {responseData.message}</p>
-      <p>API Endpoint: {responseData.apiEndpoint}</p>
-      {responseData.success && responseData.tokenInfo && (
-        <div>
-          <h2>Token Information:</h2>
-          <p>
-            Access Token: {responseData.tokenInfo.accessToken.substring(0, 10)}
-            ...
-          </p>
-          <p>Expires In: {responseData.tokenInfo.expiresIn} seconds</p>
-          <p>Token Type: {responseData.tokenInfo.tokenType}</p>
-        </div>
-      )}
-      {!responseData.success && (
-        <div>
-          <h2>Error Details:</h2>
-          <p>Error: {responseData.error}</p>
-          <pre>{JSON.stringify(responseData.details, null, 2)}</pre>
-        </div>
+    <div className="max-w-2xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">
+        MyInvois API Connection Status
+      </h1>
+      <StatusMessage
+        success={loginResponse.success}
+        message={loginResponse.message}
+      />
+      <p className="mt-2">API Endpoint: {loginResponse.apiEndpoint}</p>
+
+      {loginResponse.success && loginResponse.tokenInfo && (
+        <TokenInfo tokenInfo={loginResponse.tokenInfo} />
       )}
 
-      <button
-        className="flex items-center mt-4 px-4 py-2 font-medium text-default-700 border rounded-full hover:bg-default-100 hover:text-default-800 active:text-default-900 active:bg-default-200 transition-colors duration-200"
+      {!loginResponse.success && (
+        <ErrorDetails
+          error={loginResponse.error}
+          details={loginResponse.details}
+        />
+      )}
+      <Button
+        variant="outline"
         onClick={handleSubmitInvoice}
-        disabled={!isLoggedIn || isSubmitting}
+        disabled={!loginResponse.success || isSubmitting}
+        additionalClasses="mt-6"
       >
         {isSubmitting ? "Submitting..." : "Submit Invoice"}
-      </button>
+      </Button>
 
-      {submissionError && (
-        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          <h3 className="font-bold">Submission Error:</h3>
-          <p>{submissionError}</p>
-        </div>
-      )}
-
-      {submissionResponse && (
-        <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-          <h3 className="font-bold">Submission Response:</h3>
-          {submissionResponse.submissionUID && (
-            <p>Submission ID: {submissionResponse.submissionUID}</p>
-          )}
-          {submissionResponse.acceptedDocuments &&
-            submissionResponse.acceptedDocuments.length > 0 && (
-              <>
-                <h4 className="font-semibold mt-2">Accepted Documents:</h4>
-                <ul className="list-disc list-inside">
-                  {submissionResponse.acceptedDocuments.map((doc, index) => (
-                    <li key={index}>
-                      UUID: {doc.uuid}, Invoice Code: {doc.invoiceCodeNumber}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          {(!submissionResponse.acceptedDocuments ||
-            submissionResponse.acceptedDocuments.length === 0) && (
-            <p>No documents were accepted in this submission.</p>
-          )}
-        </div>
-      )}
+      {submissionError && <ErrorDetails error={submissionError} />}
+      {submissionResponse && <SubmissionResult response={submissionResponse} />}
     </div>
   );
 };

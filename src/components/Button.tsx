@@ -1,6 +1,6 @@
 import React from "react";
 import { Icon } from "@tabler/icons-react";
-
+ 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   icon?: Icon;
