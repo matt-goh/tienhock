@@ -5,7 +5,6 @@ import pkg2 from 'pg';
 import cors from 'cors';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import EInvoiceApiClient from './EInvoiceApiClient.js';
 
 dotenv.config();
 
@@ -2081,19 +2080,11 @@ app.get('/api/customers/combobox', async (req, res) => {
   }
 });
 
-// MyInvois API client initialization
-const apiClient = new EInvoiceApiClient(
-  process.env.MYINVOIS_API_BASE_URL,
-  process.env.MYINVOIS_CLIENT_ID,
-  process.env.MYINVOIS_CLIENT_SECRET
-);
-
 // e-invoice login endpoint
 app.post('/api/einvoice/login', async (req, res) => {
   try {
     console.log('Attempting to connect to:', `${process.env.MYINVOIS_API_BASE_URL}/connect/token`);
     const tokenResponse = await apiClient.refreshToken();
-    console.log('E-Invois API Response:', tokenResponse);
     
     if (tokenResponse && tokenResponse.access_token) {
       res.json({ 
@@ -2121,159 +2112,57 @@ app.post('/api/einvoice/login', async (req, res) => {
   }
 });
 
-// Function to generate a dummy invoice
-function generateDummyInvoice() {
-  const invoiceNumber = `INV-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
-  const invoiceDate = new Date().toISOString().split('T')[0];
-  const invoiceTime = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
+import EInvoiceApiClient from './EInvoiceApiClient.js';
+import DocumentSubmissionHandler from './documentSubmissionHandler.js';
 
-  return {
-    "Invoice": [{
-      "ID": [{ "_": invoiceNumber }],
-      "IssueDate": [{ "_": invoiceDate }],
-      "IssueTime": [{ "_": invoiceTime }],
-      "InvoiceTypeCode": [{ "_": "01", "listVersionID": "1.1" }],
-      "DocumentCurrencyCode": [{ "_": "MYR" }],
-      "TaxCurrencyCode": [{ "_": "MYR" }],
-      "AccountingSupplierParty": [{
-        "Party": [{
-          "PartyName": [{ "Name": [{ "_": "Dummy Supplier Sdn Bhd" }] }],
-          "PostalAddress": [{ 
-            "StreetName": [{ "_": "123 Main St" }],
-            "CityName": [{ "_": "Kuala Lumpur" }],
-            "PostalZone": [{ "_": "50000" }],
-            "CountrySubentityCode": [{ "_": "14" }],
-            "Country": [{ "IdentificationCode": [{ "_": "MYS" }] }]
-          }],
-          "PartyTaxScheme": [{ "CompanyID": [{ "_": "IG7139779050" }] }],
-          "PartyLegalEntity": [{ "RegistrationName": [{ "_": "Dummy Supplier Sdn Bhd" }] }],
-          "Contact": [{
-            "Telephone": [{ "_": "+60123456789" }],
-            "ElectronicMail": [{ "_": "dummy@supplier.com" }]
-          }],
-          "PartyIdentification": [
-            { "ID": [{ "_": "IG7139779050", "schemeID": "TIN" }] },
-            { "ID": [{ "_": "202001234567", "schemeID": "BRN" }] },
-            { "ID": [{ "_": "A01-2345-67891012", "schemeID": "SST" }] },
-            { "ID": [{ "_": "NA", "schemeID": "TTX" }] }
-          ],
-          "IndustryClassificationCode": [{ "_": "46510", "name": "Wholesale of computer hardware, software and peripherals" }]
-        }]
-      }],
-      "AccountingCustomerParty": [{
-        "Party": [{
-          "PartyName": [{ "Name": [{ "_": "Dummy Customer Sdn Bhd" }] }],
-          "PostalAddress": [{ 
-            "StreetName": [{ "_": "456 Side St" }],
-            "CityName": [{ "_": "Penang" }],
-            "PostalZone": [{ "_": "10000" }],
-            "CountrySubentityCode": [{ "_": "07" }],
-            "Country": [{ "IdentificationCode": [{ "_": "MYS" }] }]
-          }],
-          "PartyTaxScheme": [{ "CompanyID": [{ "_": "C2584563200" }] }],
-          "PartyLegalEntity": [{ "RegistrationName": [{ "_": "Dummy Customer Sdn Bhd" }] }],
-          "Contact": [{
-            "Telephone": [{ "_": "+60187654321" }],
-            "ElectronicMail": [{ "_": "dummy@customer.com" }]
-          }],
-          "PartyIdentification": [
-            { "ID": [{ "_": "C2584563200", "schemeID": "TIN" }] },
-            { "ID": [{ "_": "202009876543", "schemeID": "BRN" }] },
-            { "ID": [{ "_": "NA", "schemeID": "SST" }] }
-          ]
-        }]
-      }],
-      "InvoiceLine": [{
-        "ID": [{ "_": "1" }],
-        "InvoicedQuantity": [{ "_": 1, "unitCode": "EA" }],
-        "LineExtensionAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
-        "Item": [{ 
-          "Name": [{ "_": "Dummy Product" }],
-          "Description": [{ "_": "High-quality dummy product" }],
-          "CommodityClassification": [{ "ItemClassificationCode": [{ "_": "001", "listID": "CLASS" }] }]
-        }],
-        "Price": [{ "PriceAmount": [{ "_": 1000.00, "currencyID": "MYR" }] }],
-        "TaxTotal": [{
-          "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
-          "TaxSubtotal": [{
-            "TaxableAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
-            "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
-            "TaxCategory": [{
-              "ID": [{ "_": "01" }],
-              "Percent": [{ "_": 6.00 }],
-              "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
-            }]
-          }]
-        }]
-      }],
-      "TaxTotal": [{
-        "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
-        "TaxSubtotal": [{
-          "TaxableAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
-          "TaxAmount": [{ "_": 60.00, "currencyID": "MYR" }],
-          "TaxCategory": [{
-            "ID": [{ "_": "01" }],
-            "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
-          }]
-        }]
-      }],
-      "LegalMonetaryTotal": [{
-        "LineExtensionAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
-        "TaxExclusiveAmount": [{ "_": 1000.00, "currencyID": "MYR" }],
-        "TaxInclusiveAmount": [{ "_": 1060.00, "currencyID": "MYR" }],
-        "PayableAmount": [{ "_": 1060.00, "currencyID": "MYR" }]
-      }]
-    }]
-  };
-}
+const apiClient = new EInvoiceApiClient(process.env.MYINVOIS_API_BASE_URL, process.env.MYINVOIS_CLIENT_ID, process.env.MYINVOIS_CLIENT_SECRET);
+const submissionHandler = new DocumentSubmissionHandler(apiClient);
 
-// e-invoice submit endpoint
 app.post('/api/einvoice/submit', async (req, res) => {
   try {
-    // Generate a dummy invoice
-    const invoice = generateDummyInvoice();
-    const invoiceJson = JSON.stringify(invoice);
+    console.log('Starting invoice submission process');
+    const result = await submissionHandler.submitAndPollDocument();
 
-    console.log('Generated Invoice:', JSON.stringify(invoice, null, 2)); // Log the generated invoice
-
-    // Prepare the document submission
-    const documentHash = crypto.createHash('sha256').update(invoiceJson).digest('base64');
-    const submission = {
-      documents: [{
-        format: "JSON",
-        document: Buffer.from(invoiceJson).toString('base64'),
-        documentHash: documentHash,
-        codeNumber: invoice.Invoice[0].ID[0]._
-      }]
-    };
-
-    console.log('Submission Payload:', JSON.stringify(submission, null, 2)); // Log the submission payload
-
-    // Submit the document using the correct API endpoint
-    const response = await apiClient.makeApiCall('POST', '/api/v1.0/documentsubmissions/', submission);
-
-    console.log('MyInvois API Response:', JSON.stringify(response, null, 2)); // Log the full API response
-
-    // Check if the response contains the expected properties
-    if (response && response.submissionUID) {
+    if (result.success) {
+      console.log('Invoice submission successful:', JSON.stringify(result, null, 2));
       res.json({
         success: true,
-        submissionUID: response.submissionUID,
-        acceptedDocuments: response.acceptedDocuments || []
+        message: result.message,
+        submissionUid: result.submissionUid,
+        acceptedDocuments: result.acceptedDocuments
       });
     } else {
-      // If the response doesn't contain the expected properties, treat it as an error
-      throw new Error('Invalid response from MyInvois API: ' + JSON.stringify(response));
+      console.error('Invoice submission failed:', JSON.stringify(result, null, 2));
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        submissionUid: result.submissionUid,
+        rejectedDocuments: result.rejectedDocuments
+      });
     }
   } catch (error) {
     console.error('Error submitting invoice:', error);
-    console.error('Error stack:', error.stack); // Log the full error stack trace
+    let errorMessage = error.message;
+    let errorDetails = null;
+
+    if (error.response) {
+      console.error('Error response:', JSON.stringify(error.response, null, 2));
+      errorMessage = error.response.data?.error?.message || errorMessage;
+      errorDetails = error.response.data?.error?.details || null;
+    }
+
+    // Check for specific errors
+    if (errorMessage.includes('Document hash is not valid')) {
+      errorMessage = 'Document hash validation failed. Please ensure the document content is correct and try again.';
+    } else if (errorMessage.includes('Hash verification failed')) {
+      errorMessage = 'Internal hash verification failed. This may indicate an issue with the hash calculation process.';
+    }
+
     res.status(500).json({ 
       success: false, 
       message: 'Failed to submit invoice to MyInvois API', 
-      error: error.message,
-      stack: error.stack,
-      details: error.response ? error.response.data : null
+      error: errorMessage,
+      details: errorDetails
     });
   }
 });
