@@ -17,6 +17,7 @@ interface LoginResponse {
   message: string;
   apiEndpoint: string;
   tokenInfo?: TokenInfo;
+  tokenCreationTime?: number;
   error?: string;
   details?: any;
 }
@@ -71,7 +72,6 @@ const SubmissionResult: React.FC<{ response: SubmissionResponse }> = ({
   </div>
 );
 
-// Main component
 const EInvoisPage: React.FC = () => {
   const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
     null
@@ -79,16 +79,36 @@ const EInvoisPage: React.FC = () => {
   const [submissionResponse, setSubmissionResponse] =
     useState<SubmissionResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   const connectToMyInvois = useCallback(async () => {
+    const storedLoginData = localStorage.getItem("myInvoisLoginData");
+    if (storedLoginData) {
+      const parsedData: LoginResponse = JSON.parse(storedLoginData);
+      if (isTokenValid(parsedData)) {
+        setLoginResponse(parsedData);
+        return;
+      }
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/einvoice/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
       const data: LoginResponse = await response.json();
-      setLoginResponse(data);
+      if (data.success && data.tokenInfo) {
+        const loginDataWithTime = {
+          ...data,
+          tokenCreationTime: Date.now(),
+        };
+        localStorage.setItem(
+          "myInvoisLoginData",
+          JSON.stringify(loginDataWithTime)
+        );
+        setLoginResponse(loginDataWithTime);
+      } else {
+        setLoginResponse(data);
+      }
     } catch (err) {
       setLoginResponse({
         success: false,
@@ -103,13 +123,50 @@ const EInvoisPage: React.FC = () => {
     connectToMyInvois();
   }, [connectToMyInvois]);
 
+  useEffect(() => {
+    const checkTokenValidity = () => {
+      if (loginResponse && !isTokenValid(loginResponse)) {
+        toast.error(
+          "Your session has expired. Please refresh the page to log in again."
+        );
+        setLoginResponse(null);
+        localStorage.removeItem("myInvoisLoginData");
+      }
+    };
+
+    const intervalId = setInterval(checkTokenValidity, 60000); // Check every minute
+
+    return () => clearInterval(intervalId);
+  }, [loginResponse]);
+
+  const isTokenValid = (loginData: LoginResponse): boolean => {
+    if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
+    const expirationTime =
+      loginData.tokenCreationTime + loginData.tokenInfo.expiresIn * 1000;
+    return Date.now() < expirationTime;
+  };
+
   const handleSubmitInvoice = async () => {
+    if (
+      !loginResponse ||
+      !loginResponse.success ||
+      !isTokenValid(loginResponse)
+    ) {
+      toast.error(
+        "Your session has expired. Please refresh the page to log in again."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmissionResponse(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/einvoice/submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${loginResponse.tokenInfo?.accessToken}`,
+        },
       });
       const data: SubmissionResponse = await response.json();
       if (data.success) {
@@ -157,6 +214,7 @@ const EInvoisPage: React.FC = () => {
           details={loginResponse.details}
         />
       )}
+
       <Button
         variant="outline"
         onClick={handleSubmitInvoice}
@@ -166,7 +224,6 @@ const EInvoisPage: React.FC = () => {
         {isSubmitting ? "Submitting..." : "Submit Invoice"}
       </Button>
 
-      {submissionError && <ErrorDetails error={submissionError} />}
       {submissionResponse && <SubmissionResult response={submissionResponse} />}
     </div>
   );
