@@ -51,7 +51,7 @@ input[type="number"] {
 
 .group\/sidebar:hover .sidebar-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #D1D5DB transparent;
+  scrollbar-color: #d1d5db transparent;
 }
 
 .group\/sidebar:hover .sidebar-scrollbar::-webkit-scrollbar {
@@ -59,10 +59,23 @@ input[type="number"] {
   width: 6px;
 }
 
+.sidebar-transition {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+@media (max-width: 1280px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.pinned {
+    transform: translateX(0);
+  }
+}
+
 .sidebar-hidden {
   display: none;
 }
-@media (min-width: 1280px) {
+@media (min-width: 768px) {
   .sidebar-hidden {
     display: flex;
   }
