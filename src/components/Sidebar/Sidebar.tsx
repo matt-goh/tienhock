@@ -6,7 +6,7 @@ import React, {
   Dispatch,
 } from "react";
 import { SidebarData, SidebarItem } from "./SidebarData";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
@@ -36,13 +36,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
   const [activeRoute, setActiveRoute] = useState<string | null>(null);
-  const [showTooltip, setShowTooltip] = useState(false);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLLIElement> }>(
     {}
   );
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const defaultOpenItems = SidebarData.filter((item) => item.defaultOpen).map(
@@ -81,6 +81,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [location]);
 
   const isVisible = isPinned || isHovered;
+
+  const handleTitleClick = () => {
+    navigate("/");
+  };
 
   const handleToggle = (item: string) => {
     setOpenItems((prevItems) =>
@@ -149,14 +153,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         setIsHovered(false);
       }, 300);
     }
-  };
-
-  const handlePinButtonMouseEnter = () => {
-    setShowTooltip(true);
-  };
-
-  const handlePinButtonMouseLeave = () => {
-    setShowTooltip(false);
   };
 
   const renderIcon = (IconComponent?: SidebarItem["icon"]) => {
@@ -256,11 +252,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       onMouseLeave={handleSidebarMouseLeave}
     >
       <div className="relative flex justify-between items-center py-4">
-        <h2 className="text-xl font-bold text-center pl-8">Tien Hock</h2>
+        <h2
+          className="text-xl font-bold text-center ml-8 cursor-pointer"
+          onClick={handleTitleClick}
+        >
+          Tien Hock
+        </h2>
         <button
           onClick={() => setIsPinned(!isPinned)}
-          onMouseEnter={handlePinButtonMouseEnter}
-          onMouseLeave={handlePinButtonMouseLeave}
           className="flex items-center justify-center p-2 mr-3.5 h-[34px] w-[34px] rounded-lg hover:bg-default-200 active:bg-default-300"
         >
           {isPinned ? (
@@ -269,15 +268,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <IconArrowBarToRight stroke={2} />
           )}
         </button>
-        {showTooltip && (
-          <div
-            className={`absolute ${
-              isPinned ? "-right-[84px]" : "-right-[68px]"
-            } z-10 px-2 py-1 w-auto font-semibold text-xs text-default-900 text-center bg-default-200 rounded-lg shadow-sm ml-2 top-1/2 transform -translate-y-1/2`}
-          >
-            {isPinned ? "Unpin sidebar" : "Pin sidebar"}
-          </div>
-        )}
       </div>
       <div className="flex-1 overflow-y-auto sidebar-scrollbar h-[calc(100vh-4rem)]">
         <div className="text-default-700 font-medium text-left">
