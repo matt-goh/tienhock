@@ -1,11 +1,52 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import React from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import Sidebar from "./components/Sidebar/Sidebar";
 import { routes } from "./components/Sidebar/SidebarData";
 import "./index.css";
 
 const App: React.FC = () => {
+  const [isPinned, setIsPinned] = useState<boolean>(false);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const pinnedState = localStorage.getItem("sidebarPinned");
+    if (pinnedState) {
+      setIsPinned(JSON.parse(pinnedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("sidebarPinned", JSON.stringify(isPinned));
+  }, [isPinned]);
+
+  const isVisible = isPinned || isHovered;
+
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    if (!isPinned) {
+      setIsHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!isPinned) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        setIsHovered(false);
+      }, 300);
+    }
+  };
+
+  const handleSetIsPinned = useCallback((pinned: boolean) => {
+    setIsPinned(pinned);
+    if (!pinned) {
+      setIsHovered(false);
+    }
+  }, []);
+
   return (
     <Router>
       <Toaster
@@ -20,10 +61,25 @@ const App: React.FC = () => {
         }}
       />
       <div className="flex">
-        <aside className="sidebar-hidden">
-          <Sidebar />
-        </aside>
-        <main className="flex justify-center w-full py-[60px]">
+        <div
+          className="fixed top-0 left-0 h-screen sidebar-hidden"
+          style={{ width: isVisible ? '254px' : '6rem' }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <Sidebar
+            isPinned={isPinned}
+            isHovered={isHovered}
+            setIsPinned={handleSetIsPinned}
+            setIsHovered={setIsHovered}
+          />
+        </div>
+        <main
+          className={`
+            flex justify-center w-full py-[60px] transition-all duration-300 ease-in-out
+            ${isVisible ? "ml-[254px]" : "ml-[6rem]"}
+          `}
+        >
           <Routes>
             {routes.map((route: any) => (
               <Route

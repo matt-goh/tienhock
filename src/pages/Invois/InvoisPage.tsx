@@ -506,9 +506,6 @@ const InvoisPage: React.FC = () => {
 
   return (
     <div className="px-4">
-      <h1 className="text-2xl text-center font-medium text-default-700 mb-4">
-        Invois
-      </h1>
       <div className="flex justify-between items-center mb-4">
         <div className="relative flex">
           <IconSearch
@@ -523,6 +520,9 @@ const InvoisPage: React.FC = () => {
             onChange={handleSearchChange}
           />
         </div>
+        <h1 className="text-2xl text-center font-medium text-default-700 mb-4">
+          Invois
+        </h1>
         <div className="flex space-x-2 justify-center">
           <InvoiceFilterMenu
             onFilterChange={handleFilterChange}
