@@ -18,7 +18,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   children,
 }) => {
   return (
-    <li className="m-2">
+    <li className="m-1.5 my-1">
       <button
         onClick={onClick}
         className="relative group/button flex items-center py-2 pl-4 pr-2 hover:bg-default-200/90 hover:text-default-800 active:bg-default-300/90 transition-colors duration-200 rounded-lg focus:outline-none w-full text-left"

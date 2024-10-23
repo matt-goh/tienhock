@@ -243,7 +243,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div
       className={`
-        fixed top-0 left-0 h-screen bg-default-100/75 border-r border-default-200
+        relative top-0 left-0 h-screen bg-default-100/75 border-r border-default-200
         transition-all duration-300 ease-in-out w-[254px]
         ${isVisible ? "opacity-100" : "opacity-0 pointer-events-none"}
         sidebar-transition group/sidebar
@@ -251,7 +251,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       onMouseEnter={handleSidebarMouseEnter}
       onMouseLeave={handleSidebarMouseLeave}
     >
-      <div className="relative flex justify-between items-center py-4">
+      <div className="sticky top-0 flex justify-between items-center py-4 bg-default-100/75 z-10">
+        {/* Shadow effect div */}
+        <div className="pointer-events-none absolute inset-x-0 -bottom-6 h-6 z-[1] bg-gradient-to-b from-default-100 via-default-100/25 to-transparent"></div>
+
         <h2
           className="text-xl font-bold text-center ml-8 cursor-pointer"
           onClick={handleTitleClick}
@@ -271,7 +274,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
       <div className="flex-1 overflow-y-auto sidebar-scrollbar h-[calc(100vh-4rem)]">
         <div className="text-default-700 font-medium text-left">
-          <ul className="mx-0.5 space-y-2 text-base">
+          <ul className="mx-0.5 space-y-1 text-base">
             {renderSidebarItems(SidebarData)}
           </ul>
         </div>
