@@ -255,7 +255,6 @@ export const SidebarData: SidebarItem[] = [
         ),
       },
     ],
-    defaultOpen: true,
   },
 ];
 
