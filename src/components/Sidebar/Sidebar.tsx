@@ -243,8 +243,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div
       className={`
-        relative top-0 left-0 h-screen bg-default-100/75 border-r border-default-200
-        transition-all duration-300 ease-in-out w-[254px]
+        fixed top-0 left-0 h-screen bg-default-100/75 border-r border-default-200
+        transition-all duration-100 ease-in-out w-[254px]
         ${isVisible ? "opacity-100" : "opacity-0 pointer-events-none"}
         sidebar-transition group/sidebar
       `}
