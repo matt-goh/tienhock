@@ -6,17 +6,15 @@ import { routes } from "./components/Sidebar/SidebarData";
 import "./index.css";
 
 const App: React.FC = () => {
-  const [isPinned, setIsPinned] = useState<boolean>(false);
+  // Initialize state directly from localStorage
+  const [isPinned, setIsPinned] = useState<boolean>(() => {
+    const pinnedState = localStorage.getItem("sidebarPinned");
+    return pinnedState ? JSON.parse(pinnedState) : false;
+  });
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const pinnedState = localStorage.getItem("sidebarPinned");
-    if (pinnedState) {
-      setIsPinned(JSON.parse(pinnedState));
-    }
-  }, []);
-
+  // We only need this effect now, since initial state is handled in useState
   useEffect(() => {
     localStorage.setItem("sidebarPinned", JSON.stringify(isPinned));
   }, [isPinned]);
