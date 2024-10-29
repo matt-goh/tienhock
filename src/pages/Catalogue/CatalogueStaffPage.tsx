@@ -115,7 +115,7 @@ const EmployeeCard = ({
   return (
     <div
       className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered ? "bg-default-100" : ""
+        isCardHovered && !isTrashHovered ? "bg-default-100 active:bg-default-200" : ""
       }`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
@@ -236,10 +236,6 @@ const CatalogueStaffPage = () => {
     setEmployeeToDelete(employee);
     setIsDeleteDialogOpen(true);
   };
-
-  const locationOptions = useMemo(() => {
-    return Array.from(new Set(employees.map((emp) => String(emp.location))));
-  }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((employee) => {

@@ -1,17 +1,24 @@
 // server.js
 import express from 'express';
-import pkg from 'body-parser';
-import pkg2 from 'pg';
+import pkgBodyParser from 'body-parser';
+import pkgPg from 'pg';
 import cors from 'cors';
-import crypto from 'crypto';
 import dotenv from 'dotenv';
+import http from 'http';
+import WebSocket from 'ws';
 
 dotenv.config();
 
-const { json } = pkg;
-const { Pool } = pkg2;
+const { json } = pkgBodyParser;
+const { Pool } = pkgPg;
 const app = express();
 const port = process.env.PORT || 5000;
+
+// Create HTTP server instance
+const server = http.createServer(app);
+
+// Initialize WebSocket server
+const wss = new WebSocket.Server({ server });
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -22,11 +29,316 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
+// Use middleware
 app.use(cors());
 app.use(json());
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Store active connections and their sessions
+const sessions = new Map();
+
+// WebSocket connection handler
+wss.on('connection', function connection(ws) {
+  let sessionId = null;
+
+  ws.on('message', function incoming(message) {
+    try {
+      const data = JSON.parse(message.toString());
+      
+      switch (data.type) {
+        case 'register':
+          sessionId = data.sessionId;
+          sessions.set(sessionId, {
+            ws,
+            staffId: null,
+            deviceInfo: data.deviceInfo || {}
+          });
+          console.log(`New session registered: ${sessionId}`);
+          broadcastActiveSessions();
+          break;
+
+        case 'reconnect':
+          sessionId = data.sessionId;
+          console.log(`Attempting reconnection for session: ${sessionId}`);
+          
+          sessions.set(sessionId, {
+            ws,
+            staffId: data.staffId || null,
+            deviceInfo: data.deviceInfo || {}
+          });
+          
+          console.log(`Session reconnected: ${sessionId} with staffId: ${data.staffId || 'none'}`);
+          broadcastActiveSessions();
+          break;
+
+        case 'profile_switch':
+          if (sessionId && data.staffId) {
+            const session = sessions.get(sessionId);
+            if (session) {
+              session.staffId = data.staffId;
+              console.log(`Profile switched for session ${sessionId} to staff ${data.staffId}`);
+              broadcastToOthers(sessionId, {
+                type: 'profile_changed',
+                data: {
+                  sessionId,
+                  staffId: data.staffId,
+                  deviceInfo: session.deviceInfo
+                }
+              });
+              broadcastActiveSessions();
+            }
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('WebSocket message handling error:', error);
+    }
+  });
+
+  ws.on('close', function close() {
+    if (sessionId) {
+      console.log(`Session disconnected: ${sessionId}`);
+      const session = sessions.get(sessionId);
+      
+      if (session) {
+        // Instead of setting ws to null, remove the session completely
+        sessions.delete(sessionId);
+        broadcastActiveSessions();
+      }
+    }
+  });
+
+  ws.on('error', function error(err) {
+    console.error('WebSocket error:', err);
+    if (sessionId) {
+      sessions.delete(sessionId);
+      broadcastActiveSessions();
+    }
+  });
+});
+
+function broadcastToOthers(senderSessionId, message) {
+  sessions.forEach((session, sessionId) => {
+    if (sessionId !== senderSessionId && session.ws?.readyState === WebSocket.OPEN) {
+      session.ws.send(JSON.stringify(message));
+    }
+  });
+}
+
+function broadcastActiveSessions() {
+  // Only include sessions with active WebSocket connections
+  const activeSessions = Array.from(sessions.entries())
+    .filter(([_, session]) => session.ws?.readyState === WebSocket.OPEN)
+    .map(([sessionId, session]) => ({
+      sessionId,
+      staffId: session.staffId,
+      deviceInfo: session.deviceInfo,
+      lastActive: new Date().toISOString()
+    }));
+
+  const message = {
+    type: 'active_sessions',
+    data: { sessions: activeSessions }
+  };
+
+  // Only broadcast to sessions with active connections
+  sessions.forEach((session) => {
+    if (session.ws?.readyState === WebSocket.OPEN) {
+      session.ws.send(JSON.stringify(message));
+    }
+  });
+}
+
+app.get('/api/current-staff/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const session = sessions.get(sessionId);
+
+  if (!session || !session.staffId) {
+    return res.status(404).json({ 
+      message: 'No active staff found for this session',
+      sessionId 
+    });
+  }
+
+  try {
+    const query = `
+      SELECT 
+        s.id, 
+        s.name, 
+        s.job
+      FROM 
+        staffs s
+      WHERE 
+        s.id = $1 
+        AND s.job ? 'OFFICE'
+        AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+    `;
+    
+    const result = await pool.query(query, [session.staffId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Staff not found or no longer active' });
+    }
+
+    // Parse JSONB job field
+    const staff = {
+      ...result.rows[0],
+      job: JSON.parse(result.rows[0].job)
+    };
+
+    res.json(staff);
+  } catch (error) {
+    console.error('Error fetching current staff:', error);
+    res.status(500).json({ message: 'Error fetching current staff', error: error.message });
+  }
+});
+
+app.get('/api/session-state/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const session = sessions.get(sessionId);
+
+  if (!session || !session.staffId) {
+    return res.json({ 
+      hasActiveProfile: false,
+      message: 'No active profile'
+    });
+  }
+
+  try {
+    const query = `
+      SELECT 
+        s.id, 
+        s.name, 
+        s.job
+      FROM 
+        staffs s
+      WHERE 
+        s.id = $1 
+        AND s.job ? 'OFFICE'
+        AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+    `;
+    
+    const result = await pool.query(query, [session.staffId]);
+    
+    if (result.rows.length === 0) {
+      return res.json({ 
+        hasActiveProfile: false,
+        message: 'Staff not found or no longer active'
+      });
+    }
+
+    const staff = {
+      ...result.rows[0],
+      job: typeof result.rows[0].job === 'string' ? JSON.parse(result.rows[0].job) : 
+           Array.isArray(result.rows[0].job) ? result.rows[0].job :
+           typeof result.rows[0].job === 'object' ? result.rows[0].job : []
+    };
+
+    return res.json({
+      hasActiveProfile: true,
+      staff
+    });
+  } catch (error) {
+    console.error('Error fetching session state:', error);
+    return res.status(500).json({ 
+      hasActiveProfile: false,
+      message: 'Error fetching session state'
+    });
+  }
+});
+
+app.get('/api/staffs/office', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        s.id,
+        s.name,
+        s.job
+      FROM 
+        staffs s
+      WHERE 
+        s.job::jsonb ? 'OFFICE'
+        AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+      ORDER BY 
+        s.name
+    `;
+    
+    const result = await pool.query(query);
+    
+    if (!result.rows) {
+      return res.status(404).json({ message: 'No office staff found' });
+    }
+
+    // Fix: Properly parse the job field if it's a JSON string
+    const staffs = result.rows.map(staff => ({
+      ...staff,
+      job: typeof staff.job === 'string' ? JSON.parse(staff.job) : 
+           Array.isArray(staff.job) ? staff.job : 
+           typeof staff.job === 'object' ? staff.job : []
+    }));
+
+    res.json(staffs);
+  } catch (error) {
+    console.error('Error fetching office staff:', error);
+    res.status(500).json({ 
+      message: 'Error fetching office staff', 
+      error: error.message 
+    });
+  }
+});
+
+app.post('/api/switch-profile', async (req, res) => {
+  const { staffId, sessionId, deviceInfo } = req.body;
+
+  try {
+    // Verify the staff exists and is an office staff
+    const staffQuery = `
+      SELECT 
+        s.id, 
+        s.name, 
+        s.job
+      FROM 
+        staffs s
+      WHERE 
+        s.id = $1 
+        AND s.job::jsonb ? 'OFFICE'
+        AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+    `;
+    
+    const result = await pool.query(staffQuery, [staffId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Staff not found or not authorized' });
+    }
+
+    const session = sessions.get(sessionId);
+    if (session) {
+      session.staffId = staffId;
+      session.deviceInfo = deviceInfo;
+      
+      broadcastActiveSessions();
+    }
+
+    // Fix: Properly parse the job field if it's a JSON string
+    const staff = {
+      ...result.rows[0],
+      job: typeof result.rows[0].job === 'string' ? JSON.parse(result.rows[0].job) : 
+           Array.isArray(result.rows[0].job) ? result.rows[0].job :
+           typeof result.rows[0].job === 'object' ? result.rows[0].job : []
+    };
+
+    res.json({
+      message: 'Profile switched successfully',
+      staff
+    });
+  } catch (error) {
+    console.error('Error switching profile:', error);
+    res.status(500).json({ message: 'Error switching profile', error: error.message });
+  }
+});
+
+// Make sure this is at the bottom of your file
+server.listen(port, () => {
+  console.log(`Server running with WebSocket support on port ${port}`);
 });
 
 // Check for duplicate staff ID

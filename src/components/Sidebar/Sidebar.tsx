@@ -11,8 +11,15 @@ import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
+import { useProfile } from "../../contexts/ProfileContext";
+import ProfileSwitcherModal from "../ProfileSwitcherModal";
 import "../../index.css";
-import { IconArrowBarToLeft, IconArrowBarToRight } from "@tabler/icons-react";
+import {
+  IconArrowBarToLeft,
+  IconArrowBarToRight,
+  IconSwitchHorizontal,
+  IconUserCircle,
+} from "@tabler/icons-react";
 
 interface SidebarProps {
   isPinned: boolean;
@@ -32,6 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     "production",
     "pinjam",
   ]);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const { currentStaff } = useProfile();
   const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
@@ -246,13 +255,14 @@ const Sidebar: React.FC<SidebarProps> = ({
         fixed top-0 left-0 h-screen bg-default-100/75 border-r border-default-200
         transition-all duration-100 ease-in-out w-[254px]
         ${isVisible ? "opacity-100" : "opacity-0 pointer-events-none"}
-        sidebar-transition group/sidebar
+        sidebar-transition group/sidebar flex flex-col
       `}
       onMouseEnter={handleSidebarMouseEnter}
       onMouseLeave={handleSidebarMouseLeave}
     >
-      <div className="sticky top-0 flex justify-between items-center py-4 bg-default-100/75 z-10">
-        {/* Shadow effect div */}
+      {/* Header */}
+      <div className="flex-none h-[72px] flex justify-between items-center py-4 bg-default-100/75 z-10 relative">
+        {/* Header bottom shadow */}
         <div className="pointer-events-none absolute inset-x-0 -bottom-6 h-6 z-[1] bg-gradient-to-b from-default-100 via-default-100/25 to-transparent"></div>
 
         <h2
@@ -272,12 +282,44 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto sidebar-scrollbar h-[calc(100vh-4rem)]">
+
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto sidebar-scrollbar">
         <div className="text-default-700 font-medium text-left">
           <ul className="mx-0.5 space-y-1 text-base">
             {renderSidebarItems(SidebarData)}
           </ul>
         </div>
+      </div>
+
+      {/* Profile Switcher */}
+      <div className="flex-none h-[64px] bg-default-100/75 relative">
+        {/* Profile top shadow */}
+        <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 z-[1] bg-gradient-to-t from-default-100 via-default-100/25 to-transparent"></div>
+
+        <div className="mx-4 h-full flex items-center">
+          <button
+            onClick={() => setIsProfileModalOpen(true)}
+            className="w-full px-3 py-2.5 flex items-center rounded-lg hover:bg-default-200 active:bg-default-300 border border-default-300 transition-colors duration-200"
+          >
+            <div className="flex w-full justify-between">
+              <div className="flex items-center">
+                <IconUserCircle className="flex-shrink-0 mr-3 text-default-700" stroke={1.5} />
+                <span className="text-sm font-medium text-default-700">
+                  {currentStaff?.id || "Select Profile"}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <IconSwitchHorizontal stroke={1.75} size={18} className="text-default-700"/>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <ProfileSwitcherModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+        />
       </div>
     </div>
   );

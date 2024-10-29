@@ -1,3 +1,30 @@
+export interface DeviceInfo {
+  userAgent: string;
+  deviceType: "desktop" | "mobile" | "tablet";
+  timestamp: string;
+}
+
+export interface ActiveSession {
+  sessionId: string;
+  staffId: string | null;
+  deviceInfo: DeviceInfo;
+  lastActive: string;
+}
+
+export interface WebSocketMessage {
+  type: "register" | "profile_switch" | "profile_changed" | "active_sessions";
+  sessionId?: string;
+  staffId?: string;
+  deviceInfo?: DeviceInfo;
+  data?: any;
+}
+
+export interface Staff {
+  id: string;
+  name: string;
+  job: string[];
+}
+
 // Define column types
 export type ColumnType =
   | "selection"
