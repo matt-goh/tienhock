@@ -1,8 +1,9 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import Sidebar from "./components/Sidebar/Sidebar";
+import { ProfileProvider } from "./contexts/ProfileContext";
+import { Toaster } from "react-hot-toast";
 import { routes } from "./components/Sidebar/SidebarData";
+import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 
 const App: React.FC = () => {
@@ -46,50 +47,52 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <Router>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            padding: "12px",
-            fontSize: "0.875rem",
-            lineHeight: "1.25rem",
-            fontWeight: 500,
-          },
-        }}
-      />
-      <div className="flex">
-        <div
-          className="fixed top-0 left-0 h-screen sidebar-hidden"
-          style={{ width: isVisible ? '254px' : '6rem' }}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          <Sidebar
-            isPinned={isPinned}
-            isHovered={isHovered}
-            setIsPinned={handleSetIsPinned}
-            setIsHovered={setIsHovered}
-          />
-        </div>
-        <main
-          className={`
-            flex justify-center w-full py-[60px] transition-all duration-300 ease-in-out
+    <ProfileProvider>
+      <Router>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              padding: "12px",
+              fontSize: "0.875rem",
+              lineHeight: "1.25rem",
+              fontWeight: 500,
+            },
+          }}
+        />
+        <div className="flex">
+          <div
+            className="fixed top-0 left-0 h-screen sidebar-hidden"
+            style={{ width: isVisible ? "254px" : "6rem" }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Sidebar
+              isPinned={isPinned}
+              isHovered={isHovered}
+              setIsPinned={handleSetIsPinned}
+              setIsHovered={setIsHovered}
+            />
+          </div>
+          <main
+            className={`
+            flex justify-center w-full py-[68px] transition-all duration-300 ease-in-out
             ${isVisible ? "ml-[254px]" : "ml-[6rem]"}
           `}
-        >
-          <Routes>
-            {routes.map((route: any) => (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={React.createElement(route.component)}
-              />
-            ))}
-          </Routes>
-        </main>
-      </div>
-    </Router>
+          >
+            <Routes>
+              {routes.map((route: any) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={React.createElement(route.component)}
+                />
+              ))}
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </ProfileProvider>
   );
 };
 

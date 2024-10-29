@@ -55,7 +55,7 @@ const CatalogueJobPage: React.FC = () => {
         id: "description",
         header: "Description",
         type: isEditing ? "string" : "readonly",
-        width: 650,
+        width: 400,
       },
       {
         id: "amount",
@@ -596,7 +596,7 @@ const CatalogueJobPage: React.FC = () => {
                     <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
                       <ComboboxOption
                         className={({ active }) =>
-                          `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 text-left ${
+                          `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 text-base text-left ${
                             active
                               ? "bg-default-100 text-default-900"
                               : "text-default-900"

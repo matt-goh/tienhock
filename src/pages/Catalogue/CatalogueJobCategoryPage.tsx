@@ -35,7 +35,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
         id: "category",
         header: "Category",
         type: isEditing ? "string" : "readonly",
-        width: 500,
+        width: 400,
       },
       {
         id: "gaji",

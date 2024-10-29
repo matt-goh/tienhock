@@ -1,5 +1,5 @@
 import React from "react";
-import { IconChevronRight } from "@tabler/icons-react";
+import { IconBookmark, IconChevronRight } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
 interface SidebarOptionProps {
@@ -28,6 +28,14 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   const content = (
     <>
       {name}
+      <IconBookmark
+        size={18}
+        className={`transition-all duration-300 right-8 absolute ${
+          isActive
+            ? "opacity-100 hover:text-default-600"
+            : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
+        }`}
+      />
       <IconChevronRight
         size={18}
         stroke={2.25}
