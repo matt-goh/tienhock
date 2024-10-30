@@ -5,7 +5,7 @@ import React, {
   SetStateAction,
   Dispatch,
 } from "react";
-import { SidebarData, SidebarItem } from "./SidebarData";
+import { PopoverOption, SidebarData, SidebarItem } from "./SidebarData";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
@@ -20,12 +20,18 @@ import {
   IconSwitchHorizontal,
   IconUserCircle,
 } from "@tabler/icons-react";
+import { API_BASE_URL } from "../../config";
 
 interface SidebarProps {
   isPinned: boolean;
   isHovered: boolean;
   setIsPinned: (pinned: boolean) => void;
   setIsHovered: Dispatch<SetStateAction<boolean>>;
+}
+
+interface Bookmark {
+  id: number;
+  name: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -41,14 +47,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   ]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const { currentStaff } = useProfile();
-  const [hoveredOption, setHoveredOption] = useState<string | null>(null);
+  const [hoveredRegularOption, setHoveredRegularOption] = useState<
+    string | null
+  >(null);
+  const [hoveredBookmarkOption, setHoveredBookmarkOption] = useState<
+    string | null
+  >(null);
+  const [activeRegularOption, setActiveRegularOption] = useState<string | null>(
+    null
+  );
+  const [activeBookmarkOption, setActiveBookmarkOption] = useState<
+    string | null
+  >(null);
+  const [lastClickedSource, setLastClickedSource] = useState<
+    "regular" | "bookmark" | null
+  >(null);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
   const [activeRoute, setActiveRoute] = useState<string | null>(null);
-  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
-  const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLLIElement> }>(
-    {}
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [bookmarkedItems, setBookmarkedItems] = useState<Set<string>>(
+    new Set()
   );
   const location = useLocation();
   const navigate = useNavigate();
@@ -62,32 +82,152 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const currentPath = location.pathname;
-    let foundActiveRoute = false;
+    let foundActiveRegular = false;
+    let foundActiveBookmark = false;
 
-    const checkRouteMatch = (item: SidebarItem) => {
+    const checkRouteMatch = (
+      item: SidebarItem,
+      isBookmarked: boolean = false
+    ) => {
       if (item.path && currentPath.startsWith(item.path)) {
-        setActiveRoute(item.name);
-        foundActiveRoute = true;
+        if (isBookmarked && lastClickedSource === "bookmark") {
+          setActiveBookmarkOption(item.name);
+          setActiveRegularOption(null);
+          foundActiveBookmark = true;
+        } else if (!isBookmarked && lastClickedSource === "regular") {
+          setActiveRegularOption(item.name);
+          setActiveBookmarkOption(null);
+          foundActiveRegular = true;
+        }
       }
+
       if (item.popoverOptions) {
         item.popoverOptions.forEach((option) => {
           if (option.path && currentPath.startsWith(option.path)) {
-            setActiveRoute(item.name);
-            foundActiveRoute = true;
+            if (isBookmarked && lastClickedSource === "bookmark") {
+              setActiveBookmarkOption(item.name);
+              setActiveRegularOption(null);
+              foundActiveBookmark = true;
+            } else if (!isBookmarked && lastClickedSource === "regular") {
+              setActiveRegularOption(item.name);
+              setActiveBookmarkOption(null);
+              foundActiveRegular = true;
+            }
           }
         });
       }
+
       if (item.subItems) {
-        item.subItems.forEach(checkRouteMatch);
+        item.subItems.forEach((subItem) =>
+          checkRouteMatch(subItem, isBookmarked)
+        );
       }
     };
 
-    SidebarData.forEach(checkRouteMatch);
-
-    if (!foundActiveRoute) {
-      setActiveRoute(null);
+    // If no click source is set yet (initial load), prefer regular items
+    if (!lastClickedSource) {
+      setLastClickedSource("regular");
     }
-  }, [location]);
+
+    // Reset states first
+    setActiveRegularOption(null);
+    setActiveBookmarkOption(null);
+
+    // Check all items
+    SidebarData.forEach((item) => checkRouteMatch(item, false));
+    bookmarks.forEach((bookmark) => {
+      const itemData = findSidebarItem(SidebarData, bookmark.name);
+      if (itemData) {
+        checkRouteMatch(itemData, true);
+      }
+    });
+
+    if (!foundActiveRegular && !foundActiveBookmark) {
+      setActiveRegularOption(null);
+      setActiveBookmarkOption(null);
+    }
+  }, [location, bookmarks, lastClickedSource]);
+
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      if (currentStaff?.id) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/bookmarks/${currentStaff.id}`
+          );
+          const data = await response.json();
+          setBookmarks(data);
+          setBookmarkedItems(
+            new Set(data.map((bookmark: any) => bookmark.name))
+          );
+        } catch (error) {
+          console.error("Error fetching bookmarks:", error);
+        }
+      }
+    };
+
+    fetchBookmarks();
+  }, [currentStaff?.id]);
+
+  const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLLIElement> }>(
+    {}
+  );
+  const bookmarkRefs = useRef<{
+    [key: string]: React.RefObject<HTMLLIElement>;
+  }>({});
+  const regularHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const bookmarkHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const getRefForItem = (name: string, isBookmarked: boolean = false) => {
+    const refMap = isBookmarked ? bookmarkRefs : buttonRefs;
+    if (!refMap.current[name]) {
+      refMap.current[name] = React.createRef<HTMLLIElement>();
+    }
+    return refMap.current[name];
+  };
+
+  const handleBookmarkUpdate = async (name: string, isBookmarked: boolean) => {
+    if (isBookmarked) {
+      setBookmarkedItems((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(name);
+        return newSet;
+      });
+      const itemData = findSidebarItem(SidebarData, name);
+      if (itemData) {
+        setBookmarks((prev) => [...prev, { id: Date.now(), name }]);
+      }
+    } else {
+      setBookmarkedItems((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(name);
+        return newSet;
+      });
+      setBookmarks((prev) => prev.filter((bookmark) => bookmark.name !== name));
+    }
+  };
+
+  const findSidebarItem = (
+    items: SidebarItem[],
+    name: string
+  ): (SidebarItem & { popoverOptions?: PopoverOption[] }) | null => {
+    for (const item of items) {
+      if (item.name === name) {
+        return item;
+      }
+      if (item.subItems) {
+        const found = findSidebarItem(item.subItems, name);
+        if (found) return found;
+      }
+      if (item.popoverOptions) {
+        const found = item.popoverOptions.find(
+          (option) => option.name === name
+        );
+        if (found) return { name: found.name, path: found.path };
+      }
+    }
+    return null;
+  };
 
   const isVisible = isPinned || isHovered;
 
@@ -111,40 +251,87 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const handleMouseEnter = (option: string) => {
-    if (hoverTimeout.current) {
-      clearTimeout(hoverTimeout.current);
-      hoverTimeout.current = null;
+  const clearAllTimeouts = () => {
+    if (regularHoverTimeout.current) {
+      clearTimeout(regularHoverTimeout.current);
+      regularHoverTimeout.current = null;
     }
-    setHoveredOption(option);
+    if (bookmarkHoverTimeout.current) {
+      clearTimeout(bookmarkHoverTimeout.current);
+      bookmarkHoverTimeout.current = null;
+    }
+  };
+
+  const handleMouseEnter = (name: string, isBookmarked: boolean = false) => {
+    clearAllTimeouts();
+
+    // Clear the other hover state immediately
+    if (isBookmarked) {
+      setHoveredRegularOption(null);
+      setHoveredBookmarkOption(name);
+    } else {
+      setHoveredBookmarkOption(null);
+      setHoveredRegularOption(name);
+    }
+
     setIsButtonHovered(true);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (isBookmarked: boolean = false) => {
     setIsButtonHovered(false);
-    hoverTimeout.current = setTimeout(() => {
+
+    const timeoutRef = isBookmarked
+      ? bookmarkHoverTimeout
+      : regularHoverTimeout;
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
       if (!isPopoverHovered) {
-        setHoveredOption(null);
+        if (isBookmarked) {
+          setHoveredBookmarkOption(null);
+        } else {
+          setHoveredRegularOption(null);
+        }
       }
     }, 300);
   };
 
   const handlePopoverMouseEnter = () => {
-    if (hoverTimeout.current) {
-      clearTimeout(hoverTimeout.current);
-      hoverTimeout.current = null;
-    }
+    clearAllTimeouts();
     setIsPopoverHovered(true);
   };
 
-  const handlePopoverMouseLeave = () => {
+  const handlePopoverMouseLeave = (isBookmarked: boolean = false) => {
     setIsPopoverHovered(false);
-    hoverTimeout.current = setTimeout(() => {
+
+    const timeoutRef = isBookmarked
+      ? bookmarkHoverTimeout
+      : regularHoverTimeout;
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
       if (!isButtonHovered) {
-        setHoveredOption(null);
+        if (isBookmarked) {
+          setHoveredBookmarkOption(null);
+        } else {
+          setHoveredRegularOption(null);
+        }
       }
     }, 300);
   };
+
+  useEffect(() => {
+    // Cleanup timeouts when component unmounts
+    return () => {
+      clearAllTimeouts();
+    };
+  }, []);
 
   const handleSidebarMouseEnter = () => {
     if (sidebarHoverTimeout.current) {
@@ -172,6 +359,60 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const renderSidebarItems = (items: SidebarItem[]) => {
     return items.map((item) => {
+      if (item.name === "Bookmarks") {
+        return (
+          <SidebarButton
+            key={item.name}
+            name={item.name}
+            icon={renderIcon(item.icon)}
+            onClick={() => handleToggle(item.name)}
+            isOpen={openItems.includes(item.name)}
+          >
+            {openItems.includes(item.name) && (
+              <ul className="mt-1.5 space-y-1.5">
+                {bookmarks.map((bookmark) => {
+                  const itemData = findSidebarItem(SidebarData, bookmark.name);
+                  if (!itemData) return null;
+
+                  const buttonRef = getRefForItem(bookmark.name, true);
+                  const isActive =
+                    activeBookmarkOption === bookmark.name ||
+                    hoveredBookmarkOption === bookmark.name;
+
+                  return (
+                    <React.Fragment key={bookmark.id}>
+                      <SidebarOption
+                        name={bookmark.name}
+                        path={itemData.path}
+                        onMouseEnter={() =>
+                          handleMouseEnter(bookmark.name, true)
+                        }
+                        onMouseLeave={() => handleMouseLeave(true)}
+                        buttonRef={buttonRef}
+                        isActive={isActive}
+                        isInBookmarksSection={true}
+                        isBookmarked={true}
+                        onBookmarkUpdate={handleBookmarkUpdate}
+                        onNavigate={() => setLastClickedSource("bookmark")}
+                      />
+                      {hoveredBookmarkOption === bookmark.name &&
+                        itemData.popoverOptions && (
+                          <SidebarPopover
+                            options={itemData.popoverOptions}
+                            onMouseEnter={handlePopoverMouseEnter}
+                            onMouseLeave={() => handlePopoverMouseLeave(true)}
+                            buttonRef={buttonRef}
+                          />
+                        )}
+                    </React.Fragment>
+                  );
+                })}
+              </ul>
+            )}
+          </SidebarButton>
+        );
+      }
+
       if (item.subItems) {
         return (
           <SidebarButton
@@ -220,12 +461,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const renderSidebarOption = (item: SidebarItem) => {
-    if (!buttonRefs.current[item.name]) {
-      buttonRefs.current[item.name] = React.createRef<HTMLLIElement>();
-    }
-    const buttonRef = buttonRefs.current[item.name];
+    const buttonRef = getRefForItem(item.name);
     const hasPopover = !!item.popoverOptions && item.popoverOptions.length > 0;
-    const isActive = activeRoute === item.name || hoveredOption === item.name;
+    const isActive =
+      activeRegularOption === item.name || hoveredRegularOption === item.name;
 
     return (
       <React.Fragment key={item.name}>
@@ -233,15 +472,18 @@ const Sidebar: React.FC<SidebarProps> = ({
           name={item.name}
           path={item.path}
           onMouseEnter={() => handleMouseEnter(item.name)}
-          onMouseLeave={handleMouseLeave}
+          onMouseLeave={() => handleMouseLeave()}
           buttonRef={buttonRef}
           isActive={isActive}
+          isBookmarked={bookmarkedItems.has(item.name)}
+          onBookmarkUpdate={handleBookmarkUpdate}
+          onNavigate={() => setLastClickedSource("regular")}
         />
-        {hoveredOption === item.name && hasPopover && (
+        {hoveredRegularOption === item.name && hasPopover && (
           <SidebarPopover
             options={item.popoverOptions!}
             onMouseEnter={handlePopoverMouseEnter}
-            onMouseLeave={handlePopoverMouseLeave}
+            onMouseLeave={() => handlePopoverMouseLeave()}
             buttonRef={buttonRef}
           />
         )}
@@ -304,13 +546,20 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex w-full justify-between">
               <div className="flex items-center">
-                <IconUserCircle className="flex-shrink-0 mr-3 text-default-700" stroke={1.5} />
+                <IconUserCircle
+                  className="flex-shrink-0 mr-3 text-default-700"
+                  stroke={1.5}
+                />
                 <span className="text-sm font-medium text-default-700">
                   {currentStaff?.id || "Select Profile"}
                 </span>
               </div>
               <div className="flex items-center">
-                <IconSwitchHorizontal stroke={1.75} size={18} className="text-default-700"/>
+                <IconSwitchHorizontal
+                  stroke={1.75}
+                  size={18}
+                  className="text-default-700"
+                />
               </div>
             </div>
           </button>
