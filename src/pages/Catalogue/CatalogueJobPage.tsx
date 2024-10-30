@@ -327,7 +327,7 @@ const CatalogueJobPage: React.FC = () => {
       <span className="font-semibold mr-2">Type:</span>
       <Listbox value={jobType} onChange={handleJobTypeChange}>
         <div className="relative">
-          <ListboxButton className="w-40 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-400">
+          <ListboxButton className="w-40 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
             <span className="block truncate">{jobType}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
@@ -582,7 +582,7 @@ const CatalogueJobPage: React.FC = () => {
                 <Combobox value={selectedJob} onChange={handleJobSelection}>
                   <div className="relative">
                     <ComboboxInput
-                      className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-400"
+                      className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-500"
                       displayValue={(job: Job | null) => job?.name || ""}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Select a job"
@@ -687,7 +687,7 @@ const CatalogueJobPage: React.FC = () => {
                   onChange={(e) =>
                     handleJobPropertyChange("name", e.target.value)
                   }
-                  className="w-48 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-400"
+                  className="w-48 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-500"
                 />
               </>
             )}
@@ -703,7 +703,7 @@ const CatalogueJobPage: React.FC = () => {
                     onChange={(e) =>
                       handleJobPropertyChange("id", e.target.value)
                     }
-                    className="w-36 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-400 mr-4"
+                    className="w-36 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-500 mr-4"
                   />
                 ) : (
                   <span className="mr-4">{selectedJob.id}</span>
@@ -718,7 +718,7 @@ const CatalogueJobPage: React.FC = () => {
                     onChange={(e) =>
                       handleJobPropertyChange("section", e.target.value)
                     }
-                    className="w-24 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-400 mr-4"
+                    className="w-24 rounded-lg border border-default-300 bg-white py-2 px-2 text-left focus:outline-none focus:border-default-500 mr-4"
                   />
                 ) : (
                   <span className="mr-4">{selectedJob.section}</span>
