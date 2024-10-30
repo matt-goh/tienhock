@@ -82,7 +82,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
       <Combobox value={selectedCustomer} onChange={handleCustomerSelection}>
         <div className="relative">
           <ComboboxInput
-            className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-400"
+            className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-500"
             displayValue={(customer: SelectOption | null) =>
               customer?.name || ""
             }

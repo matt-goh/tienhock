@@ -146,7 +146,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         <Input
                           className={clsx(
                             "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 px-4 text-default-900",
-                            "focus:outline-none focus:border-default-400"
+                            "focus:outline-none focus:border-default-500"
                           )}
                           name="id"
                           value={formData.id}
@@ -161,7 +161,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         <Input
                           className={clsx(
                             "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 px-4 text-default-900",
-                            "focus:outline-none focus:border-default-400"
+                            "focus:outline-none focus:border-default-500"
                           )}
                           name="name"
                           value={formData.name}
@@ -188,7 +188,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                               <ComboboxInput
                                 className={clsx(
                                   "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",
-                                  "focus:outline-none focus:border-default-400"
+                                  "focus:outline-none focus:border-default-500"
                                 )}
                                 displayValue={(sections: string[]) =>
                                   sections.join(", ")

@@ -515,7 +515,7 @@ const InvoisPage: React.FC = () => {
           <input
             type="text"
             placeholder="Search"
-            className="w-full pl-11 py-2 border border-default-300 focus:border-default-400 rounded-full"
+            className="w-full pl-11 py-2 border border-default-300 focus:border-default-500 rounded-full"
             value={searchTerm}
             onChange={handleSearchChange}
           />

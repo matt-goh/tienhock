@@ -285,7 +285,7 @@ const CustomerCataloguePage: React.FC = () => {
       <span className="font-semibold mr-2">Salesman:</span>
       <Listbox value={selectedSalesman} onChange={setSelectedSalesman}>
         <div className="relative">
-          <ListboxButton className="w-48 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-400">
+          <ListboxButton className="w-48 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
             <span className="block truncate">{selectedSalesman}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown

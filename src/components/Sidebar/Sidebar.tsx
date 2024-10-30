@@ -284,7 +284,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto sidebar-scrollbar">
+      <div className="flex-1 overflow-y-auto sidebar-scrollbar mt-1">
         <div className="text-default-700 font-medium text-left">
           <ul className="mx-0.5 space-y-1 text-base">
             {renderSidebarItems(SidebarData)}

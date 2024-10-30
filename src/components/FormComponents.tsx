@@ -76,7 +76,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
         <ListboxButton
           className={clsx(
             "relative w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left",
-            "focus:outline-none focus:border-default-400"
+            "focus:outline-none focus:border-default-500"
           )}
         >
           <span className="block truncate">{value || "Select"}</span>
@@ -155,7 +155,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
           <ComboboxInput
             className={clsx(
               "w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",
-              "focus:outline-none focus:border-default-400"
+              "focus:outline-none focus:border-default-500"
             )}
             displayValue={(selected: string[]) =>
               selected
