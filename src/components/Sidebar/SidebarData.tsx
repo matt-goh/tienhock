@@ -135,7 +135,6 @@ export const SidebarData: SidebarItem[] = [
         component: eInvoisPage,
       },
     ],
-    defaultOpen: true,
   },
   {
     name: "Statement",

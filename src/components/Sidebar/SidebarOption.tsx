@@ -1,6 +1,12 @@
 import React from "react";
-import { IconBookmark, IconChevronRight } from "@tabler/icons-react";
-import { Link } from "react-router-dom";
+import {
+  IconBookmark,
+  IconBookmarkFilled,
+  IconChevronRight,
+} from "@tabler/icons-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useProfile } from "../../contexts/ProfileContext";
+import { API_BASE_URL } from "../../config";
 
 interface SidebarOptionProps {
   name: string;
@@ -9,6 +15,10 @@ interface SidebarOptionProps {
   onMouseLeave?: () => void;
   buttonRef?: React.RefObject<HTMLLIElement>;
   isActive?: boolean;
+  isInBookmarksSection?: boolean;
+  isBookmarked: boolean;
+  onBookmarkUpdate: (name: string, isBookmarked: boolean) => Promise<void>;
+  onNavigate?: () => void;
 }
 
 const SidebarOption: React.FC<SidebarOptionProps> = ({
@@ -18,24 +28,90 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   onMouseLeave,
   buttonRef,
   isActive,
+  isInBookmarksSection = false,
+  isBookmarked,
+  onBookmarkUpdate,
+  onNavigate,
 }) => {
+  const { currentStaff } = useProfile();
+  const navigate = useNavigate();
+
+  const handleBookmarkClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!currentStaff?.id || !name) return;
+
+    try {
+      if (isBookmarked) {
+        await fetch(
+          `${API_BASE_URL}/api/bookmarks/${
+            currentStaff.id
+          }/${encodeURIComponent(name)}`,
+          {
+            method: "DELETE",
+          }
+        );
+        await onBookmarkUpdate(name, false);
+      } else {
+        await fetch(`${API_BASE_URL}/api/bookmarks`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            staffId: currentStaff.id,
+            name,
+          }),
+        });
+        await onBookmarkUpdate(name, true);
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (path) {
+      e.preventDefault();
+      onNavigate?.();
+      navigate(path);
+    }
+  };
+
   const commonClasses = `block group/option flex items-center ml-10 pl-3 py-2 pr-2 transition-colors duration-200 rounded-lg focus:outline-none relative ${
     isActive
       ? "bg-default-200/90 active:bg-default-300/90 hover:text-default-800"
       : "hover:bg-default-200/90 active:bg-default-300/90 hover:text-default-800"
   }`;
 
+  const BookmarkIcon = isBookmarked ? IconBookmarkFilled : IconBookmark;
+
+  const getBookmarkIconClasses = () => {
+    if (isInBookmarksSection) {
+      return `transition-all duration-300 right-8 absolute cursor-pointer ${
+        isActive
+          ? "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
+          : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
+      }`;
+    }
+    return `transition-all duration-300 right-8 absolute cursor-pointer ${
+      isActive || isBookmarked
+        ? "opacity-100 hover:text-default-600"
+        : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
+    }`;
+  };
+
   const content = (
     <>
       {name}
-      <IconBookmark
-        size={18}
-        className={`transition-all duration-300 right-8 absolute ${
-          isActive
-            ? "opacity-100 hover:text-default-600"
-            : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
-        }`}
-      />
+      {path && (
+        <BookmarkIcon
+          size={18}
+          className={getBookmarkIconClasses()}
+          onClick={handleBookmarkClick}
+        />
+      )}
       <IconChevronRight
         size={18}
         stroke={2.25}
@@ -56,7 +132,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
       ref={buttonRef}
     >
       {path ? (
-        <Link to={path} className={commonClasses}>
+        <Link to={path} className={commonClasses} onClick={handleClick}>
           {content}
         </Link>
       ) : (
