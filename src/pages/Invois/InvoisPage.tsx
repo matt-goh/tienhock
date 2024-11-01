@@ -520,7 +520,7 @@ const InvoisPage: React.FC = () => {
             onChange={handleSearchChange}
           />
         </div>
-        <h1 className="text-2xl text-center font-medium text-default-700 mb-4">
+        <h1 className="text-2xl text-center font-medium text-default-700 mb-2">
           Invois
         </h1>
         <div className="flex space-x-2 justify-center">
