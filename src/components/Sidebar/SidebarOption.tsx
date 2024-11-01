@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   IconBookmark,
   IconBookmarkFilled,
@@ -89,13 +89,9 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 
   const getBookmarkIconClasses = () => {
     if (isInBookmarksSection) {
-      return `transition-all duration-300 right-8 absolute cursor-pointer ${
-        isActive
-          ? "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
-          : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
-      }`;
+      return `transition-all duration-200 right-8 absolute cursor-pointer opacity-0 group-hover/option:opacity-100 hover:text-default-600`;
     }
-    return `transition-all duration-300 right-8 absolute cursor-pointer ${
+    return `transition-all duration-200 right-8 absolute cursor-pointer ${
       isActive || isBookmarked
         ? "opacity-100 hover:text-default-600"
         : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
@@ -115,7 +111,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
       <IconChevronRight
         size={18}
         stroke={2.25}
-        className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-300 right-2 absolute ${
+        className={`icon icon-tabler icons-tabler-outline icon-tabler-chevron-right transition-all duration-200 right-2 absolute ${
           isActive
             ? "opacity-100 hover:text-default-600"
             : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"

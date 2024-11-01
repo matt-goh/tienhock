@@ -77,7 +77,7 @@ const App: React.FC = () => {
           <main
             className={`
             flex justify-center w-full py-[68px] transition-all duration-300 ease-in-out
-            ${isVisible ? "ml-[254px]" : "ml-[6rem]"}
+            ${isVisible ? "ml-[254px]" : ""}
           `}
           >
             <Routes>

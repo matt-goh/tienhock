@@ -90,7 +90,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-11 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
             {options.map((option) => (
               <ListboxOption
                 key={option.id}
