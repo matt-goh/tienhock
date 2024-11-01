@@ -20,8 +20,6 @@ import {
 } from "@tanstack/react-table";
 import {
   IconArrowsSort,
-  IconCancel,
-  IconDeviceFloppy,
   IconEdit,
   IconSortAscendingLetters,
   IconSortAscendingNumbers,

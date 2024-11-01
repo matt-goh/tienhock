@@ -10,7 +10,7 @@ const App: React.FC = () => {
   // Initialize state directly from localStorage
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
-    return pinnedState ? JSON.parse(pinnedState) : false;
+    return pinnedState ? JSON.parse(pinnedState) : true;
   });
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
