@@ -5,7 +5,11 @@ import React, {
   SetStateAction,
   Dispatch,
 } from "react";
-import { PopoverOption, SidebarData, SidebarItem } from "./SidebarData";
+import {
+  PopoverOption,
+  SidebarData as OriginalSidebarData,
+  SidebarItem,
+} from "./SidebarData";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
@@ -40,45 +44,59 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsPinned,
   setIsHovered,
 }) => {
+  const [SidebarData, setSidebarData] = useState<SidebarItem[]>([]);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
     "production",
     "pinjam",
   ]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const { currentStaff } = useProfile();
   const [hoveredRegularOption, setHoveredRegularOption] = useState<
-    string | null
+  string | null
   >(null);
   const [hoveredBookmarkOption, setHoveredBookmarkOption] = useState<
-    string | null
+  string | null
   >(null);
   const [activeRegularOption, setActiveRegularOption] = useState<string | null>(
     null
   );
   const [activeBookmarkOption, setActiveBookmarkOption] = useState<
-    string | null
+  string | null
   >(null);
   const [lastClickedSource, setLastClickedSource] = useState<
-    "regular" | "bookmark" | null
+  "regular" | "bookmark" | null
   >(null);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
-  const [activeRoute, setActiveRoute] = useState<string | null>(null);
-  const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [bookmarkedItems, setBookmarkedItems] = useState<Set<string>>(
     new Set()
   );
+  const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const { currentStaff, isInitializing } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Update SidebarData when profile state changes
+  useEffect(() => {
+    const updatedSidebarData = [...OriginalSidebarData];
+    if (!currentStaff || isInitializing) {
+      updatedSidebarData.splice(0, 1);
+    }
+    setSidebarData(updatedSidebarData);
+  }, [currentStaff, isInitializing]);
+
+  // Set default open items whenever SidebarData changes
   useEffect(() => {
     const defaultOpenItems = SidebarData.filter((item) => item.defaultOpen).map(
       (item) => item.name
     );
-    setOpenItems(defaultOpenItems);
-  }, []);
+    setOpenItems((prevItems) => {
+      // Merge existing open items with new default open items
+      const newOpenItems = new Set([...prevItems, ...defaultOpenItems]);
+      return Array.from(newOpenItems);
+    });
+  }, [SidebarData]);
 
   useEffect(() => {
     const currentPath = location.pathname;

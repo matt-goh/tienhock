@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IconBookmark,
   IconBookmarkFilled,
@@ -7,6 +7,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useProfile } from "../../contexts/ProfileContext";
 import { API_BASE_URL } from "../../config";
+import toast from "react-hot-toast";
 
 interface SidebarOptionProps {
   name: string;
@@ -33,14 +34,24 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   onBookmarkUpdate,
   onNavigate,
 }) => {
-  const { currentStaff } = useProfile();
+  const { currentStaff, isInitializing } = useProfile();
   const navigate = useNavigate();
 
   const handleBookmarkClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!currentStaff?.id || !name) return;
+    if (!currentStaff?.id) {
+      toast.error("Please select a profile to bookmark items");
+      return;
+    }
+
+    if (!name) return;
+
+    // Create a loading toast that we can update later
+    const toastId = toast.loading(
+      isBookmarked ? "Removing bookmark..." : "Adding bookmark..."
+    );
 
     try {
       if (isBookmarked) {
@@ -53,6 +64,10 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           }
         );
         await onBookmarkUpdate(name, false);
+        // Update the loading toast with success message
+        toast.success(`Removed "${name}" from bookmarks`, {
+          id: toastId,
+        });
       } else {
         await fetch(`${API_BASE_URL}/api/bookmarks`, {
           method: "POST",
@@ -65,9 +80,22 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           }),
         });
         await onBookmarkUpdate(name, true);
+        // Update the loading toast with success message
+        toast.success(`Added "${name}" to bookmarks`, {
+          id: toastId,
+        });
       }
     } catch (error) {
       console.error("Error toggling bookmark:", error);
+      // Update the loading toast with error message
+      toast.error(
+        `Failed to ${isBookmarked ? "remove" : "add"} bookmark: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        {
+          id: toastId,
+        }
+      );
     }
   };
 
@@ -98,10 +126,13 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     }`;
   };
 
+  // Only show bookmark icon if there's a selected profile and it's not initializing
+  const shouldShowBookmark = currentStaff && !isInitializing && path;
+
   const content = (
     <>
       {name}
-      {path && (
+      {shouldShowBookmark && (
         <BookmarkIcon
           size={18}
           className={getBookmarkIconClasses()}
@@ -119,6 +150,11 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
       />
     </>
   );
+
+  // Don't show the Bookmarks section at all if no profile is selected
+  if (isInBookmarksSection && (!currentStaff || isInitializing)) {
+    return null;
+  }
 
   return (
     <li
