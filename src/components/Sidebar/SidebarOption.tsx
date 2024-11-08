@@ -168,9 +168,9 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           {content}
         </Link>
       ) : (
-        <a href="#" className={commonClasses}>
+        <button className={commonClasses}>
           {content}
-        </a>
+        </button>
       )}
     </li>
   );

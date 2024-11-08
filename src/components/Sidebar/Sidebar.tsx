@@ -4,6 +4,7 @@ import React, {
   useEffect,
   SetStateAction,
   Dispatch,
+  useCallback,
 } from "react";
 import {
   PopoverOption,
@@ -52,19 +53,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   ]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [hoveredRegularOption, setHoveredRegularOption] = useState<
-  string | null
+    string | null
   >(null);
   const [hoveredBookmarkOption, setHoveredBookmarkOption] = useState<
-  string | null
+    string | null
   >(null);
   const [activeRegularOption, setActiveRegularOption] = useState<string | null>(
     null
   );
   const [activeBookmarkOption, setActiveBookmarkOption] = useState<
-  string | null
+    string | null
   >(null);
   const [lastClickedSource, setLastClickedSource] = useState<
-  "regular" | "bookmark" | null
+    "regular" | "bookmark" | null
   >(null);
   const [isButtonHovered, setIsButtonHovered] = useState<boolean>(false);
   const [isPopoverHovered, setIsPopoverHovered] = useState<boolean>(false);
@@ -76,6 +77,31 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { currentStaff, isInitializing } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const findSidebarItem = useCallback(
+    (
+      items: SidebarItem[],
+      name: string
+    ): (SidebarItem & { popoverOptions?: PopoverOption[] }) | null => {
+      for (const item of items) {
+        if (item.name === name) {
+          return item;
+        }
+        if (item.subItems) {
+          const found = findSidebarItem(item.subItems, name);
+          if (found) return found;
+        }
+        if (item.popoverOptions) {
+          const found = item.popoverOptions.find(
+            (option) => option.name === name
+          );
+          if (found) return { name: found.name, path: found.path };
+        }
+      }
+      return null;
+    },
+    []
+  );
 
   // Update SidebarData when profile state changes
   useEffect(() => {
@@ -164,7 +190,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       setActiveRegularOption(null);
       setActiveBookmarkOption(null);
     }
-  }, [location, bookmarks, lastClickedSource]);
+  }, [location, bookmarks, lastClickedSource, SidebarData, findSidebarItem]);
 
   useEffect(() => {
     const fetchBookmarks = async () => {
@@ -223,28 +249,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       });
       setBookmarks((prev) => prev.filter((bookmark) => bookmark.name !== name));
     }
-  };
-
-  const findSidebarItem = (
-    items: SidebarItem[],
-    name: string
-  ): (SidebarItem & { popoverOptions?: PopoverOption[] }) | null => {
-    for (const item of items) {
-      if (item.name === name) {
-        return item;
-      }
-      if (item.subItems) {
-        const found = findSidebarItem(item.subItems, name);
-        if (found) return found;
-      }
-      if (item.popoverOptions) {
-        const found = item.popoverOptions.find(
-          (option) => option.name === name
-        );
-        if (found) return { name: found.name, path: found.path };
-      }
-    }
-    return null;
   };
 
   const isVisible = isPinned || isHovered;
