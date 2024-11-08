@@ -1,8 +1,19 @@
 // main.js
 import { app, BrowserWindow } from 'electron';
-import path from 'path';
 import { fileURLToPath } from 'url';
+import { autoUpdater } from 'electron-updater';
+import path from 'path';
 import fs from 'fs';
+
+// Configure auto-updater
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'matt-goh',
+  repo: 'tienhockerp'
+});
+
+// Check for updates
+autoUpdater.checkForUpdatesAndNotify();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
