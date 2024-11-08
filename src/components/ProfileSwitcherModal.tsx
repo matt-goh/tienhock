@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, Fragment } from "react";
-import { Staff, ActiveSession } from "../types/types";
+import { useState, useEffect, Fragment } from "react";
+import { Staff } from "../types/types";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   Dialog,

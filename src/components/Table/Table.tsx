@@ -176,57 +176,6 @@ function Table<T extends Record<string, any>>({
     };
   }, [isEditing]);
 
-  //HCC
-  const handleCellClick = useCallback(
-    (rowId: string | undefined, cellIndex: number) => {
-      if (isSorting || !rowId) return;
-
-      const row = table.getRowModel().rows.find((r) => r.id === rowId);
-      if (!row || row.original.isSubtotal || row.original.isTotal) return;
-
-      const filteredCellIndex = isEditing ? cellIndex - 1 : cellIndex;
-      const columnId = columns[filteredCellIndex]?.id;
-      if (!columnId) return;
-
-      const cellValue = row.original[columnId];
-
-      // Always update these states
-      setEditableRowId(rowId);
-      setEditableCellIndex(cellIndex);
-      setSelectedRowId(rowId);
-      setPreviousCellValues((prev) => ({
-        ...prev,
-        [`${rowId}-${columnId}`]: cellValue,
-      }));
-    },
-    [isSorting, columns]
-  );
-
-  //HCC
-  const handleCellChange = useCallback(
-    (rowIndex: number, columnId: string, value: any) => {
-      setData((prevData) => {
-        const updatedData = prevData.map((row, index) => {
-          if (index === rowIndex) {
-            return { ...row, [columnId]: value };
-          }
-          return row;
-        });
-
-        if (onChange) {
-          onChange(updatedData);
-        }
-
-        return updatedData;
-      });
-
-      if (sorting.some((sort) => sort.id === columnId)) {
-        table.setSorting([...sorting]);
-      }
-    },
-    [onChange, sorting]
-  );
-
   // HKD
   const handleKeyDown = (
     e: React.KeyboardEvent,
@@ -1138,8 +1087,6 @@ function Table<T extends Record<string, any>>({
       isAllSelectedGlobal,
       isIndeterminateGlobal,
       handleColumnResize,
-      handleCellChange,
-      handleCellClick,
       handleKeyDown,
     ]
   );
@@ -1168,6 +1115,57 @@ function Table<T extends Record<string, any>>({
           setIsSorting(isSorted);
         },
   });
+
+  //HCC
+  const handleCellChange = useCallback(
+    (rowIndex: number, columnId: string, value: any) => {
+      setData((prevData) => {
+        const updatedData = prevData.map((row, index) => {
+          if (index === rowIndex) {
+            return { ...row, [columnId]: value };
+          }
+          return row;
+        });
+
+        if (onChange) {
+          onChange(updatedData);
+        }
+
+        return updatedData;
+      });
+
+      if (sorting.some((sort) => sort.id === columnId)) {
+        table.setSorting([...sorting]);
+      }
+    },
+    [onChange, sorting, table]
+  );
+
+  //HCC
+  const handleCellClick = useCallback(
+    (rowId: string | undefined, cellIndex: number) => {
+      if (isSorting || !rowId) return;
+
+      const row = table.getRowModel().rows.find((r) => r.id === rowId);
+      if (!row || row.original.isSubtotal || row.original.isTotal) return;
+
+      const filteredCellIndex = isEditing ? cellIndex - 1 : cellIndex;
+      const columnId = columns[filteredCellIndex]?.id;
+      if (!columnId) return;
+
+      const cellValue = row.original[columnId];
+
+      // Always update these states
+      setEditableRowId(rowId);
+      setEditableCellIndex(cellIndex);
+      setSelectedRowId(rowId);
+      setPreviousCellValues((prev) => ({
+        ...prev,
+        [`${rowId}-${columnId}`]: cellValue,
+      }));
+    },
+    [isSorting, columns, isEditing, table]
+  );
 
   // USS
   const updateSelectionState = useCallback(
@@ -1332,7 +1330,9 @@ function Table<T extends Record<string, any>>({
                           }
                         ${isLastCell ? "border-r-0" : ""}
                         ${
-                          isLastRow ? "border-b-0" : "border-b border-default-300"
+                          isLastRow
+                            ? "border-b-0"
+                            : "border-b border-default-300"
                         } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
                             isFirstCell && isLastRow ? "rounded-bl-lg" : ""
                           }`}

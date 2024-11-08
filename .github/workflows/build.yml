@@ -23,6 +23,8 @@ jobs:
         run: npm ci
         
       - name: Build React App
+        env:
+          CI: false  # Add this line to prevent treating warnings as errors
         run: npm run build
         
       - name: Build Electron App

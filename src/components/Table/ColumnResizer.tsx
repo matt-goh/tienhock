@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 
 interface ColumnResizerProps {
   onResize: (width: number) => void;
@@ -19,16 +19,19 @@ const ColumnResizer: React.FC<ColumnResizerProps> = ({
     setStartWidth(initialWidth);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isResizing) return;
-    const diff = e.clientX - startX;
-    const newWidth = Math.max(50, startWidth + diff); // Minimum width of 50px
-    onResize(newWidth);
-  };
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const diff = e.clientX - startX;
+      const newWidth = Math.max(50, startWidth + diff); // Minimum width of 50px
+      onResize(newWidth);
+    },
+    [isResizing, startX, startWidth, onResize]
+  );
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsResizing(false);
-  };
+  }, []);
 
   React.useEffect(() => {
     if (isResizing) {
@@ -39,7 +42,7 @@ const ColumnResizer: React.FC<ColumnResizerProps> = ({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing]);
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   return (
     <div
