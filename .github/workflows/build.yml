@@ -1,0 +1,72 @@
+name: Build and Release
+on:
+  # Build on every push to main (but don't release)
+  push:
+    branches: [ main ]
+  
+  # Build and create release only when a version tag is pushed
+  push:
+    tags:
+      - 'v*.*.*'
+  
+  # Build but don't release for PRs
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    env:
+      NODE_ENV: production
+      
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Build React App
+        run: npm run build
+        
+      - name: Build Electron App
+        run: npm run make
+        
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            out/make/squirrel.windows/x64/*.exe
+            out/make/zip/win32/x64/*.zip
+            
+  release:
+    needs: build
+    # Only run this job if the build was triggered by a version tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installers
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            **/*.exe
+            **/*.zip
+          draft: true
+          prerelease: false
+          generate_release_notes: true

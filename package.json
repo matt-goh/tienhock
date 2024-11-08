@@ -43,9 +43,11 @@
     "server": "nodemon -L server.js",
     "electron:dev": "cross-env NODE_ENV=development electron-forge start",
     "dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron-forge start\"",
-    "package": "npm run build && electron-forge package",
     "make": "npm run build && cross-env NODE_ENV=production electron-forge make",
-    "make:quick": "cross-env QUICK_BUILD=true electron-forge make"
+    "make:quick": "cross-env QUICK_BUILD=true electron-forge make",
+    "release:patch": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags"
   },
   "config": {
     "forge": {
@@ -84,7 +86,8 @@
             "repository": {
               "owner": "matt-goh",
               "name": "tienhockerp"
-            }
+            },
+            "prerelease": false
           }
         }
       ]
