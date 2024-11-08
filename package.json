@@ -7,7 +7,6 @@
   "private": true,
   "homepage": "./",
   "dependencies": {
-    "@fortawesome/react-fontawesome": "^0.2.2",
     "@headlessui/react": "^2.1.1",
     "@tabler/core": "^1.0.0-beta20",
     "@tabler/icons-react": "^3.10.0",
@@ -43,7 +42,10 @@
     "build": "react-scripts build",
     "server": "nodemon -L server.js",
     "electron:dev": "cross-env NODE_ENV=development electron-forge start",
-    "dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron-forge start\""
+    "dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron-forge start\"",
+    "package": "npm run build && electron-forge package",
+    "make": "npm run build && cross-env NODE_ENV=production electron-forge make",
+    "make:quick": "cross-env QUICK_BUILD=true electron-forge make"
   },
   "config": {
     "forge": {
