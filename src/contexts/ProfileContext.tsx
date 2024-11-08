@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
 import { Staff, ActiveSession } from "../types/types";
 import { websocketService } from "../services/websocketService";
@@ -24,80 +25,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const mountedRef = useRef(false);
-  const handlersRef = useRef({
-    profileChange: async (data: { staffId: string; sessionId: string }) => {
-      if (
-        mountedRef.current &&
-        data.sessionId === websocketService.getSessionId()
-      ) {
-        await checkSessionState();
-      }
-    },
-    sessionsUpdate: (data: { sessions: ActiveSession[] }) => {
-      if (mountedRef.current) {
-        setActiveSessions(data.sessions);
-      }
-    },
-  });
 
-  useEffect(() => {
-    mountedRef.current = true;
-
-    const initializeWebSocket = async () => {
-      if (!mountedRef.current) return;
-
-      try {
-        // Try to restore session first
-        const storedSession = sessionPersistenceService.getStoredSession();
-        if (storedSession?.staffId) {
-          setCurrentStaff({ id: storedSession.staffId, name: "", job: [] }); // We'll update with full info after checking session state
-        }
-
-        websocketService.subscribe(
-          "profile_changed",
-          handlersRef.current.profileChange
-        );
-        websocketService.subscribe(
-          "active_sessions",
-          handlersRef.current.sessionsUpdate
-        );
-
-        await websocketService.connect();
-
-        if (mountedRef.current) {
-          await checkSessionState();
-        }
-      } catch (error) {
-        if (mountedRef.current) {
-          console.error("Failed to initialize WebSocket:", error);
-          setIsInitializing(false);
-        }
-      }
-    };
-
-    initializeWebSocket();
-
-    // Set up periodic last active updates
-    const updateInterval = setInterval(() => {
-      sessionPersistenceService.updateLastActive();
-    }, 60000); // Update every minute
-
-    return () => {
-      mountedRef.current = false;
-      clearInterval(updateInterval);
-      websocketService.unsubscribe(
-        "profile_changed",
-        handlersRef.current.profileChange
-      );
-      websocketService.unsubscribe(
-        "active_sessions",
-        handlersRef.current.sessionsUpdate
-      );
-      websocketService.disconnect();
-    };
-  }, []);
-
-  const checkSessionState = async () => {
+  const checkSessionState = useCallback(async () => {
     if (!mountedRef.current) return;
 
     try {
@@ -129,7 +58,67 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsInitializing(false);
     }
-  };
+  }, []);
+
+  // Create stable handler functions using useCallback
+  const handleProfileChange = useCallback(async (data: { staffId: string; sessionId: string }) => {
+    if (mountedRef.current && data.sessionId === websocketService.getSessionId()) {
+      await checkSessionState();
+    }
+  }, [checkSessionState]);
+
+  const handleSessionsUpdate = useCallback((data: { sessions: ActiveSession[] }) => {
+    if (mountedRef.current) {
+      setActiveSessions(data.sessions);
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const initializeWebSocket = async () => {
+      if (!mountedRef.current) return;
+
+      try {
+        // Try to restore session first
+        const storedSession = sessionPersistenceService.getStoredSession();
+        if (storedSession?.staffId) {
+          setCurrentStaff({ id: storedSession.staffId, name: "", job: [] });
+        }
+
+        // Subscribe to WebSocket events
+        websocketService.subscribe("profile_changed", handleProfileChange);
+        websocketService.subscribe("active_sessions", handleSessionsUpdate);
+
+        await websocketService.connect();
+
+        if (mountedRef.current) {
+          await checkSessionState();
+        }
+      } catch (error) {
+        if (mountedRef.current) {
+          console.error("Failed to initialize WebSocket:", error);
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    initializeWebSocket();
+
+    // Set up periodic last active updates
+    const updateInterval = setInterval(() => {
+      sessionPersistenceService.updateLastActive();
+    }, 60000);
+
+    // Cleanup function
+    return () => {
+      mountedRef.current = false;
+      clearInterval(updateInterval);
+      websocketService.unsubscribe("profile_changed", handleProfileChange);
+      websocketService.unsubscribe("active_sessions", handleSessionsUpdate);
+      websocketService.disconnect();
+    };
+  }, [checkSessionState, handleProfileChange, handleSessionsUpdate]);
 
   const switchProfile = async (staff: Staff) => {
     if (!mountedRef.current) return;
@@ -163,7 +152,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       if (mountedRef.current) {
         setCurrentStaff(result.staff);
-        sessionPersistenceService.saveSession(staff.id); // Save the session after successful switch
+        sessionPersistenceService.saveSession(staff.id);
 
         websocketService.send("profile_switch", {
           staffId: staff.id,

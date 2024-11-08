@@ -144,38 +144,6 @@ function TableEditing<T extends Record<string, any>>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  //HCC
-  const handleCellClick = useCallback(
-    (rowId: string | undefined, cellIndex: number) => {
-      if (isSorting || !rowId) return;
-
-      const row = table.getRowModel().rows.find((r) => r.id === rowId);
-      if (
-        !row ||
-        row.original.isSubtotal ||
-        row.original.isTotal ||
-        row.original.isSubtotalQty
-      )
-        return;
-
-      const filteredCellIndex = cellIndex;
-      const columnId = columns[filteredCellIndex]?.id;
-      if (!columnId) return;
-
-      const cellValue = row.original[columnId];
-
-      // Always update these states
-      setEditableRowId(rowId);
-      setEditableCellIndex(cellIndex);
-      setSelectedRowId(rowId);
-      setPreviousCellValues((prev) => ({
-        ...prev,
-        [`${rowId}-${columnId}`]: cellValue,
-      }));
-    },
-    [isSorting, columns]
-  );
-
   const calculateAmount = useCallback((row: T): number => {
     const quantity = parseFloat(row.qty?.toString() || "0");
     const price = parseFloat(row.price?.toString() || "0");
@@ -220,62 +188,6 @@ function TableEditing<T extends Record<string, any>>({
       return updatedData;
     },
     [calculateAmount]
-  );
-
-  // HCC
-  const handleCellChange = useCallback(
-    (rowIndex: number, columnId: string, value: any) => {
-      setData((prevData) => {
-        const updatedData = prevData.map((row, index) => {
-          if (index === rowIndex) {
-            const updatedRow = { ...row, [columnId]: value };
-            if (
-              columnId === "qty" ||
-              columnId === "price" ||
-              updatedRow.isLess ||
-              updatedRow.isTax
-            ) {
-              if (updatedRow.isLess || updatedRow.isTax) {
-                if (columnId === "productName") {
-                  // Handle description change for special rows
-                  return {
-                    ...updatedRow,
-                    productName: value,
-                  };
-                } else {
-                  // Handle amount change for special rows
-                  return {
-                    ...updatedRow,
-                    total: parseFloat(value || "0").toFixed(2),
-                  };
-                }
-              } else {
-                const newAmount = calculateAmount(updatedRow);
-                return {
-                  ...updatedRow,
-                  total: newAmount.toFixed(2),
-                };
-              }
-            }
-            return updatedRow;
-          }
-          return row;
-        });
-
-        const recalculatedData = updateAmounts(updatedData);
-
-        if (onChange) {
-          onChange(recalculatedData);
-        }
-
-        return recalculatedData;
-      });
-
-      if (sorting.some((sort) => sort.id === columnId)) {
-        table.setSorting([...sorting]);
-      }
-    },
-    [onChange, sorting, calculateAmount, updateAmounts]
   );
 
   // Helper function to find the next editable cell
@@ -445,7 +357,7 @@ function TableEditing<T extends Record<string, any>>({
     });
 
     return true;
-  }, [columns, onChange]);
+  }, [columns, onChange, tableKey]);
 
   // HMD
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -497,18 +409,6 @@ function TableEditing<T extends Record<string, any>>({
     },
     [columns]
   );
-
-  //HAV
-  const hasAmountValuesAfterLastSubtotal = (data: T[]): boolean => {
-    const lastSubtotalIndex = data.reduceRight((acc, row, index) => {
-      if (row.isSubtotal && acc === -1) return index;
-      return acc;
-    }, -1);
-
-    const remainingRows =
-      lastSubtotalIndex === -1 ? data : data.slice(lastSubtotalIndex + 1);
-    return remainingRows.some((row) => parseFloat(row.amount) > 0);
-  };
 
   // HDR
   const handleDeleteRow = useCallback(
@@ -831,250 +731,219 @@ function TableEditing<T extends Record<string, any>>({
   };
 
   // TC
-  const tableColumns: ColumnDef<T>[] = useMemo(
-    () =>
-      allColumns.map((col): ColumnDef<T> => {
-        const commonHeaderContent = (column: any) => (
-          <div
-            className={`flex items-center w-full h-full ${
-              ["number", "rate", "amount", "float"].includes(col.type)
-                ? "justify-end"
-                : ""
-            } ${
-              isSortingDisabled
-                ? ["number", "rate", "amount", "float"].includes(col.type)
-                  ? "pl-2"
-                  : "pr-2"
-                : "group cursor-pointer"
-            }`}
-            onClick={() => {
-              if (!isSortingDisabled && isSortableColumn(column.id)) {
-                const currentIsSorted = column.getIsSorted();
-                column.toggleSorting();
-                const newIsSorted = column.getIsSorted();
-                setIsSorting(newIsSorted !== false);
-                if (currentIsSorted !== false && newIsSorted === false) {
-                  // Sorting was cleared, recalculate subtotals
-                  setData((prevData) => recalculateSubtotals(prevData));
-                } else if (newIsSorted !== false) {
-                  // New sorting applied, remove subtotals
-                  setData((prevData) =>
-                    prevData.filter((row) => !row.isSubtotal)
-                  );
-                }
-              }
-            }}
-          >
-            {["number", "rate", "amount", "float"].includes(col.type) ? (
-              <>
-                {!isSortingDisabled && (
-                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
-                    {getSortIcon(col.id, col.type, column.getIsSorted())}
-                  </span>
-                )}
-                <span
-                  className={`select-none ${isSortingDisabled ? "pl-2" : ""}`}
-                >
-                  {col.header}
-                </span>
-              </>
-            ) : (
-              <>
-                <span
-                  className={`select-none ${isSortingDisabled ? "pr-2" : ""}`}
-                >
-                  {col.header}
-                </span>
-                {!isSortingDisabled && (
-                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
-                    {getSortIcon(col.id, col.type, column.getIsSorted())}
-                  </span>
-                )}
-              </>
+  const tableColumns: ColumnDef<T>[] = allColumns.map((col): ColumnDef<T> => {
+    const commonHeaderContent = (column: any) => (
+      <div
+        className={`flex items-center w-full h-full ${
+          ["number", "rate", "amount", "float"].includes(col.type)
+            ? "justify-end"
+            : ""
+        } ${
+          isSortingDisabled
+            ? ["number", "rate", "amount", "float"].includes(col.type)
+              ? "pl-2"
+              : "pr-2"
+            : "group cursor-pointer"
+        }`}
+        onClick={() => {
+          if (!isSortingDisabled && isSortableColumn(column.id)) {
+            const currentIsSorted = column.getIsSorted();
+            column.toggleSorting();
+            const newIsSorted = column.getIsSorted();
+            setIsSorting(newIsSorted !== false);
+            if (currentIsSorted !== false && newIsSorted === false) {
+              // Sorting was cleared, recalculate subtotals
+              setData((prevData) => recalculateSubtotals(prevData));
+            } else if (newIsSorted !== false) {
+              // New sorting applied, remove subtotals
+              setData((prevData) => prevData.filter((row) => !row.isSubtotal));
+            }
+          }
+        }}
+      >
+        {["number", "rate", "amount", "float"].includes(col.type) ? (
+          <>
+            {!isSortingDisabled && (
+              <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
+                {getSortIcon(col.id, col.type, column.getIsSorted())}
+              </span>
             )}
-          </div>
-        );
+            <span className={`select-none ${isSortingDisabled ? "pl-2" : ""}`}>
+              {col.header}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className={`select-none ${isSortingDisabled ? "pr-2" : ""}`}>
+              {col.header}
+            </span>
+            {!isSortingDisabled && (
+              <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
+                {getSortIcon(col.id, col.type, column.getIsSorted())}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    );
 
-        const commonCellContent = (info: any) => (
-          <div
-            onClick={(event) => {
-              event.stopPropagation();
-              handleCellClick(info.row.id, info.cell.column.getIndex());
-            }}
-          >
-            <TableEditableCell
-              value={info.getValue()}
-              onChange={(val) => handleCellChange(info.row.index, col.id, val)}
-              type={col.type}
-              editable={
-                info.row.id === editableRowId &&
-                info.cell.column.getIndex() === editableCellIndex
-              }
-              focus={
-                info.row.id === editableRowId &&
-                info.cell.column.getIndex() === editableCellIndex
-              }
-              onKeyDown={(e) =>
-                handleKeyDown(e, info.row.id, info.cell.column.getIndex())
-              }
-              isSorting={isSorting}
-              previousCellValue={info.getValue()}
-            />
-          </div>
-        );
+    const commonCellContent = (info: any) => (
+      <div
+        onClick={(event) => {
+          event.stopPropagation();
+          handleCellClick(info.row.id, info.cell.column.getIndex());
+        }}
+      >
+        <TableEditableCell
+          value={info.getValue()}
+          onChange={(val) => handleCellChange(info.row.index, col.id, val)}
+          type={col.type}
+          editable={
+            info.row.id === editableRowId &&
+            info.cell.column.getIndex() === editableCellIndex
+          }
+          focus={
+            info.row.id === editableRowId &&
+            info.cell.column.getIndex() === editableCellIndex
+          }
+          onKeyDown={(e) =>
+            handleKeyDown(e, info.row.id, info.cell.column.getIndex())
+          }
+          isSorting={isSorting}
+          previousCellValue={info.getValue()}
+        />
+      </div>
+    );
 
-        const baseColumn: Partial<ColumnDef<T>> = {
-          id: col.id,
-          size: columnWidths[col.id],
-          header: ({ column }) => (
-            <div
-              className={`relative flex items-center h-full ${
-                isSortingDisabled ? "py-2" : ""
-              }`}
-            >
-              {commonHeaderContent(column)}
+    const baseColumn: Partial<ColumnDef<T>> = {
+      id: col.id,
+      size: columnWidths[col.id],
+      header: ({ column }) => (
+        <div
+          className={`relative flex items-center h-full ${
+            isSortingDisabled ? "py-2" : ""
+          }`}
+        >
+          {commonHeaderContent(column)}
+        </div>
+      ),
+    };
+
+    switch (col.type) {
+      case "action":
+        return {
+          ...baseColumn,
+          cell: (info) => (
+            <div className="flex items-center justify-center h-full">
+              <button
+                className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
+                  isSorting ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                onClick={(event) => {
+                  if (!isSorting) {
+                    handleDeleteRow(info.row.index, event);
+                  }
+                }}
+                disabled={isSorting}
+              >
+                <IconTrash stroke={2} width={20} height={20} />
+              </button>
             </div>
           ),
-        };
-
-        switch (col.type) {
-          case "action":
-            return {
-              ...baseColumn,
-              cell: (info) => (
-                <div className="flex items-center justify-center h-full">
-                  <button
-                    className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
-                      isSorting ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                    onClick={(event) => {
-                      if (!isSorting) {
-                        handleDeleteRow(info.row.index, event);
-                      }
-                    }}
-                    disabled={isSorting}
-                  >
-                    <IconTrash stroke={2} width={20} height={20} />
-                  </button>
-                </div>
-              ),
-            } as ColumnDef<T>;
-          case "readonly":
-          case "amount":
-            return {
-              ...baseColumn,
-              accessorFn: (row: T) => {
-                if (hasProperty(row, col.id)) {
-                  return row[col.id];
+        } as ColumnDef<T>;
+      case "readonly":
+      case "amount":
+        return {
+          ...baseColumn,
+          accessorFn: (row: T) => {
+            if (hasProperty(row, col.id)) {
+              return row[col.id];
+            }
+            return calculateAmount(row).toFixed(2);
+          },
+          cell: (info) => {
+            const value = info.getValue();
+            return (
+              <div className="px-6 py-3 text-right">
+                {typeof value === "number" ? value.toFixed(2) : String(value)}
+              </div>
+            );
+          },
+          sortingFn: isSortingDisabled
+            ? undefined
+            : (rowA, rowB, columnId) => {
+                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                  return rowA.index - rowB.index;
                 }
-                return calculateAmount(row).toFixed(2);
+                if (rowA.original.isSubtotal) return 1;
+                if (rowB.original.isSubtotal) return -1;
+
+                const a = rowA.getValue(columnId);
+                const b = rowB.getValue(columnId);
+
+                const aNum =
+                  typeof a === "number" ? a : parseFloat(a as string);
+                const bNum =
+                  typeof b === "number" ? b : parseFloat(b as string);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                  return aNum - bNum;
+                }
+
+                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
               },
-              cell: (info) => {
-                const value = info.getValue();
-                return (
-                  <div className="px-6 py-3 text-right">
-                    {typeof value === "number"
-                      ? value.toFixed(2)
-                      : String(value)}
-                  </div>
-                );
+        } as ColumnDef<T>;
+      case "checkbox":
+        return {
+          ...baseColumn,
+          accessorFn: (row: T) => row[col.id as keyof T],
+          cell: (info) => (
+            <div className="flex items-center justify-center h-full">
+              <TableEditableCell
+                value={info.getValue()}
+                onChange={(val) =>
+                  handleCellChange(info.row.index, col.id, val)
+                }
+                type="checkbox"
+                editable={!isSorting}
+                focus={false}
+                onKeyDown={() => {}}
+                isSorting={isSorting}
+                previousCellValue={info.cell.getValue()}
+              />
+            </div>
+          ),
+        } as ColumnDef<T>;
+      default:
+        return {
+          ...baseColumn,
+          accessorFn: (row: T) =>
+            hasProperty(row, col.id) ? row[col.id] : undefined,
+          cell: (info) => {
+            return commonCellContent(info);
+          },
+          sortingFn: isSortingDisabled
+            ? undefined
+            : (rowA, rowB, columnId) => {
+                if (rowA.original.isTotal) return 1;
+                if (rowB.original.isTotal) return -1;
+                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                  return rowA.index - rowB.index;
+                }
+                if (rowA.original.isSubtotal) return 1;
+                if (rowB.original.isSubtotal) return -1;
+
+                const a = rowA.getValue(columnId);
+                const b = rowB.getValue(columnId);
+
+                if (typeof a === "number" && typeof b === "number") {
+                  return a - b;
+                }
+                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
               },
-              sortingFn: isSortingDisabled
-                ? undefined
-                : (rowA, rowB, columnId) => {
-                    if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                      return rowA.index - rowB.index;
-                    }
-                    if (rowA.original.isSubtotal) return 1;
-                    if (rowB.original.isSubtotal) return -1;
-
-                    const a = rowA.getValue(columnId);
-                    const b = rowB.getValue(columnId);
-
-                    const aNum =
-                      typeof a === "number" ? a : parseFloat(a as string);
-                    const bNum =
-                      typeof b === "number" ? b : parseFloat(b as string);
-
-                    if (!isNaN(aNum) && !isNaN(bNum)) {
-                      return aNum - bNum;
-                    }
-
-                    return (a?.toString() ?? "").localeCompare(
-                      b?.toString() ?? ""
-                    );
-                  },
-            } as ColumnDef<T>;
-          case "checkbox":
-            return {
-              ...baseColumn,
-              accessorFn: (row: T) => row[col.id as keyof T],
-              cell: (info) => (
-                <div className="flex items-center justify-center h-full">
-                  <TableEditableCell
-                    value={info.getValue()}
-                    onChange={(val) =>
-                      handleCellChange(info.row.index, col.id, val)
-                    }
-                    type="checkbox"
-                    editable={!isSorting}
-                    focus={false}
-                    onKeyDown={() => {}}
-                    isSorting={isSorting}
-                    previousCellValue={info.cell.getValue()}
-                  />
-                </div>
-              ),
-            } as ColumnDef<T>;
-          default:
-            return {
-              ...baseColumn,
-              accessorFn: (row: T) =>
-                hasProperty(row, col.id) ? row[col.id] : undefined,
-              cell: (info) => {
-                const row = info.row.original as T & {
-                  isTotal?: boolean;
-                  isSubtotal?: boolean;
-                };
-                return commonCellContent(info);
-              },
-              sortingFn: isSortingDisabled
-                ? undefined
-                : (rowA, rowB, columnId) => {
-                    if (rowA.original.isTotal) return 1;
-                    if (rowB.original.isTotal) return -1;
-                    if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                      return rowA.index - rowB.index;
-                    }
-                    if (rowA.original.isSubtotal) return 1;
-                    if (rowB.original.isSubtotal) return -1;
-
-                    const a = rowA.getValue(columnId);
-                    const b = rowB.getValue(columnId);
-
-                    if (typeof a === "number" && typeof b === "number") {
-                      return a - b;
-                    }
-                    return (a?.toString() ?? "").localeCompare(
-                      b?.toString() ?? ""
-                    );
-                  },
-            } as ColumnDef<T>;
-        }
-      }),
-    [
-      columns,
-      isSorting,
-      columnWidths,
-      editableRowId,
-      editableCellIndex,
-      isSortingDisabled,
-      handleColumnResize,
-      handleCellChange,
-      handleCellClick,
-      handleKeyDown,
-    ]
-  );
+        } as ColumnDef<T>;
+    }
+  });
 
   // TuRT
   const table = useReactTable<T>({
@@ -1115,6 +984,94 @@ function TableEditing<T extends Record<string, any>>({
           }
         },
   });
+
+  //HCC
+  const handleCellClick = useCallback(
+    (rowId: string | undefined, cellIndex: number) => {
+      if (isSorting || !rowId) return;
+
+      const row = table.getRowModel().rows.find((r) => r.id === rowId);
+      if (
+        !row ||
+        row.original.isSubtotal ||
+        row.original.isTotal ||
+        row.original.isSubtotalQty
+      )
+        return;
+
+      const filteredCellIndex = cellIndex;
+      const columnId = columns[filteredCellIndex]?.id;
+      if (!columnId) return;
+
+      const cellValue = row.original[columnId];
+
+      // Always update these states
+      setEditableRowId(rowId);
+      setEditableCellIndex(cellIndex);
+      setSelectedRowId(rowId);
+      setPreviousCellValues((prev) => ({
+        ...prev,
+        [`${rowId}-${columnId}`]: cellValue,
+      }));
+    },
+    [isSorting, columns, table]
+  );
+
+  // HCC
+  const handleCellChange = useCallback(
+    (rowIndex: number, columnId: string, value: any) => {
+      setData((prevData) => {
+        const updatedData = prevData.map((row, index) => {
+          if (index === rowIndex) {
+            const updatedRow = { ...row, [columnId]: value };
+            if (
+              columnId === "qty" ||
+              columnId === "price" ||
+              updatedRow.isLess ||
+              updatedRow.isTax
+            ) {
+              if (updatedRow.isLess || updatedRow.isTax) {
+                if (columnId === "productName") {
+                  // Handle description change for special rows
+                  return {
+                    ...updatedRow,
+                    productName: value,
+                  };
+                } else {
+                  // Handle amount change for special rows
+                  return {
+                    ...updatedRow,
+                    total: parseFloat(value || "0").toFixed(2),
+                  };
+                }
+              } else {
+                const newAmount = calculateAmount(updatedRow);
+                return {
+                  ...updatedRow,
+                  total: newAmount.toFixed(2),
+                };
+              }
+            }
+            return updatedRow;
+          }
+          return row;
+        });
+
+        const recalculatedData = updateAmounts(updatedData);
+
+        if (onChange) {
+          onChange(recalculatedData);
+        }
+
+        return recalculatedData;
+      });
+
+      if (sorting.some((sort) => sort.id === columnId)) {
+        table.setSorting([...sorting]);
+      }
+    },
+    [onChange, sorting, calculateAmount, updateAmounts, table]
+  );
 
   const isLastPage = table.getCanNextPage() === false;
 

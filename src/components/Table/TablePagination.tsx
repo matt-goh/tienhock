@@ -22,7 +22,7 @@ const TablePagination = <T extends Record<string, unknown>>({
     if (storedPageSize) {
       table.setPageSize(Number(storedPageSize));
     }
-  }, []);
+  }, [table]);
   
   const handlePageSizeChange = (newPageSize: number) => {
     table.setPageSize(newPageSize);

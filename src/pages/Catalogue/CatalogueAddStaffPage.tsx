@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Tab from "../../components/Tab";
 import toast from "react-hot-toast";
@@ -45,10 +45,8 @@ const CatalogueAddStaffPage: React.FC = () => {
     dateResigned: "",
     newId: "",
   });
-  const [initialFormData, setInitialFormData] = useState<Employee>({
-    ...formData,
-  });
 
+  const initialFormDataRef = useRef<Employee>({ ...formData });
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -85,22 +83,24 @@ const CatalogueAddStaffPage: React.FC = () => {
   ];
 
   useEffect(() => {
-    // Check if form data has changed
+    // Check if form data has changed by comparing with the initial ref
     const hasChanged =
-      JSON.stringify(formData) !== JSON.stringify(initialFormData);
+      JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
     setIsFormChanged(hasChanged);
-  }, [formData, initialFormData]);
+  }, [formData]);
 
   useEffect(() => {
-    setInitialFormData({ ...formData });
-  }, []);
+    const fetchAllOptions = async () => {
+      await Promise.all([
+        fetchOptions("nationalities", setNationalities),
+        fetchOptions("races", setRaces),
+        fetchOptions("agamas", setAgamas),
+        fetchOptions("jobs", setJobs),
+        fetchOptions("locations", setLocations),
+      ]);
+    };
 
-  useEffect(() => {
-    fetchOptions("nationalities", setNationalities);
-    fetchOptions("races", setRaces);
-    fetchOptions("agamas", setAgamas);
-    fetchOptions("jobs", setJobs);
-    fetchOptions("locations", setLocations);
+    fetchAllOptions();
   }, []);
 
   const handleBackClick = () => {
@@ -218,7 +218,7 @@ const CatalogueAddStaffPage: React.FC = () => {
         );
       }
 
-      const data = await response.json();
+      await response.json();
       toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
     } catch (error) {
@@ -283,7 +283,9 @@ const CatalogueAddStaffPage: React.FC = () => {
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
-          <h1 className="text-xl font-semibold text-default-900">Add New Staff</h1>
+          <h1 className="text-xl font-semibold text-default-900">
+            Add New Staff
+          </h1>
           <p className="mt-1 text-sm text-default-500">
             Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
             anda selesai.

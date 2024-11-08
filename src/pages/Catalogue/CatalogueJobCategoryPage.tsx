@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import _ from "lodash";
 import Table from "../../components/Table/Table";
 import { ColumnConfig, JobCategory } from "../../types/types";
 import toast from "react-hot-toast";
@@ -68,7 +67,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
     }
 
     return baseColumns;
-  }, [isEditing, selectedSection]);
+  }, [isEditing, selectedSection, sections]);
 
   const fetchSections = useCallback(async () => {
     try {

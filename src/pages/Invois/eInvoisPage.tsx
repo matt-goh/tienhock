@@ -38,7 +38,9 @@ const StatusMessage: React.FC<{ success: boolean; message: string }> = ({
   </p>
 );
 
-const TokenInfo: React.FC<{ tokenInfo: TokenInfo }> = ({ tokenInfo }) => (
+const TokenInfoDisplay: React.FC<{ tokenInfo: TokenInfo }> = ({
+  tokenInfo,
+}) => (
   <div className="mt-4 p-4 bg-default-100 border border-default-400 rounded">
     <h2 className="font-bold text-default-800">Token Information:</h2>
     <p>Access Token: {tokenInfo.accessToken.substring(0, 10)}...</p>
@@ -205,7 +207,7 @@ const EInvoisPage: React.FC = () => {
       <p className="mt-2">API Endpoint: {loginResponse.apiEndpoint}</p>
 
       {loginResponse.success && loginResponse.tokenInfo && (
-        <TokenInfo tokenInfo={loginResponse.tokenInfo} />
+        <TokenInfoDisplay tokenInfo={loginResponse.tokenInfo} />
       )}
 
       {!loginResponse.success && (

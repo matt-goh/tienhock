@@ -109,9 +109,7 @@ const CatalogueJobPage: React.FC = () => {
   const fetchJobDetails = useCallback(async (jobId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_BASE_URL}/api/jobs/${jobId}/details`
-      );
+      const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/details`);
       if (!response.ok) throw new Error("Failed to fetch job details");
       const data = await response.json();
       setAllJobDetails(data);
@@ -248,63 +246,6 @@ const CatalogueJobPage: React.FC = () => {
     );
   }, []);
 
-  const handleDeleteJobDetails = useCallback(
-    async (selectedIndices: number[]) => {
-      if (!selectedJob) {
-        return;
-      }
-
-      const sortedIndices = selectedIndices.sort((a, b) => b - a);
-      const jobDetailsToDeleteFromDB: string[] = [];
-      let updatedJobDetails = [...jobDetails];
-
-      for (const index of sortedIndices) {
-        const jobDetail = updatedJobDetails[index];
-        if (isRowFromDatabase(jobDetail)) {
-          jobDetailsToDeleteFromDB.push(jobDetail.id);
-        }
-        updatedJobDetails.splice(index, 1);
-      }
-
-      // Update local state immediately
-      setJobDetails(updatedJobDetails);
-
-      if (jobDetailsToDeleteFromDB.length > 0) {
-        try {
-          const response = await fetch(
-            `${API_BASE_URL}/api/job-details`,
-            {
-              method: "DELETE",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ jobDetailIds: jobDetailsToDeleteFromDB }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error("Failed to delete job details on the server");
-          }
-
-          toast.success("Selected job details deleted successfully");
-          setIsEditing(false);
-        } catch (error) {
-          console.error("Error deleting selected job details:", error);
-          toast.error(
-            "Failed to delete some job details from the server. Please try again."
-          );
-          // Refresh job details from the server in case of error
-          await fetchJobDetails(selectedJob.id);
-          return;
-        }
-      } else {
-        toast.success("Selected rows removed");
-      }
-
-      // Ensure the Table component is updated with the new data
-      handleDataChange(updatedJobDetails);
-    },
-    [selectedJob, jobDetails, isRowFromDatabase, fetchJobDetails]
-  );
-
   const handleOptionClick = (e: React.MouseEvent, job: Job) => {
     if (!(e.target as HTMLElement).closest(".delete-button")) {
       handleJobSelection(job);
@@ -342,7 +283,9 @@ const CatalogueJobPage: React.FC = () => {
                 key={type}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active ? "bg-default-100 text-default-900" : "text-default-900"
+                    active
+                      ? "bg-default-100 text-default-900"
+                      : "text-default-900"
                   }`
                 }
                 value={type}
@@ -534,7 +477,15 @@ const CatalogueJobPage: React.FC = () => {
       console.error("Error in handleSave:", error);
       toast.error((error as Error).message);
     }
-  }, [editedJob, selectedJob, allJobDetails, jobs, originalJobDetails]);
+  }, [
+    editedJob,
+    selectedJob,
+    allJobDetails,
+    jobs,
+    originalJobDetails,
+    jobType,
+    originalJobState?.jobDetails,
+  ]);
 
   // HJPC
   const handleJobPropertyChange = useCallback(
@@ -565,6 +516,66 @@ const CatalogueJobPage: React.FC = () => {
       setFilteredJobDetails(updatedData);
     },
     [allJobDetails]
+  );
+
+  const handleDeleteJobDetails = useCallback(
+    async (selectedIndices: number[]) => {
+      if (!selectedJob) {
+        return;
+      }
+
+      const sortedIndices = selectedIndices.sort((a, b) => b - a);
+      const jobDetailsToDeleteFromDB: string[] = [];
+      let updatedJobDetails = [...jobDetails];
+
+      for (const index of sortedIndices) {
+        const jobDetail = updatedJobDetails[index];
+        if (isRowFromDatabase(jobDetail)) {
+          jobDetailsToDeleteFromDB.push(jobDetail.id);
+        }
+        updatedJobDetails.splice(index, 1);
+      }
+
+      // Update local state immediately
+      setJobDetails(updatedJobDetails);
+
+      if (jobDetailsToDeleteFromDB.length > 0) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/job-details`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobDetailIds: jobDetailsToDeleteFromDB }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to delete job details on the server");
+          }
+
+          toast.success("Selected job details deleted successfully");
+          setIsEditing(false);
+        } catch (error) {
+          console.error("Error deleting selected job details:", error);
+          toast.error(
+            "Failed to delete some job details from the server. Please try again."
+          );
+          // Refresh job details from the server in case of error
+          await fetchJobDetails(selectedJob.id);
+          return;
+        }
+      } else {
+        toast.success("Selected rows removed");
+      }
+
+      // Ensure the Table component is updated with the new data
+      handleDataChange(updatedJobDetails);
+    },
+    [
+      selectedJob,
+      jobDetails,
+      isRowFromDatabase,
+      fetchJobDetails,
+      handleDataChange,
+    ]
   );
 
   return (

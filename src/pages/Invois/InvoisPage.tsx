@@ -54,10 +54,6 @@ const InvoisPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadInvoices();
-  }, []);
-
-  useEffect(() => {
     const handleInvoicesUpdated = () => {
       setInvoices([...invoices]); // This will trigger a re-render
     };
@@ -69,7 +65,7 @@ const InvoisPage: React.FC = () => {
     };
   }, [invoices]);
 
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -88,7 +84,11 @@ const InvoisPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
 
   const parseDate = (dateString: string): Date => {
     const [day, month, year] = dateString.split("/").map(Number);
@@ -303,7 +303,7 @@ const InvoisPage: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
+      await response.json();
 
       const updatedInvoices = getInvoices();
       setInvoices(updatedInvoices);
@@ -355,16 +355,13 @@ const InvoisPage: React.FC = () => {
           customer,
           salesman,
           totalAmount,
-          filler, // Filler fields to comply with the imported data format from Tien Hock mobile app
-          filler2,
-          filler3,
-          filler4,
-          filler5,
-          filler6,
-          time,
-          orderDetailsString,
+          ...rest // Use rest operator to capture unused values
         ] = line.split("|");
 
+        // Get the last two items we need from rest
+        const time = rest[rest.length - 2];
+        const orderDetailsString = rest[rest.length - 1];
+        
         const [customerId, customername] = customer.split("\t");
 
         const orderDetails = orderDetailsString
@@ -520,7 +517,7 @@ const InvoisPage: React.FC = () => {
             onChange={handleSearchChange}
           />
         </div>
-        <h1 className="text-2xl text-center font-medium text-default-700 mb-2">
+        <h1 className="ml-2 text-2xl text-center font-medium text-default-700 mb-2">
           Invois
         </h1>
         <div className="flex space-x-2 justify-center">
