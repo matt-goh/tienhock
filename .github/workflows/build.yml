@@ -69,4 +69,4 @@ jobs:
             **/*.zip
           draft: true
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: true  
