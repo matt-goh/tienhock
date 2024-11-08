@@ -2,34 +2,36 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   release:
     runs-on: windows-latest
-    permissions: 
+    permissions:
       contents: write
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
-          cache: 'npm'
-          
+          node-version: "18.x"
+          cache: "npm"
+
       - name: Install Dependencies
         run: npm ci
-        
+
       - name: Build React App
         env:
-          CI: false  # Add this line to prevent treating warnings as errors
+          CI: false # Add this line to prevent treating warnings as errors
         run: npm run build
-        
+
       - name: Build Electron App
+        env:
+          CI: false
         run: npm run make
-        
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         env:
@@ -44,12 +46,12 @@ jobs:
           name: Release ${{ github.ref_name }}
           body: |
             ## What's New
-            
+
             Release ${{ github.ref_name }} of Tien Hock ERP
-            
+
             ### Installation
             - For Windows users, download and run `TienHockERP-Setup.exe`
             - The app will automatically check for updates on launch
-            
+
             ### Need Help?
             Please report any issues on the GitHub Issues page
