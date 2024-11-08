@@ -121,7 +121,7 @@ export default function ProfileSwitcherModal({
                   </DialogTitle>
                   <button
                     onClick={() => setShowSessions(!showSessions)}
-                    className="p-2 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors"
+                    className="p-2 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
                   >
                     <IconDevices2 stroke={1.5} />
                   </button>

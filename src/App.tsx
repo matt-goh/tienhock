@@ -1,4 +1,5 @@
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+// App.tsx
+import { Route, BrowserRouter, HashRouter, Routes } from "react-router-dom";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { Toaster } from "react-hot-toast";
@@ -6,8 +7,10 @@ import { routes } from "./components/Sidebar/SidebarData";
 import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 
+// Determine which router to use
+const Router = process.env.NODE_ENV === 'development' ? BrowserRouter : HashRouter;
+
 const App: React.FC = () => {
-  // Initialize state directly from localStorage
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
     return pinnedState ? JSON.parse(pinnedState) : true;
@@ -15,7 +18,6 @@ const App: React.FC = () => {
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // We only need this effect now, since initial state is handled in useState
   useEffect(() => {
     localStorage.setItem("sidebarPinned", JSON.stringify(isPinned));
   }, [isPinned]);
@@ -48,7 +50,7 @@ const App: React.FC = () => {
 
   return (
     <ProfileProvider>
-      <Router>
+      <Router> {/* This will be HashRouter in production, BrowserRouter in development */}
         <Toaster
           position="top-right"
           toastOptions={{
