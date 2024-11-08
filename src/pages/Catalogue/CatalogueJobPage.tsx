@@ -30,7 +30,6 @@ const CatalogueJobPage: React.FC = () => {
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
   const [jobDetails, setJobDetails] = useState<JobDetail[]>([]);
   const [filteredJobDetails, setFilteredJobDetails] = useState<JobDetail[]>([]);
-  const [originalJobDetails] = useState<JobDetail[]>([]);
   const [originalJobState, setOriginalJobState] = useState<{
     job: Job | null;
     jobDetails: JobDetail[];
