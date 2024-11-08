@@ -431,6 +431,8 @@ const InvoisDetailsPage: React.FC = () => {
               return item.isFoc;
             case "returned":
               return item.isReturned;
+            default:
+              return false;
           }
         })
         .map((item) => item.code);
@@ -599,7 +601,14 @@ const InvoisDetailsPage: React.FC = () => {
         });
       }, 0);
     },
-    [calculateTotal, addNewRow, products, calculateOverallTotal, updateInvoice]
+    [
+      calculateTotal,
+      addNewRow,
+      products,
+      calculateOverallTotal,
+      updateInvoice,
+      recalculateSubtotals,
+    ]
   );
 
   const getNextSpecialRowNumber = useCallback(

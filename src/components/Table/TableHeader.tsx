@@ -7,7 +7,7 @@ import {
 import { ColumnType } from "../../types/types";
 import ColumnResizer from "./ColumnResizer";
 
-interface TableHeaderProps<T> {
+interface TableHeaderProps {
   headerGroup: any;
   columns: Array<{ id: string; type: ColumnType }>;
   isEditing: boolean;
@@ -20,7 +20,7 @@ interface TableHeaderProps<T> {
   disableSelection?: boolean;
 }
 
-function TableHeader<T>({
+function TableHeader({
   headerGroup,
   columns,
   isEditing,
@@ -31,7 +31,7 @@ function TableHeader<T>({
   columnWidths,
   onColumnResize,
   disableSelection, // New prop
-}: TableHeaderProps<T>) {
+}: TableHeaderProps) {
   const getHeaderClass = (columnId: string, columnType: ColumnType) => {
     let baseClass = "";
     if (isSortableColumn(columnId)) {

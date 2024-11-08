@@ -299,50 +299,6 @@ function Table<T extends Record<string, any>>({
     }
   };
 
-  // HAR
-  const handleAddRow = useCallback(() => {
-    if (disableAddRowBar) return false;
-    const newRow = {
-      id: `new_${Math.random().toString(36).substr(2, 9)}`,
-      ...Object.fromEntries(
-        columns.map((col) => {
-          switch (col.type) {
-            case "number":
-            case "rate":
-            case "float":
-            case "amount":
-            case "readonly":
-              return [col.id, 0];
-            case "checkbox":
-              return [col.id, false];
-            default:
-              return [col.id, ""];
-          }
-        })
-      ),
-    } as T;
-
-    setData((prevData) => {
-      const newData = [...prevData, newRow];
-      if (onChange) {
-        onChange(newData);
-      }
-
-      // Calculate the correct page index for the new row
-      const currentLastItemIndex =
-        (pagination.pageIndex + 1) * pagination.pageSize;
-
-      // If the current page is full, move to the next page
-      if (currentLastItemIndex === prevData.length) {
-        table.nextPage();
-      }
-
-      return newData;
-    });
-
-    return true;
-  }, [columns, onChange, pagination, disableAddRowBar]);
-
   const isRowEmpty = useCallback((row: T) => {
     return Object.entries(row).every(([key, value]) => {
       if (key === "id" || key === "isSubtotal") return true;
@@ -389,82 +345,17 @@ function Table<T extends Record<string, any>>({
   }, [onChange, isRowEmpty]);
 
   // HMD
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (disableAddRowBar) return;
-    e.preventDefault();
-    setIsDragging(true);
-    setIsAddRowBarActive(true);
-    setRowsToAddOrRemove(0);
-    initialDragY.current = e.clientY;
-  }, []);
-
-  // HMM
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging) return;
-
-      const currentY = e.clientY;
-      const mouseDelta = currentY - initialDragY.current;
-
-      // Update the bar position
-      if (addRowBarRef.current) {
-        addRowBarRef.current.style.top = `${mouseDelta}px`;
-      }
-
-      // Check if we're on the last page and it's not full
-      const isLastPage = !table.getCanNextPage();
-      const isLastPageNotFull =
-        isLastPage && data.length % pagination.pageSize !== 0;
-
-      // Calculate rows to add or remove
-      const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
-
-      // Only allow adding rows if we're on the last page and it's not full
-      if (newRowsToAddOrRemove > 0 && !isLastPageNotFull) {
-        return;
-      }
-
-      setRowsToAddOrRemove(newRowsToAddOrRemove);
-
-      // Immediately add or remove rows
-      if (newRowsToAddOrRemove > 0 && isLastPageNotFull) {
-        handleAddRow();
-        initialDragY.current += DRAG_THRESHOLD;
-      } else if (newRowsToAddOrRemove < 0 && removableRowsAbove > 0) {
-        handleRemoveEmptyRow();
-        initialDragY.current -= DRAG_THRESHOLD;
-      }
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (disableAddRowBar) return;
+      e.preventDefault();
+      setIsDragging(true);
+      setIsAddRowBarActive(true);
+      setRowsToAddOrRemove(0);
+      initialDragY.current = e.clientY;
     },
-    [
-      isDragging,
-      removableRowsAbove,
-      handleAddRow,
-      handleRemoveEmptyRow,
-      data.length,
-      pagination,
-    ]
+    [disableAddRowBar]
   );
-
-  // UR
-  const updateRows = useCallback(() => {
-    if (rowsToAddOrRemove > 0) {
-      handleAddRow();
-      setRowsToAddOrRemove((prev) => prev - 1);
-    } else if (rowsToAddOrRemove < 0 && removableRowsAbove > 0) {
-      handleRemoveEmptyRow();
-      setRowsToAddOrRemove((prev) => prev + 1);
-      setRemovableRowsAbove((prev) => prev - 1);
-    }
-
-    if (rowsToAddOrRemove !== 0) {
-      requestAnimationFrame(updateRows);
-    }
-  }, [
-    rowsToAddOrRemove,
-    handleAddRow,
-    handleRemoveEmptyRow,
-    removableRowsAbove,
-  ]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -475,22 +366,6 @@ function Table<T extends Record<string, any>>({
     }
     updateRemovableRowsAbove();
   }, [updateRemovableRowsAbove]);
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    } else {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      updateRows();
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
   // DR
   const deleteRow = async (rowIndex: number) => {
@@ -559,11 +434,13 @@ function Table<T extends Record<string, any>>({
         ),
       }));
     }
-  }, [selectedRows, onDelete, data.length, pagination.pageSize]);
-
-  useEffect(() => {
-    updateSelectionState(selectedRows);
-  }, [selectedRows, data]);
+  }, [
+    selectedRows,
+    onDelete,
+    data.length,
+    pagination.pageSize,
+    pagination.pageIndex,
+  ]);
 
   const checkboxColumn: ColumnConfig = {
     id: "selection",
@@ -593,7 +470,7 @@ function Table<T extends Record<string, any>>({
 
   const allColumns = useMemo(
     () => (isEditing ? [checkboxColumn, ...columns] : columns),
-    [columns, isEditing]
+    [columns, isEditing, checkboxColumn]
   );
 
   const isSortableColumn = (columnId: string) => {
@@ -838,258 +715,233 @@ function Table<T extends Record<string, any>>({
   };
 
   // TC
-  const tableColumns: ColumnDef<T>[] = useMemo(
-    () =>
-      allColumns.map((col): ColumnDef<T> => {
-        const commonHeaderContent = (column: any) => (
-          <div
-            className={`flex items-center w-full h-full ${
-              ["number", "rate", "amount", "float"].includes(col.type)
-                ? "justify-end"
-                : ""
-            } ${
-              isSortingDisabled
-                ? ["number", "rate", "amount", "float"].includes(col.type)
-                  ? "pl-2"
-                  : "pr-2"
-                : "group cursor-pointer"
-            }`}
-            onClick={() => {
-              if (!isSortingDisabled && isSortableColumn(column.id)) {
-                column.toggleSorting();
-                const newIsSorted = column.getIsSorted();
-                setIsSorting(newIsSorted !== false);
-              }
-            }}
-          >
-            {["number", "rate", "amount", "float"].includes(col.type) ? (
-              <>
-                {!isSortingDisabled && (
-                  <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
-                    {getSortIcon(col.id, col.type, column.getIsSorted())}
-                  </span>
-                )}
-                <span
-                  className={`select-none ${isSortingDisabled ? "pl-2" : ""}`}
-                >
-                  {col.header}
-                </span>
-              </>
-            ) : (
-              <>
-                <span
-                  className={`select-none ${isSortingDisabled ? "pr-2" : ""}`}
-                >
-                  {col.header}
-                </span>
-                {!isSortingDisabled && (
-                  <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
-                    {getSortIcon(col.id, col.type, column.getIsSorted())}
-                  </span>
-                )}
-              </>
+  const tableColumns: ColumnDef<T>[] = allColumns.map((col): ColumnDef<T> => {
+    const commonHeaderContent = (column: any) => (
+      <div
+        className={`flex items-center w-full h-full ${
+          ["number", "rate", "amount", "float"].includes(col.type)
+            ? "justify-end"
+            : ""
+        } ${
+          isSortingDisabled
+            ? ["number", "rate", "amount", "float"].includes(col.type)
+              ? "pl-2"
+              : "pr-2"
+            : "group cursor-pointer"
+        }`}
+        onClick={() => {
+          if (!isSortingDisabled && isSortableColumn(column.id)) {
+            column.toggleSorting();
+            const newIsSorted = column.getIsSorted();
+            setIsSorting(newIsSorted !== false);
+          }
+        }}
+      >
+        {["number", "rate", "amount", "float"].includes(col.type) ? (
+          <>
+            {!isSortingDisabled && (
+              <span className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
+                {getSortIcon(col.id, col.type, column.getIsSorted())}
+              </span>
             )}
-          </div>
-        );
+            <span className={`select-none ${isSortingDisabled ? "pl-2" : ""}`}>
+              {col.header}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className={`select-none ${isSortingDisabled ? "pr-2" : ""}`}>
+              {col.header}
+            </span>
+            {!isSortingDisabled && (
+              <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-default-200 active:bg-default-300 duration-200 rounded-full">
+                {getSortIcon(col.id, col.type, column.getIsSorted())}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    );
 
-        const commonCellContent = (info: any) => (
-          <div
-            onClick={(event) => {
-              event.stopPropagation();
-              handleCellClick(info.row.id, info.cell.column.getIndex());
-            }}
-          >
-            <TableEditableCell
-              value={info.getValue()}
-              onChange={(val) => handleCellChange(info.row.index, col.id, val)}
-              type={col.type}
-              editable={
-                info.row.id === editableRowId &&
-                info.cell.column.getIndex() === editableCellIndex
-              }
-              focus={
-                info.row.id === editableRowId &&
-                info.cell.column.getIndex() === editableCellIndex
-              }
-              onKeyDown={(e) =>
-                handleKeyDown(e, info.row.id, info.cell.column.getIndex())
-              }
-              isSorting={isSorting}
-              previousCellValue={info.getValue()}
-            />
-          </div>
-        );
+    const commonCellContent = (info: any) => (
+      <div
+        onClick={(event) => {
+          event.stopPropagation();
+          handleCellClick(info.row.id, info.cell.column.getIndex());
+        }}
+      >
+        <TableEditableCell
+          value={info.getValue()}
+          onChange={(val) => handleCellChange(info.row.index, col.id, val)}
+          type={col.type}
+          editable={
+            info.row.id === editableRowId &&
+            info.cell.column.getIndex() === editableCellIndex
+          }
+          focus={
+            info.row.id === editableRowId &&
+            info.cell.column.getIndex() === editableCellIndex
+          }
+          onKeyDown={(e) =>
+            handleKeyDown(e, info.row.id, info.cell.column.getIndex())
+          }
+          isSorting={isSorting}
+          previousCellValue={info.getValue()}
+        />
+      </div>
+    );
 
-        const baseColumn: Partial<ColumnDef<T>> = {
-          id: col.id,
-          size: columnWidths[col.id],
-          header: ({ column }) => (
-            <div
-              className={`relative flex items-center h-full ${
-                isSortingDisabled ? "py-2" : ""
-              }`}
-            >
-              {commonHeaderContent(column)}
+    const baseColumn: Partial<ColumnDef<T>> = {
+      id: col.id,
+      size: columnWidths[col.id],
+      header: ({ column }) => (
+        <div
+          className={`relative flex items-center h-full ${
+            isSortingDisabled ? "py-2" : ""
+          }`}
+        >
+          {commonHeaderContent(column)}
+        </div>
+      ),
+    };
+
+    switch (col.type) {
+      case "action":
+        return {
+          ...baseColumn,
+          cell: (info) => (
+            <div className="flex items-center justify-center h-full">
+              <button
+                className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
+                  isSorting ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                onClick={(event) => {
+                  if (!isSorting) {
+                    handleDeleteRow(info.row.index, event);
+                  }
+                }}
+                disabled={isSorting}
+              >
+                <IconTrash stroke={2} width={20} height={20} />
+              </button>
             </div>
           ),
-        };
-
-        switch (col.type) {
-          case "action":
-            return {
-              ...baseColumn,
-              cell: (info) => (
-                <div className="flex items-center justify-center h-full">
-                  <button
-                    className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
-                      isSorting ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                    onClick={(event) => {
-                      if (!isSorting) {
-                        handleDeleteRow(info.row.index, event);
-                      }
-                    }}
-                    disabled={isSorting}
-                  >
-                    <IconTrash stroke={2} width={20} height={20} />
-                  </button>
-                </div>
-              ),
-            } as ColumnDef<T>;
-          case "readonly":
-          case "amount":
-            return {
-              ...baseColumn,
-              accessorFn: (row: T) => {
-                const amountValue = row[col.id as keyof T];
-                return typeof amountValue === "number" ||
-                  typeof amountValue === "string"
-                  ? amountValue
-                  : 0;
-              },
-              cell: (info) => {
-                const value = info.getValue();
-                return (
-                  <div className="px-6 py-3 text-right">
-                    {typeof value === "number" ? value.toFixed(2) : "0.00"}
-                  </div>
-                );
-              },
-              sortingFn: isSortingDisabled
-                ? undefined
-                : (rowA, rowB, columnId) => {
-                    if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                      return rowA.index - rowB.index;
-                    }
-                    if (rowA.original.isSubtotal) return 1;
-                    if (rowB.original.isSubtotal) return -1;
-
-                    const a = rowA.getValue(columnId);
-                    const b = rowB.getValue(columnId);
-
-                    const aNum =
-                      typeof a === "number" ? a : parseFloat(a as string);
-                    const bNum =
-                      typeof b === "number" ? b : parseFloat(b as string);
-
-                    if (!isNaN(aNum) && !isNaN(bNum)) {
-                      return aNum - bNum;
-                    }
-
-                    return (a?.toString() ?? "").localeCompare(
-                      b?.toString() ?? ""
-                    );
-                  },
-            } as ColumnDef<T>;
-          case "checkbox":
-            return {
-              ...baseColumn,
-              accessorFn: (row: T) => row[col.id as keyof T],
-              cell: (info) => (
-                <div className="flex items-center justify-center h-full">
-                  <TableEditableCell
-                    value={info.getValue()}
-                    onChange={(val) =>
-                      handleCellChange(info.row.index, col.id, val)
-                    }
-                    type="checkbox"
-                    editable={!isSorting}
-                    focus={false}
-                    onKeyDown={() => {}}
-                    isSorting={isSorting}
-                    previousCellValue={info.cell.getValue()}
-                  />
-                </div>
-              ),
-            } as ColumnDef<T>;
-          default:
-            return {
-              ...baseColumn,
-              accessorFn: (row: T) => row[col.id as keyof T] as string,
-              cell: (info) => {
-                const row = info.row.original as T & {
-                  isTotal?: boolean;
-                  isSubtotal?: boolean;
-                };
-                if (row.isTotal || row.isSubtotal) {
-                  if (col.type === "amount") {
-                    return (
-                      <>
-                        <td
-                          colSpan={columns.length - 1}
-                          className="py-3 pr-6 text-right font-semibold border-t border-b"
-                        >
-                          {row.isTotal ? "Total:" : "Subtotal:"}
-                        </td>
-                        <td className="py-3 pr-6 text-right font-semibold border-t border-b">
-                          {info.getValue() as React.ReactNode}
-                        </td>
-                      </>
-                    );
-                  }
-                  return null;
+        } as ColumnDef<T>;
+      case "readonly":
+      case "amount":
+        return {
+          ...baseColumn,
+          accessorFn: (row: T) => {
+            const amountValue = row[col.id as keyof T];
+            return typeof amountValue === "number" ||
+              typeof amountValue === "string"
+              ? amountValue
+              : 0;
+          },
+          cell: (info) => {
+            const value = info.getValue();
+            return (
+              <div className="px-6 py-3 text-right">
+                {typeof value === "number" ? value.toFixed(2) : "0.00"}
+              </div>
+            );
+          },
+          sortingFn: isSortingDisabled
+            ? undefined
+            : (rowA, rowB, columnId) => {
+                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                  return rowA.index - rowB.index;
                 }
-                return commonCellContent(info);
+                if (rowA.original.isSubtotal) return 1;
+                if (rowB.original.isSubtotal) return -1;
+
+                const a = rowA.getValue(columnId);
+                const b = rowB.getValue(columnId);
+
+                const aNum =
+                  typeof a === "number" ? a : parseFloat(a as string);
+                const bNum =
+                  typeof b === "number" ? b : parseFloat(b as string);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                  return aNum - bNum;
+                }
+
+                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
               },
-              sortingFn: isSortingDisabled
-                ? undefined
-                : (rowA, rowB, columnId) => {
-                    if (rowA.original.isTotal) return 1;
-                    if (rowB.original.isTotal) return -1;
-                    if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
-                      return rowA.index - rowB.index;
-                    }
-                    if (rowA.original.isSubtotal) return 1;
-                    if (rowB.original.isSubtotal) return -1;
+        } as ColumnDef<T>;
+      case "checkbox":
+        return {
+          ...baseColumn,
+          accessorFn: (row: T) => row[col.id as keyof T],
+          cell: (info) => (
+            <div className="flex items-center justify-center h-full">
+              <TableEditableCell
+                value={info.getValue()}
+                onChange={(val) =>
+                  handleCellChange(info.row.index, col.id, val)
+                }
+                type="checkbox"
+                editable={!isSorting}
+                focus={false}
+                onKeyDown={() => {}}
+                isSorting={isSorting}
+                previousCellValue={info.cell.getValue()}
+              />
+            </div>
+          ),
+        } as ColumnDef<T>;
+      default:
+        return {
+          ...baseColumn,
+          accessorFn: (row: T) => row[col.id as keyof T] as string,
+          cell: (info) => {
+            const row = info.row.original as T & {
+              isTotal?: boolean;
+              isSubtotal?: boolean;
+            };
+            if (row.isTotal || row.isSubtotal) {
+              if (col.type === "amount") {
+                return (
+                  <>
+                    <td
+                      colSpan={columns.length - 1}
+                      className="py-3 pr-6 text-right font-semibold border-t border-b"
+                    >
+                      {row.isTotal ? "Total:" : "Subtotal:"}
+                    </td>
+                    <td className="py-3 pr-6 text-right font-semibold border-t border-b">
+                      {info.getValue() as React.ReactNode}
+                    </td>
+                  </>
+                );
+              }
+              return null;
+            }
+            return commonCellContent(info);
+          },
+          sortingFn: isSortingDisabled
+            ? undefined
+            : (rowA, rowB, columnId) => {
+                if (rowA.original.isTotal) return 1;
+                if (rowB.original.isTotal) return -1;
+                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                  return rowA.index - rowB.index;
+                }
+                if (rowA.original.isSubtotal) return 1;
+                if (rowB.original.isSubtotal) return -1;
 
-                    const a = rowA.getValue(columnId);
-                    const b = rowB.getValue(columnId);
+                const a = rowA.getValue(columnId);
+                const b = rowB.getValue(columnId);
 
-                    if (typeof a === "number" && typeof b === "number") {
-                      return a - b;
-                    }
-                    return (a?.toString() ?? "").localeCompare(
-                      b?.toString() ?? ""
-                    );
-                  },
-            } as ColumnDef<T>;
-        }
-      }),
-    [
-      columns,
-      isEditing,
-      isSorting,
-      selectedRows,
-      columnWidths,
-      editableRowId,
-      editableCellIndex,
-      isSortingDisabled,
-      isAllSelectedGlobal,
-      isIndeterminateGlobal,
-      handleColumnResize,
-      handleKeyDown,
-    ]
-  );
+                if (typeof a === "number" && typeof b === "number") {
+                  return a - b;
+                }
+                return (a?.toString() ?? "").localeCompare(b?.toString() ?? "");
+              },
+        } as ColumnDef<T>;
+    }
+  });
 
   // TuRT
   const table = useReactTable<T>({
@@ -1115,6 +967,135 @@ function Table<T extends Record<string, any>>({
           setIsSorting(isSorted);
         },
   });
+
+  // HAR
+  const handleAddRow = useCallback(() => {
+    if (disableAddRowBar) return false;
+    const newRow = {
+      id: `new_${Math.random().toString(36).substr(2, 9)}`,
+      ...Object.fromEntries(
+        columns.map((col) => {
+          switch (col.type) {
+            case "number":
+            case "rate":
+            case "float":
+            case "amount":
+            case "readonly":
+              return [col.id, 0];
+            case "checkbox":
+              return [col.id, false];
+            default:
+              return [col.id, ""];
+          }
+        })
+      ),
+    } as T;
+
+    setData((prevData) => {
+      const newData = [...prevData, newRow];
+      if (onChange) {
+        onChange(newData);
+      }
+
+      // Calculate the correct page index for the new row
+      const currentLastItemIndex =
+        (pagination.pageIndex + 1) * pagination.pageSize;
+
+      // If the current page is full, move to the next page
+      if (currentLastItemIndex === prevData.length) {
+        table.nextPage();
+      }
+
+      return newData;
+    });
+
+    return true;
+  }, [columns, onChange, pagination, disableAddRowBar, table]);
+
+  // UR
+  const updateRows = useCallback(() => {
+    if (rowsToAddOrRemove > 0) {
+      handleAddRow();
+      setRowsToAddOrRemove((prev) => prev - 1);
+    } else if (rowsToAddOrRemove < 0 && removableRowsAbove > 0) {
+      handleRemoveEmptyRow();
+      setRowsToAddOrRemove((prev) => prev + 1);
+      setRemovableRowsAbove((prev) => prev - 1);
+    }
+
+    if (rowsToAddOrRemove !== 0) {
+      requestAnimationFrame(updateRows);
+    }
+  }, [
+    rowsToAddOrRemove,
+    handleAddRow,
+    handleRemoveEmptyRow,
+    removableRowsAbove,
+  ]);
+
+  // HMM
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const currentY = e.clientY;
+      const mouseDelta = currentY - initialDragY.current;
+
+      // Update the bar position
+      if (addRowBarRef.current) {
+        addRowBarRef.current.style.top = `${mouseDelta}px`;
+      }
+
+      // Check if we're on the last page and it's not full
+      const isLastPage = !table.getCanNextPage();
+      const isLastPageNotFull =
+        isLastPage && data.length % pagination.pageSize !== 0;
+
+      // Calculate rows to add or remove
+      const newRowsToAddOrRemove = Math.floor(mouseDelta / DRAG_THRESHOLD);
+
+      // Only allow adding rows if we're on the last page and it's not full
+      if (newRowsToAddOrRemove > 0 && !isLastPageNotFull) {
+        return;
+      }
+
+      setRowsToAddOrRemove(newRowsToAddOrRemove);
+
+      // Immediately add or remove rows
+      if (newRowsToAddOrRemove > 0 && isLastPageNotFull) {
+        handleAddRow();
+        initialDragY.current += DRAG_THRESHOLD;
+      } else if (newRowsToAddOrRemove < 0 && removableRowsAbove > 0) {
+        handleRemoveEmptyRow();
+        initialDragY.current -= DRAG_THRESHOLD;
+      }
+    },
+    [
+      table,
+      isDragging,
+      removableRowsAbove,
+      handleAddRow,
+      handleRemoveEmptyRow,
+      data.length,
+      pagination,
+    ]
+  );
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    } else {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      updateRows();
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp, updateRows]);
 
   //HCC
   const handleCellChange = useCallback(
@@ -1182,8 +1163,12 @@ function Table<T extends Record<string, any>>({
         onShowDeleteButton(selectedRows.size > 0);
       }
     },
-    [data, onShowDeleteButton, table]
+    [data, onShowDeleteButton]
   );
+
+  useEffect(() => {
+    updateSelectionState(selectedRows);
+  }, [selectedRows, data, updateSelectionState]);
 
   // HSA
   const handleSelectAll = useCallback(() => {

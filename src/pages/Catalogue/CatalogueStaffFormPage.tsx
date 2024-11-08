@@ -96,19 +96,6 @@ const CatalogueStaffFormPage: React.FC = () => {
     setIsFormChanged(hasChanged);
   }, [formData, initialFormData]);
 
-  useEffect(() => {
-    if (isEditMode) {
-      fetchStaffDetails();
-    } else {
-      setInitialFormData({ ...formData });
-    }
-    fetchOptions("nationalities", setNationalities);
-    fetchOptions("races", setRaces);
-    fetchOptions("agamas", setAgamas);
-    fetchOptions("jobs", setJobs);
-    fetchOptions("locations", setLocations);
-  }, [id]);
-
   const fetchStaffDetails = async () => {
     try {
       setLoading(true);
@@ -129,6 +116,19 @@ const CatalogueStaffFormPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isEditMode) {
+      fetchStaffDetails();
+    } else {
+      setInitialFormData({ ...formData });
+    }
+    fetchOptions("nationalities", setNationalities);
+    fetchOptions("races", setRaces);
+    fetchOptions("agamas", setAgamas);
+    fetchOptions("jobs", setJobs);
+    fetchOptions("locations", setLocations);
+  }, [id, fetchStaffDetails, formData, isEditMode]);
 
   const fetchOptions = async (
     endpoint: string,
@@ -239,7 +239,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     if (!validateForm()) {
       return;
     }
-    
+
     setIsSaving(true);
 
     const dataToSend = {
@@ -284,7 +284,7 @@ const CatalogueStaffFormPage: React.FC = () => {
         );
       }
 
-      const data = await response.json();
+      await response.json();
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`
       );
