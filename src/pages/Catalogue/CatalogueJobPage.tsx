@@ -481,10 +481,9 @@ const CatalogueJobPage: React.FC = () => {
     editedJob,
     selectedJob,
     allJobDetails,
-    jobs,
-    originalJobDetails,
-    jobType,
     originalJobState?.jobDetails,
+    jobType,
+    jobs,
   ]);
 
   // HJPC

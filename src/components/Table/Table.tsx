@@ -442,12 +442,15 @@ function Table<T extends Record<string, any>>({
     pagination.pageIndex,
   ]);
 
-  const checkboxColumn: ColumnConfig = {
-    id: "selection",
-    header: "",
-    type: "selection",
-    width: 10,
-  };
+  const checkboxColumn: ColumnConfig = useMemo(
+    () => ({
+      id: "selection",
+      header: "",
+      type: "selection",
+      width: 10,
+    }),
+    [] // No dependencies since this object is static
+  );
 
   // HC
   const handleCancel = useCallback(() => {

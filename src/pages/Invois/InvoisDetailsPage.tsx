@@ -384,12 +384,10 @@ const InvoisDetailsPage: React.FC = () => {
   const recalculateSubtotals = useCallback(
     (details: OrderDetail[]): OrderDetail[] => {
       let runningTotal = 0;
-      let lastSubtotalIndex = -1;
 
       return details.map((item, index) => {
         if (item.isSubtotal) {
           const subtotalItem = { ...item, total: runningTotal.toFixed(2) };
-          lastSubtotalIndex = index;
           return subtotalItem;
         } else if (item.isLess) {
           runningTotal -= parseFloat(item.total || "0");
@@ -606,7 +604,6 @@ const InvoisDetailsPage: React.FC = () => {
       addNewRow,
       products,
       calculateOverallTotal,
-      updateInvoice,
       recalculateSubtotals,
     ]
   );

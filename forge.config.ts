@@ -5,7 +5,6 @@ import type { ForgeConfig } from "@electron-forge/shared-types";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Resolve absolute paths to icons
 const ICON_PATH = path.resolve(__dirname, "public", "tienhock.ico");
 
 const config: ForgeConfig = {
@@ -14,7 +13,7 @@ const config: ForgeConfig = {
     executableName: "TienHockERP",
     icon: ICON_PATH,
     asar: true,
-    extraResource: ["./build"],
+    extraResource: ["./build", ".env"], // Added .env here
     ignore: [
       /^\/src/,
       /^\/public/,
@@ -23,7 +22,6 @@ const config: ForgeConfig = {
       /^\/\.vscode/,
       "forge.config.js",
       "README.md",
-      ".*",
       // Ignore development files
       "tsconfig.json",
       "tailwind.config.js",
