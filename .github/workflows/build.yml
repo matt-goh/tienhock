@@ -32,7 +32,7 @@ jobs:
           echo "NODE_ENV=production" >> .env
           echo "DB_USER=postgres" >> .env
           echo "DB_HOST=db" >> .env
-          echo "DB_NAME=tienhock" >> .env
+          echo "DB_NAME=tienhock_prod" >> .env
           echo "DB_PASSWORD=$env:DB_PASSWORD" >> .env
           echo "DB_PORT=5432" >> .env
           echo "MYINVOIS_API_BASE_URL=https://preprod-api.myinvois.hasil.gov.my" >> .env
@@ -70,6 +70,3 @@ jobs:
             ### Installation
             - For Windows users, download and run `TienHockERP-Setup.exe`
             - The app will automatically check for updates on launch
-
-            ### Need Help?
-            Please report any issues on the GitHub Issues page
