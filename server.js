@@ -12,7 +12,7 @@ dotenv.config();
 const { json } = pkgBodyParser;
 const { Pool } = pkgPg;
 const app = express();
-const port = process.env.SERVER_PORT || 5000;
+const port = 5000;
 
 // Create HTTP server instance
 const server = http.createServer(app);
