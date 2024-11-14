@@ -12,7 +12,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import StaffFilterMenu from "../../components/StaffFilterMenu";
 import { Employee, FilterOptions } from "../../types/types";
 import Button from "../../components/Button";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 const EmployeeCard = ({
   employee,
@@ -115,7 +115,9 @@ const EmployeeCard = ({
   return (
     <div
       className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered ? "bg-default-100 active:bg-default-200" : ""
+        isCardHovered && !isTrashHovered
+          ? "bg-default-100 active:bg-default-200"
+          : ""
       }`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}

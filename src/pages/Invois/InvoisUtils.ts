@@ -4,7 +4,7 @@ import {
   InvoiceFilterOptions,
   OrderDetail,
 } from "../../types/types";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 let invoices: InvoiceData[] = [];
 

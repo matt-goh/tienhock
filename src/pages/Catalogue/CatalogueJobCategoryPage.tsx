@@ -9,7 +9,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 const CatalogueJobCategoryPage: React.FC = () => {
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
@@ -121,14 +121,11 @@ const CatalogueJobCategoryPage: React.FC = () => {
       );
 
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/job-categories`,
-          {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jobCategoryIds: categoryIdsToDelete }),
-          }
-        );
+        const response = await fetch(`${API_BASE_URL}/api/job-categories`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobCategoryIds: categoryIdsToDelete }),
+        });
 
         if (!response.ok) {
           throw new Error("Failed to delete job categories on the server");
@@ -202,16 +199,13 @@ const CatalogueJobCategoryPage: React.FC = () => {
         id: category.originalId || category.id,
       }));
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/job-categories/batch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jobCategories: jobCategoriesToUpdate,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/job-categories/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobCategories: jobCategoriesToUpdate,
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -312,7 +306,9 @@ const CatalogueJobCategoryPage: React.FC = () => {
                 key={section}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active ? "bg-default-100 text-default-900" : "text-default-900"
+                    active
+                      ? "bg-default-100 text-default-900"
+                      : "text-default-900"
                   }`
                 }
                 value={section}

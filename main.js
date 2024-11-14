@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { updateElectronApp } from 'update-electron-app';
 import electronLog from 'electron-log';
+import { PRODUCTION_CONFIG } from './configs/production.js';
 
 // Configure auto-updates
 updateElectronApp({
@@ -42,8 +43,7 @@ function getAssetPath(...paths) {
 
 const getServerUrl = () => {
   const isDev = process.env.NODE_ENV === 'development';
-  const serverHost = process.env.SERVER_HOST || 'localhost';
-  return isDev ? 'http://localhost:3000' : `http://${serverHost}:5000`;
+  return isDev ? 'http://localhost:3000' : PRODUCTION_CONFIG.API_BASE_URL;
 };
 
 // New function to handle connection retries

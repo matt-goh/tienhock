@@ -34,7 +34,7 @@ import {
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 interface SelectOption {
   id: string;

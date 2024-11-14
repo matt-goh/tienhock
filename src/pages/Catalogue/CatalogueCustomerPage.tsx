@@ -9,7 +9,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 const CustomerCataloguePage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -196,16 +196,13 @@ const CustomerCataloguePage: React.FC = () => {
         id: customer.originalId || customer.id,
       }));
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/customers/batch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customers: customersToUpdate,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/customers/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customers: customersToUpdate,
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -300,7 +297,9 @@ const CustomerCataloguePage: React.FC = () => {
                 key={salesman}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active ? "bg-default-100 text-default-900" : "text-default-900"
+                    active
+                      ? "bg-default-100 text-default-900"
+                      : "text-default-900"
                   }`
                 }
                 value={salesman}

@@ -1,4 +1,4 @@
-import { getWebSocketUrl } from "../config";
+import { getWebSocketUrl } from "../configs/config";
 import { sessionPersistenceService } from "./sessionPersistenceService";
 
 export class WebSocketService {

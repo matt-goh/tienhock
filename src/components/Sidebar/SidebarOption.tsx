@@ -6,7 +6,7 @@ import {
 } from "@tabler/icons-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useProfile } from "../../contexts/ProfileContext";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 import toast from "react-hot-toast";
 
 interface SidebarOptionProps {
@@ -168,9 +168,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           {content}
         </Link>
       ) : (
-        <button className={commonClasses}>
-          {content}
-        </button>
+        <button className={commonClasses}>{content}</button>
       )}
     </li>
   );

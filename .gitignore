@@ -10,3 +10,4 @@
 # misc
 .env
 .env.production
+configs/production.js

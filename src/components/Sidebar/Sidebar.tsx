@@ -25,7 +25,7 @@ import {
   IconSwitchHorizontal,
   IconUserCircle,
 } from "@tabler/icons-react";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 interface SidebarProps {
   isPinned: boolean;
