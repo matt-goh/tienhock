@@ -6,7 +6,7 @@ services:
       context: ..
       dockerfile: prod/Dockerfile.server
     ports:
-      - "5000:5000"
+      - "192.168.1.200:5000:5000"
     environment:
       - NODE_ENV=production
       - DB_USER=postgres
@@ -14,13 +14,17 @@ services:
       - DB_NAME=tienhock_prod
       - DB_PASSWORD=foodmaker
       - DB_PORT=5432
+      - HOST=0.0.0.0 # Inside container, listen on all interfaces
+      - SERVER_HOST=192.168.1.200 # For display and client connections
     env_file:
       - .env.production
     depends_on:
       - prod_db
     restart: always
     networks:
-      - tienhock-prod-network
+      tienhock-prod-network:
+        aliases:
+          - server
     volumes:
       - ../logs:/usr/src/app/logs
 
@@ -31,13 +35,17 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=foodmaker
       - POSTGRES_DB=tienhock_prod
+      - POSTGRES_HOST_AUTH_METHOD=md5
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     ports:
-      - "5433:5432"
+      - "192.168.1.200:5433:5432"
     restart: always
     networks:
-      - tienhock-prod-network
+      tienhock-prod-network:
+        aliases:
+          - database
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s

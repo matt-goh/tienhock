@@ -18,6 +18,10 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow;
 
+// Connection retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 5000; // 5 seconds
+
 // Setup logging
 const logFile = path.join(app.getPath('userData'), 'error.log');
 function log(message, error = null) {
@@ -36,6 +40,56 @@ function getAssetPath(...paths) {
   return path.join(RESOURCES_PATH, ...paths);
 }
 
+const getServerUrl = () => {
+  const isDev = process.env.NODE_ENV === 'development';
+  const serverHost = process.env.SERVER_HOST || 'localhost';
+  return isDev ? 'http://localhost:3000' : `http://${serverHost}:5000`;
+};
+
+// New function to handle connection retries
+async function connectWithRetry(url, retries = MAX_RETRIES) {
+  try {
+    log(`Attempting to connect to ${url} (${retries} retries remaining)`);
+    await mainWindow.loadURL(url);
+    log('Connection successful');
+  } catch (error) {
+    log(`Connection failed: ${error.message}`);
+    
+    if (retries > 0) {
+      log(`Retrying connection in ${RETRY_DELAY/1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return connectWithRetry(url, retries - 1);
+    }
+    
+    log('Max retries reached, showing error to user');
+    // Show error dialog to user
+    mainWindow.webContents.executeJavaScript(`
+      alert('Unable to connect to the server. Please check your network connection and server status.');
+    `);
+    throw error;
+  }
+}
+
+// New function to handle file loading with retries
+async function loadFileWithRetry(filePath, retries = MAX_RETRIES) {
+  try {
+    log(`Attempting to load file ${filePath} (${retries} retries remaining)`);
+    await mainWindow.loadFile(filePath);
+    log('File loaded successfully');
+  } catch (error) {
+    log(`File load failed: ${error.message}`);
+    
+    if (retries > 0) {
+      log(`Retrying file load in ${RETRY_DELAY/1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return loadFileWithRetry(filePath, retries - 1);
+    }
+    
+    log('Max retries reached, showing error to user');
+    throw error;
+  }
+}
+
 async function createWindow() {
   try {
     log('Creating window...');
@@ -48,7 +102,8 @@ async function createWindow() {
       autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: false,
-        contextIsolation: true
+        contextIsolation: true,
+        additionalArguments: [`--server-url=${getServerUrl()}`]
       },
     });
 
@@ -59,7 +114,7 @@ async function createWindow() {
 
     if (isDev) {
       log('Loading development URL');
-      await mainWindow.loadURL('http://localhost:3000');
+      await connectWithRetry('http://localhost:3000');
       mainWindow.webContents.openDevTools();
     } else {
       const indexPath = getAssetPath('build', 'index.html');
@@ -85,15 +140,27 @@ async function createWindow() {
           }
         }
         
-        await mainWindow.loadFile(indexPath);
+        await loadFileWithRetry(indexPath);
       } catch (loadError) {
         log('Error loading index.html:', loadError);
         throw loadError;
       }
     }
 
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    // Enhanced error handling for load failures
+    mainWindow.webContents.on('did-fail-load', async (event, errorCode, errorDescription) => {
       log(`Page failed to load: ${errorDescription} (${errorCode})`);
+      
+      // Attempt to reload on certain error codes
+      if (errorCode === -6 || errorCode === -106) { // Common network-related error codes
+        log('Network-related error detected, attempting to reconnect...');
+        const url = isDev ? 'http://localhost:3000' : getServerUrl();
+        try {
+          await connectWithRetry(url);
+        } catch (retryError) {
+          log('Failed to reconnect after retries:', retryError);
+        }
+      }
     });
 
   } catch (error) {
