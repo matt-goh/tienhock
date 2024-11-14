@@ -1,19 +1,17 @@
 // main.js
 import { app, BrowserWindow } from 'electron';
 import { fileURLToPath } from 'url';
-import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import fs from 'fs';
+import { updateElectronApp } from 'update-electron-app';
+import log from 'electron-log';
 
-// Configure auto-updater
-autoUpdater.setFeedURL({
-  provider: 'github',
-  owner: 'matt-goh',
-  repo: 'tienhockerp'
+// Configure auto-updates
+updateElectronApp({
+  logger: log,
+  updateInterval: '1 hour',
+  notifyUser: true
 });
-
-// Check for updates
-autoUpdater.checkForUpdatesAndNotify();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
