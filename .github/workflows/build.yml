@@ -22,23 +22,32 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Create Environment File
-        env:
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MYINVOIS_CLIENT_ID: ${{ secrets.MYINVOIS_CLIENT_ID }}
-          MYINVOIS_CLIENT_SECRET: ${{ secrets.MYINVOIS_CLIENT_SECRET }}
+      - name: Create Production Config
         run: |
-          echo "REACT_APP_API_BASE_URL=http://localhost:5000" > .env
-          echo "NODE_ENV=production" >> .env
-          echo "DB_USER=postgres" >> .env
-          echo "DB_HOST=db" >> .env
-          echo "DB_NAME=tienhock_prod" >> .env
-          echo "DB_PASSWORD=$env:DB_PASSWORD" >> .env
-          echo "DB_PORT=5432" >> .env
-          echo "MYINVOIS_API_BASE_URL=https://preprod-api.myinvois.hasil.gov.my" >> .env
-          echo "MYINVOIS_CLIENT_ID=$env:MYINVOIS_CLIENT_ID" >> .env
-          echo "MYINVOIS_CLIENT_SECRET=$env:MYINVOIS_CLIENT_SECRET" >> .env
-          echo "CI=false" >> .env
+          $configContent = @"
+          export const PRODUCTION_CONFIG = {
+            // API Configuration
+            API_BASE_URL: 'http://192.168.1.200:5000',
+            NODE_ENV: 'production',
+            SERVER_PORT: 5000,
+            SERVER_HOST: '192.168.1.200',
+
+            // Database Configuration
+            DB_USER: 'postgres',
+            DB_HOST: '192.168.1.200',
+            DB_NAME: 'tienhock_prod',
+            DB_PASSWORD: '${{ secrets.DB_PASSWORD }}',
+            DB_PORT: 5433,
+
+            // MyInvois API Configuration
+            MYINVOIS_API_BASE_URL: 'https://preprod-api.myinvois.hasil.gov.my',
+            MYINVOIS_CLIENT_ID: '${{ secrets.MYINVOIS_CLIENT_ID }}',
+            MYINVOIS_CLIENT_SECRET: '${{ secrets.MYINVOIS_CLIENT_SECRET }}',
+            MyTax_IC_No: '550308125181',
+            Password: 'Tien9922'
+          };
+          "@
+          Set-Content -Path "src/configs/production.js" -Value $configContent
 
       - name: Build React App
         env:
