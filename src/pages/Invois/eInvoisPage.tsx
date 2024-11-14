@@ -1,7 +1,7 @@
 // EInvoisPage.tsx
 
 import { useEffect, useState, useCallback } from "react";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 

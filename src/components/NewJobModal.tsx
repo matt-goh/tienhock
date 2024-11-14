@@ -20,7 +20,7 @@ import {
 import clsx from "clsx";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 import { Job } from "../types/types";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL } from "../configs/config";
 
 interface Section {
   id: string;
@@ -142,7 +142,9 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         Job Entry
                       </Legend>
                       <Field>
-                        <Label className="font-medium text-default-900">ID</Label>
+                        <Label className="font-medium text-default-900">
+                          ID
+                        </Label>
                         <Input
                           className={clsx(
                             "mt-3 block w-full rounded-lg border border-default-300 bg-white py-2 px-4 text-default-900",

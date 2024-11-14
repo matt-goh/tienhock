@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { Staff, ActiveSession } from "../types/types";
 import { websocketService } from "../services/websocketService";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL } from "../configs/config";
 import { sessionPersistenceService } from "../services/sessionPersistenceService";
 
 interface ProfileContextType {
@@ -61,17 +61,26 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Create stable handler functions using useCallback
-  const handleProfileChange = useCallback(async (data: { staffId: string; sessionId: string }) => {
-    if (mountedRef.current && data.sessionId === websocketService.getSessionId()) {
-      await checkSessionState();
-    }
-  }, [checkSessionState]);
+  const handleProfileChange = useCallback(
+    async (data: { staffId: string; sessionId: string }) => {
+      if (
+        mountedRef.current &&
+        data.sessionId === websocketService.getSessionId()
+      ) {
+        await checkSessionState();
+      }
+    },
+    [checkSessionState]
+  );
 
-  const handleSessionsUpdate = useCallback((data: { sessions: ActiveSession[] }) => {
-    if (mountedRef.current) {
-      setActiveSessions(data.sessions);
-    }
-  }, []);
+  const handleSessionsUpdate = useCallback(
+    (data: { sessions: ActiveSession[] }) => {
+      if (mountedRef.current) {
+        setActiveSessions(data.sessions);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     mountedRef.current = true;

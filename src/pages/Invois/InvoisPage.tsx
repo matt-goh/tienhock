@@ -19,7 +19,7 @@ import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
 import { IconCloudUpload, IconPlus, IconSearch } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 import FilterSummary from "../../components/FilterSummary";
 
 const InvoisPage: React.FC = () => {
@@ -361,7 +361,7 @@ const InvoisPage: React.FC = () => {
         // Get the last two items we need from rest
         const time = rest[rest.length - 2];
         const orderDetailsString = rest[rest.length - 1];
-        
+
         const [customerId, customername] = customer.split("\t");
 
         const orderDetails = orderDetailsString

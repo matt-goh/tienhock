@@ -13,7 +13,7 @@ import {
 import { IconDevices2, IconUserCircle, IconSearch } from "@tabler/icons-react";
 import { formatDistanceToNow } from "date-fns";
 import { websocketService } from "../services/websocketService";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL } from "../configs/config";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
 
@@ -168,10 +168,10 @@ export default function ProfileSwitcherModal({
                             className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors"
                           >
                             <div className="flex items-center space-x-3">
-                              <IconUserCircle
-                                className="text-default-700"
-                              />
-                              <span className="font-medium text-default-700">{staff.name}</span>
+                              <IconUserCircle className="text-default-700" />
+                              <span className="font-medium text-default-700">
+                                {staff.name}
+                              </span>
                             </div>
                           </button>
                         ))

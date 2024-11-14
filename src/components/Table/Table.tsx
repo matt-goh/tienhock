@@ -35,7 +35,7 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 function Table<T extends Record<string, any>>({
   initialData,

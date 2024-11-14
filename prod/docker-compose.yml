@@ -16,8 +16,6 @@ services:
       - DB_PORT=5432
       - HOST=0.0.0.0 # Inside container, listen on all interfaces
       - SERVER_HOST=192.168.1.200 # For display and client connections
-    env_file:
-      - .env.production
     depends_on:
       - prod_db
     restart: always

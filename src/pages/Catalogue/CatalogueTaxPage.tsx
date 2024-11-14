@@ -3,7 +3,7 @@ import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import _ from "lodash";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 interface Tax {
   id: number;

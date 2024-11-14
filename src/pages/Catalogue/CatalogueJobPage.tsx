@@ -18,7 +18,7 @@ import { ColumnConfig, Job, JobDetail } from "../../types/types";
 import NewJobModal from "../../components/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 type JobSelection = Job | null;
 

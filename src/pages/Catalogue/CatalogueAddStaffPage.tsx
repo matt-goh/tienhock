@@ -6,7 +6,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 import {
   FormInput,
   FormListbox,

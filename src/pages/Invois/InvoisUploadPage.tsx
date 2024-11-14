@@ -6,7 +6,7 @@ import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { fetchInvoices, getInvoices, updateInvoice } from "./InvoisUtils";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../configs/config";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
@@ -80,16 +80,13 @@ const InvoisUploadPage: React.FC = () => {
       }
 
       // If no duplicates, proceed with submission
-      const response = await fetch(
-        `${API_BASE_URL}/api/invoices/bulk-submit`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(fileData),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/invoices/bulk-submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fileData),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

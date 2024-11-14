@@ -13,7 +13,7 @@ const config: ForgeConfig = {
     executableName: "TienHockERP",
     icon: ICON_PATH,
     asar: true,
-    extraResource: ["./build", ".env", ".env.production"],
+    extraResource: ["./build"],
     ignore: [
       /^\/src/,
       /^\/public/,
@@ -26,6 +26,8 @@ const config: ForgeConfig = {
       "tsconfig.json",
       "tailwind.config.js",
       "postcss.config.js",
+      "./configs/production.js",
+      "./dev/.env",
       // Ignore test files
       "**/*.test.js",
       "**/*.spec.js",
