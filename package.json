@@ -61,10 +61,7 @@
       "packagerConfig": {
         "name": "tienhockerp",
         "executableName": "tienhockerp",
-        "icon": "./public/tienhock.ico",
-        "extraResource": [
-          ".env"
-        ]
+        "icon": "./public/tienhock.ico"
       },
       "makers": [
         {
