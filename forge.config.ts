@@ -49,6 +49,7 @@ const config: ForgeConfig = {
         setupExe: "TienHockERP-Setup.exe",
         setupIcon: ICON_PATH,
         iconUrl: ICON_PATH,
+        remoteReleases: "https://github.com/matt-goh/tienhockerp",
         noMsi: true,
       },
     },
