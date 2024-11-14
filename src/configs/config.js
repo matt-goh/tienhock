@@ -1,5 +1,5 @@
 // config.js
-import { PRODUCTION_CONFIG } from './configs/production.js';
+import { PRODUCTION_CONFIG } from './production.js';
 
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
   ? process.env.REACT_APP_API_BASE_URL  // Use env in development

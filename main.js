@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { updateElectronApp } from 'update-electron-app';
 import electronLog from 'electron-log';
-import { PRODUCTION_CONFIG } from './configs/production.js';
+import { PRODUCTION_CONFIG } from './src/configs/production.js';
 
 // Configure auto-updates
 updateElectronApp({
