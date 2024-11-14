@@ -13,7 +13,7 @@ const config: ForgeConfig = {
     executableName: "TienHockERP",
     icon: ICON_PATH,
     asar: true,
-    extraResource: ["./build", ".env"], // Added .env here
+    extraResource: ["./build", ".env", ".env.production"],
     ignore: [
       /^\/src/,
       /^\/public/,

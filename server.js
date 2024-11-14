@@ -18,7 +18,11 @@ const port = 5000;
 const server = http.createServer(app);
 
 // Initialize WebSocket server
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ 
+  server,
+  verifyClient: () => true // Allow connections from any source
+});
+
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -393,11 +397,6 @@ app.delete('/api/bookmarks/:staffId/:name', async (req, res) => {
     console.error('Error removing bookmark:', error);
     res.status(500).json({ message: 'Error removing bookmark', error: error.message });
   }
-});
-
-// Make sure this is at the bottom of your file
-server.listen(port, () => {
-  console.log(`Server running with WebSocket support on port ${port}`);
 });
 
 // Check for duplicate staff ID
@@ -2536,4 +2535,20 @@ app.post('/api/einvoice/submit', async (req, res) => {
       details: errorDetails
     });
   }
+});
+
+app.get('/', (req, res) => {
+  res.json({ message: 'Server is running!' });
+});
+
+const isDev = process.env.NODE_ENV === 'development';
+const host = '0.0.0.0';  // Always use 0.0.0.0 inside containers
+
+server.listen(port, host, () => {
+  const displayHost = isDev 
+    ? 'localhost:5001 (development mode)'  // Display localhost for dev
+    : `${process.env.SERVER_HOST || '0.0.0.0'}:${port} (LAN access enabled)`;
+    
+  console.log(`Server running with WebSocket support on http://${displayHost}`);
+  console.log(`Server environment: ${process.env.NODE_ENV}`);
 });
