@@ -26,7 +26,7 @@ const config: ForgeConfig = {
       "tsconfig.json",
       "tailwind.config.js",
       "postcss.config.js",
-      "./configs/production.js",
+      "./src/configs/production.js",
       "./dev/.env",
       // Ignore test files
       "**/*.test.js",
