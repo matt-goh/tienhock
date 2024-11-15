@@ -1,3 +1,4 @@
+// forge.config.ts
 import path from "path";
 import { fileURLToPath } from "url";
 import type { ForgeConfig } from "@electron-forge/shared-types";
