@@ -34,7 +34,7 @@ const Button: React.FC<ButtonProps> = ({
   const colorClasses = {
     default: {
       default:
-        "bg-default-100 text-default-700 hover:text-default-800 hover:bg-default-200 active:bg-default-200 disabled:hover:bg-default-100 disabled:hover:text-default-700",
+        "bg-default-100 text-default-700 hover:text-default-800 hover:bg-default-200 active:bg-default-300/75 disabled:hover:bg-default-100 disabled:hover:text-default-700",
       outline:
         "border border-default-300 text-default-700 hover:text-default-800 hover:bg-default-100 active:bg-default-200 disabled:hover:bg-transparent disabled:hover:text-default-700",
       boldOutline:
@@ -42,7 +42,7 @@ const Button: React.FC<ButtonProps> = ({
     },
     rose: {
       default:
-        "bg-rose-100 text-rose-700 hover:text-rose-800 hover:bg-rose-200 active:bg-rose-200 disabled:hover:bg-rose-100 disabled:hover:text-rose-700",
+        "bg-rose-100 text-rose-700 hover:text-rose-800 hover:bg-rose-200 active:bg-rose-300/75 disabled:hover:bg-rose-100 disabled:hover:text-rose-700",
       outline:
         "border border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
       boldOutline:

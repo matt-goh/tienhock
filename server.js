@@ -2541,6 +2541,48 @@ app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
 
+// Health check endpoint that verifies database and WebSocket server
+app.get('/api/health', async (req, res) => {
+  try {
+    // Check database connection
+    const dbCheck = await pool.query('SELECT 1');
+    
+    // Check WebSocket server
+    const wsCheck = wss.clients.size !== undefined;
+    
+    // Get active sessions count
+    const activeSessions = Array.from(sessions.entries())
+      .filter(([_, session]) => session.ws?.readyState === WebSocket.OPEN)
+      .length;
+
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: {
+          status: dbCheck.rows.length === 1 ? 'healthy' : 'unhealthy',
+          connectionPool: {
+            total: pool.totalCount,
+            idle: pool.idleCount,
+            waiting: pool.waitingCount
+          }
+        },
+        websocket: {
+          status: wsCheck ? 'healthy' : 'unhealthy',
+          activeSessions
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
 const isDev = process.env.NODE_ENV === 'development';
 const host = '0.0.0.0';  // Always use 0.0.0.0 inside containers
 
