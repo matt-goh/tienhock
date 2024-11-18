@@ -15,42 +15,22 @@ const config: ForgeConfig = {
     icon: ICON_PATH,
     asar: true,
     extraResource: ["./build"],
-    ignore: (filePath: string) => {
-      // Don't ignore node_modules unless specifically listed
-      if (filePath.includes("node_modules")) {
-        const ignoredModules = [
-          "electron",
-          "electron-prebuilt",
-          "electron-packager",
-          ".bin",
-        ];
-        return ignoredModules.some((mod) =>
-          filePath.includes(`node_modules/${mod}`)
-        );
-      }
-
-      // Specific paths to ignore
-      const ignoredPaths = [
-        "/src/",
-        "/public/",
-        "/.cache/",
-        "/.git/",
-        "/.vscode/",
-        "forge.config.js",
-        "README.md",
-        "tsconfig.json",
-        "tailwind.config.js",
-        "postcss.config.js",
-        "/src/configs/production.js",
-        "/dev/.env",
-        ".test.js",
-        ".spec.js",
-        "/tests/",
-      ];
-
-      // Check if the file path contains any of the ignored paths
-      return ignoredPaths.some((path) => filePath.includes(path));
-    },
+    ignore: [
+      /\/src\//,
+      /\/public\//,
+      /\/.cache\//,
+      /\/.vscode\//,
+      /forge\.config\.js/,
+      /README\.md/,
+      /tsconfig\.json/,
+      /tailwind\.config\.js/,
+      /postcss\.config\.js/,
+      /\/src\/configs\/production\.js/,
+      /\/dev\/.env/,
+      /\.test\.js/,
+      /\.spec\.js/,
+      /\/tests\//,
+    ],
     win32metadata: {
       CompanyName: "Tien Hock",
       FileDescription: "Tien Hock ERP System",

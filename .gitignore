@@ -9,4 +9,4 @@
 
 # misc
 .env
-src/configs/production.js
+**/docker-compose.yml

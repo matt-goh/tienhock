@@ -59,28 +59,18 @@
   "config": {
     "forge": {
       "packagerConfig": {
-        "name": "tienhockerp",
-        "executableName": "tienhockerp",
+        "name": "TienHockERP",
+        "executableName": "TienHockERP",
         "icon": "./public/tienhock.ico"
       },
       "makers": [
         {
           "name": "@electron-forge/maker-squirrel",
           "config": {
-            "name": "tienhockerp",
+            "name": "TienHockERP",
             "authors": "Tien Hock",
             "setupIcon": "./public/tienhock.ico"
           }
-        },
-        {
-          "name": "@electron-forge/maker-zip",
-          "platforms": [
-            "win32"
-          ]
-        },
-        {
-          "name": "@electron-forge/maker-deb",
-          "config": {}
         }
       ],
       "publishers": [
@@ -129,6 +119,7 @@
     "postcss": "^8.4.38",
     "serve": "^14.2.3",
     "tailwindcss": "^3.4.4",
+    "ts-node": "^10.9.2",
     "wait-on": "^8.0.1"
   },
   "type": "module"

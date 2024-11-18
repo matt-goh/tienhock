@@ -22,36 +22,21 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Create Production Config
-        run: |
-          $configContent = @"
-          export const PRODUCTION_CONFIG = {
-            // API Configuration
-            API_BASE_URL: 'http://192.168.1.200:5000',
-            NODE_ENV: 'production',
-            SERVER_PORT: 5000,
-            SERVER_HOST: '192.168.1.200',
-
-            // Database Configuration
-            DB_USER: 'postgres',
-            DB_HOST: '192.168.1.200',
-            DB_NAME: 'tienhock_prod',
-            DB_PASSWORD: '${{ secrets.DB_PASSWORD }}',
-            DB_PORT: 5433,
-
-            // MyInvois API Configuration
-            MYINVOIS_API_BASE_URL: 'https://preprod-api.myinvois.hasil.gov.my',
-            MYINVOIS_CLIENT_ID: '${{ secrets.MYINVOIS_CLIENT_ID }}',
-            MYINVOIS_CLIENT_SECRET: '${{ secrets.MYINVOIS_CLIENT_SECRET }}',
-            MyTax_IC_No: '550308125181',
-            Password: 'Tien9922'
-          };
-          "@
-          Set-Content -Path "src/configs/production.js" -Value $configContent
-
       - name: Build React App
         env:
           CI: false
+          REACT_APP_API_BASE_URL: 'http://192.168.1.200:5000'
+          REACT_APP_NODE_ENV: 'production'
+          REACT_APP_SERVER_PORT: 5000
+          REACT_APP_SERVER_HOST: '192.168.1.200'
+          REACT_APP_DB_USER: 'postgres'
+          REACT_APP_DB_HOST: '192.168.1.200'
+          REACT_APP_DB_NAME: 'tienhock_prod'
+          REACT_APP_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REACT_APP_DB_PORT: 5433
+          REACT_APP_MYINVOIS_API_BASE_URL: 'https://preprod-api.myinvois.hasil.gov.my'
+          REACT_APP_MYINVOIS_CLIENT_ID: ${{ secrets.MYINVOIS_CLIENT_ID }}
+          REACT_APP_MYINVOIS_CLIENT_SECRET: ${{ secrets.MYINVOIS_CLIENT_SECRET }}
         run: npm run build
 
       - name: Build Electron App
@@ -66,7 +51,6 @@ jobs:
         with:
           files: |
             out/make/squirrel.windows/x64/*.exe
-            out/make/zip/win32/x64/*.zip
           draft: false
           prerelease: false
           generate_release_notes: true
