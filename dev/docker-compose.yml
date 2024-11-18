@@ -6,7 +6,10 @@ services:
       context: ..
       dockerfile: dev/Dockerfile
     ports:
-      - "3000:3000"
+      - "3000:3000"    
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_BASE_URL=http://localhost:5001
     depends_on:
       - dev_server
       - dev_db
