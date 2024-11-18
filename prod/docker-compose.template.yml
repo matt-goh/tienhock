@@ -1,4 +1,4 @@
-# prod/docker-compose.yml
+# prod/docker-compose.template.yml
 services:
   prod_server:
     container_name: tienhock_prod_server
@@ -6,16 +6,16 @@ services:
       context: ..
       dockerfile: prod/Dockerfile.server
     ports:
-      - "192.168.1.200:5000:5000"
+      - "${SERVER_HOST}:5000:5000"
     environment:
-      - REACT_APP_NODE_ENV=production
-      - REACT_APP_SERVER_HOST=192.168.1.200 # For display and client connections
-      - DB_USER=postgres
+      - NODE_ENV=production
+      - DB_USER=${DB_USER}
       - DB_HOST=prod_db
-      - DB_NAME=tienhock_prod
-      - DB_PASSWORD=foodmaker
+      - DB_NAME=${DB_NAME}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=5432
-      - HOST=0.0.0.0 # Inside container, listen on all interfaces
+      - HOST=0.0.0.0
+      - SERVER_HOST=${SERVER_HOST}
     depends_on:
       - prod_db
     restart: always
@@ -30,15 +30,15 @@ services:
     container_name: tienhock_prod_db
     image: postgres:16
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=foodmaker
-      - POSTGRES_DB=tienhock_prod
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
       - POSTGRES_HOST_AUTH_METHOD=md5
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     ports:
-      - "192.168.1.200:5433:5432"
+      - "${SERVER_HOST}:5433:5432"
     restart: always
     networks:
       tienhock-prod-network:

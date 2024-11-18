@@ -1,7 +1,7 @@
 import { IconLoader2, IconReload, IconServer } from "@tabler/icons-react";
 import { useState, useEffect, useRef } from "react";
-import { ReactNode } from "react";
 import { API_BASE_URL } from "./configs/config";
+import { ReactNode } from "react";
 import toast from "react-hot-toast";
 import App from "./App";
 import Button from "./components/Button";
@@ -50,11 +50,16 @@ const WithConnectionStatus = ({ children }: { children: ReactNode }) => {
 
   // Effect for showing toasts based on connection status changes
   useEffect(() => {
-    if (connectionStatus === "connected" && (!hasShownSuccessToast.current || wasDisconnected.current)) {
+    if (
+      connectionStatus === "connected" &&
+      (!hasShownSuccessToast.current || wasDisconnected.current)
+    ) {
       toast.success(
         (t) => (
           <div className="flex flex-col space-y-1">
-            <span className="font-medium">Connected to server successfully</span>
+            <span className="font-medium">
+              Connected to server successfully
+            </span>
           </div>
         ),
         { duration: 3000 }
@@ -107,7 +112,7 @@ const WithConnectionStatus = ({ children }: { children: ReactNode }) => {
         setConnectionStatus("connected");
       } catch (error: unknown) {
         if (!mounted) return;
-        
+
         const message = getErrorMessage(error);
         setErrorMessage(message);
         setConnectionStatus("error");

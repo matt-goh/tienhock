@@ -6,6 +6,14 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
 import WebSocket from 'ws';
+import { 
+  NODE_ENV,
+  SERVER_HOST,
+  MYINVOIS_API_BASE_URL, 
+  MYINVOIS_CLIENT_ID, 
+  MYINVOIS_CLIENT_SECRET,
+
+} from './src/configs/config.js';
 
 dotenv.config();
 
@@ -2453,14 +2461,14 @@ app.get('/api/customers/combobox', async (req, res) => {
 // e-invoice login endpoint
 app.post('/api/einvoice/login', async (req, res) => {
   try {
-    console.log('Attempting to connect to:', `${process.env.MYINVOIS_API_BASE_URL}/connect/token`);
+    console.log('Attempting to connect to:', `${MYINVOIS_API_BASE_URL}/connect/token`);
     const tokenResponse = await apiClient.refreshToken();
     
     if (tokenResponse && tokenResponse.access_token) {
       res.json({ 
         success: true, 
         message: 'Successfully connected to MyInvois API',
-        apiEndpoint: `${process.env.MYINVOIS_API_BASE_URL}/connect/token`,
+        apiEndpoint: `${MYINVOIS_API_BASE_URL}/connect/token`,
         tokenInfo: {
           accessToken: tokenResponse.access_token,
           expiresIn: tokenResponse.expires_in,
@@ -2475,7 +2483,7 @@ app.post('/api/einvoice/login', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to connect to MyInvois API', 
-      apiEndpoint: `${process.env.MYINVOIS_API_BASE_URL}/connect/token`,
+      apiEndpoint: `${MYINVOIS_API_BASE_URL}/connect/token`,
       error: error.message,
       details: error.response ? error.response.data : null
     });
@@ -2485,7 +2493,7 @@ app.post('/api/einvoice/login', async (req, res) => {
 import EInvoiceApiClient from './EInvoiceApiClient.js';
 import DocumentSubmissionHandler from './documentSubmissionHandler.js';
 
-const apiClient = new EInvoiceApiClient(process.env.MYINVOIS_API_BASE_URL, process.env.MYINVOIS_CLIENT_ID, process.env.MYINVOIS_CLIENT_SECRET);
+const apiClient = new EInvoiceApiClient(MYINVOIS_API_BASE_URL, MYINVOIS_CLIENT_ID, MYINVOIS_CLIENT_SECRET);
 const submissionHandler = new DocumentSubmissionHandler(apiClient);
 
 app.post('/api/einvoice/submit', async (req, res) => {
@@ -2583,14 +2591,14 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = NODE_ENV === 'development';
 const host = '0.0.0.0';  // Always use 0.0.0.0 inside containers
 
 server.listen(port, host, () => {
   const displayHost = isDev 
     ? 'localhost:5001 (development mode)'  // Display localhost for dev
-    : `${process.env.SERVER_HOST || '0.0.0.0'}:${port} (LAN access enabled)`;
+    : `${SERVER_HOST || '0.0.0.0'}:${port} (LAN access enabled)`;
     
   console.log(`Server running with WebSocket support on http://${displayHost}`);
-  console.log(`Server environment: ${process.env.NODE_ENV}`);
+  console.log(`Server environment: ${NODE_ENV}`);
 });
