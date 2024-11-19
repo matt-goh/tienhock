@@ -22,21 +22,33 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Create and populate .env file
+        env:
+          REACT_APP_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REACT_APP_MYINVOIS_CLIENT_ID: ${{ secrets.MYINVOIS_CLIENT_ID }}
+          REACT_APP_MYINVOIS_CLIENT_SECRET: ${{ secrets.MYINVOIS_CLIENT_SECRET }}
+        run: |
+          touch .env
+          echo "REACT_APP_API_BASE_URL=http://192.168.1.200:5000" >> .env
+          echo "REACT_APP_NODE_ENV=production" >> .env
+          echo "REACT_APP_SERVER_PORT=5000" >> .env
+          echo "REACT_APP_SERVER_HOST=192.168.1.200" >> .env
+          echo "REACT_APP_DB_USER=postgres" >> .env
+          echo "REACT_APP_DB_HOST=192.168.1.200" >> .env
+          echo "REACT_APP_DB_NAME=tienhock_prod" >> .env
+          echo "REACT_APP_DB_PASSWORD=$REACT_APP_DB_PASSWORD" >> .env
+          echo "REACT_APP_DB_PORT=5433" >> .env
+          echo "REACT_APP_MYINVOIS_API_BASE_URL=https://preprod-api.myinvois.hasil.gov.my" >> .env
+          echo "REACT_APP_MYINVOIS_CLIENT_ID=$REACT_APP_MYINVOIS_CLIENT_ID" >> .env
+          echo "REACT_APP_MYINVOIS_CLIENT_SECRET=$REACT_APP_MYINVOIS_CLIENT_SECRET" >> .env
+          
+          echo "Verifying .env file exists:"
+          ls -a .
+        shell: bash
+
       - name: Build React App
         env:
           CI: false
-          REACT_APP_API_BASE_URL: 'http://192.168.1.200:5000'
-          REACT_APP_NODE_ENV: 'production'
-          REACT_APP_SERVER_PORT: 5000
-          REACT_APP_SERVER_HOST: '192.168.1.200'
-          REACT_APP_DB_USER: 'postgres'
-          REACT_APP_DB_HOST: '192.168.1.200'
-          REACT_APP_DB_NAME: 'tienhock_prod'
-          REACT_APP_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          REACT_APP_DB_PORT: 5433
-          REACT_APP_MYINVOIS_API_BASE_URL: 'https://preprod-api.myinvois.hasil.gov.my'
-          REACT_APP_MYINVOIS_CLIENT_ID: ${{ secrets.MYINVOIS_CLIENT_ID }}
-          REACT_APP_MYINVOIS_CLIENT_SECRET: ${{ secrets.MYINVOIS_CLIENT_SECRET }}
         run: npm run build
 
       - name: Build Electron App
