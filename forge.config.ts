@@ -16,6 +16,7 @@ const config: ForgeConfig = {
     asar: true,
     extraResource: ["./build"],
     ignore: [
+      /\/.github\//,
       /\/src\//,
       /\/public\//,
       /\/.cache\//,
@@ -25,7 +26,6 @@ const config: ForgeConfig = {
       /tsconfig\.json/,
       /tailwind\.config\.js/,
       /postcss\.config\.js/,
-      /\/src\/configs\/production\.js/,
       /\/dev\/.env/,
       /\.test\.js/,
       /\.spec\.js/,
