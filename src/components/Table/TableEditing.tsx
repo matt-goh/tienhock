@@ -24,6 +24,9 @@ import {
   IconSortAscendingNumbers,
   IconSortDescendingLetters,
   IconSortDescendingNumbers,
+  IconSquare,
+  IconSquareCheckFilled,
+  IconSquareMinusFilled,
   IconTrash,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, ColumnConfig } from "../../types/types";
@@ -31,6 +34,12 @@ import TableEditableCell from "./TableEditableCell";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
+
+interface TableSelection {
+  selectedRows: Set<number>;
+  hoveredRowIndex: number | null;
+  isHeaderHovered: boolean;
+}
 
 // Type guard to check if a property exists on an object
 function hasProperty<T extends object, K extends PropertyKey>(
@@ -41,6 +50,7 @@ function hasProperty<T extends object, K extends PropertyKey>(
 }
 
 function TableEditing<T extends Record<string, any>>({
+  ref,
   initialData,
   columns,
   onSpecialRowDelete,
@@ -70,6 +80,184 @@ function TableEditing<T extends Record<string, any>>({
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
+  // Selection related states (only used when tableKey is "invois")
+  const [selection, setSelection] = useState<TableSelection>({
+    selectedRows: new Set(),
+    hoveredRowIndex: null,
+    isHeaderHovered: false,
+  });
+
+  React.useImperativeHandle(ref, () => ({
+    selection,
+    pageSelectionState,
+    clearSelection: () => {
+      setSelection((prev) => ({
+        ...prev,
+        selectedRows: new Set(),
+      }));
+    },
+  }));
+
+  // Get all indices (not just current page)
+  const getAllRowIndices = () => {
+    return Array.from({ length: data.length }, (_, i) => i);
+  };
+
+  // HSA
+  const handleSelectAll = useCallback(() => {
+    if (tableKey !== "invois") return;
+
+    const allIndices = getAllRowIndices();
+
+    setSelection((prev) => {
+      // If there are any selections (indeterminate or all selected), clear them
+      if (prev.selectedRows.size > 0) {
+        return { ...prev, selectedRows: new Set() };
+      }
+
+      // If nothing is selected, select all rows
+      const newSelectedRows = new Set(allIndices);
+      return { ...prev, selectedRows: newSelectedRows };
+    });
+  }, [tableKey, data.length]);
+
+  // Handle row selection
+  const handleRowSelection = useCallback(
+    (visibleIndex: number) => {
+      if (tableKey !== "invois") return;
+
+      const actualIndex =
+        pagination.pageIndex * pagination.pageSize + visibleIndex;
+      setSelection((prev) => {
+        const newSelectedRows = new Set(prev.selectedRows);
+        if (newSelectedRows.has(actualIndex)) {
+          newSelectedRows.delete(actualIndex);
+        } else {
+          newSelectedRows.add(actualIndex);
+        }
+        return { ...prev, selectedRows: newSelectedRows };
+      });
+    },
+    [pagination, tableKey]
+  );
+
+  // Update page selection state calculation for global selection
+  const pageSelectionState = useMemo(() => {
+    if (tableKey !== "invois") {
+      return { isAllSelected: false, isIndeterminate: false };
+    }
+
+    const allIndices = getAllRowIndices();
+    const selectedCount = allIndices.filter((index) =>
+      selection.selectedRows.has(index)
+    ).length;
+
+    return {
+      isAllSelected:
+        selectedCount === allIndices.length && allIndices.length > 0,
+      isIndeterminate: selectedCount > 0 && selectedCount < allIndices.length,
+    };
+  }, [tableKey, data.length, selection.selectedRows]);
+
+  const renderSelectionColumn = () => {
+    if (tableKey !== "invois") return null;
+
+    const visibleRows = table.getRowModel().rows;
+    const { pageIndex, pageSize } = pagination;
+
+    return (
+      <div className="rounded-lg">
+        <div className="flex flex-col">
+          {/* Header checkbox - now controls global selection */}
+          <div
+            className="h-[49px] flex items-center justify-center"
+            onMouseEnter={() =>
+              setSelection((prev) => ({ ...prev, isHeaderHovered: true }))
+            }
+            onMouseLeave={() =>
+              setSelection((prev) => ({ ...prev, isHeaderHovered: false }))
+            }
+          >
+            <button
+              onClick={handleSelectAll}
+              className={`p-2 rounded-full transition-opacity duration-200 ${
+                selection.isHeaderHovered ||
+                pageSelectionState.isAllSelected ||
+                pageSelectionState.isIndeterminate
+                  ? "opacity-100"
+                  : "opacity-0"
+              } hover:bg-default-100 active:bg-default-200`}
+            >
+              {pageSelectionState.isAllSelected ? (
+                <IconSquareCheckFilled
+                  className="text-blue-600"
+                  width={20}
+                  height={20}
+                />
+              ) : pageSelectionState.isIndeterminate ? (
+                <IconSquareMinusFilled
+                  className="text-blue-600"
+                  width={20}
+                  height={20}
+                />
+              ) : (
+                <IconSquare
+                  className="text-default-400"
+                  width={20}
+                  height={20}
+                />
+              )}
+            </button>
+          </div>
+
+          {/* Row checkboxes */}
+          {visibleRows.map((row, index) => {
+            const actualIndex = pageIndex * pageSize + index;
+            const isVisible =
+              selection.hoveredRowIndex === index ||
+              selection.selectedRows.has(actualIndex);
+
+            return (
+              <div
+                key={row.id}
+                className="h-[49px] flex items-center justify-center"
+                onMouseEnter={() =>
+                  setSelection((prev) => ({ ...prev, hoveredRowIndex: index }))
+                }
+                onMouseLeave={() =>
+                  setSelection((prev) => ({ ...prev, hoveredRowIndex: null }))
+                }
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRowSelection(index);
+                  }}
+                  className={`p-2 rounded-full transition-opacity duration-200 ${
+                    isVisible ? "opacity-100" : "opacity-0"
+                  } hover:bg-default-100 active:bg-default-200`}
+                >
+                  {selection.selectedRows.has(actualIndex) ? (
+                    <IconSquareCheckFilled
+                      className="text-blue-600"
+                      width={20}
+                      height={20}
+                    />
+                  ) : (
+                    <IconSquare
+                      className="text-default-400"
+                      width={20}
+                      height={20}
+                    />
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   // Refs
   const addRowBarRef = useRef<HTMLDivElement>(null);
@@ -143,6 +331,13 @@ function TableEditing<T extends Record<string, any>>({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (ref && "current" in ref && ref.current) {
+      ref.current.selection = selection;
+      ref.current.pageSelectionState = pageSelectionState;
+    }
+  }, [selection, pageSelectionState]);
 
   const calculateAmount = useCallback((row: T): number => {
     const quantity = parseFloat(row.qty?.toString() || "0");
@@ -1077,69 +1272,74 @@ function TableEditing<T extends Record<string, any>>({
 
   return (
     <div ref={tableRef} className="flex flex-col items-center w-auto">
-      <div className="rounded-lg border border-default-300 w-fit">
-        <table
-          className="w-auto border-collapse border-spacing-0 rounded-lg"
-          ref={tableContainerRef}
-          style={{ tableLayout: "fixed" }}
-        >
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableHeader
-                key={headerGroup.id}
-                headerGroup={headerGroup}
-                columns={columns}
-                isEditing={true}
-                isSortableColumn={isSortableColumn}
-                columnWidths={columnWidths}
-                onColumnResize={handleColumnResize}
-              />
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row, rowIndex) => {
-              const isLastRow =
-                rowIndex === table.getRowModel().rows.length - 1;
-              return (
-                <tr
-                  key={row.id}
-                  className={`border-t ${
-                    isLastRow
-                      ? "border-b-0 rounded-b-lg"
-                      : "border-b border-default-300"
-                  } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
-                     ${row.id === editableRowId ? "relative z-10" : ""}}`}
-                  onClick={() =>
-                    row.original.isSubtotal ||
-                    row.original.isSubtotalQty ||
-                    row.original.isTotal
-                      ? setSelectedRowId(row.id)
-                      : null
-                  }
-                >
-                  {row.getVisibleCells().map((cell, cellIndex) => {
-                    const isLastRow =
-                      rowIndex === table.getRowModel().rows.length - 1;
-                    const isFirstCell = cellIndex === 0;
-                    const isLastCell =
-                      cellIndex === row.getVisibleCells().length - 1;
-                    // Special handling for Less, Tax, and Total rows
-                    if (row.original.isLess || row.original.isTax) {
-                      if (
-                        cellIndex === 0 ||
-                        cellIndex === 1 ||
-                        cellIndex === columns.length - 2 ||
-                        cellIndex === columns.length - 1
-                      ) {
-                        const isCellHighlighted =
-                          row.id === editableRowId &&
-                          cellIndex === editableCellIndex &&
-                          !isSorting;
+      <div className="flex gap-2">
+        {/* Separate Selection Column */}
+        {renderSelectionColumn()}
 
-                        return (
-                          <td
-                            key={cell.id}
-                            className={`relative px-6 py-4 whitespace-no-wrap cursor-default
+        {/* Main Table */}
+        <div className="rounded-lg border border-default-300 w-fit">
+          <table
+            className="w-auto border-collapse border-spacing-0 rounded-lg"
+            ref={tableContainerRef}
+            style={{ tableLayout: "fixed" }}
+          >
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableHeader
+                  key={headerGroup.id}
+                  headerGroup={headerGroup}
+                  columns={columns}
+                  isEditing={true}
+                  isSortableColumn={isSortableColumn}
+                  columnWidths={columnWidths}
+                  onColumnResize={handleColumnResize}
+                />
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row, rowIndex) => {
+                const isLastRow =
+                  rowIndex === table.getRowModel().rows.length - 1;
+                return (
+                  <tr
+                    key={row.id}
+                    className={`border-t ${
+                      isLastRow
+                        ? "border-b-0 rounded-b-lg"
+                        : "border-b border-default-300"
+                    } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
+                     ${row.id === editableRowId ? "relative z-10" : ""}}`}
+                    onClick={() =>
+                      row.original.isSubtotal ||
+                      row.original.isSubtotalQty ||
+                      row.original.isTotal
+                        ? setSelectedRowId(row.id)
+                        : null
+                    }
+                  >
+                    {row.getVisibleCells().map((cell, cellIndex) => {
+                      const isLastRow =
+                        rowIndex === table.getRowModel().rows.length - 1;
+                      const isFirstCell = cellIndex === 0;
+                      const isLastCell =
+                        cellIndex === row.getVisibleCells().length - 1;
+                      // Special handling for Less, Tax, and Total rows
+                      if (row.original.isLess || row.original.isTax) {
+                        if (
+                          cellIndex === 0 ||
+                          cellIndex === 1 ||
+                          cellIndex === columns.length - 2 ||
+                          cellIndex === columns.length - 1
+                        ) {
+                          const isCellHighlighted =
+                            row.id === editableRowId &&
+                            cellIndex === editableCellIndex &&
+                            !isSorting;
+
+                          return (
+                            <td
+                              key={cell.id}
+                              className={`relative px-6 py-4 whitespace-no-wrap cursor-default
                               ${
                                 isFirstCell
                                   ? "border-l-0"
@@ -1163,144 +1363,145 @@ function TableEditing<T extends Record<string, any>>({
                                   ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
                                   : ""
                               }`}
-                            colSpan={cellIndex === 1 ? columns.length - 3 : 1}
-                            style={{
-                              padding: "0",
-                              boxSizing: "border-box",
-                              width:
-                                `${columnWidths[cell.column.id]}px` || "auto",
-                            }}
-                            onClick={() => handleCellClick(row.id, cellIndex)}
-                          >
-                            {renderCell(row, cell, cellIndex, isLastRow)}
-                          </td>
-                        );
-                      } else {
-                        return null;
-                      }
-                    }
-                    if (
-                      row.original.isTotal ||
-                      row.original.isSubtotal ||
-                      row.original.isSubtotalQty
-                    ) {
-                      const amountColumnId = columns.find(
-                        (col) => col.id === "amount"
-                      )?.id;
-                      const qtyColumnId = columns.find(
-                        (col) => col.id === "qty"
-                      )?.id;
-
-                      if (row.original.isSubtotalQty) {
-                        if (
-                          !(cell.column.id === qtyColumnId) &&
-                          !(cell.column.id === amountColumnId)
-                        ) {
-                          return (
-                            <td
-                              key={cell.id}
-                              className="py-3 pr-6 text-right font-semibold rounded-bl-lg"
-                            ></td>
-                          );
-                        }
-                        if (cell.column.id === qtyColumnId) {
-                          return (
-                            <td
-                              key={cell.id}
-                              className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                              colSpan={cellIndex === 1 ? columns.length - 3 : 1}
+                              style={{
+                                padding: "0",
+                                boxSizing: "border-box",
+                                width:
+                                  `${columnWidths[cell.column.id]}px` || "auto",
+                              }}
+                              onClick={() => handleCellClick(row.id, cellIndex)}
                             >
-                              {row.original.qty}
-                            </td>
-                          );
-                        }
-                        if (cell.column.id === amountColumnId) {
-                          return (
-                            <td
-                              key={cell.id}
-                              className="py-3 px-6 text-left font-semibold rounded-bl-lg"
-                            >
-                              {row.original.amount.toFixed(2)}
+                              {renderCell(row, cell, cellIndex, isLastRow)}
                             </td>
                           );
                         } else {
                           return null;
                         }
-                      } else if (
-                        cell.column.id ===
-                        columns.find((col) => col.type === "amount")?.id
-                      ) {
-                        return (
-                          <td
-                            key={cell.id}
-                            colSpan={
-                              row.original.isTotal
-                                ? columns.length
-                                : columns.length - 1
-                            }
-                            className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
-                          >
-                            {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
-                            {cell.getValue() as ReactNode}
-                          </td>
-                        );
-                      } else if (
-                        cell.column.id === columns[columns.length - 1].id &&
-                        !row.original.isTotal
-                      ) {
-                        return (
-                          <td
-                            key={cell.id}
-                            className="border-l border-default-300"
-                          >
-                            {renderCell(row, cell, cellIndex, isLastRow)}
-                          </td>
-                        );
-                      } else {
-                        return null;
                       }
-                    } else {
-                      return (
-                        <td
-                          key={cell.id}
-                          className={`relative px-6 py-4 whitespace-no-wrap ${
-                            isSorting ? "bg-default-50" : "cursor-default"
-                          } ${
-                            row.id === editableRowId &&
-                            cellIndex === editableCellIndex &&
-                            !isSorting
-                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
-                              : ""
-                          } ${
-                            isFirstCell
-                              ? "border-l-0"
-                              : "border-l border-default-300"
+                      if (
+                        row.original.isTotal ||
+                        row.original.isSubtotal ||
+                        row.original.isSubtotalQty
+                      ) {
+                        const amountColumnId = columns.find(
+                          (col) => col.id === "amount"
+                        )?.id;
+                        const qtyColumnId = columns.find(
+                          (col) => col.id === "qty"
+                        )?.id;
+
+                        if (row.original.isSubtotalQty) {
+                          if (
+                            !(cell.column.id === qtyColumnId) &&
+                            !(cell.column.id === amountColumnId)
+                          ) {
+                            return (
+                              <td
+                                key={cell.id}
+                                className="py-3 pr-6 text-right font-semibold rounded-bl-lg"
+                              ></td>
+                            );
                           }
+                          if (cell.column.id === qtyColumnId) {
+                            return (
+                              <td
+                                key={cell.id}
+                                className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                              >
+                                {row.original.qty}
+                              </td>
+                            );
+                          }
+                          if (cell.column.id === amountColumnId) {
+                            return (
+                              <td
+                                key={cell.id}
+                                className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                              >
+                                {row.original.amount.toFixed(2)}
+                              </td>
+                            );
+                          } else {
+                            return null;
+                          }
+                        } else if (
+                          cell.column.id ===
+                          columns.find((col) => col.type === "amount")?.id
+                        ) {
+                          return (
+                            <td
+                              key={cell.id}
+                              colSpan={
+                                row.original.isTotal
+                                  ? columns.length
+                                  : columns.length - 1
+                              }
+                              className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
+                            >
+                              {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
+                              {cell.getValue() as ReactNode}
+                            </td>
+                          );
+                        } else if (
+                          cell.column.id === columns[columns.length - 1].id &&
+                          !row.original.isTotal
+                        ) {
+                          return (
+                            <td
+                              key={cell.id}
+                              className="border-l border-default-300"
+                            >
+                              {renderCell(row, cell, cellIndex, isLastRow)}
+                            </td>
+                          );
+                        } else {
+                          return null;
+                        }
+                      } else {
+                        return (
+                          <td
+                            key={cell.id}
+                            className={`relative px-6 py-4 whitespace-no-wrap ${
+                              isSorting ? "bg-default-50" : "cursor-default"
+                            } ${
+                              row.id === editableRowId &&
+                              cellIndex === editableCellIndex &&
+                              !isSorting
+                                ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
+                                : ""
+                            } ${
+                              isFirstCell
+                                ? "border-l-0"
+                                : "border-l border-default-300"
+                            }
                           ${isLastCell ? "border-r-0" : ""}
                           ${
                             isLastRow
                               ? "border-b-0"
                               : "border-b border-default-300"
                           } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
-                            isFirstCell && isLastRow ? "rounded-bl-lg" : ""
-                          }`}
-                          onClick={() => handleCellClick(row.id, cellIndex)}
-                          style={{
-                            padding: "0",
-                            boxSizing: "border-box",
-                            width:
-                              `${columnWidths[cell.column.id]}px` || "auto",
-                          }}
-                        >
-                          {renderCell(row, cell, cellIndex, isLastRow)}
-                        </td>
-                      );
-                    }
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                              isFirstCell && isLastRow ? "rounded-bl-lg" : ""
+                            }`}
+                            onClick={() => handleCellClick(row.id, cellIndex)}
+                            style={{
+                              padding: "0",
+                              boxSizing: "border-box",
+                              width:
+                                `${columnWidths[cell.column.id]}px` || "auto",
+                            }}
+                          >
+                            {renderCell(row, cell, cellIndex, isLastRow)}
+                          </td>
+                        );
+                      }
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       {isLastPage &&
         !(tableKey === "invois") &&
@@ -1344,6 +1545,7 @@ function TableEditing<T extends Record<string, any>>({
           </>
         )}
       <div className="flex justify-between items-center mt-4 w-full">
+        {tableKey === "invois" && <div className="w-[48px]"></div>}
         {data.length >= 10 && <TablePagination table={table} />}
       </div>
     </div>
