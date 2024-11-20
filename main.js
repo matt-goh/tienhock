@@ -1,17 +1,11 @@
 // main.js
 import { app, BrowserWindow } from 'electron';
+import { updateElectronApp } from 'update-electron-app';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
-import { updateElectronApp } from 'update-electron-app';
-import electronLog from 'electron-log';
 
-// Configure auto-updates
-updateElectronApp({
-  logger: electronLog,
-  updateInterval: '1 hour',
-  notifyUser: true
-});
+updateElectronApp();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
