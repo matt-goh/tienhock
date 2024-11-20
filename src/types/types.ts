@@ -64,6 +64,7 @@ export interface Data {
 
 // Props for the Table component
 export interface TableProps<T> {
+  ref?: React.RefObject<any>;
   initialData: T[];
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;

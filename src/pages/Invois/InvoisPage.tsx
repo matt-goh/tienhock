@@ -32,6 +32,7 @@ const InvoisPage: React.FC = () => {
   const [filteredInvoices, setFilteredInvoices] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tableRef = useRef<any>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null
@@ -505,17 +506,20 @@ const InvoisPage: React.FC = () => {
     <div className="px-4">
       <div className="flex justify-between items-center mb-4">
         <div className="relative flex">
-          <IconSearch
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-            size={22}
-          />
-          <input
-            type="text"
-            placeholder="Search"
-            className="w-full pl-11 py-2 border border-default-300 focus:border-default-500 rounded-full"
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
+          {!filters.applyProductFilter && <div className="w-[48px]"></div>}
+          <div className="relative flex">
+            <IconSearch
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
+              size={22}
+            />
+            <input
+              type="text"
+              placeholder="Search"
+              className="w-full pl-11 py-2 border border-default-300 focus:border-default-500 rounded-full"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+          </div>
         </div>
         <h1 className="ml-2 text-2xl text-center font-medium text-default-700 mb-2">
           Invois
@@ -566,7 +570,7 @@ const InvoisPage: React.FC = () => {
             <TableEditing<ProductData>
               initialData={productData}
               columns={productColumns}
-              onChange={() => {}} // Product data is read-only
+              onChange={() => {}}
               tableKey="invois-products"
             />
           ) : (
