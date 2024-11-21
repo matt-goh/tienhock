@@ -109,13 +109,41 @@ const InvoisPage: React.FC = () => {
       );
       await Promise.all(deletePromises);
 
-      toast.success("Selected invoices deleted successfully");
-      await loadInvoices(); // Reload the invoices
+      // Reset filters to initial state
+      setFilters({
+        salesmanFilter: null,
+        applySalesmanFilter: true,
+        customerFilter: null,
+        applyCustomerFilter: true,
+        dateRangeFilter: { start: today, end: tomorrow },
+        applyDateRangeFilter: false,
+        invoiceTypeFilter: null,
+        applyInvoiceTypeFilter: true,
+        applyProductFilter: false,
+      });
+
+      setSearchTerm("");
+
+      // Load fresh data
+      const fetchedInvoices = await fetchDbInvoices({
+        salesmanFilter: null,
+        applySalesmanFilter: true,
+        customerFilter: null,
+        applyCustomerFilter: true,
+        dateRangeFilter: { start: today, end: tomorrow },
+        applyDateRangeFilter: false,
+        invoiceTypeFilter: null,
+        applyInvoiceTypeFilter: true,
+        applyProductFilter: false,
+      });
+      setInvoices(fetchedInvoices);
 
       // Reset selection states
       setSelectedCount(0);
       setIsAllSelected(false);
       setSelectedInvoices([]);
+
+      toast.success("Selected invoices deleted successfully");
     } catch (error) {
       console.error("Error deleting invoices:", error);
       toast.error("Failed to delete invoices. Please try again.");
@@ -263,6 +291,12 @@ const InvoisPage: React.FC = () => {
       setFilteredInvoices(filtered);
     }
   }, [invoices, filters, searchTerm]);
+
+  useEffect(() => {
+    setSelectedCount(0);
+    setIsAllSelected(false);
+    setSelectedInvoices([]);
+  }, [invoices]);
 
   useEffect(() => {
     applyFilters();
