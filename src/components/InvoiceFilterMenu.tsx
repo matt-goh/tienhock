@@ -21,6 +21,7 @@ import {
 } from "@tabler/icons-react";
 import { InvoiceFilterOptions } from "../types/types";
 import Button from "./Button";
+import CustomerFilterTags from "./CustomerFilterTags";
 
 type InvoiceType = "C" | "I" | null;
 
@@ -120,18 +121,15 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       .filter((salesman): salesman is string => salesman !== undefined);
     handleFilterChange("salesmanFilter", selectedSalesmen);
   };
-  
+
   const handleCustomerSelection = (selectedCustomerIds: string[]) => {
-    console.log("Selected customer IDs:", selectedCustomerIds);
     const selectedCustomers = selectedCustomerIds
       .map((id) => {
         const found = cachedCustomerOptions.find((option) => option.id === id);
-        console.log("Found customer:", found);
         return found?.name;
       })
       .filter((customer): customer is string => customer !== undefined);
 
-    console.log("Final selected customers:", selectedCustomers);
     handleFilterChange("customerFilter", selectedCustomers);
   };
 
@@ -509,35 +507,11 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
           </div>
           {currentFilters.customerFilter &&
             currentFilters.customerFilter.length > 0 && (
-              <div className="px-2.5 py-1">
-                <div className="flex flex-wrap gap-2">
-                  {currentFilters.customerFilter.map((customer) => (
-                    <span
-                      key={customer}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 cursor-pointer"
-                      onClick={() =>
-                        handleCustomerSelection(
-                          currentFilters.customerFilter
-                            ?.filter((c) => c !== customer)
-                            .map(
-                              (c) =>
-                                cachedCustomerOptions.find(
-                                  (option) => option.name === c
-                                )?.id
-                            )
-                            .filter((id): id is string => id !== undefined) ??
-                            []
-                        )
-                      }
-                    >
-                      {customer}
-                      <button className="ml-1 text-sky-600 hover:text-sky-800">
-                        <IconX size={14} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <CustomerFilterTags
+                customers={currentFilters.customerFilter}
+                onRemove={handleCustomerSelection}
+                cachedCustomerOptions={cachedCustomerOptions}
+              />
             )}
           {/* Invoice Type Filter */}
           <div className="px-1">
