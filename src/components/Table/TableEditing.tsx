@@ -54,6 +54,7 @@ function TableEditing<T extends Record<string, any>>({
   initialData,
   columns,
   onSpecialRowDelete,
+  onSelectionChange,
   onChange,
   tableKey,
 }: TableProps<T>) {
@@ -112,14 +113,20 @@ function TableEditing<T extends Record<string, any>>({
     setSelection((prev) => {
       // If there are any selections (indeterminate or all selected), clear them
       if (prev.selectedRows.size > 0) {
+        onSelectionChange?.(0, false, []); // Notify parent of cleared selection
         return { ...prev, selectedRows: new Set() };
       }
 
-      // If nothing is selected, select all rows
+      // If nothing is selected, select all visible rows
       const newSelectedRows = new Set(allIndices);
+      // Pass the actual filtered data to the parent
+      const selectedData = Array.from(newSelectedRows).map(
+        (index) => data[index]
+      );
+      onSelectionChange?.(newSelectedRows.size, true, selectedData);
       return { ...prev, selectedRows: newSelectedRows };
     });
-  }, [tableKey, data.length]);
+  }, [tableKey, data, onSelectionChange]);
 
   // Handle row selection
   const handleRowSelection = useCallback(
@@ -135,10 +142,17 @@ function TableEditing<T extends Record<string, any>>({
         } else {
           newSelectedRows.add(actualIndex);
         }
+
+        // Get the selected data
+        const selectedData = Array.from(newSelectedRows).map(
+          (index) => data[index]
+        );
+        onSelectionChange?.(newSelectedRows.size, false, selectedData);
+
         return { ...prev, selectedRows: newSelectedRows };
       });
     },
-    [pagination, tableKey]
+    [pagination, tableKey, data, onSelectionChange]
   );
 
   // Update page selection state calculation for global selection
@@ -287,6 +301,16 @@ function TableEditing<T extends Record<string, any>>({
   }, []);
 
   useEffect(() => {
+    // Reset selection when data changes (like when filters are applied)
+    setSelection((prev) => ({
+      ...prev,
+      selectedRows: new Set(),
+    }));
+    // Notify parent of cleared selection
+    onSelectionChange?.(0, false, []);
+  }, [data, onSelectionChange]);
+
+  useEffect(() => {
     if (pagination.pageIndex >= Math.ceil(data.length / pagination.pageSize)) {
       setPagination((prev) => ({
         ...prev,
@@ -334,8 +358,16 @@ function TableEditing<T extends Record<string, any>>({
 
   useEffect(() => {
     if (ref && "current" in ref && ref.current) {
-      ref.current.selection = selection;
-      ref.current.pageSelectionState = pageSelectionState;
+      // Only update if values have actually changed
+      if (
+        ref.current.selection !== selection ||
+        ref.current.pageSelectionState !== pageSelectionState
+      ) {
+        Object.assign(ref.current, {
+          selection,
+          pageSelectionState,
+        });
+      }
     }
   }, [selection, pageSelectionState]);
 

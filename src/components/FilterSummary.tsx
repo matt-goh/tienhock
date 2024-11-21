@@ -70,7 +70,7 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
   return (
     <div
       className={`flex flex-wrap ${
-        filters.applyProductFilter ? "w-[760px]" : "w-[960px]"
+        filters.applyProductFilter ? "w-[760px]" : "w-[960px] pl-[45px]"
       } max-w-full text-sm text-default-500 mt-2 mb-4`}
     >
       <strong className="mr-1">Applied Filters:</strong>

@@ -18,7 +18,6 @@ services:
       - HOST=0.0.0.0 # Inside container, listen on all interfaces
     depends_on:
       - prod_db
-    restart: always
     networks:
       tienhock-prod-network:
         aliases:
@@ -39,7 +38,6 @@ services:
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     ports:
       - "192.168.1.200:5433:5432"
-    restart: always
     networks:
       tienhock-prod-network:
         aliases:

@@ -69,6 +69,11 @@ export interface TableProps<T> {
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;
   onSpecialRowDelete?: (rowType: "less" | "tax") => void;
+  onSelectionChange?: (
+    count: number,
+    allSelected: boolean,
+    selectedData: T[]
+  ) => void;
   onDelete?: (selectedIds: number[]) => Promise<void>;
   onChange?: (changedData: T[]) => void;
   isEditing?: boolean;

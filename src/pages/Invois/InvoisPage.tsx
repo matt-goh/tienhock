@@ -16,12 +16,7 @@ import {
 } from "../../types/types";
 import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
-import {
-  IconCloudUpload,
-  IconPlus,
-  IconSearch,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconCloudUpload, IconPlus, IconSearch } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
 import { API_BASE_URL } from "../../configs/config";
@@ -37,11 +32,10 @@ const InvoisPage: React.FC = () => {
   const [filteredInvoices, setFilteredInvoices] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const tableRef = useRef<any>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
-    null
-  );
+  const [selectedCount, setSelectedCount] = useState(0);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [selectedInvoices, setSelectedInvoices] = useState<InvoiceData[]>([]);
   const [filters, setFilters] = useState<InvoiceFilterOptions>({
     salesmanFilter: null,
     applySalesmanFilter: true,
@@ -94,39 +88,34 @@ const InvoisPage: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
-  }, [loadInvoices]);
+  }, []);
+
+  const handleSelectionChange = useCallback(
+    (count: number, allSelected: boolean, selectedRows: InvoiceData[]) => {
+      setSelectedCount(count);
+      setIsAllSelected(allSelected);
+      setSelectedInvoices(selectedRows);
+    },
+    []
+  );
 
   const handleBulkDelete = async () => {
-    if (!tableRef.current) return;
-
-    const { selection, pageSelectionState } = tableRef.current;
-    const selectedIndices = Array.from(selection.selectedRows);
+    // Close the dialog immediately
+    setShowDeleteConfirmation(false);
 
     try {
-      // If all are selected, delete all filtered invoices
-      if (pageSelectionState.isAllSelected) {
-        const deletePromises = filteredInvoices.map((invoice) =>
-          deleteInvoice(invoice.id)
-        );
-        await Promise.all(deletePromises);
-      } else {
-        // Delete only selected invoices
-        const selectedInvoices = selectedIndices.map(
-          (index) => filteredInvoices[index as number]
-        );
-        const deletePromises = selectedInvoices.map((invoice) =>
-          deleteInvoice(invoice.id)
-        );
-        await Promise.all(deletePromises);
-      }
+      const deletePromises = selectedInvoices.map((invoice) =>
+        deleteInvoice(invoice.id)
+      );
+      await Promise.all(deletePromises);
 
       toast.success("Selected invoices deleted successfully");
-      await loadInvoices(); // Reload the invoices after deletion
+      await loadInvoices(); // Reload the invoices
 
-      // Clear selection after deletion
-      if (tableRef.current) {
-        tableRef.current.clearSelection();
-      }
+      // Reset selection states
+      setSelectedCount(0);
+      setIsAllSelected(false);
+      setSelectedInvoices([]);
     } catch (error) {
       console.error("Error deleting invoices:", error);
       toast.error("Failed to delete invoices. Please try again.");
@@ -152,22 +141,26 @@ const InvoisPage: React.FC = () => {
     }
 
     if (
+      filters.applyCustomerFilter &&
+      filters.customerFilter &&
+      filters.customerFilter.length > 0
+    ) {
+      filtered = filtered.filter((invoice) => {
+        // Ensure case-insensitive comparison
+        const customerName = invoice.customername.toLowerCase();
+        return filters.customerFilter!.some(
+          (customer) => customer.toLowerCase() === customerName
+        );
+      });
+    }
+
+    if (
       filters.applySalesmanFilter &&
       filters.salesmanFilter &&
       filters.salesmanFilter.length > 0
     ) {
       filtered = filtered.filter((invoice) =>
         filters.salesmanFilter!.includes(invoice.salesman)
-      );
-    }
-
-    if (
-      filters.applyCustomerFilter &&
-      filters.customerFilter &&
-      filters.customerFilter.length > 0
-    ) {
-      filtered = filtered.filter((invoice) =>
-        filters.customerFilter!.includes(invoice.customername)
       );
     }
 
@@ -190,6 +183,10 @@ const InvoisPage: React.FC = () => {
     }
 
     if (filters.applyProductFilter) {
+      // Reset selection when switching to product view
+      setSelectedCount(0);
+      setIsAllSelected(false);
+      setSelectedInvoices([]);
       const products: { [key: string]: ProductData } = {};
 
       filtered.forEach((invoice) => {
@@ -294,6 +291,11 @@ const InvoisPage: React.FC = () => {
         newFilters.dateRangeFilter.end = adjustedEnd;
       }
     }
+
+    // Clear selection when filters change
+    setSelectedCount(0);
+    setIsAllSelected(false);
+    setSelectedInvoices([]);
     setFilters(newFilters);
   };
 
@@ -482,21 +484,6 @@ const InvoisPage: React.FC = () => {
     });
   };
 
-  const handleConfirmDelete = async () => {
-    if (selectedInvoiceId) {
-      try {
-        await deleteInvoice(selectedInvoiceId);
-        toast.success("Invoice deleted successfully");
-        loadInvoices(); // Reload the invoices after deletion
-      } catch (error) {
-        console.error("Error deleting invoice:", error);
-        toast.error("Failed to delete invoice. Please try again.");
-      }
-    }
-    setShowDeleteConfirmation(false);
-    setSelectedInvoiceId(null);
-  };
-
   const invoiceColumns: ColumnConfig[] = [
     {
       id: "invoiceno",
@@ -548,24 +535,7 @@ const InvoisPage: React.FC = () => {
     <div className="px-4">
       <div className="flex justify-between items-center mb-4">
         <div className="relative flex">
-          {!filters.applyProductFilter && (
-            <>
-              {/* Add delete button here */}
-              {tableRef.current?.selection.selectedRows.size > 0 && (
-                <button
-                  onClick={() => setShowDeleteConfirmation(true)}
-                  className="px-4 py-2 mr-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
-                >
-                  <div className="flex items-center gap-2">
-                    <IconTrash size={16} stroke={2} />
-                    Delete {tableRef.current.selection.selectedRows.size}{" "}
-                    selected
-                  </div>
-                </button>
-              )}
-              <div className="w-[45px]"></div>
-            </>
-          )}
+          {!filters.applyProductFilter && <div className="w-[45px]"></div>}
           <div className="relative flex">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
@@ -584,6 +554,14 @@ const InvoisPage: React.FC = () => {
           Invois
         </h1>
         <div className="flex space-x-2 justify-center">
+          {selectedCount > 0 && (
+            <button
+              onClick={() => setShowDeleteConfirmation(true)}
+              className="px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+            >
+              <div className="flex items-center gap-2">Delete</div>
+            </button>
+          )}
           <InvoiceFilterMenu
             onFilterChange={handleFilterChange}
             currentFilters={filters}
@@ -642,6 +620,7 @@ const InvoisPage: React.FC = () => {
             initialData={filteredInvoices}
             columns={invoiceColumns}
             onChange={setInvoices}
+            onSelectionChange={handleSelectionChange}
             tableKey="invois"
           />
         ) : (
@@ -654,12 +633,10 @@ const InvoisPage: React.FC = () => {
         onConfirm={handleBulkDelete}
         title="Delete Confirmation"
         message={
-          tableRef.current?.pageSelectionState.isAllSelected
+          isAllSelected
             ? "Are you sure you want to delete all invoices? This action cannot be undone."
-            : `Are you sure you want to delete ${
-                tableRef.current?.selection.selectedRows.size
-              } selected invoice${
-                tableRef.current?.selection.selectedRows.size === 1 ? "" : "s"
+            : `Are you sure you want to delete ${selectedCount} selected invoice${
+                selectedCount === 1 ? "" : "s"
               }? This action cannot be undone.`
         }
         confirmButtonText="Delete"
