@@ -65,28 +65,29 @@ const InvoisPage: React.FC = () => {
     };
   }, [invoices]);
 
-  const loadInvoices = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const fetchedInvoices = await fetchDbInvoices(filters);
-      setInvoices(fetchedInvoices);
-    } catch (error) {
-      console.error("Error loading invoices:", error);
-      setError(
-        error instanceof Error ? error.message : "An unknown error occurred"
-      );
-      toast.error(
-        `Failed to load invoices: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filters]);
-
   useEffect(() => {
+    const loadInvoices = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const fetchedInvoices = await fetchDbInvoices(filters);
+        setInvoices(fetchedInvoices);
+        setFilteredInvoices(fetchedInvoices);
+      } catch (error) {
+        console.error("Error loading invoices:", error);
+        setError(
+          error instanceof Error ? error.message : "An unknown error occurred"
+        );
+        toast.error(
+          `Failed to load invoices: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadInvoices();
   }, []);
 
@@ -168,42 +169,49 @@ const InvoisPage: React.FC = () => {
       );
     }
 
+    // Customer filter
     if (
       filters.applyCustomerFilter &&
       filters.customerFilter &&
       filters.customerFilter.length > 0
     ) {
-      filtered = filtered.filter((invoice) => {
-        // Ensure case-insensitive comparison
-        const customerName = invoice.customername.toLowerCase();
-        return filters.customerFilter!.some(
-          (customer) => customer.toLowerCase() === customerName
-        );
+      const customerSet = new Set(filters.customerFilter);
+      filtered = filtered.filter((invoice) =>
+        customerSet.has(invoice.customername)
+      );
+      console.log("After customer filter:", {
+        selectedCustomers: filters.customerFilter,
+        filteredCount: filtered.length,
       });
     }
 
+    // Salesman filter
     if (
       filters.applySalesmanFilter &&
       filters.salesmanFilter &&
       filters.salesmanFilter.length > 0
     ) {
+      const salesmanSet = new Set(filters.salesmanFilter);
       filtered = filtered.filter((invoice) =>
-        filters.salesmanFilter!.includes(invoice.salesman)
+        salesmanSet.has(invoice.salesman)
       );
     }
 
-    if (filters.applyDateRangeFilter && filters.dateRangeFilter) {
+    // Date filter
+    if (filters.dateRangeFilter?.start || filters.dateRangeFilter?.end) {
       filtered = filtered.filter((invoice) => {
         const invoiceDate = parseDate(invoice.date);
+        const startDate = filters.dateRangeFilter?.start;
+        const endDate = filters.dateRangeFilter?.end;
+
         return (
-          (!filters.dateRangeFilter!.start ||
-            invoiceDate >= filters.dateRangeFilter!.start) &&
-          (!filters.dateRangeFilter!.end ||
-            invoiceDate < filters.dateRangeFilter!.end)
+          (!startDate || invoiceDate >= startDate) &&
+          (!endDate || invoiceDate < endDate)
         );
       });
     }
 
+    // Invoice type filter
     if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
       filtered = filtered.filter(
         (invoice) => invoice.type === filters.invoiceTypeFilter
@@ -313,23 +321,25 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleFilterChange = (newFilters: InvoiceFilterOptions) => {
+    // Only reload data if date range changes
     if (
-      newFilters.dateRangeFilter &&
-      newFilters.dateRangeFilter.start &&
-      newFilters.dateRangeFilter.end
+      newFilters.dateRangeFilter?.start?.getTime() !==
+        filters.dateRangeFilter?.start?.getTime() ||
+      newFilters.dateRangeFilter?.end?.getTime() !==
+        filters.dateRangeFilter?.end?.getTime()
     ) {
-      const { start, end } = newFilters.dateRangeFilter;
-      if (start.getTime() === end.getTime()) {
-        const adjustedEnd = new Date(start);
-        adjustedEnd.setDate(adjustedEnd.getDate() + 1);
-        newFilters.dateRangeFilter.end = adjustedEnd;
-      }
+      const loadInvoices = async () => {
+        try {
+          const fetchedInvoices = await fetchDbInvoices(newFilters);
+          setInvoices(fetchedInvoices);
+        } catch (error) {
+          console.error("Error loading invoices:", error);
+          toast.error("Failed to load invoices");
+        }
+      };
+      loadInvoices();
     }
 
-    // Clear selection when filters change
-    setSelectedCount(0);
-    setIsAllSelected(false);
-    setSelectedInvoices([]);
     setFilters(newFilters);
   };
 

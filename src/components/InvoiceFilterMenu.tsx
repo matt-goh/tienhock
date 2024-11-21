@@ -43,20 +43,54 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [cachedSalesmanOptions, setCachedSalesmanOptions] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [cachedCustomerOptions, setCachedCustomerOptions] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
-  const uniqueSalesmanOptions = Array.from(new Set(salesmanOptions)).map(
-    (salesman, index) => ({
-      id: index.toString(),
-      name: salesman,
-    })
-  );
+  // Store initial options in a ref to compare against
+  const initialOptionsRef = useRef({
+    salesmen: new Set<string>(),
+    customers: new Set<string>(),
+  });
 
-  const uniqueCustomerOptions = Array.from(new Set(customerOptions)).map(
-    (customer, index) => ({
-      id: index.toString(),
-      name: customer,
-    })
-  );
+  // Cache options only when there are truly new options
+  useEffect(() => {
+    const newSalesmenSet = new Set(salesmanOptions);
+    const newCustomersSet = new Set(customerOptions);
+
+    // Check if we have new base options (not just filtered ones)
+    const salesmenChanged = salesmanOptions.some(
+      (s) => !initialOptionsRef.current.salesmen.has(s)
+    );
+    const customersChanged = customerOptions.some(
+      (c) => !initialOptionsRef.current.customers.has(c)
+    );
+
+    if (salesmenChanged || initialOptionsRef.current.salesmen.size === 0) {
+      const uniqueSalesmen = Array.from(newSalesmenSet).map(
+        (salesman, index) => ({
+          id: index.toString(),
+          name: salesman,
+        })
+      );
+      setCachedSalesmanOptions(uniqueSalesmen);
+      initialOptionsRef.current.salesmen = newSalesmenSet;
+    }
+
+    if (customersChanged || initialOptionsRef.current.customers.size === 0) {
+      const uniqueCustomers = Array.from(newCustomersSet).map(
+        (customer, index) => ({
+          id: index.toString(),
+          name: customer,
+        })
+      );
+      setCachedCustomerOptions(uniqueCustomers);
+      initialOptionsRef.current.customers = newCustomersSet;
+    }
+  }, [salesmanOptions, customerOptions]);
 
   const handleFilterChange = (key: keyof InvoiceFilterOptions, value: any) => {
     onFilterChange({ ...currentFilters, [key]: value });
@@ -69,7 +103,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       customerFilter: null,
       applyCustomerFilter: true,
       dateRangeFilter: { start: today, end: tomorrow },
-      applyDateRangeFilter: false,
+      applyDateRangeFilter: true, // Always true now
       invoiceTypeFilter: null,
       applyInvoiceTypeFilter: true,
       applyProductFilter: false,
@@ -81,19 +115,23 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     const selectedSalesmen = selectedSalesmanIds
       .map(
         (id) =>
-          uniqueSalesmanOptions.find((salesman) => salesman.id === id)?.name
+          cachedSalesmanOptions.find((salesman) => salesman.id === id)?.name
       )
       .filter((salesman): salesman is string => salesman !== undefined);
     handleFilterChange("salesmanFilter", selectedSalesmen);
   };
-
+  
   const handleCustomerSelection = (selectedCustomerIds: string[]) => {
+    console.log("Selected customer IDs:", selectedCustomerIds);
     const selectedCustomers = selectedCustomerIds
-      .map(
-        (id) =>
-          uniqueCustomerOptions.find((customer) => customer.id === id)?.name
-      )
+      .map((id) => {
+        const found = cachedCustomerOptions.find((option) => option.id === id);
+        console.log("Found customer:", found);
+        return found?.name;
+      })
       .filter((customer): customer is string => customer !== undefined);
+
+    console.log("Final selected customers:", selectedCustomers);
     handleFilterChange("customerFilter", selectedCustomers);
   };
 
@@ -150,67 +188,38 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       </Button>
       {isOpen && (
         <div className="absolute space-y-1 py-1 right-0 w-64 text-default-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-10">
-          {/* Date Range Filter */}
+          {/* Date Range Filter - Always visible and active */}
           <div className="px-1">
-            <div
-              className="flex px-2.5 py-2.5 items-center justify-between rounded-md hover:bg-default-100 active:bg-default-200 transition-colors duration-200 cursor-pointer"
-              onClick={() =>
-                handleFilterChange(
-                  "applyDateRangeFilter",
-                  !currentFilters.applyDateRangeFilter
-                )
-              }
-            >
-              <span className="block truncate">Sales by date range</span>
-              <button className="flex items-center ml-2">
-                {currentFilters.applyDateRangeFilter ? (
-                  <IconSquareCheckFilled
-                    width={18}
-                    height={18}
-                    className="text-blue-600"
-                  />
-                ) : (
-                  <IconSquare
-                    width={18}
-                    height={18}
-                    stroke={2}
-                    className="text-default-400"
-                  />
-                )}
-              </button>
-            </div>
-            {currentFilters.applyDateRangeFilter && (
-              <div className="px-2.5 py-2 space-y-2">
-                <div>
-                  <label htmlFor="start-date" className="block mb-1">
-                    Start Date:
-                  </label>
-                  <input
-                    type="date"
-                    id="start-date"
-                    value={formatDateForInput(
-                      currentFilters.dateRangeFilter?.start ?? null
-                    )}
-                    onChange={(e) => handleDateChange("start", e.target.value)}
-                    className="w-full p-1 border rounded"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="end-date" className="block mb-1">
-                    End Date:
-                  </label>
-                  <input
-                    type="date"
-                    id="end-date"
-                    value={formatDateForInput(
-                      currentFilters.dateRangeFilter?.end ?? null
-                    )}
-                    onChange={(e) => handleDateChange("end", e.target.value)}
-                    className="w-full p-1 border rounded"
-                  />
-                </div>
+            <div className="px-2.5 py-2 space-y-2">
+              <div>
+                <label htmlFor="start-date" className="block mb-1">
+                  Start Date:
+                </label>
+                <input
+                  type="date"
+                  id="start-date"
+                  value={formatDateForInput(
+                    currentFilters.dateRangeFilter?.start ?? null
+                  )}
+                  onChange={(e) => handleDateChange("start", e.target.value)}
+                  className="w-full p-1 border rounded"
+                />
               </div>
-            )}
+              <div>
+                <label htmlFor="end-date" className="block mb-1">
+                  End Date:
+                </label>
+                <input
+                  type="date"
+                  id="end-date"
+                  value={formatDateForInput(
+                    currentFilters.dateRangeFilter?.end ?? null
+                  )}
+                  onChange={(e) => handleDateChange("end", e.target.value)}
+                  className="w-full p-1 border rounded"
+                />
+              </div>
+            </div>
           </div>
           {/* Sales by Product Filter */}
           <div className="px-1">
@@ -242,6 +251,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               </button>
             </div>
           </div>
+
           {/* Salesman Filter */}
           <div className="px-1">
             <Combobox
@@ -249,7 +259,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               value={
                 currentFilters.salesmanFilter?.map(
                   (salesman) =>
-                    uniqueSalesmanOptions.find(
+                    cachedSalesmanOptions.find(
                       (option) => option.name === salesman
                     )?.id
                 ) ?? []
@@ -313,12 +323,12 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     leaveTo="opacity-0"
                   >
                     <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-                      {uniqueSalesmanOptions.length === 0 ? (
+                      {cachedSalesmanOptions.length === 0 ? (
                         <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                           No salesmen found.
                         </div>
                       ) : (
-                        uniqueSalesmanOptions.map((option) => (
+                        cachedSalesmanOptions.map((option) => (
                           <ComboboxOption
                             key={option.id}
                             className={({ active }) =>
@@ -367,7 +377,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             ?.filter((s) => s !== salesman)
                             .map(
                               (s) =>
-                                uniqueSalesmanOptions.find(
+                                cachedSalesmanOptions.find(
                                   (option) => option.name === s
                                 )?.id
                             )
@@ -393,7 +403,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               value={
                 currentFilters.customerFilter?.map(
                   (customer) =>
-                    uniqueCustomerOptions.find(
+                    cachedCustomerOptions.find(
                       (option) => option.name === customer
                     )?.id
                 ) ?? []
@@ -457,12 +467,12 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     leaveTo="opacity-0"
                   >
                     <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-                      {uniqueCustomerOptions.length === 0 ? (
+                      {cachedCustomerOptions.length === 0 ? (
                         <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                           No customers found.
                         </div>
                       ) : (
-                        uniqueCustomerOptions.map((option) => (
+                        cachedCustomerOptions.map((option) => (
                           <ComboboxOption
                             key={option.id}
                             className={({ active }) =>
@@ -511,7 +521,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             ?.filter((c) => c !== customer)
                             .map(
                               (c) =>
-                                uniqueCustomerOptions.find(
+                                cachedCustomerOptions.find(
                                   (option) => option.name === c
                                 )?.id
                             )

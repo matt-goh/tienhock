@@ -28,6 +28,20 @@ export const fetchDbInvoices = async (
   try {
     const queryParams = new URLSearchParams();
 
+    // Always include date range parameters since the filter is always active
+    if (filters.dateRangeFilter?.start) {
+      queryParams.append(
+        "startDate",
+        filters.dateRangeFilter.start.toISOString().split("T")[0]
+      );
+    }
+    if (filters.dateRangeFilter?.end) {
+      queryParams.append(
+        "endDate",
+        filters.dateRangeFilter.end.toISOString().split("T")[0]
+      );
+    }
+
     if (
       filters.applySalesmanFilter &&
       filters.salesmanFilter &&
@@ -41,21 +55,6 @@ export const fetchDbInvoices = async (
       filters.customerFilter.length > 0
     ) {
       queryParams.append("customers", filters.customerFilter.join(","));
-    }
-    if (
-      filters.applyDateRangeFilter &&
-      filters.dateRangeFilter &&
-      filters.dateRangeFilter.start &&
-      filters.dateRangeFilter.end
-    ) {
-      queryParams.append(
-        "startDate",
-        filters.dateRangeFilter.start.toISOString().split("T")[0]
-      );
-      queryParams.append(
-        "endDate",
-        filters.dateRangeFilter.end.toISOString().split("T")[0]
-      );
     }
     if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
       queryParams.append("invoiceType", filters.invoiceTypeFilter);
