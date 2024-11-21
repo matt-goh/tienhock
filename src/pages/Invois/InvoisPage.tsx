@@ -16,7 +16,12 @@ import {
 } from "../../types/types";
 import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
-import { IconCloudUpload, IconPlus, IconSearch } from "@tabler/icons-react";
+import {
+  IconCloudUpload,
+  IconPlus,
+  IconSearch,
+  IconTrash,
+} from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
 import { API_BASE_URL } from "../../configs/config";
@@ -90,6 +95,43 @@ const InvoisPage: React.FC = () => {
   useEffect(() => {
     loadInvoices();
   }, [loadInvoices]);
+
+  const handleBulkDelete = async () => {
+    if (!tableRef.current) return;
+
+    const { selection, pageSelectionState } = tableRef.current;
+    const selectedIndices = Array.from(selection.selectedRows);
+
+    try {
+      // If all are selected, delete all filtered invoices
+      if (pageSelectionState.isAllSelected) {
+        const deletePromises = filteredInvoices.map((invoice) =>
+          deleteInvoice(invoice.id)
+        );
+        await Promise.all(deletePromises);
+      } else {
+        // Delete only selected invoices
+        const selectedInvoices = selectedIndices.map(
+          (index) => filteredInvoices[index as number]
+        );
+        const deletePromises = selectedInvoices.map((invoice) =>
+          deleteInvoice(invoice.id)
+        );
+        await Promise.all(deletePromises);
+      }
+
+      toast.success("Selected invoices deleted successfully");
+      await loadInvoices(); // Reload the invoices after deletion
+
+      // Clear selection after deletion
+      if (tableRef.current) {
+        tableRef.current.clearSelection();
+      }
+    } catch (error) {
+      console.error("Error deleting invoices:", error);
+      toast.error("Failed to delete invoices. Please try again.");
+    }
+  };
 
   const parseDate = (dateString: string): Date => {
     const [day, month, year] = dateString.split("/").map(Number);
@@ -506,7 +548,24 @@ const InvoisPage: React.FC = () => {
     <div className="px-4">
       <div className="flex justify-between items-center mb-4">
         <div className="relative flex">
-          {!filters.applyProductFilter && <div className="w-[48px]"></div>}
+          {!filters.applyProductFilter && (
+            <>
+              {/* Add delete button here */}
+              {tableRef.current?.selection.selectedRows.size > 0 && (
+                <button
+                  onClick={() => setShowDeleteConfirmation(true)}
+                  className="px-4 py-2 mr-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+                >
+                  <div className="flex items-center gap-2">
+                    <IconTrash size={16} stroke={2} />
+                    Delete {tableRef.current.selection.selectedRows.size}{" "}
+                    selected
+                  </div>
+                </button>
+              )}
+              <div className="w-[45px]"></div>
+            </>
+          )}
           <div className="relative flex">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
@@ -592,9 +651,17 @@ const InvoisPage: React.FC = () => {
       <ConfirmationDialog
         isOpen={showDeleteConfirmation}
         onClose={() => setShowDeleteConfirmation(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Invoice"
-        message="Are you sure you want to delete this invoice? This action cannot be undone."
+        onConfirm={handleBulkDelete}
+        title="Delete Confirmation"
+        message={
+          tableRef.current?.pageSelectionState.isAllSelected
+            ? "Are you sure you want to delete all invoices? This action cannot be undone."
+            : `Are you sure you want to delete ${
+                tableRef.current?.selection.selectedRows.size
+              } selected invoice${
+                tableRef.current?.selection.selectedRows.size === 1 ? "" : "s"
+              }? This action cannot be undone.`
+        }
         confirmButtonText="Delete"
       />
     </div>
