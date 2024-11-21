@@ -2,7 +2,7 @@
   "name": "tienhockerp",
   "productName": "Tien Hock ERP",
   "description": "Tien Hock ERP System",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "main": "main.js",
   "private": true,
   "homepage": "./",
