@@ -1,26 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { IconSend, IconTrash } from "@tabler/icons-react";
 import TableEditing from "../../components/Table/TableEditing";
 import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
-import { fetchInvoices, getInvoices, updateInvoice } from "./InvoisUtils";
+import { fetchInvoices, getInvoices } from "./InvoisUtils";
 import { API_BASE_URL } from "../../configs/config";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCount, setSelectedCount] = useState(0);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [selectedInvoices, setSelectedInvoices] = useState<InvoiceData[]>([]);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadInvoices();
-  }, []);
-
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -39,7 +40,52 @@ const InvoisUploadPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
+  const handleSelectionChange = useCallback(
+    (count: number, allSelected: boolean, selectedRows: InvoiceData[]) => {
+      setSelectedCount(count);
+      setIsAllSelected(allSelected);
+      setSelectedInvoices(selectedRows);
+    },
+    []
+  );
+
+  const handleDataChange = useCallback((newData: InvoiceData[]) => {
+    setFileData(newData);
+  }, []);
+
+  const handleBulkDelete = useCallback(() => {
+    setShowDeleteConfirmation(false);
+    try {
+      const idsToDelete = new Set(
+        selectedInvoices.map((invoice) => invoice.id)
+      );
+      const updatedFileData = fileData.filter(
+        (invoice) => !idsToDelete.has(invoice.id)
+      );
+      setFileData(updatedFileData);
+
+      // Reset selection states
+      setSelectedCount(0);
+      setIsAllSelected(false);
+      setSelectedInvoices([]);
+
+      toast.success("Selected invoices deleted successfully");
+
+      // If all data is deleted, navigate back to invois page
+      if (updatedFileData.length === 0) {
+        navigate("/stock/invois");
+      }
+    } catch (error) {
+      console.error("Error deleting invoices:", error);
+      toast.error("Failed to delete invoices. Please try again.");
+    }
+  }, [selectedInvoices, fileData, navigate]);
 
   const handleSubmit = async () => {
     if (fileData.length === 0) {
@@ -51,7 +97,7 @@ const InvoisUploadPage: React.FC = () => {
     setError(null);
 
     try {
-      // First, check for duplicate invoice numbers
+      // Check for duplicate invoice numbers
       const invoiceNumbers = fileData.map((invoice) => invoice.invoiceno);
       const checkDuplicatesResponse = await fetch(
         `${API_BASE_URL}/api/invoices/check-bulk-duplicates`,
@@ -75,7 +121,6 @@ const InvoisUploadPage: React.FC = () => {
       if (duplicatesResult.duplicates.length > 0) {
         const duplicateList = duplicatesResult.duplicates.join(", ");
         toast.error(`Duplicate invoice numbers found: ${duplicateList}`);
-        setIsSubmitting(false);
         return;
       }
 
@@ -196,7 +241,15 @@ const InvoisUploadPage: React.FC = () => {
         Imported Invoices
       </h1>
       <div className={`flex mb-4 space-x-2 justify-center`}>
-        {fileData.length > 0 && (
+        {selectedCount > 0 && (
+          <button
+            onClick={() => setShowDeleteConfirmation(true)}
+            className="px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+          >
+            <div className="flex items-center gap-2">Delete</div>
+          </button>
+        )}
+        {fileData.length > 0 && !selectedCount && (
           <button
             onClick={handleClearData}
             className="flex items-center px-4 py-2 font-medium text-red-600 border border-red-600 rounded-full hover:bg-red-50 active:bg-red-100 transition-colors duration-200"
@@ -219,15 +272,25 @@ const InvoisUploadPage: React.FC = () => {
         <TableEditing<InvoiceData>
           initialData={fileData}
           columns={columns}
-          onChange={(newData: InvoiceData[]) => {
-            setTimeout(() => {
-              newData.forEach((invoice) => updateInvoice(invoice));
-              setFileData(getInvoices());
-            }, 0);
-          }}
+          onChange={handleDataChange}
+          onSelectionChange={handleSelectionChange}
           tableKey="invois"
         />
       )}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Confirmation"
+        message={
+          isAllSelected
+            ? "Are you sure you want to delete all invoices? This action cannot be undone."
+            : `Are you sure you want to delete ${selectedCount} selected invoice${
+                selectedCount === 1 ? "" : "s"
+              }? This action cannot be undone.`
+        }
+        confirmButtonText="Delete"
+      />
     </div>
   );
 };
