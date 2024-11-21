@@ -38,9 +38,9 @@ jobs:
           echo "REACT_APP_DB_NAME=tienhock_prod" >> .env
           echo "REACT_APP_DB_PASSWORD=$DB_PASSWORD" >> .env
           echo "REACT_APP_DB_PORT=5433" >> .env
-          echo "MYINVOIS_API_BASE_URL=https://preprod-api.myinvois.hasil.gov.my" >> .env
-          echo "MYINVOIS_CLIENT_ID=$MYINVOIS_CLIENT_ID" >> .env
-          echo "MYINVOIS_CLIENT_SECRET=$MYINVOIS_CLIENT_SECRET" >> .env
+          echo "REACT_APP_MYINVOIS_API_BASE_URL=https://preprod-api.myinvois.hasil.gov.my" >> .env
+          echo "REACT_APP_MYINVOIS_CLIENT_ID=$MYINVOIS_CLIENT_ID" >> .env
+          echo "REACT_APP_MYINVOIS_CLIENT_SECRET=$MYINVOIS_CLIENT_SECRET" >> .env
           
           echo "Verifying .env file exists:"
           ls -a .
