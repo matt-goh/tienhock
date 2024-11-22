@@ -9,10 +9,6 @@ import WebSocket from 'ws';
 import { 
   NODE_ENV,
   SERVER_HOST,
-  MYINVOIS_API_BASE_URL, 
-  MYINVOIS_CLIENT_ID, 
-  MYINVOIS_CLIENT_SECRET,
-
 } from './src/configs/config.js';
 
 dotenv.config();
@@ -21,6 +17,11 @@ const { json } = pkgBodyParser;
 const { Pool } = pkgPg;
 const app = express();
 const port = 5000;
+
+// MyInvois API Configuration
+const MYINVOIS_API_BASE_URL = 'https://preprod-api.myinvois.hasil.gov.my';
+const MYINVOIS_CLIENT_ID = 'b0037953-93e3-4e8d-92b3-99efb15afe33';
+const MYINVOIS_CLIENT_SECRET = '1e612d39-da8d-42cc-b949-bcd04d9d3fab';
 
 // Create HTTP server instance
 const server = http.createServer(app);

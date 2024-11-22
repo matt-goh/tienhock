@@ -25,8 +25,6 @@ jobs:
       - name: Create and populate .env file
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MYINVOIS_CLIENT_ID: ${{ secrets.MYINVOIS_CLIENT_ID }}
-          MYINVOIS_CLIENT_SECRET: ${{ secrets.MYINVOIS_CLIENT_SECRET }}
         run: |
           touch .env
           echo "REACT_APP_API_BASE_URL=http://192.168.1.200:5000" >> .env
@@ -38,8 +36,6 @@ jobs:
           echo "REACT_APP_DB_NAME=tienhock_prod" >> .env
           echo "REACT_APP_DB_PASSWORD=$DB_PASSWORD" >> .env
           echo "REACT_APP_DB_PORT=5433" >> .env
-          echo "REACT_APP_MYINVOIS_CLIENT_ID=$MYINVOIS_CLIENT_ID" >> .env
-          echo "REACT_APP_MYINVOIS_CLIENT_SECRET=$MYINVOIS_CLIENT_SECRET" >> .env
           
           echo "Verifying .env file exists:"
           ls -a .
