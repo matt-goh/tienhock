@@ -191,7 +191,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             <div className="px-2.5 py-2 space-y-2">
               <div>
                 <label htmlFor="start-date" className="block mb-1">
-                  Start Date:
+                  From:
                 </label>
                 <input
                   type="date"
@@ -205,7 +205,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               </div>
               <div>
                 <label htmlFor="end-date" className="block mb-1">
-                  End Date:
+                  To:
                 </label>
                 <input
                   type="date"
