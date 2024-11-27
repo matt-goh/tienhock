@@ -27,6 +27,7 @@ services:
       dockerfile: dev/Dockerfile.server
     ports:
       - "5001:5000"
+    restart: always
     environment:
       - DB_USER=postgres
       - DB_HOST=dev_db

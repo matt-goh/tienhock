@@ -32,7 +32,6 @@ const wss = new WebSocket.Server({
   verifyClient: () => true // Allow connections from any source
 });
 
-
 // PostgreSQL connection
 const pool = new Pool({
   user: process.env.DB_USER,
