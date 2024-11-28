@@ -6,13 +6,13 @@ import {
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
+import { Employee, FilterOptions } from "../../types/types";
+import { API_BASE_URL } from "../../configs/config";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import StaffFilterMenu from "../../components/StaffFilterMenu";
-import { Employee, FilterOptions } from "../../types/types";
 import Button from "../../components/Button";
-import { API_BASE_URL } from "../../configs/config";
 
 const EmployeeCard = ({
   employee,

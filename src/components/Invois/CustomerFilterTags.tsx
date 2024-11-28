@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { IconX, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 
 interface CustomerOption {

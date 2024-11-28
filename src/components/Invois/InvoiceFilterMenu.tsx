@@ -19,8 +19,8 @@ import {
   IconX,
   IconTrash,
 } from "@tabler/icons-react";
-import { InvoiceFilterOptions } from "../types/types";
-import Button from "./Button";
+import { InvoiceFilterOptions } from "../../types/types";
+import Button from "../Button";
 import CustomerFilterTags from "./CustomerFilterTags";
 
 type InvoiceType = "C" | "I" | null;
@@ -39,8 +39,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   currentFilters,
   salesmanOptions,
   customerOptions,
-  today,
-  tomorrow,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -103,7 +101,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       applySalesmanFilter: true,
       customerFilter: null,
       applyCustomerFilter: true,
-      dateRangeFilter: { start: today, end: tomorrow },
+      dateRangeFilter: currentFilters.dateRangeFilter,
       applyDateRangeFilter: true, // Always true now
       invoiceTypeFilter: null,
       applyInvoiceTypeFilter: true,
@@ -185,40 +183,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
         Filter
       </Button>
       {isOpen && (
-        <div className="absolute space-y-1 py-1 right-0 w-64 text-default-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-10">
-          {/* Date Range Filter - Always visible and active */}
-          <div className="px-1">
-            <div className="px-2.5 py-2 space-y-2">
-              <div>
-                <label htmlFor="start-date" className="block mb-1">
-                  From:
-                </label>
-                <input
-                  type="date"
-                  id="start-date"
-                  value={formatDateForInput(
-                    currentFilters.dateRangeFilter?.start ?? null
-                  )}
-                  onChange={(e) => handleDateChange("start", e.target.value)}
-                  className="w-full p-1 border rounded"
-                />
-              </div>
-              <div>
-                <label htmlFor="end-date" className="block mb-1">
-                  To:
-                </label>
-                <input
-                  type="date"
-                  id="end-date"
-                  value={formatDateForInput(
-                    currentFilters.dateRangeFilter?.end ?? null
-                  )}
-                  onChange={(e) => handleDateChange("end", e.target.value)}
-                  className="w-full p-1 border rounded"
-                />
-              </div>
-            </div>
-          </div>
+        <div className="absolute space-y-1 mt-1 py-1 right-0 w-64 text-default-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-10">
           {/* Sales by Product Filter */}
           <div className="px-1">
             <div
