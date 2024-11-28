@@ -6,21 +6,21 @@ import React, {
   useCallback,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import TableEditing from "../../components/Table/TableEditing";
-import Button from "../../components/Button";
 import {
   ColumnConfig,
   InvoiceData,
   InvoiceFilterOptions,
   ProductData,
 } from "../../types/types";
-import toast from "react-hot-toast";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
 import { IconCloudUpload, IconPlus, IconSearch } from "@tabler/icons-react";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import InvoiceFilterMenu from "../../components/InvoiceFilterMenu";
 import { API_BASE_URL } from "../../configs/config";
-import FilterSummary from "../../components/FilterSummary";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
+import FilterSummary from "../../components/Invois/FilterSummary";
+import TableEditing from "../../components/Table/TableEditing";
+import Button from "../../components/Button";
+import toast from "react-hot-toast";
 
 const InvoisPage: React.FC = () => {
   const today = new Date();
@@ -49,6 +49,7 @@ const InvoisPage: React.FC = () => {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [productData, setProductData] = useState<ProductData[]>([]);
+  const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -553,10 +554,10 @@ const InvoisPage: React.FC = () => {
   ];
 
   const productColumns: ColumnConfig[] = [
-    { id: "code", header: "Code", type: "readonly", width: 150 },
-    { id: "productName", header: "Product Name", type: "readonly", width: 350 },
-    { id: "qty", header: "Quantity", type: "readonly", width: 150 },
-    { id: "amount", header: "Amount", type: "readonly", width: 150 },
+    { id: "code", header: "Code", type: "readonly", width: 180 },
+    { id: "productName", header: "Product Name", type: "readonly", width: 400 },
+    { id: "qty", header: "Quantity", type: "readonly", width: 180 },
+    { id: "amount", header: "Amount", type: "readonly", width: 180 },
   ];
 
   const salesmanOptions = useMemo(() => {
@@ -567,6 +568,37 @@ const InvoisPage: React.FC = () => {
     return Array.from(new Set(invoices.map((invoice) => invoice.customername)));
   }, [invoices]);
 
+  const formatDateForInput = (date: Date | null): string => {
+    if (!date) return "";
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleDateChange = (type: "start" | "end", value: string) => {
+    if (!value) {
+      handleFilterChange({
+        ...filters,
+        dateRangeFilter: {
+          ...filters.dateRangeFilter,
+          [type]: null,
+        },
+      });
+      return;
+    }
+    const [year, month, day] = value.split("-").map(Number);
+    const newDate = new Date(year, month - 1, day);
+    const newDateRange = {
+      ...filters.dateRangeFilter,
+      [type]: newDate,
+    };
+    handleFilterChange({
+      ...filters,
+      dateRangeFilter: newDateRange,
+    });
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -576,115 +608,181 @@ const InvoisPage: React.FC = () => {
   }
 
   return (
-    <div className="px-4">
-      <div className="flex justify-between items-center mb-4">
-        <div className="relative flex">
-          {!filters.applyProductFilter && <div className="w-[45px]"></div>}
-          <div className="relative flex">
-            <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-              size={22}
-            />
+    <div className="px-6">
+      <div className="flex flex-col">
+        {/* Page Header aligned with table (excluding checkbox width) */}
+        <div
+          className={`flex items-start justify-between pb-4 ${
+            !filters.applyProductFilter ? "pl-[45px]" : ""
+          }`}
+        >
+          <h1 className="text-3xl font-semibold text-default-900">Invois</h1>
+          <div className="flex items-center gap-3">
+            {selectedCount > 0 && (
+              <button
+                onClick={() => setShowDeleteConfirmation(true)}
+                className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+              >
+                Delete Selected ({selectedCount})
+              </button>
+            )}
             <input
-              type="text"
-              placeholder="Search"
-              className="w-full pl-11 py-2 border border-default-300 focus:border-default-500 rounded-full"
-              value={searchTerm}
-              onChange={handleSearchChange}
+              ref={fileInputRef}
+              type="file"
+              accept=".txt"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="fileUpload"
+              multiple
             />
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                icon={IconCloudUpload}
+                iconSize={16}
+                iconStroke={2}
+                variant="outline"
+              >
+                Import
+              </Button>
+              <Button
+                onClick={handleCreateNewInvoice}
+                icon={IconPlus}
+                iconSize={16}
+                iconStroke={2}
+                variant="outline"
+              >
+                Create
+              </Button>
+            </div>
           </div>
         </div>
-        <h1 className="ml-2 text-2xl text-center font-medium text-default-700 mb-2">
-          Invois
-        </h1>
-        <div className="flex space-x-2 justify-center">
-          {selectedCount > 0 && (
-            <button
-              onClick={() => setShowDeleteConfirmation(true)}
-              className="px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
-            >
-              <div className="flex items-center gap-2">Delete</div>
-            </button>
-          )}
-          <InvoiceFilterMenu
-            onFilterChange={handleFilterChange}
-            currentFilters={filters}
-            salesmanOptions={salesmanOptions}
-            customerOptions={customerOptions}
-            today={today}
-            tomorrow={tomorrow}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="fileUpload"
-            multiple
-          />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            icon={IconCloudUpload}
-            iconSize={16}
-            iconStroke={2}
-            variant="outline"
-          >
-            Import
-          </Button>
 
-          <Button
-            onClick={handleCreateNewInvoice}
-            icon={IconPlus}
-            iconSize={16}
-            iconStroke={2}
-            variant="outline"
-          >
-            Create
-          </Button>
+        {/* Filters Section */}
+        <div
+          className={`space-y-4 ${
+            !filters.applyProductFilter ? "ml-[45px]" : ""
+          }`}
+        >
+          <div className="flex gap-4">
+            {/* Search Bar */}
+            <div className="w-[350px]">
+              <div className="relative">
+                <IconSearch
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
+                  size={20}
+                />
+                <input
+                  type="text"
+                  placeholder="Search invoices..."
+                  className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+              </div>
+            </div>
+
+            {/* Date Range */}
+            <div className="flex-1">
+              <div
+                className={`flex items-center bg-white border ${
+                  isDateRangeFocused
+                    ? "border-default-500"
+                    : "border-default-300"
+                } rounded-full px-4`}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <input
+                    type="date"
+                    value={formatDateForInput(
+                      filters.dateRangeFilter?.start ?? null
+                    )}
+                    onChange={(e) => handleDateChange("start", e.target.value)}
+                    onFocus={() => setIsDateRangeFocused(true)}
+                    onBlur={() => setIsDateRangeFocused(false)}
+                    className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
+                  />
+                  <span className="text-default-400">to</span>
+                  <input
+                    type="date"
+                    value={formatDateForInput(
+                      filters.dateRangeFilter?.end ?? null
+                    )}
+                    onChange={(e) => handleDateChange("end", e.target.value)}
+                    onFocus={() => setIsDateRangeFocused(true)}
+                    onBlur={() => setIsDateRangeFocused(false)}
+                    className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Menu */}
+            <div className="flex justify-end">
+              <InvoiceFilterMenu
+                onFilterChange={handleFilterChange}
+                currentFilters={filters}
+                salesmanOptions={salesmanOptions}
+                customerOptions={customerOptions}
+                today={today}
+                tomorrow={tomorrow}
+              />
+            </div>
+          </div>
+
+          {/* Filter Summary */}
+          <FilterSummary filters={filters} />
         </div>
-      </div>
-      <div className="w-auto max-w-full">
-        <FilterSummary filters={filters} />
-        {filters.applyProductFilter ? (
-          productData.length > 0 ? (
-            <TableEditing<ProductData>
-              initialData={productData}
-              columns={productColumns}
-              onChange={() => {}}
-              tableKey="invois-products"
+
+        {/* Table Section */}
+        <div className="bg-white overflow-hidden">
+          {filters.applyProductFilter ? (
+            <>
+              {productData.length > 0 ? (
+                <div className="w-full">
+                  <TableEditing<ProductData>
+                    initialData={productData}
+                    columns={productColumns}
+                    onChange={() => {}}
+                    tableKey="invois-products"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[200px]">
+                  <p className="text-default-500">No product data found.</p>
+                </div>
+              )}
+            </>
+          ) : filteredInvoices.length > 0 ? (
+            <TableEditing<InvoiceData>
+              initialData={filteredInvoices}
+              columns={invoiceColumns}
+              onChange={setInvoices}
+              onSelectionChange={handleSelectionChange}
+              tableKey="invois"
             />
           ) : (
-            <p className="text-center text-default-500">
-              No product data found.
-            </p>
-          )
-        ) : filteredInvoices.length > 0 ? (
-          <TableEditing<InvoiceData>
-            initialData={filteredInvoices}
-            columns={invoiceColumns}
-            onChange={setInvoices}
-            onSelectionChange={handleSelectionChange}
-            tableKey="invois"
-          />
-        ) : (
-          <p className="text-center text-default-500">No invoices found.</p>
-        )}
+            <div className="py-16">
+              <p className="text-center text-default-500">No invoices found.</p>
+            </div>
+          )}
+        </div>
+
+        <ConfirmationDialog
+          isOpen={showDeleteConfirmation}
+          onClose={() => setShowDeleteConfirmation(false)}
+          onConfirm={handleBulkDelete}
+          title="Delete Confirmation"
+          message={
+            isAllSelected
+              ? "Are you sure you want to delete all invoices? This action cannot be undone."
+              : `Are you sure you want to delete ${selectedCount} selected invoice${
+                  selectedCount === 1 ? "" : "s"
+                }? This action cannot be undone.`
+          }
+          confirmButtonText="Delete"
+        />
       </div>
-      <ConfirmationDialog
-        isOpen={showDeleteConfirmation}
-        onClose={() => setShowDeleteConfirmation(false)}
-        onConfirm={handleBulkDelete}
-        title="Delete Confirmation"
-        message={
-          isAllSelected
-            ? "Are you sure you want to delete all invoices? This action cannot be undone."
-            : `Are you sure you want to delete ${selectedCount} selected invoice${
-                selectedCount === 1 ? "" : "s"
-              }? This action cannot be undone.`
-        }
-        confirmButtonText="Delete"
-      />
     </div>
   );
 };
