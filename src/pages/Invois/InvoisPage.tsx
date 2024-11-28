@@ -22,11 +22,29 @@ import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 
+const STORAGE_KEY = "invoisDateFilters";
+
 const InvoisPage: React.FC = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Function to get initial dates from localStorage
+  const getInitialDates = () => {
+    const savedFilters = localStorage.getItem(STORAGE_KEY);
+    if (savedFilters) {
+      const { start, end } = JSON.parse(savedFilters);
+      return {
+        start: start ? new Date(start) : today,
+        end: end ? new Date(end) : tomorrow,
+      };
+    }
+    return {
+      start: today,
+      end: tomorrow,
+    };
+  };
 
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<InvoiceData[]>([]);
@@ -41,7 +59,7 @@ const InvoisPage: React.FC = () => {
     applySalesmanFilter: true,
     customerFilter: null,
     applyCustomerFilter: true,
-    dateRangeFilter: { start: today, end: tomorrow },
+    dateRangeFilter: getInitialDates(),
     applyDateRangeFilter: true,
     invoiceTypeFilter: null,
     applyInvoiceTypeFilter: true,
@@ -321,7 +339,24 @@ const InvoisPage: React.FC = () => {
     return "Other";
   };
 
+  // Function to save dates to localStorage
+  const saveDatesToStorage = (startDate: Date | null, endDate: Date | null) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        start: startDate?.toISOString(),
+        end: endDate?.toISOString(),
+      })
+    );
+  };
+
   const handleFilterChange = (newFilters: InvoiceFilterOptions) => {
+    // Save dates to localStorage
+    saveDatesToStorage(
+      newFilters.dateRangeFilter?.start ?? null,
+      newFilters.dateRangeFilter?.end ?? null
+    );
+
     // Only reload data if date range changes
     if (
       newFilters.dateRangeFilter?.start?.getTime() !==
@@ -556,8 +591,8 @@ const InvoisPage: React.FC = () => {
   const productColumns: ColumnConfig[] = [
     { id: "code", header: "Code", type: "readonly", width: 180 },
     { id: "productName", header: "Product Name", type: "readonly", width: 400 },
-    { id: "qty", header: "Quantity", type: "readonly", width: 180 },
-    { id: "amount", header: "Amount", type: "readonly", width: 180 },
+    { id: "qty", header: "Quantity", type: "number", width: 180 },
+    { id: "amount", header: "Amount", type: "amount", width: 180 },
   ];
 
   const salesmanOptions = useMemo(() => {
@@ -578,15 +613,17 @@ const InvoisPage: React.FC = () => {
 
   const handleDateChange = (type: "start" | "end", value: string) => {
     if (!value) {
+      const newDateRange = {
+        ...filters.dateRangeFilter,
+        [type]: null,
+      };
       handleFilterChange({
         ...filters,
-        dateRangeFilter: {
-          ...filters.dateRangeFilter,
-          [type]: null,
-        },
+        dateRangeFilter: newDateRange,
       });
       return;
     }
+    
     const [year, month, day] = value.split("-").map(Number);
     const newDate = new Date(year, month - 1, day);
     const newDateRange = {

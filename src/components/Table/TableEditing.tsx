@@ -1439,9 +1439,9 @@ function TableEditing<T extends Record<string, any>>({
                             return (
                               <td
                                 key={cell.id}
-                                className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                                className="py-3 px-6 text-right font-semibold rounded-bl-lg"
                               >
-                                {row.original.qty}
+                                Total: {row.original.qty}
                               </td>
                             );
                           }
@@ -1449,9 +1449,9 @@ function TableEditing<T extends Record<string, any>>({
                             return (
                               <td
                                 key={cell.id}
-                                className="py-3 px-6 text-left font-semibold rounded-bl-lg"
+                                className="py-3 px-6 text-right font-semibold rounded-bl-lg"
                               >
-                                {row.original.amount.toFixed(2)}
+                                RM {row.original.amount.toFixed(2)}
                               </td>
                             );
                           } else {
