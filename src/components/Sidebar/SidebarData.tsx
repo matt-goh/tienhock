@@ -1,11 +1,7 @@
 import {
-  IconBookmark,
-  IconBuildingFactory2,
-  IconInvoice,
-  IconListDetails,
   IconPackage,
-  IconReportMoney,
-  IconFileInvoice,
+  IconBookmark,
+  IconListDetails,
 } from "@tabler/icons-react";
 import { Icon } from "@tabler/icons-react";
 import React from "react";
@@ -22,7 +18,6 @@ import InvoisDetailsPage from "../../pages/Invois/InvoisDetailsPage";
 import InvoisUploadPage from "../../pages/Invois/InvoisUploadPage";
 import CatalogueJobPage from "../../pages/Catalogue/CatalogueJobPage";
 import CatalogueTaxPage from "../../pages/Catalogue/CatalogueTaxPage";
-import eInvoisPage from "../../pages/Invois/eInvoisPage";
 import InvoisPage from "../../pages/Invois/InvoisPage";
 
 export interface PopoverOption {
@@ -52,51 +47,6 @@ export const SidebarData: SidebarItem[] = [
     icon: IconBookmark,
     subItems: [],
     defaultOpen: true,
-  },
-  {
-    name: "Payroll",
-    icon: IconReportMoney,
-    subItems: [
-      {
-        name: "Production",
-        icon: IconBuildingFactory2,
-        subItems: [
-          {
-            name: "Mee",
-            path: "/payroll/production/mee",
-            popoverOptions: [
-              { name: "Mee Option 1", path: "/payroll/production/mee/option1" },
-              { name: "Mee Option 2", path: "/payroll/production/mee/option2" },
-            ],
-          },
-          {
-            name: "Bihun",
-            path: "/payroll/production/bihun",
-            popoverOptions: [
-              {
-                name: "Bihun Option 1",
-                path: "/payroll/production/bihun/option1",
-              },
-              {
-                name: "Bihun Option 2",
-                path: "/payroll/production/bihun/option2",
-              },
-            ],
-          },
-        ],
-      },
-      {
-        name: "Pinjam",
-        icon: IconInvoice,
-        subItems: [
-          { name: "Entry", path: "/payroll/pinjam/entry" },
-          {
-            name: "Summary",
-            path: "/payroll/pinjam/summary",
-          },
-        ],
-      },
-    ],
   },
   {
     name: "Stock",
@@ -129,17 +79,7 @@ export const SidebarData: SidebarItem[] = [
           },
         ],
       },
-      {
-        name: "e-Invois",
-        path: "/stock/e-invois",
-        component: eInvoisPage,
-      },
     ],
-  },
-  {
-    name: "Statement",
-    icon: IconFileInvoice,
-    subItems: [],
   },
   {
     name: "Catalogue",

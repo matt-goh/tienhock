@@ -19,6 +19,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
 import FilterSummary from "../../components/Invois/FilterSummary";
 import TableEditing from "../../components/Table/TableEditing";
+import EInvoisMenu from "../../components/Invois/EInvoisMenu";
 import InvoisPDF from "./InvoisPDF";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
@@ -675,6 +676,10 @@ const InvoisPage: React.FC = () => {
               multiple
             />
             <div className="flex items-center gap-4">
+              <EInvoisMenu
+                selectedInvoices={selectedInvoices}
+                dateRange={filters.dateRangeFilter}
+              />
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 icon={IconCloudUpload}
