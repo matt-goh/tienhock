@@ -19,6 +19,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
 import FilterSummary from "../../components/Invois/FilterSummary";
 import TableEditing from "../../components/Table/TableEditing";
+import InvoisPDF from "./InvoisPDF";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 
@@ -53,6 +54,7 @@ const InvoisPage: React.FC = () => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const [isAllSelected, setIsAllSelected] = useState(false);
+  const [showPDF, setShowPDF] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState<InvoiceData[]>([]);
   const [filters, setFilters] = useState<InvoiceFilterOptions>({
     salesmanFilter: null,
@@ -623,7 +625,7 @@ const InvoisPage: React.FC = () => {
       });
       return;
     }
-    
+
     const [year, month, day] = value.split("-").map(Number);
     const newDate = new Date(year, month - 1, day);
     const newDateRange = {
@@ -820,6 +822,10 @@ const InvoisPage: React.FC = () => {
           confirmButtonText="Delete"
         />
       </div>
+      <Button onClick={() => setShowPDF(!showPDF)} variant="outline">
+        {showPDF ? "Hide PDF" : "Show PDF"}
+      </Button>
+      {showPDF && <InvoisPDF invoices={filteredInvoices} />}
     </div>
   );
 };
