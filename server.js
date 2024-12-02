@@ -2490,8 +2490,9 @@ app.post('/api/einvoice/login', async (req, res) => {
   }
 });
 
-import EInvoiceApiClient from './EInvoiceApiClient.js';
-import DocumentSubmissionHandler from './documentSubmissionHandler.js';
+import EInvoiceApiClient from './src/pages/Invois/EInvoiceApiClient.js';
+import DocumentSubmissionHandler from './src/pages/Invois/documentSubmissionHandler.js';
+import { transformInvoiceToMyInvoisFormat } from './src/pages/Invois/transformInvoiceData.js';
 
 const apiClient = new EInvoiceApiClient(MYINVOIS_API_BASE_URL, MYINVOIS_CLIENT_ID, MYINVOIS_CLIENT_SECRET);
 const submissionHandler = new DocumentSubmissionHandler(apiClient);
@@ -2499,25 +2500,48 @@ const submissionHandler = new DocumentSubmissionHandler(apiClient);
 app.post('/api/einvoice/submit', async (req, res) => {
   try {
     console.log('Starting invoice submission process');
-    const result = await submissionHandler.submitAndPollDocument();
+    const { invoiceId } = req.body;
 
-    if (result.success) {
-      console.log('Invoice submission successful:', JSON.stringify(result, null, 2));
-      res.json({
-        success: true,
-        message: result.message,
-        submissionUid: result.submissionUid,
-        acceptedDocuments: result.acceptedDocuments
-      });
-    } else {
-      console.error('Invoice submission failed:', JSON.stringify(result, null, 2));
-      res.status(400).json({
+    if (!invoiceId) {
+      return res.status(400).json({
         success: false,
-        message: result.message,
-        submissionUid: result.submissionUid,
-        rejectedDocuments: result.rejectedDocuments
+        message: 'No invoice ID provided for submission'
       });
     }
+
+    try {
+      // 1. Fetch invoice data from database
+      const invoiceData = await fetchInvoiceFromDb(invoiceId);
+      
+      // 2. Transform invoice data to MyInvois format
+      const transformedInvoice = transformInvoiceToMyInvoisFormat(invoiceData);
+      
+      // 3. Submit transformed invoice
+      const result = await submissionHandler.submitAndPollDocument(transformedInvoice);
+
+      if (result.success) {
+        console.log('Invoice submission successful:', JSON.stringify(result, null, 2));
+        res.json({
+          success: true,
+          message: result.message,
+          submissionUid: result.submissionUid,
+          acceptedDocuments: result.acceptedDocuments
+        });
+      } else {
+        console.error('Invoice submission failed:', JSON.stringify(result, null, 2));
+        res.status(400).json({
+          success: false,
+          message: result.message,
+          submissionUid: result.submissionUid,
+          rejectedDocuments: result.rejectedDocuments
+        });
+      }
+
+    } catch (error) {
+      console.error('Error in invoice processing:', error);
+      throw error; // Propagate to outer catch block for consistent error handling
+    }
+
   } catch (error) {
     console.error('Error submitting invoice:', error);
     let errorMessage = error.message;
@@ -2544,6 +2568,90 @@ app.post('/api/einvoice/submit', async (req, res) => {
     });
   }
 });
+
+async function fetchInvoiceFromDb(invoiceId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // First fetch the invoice data
+    const invoiceQuery = `
+      SELECT 
+        i.id, 
+        i.invoiceno, 
+        i.orderno, 
+        TO_CHAR(i.date, 'DD/MM/YYYY') as date,
+        i.type,
+        i.customer,
+        i.customername,
+        i.salesman,
+        i.totalamount as "totalAmount",
+        TO_CHAR(i.time, 'HH24:MI') as time
+      FROM 
+        invoices i
+      WHERE 
+        i.id = $1
+    `;
+    
+    const invoiceResult = await client.query(invoiceQuery, [invoiceId]);
+    
+    if (invoiceResult.rows.length === 0) {
+      throw new Error(`Invoice not found: ${invoiceId}`);
+    }
+
+    // Then fetch the order details for this invoice
+    const orderDetailsQuery = `
+      SELECT 
+        od.code,
+        od.productname as "productName",
+        od.qty,
+        od.price,
+        od.total,
+        od.isfoc as "isFoc",
+        od.isreturned as "isReturned",
+        od.istotal as "isTotal",
+        od.issubtotal as "isSubtotal",
+        od.isless as "isLess",
+        od.istax as "isTax"
+      FROM 
+        order_details od
+      WHERE 
+        od.invoiceid = $1
+      ORDER BY 
+        CASE 
+          WHEN od.istotal = true THEN 4
+          WHEN od.issubtotal = true THEN 3
+          WHEN od.isless = true THEN 2
+          WHEN od.istax = true THEN 1
+          ELSE 0 
+        END,
+        od.id
+    `;
+
+    const orderDetailsResult = await client.query(orderDetailsQuery, [invoiceId]);
+
+    await client.query('COMMIT');
+
+    // Combine invoice data with order details
+    const invoice = {
+      ...invoiceResult.rows[0],
+      orderDetails: orderDetailsResult.rows.map(detail => ({
+        ...detail,
+        qty: Number(detail.qty),
+        price: Number(detail.price),
+        total: detail.total
+      }))
+    };
+
+    return invoice;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error fetching invoice from database:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
