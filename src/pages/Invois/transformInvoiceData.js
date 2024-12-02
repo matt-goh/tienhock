@@ -292,7 +292,7 @@ export function transformInvoiceToMyInvoisFormat(invoiceData) {
         "PaymentMeans": [
           {
             "PaymentMeansCode": [{ "_": "03" }],
-            "PayeeFinancialAccount": [{ "_": "1234567890123" }]
+            "PayeeFinancialAccount": [{ "ID": [{ "_": "1234567890123"  }] }]
           }
         ],
         "PaymentTerms": [
@@ -398,7 +398,8 @@ export function transformInvoiceToMyInvoisFormat(invoiceData) {
                   "PerUnitAmount": [{ "_": formatAmount(totals.subtotal), "currencyID": "MYR" }],
                   "TaxCategory": [
                     {
-                      "ID": [{ "_": "01" }],
+                      "ID": [{ "_": "E" }],
+                      "TaxExemptionReason": [{ "_": "NA" }],
                       "TaxScheme": [{ 
                         "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }]
                       }]
