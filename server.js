@@ -1891,15 +1891,27 @@ app.get('/api/db/invoices', async (req, res) => {
 
     const orderDetailsQuery = `
       SELECT 
-        od.invoiceid, od.code, p.description as productname, 
-        od.qty, od.price, od.total, od.isfoc, od.isreturned,
-        od.istotal, od.issubtotal, od.isless, od.istax
-      FROM 
-        order_details od
-      LEFT JOIN 
-        products p ON od.code = p.id
-      WHERE
-        od.invoiceid = ANY($1)
+      od.invoiceid, 
+      od.code,
+      CASE 
+        WHEN od.isless OR od.istax THEN od.productname  -- Use the stored productname for special rows
+        ELSE p.description  -- Use product description for normal products
+      END as productname,
+      od.qty, 
+      od.price, 
+      od.total, 
+      od.isfoc, 
+      od.isreturned,
+      od.istotal, 
+      od.issubtotal, 
+      od.isless, 
+      od.istax
+    FROM 
+      order_details od
+    LEFT JOIN 
+      products p ON od.code = p.id
+    WHERE
+      od.invoiceid = ANY($1)
     `;
     const orderDetailsResult = await pool.query(orderDetailsQuery, [invoiceResult.rows.map(inv => inv.id)]);
 
@@ -2264,6 +2276,7 @@ app.get('/api/invoices', async (req, res) => {
     res.status(500).json({ message: 'Error fetching invoices', error: error.message });
   }
 });
+
 // Delete an invoice from the database
 app.delete('/api/db/invoices/:id', async (req, res) => {
   const { id } = req.params;
