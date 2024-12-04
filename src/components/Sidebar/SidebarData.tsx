@@ -19,6 +19,7 @@ import InvoisUploadPage from "../../pages/Invois/InvoisUploadPage";
 import CatalogueJobPage from "../../pages/Catalogue/CatalogueJobPage";
 import CatalogueTaxPage from "../../pages/Catalogue/CatalogueTaxPage";
 import InvoisPage from "../../pages/Invois/InvoisPage";
+import PDFViewerPage from "../../pages/Invois/PDFViewerPage";
 
 export interface PopoverOption {
   name: string;
@@ -61,6 +62,11 @@ export const SidebarData: SidebarItem[] = [
             name: "Invois Details",
             path: "/stock/invois/:id",
             component: InvoisDetailsPage,
+          },
+          {
+            name: "Invois PDF Viewer",
+            path: "/pdf-viewer",
+            component: PDFViewerPage,
           },
           {
             name: "Imported Invois Page",
