@@ -149,16 +149,37 @@ export const saveInvoice = async (
   saveToDb: boolean = true
 ): Promise<InvoiceData> => {
   try {
-    // Filter out total rows and other calculated rows
-    const filteredOrderDetails = invoice.orderDetails.filter(
-      (detail) =>
-        !detail.isTotal && !detail.isSubtotal && !detail.isLess && !detail.isTax
+    // Normalize the order details before saving
+    const normalizedOrderDetails = invoice.orderDetails.map((detail) => {
+      if (detail.isless || detail.istax) {
+        return {
+          invoiceid: detail.invoiceid,
+          code: detail.code,
+          productname: detail.productname,
+          qty: Number(detail.qty),
+          price: Number(detail.price),
+          total: detail.total.toString(),
+          isfoc: false,
+          isreturned: false,
+          istotal: false,
+          issubtotal: false,
+          isless: detail.isless || false,
+          istax: detail.istax || false,
+        };
+      }
+      return detail;
+    });
+
+    // Filter out total rows but keep special rows
+    const filteredOrderDetails = normalizedOrderDetails.filter(
+      (detail) => !detail.istotal
     );
 
     const invoiceToSave = {
       ...invoice,
       orderDetails: filteredOrderDetails,
     };
+
     const url = `${API_BASE_URL}/api/invoices/submit?saveToDb=${saveToDb}`;
 
     const response = await fetch(url, {
@@ -202,72 +223,6 @@ export const saveInvoice = async (
   }
 };
 
-function addCalculatedTotalRows(orderDetails: OrderDetail[]): OrderDetail[] {
-  let subtotal = 0;
-  let focTotal = 0;
-  let returnedTotal = 0;
-  const detailsWithTotals = [...orderDetails];
-
-  // Calculate totals
-  orderDetails.forEach((detail) => {
-    if (!detail.isFoc && !detail.isReturned) {
-      subtotal += parseFloat(detail.total) || 0;
-    } else if (detail.isFoc) {
-      focTotal += parseFloat(detail.total) || 0;
-    } else if (detail.isReturned) {
-      returnedTotal += parseFloat(detail.total) || 0;
-    }
-  });
-
-  // Add subtotal row
-  detailsWithTotals.push({
-    code: "SUBTOTAL",
-    productName: "Subtotal",
-    qty: 0,
-    price: 0,
-    total: subtotal.toFixed(2),
-    isSubtotal: true,
-  });
-
-  // Add FOC total row if applicable
-  if (focTotal > 0) {
-    detailsWithTotals.push({
-      code: "FOC-TOTAL",
-      productName: "FOC Total",
-      qty: 0,
-      price: 0,
-      total: focTotal.toFixed(2),
-      isFoc: true,
-      isTotal: true,
-    });
-  }
-
-  // Add Returned total row if applicable
-  if (returnedTotal > 0) {
-    detailsWithTotals.push({
-      code: "RETURNED-TOTAL",
-      productName: "Returned Total",
-      qty: 0,
-      price: 0,
-      total: returnedTotal.toFixed(2),
-      isReturned: true,
-      isTotal: true,
-    });
-  }
-
-  // Add grand total row
-  detailsWithTotals.push({
-    code: "GRAND-TOTAL",
-    productName: "Total",
-    qty: 0,
-    price: 0,
-    total: (subtotal - returnedTotal).toFixed(2),
-    isTotal: true,
-  });
-
-  return detailsWithTotals;
-}
-
 export const createInvoice = async (
   invoiceData: InvoiceData
 ): Promise<InvoiceData> => {
@@ -281,10 +236,9 @@ export const createInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
-    // Filter out total rows and other calculated rows
+    // Only filter out total rows, keep tax and less rows
     const filteredOrderDetails = invoiceData.orderDetails.filter(
-      (detail) =>
-        !detail.isTotal && !detail.isSubtotal && !detail.isLess && !detail.isTax
+      (detail) => !detail.istotal
     );
 
     const invoiceToCreate = {
@@ -321,3 +275,87 @@ export const createInvoice = async (
     throw error;
   }
 };
+
+function addCalculatedTotalRows(orderDetails: OrderDetail[]): OrderDetail[] {
+  let subtotal = 0;
+  let focTotal = 0;
+  let returnedTotal = 0;
+  const detailsWithTotals = [...orderDetails];
+
+  // Calculate totals, considering tax and less rows
+  orderDetails.forEach((detail) => {
+    if (detail.isless) {
+      subtotal -= parseFloat(detail.total) || 0;
+    } else if (detail.istax) {
+      subtotal += parseFloat(detail.total) || 0;
+    } else if (!detail.isfoc && !detail.isreturned) {
+      subtotal += parseFloat(detail.total) || 0;
+    } else if (detail.isfoc) {
+      focTotal += parseFloat(detail.total) || 0;
+    } else if (detail.isreturned) {
+      returnedTotal += parseFloat(detail.total) || 0;
+    }
+  });
+
+  // Sort the details to maintain proper order
+  detailsWithTotals.sort((a, b) => {
+    const getOrderValue = (item: OrderDetail) => {
+      if (item.istotal) return 6;
+      if (item.issubtotal) return 5;
+      if (item.isless) return 4;
+      if (item.istax) return 3;
+      if (item.isfoc) return 2;
+      if (item.isreturned) return 1;
+      return 0;
+    };
+    return getOrderValue(a) - getOrderValue(b);
+  });
+
+  // Add subtotal row
+  detailsWithTotals.push({
+    code: "SUBTOTAL",
+    productname: "Subtotal",
+    qty: 0,
+    price: 0,
+    total: subtotal.toFixed(2),
+    issubtotal: true,
+  });
+
+  // Add FOC total row if applicable
+  if (focTotal > 0) {
+    detailsWithTotals.push({
+      code: "FOC-TOTAL",
+      productname: "FOC Total",
+      qty: 0,
+      price: 0,
+      total: focTotal.toFixed(2),
+      isfoc: true,
+      istotal: true,
+    });
+  }
+
+  // Add Returned total row if applicable
+  if (returnedTotal > 0) {
+    detailsWithTotals.push({
+      code: "RETURNED-TOTAL",
+      productname: "Returned Total",
+      qty: 0,
+      price: 0,
+      total: returnedTotal.toFixed(2),
+      isreturned: true,
+      istotal: true,
+    });
+  }
+
+  // Add grand total row
+  detailsWithTotals.push({
+    code: "GRAND-TOTAL",
+    productname: "Total",
+    qty: 0,
+    price: 0,
+    total: (subtotal - returnedTotal).toFixed(2),
+    istotal: true,
+  });
+
+  return detailsWithTotals;
+}

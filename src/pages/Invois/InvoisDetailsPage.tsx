@@ -226,16 +226,13 @@ const InvoisDetailsPage: React.FC = () => {
   const calculateTotal = useCallback((items: OrderDetail[]) => {
     return items
       .reduce((sum, detail) => {
-        if (detail.isTotal) {
-          return sum;
-        }
-        if (detail.isLess) {
+        if (detail.isless) {
           return sum - parseFloat(detail.total || "0");
         }
-        if (detail.isTax) {
+        if (detail.istax) {
           return sum + parseFloat(detail.total || "0");
         }
-        if (detail.isSubtotal || detail.isTotal) {
+        if (detail.issubtotal || detail.istotal) {
           return sum;
         }
         return sum + parseFloat(detail.total || "0");
@@ -246,7 +243,7 @@ const InvoisDetailsPage: React.FC = () => {
   const calculateOverallTotal = useCallback(
     (orderDetails: OrderDetail[]) => {
       const regularItems = orderDetails.filter(
-        (item) => !item.isFoc && !item.isReturned && !item.isTotal
+        (item) => !item.isfoc && !item.isreturned && !item.istotal
       );
       return calculateTotal(regularItems);
     },
@@ -299,6 +296,37 @@ const InvoisDetailsPage: React.FC = () => {
     fetchCustomers("", 1);
   }, [invoiceData?.salesman, fetchCustomers]);
 
+  useEffect(() => {
+    if (invoiceData) {
+      setInvoiceData((prev) => {
+        if (!prev) return null;
+
+        const normalizedOrderDetails = prev.orderDetails.map((detail) => {
+          // Handle special rows
+          if (detail.isless || detail.istax) {
+            return normalizeSpecialRow(detail, detail.isless ? "Less" : "Tax");
+          }
+          return {
+            ...detail,
+            // Normalize standard fields
+            productname: detail.productname,
+            isless: detail.isless || false,
+            istax: detail.istax || false,
+            isfoc: detail.isfoc || false,
+            isreturned: detail.isreturned || false,
+            istotal: detail.istotal || false,
+            issubtotal: detail.issubtotal || false,
+          };
+        });
+
+        return {
+          ...prev,
+          orderDetails: normalizedOrderDetails,
+        };
+      });
+    }
+  }, [initialInvoiceData]); // Run when initial data is loaded
+
   const loadMoreCustomers = useCallback(() => {
     if (customerPage < totalCustomerPages && !isFetchingCustomers) {
       const nextPage = customerPage + 1;
@@ -350,21 +378,21 @@ const InvoisDetailsPage: React.FC = () => {
 
   const addTotalRow = useCallback(
     (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
-      const existingTotalRow = items.find((item) => item.isTotal);
+      const existingTotalRow = items.find((item) => item.istotal);
       if (existingTotalRow) {
         return items.map((item) =>
-          item.isTotal ? { ...item, total: totalAmount } : item
+          item.istotal ? { ...item, total: totalAmount } : item
         );
       } else {
         return [
           ...items,
           {
             code: "",
-            productName: "Total:",
+            productname: "Total:",
             qty: 0,
             price: 0,
             total: totalAmount,
-            isTotal: true,
+            istotal: true,
           },
         ];
       }
@@ -375,7 +403,7 @@ const InvoisDetailsPage: React.FC = () => {
   const orderDetailsWithTotal = useMemo(() => {
     if (!invoiceData) return [];
     const regularItems = invoiceData.orderDetails.filter(
-      (item) => !item.isFoc && !item.isReturned
+      (item) => !item.isfoc && !item.isreturned
     );
     const totalAmount = calculateTotal(regularItems);
     return addTotalRow(regularItems, totalAmount);
@@ -383,31 +411,43 @@ const InvoisDetailsPage: React.FC = () => {
 
   const recalculateSubtotals = useCallback(
     (details: OrderDetail[]): OrderDetail[] => {
+      const result: OrderDetail[] = [];
       let runningTotal = 0;
 
-      return details.map((item, index) => {
-        if (item.isSubtotal) {
-          const subtotalItem = { ...item, total: runningTotal.toFixed(2) };
-          return subtotalItem;
-        } else if (item.isLess) {
-          runningTotal -= parseFloat(item.total || "0");
-        } else if (item.isTax) {
-          runningTotal += parseFloat(item.total || "0");
-        } else if (!item.isTotal) {
-          runningTotal += parseFloat(item.total || "0");
+      // First pass: calculate running total and maintain order
+      for (const item of details) {
+        if (item.issubtotal) {
+          // When we hit a subtotal, add it with the current running total
+          result.push({
+            ...item,
+            total: runningTotal.toFixed(2),
+          });
+          // Don't reset running total - it should continue accumulating
+        } else {
+          // Add the non-subtotal item as-is
+          result.push(item);
+          // Update running total based on item type
+          if (item.isless) {
+            runningTotal -= parseFloat(item.total || "0");
+          } else if (item.istax) {
+            runningTotal += parseFloat(item.total || "0");
+          } else if (!item.istotal) {
+            runningTotal += parseFloat(item.total || "0");
+          }
         }
-        return item;
-      });
+      }
+
+      return result;
     },
     []
   );
 
   const handleSpecialRowDelete = useCallback(
-    (rowCode: string) => {
+    (code: string) => {
       setInvoiceData((prevData) => {
         if (!prevData) return null;
         const newDetails = prevData.orderDetails.filter(
-          (item) => item.code !== rowCode
+          (item) => item.code !== code
         );
         return {
           ...prevData,
@@ -424,11 +464,11 @@ const InvoisDetailsPage: React.FC = () => {
         .filter((item) => {
           switch (tableType) {
             case "details":
-              return !item.isFoc && !item.isReturned;
+              return !item.isfoc && !item.isreturned;
             case "foc":
-              return item.isFoc;
+              return item.isfoc;
             case "returned":
-              return item.isReturned;
+              return item.isreturned;
             default:
               return false;
           }
@@ -454,12 +494,12 @@ const InvoisDetailsPage: React.FC = () => {
 
       const newItem: OrderDetail = {
         code: randomProduct.id,
-        productName: randomProduct.description,
+        productname: randomProduct.description,
         qty: 1,
         price: tableType === "details" ? 0 : 0,
         total: "0",
-        isFoc: tableType === "foc",
-        isReturned: tableType === "returned",
+        isfoc: tableType === "foc",
+        isreturned: tableType === "returned",
       };
 
       return newItem;
@@ -485,68 +525,69 @@ const InvoisDetailsPage: React.FC = () => {
         setInvoiceData((prevInvoiceData) => {
           if (!prevInvoiceData) return null;
 
-          const filteredItems = updatedItems.filter(
-            (item) => !item.isTotal && item.productName != null
+          const prevRegularItems = prevInvoiceData.orderDetails.filter(
+            (item) => !item.istotal && !item.isfoc && !item.isreturned
           );
-          // Separate order details from FOC and returned items
-          const currentOrderDetails = prevInvoiceData.orderDetails.filter(
-            (item) => !item.isTotal && !item.isFoc && !item.isReturned
-          );
+
+          // Filter out total row from updated items
+          const filteredItems = updatedItems.filter((item) => !item.istotal);
+
+          // Get other types of items to preserve
           const focItems = prevInvoiceData.orderDetails.filter(
-            (item) => item.isFoc
+            (item) => item.isfoc
           );
           const returnedItems = prevInvoiceData.orderDetails.filter(
-            (item) => item.isReturned
+            (item) => item.isreturned
           );
+
           let updatedOrderDetails: OrderDetail[];
 
-          // Check if it's a deletion operation
-          if (filteredItems.length < currentOrderDetails.length) {
-            // It's a deletion operation
+          // Check if this is a deletion operation
+          if (filteredItems.length < prevRegularItems.length) {
+            // For deletion, maintain the exact order from filteredItems
             updatedOrderDetails = filteredItems;
           } else {
-            // It's a regular update operation
-            const newItems = updatedItems.filter(
-              (item) =>
-                !item.code && !item.isTotal && !item.isFoc && !item.isReturned
-            );
-            // Update existing items
-            updatedOrderDetails = currentOrderDetails.map((item) => {
-              const updatedItem = updatedItems.find(
+            // For updates/additions, maintain original order while updating values
+            updatedOrderDetails = prevRegularItems.map((item) => {
+              // If this is a subtotal, preserve its position
+              if (item.issubtotal) return item;
+
+              const updatedItem = filteredItems.find(
                 (updated) => updated.code === item.code
               );
-              if (updatedItem) {
-                // Check if the product name has changed
-                if (updatedItem.productName !== item.productName) {
-                  // Find the matching product in the products array
-                  const matchingProduct = products.find(
-                    (p) => p.description === updatedItem.productName
-                  );
-                  if (matchingProduct) {
-                    // Update the code to match the new product
-                    updatedItem.code = matchingProduct.id;
-                  }
-                }
-                if (item.isLess || item.isTax) {
-                  // For Less and Tax rows, use the updated total directly
-                  return {
-                    ...item,
-                    ...updatedItem,
-                    total: updatedItem.total,
-                  };
-                } else {
-                  // For regular items, recalculate the total
-                  return {
-                    ...item,
-                    ...updatedItem,
-                    total: (updatedItem.qty * updatedItem.price).toFixed(2),
-                  };
+              if (!updatedItem) return item;
+
+              // Handle product name changes
+              if (updatedItem.productname !== item.productname) {
+                const matchingProduct = products.find(
+                  (p) => p.description === updatedItem.productname
+                );
+                if (matchingProduct) {
+                  updatedItem.code = matchingProduct.id;
                 }
               }
-              return item;
+
+              // Return updated item
+              if (item.isless || item.istax) {
+                return {
+                  ...item,
+                  ...updatedItem,
+                  total: updatedItem.total,
+                };
+              }
+              return {
+                ...item,
+                ...updatedItem,
+                total: (updatedItem.qty * updatedItem.price).toFixed(2),
+              };
             });
 
-            // Add only one new item if there are any and we haven't added one in this render cycle
+            // Handle new items
+            const newItems = filteredItems.filter(
+              (item) =>
+                !item.code && !item.istotal && !item.isfoc && !item.isreturned
+            );
+
             if (newItems.length > 0 && !newRowAddedRef.current) {
               const newItem = addNewRow("details");
               if (newItem) {
@@ -556,23 +597,23 @@ const InvoisDetailsPage: React.FC = () => {
             }
           }
 
-          // Apply recalculateSubtotals here
+          // Recalculate the subtotals while maintaining positions
           updatedOrderDetails = recalculateSubtotals(updatedOrderDetails);
 
-          // Calculate total for order details
+          // Calculate total
           const totalAmount = calculateTotal(updatedOrderDetails);
 
           // Add total row
           const totalRow = {
             code: "",
-            productName: "Total:",
+            productname: "Total:",
             qty: 0,
             price: 0,
             total: totalAmount,
-            isTotal: true,
+            istotal: true,
           };
 
-          // Combine updated order details with FOC and returned items
+          // Combine everything
           const combinedOrderDetails = [
             ...updatedOrderDetails,
             ...focItems,
@@ -580,16 +621,9 @@ const InvoisDetailsPage: React.FC = () => {
             totalRow,
           ];
 
-          // Calculate the overall total amount for the invoice
+          // Calculate overall total
           const overallTotalAmount =
             calculateOverallTotal(combinedOrderDetails);
-
-          // Update the global invoice data
-          updateInvoice({
-            ...prevInvoiceData,
-            orderDetails: combinedOrderDetails,
-            totalAmount: overallTotalAmount,
-          });
 
           return {
             ...prevInvoiceData,
@@ -624,11 +658,42 @@ const InvoisDetailsPage: React.FC = () => {
     [invoiceData]
   );
 
+  const normalizeSpecialRow = useCallback(
+    (row: OrderDetail, type: "Less" | "Tax") => {
+      return {
+        // Keep any existing ID if it's from DB
+        invoiceid: row.invoiceid || "",
+        code:
+          row.code ||
+          `${type.toUpperCase()}-${getNextSpecialRowNumber(
+            type.toUpperCase()
+          )}`,
+        // Keep the original productname instead of generating a new one
+        productname:
+          row.productname ||
+          `${type} ${getNextSpecialRowNumber(type.toUpperCase())}`,
+        // Convert numeric values to strings if needed but preserve the original values
+        qty: row.qty || 1,
+        price: row.price || 0,
+        // Keep the original total value instead of defaulting to "0"
+        total: row.total || "0",
+        // Ensure all boolean flags are present
+        isfoc: false,
+        isreturned: false,
+        istotal: false,
+        issubtotal: false,
+        isless: type === "Less",
+        istax: type === "Tax",
+      };
+    },
+    [getNextSpecialRowNumber]
+  );
+
   const insertBeforeTotal = (
     orderDetails: OrderDetail[],
     newItem: OrderDetail
   ) => {
-    const totalIndex = orderDetails.findIndex((item) => item.isTotal);
+    const totalIndex = orderDetails.findIndex((item) => item.istotal);
     if (totalIndex !== -1) {
       return [
         ...orderDetails.slice(0, totalIndex),
@@ -642,15 +707,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleAddLess = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
-      const nextNumber = getNextSpecialRowNumber("LESS");
-      const newItem = {
-        code: `LESS-${nextNumber}`,
-        productName: `Less ${nextNumber}`,
-        qty: 1,
-        price: 0,
-        total: "0",
-        isLess: true,
-      };
+      const newItem = normalizeSpecialRow({} as OrderDetail, "Less");
       return {
         ...prevData,
         orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
@@ -661,15 +718,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleAddTax = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
-      const nextNumber = getNextSpecialRowNumber("TAX");
-      const newItem = {
-        code: `TAX-${nextNumber}`,
-        productName: `Tax ${nextNumber}`,
-        qty: 1,
-        price: 0,
-        total: "0",
-        isTax: true,
-      };
+      const newItem = normalizeSpecialRow({} as OrderDetail, "Tax");
       return {
         ...prevData,
         orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
@@ -681,29 +730,62 @@ const InvoisDetailsPage: React.FC = () => {
     setInvoiceData((prevData) => {
       if (!prevData) return null;
       const nextNumber = getNextSpecialRowNumber("SUBTOTAL");
-      const subtotalAmount = calculateTotal(
-        prevData.orderDetails.filter(
-          (item) => !item.isSubtotal && !item.isFoc && !item.isReturned
-        )
-      );
-      const newItem = {
+
+      // Calculate subtotal only from non-special rows up to this point
+      const currentItems = prevData.orderDetails;
+      let runningTotal = 0;
+
+      for (const item of currentItems) {
+        if (item.istotal || item.issubtotal) continue;
+        if (item.isless) {
+          runningTotal -= parseFloat(item.total || "0");
+          continue;
+        }
+        if (item.istax) {
+          runningTotal += parseFloat(item.total || "0");
+          continue;
+        }
+        if (!item.isfoc && !item.isreturned) {
+          runningTotal += parseFloat(item.total || "0");
+        }
+      }
+
+      const newItem: OrderDetail = {
         code: `SUBTOTAL-${nextNumber}`,
-        productName: `Subtotal ${nextNumber}`,
+        productname: `Subtotal ${nextNumber}`,
         qty: 0,
         price: 0,
-        total: subtotalAmount,
-        isSubtotal: true,
+        total: runningTotal.toFixed(2),
+        issubtotal: true,
+        // Add other required properties with default values
+        isless: false,
+        istax: false,
+        isfoc: false,
+        isreturned: false,
+        istotal: false,
       };
+
+      // Insert before total but after all regular items
+      const totalRowIndex = prevData.orderDetails.findIndex(
+        (item) => item.istotal
+      );
+      const newOrderDetails = [...prevData.orderDetails];
+      if (totalRowIndex !== -1) {
+        newOrderDetails.splice(totalRowIndex, 0, newItem);
+      } else {
+        newOrderDetails.push(newItem);
+      }
+
       return {
         ...prevData,
-        orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
+        orderDetails: newOrderDetails,
       };
     });
   };
 
   const focItemsWithTotal = useMemo(() => {
     if (!invoiceData) return [];
-    const focItems = invoiceData.orderDetails.filter((item) => item.isFoc);
+    const focItems = invoiceData.orderDetails.filter((item) => item.isfoc);
     const totalAmount = calculateTotal(focItems);
     return addTotalRow(focItems, totalAmount);
   }, [invoiceData, calculateTotal, addTotalRow]);
@@ -711,7 +793,7 @@ const InvoisDetailsPage: React.FC = () => {
   const returnedItemsWithTotal = useMemo(() => {
     if (!invoiceData) return [];
     const returnedItems = invoiceData.orderDetails.filter(
-      (item) => item.isReturned
+      (item) => item.isreturned
     );
     const totalAmount = calculateTotal(returnedItems);
     return addTotalRow(returnedItems, totalAmount);
@@ -806,7 +888,7 @@ const InvoisDetailsPage: React.FC = () => {
       if (!newItem) return prevData;
 
       const totalIndex = prevData.orderDetails.findIndex(
-        (item) => item.isTotal
+        (item) => item.istotal
       );
       const newOrderDetails = [...prevData.orderDetails];
 
@@ -830,7 +912,7 @@ const InvoisDetailsPage: React.FC = () => {
       if (!newItem) return prevData;
 
       const totalIndex = prevData.orderDetails.findIndex(
-        (item) => item.isTotal && item.isFoc
+        (item) => item.istotal && item.isfoc
       );
       const newOrderDetails = [...prevData.orderDetails];
 
@@ -838,7 +920,7 @@ const InvoisDetailsPage: React.FC = () => {
         newOrderDetails.splice(totalIndex, 0, newItem);
       } else {
         const lastFocIndex = newOrderDetails
-          .map((item) => item.isFoc)
+          .map((item) => item.isfoc)
           .lastIndexOf(true);
         if (lastFocIndex !== -1) {
           newOrderDetails.splice(lastFocIndex + 1, 0, newItem);
@@ -861,7 +943,7 @@ const InvoisDetailsPage: React.FC = () => {
       if (!newItem) return prevData;
 
       const totalIndex = prevData.orderDetails.findIndex(
-        (item) => item.isTotal && item.isReturned
+        (item) => item.istotal && item.isreturned
       );
       const newOrderDetails = [...prevData.orderDetails];
 
@@ -869,7 +951,7 @@ const InvoisDetailsPage: React.FC = () => {
         newOrderDetails.splice(totalIndex, 0, newItem);
       } else {
         const lastReturnedIndex = newOrderDetails
-          .map((item) => item.isReturned)
+          .map((item) => item.isreturned)
           .lastIndexOf(true);
         if (lastReturnedIndex !== -1) {
           newOrderDetails.splice(lastReturnedIndex + 1, 0, newItem);
@@ -890,15 +972,15 @@ const InvoisDetailsPage: React.FC = () => {
     setTimeout(() => {
       setInvoiceData((prevInvoiceData) => {
         if (!prevInvoiceData) return null;
-        const filteredItems = updatedItems.filter((item) => !item.isTotal);
+        const filteredItems = updatedItems.filter((item) => !item.istotal);
         const currentFocItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isFoc && !item.isTotal
+          (item) => item.isfoc && !item.istotal
         );
         const regularItems = prevInvoiceData.orderDetails.filter(
-          (item) => !item.isFoc && !item.isReturned
+          (item) => !item.isfoc && !item.isreturned
         );
         const returnedItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isReturned
+          (item) => item.isreturned
         );
         let updatedFocItems: OrderDetail[];
 
@@ -906,18 +988,18 @@ const InvoisDetailsPage: React.FC = () => {
           updatedFocItems = filteredItems;
         } else {
           const newItems = updatedItems.filter(
-            (item) => !item.code && !item.isTotal && item.isFoc
+            (item) => !item.code && !item.istotal && item.isfoc
           );
           updatedFocItems = currentFocItems.map((item) => {
             const updatedItem = updatedItems.find(
-              (updated) => updated.code === item.code && updated.isFoc
+              (updated) => updated.code === item.code && updated.isfoc
             );
             if (updatedItem) {
               // Check if the product name has changed
-              if (updatedItem.productName !== item.productName) {
+              if (updatedItem.productname !== item.productname) {
                 // Find the matching product in the products array
                 const matchingProduct = products.find(
-                  (p) => p.description === updatedItem.productName
+                  (p) => p.description === updatedItem.productname
                 );
                 if (matchingProduct) {
                   // Update the code to match the new product
@@ -927,7 +1009,7 @@ const InvoisDetailsPage: React.FC = () => {
               return {
                 ...item,
                 code: updatedItem.code || item.code,
-                productName: updatedItem.productName || item.productName,
+                productname: updatedItem.productname || item.productname,
                 qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
                 price:
                   updatedItem.price !== undefined
@@ -939,7 +1021,7 @@ const InvoisDetailsPage: React.FC = () => {
                     ? updatedItem.price
                     : item.price)
                 ).toFixed(2),
-                isFoc: true,
+                isfoc: true,
               };
             }
             return item;
@@ -958,12 +1040,12 @@ const InvoisDetailsPage: React.FC = () => {
 
         const totalRow = {
           code: "",
-          productName: "Total:",
+          productname: "Total:",
           qty: 0,
           price: 0,
           total: totalAmount,
-          isTotal: true,
-          isFoc: true,
+          istotal: true,
+          isfoc: true,
         };
 
         const combinedOrderDetails = [
@@ -985,15 +1067,15 @@ const InvoisDetailsPage: React.FC = () => {
       setInvoiceData((prevInvoiceData) => {
         if (!prevInvoiceData) return null;
 
-        const filteredItems = updatedItems.filter((item) => !item.isTotal);
+        const filteredItems = updatedItems.filter((item) => !item.istotal);
         const currentReturnedItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isReturned && !item.isTotal
+          (item) => item.isreturned && !item.istotal
         );
         const regularItems = prevInvoiceData.orderDetails.filter(
-          (item) => !item.isFoc && !item.isReturned
+          (item) => !item.isfoc && !item.isreturned
         );
         const focItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isFoc
+          (item) => item.isfoc
         );
         let updatedReturnedItems: OrderDetail[];
 
@@ -1001,18 +1083,18 @@ const InvoisDetailsPage: React.FC = () => {
           updatedReturnedItems = filteredItems;
         } else {
           const newItems = updatedItems.filter(
-            (item) => !item.code && !item.isTotal && item.isReturned
+            (item) => !item.code && !item.istotal && item.isreturned
           );
           updatedReturnedItems = currentReturnedItems.map((item) => {
             const updatedItem = updatedItems.find(
-              (updated) => updated.code === item.code && updated.isReturned
+              (updated) => updated.code === item.code && updated.isreturned
             );
             if (updatedItem) {
               // Check if the product name has changed
-              if (updatedItem.productName !== item.productName) {
+              if (updatedItem.productname !== item.productname) {
                 // Find the matching product in the products array
                 const matchingProduct = products.find(
-                  (p) => p.description === updatedItem.productName
+                  (p) => p.description === updatedItem.productname
                 );
                 if (matchingProduct) {
                   // Update the code to match the new product
@@ -1022,7 +1104,7 @@ const InvoisDetailsPage: React.FC = () => {
               return {
                 ...item,
                 code: updatedItem.code || item.code,
-                productName: updatedItem.productName || item.productName,
+                productname: updatedItem.productname || item.productname,
                 qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
                 price:
                   updatedItem.price !== undefined
@@ -1034,7 +1116,7 @@ const InvoisDetailsPage: React.FC = () => {
                     ? updatedItem.price
                     : item.price)
                 ).toFixed(2),
-                isReturned: true,
+                isreturned: true,
               };
             }
             return item;
@@ -1053,12 +1135,12 @@ const InvoisDetailsPage: React.FC = () => {
 
         const totalRow = {
           code: "",
-          productName: "Total:",
+          productname: "Total:",
           qty: 0,
           price: 0,
           total: totalAmount,
-          isTotal: true,
-          isReturned: true,
+          istotal: true,
+          isreturned: true,
         };
 
         const combinedOrderDetails = [
@@ -1106,7 +1188,7 @@ const InvoisDetailsPage: React.FC = () => {
       width: 150,
     },
     {
-      id: "productName",
+      id: "productname",
       header: "PRODUCT",
       type: "combobox",
       width: 350,
@@ -1184,7 +1266,7 @@ const InvoisDetailsPage: React.FC = () => {
       type: "amount",
       width: 100,
       cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => {
-        const isEditable = info.row.original.isLess || info.row.original.isTax;
+        const isEditable = info.row.original.isless || info.row.original.istax;
         return (
           <input
             type="float"
@@ -1220,7 +1302,7 @@ const InvoisDetailsPage: React.FC = () => {
   const focItemsColumns: ColumnConfig[] = [
     { id: "code", header: "ID", type: "readonly", width: 150 },
     {
-      id: "productName",
+      id: "productname",
       header: "PRODUCT",
       type: "combobox",
       width: 350,
@@ -1298,7 +1380,7 @@ const InvoisDetailsPage: React.FC = () => {
       width: 100,
       cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
         <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.isTotal
+          {info.row.original.istotal
             ? info.getValue()
             : (
                 parseFloat(info.row.original.price.toString()) *
@@ -1313,7 +1395,7 @@ const InvoisDetailsPage: React.FC = () => {
   const returnedGoodsColumns: ColumnConfig[] = [
     { id: "code", header: "ID", type: "readonly", width: 150 },
     {
-      id: "productName",
+      id: "productname",
       header: "PRODUCT",
       type: "combobox",
       width: 350,
@@ -1392,7 +1474,7 @@ const InvoisDetailsPage: React.FC = () => {
       width: 100,
       cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
         <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.isTotal
+          {info.row.original.istotal
             ? info.getValue()
             : (
                 parseFloat(info.row.original.price.toString()) *

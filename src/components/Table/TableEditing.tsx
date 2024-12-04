@@ -381,17 +381,21 @@ function TableEditing<T extends Record<string, any>>({
     (currentData: T[]): T[] => {
       let total = 0;
       const updatedData = currentData.map((row) => {
-        if (row.isTotal) return row;
-        if (row.isSubtotal) return row;
+        if (row.istotal) return row;
+        if (row.issubtotal) return row;
 
-        if (row.isLess) {
-          total -= parseFloat(row.total || "0");
-          return row;
-        }
-
-        if (row.isTax) {
-          total += parseFloat(row.total || "0");
-          return row;
+        if (row.isless || row.istax) {
+          const currentTotal = parseFloat(row.total || "0");
+          if (row.isless) {
+            total -= currentTotal;
+          } else {
+            total += currentTotal;
+          }
+          // Preserve the special row's total
+          return {
+            ...row,
+            total: row.total, // Keep the original total
+          };
         }
 
         const amount = calculateAmount(row);
@@ -404,7 +408,7 @@ function TableEditing<T extends Record<string, any>>({
       });
 
       // Update total row
-      const totalRowIndex = updatedData.findIndex((row) => row.isTotal);
+      const totalRowIndex = updatedData.findIndex((row) => row.istotal);
       if (totalRowIndex !== -1) {
         updatedData[totalRowIndex] = {
           ...updatedData[totalRowIndex],
@@ -452,7 +456,7 @@ function TableEditing<T extends Record<string, any>>({
       }
 
       const row = sortedRows[rowIndex].original;
-      if (row.isTotal) {
+      if (row.istotal) {
         rowIndex = (rowIndex + 1) % totalRows;
         colIndex = 0;
         continue;
@@ -460,7 +464,7 @@ function TableEditing<T extends Record<string, any>>({
 
       const column = allColumns[colIndex];
       if (
-        !row.isSubtotal &&
+        !row.issubtotal &&
         isEditableColumn(column) &&
         column.type !== "listbox" &&
         column.type !== "combobox"
@@ -506,7 +510,7 @@ function TableEditing<T extends Record<string, any>>({
         isLastColumn &&
         isLastRow &&
         isLastPage &&
-        !sortedRows[currentRowIndex].original.isTotal
+        !sortedRows[currentRowIndex].original.istotal
       ) {
         setTimeout(() => {
           const newRows = table.getRowModel().rows;
@@ -556,8 +560,8 @@ function TableEditing<T extends Record<string, any>>({
           }
         })
       ),
-      ...(tableKey === "focItems" && { isFoc: true }),
-      ...(tableKey === "returnedGoods" && { isReturned: true }),
+      ...(tableKey === "focItems" && { isfoc: true }),
+      ...(tableKey === "returnedGoods" && { isreturned: true }),
     } as T;
 
     setData((prevData) => {
@@ -565,7 +569,7 @@ function TableEditing<T extends Record<string, any>>({
       let totalRow: T | undefined;
 
       // Check if the last row is a Total row
-      if (newData.length > 0 && newData[newData.length - 1].isTotal) {
+      if (newData.length > 0 && newData[newData.length - 1].istotal) {
         totalRow = newData.pop();
       }
 
@@ -615,7 +619,7 @@ function TableEditing<T extends Record<string, any>>({
       const recalculatedData: T[] = [];
 
       currentData.forEach((row, index) => {
-        if (row.isSubtotal) {
+        if (row.issubtotal) {
           const subtotalAmount = currentSubtotal.toFixed(2);
           recalculatedData.push({
             ...row,
@@ -643,30 +647,38 @@ function TableEditing<T extends Record<string, any>>({
       event.stopPropagation();
       const rowToDelete = data[rowIndex];
 
-      if (rowToDelete.isLess || rowToDelete.isTax) {
-        // Handle special rows (Less or Tax)
-        if (onSpecialRowDelete) {
-          onSpecialRowDelete(rowToDelete.isLess ? "less" : "tax");
+      setData((prevData) => {
+        // Keep track of the total row
+        const totalRow = prevData.find((row) => row.istotal);
+
+        // Filter out the row to delete while maintaining original order
+        const filteredData = prevData.filter((row, idx) => {
+          if (row.istotal) return false; // Remove total row (we'll add it back)
+          if (rowToDelete.isless || rowToDelete.istax) {
+            // For special rows, filter by code
+            if (onSpecialRowDelete && row.code === rowToDelete.code) {
+              onSpecialRowDelete(row.code);
+              return false;
+            }
+            return true;
+          } else {
+            // For regular and subtotal rows, filter by index
+            return idx !== rowIndex;
+          }
+        });
+
+        // Recalculate subtotals while maintaining order
+        const recalculatedData = recalculateSubtotals(filteredData);
+
+        if (onChange) {
+          onChange(recalculatedData);
         }
-        setData((prevData) => {
-          const newData = prevData.filter((_, index) => index !== rowIndex);
-          if (onChange) {
-            onChange(newData);
-          }
-          return newData;
-        });
-      } else {
-        // Handle regular rows
-        setData((prevData) => {
-          const newData = prevData.filter((_, index) => index !== rowIndex);
-          if (onChange) {
-            onChange(newData);
-          }
-          return newData;
-        });
-      }
+
+        // Add back total row if it exists
+        return totalRow ? [...recalculatedData, totalRow] : recalculatedData;
+      });
     },
-    [data, onChange, onSpecialRowDelete]
+    [data, onChange, onSpecialRowDelete, recalculateSubtotals]
   );
 
   const allColumns = useMemo(() => columns, [columns]);
@@ -717,14 +729,48 @@ function TableEditing<T extends Record<string, any>>({
     const renderCellContent = () => {
       const columnType = allColumns[cellIndex].type;
       const columnConfig = allColumns[cellIndex];
-      const isEditable =
-        !isSorting &&
-        !row.original.isSubtotal &&
-        !row.original.isTotal &&
-        !row.original.isSubtotalQty &&
-        (isEditableColumn(columnConfig) ||
-          row.original.isLess ||
-          row.original.isTax);
+
+      // Show action column for subtotal rows
+      if (columnType === "action") {
+        return (
+          <div className="flex items-center justify-center h-full">
+            <button
+              className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
+                isSorting ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              onClick={(event) => {
+                if (!isSorting) {
+                  handleDeleteRow(row.index, event);
+                }
+              }}
+              disabled={isSorting}
+            >
+              <IconTrash stroke={2} width={20} height={20} />
+            </button>
+          </div>
+        );
+      }
+
+      // Early return for subtotal rows
+      if (row.original.issubtotal) {
+        // Only render content for the amount column and description column
+        const isAmountColumn = columnType === "amount";
+        const isDescriptionColumn = columnConfig.id === "productname";
+
+        if (isAmountColumn) {
+          return (
+            <div className="px-6 py-3 text-right font-semibold">
+              {`Subtotal: ${cell.getValue()}`}
+            </div>
+          );
+        }
+
+        if (isDescriptionColumn) {
+          return <div className="px-6 py-3">{cell.getValue() as string}</div>;
+        }
+
+        return null;
+      }
 
       // Custom cell renderer
       if (columnConfig.cell) {
@@ -734,15 +780,10 @@ function TableEditing<T extends Record<string, any>>({
         });
       }
 
-      // Handle special rows (Less, Tax, Subtotal, and Total)
-      if (
-        row.original.isLess ||
-        row.original.isTax ||
-        row.original.isSubtotal ||
-        row.original.isTotal ||
-        row.original.isSubtotalQty
-      ) {
+      // Handle special rows (Less, Tax, Subtotal, Total)
+      if (row.original.isless || row.original.istax) {
         if (cellIndex === 0) {
+          // Code column
           return (
             <input
               className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
@@ -754,65 +795,41 @@ function TableEditing<T extends Record<string, any>>({
             />
           );
         } else if (cellIndex === 1) {
-          // Make the description editable for Less, Tax, and Subtotal rows
-          if (
-            row.original.isLess ||
-            row.original.isTax ||
-            row.original.isSubtotal
-          ) {
-            return (
-              <TableEditableCell
-                value={cell.getValue()}
-                onChange={(val) =>
-                  handleCellChange(row.index, cell.column.id, val)
-                }
-                type="string"
-                editable={!isSorting}
-                focus={
-                  row.id === editableRowId && cellIndex === editableCellIndex
-                }
-                onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
-                isSorting={isSorting}
-                previousCellValue={cell.getValue()}
-              />
-            );
-          }
+          // Description column
+          return (
+            <TableEditableCell
+              value={cell.getValue()}
+              onChange={(val) =>
+                handleCellChange(row.index, cell.column.id, val)
+              }
+              type="string"
+              editable={!isSorting}
+              focus={
+                row.id === editableRowId && cellIndex === editableCellIndex
+              }
+              onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
+              isSorting={isSorting}
+              previousCellValue={cell.getValue()}
+            />
+          );
         } else if (cellIndex === columns.length - 2) {
-          // Make the amount column editable for Less and Tax rows
-          if (row.original.isLess || row.original.isTax) {
-            return (
-              <TableEditableCell
-                value={cell.getValue()}
-                onChange={(val) =>
-                  handleCellChange(row.index, cell.column.id, val)
-                }
-                type="rate"
-                editable={!isSorting}
-                focus={
-                  row.id === editableRowId && cellIndex === editableCellIndex
-                }
-                onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
-                isSorting={isSorting}
-                previousCellValue={cell.getValue()}
-              />
-            );
-          } else {
-            // For Subtotal and Total rows, keep it readonly
-            return (
-              <input
-                className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent text-right cursor-default"
-                tabIndex={-1}
-                type="text"
-                readOnly
-                value={
-                  typeof cell.getValue() === "number"
-                    ? (cell.getValue() as number).toFixed(2)
-                    : (cell.getValue() as string)
-                }
-                style={{ boxSizing: "border-box" }}
-              />
-            );
-          }
+          // Amount column
+          return (
+            <TableEditableCell
+              value={cell.getValue()}
+              onChange={(val) =>
+                handleCellChange(row.index, cell.column.id, val)
+              }
+              type="rate"
+              editable={!isSorting}
+              focus={
+                row.id === editableRowId && cellIndex === editableCellIndex
+              }
+              onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
+              isSorting={isSorting}
+              previousCellValue={cell.getValue()}
+            />
+          );
         } else if (cellIndex === columns.length - 1) {
           // Action column
           return (
@@ -832,14 +849,67 @@ function TableEditing<T extends Record<string, any>>({
               </button>
             </div>
           );
-        } else {
-          return null;
         }
+        return null;
       }
 
-      // Non-subtotal rows
-      if (columnType === "action") {
-        return flexRender(cell.column.columnDef.cell, cell.getContext());
+      // Handle Total, Subtotal, and SubtotalQty rows
+      if (
+        row.original.istotal ||
+        row.original.issubtotal ||
+        row.original.isSubtotalQty
+      ) {
+        if (row.original.isSubtotalQty) {
+          const qtyColumnId = columns.find((col) => col.id === "qty")?.id;
+          const amountColumnId = columns.find((col) => col.id === "amount")?.id;
+
+          if (
+            !(cell.column.id === qtyColumnId) &&
+            !(cell.column.id === amountColumnId)
+          ) {
+            return (
+              <td className="py-3 pr-6 text-right font-semibold rounded-bl-lg"></td>
+            );
+          }
+          if (cell.column.id === qtyColumnId) {
+            return (
+              <td className="py-3 px-6 text-right font-semibold rounded-bl-lg">
+                Total: {row.original.qty}
+              </td>
+            );
+          }
+          if (cell.column.id === amountColumnId) {
+            return (
+              <td className="py-3 px-6 text-right font-semibold rounded-bl-lg">
+                RM {row.original.amount.toFixed(2)}
+              </td>
+            );
+          }
+        } else if (
+          cell.column.id === columns.find((col) => col.type === "amount")?.id
+        ) {
+          return (
+            <td
+              colSpan={
+                row.original.istotal ? columns.length : columns.length - 1
+              }
+              className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
+            >
+              {row.original.istotal ? "Total:" : "Subtotal:"}{" "}
+              {cell.getValue() as ReactNode}
+            </td>
+          );
+        } else if (
+          cell.column.id === columns[columns.length - 1].id &&
+          !row.original.istotal
+        ) {
+          return (
+            <td className="border-l border-default-300">
+              {renderCell(row, cell, cellIndex, isLastRow)}
+            </td>
+          );
+        }
+        return null;
       }
 
       if (
@@ -856,25 +926,13 @@ function TableEditing<T extends Record<string, any>>({
         return (
           <TableEditableCell
             value={cell.getValue()}
-            onChange={(val) => {
-              if (!isSorting) {
-                handleCellChange(row.index, cell.column.id, val);
-              }
-            }}
-            type={columnType}
-            editable={isEditable && !isSorting}
-            focus={
-              isEditable &&
-              !isSorting &&
-              row.id === editableRowId &&
-              cellIndex === editableCellIndex
-            }
-            onKeyDown={(e) => !isSorting && handleKeyDown(e, row.id, cellIndex)}
+            onChange={(val) => handleCellChange(row.index, cell.column.id, val)}
+            type={columns[cellIndex].type}
+            editable={!isSorting && isEditableColumn(columns[cellIndex])}
+            focus={row.id === editableRowId && cellIndex === editableCellIndex}
+            onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
             isSorting={isSorting}
-            previousCellValue={
-              previousCellValues[`${row.id}-${cell.column.id}`] ??
-              cell.getValue()
-            }
+            previousCellValue={cell.getValue()}
             options={columnConfig.options}
           />
         );
@@ -983,7 +1041,7 @@ function TableEditing<T extends Record<string, any>>({
               setData((prevData) => recalculateSubtotals(prevData));
             } else if (newIsSorted !== false) {
               // New sorting applied, remove subtotals
-              setData((prevData) => prevData.filter((row) => !row.isSubtotal));
+              setData((prevData) => prevData.filter((row) => !row.issubtotal));
             }
           }
         }}
@@ -1099,11 +1157,11 @@ function TableEditing<T extends Record<string, any>>({
           sortingFn: isSortingDisabled
             ? undefined
             : (rowA, rowB, columnId) => {
-                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                if (rowA.original.issubtotal && rowB.original.issubtotal) {
                   return rowA.index - rowB.index;
                 }
-                if (rowA.original.isSubtotal) return 1;
-                if (rowB.original.isSubtotal) return -1;
+                if (rowA.original.issubtotal) return 1;
+                if (rowB.original.issubtotal) return -1;
 
                 const a = rowA.getValue(columnId);
                 const b = rowB.getValue(columnId);
@@ -1152,13 +1210,13 @@ function TableEditing<T extends Record<string, any>>({
           sortingFn: isSortingDisabled
             ? undefined
             : (rowA, rowB, columnId) => {
-                if (rowA.original.isTotal) return 1;
-                if (rowB.original.isTotal) return -1;
-                if (rowA.original.isSubtotal && rowB.original.isSubtotal) {
+                if (rowA.original.istotal) return 1;
+                if (rowB.original.istotal) return -1;
+                if (rowA.original.issubtotal && rowB.original.issubtotal) {
                   return rowA.index - rowB.index;
                 }
-                if (rowA.original.isSubtotal) return 1;
-                if (rowB.original.isSubtotal) return -1;
+                if (rowA.original.issubtotal) return 1;
+                if (rowB.original.issubtotal) return -1;
 
                 const a = rowA.getValue(columnId);
                 const b = rowB.getValue(columnId);
@@ -1195,11 +1253,11 @@ function TableEditing<T extends Record<string, any>>({
           const isSorted = newSorting.length > 0;
           setIsSorting(isSorted);
           if (isSorted) {
-            setData((prevData) => prevData.filter((row) => !row.isSubtotal));
+            setData((prevData) => prevData.filter((row) => !row.issubtotal));
           } else {
             setData((prevData) => {
               const recalculatedData = originalData.map((row) => {
-                if (!row.isSubtotal) {
+                if (!row.issubtotal) {
                   return { ...row };
                 }
                 return row;
@@ -1218,28 +1276,27 @@ function TableEditing<T extends Record<string, any>>({
       if (isSorting || !rowId) return;
 
       const row = table.getRowModel().rows.find((r) => r.id === rowId);
-      if (
-        !row ||
-        row.original.isSubtotal ||
-        row.original.isTotal ||
-        row.original.isSubtotalQty
-      )
-        return;
+      if (!row || row.original.istotal || row.original.isSubtotalQty) return;
 
-      const filteredCellIndex = cellIndex;
-      const columnId = columns[filteredCellIndex]?.id;
-      if (!columnId) return;
+      const column = columns[cellIndex];
+      const isEditableSpecialRow =
+        (row.original.isless || row.original.istax) &&
+        (cellIndex === 1 || cellIndex === columns.length - 2);
+      const isEditableRegularRow =
+        !row.original.isless &&
+        !row.original.istax &&
+        !row.original.issubtotal &&
+        isEditableColumn(column);
 
-      const cellValue = row.original[columnId];
-
-      // Always update these states
-      setEditableRowId(rowId);
-      setEditableCellIndex(cellIndex);
-      setSelectedRowId(rowId);
-      setPreviousCellValues((prev) => ({
-        ...prev,
-        [`${rowId}-${columnId}`]: cellValue,
-      }));
+      if (isEditableSpecialRow || isEditableRegularRow) {
+        setEditableRowId(rowId);
+        setEditableCellIndex(cellIndex);
+        setSelectedRowId(rowId);
+        setPreviousCellValues((prev) => ({
+          ...prev,
+          [`${rowId}-${column.id}`]: row.original[column.id],
+        }));
+      }
     },
     [isSorting, columns, table]
   );
@@ -1254,15 +1311,15 @@ function TableEditing<T extends Record<string, any>>({
             if (
               columnId === "qty" ||
               columnId === "price" ||
-              updatedRow.isLess ||
-              updatedRow.isTax
+              updatedRow.isless ||
+              updatedRow.istax
             ) {
-              if (updatedRow.isLess || updatedRow.isTax) {
-                if (columnId === "productName") {
+              if (updatedRow.isless || updatedRow.istax) {
+                if (columnId === "productname") {
                   // Handle description change for special rows
                   return {
                     ...updatedRow,
-                    productName: value,
+                    productname: value,
                   };
                 } else {
                   // Handle amount change for special rows
@@ -1342,9 +1399,9 @@ function TableEditing<T extends Record<string, any>>({
                     } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
                      ${row.id === editableRowId ? "relative z-10" : ""}}`}
                     onClick={() =>
-                      row.original.isSubtotal ||
+                      row.original.issubtotal ||
                       row.original.isSubtotalQty ||
-                      row.original.isTotal
+                      row.original.istotal
                         ? setSelectedRowId(row.id)
                         : null
                     }
@@ -1356,7 +1413,7 @@ function TableEditing<T extends Record<string, any>>({
                       const isLastCell =
                         cellIndex === row.getVisibleCells().length - 1;
                       // Special handling for Less, Tax, and Total rows
-                      if (row.original.isLess || row.original.isTax) {
+                      if (row.original.isless || row.original.istax) {
                         if (
                           cellIndex === 0 ||
                           cellIndex === 1 ||
@@ -1412,8 +1469,8 @@ function TableEditing<T extends Record<string, any>>({
                         }
                       }
                       if (
-                        row.original.isTotal ||
-                        row.original.isSubtotal ||
+                        row.original.istotal ||
+                        row.original.issubtotal ||
                         row.original.isSubtotalQty
                       ) {
                         const amountColumnId = columns.find(
@@ -1465,19 +1522,19 @@ function TableEditing<T extends Record<string, any>>({
                             <td
                               key={cell.id}
                               colSpan={
-                                row.original.isTotal
+                                row.original.istotal
                                   ? columns.length
                                   : columns.length - 1
                               }
                               className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
                             >
-                              {row.original.isTotal ? "Total:" : "Subtotal:"}{" "}
+                              {row.original.istotal ? "Total:" : "Subtotal:"}{" "}
                               {cell.getValue() as ReactNode}
                             </td>
                           );
                         } else if (
                           cell.column.id === columns[columns.length - 1].id &&
-                          !row.original.isTotal
+                          !row.original.istotal
                         ) {
                           return (
                             <td

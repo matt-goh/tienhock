@@ -96,7 +96,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     setIsFormChanged(hasChanged);
   }, [formData, initialFormData]);
 
-  const fetchStaffDetails = useCallback(async () => {
+  const fetchStaffDetails = async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/staffs/${id}`);
@@ -115,7 +115,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]); // Add id as dependency since it's used in the fetch URL
+  };
 
   useEffect(() => {
     if (isEditMode) {
@@ -128,7 +128,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     fetchOptions("agamas", setAgamas);
     fetchOptions("jobs", setJobs);
     fetchOptions("locations", setLocations);
-  }, [fetchStaffDetails, formData, isEditMode]);
+  }, []);
 
   const fetchOptions = async (
     endpoint: string,

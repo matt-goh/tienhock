@@ -20,7 +20,6 @@ import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
 import FilterSummary from "../../components/Invois/FilterSummary";
 import TableEditing from "../../components/Table/TableEditing";
 import EInvoisMenu from "../../components/Invois/EInvoisMenu";
-import InvoisPDF from "./InvoisPDF";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 
@@ -248,15 +247,15 @@ const InvoisPage: React.FC = () => {
 
       filtered.forEach((invoice) => {
         invoice.orderDetails.forEach((detail) => {
-          if (!detail.isFoc && !detail.isReturned) {
-            const key = `${detail.code}-${detail.productName}`;
+          if (!detail.isfoc && !detail.isreturned) {
+            const key = `${detail.code}-${detail.productname}`;
             if (products[key]) {
               products[key].qty += parseFloat(detail.qty.toString()) || 0;
               products[key].amount += parseFloat(detail.total) || 0;
             } else {
               products[key] = {
                 code: detail.code,
-                productName: detail.productName,
+                productname: detail.productname,
                 qty: parseFloat(detail.qty.toString()) || 0,
                 amount: parseFloat(detail.total) || 0,
               };
@@ -267,14 +266,14 @@ const InvoisPage: React.FC = () => {
 
       const sortedProducts = Object.values(products)
         .filter(
-          (product) => product.productName != null && product.productName !== ""
+          (product) => product.productname != null && product.productname !== ""
         )
         .map((product) => ({
           ...product,
           qty: Number(product.qty.toFixed(2)),
           amount: Number(product.amount.toFixed(2)),
         }))
-        .sort((a, b) => a.productName.localeCompare(b.productName));
+        .sort((a, b) => a.productname.localeCompare(b.productname));
 
       const groupedProducts: ProductData[] = [];
       let currentGroup = "";
@@ -288,7 +287,7 @@ const InvoisPage: React.FC = () => {
           if (currentGroup !== "") {
             groupedProducts.push({
               code: `${currentGroup} Subtotal`,
-              productName: `${currentGroup} Subtotal`,
+              productname: `${currentGroup} Subtotal`,
               qty: groupQty,
               amount: groupAmount,
               isSubtotalQty: true,
@@ -308,7 +307,7 @@ const InvoisPage: React.FC = () => {
       if (currentGroup !== "") {
         groupedProducts.push({
           code: `${currentGroup} Subtotal`,
-          productName: `${currentGroup} Subtotal`,
+          productname: `${currentGroup} Subtotal`,
           qty: groupQty,
           amount: groupAmount,
           isSubtotalQty: true,
@@ -498,12 +497,12 @@ const InvoisPage: React.FC = () => {
             const [code, qty, price, total, foc, returned] = item.split("&&");
             const baseItem = {
               code: code || "",
-              productName: "", // This will be filled by the server
+              productname: "", // This will be filled by the server
               qty: Number(qty) || 0,
               price: Number((parseFloat(price) / 100).toFixed(2)),
               total: (parseFloat(total) / 100).toFixed(2),
-              isFoc: false,
-              isReturned: false,
+              isfoc: false,
+              isreturned: false,
             };
 
             const items = [baseItem];
@@ -514,7 +513,7 @@ const InvoisPage: React.FC = () => {
                 qty: Number(foc),
                 price: Number((parseFloat(price) / 100).toFixed(2)),
                 total: (Number(baseItem.price) * Number(foc)).toFixed(2),
-                isFoc: true,
+                isfoc: true,
               });
             }
 
@@ -524,7 +523,7 @@ const InvoisPage: React.FC = () => {
                 qty: Number(returned),
                 price: Number((parseFloat(price) / 100).toFixed(2)),
                 total: (Number(baseItem.price) * Number(returned)).toFixed(2),
-                isReturned: true,
+                isreturned: true,
               });
             }
 
@@ -606,7 +605,7 @@ const InvoisPage: React.FC = () => {
 
   const productColumns: ColumnConfig[] = [
     { id: "code", header: "Code", type: "readonly", width: 180 },
-    { id: "productName", header: "Product Name", type: "readonly", width: 400 },
+    { id: "productname", header: "Product Name", type: "readonly", width: 400 },
     { id: "qty", header: "Quantity", type: "number", width: 180 },
     { id: "amount", header: "Amount", type: "amount", width: 180 },
   ];

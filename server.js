@@ -1939,16 +1939,16 @@ app.get('/api/db/invoices', async (req, res) => {
           .filter(detail => detail.invoiceid === invoice.id)
           .map(detail => ({
             code: detail.code,
-            productName: detail.productname,
+            productname: detail.productname,
             qty: detail.qty,
             price: detail.price,
             total: detail.total,
-            isFoc: detail.isfoc,
-            isReturned: detail.isreturned,
-            isTotal: detail.istotal,
-            isSubtotal: detail.issubtotal,
-            isLess: detail.isless,
-            isTax: detail.istax
+            isfoc: detail.isfoc,
+            isreturned: detail.isreturned,
+            istotal: detail.istotal,
+            issubtotal: detail.issubtotal,
+            isless: detail.isless,
+            istax: detail.istax
           }))
       };
     });
@@ -2047,22 +2047,22 @@ app.post('/api/invoices/submit', async (req, res) => {
       // Insert new order details
       for (const detail of processedInvoice.orderDetails) {
         const detailQuery = `
-          INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned, isTotal, isSubtotal, isLess, isTax)
+          INSERT INTO order_details (invoiceId, code, productname, qty, price, total, isfoc, isreturned, istotal, issubtotal, isless, istax)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `;
         await client.query(detailQuery, [
           savedInvoice.id,
           detail.code,
-          detail.productName,
+          detail.productname,
           detail.qty,
           detail.price,
           detail.total,
-          detail.isFoc || false,
-          detail.isReturned || false,
-          detail.isTotal || false,
-          detail.isSubtotal || false,
-          detail.isLess || false,
-          detail.isTax || false
+          detail.isfoc || false,
+          detail.isreturned || false,
+          detail.istotal || false,
+          detail.issubtotal || false,
+          detail.isless || false,
+          detail.istax || false
         ]);
       }
 
@@ -2117,12 +2117,12 @@ async function cleanupOrphanedTotalRows(client) {
   const query = `
     DELETE FROM order_details
     WHERE (
-      isTotal = true OR 
-      isSubtotal = true OR 
-      isLess = true OR 
-      isTax = true OR
-      isFoc = true OR
-      isReturned = true OR
+      istotal = true OR 
+      issubtotal = true OR 
+      isless = true OR 
+      istax = true OR
+      isfoc = true OR
+      isreturned = true OR
       code = '' OR code IS NULL
     ) AND (
       invoiceId NOT IN (SELECT id FROM invoices)
@@ -2132,7 +2132,7 @@ async function cleanupOrphanedTotalRows(client) {
         FROM order_details
         GROUP BY invoiceId
         HAVING COUNT(*) = SUM(
-          CASE WHEN isTotal OR isSubtotal OR isLess OR isTax OR isFoc OR isReturned 
+          CASE WHEN istotal OR issubtotal OR isless OR istax OR isfoc OR isreturned 
                OR code = '' OR code IS NULL THEN 1 ELSE 0 END
         )
       )
@@ -2198,22 +2198,22 @@ app.post('/api/invoices/bulk-submit', async (req, res) => {
       // Insert order details
       for (const detail of invoice.orderDetails) {
         const detailQuery = `
-          INSERT INTO order_details (invoiceId, code, productName, qty, price, total, isFoc, isReturned, isTotal, isSubtotal, isLess, isTax)
+          INSERT INTO order_details (invoiceId, code, productname, qty, price, total, isfoc, isreturned, istotal, issubtotal, isless, istax)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `;
         await client.query(detailQuery, [
           insertedInvoice.id,
           detail.code,
-          detail.productName,
+          detail.productname,
           detail.qty,
           detail.price,
           detail.total,
-          detail.isFoc || false,
-          detail.isReturned || false,
-          detail.isTotal || false,
-          detail.isSubtotal || false,
-          detail.isLess || false,
-          detail.isTax || false
+          detail.isfoc || false,
+          detail.isreturned || false,
+          detail.istotal || false,
+          detail.issubtotal || false,
+          detail.isless || false,
+          detail.istax || false
         ]);
       }
 
@@ -2253,7 +2253,7 @@ app.get('/api/invoices', async (req, res) => {
       orderDetails: invoice.orderDetails
         .map(detail => ({
           ...sanitizeOrderDetail(detail),
-          productName: productMap.get(detail.code) || detail.code
+          productname: productMap.get(detail.code) || detail.code
         }))
         .filter(detail => !shouldRemoveRow(detail))
     }));
@@ -2603,16 +2603,16 @@ async function fetchInvoiceFromDb(invoiceId) {
     const orderDetailsQuery = `
       SELECT 
         od.code,
-        od.productname as "productName",
+        od.productname as "productname",
         od.qty,
         od.price,
         od.total,
-        od.isfoc as "isFoc",
-        od.isreturned as "isReturned",
-        od.istotal as "isTotal",
-        od.issubtotal as "isSubtotal",
-        od.isless as "isLess",
-        od.istax as "isTax"
+        od.isfoc as "isfoc",
+        od.isreturned as "isreturned",
+        od.istotal as "istotal",
+        od.issubtotal as "issubtotal",
+        od.isless as "isless",
+        od.istax as "istax"
       FROM 
         order_details od
       WHERE 
