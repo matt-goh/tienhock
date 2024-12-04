@@ -55,7 +55,6 @@ const InvoisPage: React.FC = () => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const [isAllSelected, setIsAllSelected] = useState(false);
-  const [showPDF, setShowPDF] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState<InvoiceData[]>([]);
   const [filters, setFilters] = useState<InvoiceFilterOptions>({
     salesmanFilter: null,
@@ -567,6 +566,20 @@ const InvoisPage: React.FC = () => {
     });
   };
 
+  const handlePDFClick = () => {
+    // Store the data in sessionStorage before opening the window
+    sessionStorage.setItem("PDF_DATA", JSON.stringify(filteredInvoices));
+
+    // Open the window and remove the data after it's opened
+    const pdfWindow = window.open("/pdf-viewer", "_blank");
+    if (pdfWindow) {
+      // Clean up the storage after a delay to ensure the new window has time to read it
+      setTimeout(() => {
+        sessionStorage.removeItem("PDF_DATA");
+      }, 1000);
+    }
+  };
+
   const invoiceColumns: ColumnConfig[] = [
     {
       id: "invoiceno",
@@ -676,6 +689,9 @@ const InvoisPage: React.FC = () => {
               multiple
             />
             <div className="flex items-center gap-4">
+              <Button onClick={handlePDFClick} variant="outline">
+                Open PDF
+              </Button>
               <EInvoisMenu
                 selectedInvoices={selectedInvoices}
                 dateRange={filters.dateRangeFilter}
@@ -827,10 +843,6 @@ const InvoisPage: React.FC = () => {
           confirmButtonText="Delete"
         />
       </div>
-      <Button onClick={() => setShowPDF(!showPDF)} variant="outline">
-        {showPDF ? "Hide PDF" : "Show PDF"}
-      </Button>
-      {showPDF && <InvoisPDF invoices={filteredInvoices} />}
     </div>
   );
 };

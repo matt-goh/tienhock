@@ -83,22 +83,6 @@ export interface TableProps<T> {
   tableKey?: string;
 }
 
-export interface OrderDetail {
-  code: string;
-  productName: string;
-  qty: number;
-  price: number;
-  total: string;
-  isFoc?: boolean;
-  isReturned?: boolean;
-  isTotal?: boolean;
-  isSubtotal?: boolean;
-  isLess?: boolean;
-  isTax?: boolean;
-  colspan?: number;
-  action?: string;
-}
-
 export interface InvoiceData {
   id: string;
   invoiceno: string;
@@ -115,6 +99,22 @@ export interface InvoiceData {
   tax?: string;
   rounding?: string;
   isSorting?: boolean;
+}
+
+export interface OrderDetail {
+  code: string;
+  productName: string;
+  qty: number;
+  price: number;
+  total: string;
+  isFoc?: boolean;
+  isReturned?: boolean;
+  isTotal?: boolean;
+  isSubtotal?: boolean;
+  isLess?: boolean;
+  isTax?: boolean;
+  colspan?: number;
+  action?: string;
 }
 
 export interface Employee {

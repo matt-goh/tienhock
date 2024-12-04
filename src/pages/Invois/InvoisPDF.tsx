@@ -1,97 +1,222 @@
-import React from 'react';
-import { Page, Text, View, Document, StyleSheet, PDFViewer } from '@react-pdf/renderer';
-import { InvoiceData } from '../../types/types';
+import React from "react";
+import {
+  Page,
+  Text,
+  View,
+  Document,
+  StyleSheet,
+  PDFViewer,
+  Image,
+} from "@react-pdf/renderer";
+import { InvoiceData, OrderDetail } from "../../types/types";
 
-// Define styles for the PDF
+const ROWS_PER_PAGE = 28;
+const HEADER_ROWS = 3;
+const TABLE_HEADER_ROWS = 3;
+
+// Color palette for easy customization
+const colors = {
+  background: "#ffffff",
+  header: {
+    background: "#F3F4F6",
+    companyName: "#1e293b",
+    companyDetails: "#334155",
+  },
+  table: {
+    headerBackground: "#F3F4F6",
+    border: "#D1D5DB",
+    borderDark: "#D1D5DB",
+  },
+  text: {
+    primary: "#111827",
+    secondary: "#374151",
+    bold: "#030712",
+  },
+  borders: {
+    invoice: "#27272A",
+  },
+};
+
 const styles = StyleSheet.create({
   page: {
-    flexDirection: 'column',
-    padding: 30,
-    fontFamily: 'Helvetica',
+    flexDirection: "column",
+    padding: 40,
+    fontFamily: "Helvetica",
+    fontSize: 9,
+    backgroundColor: colors.background,
+  },
+  headerContainer: {
+    backgroundColor: colors.header.background,
+    borderRadius: 6,
+    padding: 15,
+    marginBottom: 15,
   },
   header: {
-    marginBottom: 20,
-    borderBottom: '1pt solid black',
-    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 15,
   },
   companyName: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    color: colors.header.companyName,
   },
   companyDetails: {
     fontSize: 10,
-    marginTop: 5,
+    marginTop: 4,
+    color: colors.header.companyDetails,
+    lineHeight: 1,
   },
   invoice: {
-    marginBottom: 10,
+    marginBottom: 15,
+    borderBottom: `1pt solid ${colors.borders.invoice}`,
+    paddingBottom: 8,
   },
-  invoiceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+  table: {
+    width: "100%",
+    marginBottom: 15,
+  },
+  tableContent: {
+    border: `1pt solid ${colors.table.border}`,
+    paddingBottom: 7,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.table.borderDark,
+    borderBottomStyle: "solid",
+    minHeight: 24,
+    alignItems: "center",
+  },
+  invoiceInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  tableHeader: {
+    backgroundColor: colors.table.headerBackground,
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.table.border,
+  },
+  tableCell: {
+    padding: "6 8",
+  },
+  infoCell: {
+    padding: "3 8",
   },
   customerInfo: {
     fontSize: 10,
+    color: colors.text.primary,
+    fontFamily: "Helvetica",
   },
-  invoiceInfo: {
-    fontSize: 10,
-    textAlign: 'right',
-  },
-  table: {
-    width: 'auto',
-    marginBottom: 10,
+  customerLabel: {
+    color: colors.text.secondary,
+    marginRight: 5,
     fontSize: 9,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    borderBottomStyle: 'solid',
-    alignItems: 'center',
-    minHeight: 20,
-  },
-  tableHeader: {
-    backgroundColor: '#f0f0f0',
-  },
-  tableCell: {
-    padding: 5,
+    fontFamily: "Helvetica-Bold",
   },
   descriptionCell: {
-    width: '40%',
+    width: "45%",
+    borderRightWidth: 0.5,
+    borderRightColor: colors.table.border,
+  },
+  focCell: {
+    width: "10%",
+    textAlign: "right",
+    borderRightWidth: 0.5,
+    borderRightColor: colors.table.border,
+  },
+  returnCell: {
+    width: "10%",
+    textAlign: "right",
+    borderRightWidth: 0.5,
+    borderRightColor: colors.table.border,
   },
   qtyCell: {
-    width: '15%',
-    textAlign: 'right',
+    width: "10%",
+    textAlign: "right",
+    borderRightWidth: 0.5,
+    borderRightColor: colors.table.border,
   },
   priceCell: {
-    width: '15%',
-    textAlign: 'right',
+    width: "12%",
+    textAlign: "right",
+    borderRightWidth: 0.5,
+    borderRightColor: colors.table.border,
   },
   amountCell: {
-    width: '15%',
-    textAlign: 'right',
+    width: "13%",
+    textAlign: "right",
   },
-  packingCell: {
-    width: '15%',
+  infoLeftCell: {
+    width: "65%",
+  },
+  infoRightCell: {
+    width: "35%",
+    textAlign: "right",
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  infoLeftSection: {
+    width: "65%",
+  },
+  infoRightSection: {
+    width: "35%",
+    alignItems: "flex-end",
+  },
+  infoRightContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
   },
   totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#000',
-    borderTopStyle: 'solid',
-    paddingTop: 5,
-  },
-  bold: {
-    fontWeight: 'bold',
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingTop: 8,
+    paddingRight: 8,
   },
   summary: {
-    marginTop: 20,
+    marginTop: 25,
+    borderTop: `2pt solid ${colors.text.primary}`,
+    paddingTop: 15,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    fontSize: 10,
+    color: colors.text.primary,
+  },
+  grandTotal: {
+    marginTop: 12,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#000',
-    borderTopStyle: 'solid',
-    paddingTop: 10,
+    borderTopColor: colors.text.primary,
+  },
+  bold: {
+    fontFamily: "Helvetica-Bold",
+    color: colors.text.bold,
+  },
+  lessRow: {
+    fontStyle: "italic",
+    color: colors.text.secondary,
+  },
+  taxRow: {
+    fontStyle: "italic",
+    color: colors.text.secondary,
+  },
+  logo: {
+    width: 45,
+    height: 45,
+    marginTop: 2,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
 });
 
@@ -100,10 +225,120 @@ interface InvoicePDFProps {
 }
 
 const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
-  // Calculate totals
+  const getProcessedOrderDetails = (details: OrderDetail[]) => {
+    const regularDetails = new Map<
+      string,
+      {
+        detail: OrderDetail;
+        foc: number;
+        returned: number;
+      }
+    >();
+    const specialRows: OrderDetail[] = [];
+
+    details.forEach((detail) => {
+      if (detail.isLess || detail.isTax) {
+        specialRows.push(detail);
+        return;
+      }
+
+      const key = `${detail.code}-${detail.productName}`;
+      if (!regularDetails.has(key)) {
+        regularDetails.set(key, {
+          detail: { ...detail, isFoc: false, isReturned: false },
+          foc: 0,
+          returned: 0,
+        });
+      }
+
+      const item = regularDetails.get(key)!;
+      if (detail.isFoc) {
+        item.foc += Math.round(detail.qty);
+      } else if (detail.isReturned) {
+        item.returned += Math.round(detail.qty);
+      } else {
+        item.detail = { ...detail, qty: Math.round(detail.qty) };
+      }
+    });
+
+    return {
+      regularItems: Array.from(regularDetails.values()),
+      specialRows,
+    };
+  };
+
+  const calculateInvoiceRows = (invoice: InvoiceData) => {
+    const { regularItems, specialRows } = getProcessedOrderDetails(
+      invoice.orderDetails
+    );
+    return TABLE_HEADER_ROWS + regularItems.length + specialRows.length + 1;
+  };
+
+  const paginateInvoices = (invoices: InvoiceData[]) => {
+    const pages: InvoiceData[][] = [];
+    let currentPage: InvoiceData[] = [];
+    let currentPageRows = HEADER_ROWS;
+
+    invoices.forEach((invoice) => {
+      const invoiceRows = calculateInvoiceRows(invoice);
+
+      if (currentPageRows + invoiceRows > ROWS_PER_PAGE) {
+        if (currentPage.length > 0) {
+          pages.push(currentPage);
+          currentPage = [];
+          currentPageRows = HEADER_ROWS;
+        }
+      }
+
+      currentPage.push(invoice);
+      currentPageRows += invoiceRows;
+    });
+
+    if (currentPage.length > 0) {
+      pages.push(currentPage);
+    }
+
+    return pages;
+  };
+
+  const renderTableRow = (
+    detail: OrderDetail,
+    foc: number = 0,
+    returned: number = 0,
+    isSpecialRow: boolean = false
+  ) => (
+    <View
+      style={[
+        styles.tableRow,
+        isSpecialRow ? (detail.isLess ? styles.lessRow : styles.taxRow) : {},
+      ]}
+    >
+      <Text style={[styles.tableCell, styles.descriptionCell]}>
+        {detail.productName}
+      </Text>
+      <Text style={[styles.tableCell, styles.focCell]}>
+        {!isSpecialRow ? foc || "" : ""}
+      </Text>
+      <Text style={[styles.tableCell, styles.returnCell]}>
+        {!isSpecialRow ? returned || "" : ""}
+      </Text>
+      <Text style={[styles.tableCell, styles.qtyCell]}>
+        {!isSpecialRow ? Math.round(detail.qty) : ""}
+      </Text>
+      <Text style={[styles.tableCell, styles.priceCell]}>
+        {!isSpecialRow ? Number(detail.price).toFixed(2) : ""}
+      </Text>
+      <Text style={[styles.tableCell, styles.amountCell]}>
+        {Number(detail.total).toFixed(2)}
+      </Text>
+    </View>
+  );
+
+  const pages = paginateInvoices(invoices);
+
   const totals = invoices.reduce(
     (acc, invoice) => {
-      if (invoice.type === 'C') {
+      if (invoice.type === "C") {
         acc.cashTotal += parseFloat(invoice.totalAmount);
         acc.cashCount++;
       } else {
@@ -115,86 +350,150 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
     { cashTotal: 0, invoiceTotal: 0, cashCount: 0, invoiceCount: 0 }
   );
 
-  return (
-    <PDFViewer style={{ width: '100%', height: '800px' }}>
-      <Document>
-        <Page size="A4" style={styles.page}>
-          {/* Company Header */}
-          <View style={styles.header}>
-            <Text style={styles.companyName}>TIEN HOCK FOOD INDUSTRIES S/B (953309-T)</Text>
-            <Text style={styles.companyDetails}>
-              KG. Kibabalu, Karamunsing Kota Kinabalu, Sabah
+  const renderInvoiceInfoRows = (invoice: InvoiceData) => (
+    <>
+      <View style={styles.infoRow}>
+        <View style={styles.infoLeftSection}>
+          <Text style={styles.customerInfo}>
+            <Text style={styles.customerLabel}>Customer: </Text>
+            {invoice.customername}
+          </Text>
+        </View>
+        <View style={styles.infoRightSection}>
+          <View style={styles.infoRightContainer}>
+            <Text style={[styles.customerInfo]}>
+              <Text style={styles.customerLabel}>Type: </Text>
+              {invoice.type === "C" ? "Cash" : "Invoice"}
             </Text>
-            <Text style={styles.companyDetails}>
-              Tel: (088)719715,719799 Fax:(088)72645
+            <Text style={styles.customerInfo}>
+              <Text style={styles.customerLabel}>Invoice No: </Text>
+              {invoice.invoiceno}
             </Text>
           </View>
+        </View>
+      </View>
+      <View style={[styles.infoRow, { marginBottom: 10 }]}>
+        <View style={styles.infoLeftSection}>
+          <Text style={styles.customerInfo}>
+            <Text style={styles.customerLabel}>Salesman: </Text>
+            {invoice.salesman}
+          </Text>
+        </View>
+        <View style={styles.infoRightSection}>
+          <View style={styles.infoRightContainer}>
+            <Text style={[styles.customerInfo]}>
+              <Text style={styles.customerLabel}>Time: </Text>
+              {invoice.time}
+            </Text>
+            <Text style={styles.customerInfo}>
+              <Text style={styles.customerLabel}>Date: </Text>
+              {invoice.date}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </>
+  );
 
-          {/* Invoices */}
-          {invoices.map((invoice, index) => (
-            <View key={index} style={styles.invoice}>
-              <View style={styles.invoiceHeader}>
-                <View>
-                  <Text style={styles.customerInfo}>M/S: {invoice.customername}</Text>
-                  <Text style={styles.customerInfo}>GST NO: {invoice.customer}</Text>
-                </View>
-                <View>
-                  <Text style={styles.invoiceInfo}>
-                    INVOICE NO: {invoice.type}{invoice.invoiceno}
-                  </Text>
-                  <Text style={styles.invoiceInfo}>DATE: {invoice.date}</Text>
-                  <Text style={styles.invoiceInfo}>TIME: {invoice.time}</Text>
-                </View>
-              </View>
-
-              {/* Order Details Table */}
-              <View style={styles.table}>
-                <View style={[styles.tableRow, styles.tableHeader]}>
-                  <Text style={[styles.tableCell, styles.descriptionCell]}>Description</Text>
-                  <Text style={[styles.tableCell, styles.packingCell]}>Packing</Text>
-                  <Text style={[styles.tableCell, styles.qtyCell]}>Qty</Text>
-                  <Text style={[styles.tableCell, styles.priceCell]}>U/Price</Text>
-                  <Text style={[styles.tableCell, styles.amountCell]}>Amount</Text>
-                </View>
-
-                {invoice.orderDetails.map((detail, detailIndex) => (
-                  <View key={detailIndex} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, styles.descriptionCell]}>
-                      {detail.productName}
+  return (
+    <PDFViewer style={{ width: "100%", height: "100%" }}>
+      <Document>
+        {pages.map((pageInvoices, pageIndex) => (
+          <Page key={pageIndex} size="A4" style={styles.page}>
+            {pageIndex === 0 && (
+              <View style={styles.headerContainer}>
+                <View style={styles.header}>
+                  <Image src="/tienhock.png" style={styles.logo} />
+                  <View style={styles.headerTextContainer}>
+                    <Text style={styles.companyName}>
+                      TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
                     </Text>
-                    <Text style={[styles.tableCell, styles.packingCell]}>
-                      {detail.code.includes('3KG') ? '3kg x 1bag' : 
-                       detail.code.includes('1.5KG') ? '1.5kg x 1bag' : ''}
+                    <Text style={styles.companyDetails}>
+                      Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah
                     </Text>
-                    <Text style={[styles.tableCell, styles.qtyCell]}>{detail.qty}</Text>
-                    <Text style={[styles.tableCell, styles.priceCell]}>
-                      {Number(detail.price).toFixed(2)}
-                    </Text>
-                    <Text style={[styles.tableCell, styles.amountCell]}>
-                      {Number(detail.total).toFixed(2)}
+                    <Text style={styles.companyDetails}>
+                      Tel: (088)719715, 719799 Fax:(088)72645
                     </Text>
                   </View>
-                ))}
+                </View>
+              </View>
+            )}
 
-                <View style={styles.totalRow}>
-                  <Text style={[styles.tableCell, styles.bold]}>
-                    Total Amount Payable: ${Number(invoice.totalAmount).toFixed(2)}
+            {pageInvoices.map((invoice, index) => {
+              const { regularItems, specialRows } = getProcessedOrderDetails(
+                invoice.orderDetails
+              );
+
+              return (
+                <View key={index} style={styles.invoice}>
+                  <View style={styles.table}>
+                    {renderInvoiceInfoRows(invoice)}
+                    <View style={styles.tableContent}>
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        <Text
+                          style={[styles.tableCell, styles.descriptionCell]}
+                        >
+                          Description
+                        </Text>
+                        <Text style={[styles.tableCell, styles.focCell]}>
+                          Foc
+                        </Text>
+                        <Text style={[styles.tableCell, styles.returnCell]}>
+                          Return
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                          Qty
+                        </Text>
+                        <Text style={[styles.tableCell, styles.priceCell]}>
+                          Unit/Price
+                        </Text>
+                        <Text style={[styles.tableCell, styles.amountCell]}>
+                          Amount
+                        </Text>
+                      </View>
+
+                      {regularItems.map(
+                        ({ detail, foc, returned }, detailIndex) =>
+                          renderTableRow(detail, foc, returned)
+                      )}
+
+                      {specialRows.map((specialRow, index) =>
+                        renderTableRow(specialRow, 0, 0, true)
+                      )}
+
+                      <View style={styles.totalRow}>
+                        <Text style={styles.bold}>
+                          Total Amount Payable: RM{" "}
+                          {Number(invoice.totalAmount).toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+
+            {pageIndex === pages.length - 1 && (
+              <View style={styles.summary}>
+                <Text style={styles.bold}>Summary</Text>
+                <View style={styles.summaryRow}>
+                  <Text>Cash Invoices ({totals.cashCount}):</Text>
+                  <Text>RM {totals.cashTotal.toFixed(2)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text>Credit Invoices ({totals.invoiceCount}):</Text>
+                  <Text>RM {totals.invoiceTotal.toFixed(2)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.grandTotal]}>
+                  <Text style={styles.bold}>Grand Total:</Text>
+                  <Text style={styles.bold}>
+                    RM {(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
                   </Text>
                 </View>
               </View>
-            </View>
-          ))}
-
-          {/* Summary Section */}
-          <View style={styles.summary}>
-            <Text style={styles.bold}>Summary</Text>
-            <Text>Cash Invoices: {totals.cashCount} (${totals.cashTotal.toFixed(2)})</Text>
-            <Text>Credit Invoices: {totals.invoiceCount} (${totals.invoiceTotal.toFixed(2)})</Text>
-            <Text style={styles.bold}>
-              Total: ${(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
-            </Text>
-          </View>
-        </Page>
+            )}
+          </Page>
+        ))}
       </Document>
     </PDFViewer>
   );
