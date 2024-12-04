@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     lineHeight: 1,
   },
   invoice: {
-    marginBottom: 15,
+    marginBottom: 12,
     borderBottom: `1pt solid ${colors.borders.invoice}`,
     paddingBottom: 8,
   },
@@ -181,9 +181,9 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   summary: {
-    marginTop: 25,
-    borderTop: `2pt solid ${colors.text.primary}`,
-    paddingTop: 15,
+  },
+  summaryTitle: {
+    paddingBottom: 8,
   },
   summaryRow: {
     flexDirection: "row",
@@ -193,7 +193,6 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   grandTotal: {
-    marginTop: 12,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: colors.text.primary,
@@ -237,24 +236,24 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
     const specialRows: OrderDetail[] = [];
 
     details.forEach((detail) => {
-      if (detail.isLess || detail.isTax) {
+      if (detail.isless || detail.istax) {
         specialRows.push(detail);
         return;
       }
 
-      const key = `${detail.code}-${detail.productName}`;
+      const key = `${detail.code}-${detail.productname}`;
       if (!regularDetails.has(key)) {
         regularDetails.set(key, {
-          detail: { ...detail, isFoc: false, isReturned: false },
+          detail: { ...detail, isfoc: false, isreturned: false },
           foc: 0,
           returned: 0,
         });
       }
 
       const item = regularDetails.get(key)!;
-      if (detail.isFoc) {
+      if (detail.isfoc) {
         item.foc += Math.round(detail.qty);
-      } else if (detail.isReturned) {
+      } else if (detail.isreturned) {
         item.returned += Math.round(detail.qty);
       } else {
         item.detail = { ...detail, qty: Math.round(detail.qty) };
@@ -310,11 +309,11 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
     <View
       style={[
         styles.tableRow,
-        isSpecialRow ? (detail.isLess ? styles.lessRow : styles.taxRow) : {},
+        isSpecialRow ? (detail.isless ? styles.lessRow : styles.taxRow) : {},
       ]}
     >
       <Text style={[styles.tableCell, styles.descriptionCell]}>
-        {detail.productName}
+        {detail.productname}
       </Text>
       <Text style={[styles.tableCell, styles.focCell]}>
         {!isSpecialRow ? foc || "" : ""}
@@ -475,7 +474,7 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
 
             {pageIndex === pages.length - 1 && (
               <View style={styles.summary}>
-                <Text style={styles.bold}>Summary</Text>
+                <Text style={[styles.bold, styles.summaryTitle]}>Summary</Text>
                 <View style={styles.summaryRow}>
                   <Text>Cash Invoices ({totals.cashCount}):</Text>
                   <Text>RM {totals.cashTotal.toFixed(2)}</Text>

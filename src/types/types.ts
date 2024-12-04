@@ -102,17 +102,18 @@ export interface InvoiceData {
 }
 
 export interface OrderDetail {
+  invoiceid?: string;
   code: string;
-  productName: string;
+  productname: string;
   qty: number;
   price: number;
   total: string;
-  isFoc?: boolean;
-  isReturned?: boolean;
-  isTotal?: boolean;
-  isSubtotal?: boolean;
-  isLess?: boolean;
-  isTax?: boolean;
+  isfoc?: boolean;
+  isreturned?: boolean;
+  istotal?: boolean;
+  issubtotal?: boolean;
+  isless?: boolean;
+  istax?: boolean;
   colspan?: number;
   action?: string;
 }
@@ -168,7 +169,7 @@ export interface InvoiceFilterOptions {
 
 export interface ProductData {
   code: string;
-  productName: string;
+  productname: string;
   qty: number;
   amount: number;
   isSubtotalQty?: boolean;
