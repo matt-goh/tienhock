@@ -180,8 +180,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingRight: 8,
   },
-  summary: {
-  },
+  summary: {},
   summaryTitle: {
     paddingBottom: 8,
   },
@@ -201,14 +200,6 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: colors.text.bold,
   },
-  lessRow: {
-    fontStyle: "italic",
-    color: colors.text.secondary,
-  },
-  taxRow: {
-    fontStyle: "italic",
-    color: colors.text.secondary,
-  },
   logo: {
     width: 45,
     height: 45,
@@ -216,6 +207,22 @@ const styles = StyleSheet.create({
   },
   headerTextContainer: {
     flex: 1,
+  },
+  subtotalRow: {
+    backgroundColor: colors.table.headerBackground,
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.table.borderDark,
+    borderBottomStyle: "solid",
+    minHeight: 24,
+    alignItems: "center",
+  },
+  subtotalText: {
+    padding: "6 8",
+    width: "45%",
+    borderRightWidth: 0.5,
+    borderRightColor: colors.table.border,
+    fontFamily: "Helvetica-Bold",
   },
 });
 
@@ -235,9 +242,22 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
     >();
     const specialRows: OrderDetail[] = [];
 
+    // Keep track of order
+    const orderedRows: OrderDetail[] = [];
+
     details.forEach((detail) => {
       if (detail.isless || detail.istax) {
-        specialRows.push(detail);
+        // Check if it's a subtotal row
+        const isSubtotalRow = detail.code?.toLowerCase()?.includes("subtotal");
+
+        const specialRow = {
+          ...detail,
+          productname: `${detail.productname}${
+            isSubtotalRow ? " Subtotal" : ""
+          } (${detail.isless ? "Less" : "Tax"})`,
+          issubtotal: isSubtotalRow,
+        };
+        specialRows.push(specialRow);
         return;
       }
 
@@ -260,9 +280,16 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
       }
     });
 
+    // First, add regular items
+    const regularItems = Array.from(regularDetails.values());
+    orderedRows.push(...regularItems.map((item) => item.detail));
+
+    // Then add special rows in their original order
+    orderedRows.push(...specialRows);
+
     return {
-      regularItems: Array.from(regularDetails.values()),
-      specialRows,
+      regularItems: regularItems,
+      specialRows: specialRows,
     };
   };
 
@@ -301,31 +328,34 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
   };
 
   const renderTableRow = (
-    detail: OrderDetail,
+    detail: OrderDetail & { issubtotal?: boolean },
     foc: number = 0,
     returned: number = 0,
     isSpecialRow: boolean = false
   ) => (
-    <View
-      style={[
-        styles.tableRow,
-        isSpecialRow ? (detail.isless ? styles.lessRow : styles.taxRow) : {},
-      ]}
-    >
-      <Text style={[styles.tableCell, styles.descriptionCell]}>
+    <View style={detail.issubtotal ? styles.subtotalRow : styles.tableRow}>
+      <Text
+        style={
+          detail.issubtotal
+            ? styles.subtotalText
+            : [styles.tableCell, styles.descriptionCell]
+        }
+      >
         {detail.productname}
       </Text>
       <Text style={[styles.tableCell, styles.focCell]}>
-        {!isSpecialRow ? foc || "" : ""}
+        {!isSpecialRow && !detail.issubtotal ? foc || "" : ""}
       </Text>
       <Text style={[styles.tableCell, styles.returnCell]}>
-        {!isSpecialRow ? returned || "" : ""}
+        {!isSpecialRow && !detail.issubtotal ? returned || "" : ""}
       </Text>
       <Text style={[styles.tableCell, styles.qtyCell]}>
-        {!isSpecialRow ? Math.round(detail.qty) : ""}
+        {!isSpecialRow && !detail.issubtotal ? Math.round(detail.qty) : ""}
       </Text>
       <Text style={[styles.tableCell, styles.priceCell]}>
-        {!isSpecialRow ? Number(detail.price).toFixed(2) : ""}
+        {!isSpecialRow && !detail.issubtotal
+          ? Number(detail.price).toFixed(2)
+          : ""}
       </Text>
       <Text style={[styles.tableCell, styles.amountCell]}>
         {Number(detail.total).toFixed(2)}
@@ -453,7 +483,11 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
 
                       {regularItems.map(
                         ({ detail, foc, returned }, detailIndex) =>
-                          renderTableRow(detail, foc, returned)
+                          renderTableRow(
+                            detail, // Pass the detail object directly, since it already contains all properties
+                            foc,
+                            returned
+                          )
                       )}
 
                       {specialRows.map((specialRow, index) =>
