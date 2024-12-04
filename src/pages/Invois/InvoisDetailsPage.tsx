@@ -660,24 +660,35 @@ const InvoisDetailsPage: React.FC = () => {
 
   const normalizeSpecialRow = useCallback(
     (row: OrderDetail, type: "Less" | "Tax") => {
+      // If this is an existing row (has invoiceid), preserve its original productname
+      if (row.invoiceid || row.code) {
+        return {
+          // Keep existing properties
+          invoiceid: row.invoiceid || "",
+          code: row.code,
+          productname: row.productname, // Keep original description
+          qty: row.qty || 1,
+          price: row.price || 0,
+          total: row.total || "0",
+          // Set flags
+          isfoc: false,
+          isreturned: false,
+          istotal: false,
+          issubtotal: false,
+          isless: type === "Less",
+          istax: type === "Tax",
+        };
+      }
+
+      // Only generate new code and description for new rows
+      const nextNumber = getNextSpecialRowNumber(type.toUpperCase());
       return {
-        // Keep any existing ID if it's from DB
-        invoiceid: row.invoiceid || "",
-        code:
-          row.code ||
-          `${type.toUpperCase()}-${getNextSpecialRowNumber(
-            type.toUpperCase()
-          )}`,
-        // Keep the original productname instead of generating a new one
-        productname:
-          row.productname ||
-          `${type} ${getNextSpecialRowNumber(type.toUpperCase())}`,
-        // Convert numeric values to strings if needed but preserve the original values
-        qty: row.qty || 1,
-        price: row.price || 0,
-        // Keep the original total value instead of defaulting to "0"
-        total: row.total || "0",
-        // Ensure all boolean flags are present
+        invoiceid: "",
+        code: `${type.toUpperCase()}-${nextNumber}`,
+        productname: `${type} ${nextNumber}`, // Only set default name for new rows
+        qty: 1,
+        price: 0,
+        total: "0",
         isfoc: false,
         isreturned: false,
         istotal: false,
@@ -1351,14 +1362,13 @@ const InvoisDetailsPage: React.FC = () => {
           step="0.01"
           value={info.getValue()}
           onChange={(e) => {
-            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const newValue = parseFloat(e.target.value) || 0;
             const updatedItem = {
               ...info.row.original,
               price: newValue,
-              total: (newValue * info.row.original.price).toFixed(2),
+              total: (newValue * info.row.original.qty).toFixed(2),
             };
 
-            // Get all current order details
             const allOrderDetails = invoiceData.orderDetails.map((item) => {
               if (item.code === updatedItem.code) {
                 return updatedItem;
@@ -1366,7 +1376,6 @@ const InvoisDetailsPage: React.FC = () => {
               return item;
             });
 
-            // Update all order details, including the modified item
             handleFocChange(allOrderDetails);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
@@ -1445,14 +1454,13 @@ const InvoisDetailsPage: React.FC = () => {
           step="0.01"
           value={info.getValue()}
           onChange={(e) => {
-            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+            const newValue = parseFloat(e.target.value) || 0;
             const updatedItem = {
               ...info.row.original,
               price: newValue,
-              total: (newValue * info.row.original.price).toFixed(2),
+              total: (newValue * info.row.original.qty).toFixed(2),
             };
 
-            // Get all current order details
             const allOrderDetails = invoiceData.orderDetails.map((item) => {
               if (item.code === updatedItem.code) {
                 return updatedItem;
@@ -1460,7 +1468,6 @@ const InvoisDetailsPage: React.FC = () => {
               return item;
             });
 
-            // Update all order details, including the modified item
             handleReturnedChange(allOrderDetails);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
