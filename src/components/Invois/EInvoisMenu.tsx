@@ -237,18 +237,15 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     setIsSubmitting(true);
     setSubmissionResponse(null);
     try {
+      const invoiceId = selectedInvoices[0].id;
+
       const response = await fetch(`${API_BASE_URL}/api/einvoice/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${loginResponse.tokenInfo?.accessToken}`,
         },
         body: JSON.stringify({
-          invoices: selectedInvoices.map((invoice) => invoice.id),
-          dateRange: {
-            start: submissionInfo.startDate,
-            end: submissionInfo.endDate,
-          },
+          invoiceId, // Include invoiceId in the request body
         }),
       });
       const data: SubmissionResponse = await response.json();

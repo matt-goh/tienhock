@@ -1,5 +1,5 @@
-import { generateDummyInvoice } from './generateDummyInvoice.js';
 import { createHash } from 'crypto';
+import { transformInvoiceToMyInvoisFormat } from './transformInvoiceData.js';
 
 class DocumentSubmissionHandler {
   constructor(apiClient) {
@@ -8,11 +8,13 @@ class DocumentSubmissionHandler {
     this.POLLING_INTERVAL = 5000; // 5 seconds
   }
 
-  async submitAndPollDocument() {
+  async submitAndPollDocument(invoiceData) {
     try {
-      const invoice = generateDummyInvoice();
-      const requestBody = this.prepareRequestBody(invoice);
+      // Transform the invoice data to MyInvois format
+      const transformedInvoice = transformInvoiceToMyInvoisFormat(invoiceData);
+      console.log('Transformed invoice:', JSON.stringify(transformedInvoice, null, 2));
       
+      const requestBody = this.prepareRequestBody(transformedInvoice);
       console.log('Submission payload:', JSON.stringify(requestBody, null, 2));
 
       const submissionResponse = await this.submitDocuments(requestBody);
@@ -29,7 +31,13 @@ class DocumentSubmissionHandler {
   }
 
   prepareRequestBody(invoice) {
+    if (!invoice || !invoice.Invoice || !invoice.Invoice[0] || !invoice.Invoice[0].ID) {
+      throw new Error('Invalid invoice data structure');
+    }
+    
     const jsonDocument = JSON.stringify(invoice);
+    console.log('Preparing request body for invoice:', invoice.Invoice[0].ID[0]._);
+    
     return {
       documents: [{
         format: "JSON",
