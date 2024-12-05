@@ -199,7 +199,7 @@ export function transformInvoiceToMyInvoisFormat(invoiceData) {
                   }
                 ],
                 "PartyIdentification": [
-                  { "ID": [{ "_": "IG7139779050", "schemeID": "TIN" }] },
+                  { "ID": [{ "_": "EI00000000010", "schemeID": "TIN" }] },
                   { "ID": [{ "_": "NA", "schemeID": "BRN" }] },
                   { "ID": [{ "_": "NA", "schemeID": "SST" }] },
                   { "ID": [{ "_": "NA", "schemeID": "TTX" }] }
@@ -242,7 +242,7 @@ export function transformInvoiceToMyInvoisFormat(invoiceData) {
                   {
                     "ID": [
                       {
-                        "_": "IG7139779050",
+                        "_": "EI00000000010",
                         "schemeID": "TIN"
                       }
                     ]
@@ -370,7 +370,7 @@ export function transformInvoiceToMyInvoisFormat(invoiceData) {
           }
         ],
         "InvoiceLine": [{
-          "ID": [{ "_": "1" }],
+          "ID": [{ "_": "1234" }],
           "InvoicedQuantity": [{ "_": 1, "unitCode": "C62" }],
           "LineExtensionAmount": [{ "_": formatAmount(totals.subtotal), "currencyID": "MYR" }],
           "AllowanceCharge": [
