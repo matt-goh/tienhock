@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 import { updateElectronApp } from 'update-electron-app';
 import { fileURLToPath } from 'url';
+import { ipcMain } from 'electron';
 import path from 'path';
 import fs from 'fs';
 
@@ -96,6 +97,7 @@ async function createWindow() {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
         additionalArguments: [`--server-url=${getServerUrl()}`]
       },
     });
@@ -161,6 +163,29 @@ async function createWindow() {
     throw error;
   }
 }
+
+ipcMain.handle('print-pdf', async (event, { data, options }) => {
+  try {
+    const window = event.sender;
+    await window.webContents.print({
+      silent: options.silent,
+      printBackground: options.printBackground,
+      deviceName: options.deviceName,
+      // You can add more print options here
+    }, (success, failureReason) => {
+      if (!success) {
+        throw new Error(`Print failed: ${failureReason}`);
+      }
+    });
+  } catch (error) {
+    throw error;
+  }
+});
+
+ipcMain.handle('get-printers', async (event) => {
+  const window = event.sender;
+  return await window.webContents.getPrinters();
+});
 
 app.on('ready', () => {
   try {
