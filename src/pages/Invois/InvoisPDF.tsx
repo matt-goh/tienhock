@@ -40,7 +40,9 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     flexDirection: "column",
-    padding: 40,
+    paddingVertical: 35,
+    paddingLeft: 40,
+    paddingRight: 40,
     fontFamily: "Helvetica",
     fontSize: 9,
     backgroundColor: colors.background,
@@ -78,14 +80,14 @@ const styles = StyleSheet.create({
   },
   tableContent: {
     border: `1pt solid ${colors.table.border}`,
-    paddingBottom: 7,
+    paddingBottom: 6,
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderBottomColor: colors.table.borderDark,
     borderBottomStyle: "solid",
-    minHeight: 24,
+    minHeight: 20,
     alignItems: "center",
   },
   invoiceInfo: {
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    paddingTop: 8,
+    paddingTop: 6,
     paddingRight: 8,
   },
   summary: {},
@@ -203,7 +205,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 45,
     height: 45,
-    marginTop: 2,
   },
   headerTextContainer: {
     flex: 1,
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: colors.table.borderDark,
     borderBottomStyle: "solid",
-    minHeight: 24,
+    minHeight: 20,
     alignItems: "center",
   },
   subtotalText: {
@@ -232,6 +233,10 @@ interface InvoicePDFProps {
 
 const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
   const getProcessedOrderDetails = (details: OrderDetail[]) => {
+    // Keep track of all rows in their original order
+    const orderedRows: OrderDetail[] = [];
+
+    // Map to store regular items with their FOC and returned quantities
     const regularDetails = new Map<
       string,
       {
@@ -240,24 +245,16 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
         returned: number;
       }
     >();
-    const specialRows: OrderDetail[] = [];
 
-    // Keep track of order
-    const orderedRows: OrderDetail[] = [];
-
+    // First pass: Process regular items to combine FOC and returned quantities
     details.forEach((detail) => {
-      if (detail.isless || detail.istax) {
-        // Check if it's a subtotal row
-        const isSubtotalRow = detail.code?.toLowerCase()?.includes("subtotal");
-
-        const specialRow = {
-          ...detail,
-          productname: `${detail.productname}${
-            isSubtotalRow ? " Subtotal" : ""
-          } (${detail.isless ? "Less" : "Tax"})`,
-          issubtotal: isSubtotalRow,
-        };
-        specialRows.push(specialRow);
+      // Skip special rows and total rows in first pass
+      if (
+        detail.isless ||
+        detail.istax ||
+        detail.issubtotal ||
+        detail.istotal
+      ) {
         return;
       }
 
@@ -280,24 +277,47 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
       }
     });
 
-    // First, add regular items
-    const regularItems = Array.from(regularDetails.values());
-    orderedRows.push(...regularItems.map((item) => item.detail));
+    // Second pass: Build the ordered rows while maintaining original sequence
+    details.forEach((detail) => {
+      if (detail.istotal) return; // Skip total rows
 
-    // Then add special rows in their original order
-    orderedRows.push(...specialRows);
+      if (detail.isless || detail.istax || detail.issubtotal) {
+        // Format description for special rows
+        let formattedDescription = detail.productname || "";
+
+        if (detail.issubtotal) {
+          formattedDescription = "Subtotal";
+        } else if (detail.isless) {
+          formattedDescription = `${formattedDescription} (Less)`;
+        } else if (detail.istax) {
+          formattedDescription = `${formattedDescription} (Tax)`;
+        }
+
+        const specialRow = {
+          ...detail,
+          productname: formattedDescription,
+          issubtotal: detail.issubtotal,
+        };
+        orderedRows.push(specialRow);
+      } else if (!detail.isfoc && !detail.isreturned) {
+        // Only process regular items once (not FOC or returned versions)
+        const key = `${detail.code}-${detail.productname}`;
+        const item = regularDetails.get(key);
+        if (item && !orderedRows.some((row) => row.code === detail.code)) {
+          orderedRows.push(item.detail);
+        }
+      }
+    });
 
     return {
-      regularItems: regularItems,
-      specialRows: specialRows,
+      regularItems: Array.from(regularDetails.values()),
+      orderedRows: orderedRows,
     };
   };
 
   const calculateInvoiceRows = (invoice: InvoiceData) => {
-    const { regularItems, specialRows } = getProcessedOrderDetails(
-      invoice.orderDetails
-    );
-    return TABLE_HEADER_ROWS + regularItems.length + specialRows.length + 1;
+    const { orderedRows } = getProcessedOrderDetails(invoice.orderDetails);
+    return TABLE_HEADER_ROWS + orderedRows.length + 1; // +1 for the total row
   };
 
   const paginateInvoices = (invoices: InvoiceData[]) => {
@@ -449,7 +469,7 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
             )}
 
             {pageInvoices.map((invoice, index) => {
-              const { regularItems, specialRows } = getProcessedOrderDetails(
+              const { regularItems, orderedRows } = getProcessedOrderDetails(
                 invoice.orderDetails
               );
 
@@ -481,18 +501,20 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
                         </Text>
                       </View>
 
-                      {regularItems.map(
-                        ({ detail, foc, returned }, detailIndex) =>
-                          renderTableRow(
-                            detail, // Pass the detail object directly, since it already contains all properties
-                            foc,
-                            returned
-                          )
-                      )}
-
-                      {specialRows.map((specialRow, index) =>
-                        renderTableRow(specialRow, 0, 0, true)
-                      )}
+                      {orderedRows.map((row) => {
+                        if (row.isless || row.istax || row.issubtotal) {
+                          return renderTableRow(row, 0, 0, true);
+                        } else {
+                          const item = regularItems.find(
+                            (item) => item.detail.code === row.code
+                          );
+                          return renderTableRow(
+                            row,
+                            item?.foc || 0,
+                            item?.returned || 0
+                          );
+                        }
+                      })}
 
                       <View style={styles.totalRow}>
                         <Text style={styles.bold}>
