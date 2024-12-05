@@ -31,6 +31,8 @@ import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import { BlobProvider } from "@react-pdf/renderer";
 import InvoisPDF from "./InvoisPDF";
+import PrintPDFOverlay from "./PrintPDFOverlay";
+import { generatePDFFilename } from "./generatePDFFilename";
 
 // Separate PDF generation component to prevent re-renders
 const PDFDownloadButton = ({
@@ -50,7 +52,7 @@ const PDFDownloadButton = ({
         if (url && !loading && !error) {
           const link = document.createElement("a");
           link.href = url;
-          link.download = "invoices.pdf";
+          link.download = generatePDFFilename(invoices);
           link.click();
           setTimeout(() => setStartDownload(false), 100);
         }
@@ -106,6 +108,7 @@ const InvoisPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [productData, setProductData] = useState<ProductData[]>([]);
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
+  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [startDownload, setStartDownload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
@@ -628,29 +631,7 @@ const InvoisPage: React.FC = () => {
   const handlePrintPDF = () => {
     const invoicesToUse =
       selectedCount > 0 ? selectedInvoices : filteredInvoices;
-
-    // Create a hidden iframe for printing
-    const printFrame = document.createElement("iframe");
-    printFrame.style.display = "none";
-    document.body.appendChild(printFrame);
-
-    // Store the data temporarily
-    sessionStorage.setItem("PDF_DATA", JSON.stringify(invoicesToUse));
-
-    // Load the PDF viewer URL in the iframe
-    printFrame.src = "/pdf-viewer";
-
-    // Wait for the frame to load, then print
-    printFrame.onload = () => {
-      setTimeout(() => {
-        printFrame.contentWindow?.print();
-        // Clean up
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-          sessionStorage.removeItem("PDF_DATA");
-        }, 1000);
-      }, 1000); // Give time for PDF to render
-    };
+    setShowPrintOverlay(true);
   };
 
   const invoiceColumns: ColumnConfig[] = [
@@ -952,6 +933,12 @@ const InvoisPage: React.FC = () => {
           confirmButtonText="Delete"
         />
       </div>
+      {showPrintOverlay && (
+        <PrintPDFOverlay
+          invoices={selectedCount > 0 ? selectedInvoices : filteredInvoices}
+          onComplete={() => setShowPrintOverlay(false)}
+        />
+      )}
     </div>
   );
 };

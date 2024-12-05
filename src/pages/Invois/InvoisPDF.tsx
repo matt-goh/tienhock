@@ -3,9 +3,7 @@ import {
   Page,
   Text,
   View,
-  Document,
   StyleSheet,
-  PDFViewer,
   Image,
 } from "@react-pdf/renderer";
 import { InvoiceData, OrderDetail } from "../../types/types";
@@ -447,121 +445,114 @@ const InvoisPDF: React.FC<{ invoices: InvoiceData[] }> = ({ invoices }) => {
   );
 
   return (
-    <PDFViewer style={{ width: "100%", height: "100%" }}>
-      <Document>
-        {pages.map((pageInvoices, pageIndex) => (
-          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
-            {pageIndex === 0 && (
-              <View style={styles.headerContainer}>
-                <View style={styles.header}>
-                  <Image src="/tienhock.png" style={styles.logo} />
-                  <View style={styles.headerTextContainer}>
-                    <Text style={styles.companyName}>
-                      TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
-                    </Text>
-                    <Text style={styles.companyDetails}>
-                      Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah
-                    </Text>
-                    <Text style={styles.companyDetails}>
-                      Tel: (088)719715, 719799 Fax:(088)72645
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {pageInvoices.map((invoice, invoiceIndex) => {
-              const { regularItems, orderedRows } = getProcessedOrderDetails(
-                invoice.orderDetails
-              );
-
-              return (
-                <View
-                  key={`invoice-${pageIndex}-${invoiceIndex}`}
-                  style={styles.invoice}
-                >
-                  <View style={styles.table}>
-                    {renderInvoiceInfoRows(invoice)}
-                    <View style={styles.tableContent}>
-                      <View style={[styles.tableRow, styles.tableHeader]}>
-                        <Text
-                          style={[styles.tableCell, styles.descriptionCell]}
-                        >
-                          Description
-                        </Text>
-                        <Text style={[styles.tableCell, styles.focCell]}>
-                          Foc
-                        </Text>
-                        <Text style={[styles.tableCell, styles.returnCell]}>
-                          Return
-                        </Text>
-                        <Text style={[styles.tableCell, styles.qtyCell]}>
-                          Qty
-                        </Text>
-                        <Text style={[styles.tableCell, styles.priceCell]}>
-                          Unit/Price
-                        </Text>
-                        <Text style={[styles.tableCell, styles.amountCell]}>
-                          Amount
-                        </Text>
-                      </View>
-
-                      {orderedRows.map((row, rowIndex) => {
-                        if (row.isless || row.istax || row.issubtotal) {
-                          return renderTableRow(row, 0, 0, true, rowIndex);
-                        } else {
-                          const item = regularItems.find(
-                            (item) => item.detail.code === row.code
-                          );
-                          return renderTableRow(
-                            row,
-                            item?.foc || 0,
-                            item?.returned || 0,
-                            false,
-                            rowIndex
-                          );
-                        }
-                      })}
-
-                      {/* Total row */}
-                      <View
-                        key={`total-${invoiceIndex}`}
-                        style={styles.totalRow}
-                      >
-                        <Text style={styles.bold}>
-                          Total Amount Payable: RM{" "}
-                          {Number(invoice.totalAmount).toFixed(2)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-
-            {pageIndex === pages.length - 1 && (
-              <View style={styles.summary}>
-                <Text style={[styles.bold, styles.summaryTitle]}>Summary</Text>
-                <View style={styles.summaryRow}>
-                  <Text>Cash Invoices ({totals.cashCount}):</Text>
-                  <Text>RM {totals.cashTotal.toFixed(2)}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text>Credit Invoices ({totals.invoiceCount}):</Text>
-                  <Text>RM {totals.invoiceTotal.toFixed(2)}</Text>
-                </View>
-                <View style={[styles.summaryRow, styles.grandTotal]}>
-                  <Text style={styles.bold}>Grand Total:</Text>
-                  <Text style={styles.bold}>
-                    RM {(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
+    <>
+      {pages.map((pageInvoices, pageIndex) => (
+        <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
+          {pageIndex === 0 && (
+            <View style={styles.headerContainer}>
+              <View style={styles.header}>
+                <Image src="/tienhock.png" style={styles.logo} />
+                <View style={styles.headerTextContainer}>
+                  <Text style={styles.companyName}>
+                    TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
+                  </Text>
+                  <Text style={styles.companyDetails}>
+                    Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah
+                  </Text>
+                  <Text style={styles.companyDetails}>
+                    Tel: (088)719715, 719799 Fax:(088)72645
                   </Text>
                 </View>
               </View>
-            )}
-          </Page>
-        ))}
-      </Document>
-    </PDFViewer>
+            </View>
+          )}
+
+          {pageInvoices.map((invoice, invoiceIndex) => {
+            const { regularItems, orderedRows } = getProcessedOrderDetails(
+              invoice.orderDetails
+            );
+
+            return (
+              <View
+                key={`invoice-${pageIndex}-${invoiceIndex}`}
+                style={styles.invoice}
+              >
+                <View style={styles.table}>
+                  {renderInvoiceInfoRows(invoice)}
+                  <View style={styles.tableContent}>
+                    <View style={[styles.tableRow, styles.tableHeader]}>
+                      <Text style={[styles.tableCell, styles.descriptionCell]}>
+                        Description
+                      </Text>
+                      <Text style={[styles.tableCell, styles.focCell]}>
+                        Foc
+                      </Text>
+                      <Text style={[styles.tableCell, styles.returnCell]}>
+                        Return
+                      </Text>
+                      <Text style={[styles.tableCell, styles.qtyCell]}>
+                        Qty
+                      </Text>
+                      <Text style={[styles.tableCell, styles.priceCell]}>
+                        Unit/Price
+                      </Text>
+                      <Text style={[styles.tableCell, styles.amountCell]}>
+                        Amount
+                      </Text>
+                    </View>
+
+                    {orderedRows.map((row, rowIndex) => {
+                      if (row.isless || row.istax || row.issubtotal) {
+                        return renderTableRow(row, 0, 0, true, rowIndex);
+                      } else {
+                        const item = regularItems.find(
+                          (item) => item.detail.code === row.code
+                        );
+                        return renderTableRow(
+                          row,
+                          item?.foc || 0,
+                          item?.returned || 0,
+                          false,
+                          rowIndex
+                        );
+                      }
+                    })}
+
+                    {/* Total row */}
+                    <View key={`total-${invoiceIndex}`} style={styles.totalRow}>
+                      <Text style={styles.bold}>
+                        Total Amount Payable: RM{" "}
+                        {Number(invoice.totalAmount).toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          {pageIndex === pages.length - 1 && (
+            <View style={styles.summary}>
+              <Text style={[styles.bold, styles.summaryTitle]}>Summary</Text>
+              <View style={styles.summaryRow}>
+                <Text>Cash Invoices ({totals.cashCount}):</Text>
+                <Text>RM {totals.cashTotal.toFixed(2)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text>Credit Invoices ({totals.invoiceCount}):</Text>
+                <Text>RM {totals.invoiceTotal.toFixed(2)}</Text>
+              </View>
+              <View style={[styles.summaryRow, styles.grandTotal]}>
+                <Text style={styles.bold}>Grand Total:</Text>
+                <Text style={styles.bold}>
+                  RM {(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          )}
+        </Page>
+      ))}
+    </>
   );
 };
 
