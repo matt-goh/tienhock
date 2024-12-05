@@ -13,7 +13,14 @@ import {
   ProductData,
 } from "../../types/types";
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
-import { IconCloudUpload, IconPlus, IconSearch } from "@tabler/icons-react";
+import {
+  IconCloudUpload,
+  IconDownload,
+  IconEye,
+  IconPlus,
+  IconPrinter,
+  IconSearch,
+} from "@tabler/icons-react";
 import { API_BASE_URL } from "../../configs/config";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
@@ -22,6 +29,36 @@ import TableEditing from "../../components/Table/TableEditing";
 import EInvoisMenu from "../../components/Invois/EInvoisMenu";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
+import { BlobProvider } from "@react-pdf/renderer";
+import InvoisPDF from "./InvoisPDF";
+
+// Separate PDF generation component to prevent re-renders
+const PDFDownloadButton = ({
+  invoices,
+  startDownload,
+  setStartDownload,
+}: {
+  invoices: InvoiceData[];
+  startDownload: boolean;
+  setStartDownload: (value: boolean) => void;
+}) => {
+  if (!startDownload) return null;
+
+  return (
+    <BlobProvider document={<InvoisPDF invoices={invoices} />}>
+      {({ blob, url, loading, error }) => {
+        if (url && !loading && !error) {
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "invoices.pdf";
+          link.click();
+          setTimeout(() => setStartDownload(false), 100);
+        }
+        return null;
+      }}
+    </BlobProvider>
+  );
+};
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -69,6 +106,7 @@ const InvoisPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [productData, setProductData] = useState<ProductData[]>([]);
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
+  const [startDownload, setStartDownload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -565,9 +603,17 @@ const InvoisPage: React.FC = () => {
     });
   };
 
+  const handleDownloadClick = () => {
+    setStartDownload(true);
+  };
+
   const handlePDFClick = () => {
+    // Determine which invoices to use for the PDF
+    const invoicesToUse =
+      selectedCount > 0 ? selectedInvoices : filteredInvoices;
+
     // Store the data in sessionStorage before opening the window
-    sessionStorage.setItem("PDF_DATA", JSON.stringify(filteredInvoices));
+    sessionStorage.setItem("PDF_DATA", JSON.stringify(invoicesToUse));
 
     // Open the window and remove the data after it's opened
     const pdfWindow = window.open("/pdf-viewer", "_blank");
@@ -577,6 +623,34 @@ const InvoisPage: React.FC = () => {
         sessionStorage.removeItem("PDF_DATA");
       }, 1000);
     }
+  };
+
+  const handlePrintPDF = () => {
+    const invoicesToUse =
+      selectedCount > 0 ? selectedInvoices : filteredInvoices;
+
+    // Create a hidden iframe for printing
+    const printFrame = document.createElement("iframe");
+    printFrame.style.display = "none";
+    document.body.appendChild(printFrame);
+
+    // Store the data temporarily
+    sessionStorage.setItem("PDF_DATA", JSON.stringify(invoicesToUse));
+
+    // Load the PDF viewer URL in the iframe
+    printFrame.src = "/pdf-viewer";
+
+    // Wait for the frame to load, then print
+    printFrame.onload = () => {
+      setTimeout(() => {
+        printFrame.contentWindow?.print();
+        // Clean up
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+          sessionStorage.removeItem("PDF_DATA");
+        }, 1000);
+      }, 1000); // Give time for PDF to render
+    };
   };
 
   const invoiceColumns: ColumnConfig[] = [
@@ -661,6 +735,11 @@ const InvoisPage: React.FC = () => {
 
   return (
     <div className="px-6">
+      <PDFDownloadButton
+        invoices={selectedCount > 0 ? selectedInvoices : filteredInvoices}
+        startDownload={startDownload}
+        setStartDownload={setStartDownload}
+      />
       <div className="flex flex-col">
         {/* Page Header aligned with table (excluding checkbox width) */}
         <div
@@ -668,15 +747,49 @@ const InvoisPage: React.FC = () => {
             !filters.applyProductFilter ? "pl-[45px]" : ""
           }`}
         >
-          <h1 className="text-3xl font-semibold text-default-900">Invois</h1>
+          <h1 className="text-3xl font-semibold text-default-900">
+            Invois {selectedCount > 0 && `(${selectedCount})`}
+          </h1>
           <div className="flex items-center gap-3">
             {selectedCount > 0 && (
-              <button
-                onClick={() => setShowDeleteConfirmation(true)}
-                className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
-              >
-                Delete Selected ({selectedCount})
-              </button>
+              <>
+                <button
+                  onClick={() => setShowDeleteConfirmation(true)}
+                  className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+                >
+                  Delete
+                </button>
+                <Button
+                  onClick={handlePDFClick}
+                  icon={IconEye}
+                  iconSize={16}
+                  iconStroke={2}
+                  variant="outline"
+                >
+                  View
+                </Button>
+
+                <Button
+                  onClick={handleDownloadClick}
+                  disabled={startDownload}
+                  icon={IconDownload}
+                  iconSize={16}
+                  iconStroke={2}
+                  variant="outline"
+                >
+                  {startDownload ? "Preparing..." : "Download"}
+                </Button>
+
+                <Button
+                  onClick={handlePrintPDF}
+                  icon={IconPrinter}
+                  iconSize={16}
+                  iconStroke={2}
+                  variant="outline"
+                >
+                  Print
+                </Button>
+              </>
             )}
             <input
               ref={fileInputRef}
@@ -687,10 +800,7 @@ const InvoisPage: React.FC = () => {
               id="fileUpload"
               multiple
             />
-            <div className="flex items-center gap-4">
-              <Button onClick={handlePDFClick} variant="outline">
-                Open PDF
-              </Button>
+            <div className="flex items-center gap-3">
               <EInvoisMenu
                 selectedInvoices={selectedInvoices}
                 dateRange={filters.dateRangeFilter}
