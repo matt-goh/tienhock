@@ -1,16 +1,11 @@
 import React from "react";
-import {
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Image,
-} from "@react-pdf/renderer";
+import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, OrderDetail } from "../../types/types";
 
 const ROWS_PER_PAGE = 28;
 const HEADER_ROWS = 3;
 const TABLE_HEADER_ROWS = 3;
+const SUMMARY_ROWS = 4;
 
 // Color palette for easy customization
 const colors = {
@@ -320,22 +315,54 @@ const InvoisPDF: React.FC<{ invoices: InvoiceData[] }> = ({ invoices }) => {
     const pages: InvoiceData[][] = [];
     let currentPage: InvoiceData[] = [];
     let currentPageRows = HEADER_ROWS;
+    let remainingSpace = 0;
 
-    invoices.forEach((invoice) => {
+    // Calculate total rows needed for summary
+    const summaryNeededRows = SUMMARY_ROWS;
+
+    invoices.forEach((invoice, index) => {
       const invoiceRows = calculateInvoiceRows(invoice);
+      const isLastInvoice = index === invoices.length - 1;
 
+      // Check if adding this invoice would exceed page limit
       if (currentPageRows + invoiceRows > ROWS_PER_PAGE) {
-        if (currentPage.length > 0) {
+        // If this is the last invoice, check if we need a new page for summary
+        if (isLastInvoice) {
+          remainingSpace = ROWS_PER_PAGE - currentPageRows;
+          // If not enough space for both invoice and summary, start a new page
+          if (remainingSpace < invoiceRows + summaryNeededRows) {
+            pages.push(currentPage);
+            currentPage = [invoice];
+            currentPageRows = HEADER_ROWS + invoiceRows;
+          } else {
+            currentPage.push(invoice);
+            currentPageRows += invoiceRows;
+          }
+        } else {
+          // Not the last invoice, simply start a new page
           pages.push(currentPage);
-          currentPage = [];
-          currentPageRows = HEADER_ROWS;
+          currentPage = [invoice];
+          currentPageRows = HEADER_ROWS + invoiceRows;
+        }
+      } else {
+        // Check if this is the last invoice and if we have enough space for summary
+        if (
+          isLastInvoice &&
+          currentPageRows + invoiceRows + summaryNeededRows > ROWS_PER_PAGE
+        ) {
+          // Not enough space for summary, push current page and start new one
+          pages.push(currentPage);
+          currentPage = [invoice];
+          currentPageRows = HEADER_ROWS + invoiceRows;
+        } else {
+          // Enough space, add to current page
+          currentPage.push(invoice);
+          currentPageRows += invoiceRows;
         }
       }
-
-      currentPage.push(invoice);
-      currentPageRows += invoiceRows;
     });
 
+    // Push the last page if it has any invoices
     if (currentPage.length > 0) {
       pages.push(currentPage);
     }
