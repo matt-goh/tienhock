@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { InvoiceData } from '../../types/types';
-import InvoisPDF from './InvoisPDF';
+import React, { useState, useEffect } from "react";
+import { InvoiceData } from "../../types/types";
+import InvoisPDF from "./InvoisPDF";
+import { PDFViewer, Document } from "@react-pdf/renderer";
+import { generatePDFFilename } from "./generatePDFFilename";
 
 const PDFViewerPage: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
@@ -9,7 +11,7 @@ const PDFViewerPage: React.FC = () => {
   useEffect(() => {
     try {
       // Try to get the data from sessionStorage
-      const storedData = sessionStorage.getItem('PDF_DATA');
+      const storedData = sessionStorage.getItem("PDF_DATA");
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         if (Array.isArray(parsedData)) {
@@ -18,12 +20,12 @@ const PDFViewerPage: React.FC = () => {
           return;
         }
       }
-      
+
       // If no data in sessionStorage, show error
       setIsLoading(false);
-      console.error('No invoice data found');
+      console.error("No invoice data found");
     } catch (error) {
-      console.error('Error loading PDF data:', error);
+      console.error("Error loading PDF data:", error);
       setIsLoading(false);
     }
   }, []);
@@ -46,7 +48,11 @@ const PDFViewerPage: React.FC = () => {
 
   return (
     <div className="h-screen w-screen">
-      <InvoisPDF invoices={invoices} />
+      <PDFViewer style={{ width: "100%", height: "100%" }}>
+        <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
+          <InvoisPDF invoices={invoices} />
+        </Document>
+      </PDFViewer>
     </div>
   );
 };
