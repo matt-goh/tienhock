@@ -182,7 +182,9 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingRight: 8,
   },
-  summary: {},
+  summary: {
+    marginTop: -2,
+  },
   summaryTitle: {
     paddingBottom: 8,
   },
@@ -227,11 +229,7 @@ const styles = StyleSheet.create({
   },
 });
 
-interface InvoicePDFProps {
-  invoices: InvoiceData[];
-}
-
-const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
+const InvoisPDF: React.FC<{ invoices: InvoiceData[] }> = ({ invoices }) => {
   const getProcessedOrderDetails = (details: OrderDetail[]) => {
     // Keep track of all rows in their original order
     const orderedRows: OrderDetail[] = [];
@@ -351,9 +349,13 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
     detail: OrderDetail & { issubtotal?: boolean },
     foc: number = 0,
     returned: number = 0,
-    isSpecialRow: boolean = false
+    isSpecialRow: boolean = false,
+    index: number
   ) => (
-    <View style={detail.issubtotal ? styles.subtotalRow : styles.tableRow}>
+    <View
+      key={`row-${index}`}
+      style={detail.issubtotal ? styles.subtotalRow : styles.tableRow}
+    >
       <Text
         style={
           detail.issubtotal
@@ -448,7 +450,7 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
     <PDFViewer style={{ width: "100%", height: "100%" }}>
       <Document>
         {pages.map((pageInvoices, pageIndex) => (
-          <Page key={pageIndex} size="A4" style={styles.page}>
+          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
             {pageIndex === 0 && (
               <View style={styles.headerContainer}>
                 <View style={styles.header}>
@@ -468,13 +470,16 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
               </View>
             )}
 
-            {pageInvoices.map((invoice, index) => {
+            {pageInvoices.map((invoice, invoiceIndex) => {
               const { regularItems, orderedRows } = getProcessedOrderDetails(
                 invoice.orderDetails
               );
 
               return (
-                <View key={index} style={styles.invoice}>
+                <View
+                  key={`invoice-${pageIndex}-${invoiceIndex}`}
+                  style={styles.invoice}
+                >
                   <View style={styles.table}>
                     {renderInvoiceInfoRows(invoice)}
                     <View style={styles.tableContent}>
@@ -501,9 +506,9 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
                         </Text>
                       </View>
 
-                      {orderedRows.map((row) => {
+                      {orderedRows.map((row, rowIndex) => {
                         if (row.isless || row.istax || row.issubtotal) {
-                          return renderTableRow(row, 0, 0, true);
+                          return renderTableRow(row, 0, 0, true, rowIndex);
                         } else {
                           const item = regularItems.find(
                             (item) => item.detail.code === row.code
@@ -511,12 +516,18 @@ const InvoisPDF: React.FC<InvoicePDFProps> = ({ invoices }) => {
                           return renderTableRow(
                             row,
                             item?.foc || 0,
-                            item?.returned || 0
+                            item?.returned || 0,
+                            false,
+                            rowIndex
                           );
                         }
                       })}
 
-                      <View style={styles.totalRow}>
+                      {/* Total row */}
+                      <View
+                        key={`total-${invoiceIndex}`}
+                        style={styles.totalRow}
+                      >
                         <Text style={styles.bold}>
                           Total Amount Payable: RM{" "}
                           {Number(invoice.totalAmount).toFixed(2)}
