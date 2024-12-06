@@ -29,38 +29,8 @@ import TableEditing from "../../components/Table/TableEditing";
 import EInvoisMenu from "../../components/Invois/EInvoisMenu";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
-import { BlobProvider } from "@react-pdf/renderer";
-import InvoisPDF from "./InvoisPDF";
 import PrintPDFOverlay from "./PrintPDFOverlay";
-import { generatePDFFilename } from "./generatePDFFilename";
-
-// Separate PDF generation component to prevent re-renders
-const PDFDownloadButton = ({
-  invoices,
-  startDownload,
-  setStartDownload,
-}: {
-  invoices: InvoiceData[];
-  startDownload: boolean;
-  setStartDownload: (value: boolean) => void;
-}) => {
-  if (!startDownload) return null;
-
-  return (
-    <BlobProvider document={<InvoisPDF invoices={invoices} />}>
-      {({ blob, url, loading, error }) => {
-        if (url && !loading && !error) {
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = generatePDFFilename(invoices);
-          link.click();
-          setTimeout(() => setStartDownload(false), 100);
-        }
-        return null;
-      }}
-    </BlobProvider>
-  );
-};
+import PDFDownloadHandler from "./PDFDownloadHandler";
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -109,7 +79,6 @@ const InvoisPage: React.FC = () => {
   const [productData, setProductData] = useState<ProductData[]>([]);
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
-  const [startDownload, setStartDownload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -606,10 +575,6 @@ const InvoisPage: React.FC = () => {
     });
   };
 
-  const handleDownloadClick = () => {
-    setStartDownload(true);
-  };
-
   const handlePDFClick = () => {
     // Determine which invoices to use for the PDF
     const invoicesToUse =
@@ -716,11 +681,6 @@ const InvoisPage: React.FC = () => {
 
   return (
     <div className="px-6">
-      <PDFDownloadButton
-        invoices={selectedCount > 0 ? selectedInvoices : filteredInvoices}
-        startDownload={startDownload}
-        setStartDownload={setStartDownload}
-      />
       <div className="flex flex-col">
         {/* Page Header aligned with table (excluding checkbox width) */}
         <div
@@ -733,45 +693,39 @@ const InvoisPage: React.FC = () => {
           </h1>
           <div className="flex items-center gap-3">
             {selectedCount > 0 && (
-              <>
-                <button
-                  onClick={() => setShowDeleteConfirmation(true)}
-                  className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
-                >
-                  Delete
-                </button>
-                <Button
-                  onClick={handlePDFClick}
-                  icon={IconEye}
-                  iconSize={16}
-                  iconStroke={2}
-                  variant="outline"
-                >
-                  View
-                </Button>
-
-                <Button
-                  onClick={handleDownloadClick}
-                  disabled={startDownload}
-                  icon={IconDownload}
-                  iconSize={16}
-                  iconStroke={2}
-                  variant="outline"
-                >
-                  {startDownload ? "Preparing..." : "Download"}
-                </Button>
-
-                <Button
-                  onClick={handlePrintPDF}
-                  icon={IconPrinter}
-                  iconSize={16}
-                  iconStroke={2}
-                  variant="outline"
-                >
-                  Print
-                </Button>
-              </>
+              <button
+                onClick={() => setShowDeleteConfirmation(true)}
+                className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+              >
+                Delete
+              </button>
             )}
+            <Button
+              onClick={handlePDFClick}
+              icon={IconEye}
+              iconSize={16}
+              iconStroke={2}
+              variant="outline"
+              disabled={selectedCount === 0}
+            >
+              View
+            </Button>
+
+            <PDFDownloadHandler
+              invoices={selectedCount > 0 ? selectedInvoices : filteredInvoices}
+              disabled={selectedCount === 0}
+            />
+
+            <Button
+              onClick={handlePrintPDF}
+              icon={IconPrinter}
+              iconSize={16}
+              iconStroke={2}
+              variant="outline"
+              disabled={selectedCount === 0}
+            >
+              Print
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
