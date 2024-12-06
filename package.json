@@ -11,7 +11,6 @@
     "url": "https://github.com/matt-goh/tienhock.git"
   },
   "dependencies": {
-    "@electron-forge/shared-types": "^7.5.0",
     "@headlessui/react": "^2.1.1",
     "@react-pdf/font": "^3.0.1",
     "@react-pdf/layout": "^4.1.3",
@@ -34,7 +33,6 @@
     "crypto": "^1.0.1",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
-    "electron-log": "^5.2.2",
     "express": "^4.19.2",
     "idb": "^8.0.0",
     "lodash": "^4.17.21",
@@ -45,52 +43,13 @@
     "react-router-dom": "^6.25.1",
     "react-scripts": "^5.0.1",
     "typescript": "^4.9.5",
-    "update-electron-app": "^3.0.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
     "react": "WATCHPACK_POLLING=true react-scripts start",
     "build": "react-scripts build",
-    "server": "nodemon -L server.js",
-    "electron:dev": "cross-env NODE_ENV=development electron-forge start",
-    "dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron-forge start\"",
-    "make": "npm run build && cross-env NODE_ENV=production electron-forge make",
-    "make:quick": "cross-env QUICK_BUILD=true electron-forge make",
-    "release:patch": "npm version patch && git push origin master --follow-tags",
-    "release:minor": "npm version minor && git push origin master --follow-tags",
-    "release:major": "npm version major && git push origin master --follow-tags"
-  },
-  "config": {
-    "forge": {
-      "packagerConfig": {
-        "name": "TienHockERP",
-        "executableName": "TienHockERP",
-        "icon": "./public/tienhock.ico"
-      },
-      "makers": [
-        {
-          "name": "@electron-forge/maker-squirrel",
-          "config": {
-            "name": "TienHockERP",
-            "authors": "Tien Hock",
-            "setupIcon": "./public/tienhock.ico"
-          }
-        }
-      ],
-      "publishers": [
-        {
-          "name": "@electron-forge/publisher-github",
-          "config": {
-            "repository": {
-              "owner": "matt-goh",
-              "name": "tienhockerp"
-            },
-            "prerelease": false
-          }
-        }
-      ]
-    }
+    "server": "nodemon -L server.js"
   },
   "eslintConfig": {
     "extends": [
@@ -112,16 +71,10 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@electron-forge/cli": "^7.5.0",
-    "@electron-forge/maker-deb": "^7.5.0",
-    "@electron-forge/maker-squirrel": "^7.5.0",
-    "@electron-forge/maker-zip": "^7.5.0",
-    "@electron-forge/publisher-github": "^7.5.0",
     "@types/react-pdf": "^7.0.0",
     "autoprefixer": "^10.4.19",
     "concurrently": "^9.0.1",
     "cross-env": "^7.0.3",
-    "electron": "^31.1.0",
     "postcss": "^8.4.38",
     "serve": "^14.2.3",
     "tailwindcss": "^3.4.4",
