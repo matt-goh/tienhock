@@ -646,6 +646,74 @@ const InvoisPage: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const getDateRangeInfo = (start: Date, end: Date) => {
+    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+    const rangeDuration = end.getTime() - start.getTime();
+    return {
+      isWithinMonth: rangeDuration <= oneMonthMs,
+      isValidDirection: rangeDuration > 0,
+      rangeDuration,
+    };
+  };
+
+  const adjustDateRange = (
+    newDate: Date,
+    type: "start" | "end",
+    currentRange: { start: Date | null; end: Date | null }
+  ): { start: Date; end: Date } => {
+    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+
+    if (!currentRange.start || !currentRange.end) {
+      // If we don't have both dates, set the other date one month apart
+      if (type === "start") {
+        return {
+          start: newDate,
+          end: new Date(newDate.getTime() + oneMonthMs),
+        };
+      } else {
+        return {
+          start: new Date(newDate.getTime() - oneMonthMs),
+          end: newDate,
+        };
+      }
+    }
+
+    // Get the other existing date
+    const otherDate = type === "start" ? currentRange.end : currentRange.start;
+
+    // Check if the new range would exceed one month
+    const rangeInfo = getDateRangeInfo(
+      type === "start" ? newDate : currentRange.start,
+      type === "end" ? newDate : currentRange.end
+    );
+
+    if (!rangeInfo.isValidDirection) {
+      // If dates are in wrong order, adjust the other date to maintain order
+      return type === "start"
+        ? {
+            start: newDate,
+            end: new Date(newDate.getTime() + 24 * 60 * 60 * 1000),
+          } // one day later
+        : {
+            start: new Date(newDate.getTime() - 24 * 60 * 60 * 1000),
+            end: newDate,
+          }; // one day earlier
+    }
+
+    if (!rangeInfo.isWithinMonth) {
+      // If range exceeds one month, adjust the other date to maintain one month maximum
+      return type === "start"
+        ? { start: newDate, end: new Date(newDate.getTime() + oneMonthMs) }
+        : { start: new Date(newDate.getTime() - oneMonthMs), end: newDate };
+    }
+
+    // If range is valid (within a month), return new date with existing other date
+    return {
+      start: type === "start" ? newDate : currentRange.start,
+      end: type === "end" ? newDate : currentRange.end,
+    };
+  };
+
   const handleDateChange = (type: "start" | "end", value: string) => {
     if (!value) {
       const newDateRange = {
@@ -661,13 +729,17 @@ const InvoisPage: React.FC = () => {
 
     const [year, month, day] = value.split("-").map(Number);
     const newDate = new Date(year, month - 1, day);
-    const newDateRange = {
-      ...filters.dateRangeFilter,
-      [type]: newDate,
-    };
+
+    // Get adjusted date range
+    const adjustedRange = adjustDateRange(
+      newDate,
+      type,
+      filters.dateRangeFilter
+    );
+
     handleFilterChange({
       ...filters,
-      dateRangeFilter: newDateRange,
+      dateRangeFilter: adjustedRange,
     });
   };
 
