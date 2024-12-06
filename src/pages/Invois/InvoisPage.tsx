@@ -661,7 +661,7 @@ const InvoisPage: React.FC = () => {
     type: "start" | "end",
     currentRange: { start: Date | null; end: Date | null }
   ): { start: Date; end: Date } => {
-    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+    const oneMonthMs = 32 * 24 * 60 * 60 * 1000;
 
     if (!currentRange.start || !currentRange.end) {
       // If we don't have both dates, set the other date one month apart
