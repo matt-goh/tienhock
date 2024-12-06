@@ -2,6 +2,11 @@ import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, OrderDetail } from "../../types/types";
 
+interface InvoisPDFProps {
+  invoices: InvoiceData[];
+  logoData?: string | null;
+}
+
 const ROWS_PER_PAGE = 28;
 const HEADER_ROWS = 3;
 const TABLE_HEADER_ROWS = 3;
@@ -222,7 +227,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const InvoisPDF: React.FC<{ invoices: InvoiceData[] }> = ({ invoices }) => {
+const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
   const getProcessedOrderDetails = (details: OrderDetail[]) => {
     // Keep track of all rows in their original order
     const orderedRows: OrderDetail[] = [];
@@ -478,7 +483,11 @@ const InvoisPDF: React.FC<{ invoices: InvoiceData[] }> = ({ invoices }) => {
           {pageIndex === 0 && (
             <View style={styles.headerContainer}>
               <View style={styles.header}>
-                <Image src="/tienhock.png" style={styles.logo} />
+                {logoData ? (
+                  <Image src={logoData} style={styles.logo} />
+                ) : (
+                  <Image src="/tienhock.png" style={styles.logo} />
+                )}
                 <View style={styles.headerTextContainer}>
                   <Text style={styles.companyName}>
                     TIEN HOCK FOOD INDUSTRIES S/B (953309-T)

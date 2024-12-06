@@ -1,9 +1,14 @@
 import { InvoiceData } from "../../types/types";
 
-// Utility function to generate consistent PDF filenames
 export const generatePDFFilename = (invoices: InvoiceData[]): string => {
   if (!invoices || invoices.length === 0) {
     return "no-invoices.pdf";
+  }
+
+  // For single invoice, use invoice number
+  if (invoices.length === 1) {
+    const invoice = invoices[0];
+    return `invoice_${invoice.type}${invoice.invoiceno}.pdf`;
   }
 
   // Sort invoices by date
