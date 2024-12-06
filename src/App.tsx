@@ -1,5 +1,4 @@
-// App.tsx
-import { Route, BrowserRouter, HashRouter, Routes, useLocation } from "react-router-dom";
+import { Route, BrowserRouter, Routes, useLocation } from "react-router-dom";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { Toaster } from "react-hot-toast";
@@ -7,10 +6,6 @@ import { routes } from "./components/Sidebar/SidebarData";
 import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 
-// Determine which router to use
-const Router = process.env.NODE_ENV === 'development' ? BrowserRouter : HashRouter;
-
-// Create a Layout component that uses useLocation
 const Layout: React.FC = () => {
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
@@ -19,7 +14,7 @@ const Layout: React.FC = () => {
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
-  const isPDFRoute = location.pathname === '/pdf-viewer';
+  const isPDFRoute = location.pathname === "/pdf-viewer";
   const isVisible = isPinned || isHovered;
 
   useEffect(() => {
@@ -70,12 +65,12 @@ const Layout: React.FC = () => {
       <main
         className={`
           flex justify-center w-full transition-all duration-300 ease-in-out
-          ${!isPDFRoute ? 'py-[68px]' : ''} 
+          ${!isPDFRoute ? "py-[68px]" : ""} 
           ${isVisible && !isPDFRoute ? "ml-[254px]" : ""}
         `}
       >
         <Routes>
-          {routes.map((route: any) => (
+          {routes.map((route) => (
             <Route
               key={route.path}
               path={route.path}
@@ -91,7 +86,7 @@ const Layout: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ProfileProvider>
-      <Router>
+      <BrowserRouter>
         <Toaster
           position="top-right"
           toastOptions={{
@@ -104,7 +99,7 @@ const App: React.FC = () => {
           }}
         />
         <Layout />
-      </Router>
+      </BrowserRouter>
     </ProfileProvider>
   );
 };
