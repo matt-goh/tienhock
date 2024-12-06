@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { pdf, Document } from '@react-pdf/renderer';
-import InvoisPDF from './InvoisPDF';
-import { InvoiceData } from '../../types/types';
-import toast from 'react-hot-toast';
+import React, { useEffect, useState, useRef } from "react";
+import { pdf, Document } from "@react-pdf/renderer";
+import InvoisPDF from "./InvoisPDF";
+import { InvoiceData } from "../../types/types";
+import toast from "react-hot-toast";
+import { generatePDFFilename } from "./generatePDFFilename";
 
 declare global {
   interface Window {
@@ -13,32 +14,77 @@ declare global {
   }
 }
 
-const PrintPDFOverlay = ({ 
-  invoices, 
-  onComplete 
-}: { 
-  invoices: InvoiceData[],
-  onComplete: () => void
+const PrintPDFOverlay = ({
+  invoices,
+  onComplete,
+}: {
+  invoices: InvoiceData[];
+  onComplete: () => void;
 }) => {
   const [isPrinting, setIsPrinting] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
   const hasPrintedRef = useRef(false);
+  const resourcesRef = useRef<{
+    printFrame: HTMLIFrameElement | null;
+    container: HTMLDivElement | null;
+    pdfUrl: string | null;
+  }>({
+    printFrame: null,
+    container: null,
+    pdfUrl: null,
+  });
 
   useEffect(() => {
+    const cleanup = () => {
+      if (resourcesRef.current.pdfUrl) {
+        URL.revokeObjectURL(resourcesRef.current.pdfUrl);
+      }
+      if (
+        resourcesRef.current.printFrame &&
+        resourcesRef.current.printFrame.parentNode
+      ) {
+        document.body.removeChild(resourcesRef.current.printFrame);
+      }
+      if (
+        resourcesRef.current.container &&
+        resourcesRef.current.container.parentNode
+      ) {
+        document.body.removeChild(resourcesRef.current.container);
+      }
+      resourcesRef.current = {
+        printFrame: null,
+        container: null,
+        pdfUrl: null,
+      };
+      setIsPrinting(false);
+      setIsGenerating(false);
+      onComplete();
+    };
+
     const generateAndPrint = async () => {
       if (hasPrintedRef.current) return;
 
       try {
+        // Create a temporary div to mount the PDF renderer
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        document.body.appendChild(container);
+        resourcesRef.current.container = container;
+
+        // First render the PDF to ensure it's properly initialized
         const pdfComponent = (
-          <Document>
+          <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
             <InvoisPDF invoices={invoices} />
           </Document>
         );
 
+        // Generate PDF blob
         const pdfBlob = await pdf(pdfComponent).toBlob();
         setIsGenerating(false);
 
         if (window.electron?.print) {
+          // Use Electron's print API
           const pdfArrayBuffer = await pdfBlob.arrayBuffer();
           await window.electron.print({
             data: Buffer.from(pdfArrayBuffer),
@@ -48,18 +94,21 @@ const PrintPDFOverlay = ({
           });
           cleanup();
         } else {
+          // Web browser printing
           const pdfUrl = URL.createObjectURL(pdfBlob);
-          const printFrame = document.createElement('iframe');
-          printFrame.style.display = 'none';
+          resourcesRef.current.pdfUrl = pdfUrl;
+
+          const printFrame = document.createElement("iframe");
+          printFrame.style.display = "none";
           document.body.appendChild(printFrame);
+          resourcesRef.current.printFrame = printFrame;
 
           printFrame.onload = () => {
             if (!hasPrintedRef.current && printFrame?.contentWindow) {
               hasPrintedRef.current = true;
               printFrame.contentWindow.onafterprint = () => {
-                document.body.removeChild(printFrame);
-                URL.revokeObjectURL(pdfUrl);
                 cleanup();
+                printFrame?.contentWindow?.close();
               };
               printFrame.contentWindow.print();
             }
@@ -68,26 +117,17 @@ const PrintPDFOverlay = ({
           printFrame.src = pdfUrl;
         }
       } catch (error) {
-        console.error('Error generating PDF:', error);
-        toast.error('Error preparing document for print. Please try again.');
+        console.error("Error generating PDF:", error);
+        toast.error("Error preparing document for print. Please try again.");
         cleanup();
       }
-    };
-
-    const cleanup = () => {
-      setIsPrinting(false);
-      setIsGenerating(false);
-      onComplete();
     };
 
     if (isPrinting) {
       generateAndPrint();
     }
 
-    return () => {
-      setIsPrinting(false);
-      setIsGenerating(false);
-    };
+    return cleanup;
   }, [invoices, isPrinting, onComplete]);
 
   return isPrinting ? (
@@ -97,7 +137,9 @@ const PrintPDFOverlay = ({
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-default-200 border-t-default-600 rounded-full animate-spin" />
           <p className="text-base font-medium text-default-900">
-            {isGenerating ? 'Preparing document for printing...' : 'Opening print dialog...'}
+            {isGenerating
+              ? "Preparing document for printing..."
+              : "Opening print dialog..."}
           </p>
           <p className="text-sm text-default-500">Please wait a moment</p>
         </div>
