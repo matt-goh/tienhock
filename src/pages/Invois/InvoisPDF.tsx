@@ -10,7 +10,7 @@ interface InvoisPDFProps {
 const ROWS_PER_PAGE = 28;
 const HEADER_ROWS = 3;
 const TABLE_HEADER_ROWS = 3;
-const SUMMARY_ROWS = 4;
+const SUMMARY_ROWS = 3;
 
 // Color palette for easy customization
 const colors = {
@@ -38,7 +38,8 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     flexDirection: "column",
-    paddingVertical: 35,
+    paddingTop: 30,
+    paddingBottom: 15,
     paddingLeft: 40,
     paddingRight: 40,
     fontFamily: "Helvetica",
