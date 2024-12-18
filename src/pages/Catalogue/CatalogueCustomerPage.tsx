@@ -33,7 +33,7 @@ const CustomerCataloguePage: React.FC = () => {
         id: "name",
         header: "Name",
         type: isEditing ? "string" : "readonly",
-        width: 400,
+        width: 300,
       },
       {
         id: "closeness",
@@ -44,9 +44,9 @@ const CustomerCataloguePage: React.FC = () => {
       },
       {
         id: "tin_number",
-        header: "TIN Number",
-        type: isEditing ? "number" : "readonly",
-        width: 250,
+        header: "TIN",
+        type: isEditing ? "string" : "readonly",
+        width: 150,
       },
     ];
 
@@ -291,7 +291,7 @@ const CustomerCataloguePage: React.FC = () => {
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-11 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {salesmen.map((salesman) => (
               <ListboxOption
                 key={salesman}

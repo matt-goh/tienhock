@@ -28,13 +28,13 @@ const CatalogueJobCategoryPage: React.FC = () => {
         id: "id",
         header: "ID",
         type: isEditing ? "string" : "readonly",
-        width: 200,
+        width: 150,
       },
       {
         id: "category",
         header: "Category",
         type: isEditing ? "string" : "readonly",
-        width: 400,
+        width: 300,
       },
       {
         id: "gaji",
@@ -61,7 +61,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
         id: "section",
         header: "Section",
         type: isEditing ? "listbox" : "readonly",
-        width: 200,
+        width: 150,
         options: sections,
       });
     }
@@ -300,7 +300,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-11 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {sections.map((section) => (
               <ListboxOption
                 key={section}

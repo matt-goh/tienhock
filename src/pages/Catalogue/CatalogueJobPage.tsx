@@ -276,7 +276,7 @@ const CatalogueJobPage: React.FC = () => {
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-11 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {["All", "Gaji", "Tambahan", "Overtime"].map((type) => (
               <ListboxOption
                 key={type}
