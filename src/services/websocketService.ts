@@ -1,4 +1,4 @@
-import { getWebSocketUrl } from "../configs/config";
+import { getWebSocketUrl, NODE_ENV } from "../configs/config";
 import { sessionPersistenceService } from "./sessionPersistenceService";
 
 export class WebSocketService {
@@ -17,7 +17,7 @@ export class WebSocketService {
 
   constructor() {
     this.sessionId = this.getOrCreateSessionId();
-    this.isDevelopment = process.env.NODE_ENV === "development";
+    this.isDevelopment = NODE_ENV === "development";
   }
 
   private getOrCreateSessionId(): string {

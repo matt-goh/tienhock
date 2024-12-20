@@ -33,7 +33,7 @@ export const {
 };
 
 export const getWebSocketUrl = () => {
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isDevelopment = NODE_ENV === 'development';
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   
   if (isDevelopment) {
