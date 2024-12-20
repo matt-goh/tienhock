@@ -30,7 +30,7 @@ services:
       context: ..
       dockerfile: prod/Dockerfile
     environment:
-      - NODE_ENV=production
+      - REACT_APP_NODE_ENV=production
       - REACT_APP_API_BASE_URL=http://tienhockfood.duckdns.org
       - WDS_SOCKET_PORT=0
     depends_on:
@@ -45,7 +45,7 @@ services:
       context: ..
       dockerfile: prod/Dockerfile.server
     environment:
-      - NODE_ENV=production
+      - REACT_APP_NODE_ENV=production
       - HOST=0.0.0.0 # Allow connections from anywhere
       - DB_USER=postgres
       - DB_HOST=prod_db

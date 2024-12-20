@@ -4,7 +4,6 @@ import pkgBodyParser from 'body-parser';
 import pkgPg from 'pg';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import http from 'http';
 import WebSocket from 'ws';
 import { 
   NODE_ENV,
