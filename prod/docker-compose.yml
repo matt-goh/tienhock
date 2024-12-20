@@ -32,6 +32,7 @@ services:
     environment:
       - NODE_ENV=production
       - REACT_APP_API_BASE_URL=http://tienhockfood.duckdns.org
+      - WDS_SOCKET_PORT=0
     depends_on:
       - prod_server
       - prod_db

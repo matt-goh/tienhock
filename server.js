@@ -23,13 +23,20 @@ const MYINVOIS_API_BASE_URL = 'https://preprod-api.myinvois.hasil.gov.my';
 const MYINVOIS_CLIENT_ID = 'b0037953-93e3-4e8d-92b3-99efb15afe33';
 const MYINVOIS_CLIENT_SECRET = '1e612d39-da8d-42cc-b949-bcd04d9d3fab';
 
-// Create HTTP server instance
-const server = http.createServer(app);
+// Create HTTP server instance after middleware setup
+const httpServer = app.listen(port, '0.0.0.0', () => {
+  const displayHost = NODE_ENV === 'development'
+    ? 'localhost:5001 (development mode)'
+    : `${SERVER_HOST || '0.0.0.0'}:${port}`;
+    
+  console.log(`Server running with WebSocket support on http://${displayHost}`);
+  console.log(`Server environment: ${NODE_ENV}`);
+});
 
-// Initialize WebSocket server
+// Initialize WebSocket server with the HTTP server instance
 const wss = new WebSocket.Server({ 
-  server,
-  verifyClient: () => true // Allow connections from any source
+  server: httpServer,
+  path: '/api/ws'
 });
 
 // PostgreSQL connection
@@ -47,6 +54,11 @@ app.use(json());
 
 // Store active connections and their sessions
 const sessions = new Map();
+
+// After WebSocket server initialization
+wss.on('error', function error(error) {
+  console.error('WebSocket Server Error:', error);
+});
 
 // WebSocket connection handler
 wss.on('connection', function connection(ws) {
@@ -2698,7 +2710,8 @@ app.get('/api/health', async (req, res) => {
         },
         websocket: {
           status: wsCheck ? 'healthy' : 'unhealthy',
-          activeSessions
+          activeSessions,
+          server: httpServer ? 'running' : 'not running'
         }
       }
     });
@@ -2710,16 +2723,4 @@ app.get('/api/health', async (req, res) => {
       error: error.message
     });
   }
-});
-
-const isDev = NODE_ENV === 'development';
-const host = '0.0.0.0';  // Always use 0.0.0.0 inside containers
-
-server.listen(port, host, () => {
-  const displayHost = isDev 
-    ? 'localhost:5001 (development mode)'  // Display localhost for dev
-    : `${SERVER_HOST || '0.0.0.0'}:${port} (LAN access enabled)`;
-    
-  console.log(`Server running with WebSocket support on http://${displayHost}`);
-  console.log(`Server environment: ${NODE_ENV}`);
 });
