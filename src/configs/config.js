@@ -34,5 +34,10 @@ export const {
 
 // Helper function to convert HTTP URL to WebSocket URL
 export const getWebSocketUrl = () => {
-  return API_BASE_URL.replace(/^http/, 'ws');
+  // Instead of using API_BASE_URL, use window.location to get the current host
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host; // This will not include the development port
+  
+  // Return the WebSocket URL with the /api/ws path
+  return `${protocol}//${host}/api/ws`;
 };
