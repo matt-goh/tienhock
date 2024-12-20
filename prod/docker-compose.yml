@@ -1,15 +1,37 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - prod_app
+      - prod_server
+    networks:
+      - tienhock-prod-network
+
+  duckdns:
+    image: linuxserver/duckdns
+    container_name: duckdns
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Singapore # Adjust to your timezone
+      - SUBDOMAINS=tienhockfood # Replace with your DuckDNS subdomain
+      - TOKEN=021f2282-7bf2-4f95-bd18-ff70c4ec84bd # Replace with your DuckDNS token
+    networks:
+      - tienhock-prod-network
+
   prod_app:
     container_name: tienhock_prod_app
     build:
       context: ..
       dockerfile: prod/Dockerfile
-    ports:
-      - "192.168.1.200:3000:3000"
-    restart: always
     environment:
       - NODE_ENV=production
-      - REACT_APP_API_BASE_URL=http://192.168.1.200:5000
+      - REACT_APP_API_BASE_URL=http://tienhockfood.duckdns.org
     depends_on:
       - prod_server
       - prod_db
@@ -21,18 +43,14 @@ services:
     build:
       context: ..
       dockerfile: prod/Dockerfile.server
-    ports:
-      - "192.168.1.200:5000:5000"
-    restart: always
     environment:
-      - REACT_APP_NODE_ENV=production
-      - REACT_APP_SERVER_HOST=192.168.1.200
+      - NODE_ENV=production
+      - HOST=0.0.0.0 # Allow connections from anywhere
       - DB_USER=postgres
       - DB_HOST=prod_db
       - DB_NAME=tienhock_prod
       - DB_PASSWORD=foodmaker
       - DB_PORT=5432
-      - HOST=0.0.0.0
     depends_on:
       - prod_db
     networks:
@@ -54,7 +72,7 @@ services:
       - postgres_prod_data:/var/lib/postgresql/data
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     ports:
-      - "192.168.1.200:5433:5432"
+      - "127.0.0.1:5433:5432"
     networks:
       tienhock-prod-network:
         aliases:
