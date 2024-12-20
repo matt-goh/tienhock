@@ -32,12 +32,15 @@ export const {
   DB_PORT: getEnvVariable('DB_PORT'),
 };
 
-// Helper function to convert HTTP URL to WebSocket URL
 export const getWebSocketUrl = () => {
-  // Instead of using API_BASE_URL, use window.location to get the current host
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host; // This will not include the development port
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   
-  // Return the WebSocket URL with the /api/ws path
-  return `${protocol}//${host}/api/ws`;
+  if (isDevelopment) {
+    // Development environment - use port 5001
+    return `${wsProtocol}//localhost:5001/api/ws`;
+  }
+  
+  // Production environment - use window.location to get the current host
+  return `${wsProtocol}//${window.location.host}/api/ws`;
 };

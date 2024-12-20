@@ -13,13 +13,65 @@ export class WebSocketService {
   private connectionPromise: Promise<void> | null = null;
   private connectionResolver: (() => void) | null = null;
   private connectionRejector: ((error: Error) => void) | null = null;
+  private isDevelopment: boolean;
 
   constructor() {
     this.sessionId = this.getOrCreateSessionId();
+    this.isDevelopment = process.env.NODE_ENV === "development";
   }
 
   private getOrCreateSessionId(): string {
     return sessionPersistenceService.getSessionId();
+  }
+
+  private getWebSocketUrlWithFallback(): string {
+    try {
+      const wsUrl = getWebSocketUrl();
+      if (this.isDevelopment) {
+        // In development, try to connect to local server first
+        const localWsUrl = wsUrl.replace(
+          "ws://localhost:5000",
+          "ws://localhost:5001"
+        );
+        return localWsUrl;
+      }
+      return wsUrl;
+    } catch (error) {
+      console.error("Error getting WebSocket URL:", error);
+      // Fallback URL for development
+      return this.isDevelopment
+        ? "ws://localhost:5001/api/ws"
+        : "ws://localhost:5000/api/ws";
+    }
+  }
+
+  private cleanup() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    if (this.ws) {
+      // Store reference to avoid null check issues
+      const ws = this.ws;
+      this.ws = null;
+
+      // Remove all listeners first
+      ws.onopen = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+
+      // Only close if not already closing/closed
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    }
+
+    // Clear connection promise state
+    this.connectionPromise = null;
+    this.connectionResolver = null;
+    this.connectionRejector = null;
   }
 
   async connect(): Promise<void> {
@@ -38,13 +90,23 @@ export class WebSocketService {
       this.connectionRejector = reject;
 
       try {
-        const wsUrl = getWebSocketUrl();
+        const wsUrl = this.getWebSocketUrlWithFallback();
         this.ws = new WebSocket(wsUrl);
 
         const timeoutId = setTimeout(() => {
           if (this.ws?.readyState === WebSocket.CONNECTING) {
             this.ws.close();
-            if (this.connectionRejector) {
+            if (this.isDevelopment) {
+              console.warn(
+                "Development WebSocket connection timed out, attempting fallback..."
+              );
+              // Try fallback URL in development
+              this.tryFallbackConnection().catch((error) => {
+                if (this.connectionRejector) {
+                  this.connectionRejector(error);
+                }
+              });
+            } else if (this.connectionRejector) {
               this.connectionRejector(
                 new Error("WebSocket connection timeout")
               );
@@ -80,47 +142,7 @@ export class WebSocketService {
           this.connectionRejector = null;
         };
 
-        // Rest of the WebSocket setup remains the same...
-        this.ws.onmessage = (event) => {
-          if (this.isDisconnecting) return;
-          try {
-            const message = JSON.parse(event.data);
-            const handlers = this.messageHandlers.get(message.type);
-            if (handlers) {
-              handlers.forEach((handler) => handler(message.data));
-            }
-          } catch (error) {
-            console.error("WebSocket message handling error:", error);
-          }
-        };
-
-        this.ws.onclose = (event) => {
-          clearTimeout(timeoutId);
-          if (!this.isDisconnecting) {
-            this.handleDisconnection();
-          }
-          if (
-            this.connectionRejector &&
-            this.ws?.readyState !== WebSocket.OPEN
-          ) {
-            this.connectionRejector(
-              new Error("WebSocket closed before connection established")
-            );
-          }
-          this.connectionPromise = null;
-          this.connectionResolver = null;
-          this.connectionRejector = null;
-        };
-
-        this.ws.onerror = (error) => {
-          clearTimeout(timeoutId);
-          if (this.connectionRejector) {
-            this.connectionRejector(new Error("WebSocket connection failed"));
-          }
-          this.connectionPromise = null;
-          this.connectionResolver = null;
-          this.connectionRejector = null;
-        };
+        this.setupWebSocketHandlers();
       } catch (error) {
         if (this.connectionRejector) {
           this.connectionRejector(
@@ -136,39 +158,81 @@ export class WebSocketService {
     return this.connectionPromise;
   }
 
-  private cleanup() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
+  private async tryFallbackConnection(): Promise<void> {
+    // Try alternative development port if initial connection fails
+    const fallbackUrl = "ws://localhost:5000/api/ws";
+    console.log("Attempting fallback connection to:", fallbackUrl);
 
-    if (this.ws) {
-      // Store reference to avoid null check issues
-      const ws = this.ws;
-      this.ws = null;
+    this.ws = new WebSocket(fallbackUrl);
+    return new Promise((resolve, reject) => {
+      const fallbackTimeout = setTimeout(() => {
+        reject(new Error("Fallback connection timeout"));
+      }, 5000);
 
-      // Remove all listeners first
-      ws.onopen = null;
-      ws.onclose = null;
-      ws.onerror = null;
-      ws.onmessage = null;
+      this.ws!.onopen = () => {
+        clearTimeout(fallbackTimeout);
+        console.log("Connected to fallback WebSocket server");
+        resolve();
+      };
 
-      // Only close if not already closing/closed
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      this.ws!.onerror = () => {
+        clearTimeout(fallbackTimeout);
+        reject(new Error("Fallback connection failed"));
+      };
+    });
+  }
+
+  private setupWebSocketHandlers(): void {
+    if (!this.ws) return;
+
+    this.ws.onmessage = (event) => {
+      if (this.isDisconnecting) return;
+      try {
+        const message = JSON.parse(event.data);
+        const handlers = this.messageHandlers.get(message.type);
+        if (handlers) {
+          handlers.forEach((handler) => handler(message.data));
+        }
+      } catch (error) {
+        console.error("WebSocket message handling error:", error);
       }
-    }
+    };
 
-    // Clear connection promise state
-    this.connectionPromise = null;
-    this.connectionResolver = null;
-    this.connectionRejector = null;
+    this.ws.onclose = (event) => {
+      console.log(`WebSocket closed with code ${event.code}`);
+      if (!this.isDisconnecting) {
+        this.handleDisconnection();
+      }
+      if (this.connectionRejector && this.ws?.readyState !== WebSocket.OPEN) {
+        this.connectionRejector(
+          new Error("WebSocket closed before connection established")
+        );
+      }
+      this.connectionPromise = null;
+      this.connectionResolver = null;
+      this.connectionRejector = null;
+    };
+
+    this.ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      if (this.connectionRejector) {
+        this.connectionRejector(new Error("WebSocket connection failed"));
+      }
+      this.connectionPromise = null;
+      this.connectionResolver = null;
+      this.connectionRejector = null;
+    };
   }
 
   private handleDisconnection() {
     if (this.isDisconnecting) return;
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      console.log(
+        `Attempting reconnection (${this.reconnectAttempts + 1}/${
+          this.maxReconnectAttempts
+        })`
+      );
       this.scheduleReconnect();
     } else {
       console.error(

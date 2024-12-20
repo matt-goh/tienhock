@@ -1,4 +1,10 @@
-import { Route, BrowserRouter, Routes, useLocation } from "react-router-dom";
+import {
+  Route,
+  BrowserRouter,
+  Routes,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { Toaster } from "react-hot-toast";
@@ -24,8 +30,8 @@ const Layout: React.FC = () => {
       setIsMobile(window.innerWidth < 1024);
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
@@ -60,13 +66,17 @@ const Layout: React.FC = () => {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-default-50 p-4">
         <div className="max-w-md w-full text-center space-y-6 p-6 bg-white rounded-lg shadow-lg">
-          <IconDeviceDesktop className="h-16 w-16 mx-auto text-sky-500" stroke={1.5} />
+          <IconDeviceDesktop
+            className="h-16 w-16 mx-auto text-sky-500"
+            stroke={1.5}
+          />
           <div className="space-y-3">
             <h2 className="text-xl font-semibold text-default-900">
               Desktop View Recommended
             </h2>
             <p className="text-default-500">
-              This application is optimized for desktop use. Please open it on a larger screen.
+              This application is optimized for desktop use. Please open it on a
+              larger screen.
             </p>
             <p className="text-sm text-default-400">
               Minimum recommended width: 1024px
@@ -102,6 +112,7 @@ const Layout: React.FC = () => {
         `}
       >
         <Routes>
+          <Route path="/" element={<Navigate to="/stock/invois" replace />} />
           {routes.map((route) => (
             <Route
               key={route.path}
