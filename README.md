@@ -9,7 +9,7 @@ A desktop ERP application built with Electron, React, and Node.js, designed for 
 - Customer Database
 - Invoice Generation and Management
 - Job Categories and Details
-- Real-time Multi-user Support (WebSocket)
+- Real-time Multi-user Support
 - e-Invoice Integration
 
 ## Technology Stack
@@ -18,5 +18,4 @@ A desktop ERP application built with Electron, React, and Node.js, designed for 
 - **Backend**: Node.js, Express
 - **Desktop Framework**: Electron
 - **Database**: PostgreSQL
-- **Real-time Communication**: WebSocket
 - **Containerization**: Docker

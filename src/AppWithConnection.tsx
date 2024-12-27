@@ -15,7 +15,6 @@ interface HealthData {
   status: string;
   services: {
     database: HealthService;
-    websocket: HealthService;
   };
   error?: string;
 }
