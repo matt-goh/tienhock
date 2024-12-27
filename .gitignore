@@ -9,4 +9,4 @@
 
 # misc
 .env
-/docker-compose.yml
+prod/docker-compose.yml
