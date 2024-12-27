@@ -6,17 +6,16 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Staff, ActiveSession } from "../types/types";
-import { websocketService } from "../services/websocketService";
+import { sessionService } from "../services/SessionService";
 import { API_BASE_URL } from "../configs/config";
-import { sessionPersistenceService } from "../services/sessionPersistenceService";
-
-interface ProfileContextType {
-  currentStaff: Staff | null;
-  activeSessions: ActiveSession[];
-  switchProfile: (staff: Staff) => Promise<void>;
-  isInitializing: boolean;
-}
+import { toast } from "react-hot-toast";
+import type {
+  Staff,
+  ActiveSession,
+  SessionError,
+  ProfileContextType,
+  DeviceInfo
+} from "../types/types";
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
@@ -24,14 +23,46 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastEventId, setLastEventId] = useState(0);
   const mountedRef = useRef(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout>();
+
+  const clearError = useCallback(() => setError(null), []);
+
+  const handleError = useCallback((error: unknown, fallbackMessage: string) => {
+    console.error(fallbackMessage, error);
+    
+    let errorMessage: string;
+    if (error instanceof Error && 'code' in error) {
+      const sessionError = error as SessionError;
+      switch (sessionError.code) {
+        case 'SESSION_EXPIRED':
+          errorMessage = 'Your session has expired. Please refresh the page.';
+          break;
+        case 'NETWORK_ERROR':
+          errorMessage = 'Network error. Please check your connection.';
+          break;
+        case 'INITIALIZATION_ERROR':
+          errorMessage = 'Failed to initialize. Please refresh the page.';
+          break;
+        default:
+          errorMessage = sessionError.message;
+      }
+    } else {
+      errorMessage = error instanceof Error ? error.message : fallbackMessage;
+    }
+
+    setError(errorMessage);
+    toast.error(errorMessage);
+  }, []);
 
   const checkSessionState = useCallback(async () => {
     if (!mountedRef.current) return;
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/session-state/${websocketService.getSessionId()}`,
+        `${API_BASE_URL}/api/session-state/${sessionService.getSessionId()}`,
         {
           method: "GET",
           headers: {
@@ -53,123 +84,131 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setCurrentStaff(null);
       }
     } catch (error) {
-      console.error("Error checking session state:", error);
+      handleError(error, 'Error checking session state');
       setCurrentStaff(null);
     } finally {
       setIsInitializing(false);
     }
-  }, []);
+  }, [handleError]);
 
-  // Create stable handler functions using useCallback
-  const handleProfileChange = useCallback(
-    async (data: { staffId: string; sessionId: string }) => {
-      if (
-        mountedRef.current &&
-        data.sessionId === websocketService.getSessionId()
-      ) {
-        await checkSessionState();
-      }
-    },
-    [checkSessionState]
-  );
+  const fetchActiveSessions = useCallback(async () => {
+    if (!mountedRef.current) return;
 
-  const handleSessionsUpdate = useCallback(
-    (data: { sessions: ActiveSession[] }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sessions/active`);
+      if (!response.ok) throw new Error("Failed to fetch sessions");
+      const data = await response.json();
       if (mountedRef.current) {
         setActiveSessions(data.sessions);
       }
-    },
-    []
-  );
+    } catch (error) {
+      handleError(error, 'Error fetching sessions');
+    }
+  }, [handleError]);
+
+  const pollSessionEvents = useCallback(async () => {
+    if (!mountedRef.current) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/sessions/events?lastEventId=${lastEventId}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch session events");
+
+      const events = await response.json();
+      if (events.length > 0 && mountedRef.current) {
+        setLastEventId(events[events.length - 1].id);
+
+        // Check if any events affect the current session
+        const currentSessionEvents = events.filter(
+          (event: { session_id: string }) =>
+            event.session_id === sessionService.getSessionId()
+        );
+
+        if (currentSessionEvents.length > 0) {
+          await checkSessionState();
+        }
+
+        await fetchActiveSessions();
+      }
+    } catch (error) {
+      handleError(error, 'Error polling session events');
+    }
+  }, [lastEventId, checkSessionState, fetchActiveSessions, handleError]);
 
   useEffect(() => {
     mountedRef.current = true;
 
-    const initializeWebSocket = async () => {
+    const initializeSession = async () => {
       if (!mountedRef.current) return;
 
       try {
-        // Try to restore session first
-        const storedSession = sessionPersistenceService.getStoredSession();
-        if (storedSession?.staffId) {
-          setCurrentStaff({ id: storedSession.staffId, name: "", job: [] });
-        }
-
-        // Subscribe to WebSocket events
-        websocketService.subscribe("profile_changed", handleProfileChange);
-        websocketService.subscribe("active_sessions", handleSessionsUpdate);
-
-        await websocketService.connect();
-
-        if (mountedRef.current) {
-          await checkSessionState();
-        }
+        await sessionService.initialize();
+        pollIntervalRef.current = setInterval(pollSessionEvents, 5000);
+        await checkSessionState();
+        await fetchActiveSessions();
       } catch (error) {
+        handleError(error, 'Failed to initialize session');
+      } finally {
         if (mountedRef.current) {
-          console.error("Failed to initialize WebSocket:", error);
           setIsInitializing(false);
         }
       }
     };
 
-    initializeWebSocket();
+    initializeSession();
 
-    // Set up periodic last active updates
-    const updateInterval = setInterval(() => {
-      sessionPersistenceService.updateLastActive();
-    }, 60000);
-
-    // Cleanup function
     return () => {
       mountedRef.current = false;
-      clearInterval(updateInterval);
-      websocketService.unsubscribe("profile_changed", handleProfileChange);
-      websocketService.unsubscribe("active_sessions", handleSessionsUpdate);
-      websocketService.disconnect();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
     };
-  }, [checkSessionState, handleProfileChange, handleSessionsUpdate]);
+  }, [checkSessionState, fetchActiveSessions, pollSessionEvents, handleError]);
 
   const switchProfile = async (staff: Staff) => {
     if (!mountedRef.current) return;
 
     try {
       setIsInitializing(true);
+      setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/api/switch-profile`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          staffId: staff.id,
-          sessionId: websocketService.getSessionId(),
-          deviceInfo: {
-            userAgent: navigator.userAgent,
-            deviceType: "Desktop",
-            timestamp: new Date().toISOString(),
+      const deviceInfo: DeviceInfo = {
+        userAgent: navigator.userAgent,
+        deviceType: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
+        timestamp: new Date().toISOString(),
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/sessions/${sessionService.getSessionId()}/switch-profile`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
           },
-        }),
-      });
+          body: JSON.stringify({
+            staffId: staff.id,
+            deviceInfo,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to switch profile");
+        throw new Error(errorData.error || "Failed to switch profile");
       }
 
       const result = await response.json();
 
       if (mountedRef.current) {
         setCurrentStaff(result.staff);
-        sessionPersistenceService.saveSession(staff.id);
-
-        websocketService.send("profile_switch", {
-          staffId: staff.id,
-          sessionId: websocketService.getSessionId(),
-        });
+        sessionService.updateStoredSession(staff.id);
+        await fetchActiveSessions();
+        toast.success(`Switched to ${staff.name}'s profile`);
       }
     } catch (error) {
-      console.error("Error switching profile:", error);
+      handleError(error, 'Error switching profile');
       throw error;
     } finally {
       setIsInitializing(false);
@@ -178,7 +217,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ProfileContext.Provider
-      value={{ currentStaff, activeSessions, switchProfile, isInitializing }}
+      value={{ 
+        currentStaff, 
+        activeSessions, 
+        switchProfile,
+        isInitializing,
+        error,
+        clearError
+      }}
     >
       {children}
     </ProfileContext.Provider>
@@ -192,3 +238,5 @@ export const useProfile = () => {
   }
   return context;
 };
+
+export type { Staff, ActiveSession, SessionError, ProfileContextType };

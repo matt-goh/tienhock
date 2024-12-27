@@ -1,7 +1,5 @@
-"use client";
-
 import { useState, useEffect, Fragment } from "react";
-import { Staff } from "../types/types";
+import { Staff, ActiveSession } from "../types/types";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   Dialog,
@@ -12,7 +10,7 @@ import {
 } from "@headlessui/react";
 import { IconDevices2, IconUserCircle, IconSearch } from "@tabler/icons-react";
 import { formatDistanceToNow } from "date-fns";
-import { websocketService } from "../services/websocketService";
+import { sessionService } from "../services/SessionService";
 import { API_BASE_URL } from "../configs/config";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
@@ -26,59 +24,103 @@ export default function ProfileSwitcherModal({
   isOpen,
   onClose,
 }: ProfileSwitcherModalProps) {
-  const { activeSessions, switchProfile } = useProfile();
+  const { activeSessions, switchProfile, currentStaff } = useProfile();
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSessions, setShowSessions] = useState(false);
   const [error, setError] = useState("");
+  const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [lastEventId, setLastEventId] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+
     if (isOpen) {
       fetchStaffList();
+      fetchActiveSessions();
       setShowSessions(false);
       setSearchQuery("");
+      pollInterval = setInterval(pollSessionEvents, 5000);
     }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [isOpen]);
+
+  const fetchActiveSessions = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sessions/active`);
+      if (!response.ok) throw new Error("Failed to fetch sessions");
+      const data = await response.json();
+      setSessions(data.sessions);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      toast.error("Failed to load active sessions");
+    }
+  };
+
+  const pollSessionEvents = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/sessions/events?lastEventId=${lastEventId}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch session events");
+
+      const events = await response.json();
+      if (events.length > 0) {
+        setLastEventId(events[events.length - 1].id);
+        await fetchActiveSessions();
+      }
+    } catch (error) {
+      console.error("Error polling session events:", error);
+    }
+  };
 
   const fetchStaffList = async () => {
     setError("");
+    setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/staffs/office`, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
+      const response = await fetch(`${API_BASE_URL}/api/staffs/office`);
+      if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       const data = await response.json();
-
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid data format received");
-      }
+      if (!Array.isArray(data)) throw new Error("Invalid data format received");
 
       setStaffList(data);
     } catch (error) {
       console.error("Error fetching staff list:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load staff list"
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load staff list";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleProfileSelect = async (staff: Staff) => {
+    if (staff.id === currentStaff?.id) {
+      onClose();
+      return;
+    }
+
+    setIsLoading(true);
     try {
       await switchProfile(staff);
-      toast.success(`Switched to ${staff.id}'s profile`);
+      sessionService.updateStoredSession(staff.id);
+      toast.success(`Switched to ${staff.name}'s profile`);
       onClose();
     } catch (error) {
       console.error("Error switching profile:", error);
-      setError("Failed to switch profile");
-      toast.error("Failed to switch profile");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to switch profile";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -86,7 +128,7 @@ export default function ProfileSwitcherModal({
     staff.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const currentSessionId = websocketService.getSessionId();
+  const currentSessionId = sessionService.getSessionId();
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -122,6 +164,9 @@ export default function ProfileSwitcherModal({
                   <button
                     onClick={() => setShowSessions(!showSessions)}
                     className="p-2 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+                    aria-label={
+                      showSessions ? "Show profiles" : "Show sessions"
+                    }
                   >
                     <IconDevices2 stroke={1.5} />
                   </button>
@@ -139,15 +184,21 @@ export default function ProfileSwitcherModal({
                         placeholder="Search staff..."
                         className={clsx(
                           "w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg",
-                          "focus:border-default-500"
+                          "focus:border-default-500 focus:ring-1 focus:ring-default-500",
+                          "disabled:bg-default-50 disabled:cursor-not-allowed"
                         )}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
 
                     <div className="max-h-[60vh] overflow-y-auto space-y-2">
-                      {filteredStaff.length === 0 ? (
+                      {isLoading ? (
+                        <div className="text-center py-8 text-default-500">
+                          <p className="font-medium">Loading staff...</p>
+                        </div>
+                      ) : filteredStaff.length === 0 ? (
                         <div className="text-center py-8 text-default-500">
                           {searchQuery ? (
                             <>
@@ -165,7 +216,13 @@ export default function ProfileSwitcherModal({
                           <button
                             key={staff.id}
                             onClick={() => handleProfileSelect(staff)}
-                            className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors"
+                            className={clsx(
+                              "w-full flex items-center justify-between p-3 rounded-lg",
+                              "hover:bg-default-100 active:bg-default-200 transition-colors",
+                              "disabled:cursor-not-allowed disabled:opacity-50",
+                              staff.id === currentStaff?.id && "bg-default-100"
+                            )}
+                            disabled={isLoading}
                           >
                             <div className="flex items-center space-x-3">
                               <IconUserCircle className="text-default-700" />
@@ -173,6 +230,11 @@ export default function ProfileSwitcherModal({
                                 {staff.name}
                               </span>
                             </div>
+                            {staff.id === currentStaff?.id && (
+                              <span className="text-xs text-center bg-sky-100 text-sky-800 px-3 py-1 rounded-full">
+                                Current Profile
+                              </span>
+                            )}
                           </button>
                         ))
                       )}
@@ -180,7 +242,7 @@ export default function ProfileSwitcherModal({
                   </>
                 ) : (
                   <div className="max-h-[60vh] overflow-y-auto space-y-3">
-                    {activeSessions.map((session) => {
+                    {sessions.map((session) => {
                       const sessionStaff = staffList.find(
                         (s) => s.id === session.staffId
                       );
@@ -216,7 +278,11 @@ export default function ProfileSwitcherModal({
                   </div>
                 )}
 
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                {error && (
+                  <p className="text-red-500 text-sm mt-2 text-center">
+                    {error}
+                  </p>
+                )}
               </DialogPanel>
             </TransitionChild>
           </div>

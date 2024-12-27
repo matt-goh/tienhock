@@ -31,16 +31,3 @@ export const {
   DB_PASSWORD: getEnvVariable('DB_PASSWORD'),
   DB_PORT: getEnvVariable('DB_PORT'),
 };
-
-export const getWebSocketUrl = () => {
-  const isDevelopment = NODE_ENV === 'development';
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  
-  if (isDevelopment) {
-    // Development environment - use port 5001
-    return `${wsProtocol}//localhost:5001/api/ws`;
-  }
-  
-  // Production environment - use window.location to get the current host
-  return `${wsProtocol}//${window.location.host}/api/ws`;
-};
