@@ -1,18 +1,14 @@
-FROM node:14
-
-# Set working directory
+# Build stage
+FROM node:14 as builder
 WORKDIR /app
-
-# Copy package.json and package-lock.json
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
-
-# Copy the rest of the application code
 COPY . .
+RUN npm run build
 
-EXPOSE 3000
-
-# Start the application
-CMD ["npm", "run", "react"]
+# Production stage
+FROM nginx:alpine
+COPY --from=builder /app/public /usr/share/nginx/html
+COPY prod/nginx/nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

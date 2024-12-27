@@ -4,11 +4,11 @@ import pkgBodyParser from 'body-parser';
 import pkgPg from 'pg';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import WebSocket from 'ws';
 import { 
   NODE_ENV,
   SERVER_HOST,
 } from './src/configs/config.js';
+import router from './src/routes/sessions.js';
 
 dotenv.config();
 
@@ -28,18 +28,12 @@ const httpServer = app.listen(port, '0.0.0.0', () => {
     ? 'localhost:5001 (development mode)'
     : `${SERVER_HOST || '0.0.0.0'}:${port}`;
     
-  console.log(`Server running with WebSocket support on http://${displayHost}`);
+  console.log(`Server running on https://${displayHost}`);
   console.log(`Server environment: ${NODE_ENV}`);
 });
 
-// Initialize WebSocket server with the HTTP server instance
-const wss = new WebSocket.Server({ 
-  server: httpServer,
-  path: '/api/ws'
-});
-
 // PostgreSQL connection
-const pool = new Pool({
+export const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
@@ -50,140 +44,130 @@ const pool = new Pool({
 // Use middleware
 app.use(cors());
 app.use(json());
+app.use('/api', router);
 
-// Store active connections and their sessions
-const sessions = new Map();
-
-// After WebSocket server initialization
-wss.on('error', function error(error) {
-  console.error('WebSocket Server Error:', error);
-});
-
-// WebSocket connection handler
-wss.on('connection', function connection(ws) {
-  let sessionId = null;
-
-  ws.on('message', function incoming(message) {
-    try {
-      const data = JSON.parse(message.toString());
-      
-      switch (data.type) {
-        case 'register':
-          sessionId = data.sessionId;
-          sessions.set(sessionId, {
-            ws,
-            staffId: null,
-            deviceInfo: data.deviceInfo || {}
-          });
-          console.log(`New session registered: ${sessionId}`);
-          broadcastActiveSessions();
-          break;
-
-        case 'reconnect':
-          sessionId = data.sessionId;
-          console.log(`Attempting reconnection for session: ${sessionId}`);
-          
-          sessions.set(sessionId, {
-            ws,
-            staffId: data.staffId || null,
-            deviceInfo: data.deviceInfo || {}
-          });
-          
-          console.log(`Session reconnected: ${sessionId} with staffId: ${data.staffId || 'none'}`);
-          broadcastActiveSessions();
-          break;
-
-        case 'profile_switch':
-          if (sessionId && data.staffId) {
-            const session = sessions.get(sessionId);
-            if (session) {
-              session.staffId = data.staffId;
-              console.log(`Profile switched for session ${sessionId} to staff ${data.staffId}`);
-              broadcastToOthers(sessionId, {
-                type: 'profile_changed',
-                data: {
-                  sessionId,
-                  staffId: data.staffId,
-                  deviceInfo: session.deviceInfo
-                }
-              });
-              broadcastActiveSessions();
-            }
-          }
-          break;
-      }
-    } catch (error) {
-      console.error('WebSocket message handling error:', error);
-    }
-  });
-
-  ws.on('close', function close() {
-    if (sessionId) {
-      console.log(`Session disconnected: ${sessionId}`);
-      const session = sessions.get(sessionId);
-      
-      if (session) {
-        // Instead of setting ws to null, remove the session completely
-        sessions.delete(sessionId);
-        broadcastActiveSessions();
-      }
-    }
-  });
-
-  ws.on('error', function error(err) {
-    console.error('WebSocket error:', err);
-    if (sessionId) {
-      sessions.delete(sessionId);
-      broadcastActiveSessions();
-    }
-  });
-});
-
-function broadcastToOthers(senderSessionId, message) {
-  sessions.forEach((session, sessionId) => {
-    if (sessionId !== senderSessionId && session.ws?.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify(message));
-    }
-  });
-}
-
-function broadcastActiveSessions() {
-  // Only include sessions with active WebSocket connections
-  const activeSessions = Array.from(sessions.entries())
-    .filter(([_, session]) => session.ws?.readyState === WebSocket.OPEN)
-    .map(([sessionId, session]) => ({
-      sessionId,
-      staffId: session.staffId,
-      deviceInfo: session.deviceInfo,
-      lastActive: new Date().toISOString()
-    }));
-
-  const message = {
-    type: 'active_sessions',
-    data: { sessions: activeSessions }
-  };
-
-  // Only broadcast to sessions with active connections
-  sessions.forEach((session) => {
-    if (session.ws?.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify(message));
-    }
-  });
-}
-
-app.get('/api/current-staff/:sessionId', async (req, res) => {
-  const { sessionId } = req.params;
-  const session = sessions.get(sessionId);
-
-  if (!session || !session.staffId) {
-    return res.status(404).json({ 
-      message: 'No active staff found for this session',
-      sessionId 
-    });
-  }
+// Session Management Endpoints
+app.post('/api/sessions/register', async (req, res) => {
+  const { sessionId, staffId = null, deviceInfo = {} } = req.body;
 
   try {
     const query = `
+      INSERT INTO active_sessions (session_id, staff_id, device_info)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (session_id) 
+      DO UPDATE SET
+        staff_id = EXCLUDED.staff_id,
+        device_info = EXCLUDED.device_info,
+        last_active = CURRENT_TIMESTAMP,
+        status = 'active'
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [sessionId, staffId, deviceInfo]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error registering session:', error);
+    res.status(500).json({ error: 'Failed to register session' });
+  }
+});
+
+app.get('/api/sessions/active', async (req, res) => {
+  try {
+    const query = `
+      WITH session_info AS (
+        SELECT 
+          a.*,
+          e.id as last_event_id,
+          e.event_type as last_event_type,
+          e.created_at as last_event_time
+        FROM active_sessions a
+        LEFT JOIN session_events e ON a.session_id = e.session_id
+        WHERE a.last_active > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+          AND a.status = 'active'
+        ORDER BY e.created_at DESC
+        LIMIT 1
+      )
+      SELECT DISTINCT ON (session_id)
+        session_id,
+        staff_id,
+        device_info,
+        last_active,
+        status,
+        metadata,
+        last_event_id,
+        last_event_type,
+        last_event_time
+      FROM session_info
+      ORDER BY session_id, last_event_time DESC
+    `;
+    
+    const result = await pool.query(query);
+    res.json({
+      sessions: result.rows,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching active sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch active sessions' });
+  }
+});
+
+app.post('/api/sessions/:sessionId/heartbeat', async (req, res) => {
+  const { sessionId } = req.params;
+  
+  try {
+    const query = `
+      UPDATE active_sessions 
+      SET last_active = CURRENT_TIMESTAMP
+      WHERE session_id = $1
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [sessionId]);
+    
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Session not found' });
+    } else {
+      res.json(result.rows[0]);
+    }
+  } catch (error) {
+    console.error('Error updating session activity:', error);
+    res.status(500).json({ error: 'Failed to update session activity' });
+  }
+});
+
+// Profile switching endpoint
+app.post('/api/sessions/:sessionId/switch-profile', async (req, res) => {
+  const { sessionId } = req.params;
+  const { staffId } = req.body;
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Update session with new staff ID
+    const sessionQuery = `
+      UPDATE active_sessions 
+      SET 
+        staff_id = $1,
+        last_active = CURRENT_TIMESTAMP,
+        metadata = jsonb_set(
+          metadata, 
+          '{last_profile_switch}',
+          to_jsonb(CURRENT_TIMESTAMP)
+        )
+      WHERE session_id = $2
+      RETURNING *
+    `;
+    
+    const sessionResult = await client.query(sessionQuery, [staffId, sessionId]);
+    
+    if (sessionResult.rows.length === 0) {
+      throw new Error('Session not found');
+    }
+
+    // Get staff details
+    const staffQuery = `
       SELECT 
         s.id, 
         s.name, 
@@ -196,78 +180,121 @@ app.get('/api/current-staff/:sessionId', async (req, res) => {
         AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
     `;
     
-    const result = await pool.query(query, [session.staffId]);
+    const staffResult = await client.query(staffQuery, [staffId]);
     
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Staff not found or no longer active' });
+    if (staffResult.rows.length === 0) {
+      throw new Error('Staff not found or not authorized');
     }
 
-    // Parse JSONB job field
-    const staff = {
-      ...result.rows[0],
-      job: JSON.parse(result.rows[0].job)
-    };
+    await client.query('COMMIT');
 
-    res.json(staff);
+    const staff = {
+      ...staffResult.rows[0],
+      job: typeof staffResult.rows[0].job === 'string' 
+        ? JSON.parse(staffResult.rows[0].job)
+        : staffResult.rows[0].job
+    };
+    
+    res.json({
+      session: sessionResult.rows[0],
+      staff
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error switching profile:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Get session events for polling
+app.get('/api/sessions/events', async (req, res) => {
+  const { lastEventId = 0 } = req.query;
+  
+  try {
+    const query = `
+      SELECT * FROM session_events
+      WHERE id > $1
+      ORDER BY id ASC
+      LIMIT 100
+    `;
+    
+    const result = await pool.query(query, [lastEventId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching session events:', error);
+    res.status(500).json({ error: 'Failed to fetch session events' });
+  }
+});
+
+app.get('/api/current-staff/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    // Get the session from database instead of memory
+    const sessionQuery = `
+      SELECT staff_id 
+      FROM active_sessions 
+      WHERE session_id = $1 AND status = 'active'
+    `;
+    const sessionResult = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionResult.rows.length || !sessionResult.rows[0].staff_id) {
+      return res.status(404).json({ 
+        message: 'No active staff found for this session',
+        sessionId 
+      });
+    }
+
+    // Rest of your existing code...
   } catch (error) {
     console.error('Error fetching current staff:', error);
     res.status(500).json({ message: 'Error fetching current staff', error: error.message });
   }
 });
 
-app.get('/api/session-state/:sessionId', async (req, res) => {
+// End session
+app.delete('/api/sessions/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  const session = sessions.get(sessionId);
-
-  if (!session || !session.staffId) {
-    return res.json({ 
-      hasActiveProfile: false,
-      message: 'No active profile'
-    });
-  }
-
+  
   try {
     const query = `
-      SELECT 
-        s.id, 
-        s.name, 
-        s.job
-      FROM 
-        staffs s
-      WHERE 
-        s.id = $1 
-        AND s.job ? 'OFFICE'
-        AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+      UPDATE active_sessions 
+      SET 
+        status = 'ended',
+        metadata = jsonb_set(
+          metadata, 
+          '{end_time}',
+          to_jsonb(CURRENT_TIMESTAMP)
+        )
+      WHERE session_id = $1
+      RETURNING *
     `;
     
-    const result = await pool.query(query, [session.staffId]);
+    const result = await pool.query(query, [sessionId]);
     
     if (result.rows.length === 0) {
-      return res.json({ 
-        hasActiveProfile: false,
-        message: 'Staff not found or no longer active'
-      });
+      res.status(404).json({ error: 'Session not found' });
+    } else {
+      res.json({ message: 'Session ended successfully', session: result.rows[0] });
     }
-
-    const staff = {
-      ...result.rows[0],
-      job: typeof result.rows[0].job === 'string' ? JSON.parse(result.rows[0].job) : 
-           Array.isArray(result.rows[0].job) ? result.rows[0].job :
-           typeof result.rows[0].job === 'object' ? result.rows[0].job : []
-    };
-
-    return res.json({
-      hasActiveProfile: true,
-      staff
-    });
   } catch (error) {
-    console.error('Error fetching session state:', error);
-    return res.status(500).json({ 
-      hasActiveProfile: false,
-      message: 'Error fetching session state'
-    });
+    console.error('Error ending session:', error);
+    res.status(500).json({ error: 'Failed to end session' });
   }
 });
+
+// Add session cleanup job
+const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+setInterval(async () => {
+  try {
+    await pool.query('SELECT cleanup_old_sessions($1)', [24]); // 24 hours max age
+    console.log('Cleaned up old sessions');
+  } catch (error) {
+    console.error('Error cleaning up sessions:', error);
+  }
+}, CLEANUP_INTERVAL);
 
 app.get('/api/staffs/office', async (req, res) => {
   try {
@@ -2681,20 +2708,21 @@ app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
 
-// Health check endpoint that verifies database and WebSocket server
+// Health check endpoint that verifies database connection
 app.get('/api/health', async (req, res) => {
   try {
     // Check database connection
     const dbCheck = await pool.query('SELECT 1');
     
-    // Check WebSocket server
-    const wsCheck = wss.clients.size !== undefined;
+    // Get active sessions count from database
+    const sessionsQuery = `
+      SELECT COUNT(*) as count 
+      FROM active_sessions 
+      WHERE status = 'active' 
+      AND last_active > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
+    `;
+    const activeSessionsResult = await pool.query(sessionsQuery);
     
-    // Get active sessions count
-    const activeSessions = Array.from(sessions.entries())
-      .filter(([_, session]) => session.ws?.readyState === WebSocket.OPEN)
-      .length;
-
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -2705,12 +2733,13 @@ app.get('/api/health', async (req, res) => {
             total: pool.totalCount,
             idle: pool.idleCount,
             waiting: pool.waitingCount
-          }
+          },
+          activeSessions: Number(activeSessionsResult.rows[0].count)
         },
-        websocket: {
-          status: wsCheck ? 'healthy' : 'unhealthy',
-          activeSessions,
-          server: httpServer ? 'running' : 'not running'
+        server: {
+          status: 'healthy',
+          uptime: process.uptime(),
+          memoryUsage: process.memoryUsage().heapUsed
         }
       }
     });
@@ -2719,7 +2748,7 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });

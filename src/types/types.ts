@@ -1,22 +1,67 @@
 export interface DeviceInfo {
   userAgent: string;
-  deviceType: "desktop" | "mobile" | "tablet";
+  deviceType: "Mobile" | "Desktop";
   timestamp: string;
 }
 
 export interface ActiveSession {
   sessionId: string;
   staffId: string | null;
+  staffName?: string | null;
+  staffJob?: string[] | null;
   deviceInfo: DeviceInfo;
+  lastActive: string;
+  status: "active" | "ended" | "expired";
+  metadata?: {
+    lastProfileSwitch?: string;
+    endTime?: string;
+    expiredAt?: string;
+  };
+  lastEventId?: number;
+  lastEventType?: string;
+  lastEventTime?: string;
+}
+
+export interface SessionEvent {
+  id: number;
+  sessionId: string;
+  eventType: "PROFILE_SWITCH" | "SESSION_END" | "SESSION_EXPIRED";
+  metadata: {
+    previousStaffId?: string;
+    newStaffId?: string;
+    timestamp: string;
+    endTime?: string;
+    reason?: string;
+  };
+  createdAt: string;
+  staffInfo?: {
+    name: string | null;
+    job: string[] | null;
+  };
+}
+
+export interface SessionState {
+  hasActiveProfile: boolean;
+  staff: Staff | null;
   lastActive: string;
 }
 
-export interface WebSocketMessage {
-  type: "register" | "profile_switch" | "profile_changed" | "active_sessions";
-  sessionId?: string;
-  staffId?: string;
-  deviceInfo?: DeviceInfo;
-  data?: any;
+export interface SessionError extends Error {
+  code:
+    | "INITIALIZATION_ERROR"
+    | "NETWORK_ERROR"
+    | "STORAGE_ERROR"
+    | "SESSION_EXPIRED"
+    | "INVALID_STATE";
+}
+
+export interface ProfileContextType {
+  currentStaff: Staff | null;
+  activeSessions: ActiveSession[];
+  switchProfile: (staff: Staff) => Promise<void>;
+  isInitializing: boolean;
+  error: string | null;
+  clearError: () => void;
 }
 
 export interface Staff {
