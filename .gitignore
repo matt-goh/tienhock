@@ -6,7 +6,7 @@
 /build
 /out
 /logs
-docker-compose.yml
 
 # misc
 .env
+/docker-compose.yml
