@@ -22,16 +22,6 @@ const MYINVOIS_API_BASE_URL = 'https://preprod-api.myinvois.hasil.gov.my';
 const MYINVOIS_CLIENT_ID = 'b0037953-93e3-4e8d-92b3-99efb15afe33';
 const MYINVOIS_CLIENT_SECRET = '1e612d39-da8d-42cc-b949-bcd04d9d3fab';
 
-// Create HTTP server instance after middleware setup
-const httpServer = app.listen(port, '0.0.0.0', () => {
-  const displayHost = NODE_ENV === 'development'
-    ? 'localhost:5001 (development mode)'
-    : `${SERVER_HOST || '0.0.0.0'}:${port}`;
-    
-  console.log(`Server running on https://${displayHost}`);
-  console.log(`Server environment: ${NODE_ENV}`);
-});
-
 // PostgreSQL connection
 export const pool = new Pool({
   user: process.env.DB_USER,
@@ -41,10 +31,58 @@ export const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
+// Set up session cleanup interval
+const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+setInterval(async () => {
+  try {
+    await pool.query('SELECT cleanup_old_sessions($1)', [24]); // 24 hours max age
+    console.log('Cleaned up old sessions');
+  } catch (error) {
+    console.error('Error cleaning up sessions:', error);
+  }
+}, CLEANUP_INTERVAL);
+
 // Use middleware
 app.use(cors());
 app.use(json());
 app.use('/api', router);
+
+// Start server
+app.listen(port, '0.0.0.0', () => {
+  const displayHost = NODE_ENV === 'development'
+    ? 'localhost:5001 (development mode)'
+    : `${SERVER_HOST || '0.0.0.0'}:${port}`;
+    
+  console.log(`Server running on http://${displayHost}`);
+  console.log(`Server environment: ${NODE_ENV}`);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received. Closing HTTP server and database pool...');
+  
+  try {
+    await pool.end();
+    console.log('Database pool closed.');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT signal received. Closing HTTP server and database pool...');
+  
+  try {
+    await pool.end();
+    console.log('Database pool closed.');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+});
 
 // Session Management Endpoints
 app.post('/api/sessions/register', async (req, res) => {
@@ -284,17 +322,6 @@ app.delete('/api/sessions/:sessionId', async (req, res) => {
     res.status(500).json({ error: 'Failed to end session' });
   }
 });
-
-// Add session cleanup job
-const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-setInterval(async () => {
-  try {
-    await pool.query('SELECT cleanup_old_sessions($1)', [24]); // 24 hours max age
-    console.log('Cleaned up old sessions');
-  } catch (error) {
-    console.error('Error cleaning up sessions:', error);
-  }
-}, CLEANUP_INTERVAL);
 
 app.get('/api/staffs/office', async (req, res) => {
   try {
