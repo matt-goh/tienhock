@@ -74,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     new Set()
   );
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hasSetInitialState = useRef(false);
   const { currentStaff, isInitializing } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
@@ -103,6 +104,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     []
   );
 
+  // On mount, set initial open items
+  useEffect(() => {
+    const defaultOpenItems = OriginalSidebarData.filter(
+      (item) => item.defaultOpen
+    ).map((item) => item.name);
+    setOpenItems(defaultOpenItems);
+  }, []);
+
   // Update SidebarData when profile state changes
   useEffect(() => {
     const updatedSidebarData = [...OriginalSidebarData];
@@ -111,18 +120,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
     setSidebarData(updatedSidebarData);
   }, [currentStaff, isInitializing]);
-
-  // Set default open items whenever SidebarData changes
-  useEffect(() => {
-    const defaultOpenItems = SidebarData.filter((item) => item.defaultOpen).map(
-      (item) => item.name
-    );
-    setOpenItems((prevItems) => {
-      // Merge existing open items with new default open items
-      const newOpenItems = new Set([...prevItems, ...defaultOpenItems]);
-      return Array.from(newOpenItems);
-    });
-  }, [SidebarData]);
 
   useEffect(() => {
     const currentPath = location.pathname;
