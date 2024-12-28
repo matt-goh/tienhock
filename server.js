@@ -2750,51 +2750,6 @@ app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
 
-// Health check endpoint that verifies database connection
-app.get('/api/health', async (req, res) => {
-  try {
-    // Check database connection
-    const dbCheck = await pool.query('SELECT 1');
-    
-    // Get active sessions count from database
-    const sessionsQuery = `
-      SELECT COUNT(*) as count 
-      FROM active_sessions 
-      WHERE status = 'active' 
-      AND last_active > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
-    `;
-    const activeSessionsResult = await pool.query(sessionsQuery);
-    
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      services: {
-        database: {
-          status: dbCheck.rows.length === 1 ? 'healthy' : 'unhealthy',
-          connectionPool: {
-            total: pool.totalCount,
-            idle: pool.idleCount,
-            waiting: pool.waitingCount
-          },
-          activeSessions: Number(activeSessionsResult.rows[0].count)
-        },
-        server: {
-          status: 'healthy',
-          uptime: process.uptime(),
-          memoryUsage: process.memoryUsage().heapUsed
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Health check failed:', error);
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
