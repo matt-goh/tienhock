@@ -14,12 +14,14 @@ import type {
   ActiveSession,
   SessionError,
   ProfileContextType,
-  DeviceInfo
+  DeviceInfo,
 } from "../types/types";
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
+  const POLL_INTERVAL = 30000;
+
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -32,19 +34,19 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const handleError = useCallback((error: unknown, fallbackMessage: string) => {
     console.error(fallbackMessage, error);
-    
+
     let errorMessage: string;
-    if (error instanceof Error && 'code' in error) {
+    if (error instanceof Error && "code" in error) {
       const sessionError = error as SessionError;
       switch (sessionError.code) {
-        case 'SESSION_EXPIRED':
-          errorMessage = 'Your session has expired. Please refresh the page.';
+        case "SESSION_EXPIRED":
+          errorMessage = "Your session has expired. Please refresh the page.";
           break;
-        case 'NETWORK_ERROR':
-          errorMessage = 'Network error. Please check your connection.';
+        case "NETWORK_ERROR":
+          errorMessage = "Network error. Please check your connection.";
           break;
-        case 'INITIALIZATION_ERROR':
-          errorMessage = 'Failed to initialize. Please refresh the page.';
+        case "INITIALIZATION_ERROR":
+          errorMessage = "Failed to initialize. Please refresh the page.";
           break;
         default:
           errorMessage = sessionError.message;
@@ -84,7 +86,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setCurrentStaff(null);
       }
     } catch (error) {
-      handleError(error, 'Error checking session state');
+      handleError(error, "Error checking session state");
       setCurrentStaff(null);
     } finally {
       setIsInitializing(false);
@@ -102,7 +104,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setActiveSessions(data.sessions);
       }
     } catch (error) {
-      handleError(error, 'Error fetching sessions');
+      handleError(error, "Error fetching sessions");
     }
   }, [handleError]);
 
@@ -125,14 +127,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             event.session_id === sessionService.getSessionId()
         );
 
+        // Only fetch session state if relevant events exist
         if (currentSessionEvents.length > 0) {
           await checkSessionState();
+          await fetchActiveSessions();
         }
-
-        await fetchActiveSessions();
       }
     } catch (error) {
-      handleError(error, 'Error polling session events');
+      handleError(error, "Error polling session events");
     }
   }, [lastEventId, checkSessionState, fetchActiveSessions, handleError]);
 
@@ -144,11 +146,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       try {
         await sessionService.initialize();
-        pollIntervalRef.current = setInterval(pollSessionEvents, 5000);
         await checkSessionState();
         await fetchActiveSessions();
+
+        // Start polling with longer interval
+        pollIntervalRef.current = setInterval(pollSessionEvents, POLL_INTERVAL);
       } catch (error) {
-        handleError(error, 'Failed to initialize session');
+        handleError(error, "Failed to initialize session");
       } finally {
         if (mountedRef.current) {
           setIsInitializing(false);
@@ -175,7 +179,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       const deviceInfo: DeviceInfo = {
         userAgent: navigator.userAgent,
-        deviceType: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
+        deviceType: /Mobile|Android|iPhone/i.test(navigator.userAgent)
+          ? "Mobile"
+          : "Desktop",
         timestamp: new Date().toISOString(),
       };
 
@@ -208,7 +214,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         toast.success(`Switched to ${staff.name}'s profile`);
       }
     } catch (error) {
-      handleError(error, 'Error switching profile');
+      handleError(error, "Error switching profile");
       throw error;
     } finally {
       setIsInitializing(false);
@@ -217,13 +223,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ProfileContext.Provider
-      value={{ 
-        currentStaff, 
-        activeSessions, 
+      value={{
+        currentStaff,
+        activeSessions,
         switchProfile,
         isInitializing,
         error,
-        clearError
+        clearError,
       }}
     >
       {children}

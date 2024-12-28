@@ -34,20 +34,68 @@ export default function ProfileSwitcherModal({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    let pollInterval: NodeJS.Timeout;
+    let isMounted = true;
 
     if (isOpen) {
-      fetchStaffList();
-      fetchActiveSessions();
-      setShowSessions(false);
-      setSearchQuery("");
-      pollInterval = setInterval(pollSessionEvents, 5000);
+      const initializeModal = async () => {
+        try {
+          await fetchStaffList();
+          if (isMounted) {
+            setShowSessions(false);
+            setSearchQuery("");
+          }
+        } catch (error) {
+          console.error("Error initializing modal:", error);
+        }
+      };
+
+      initializeModal();
     }
 
     return () => {
-      if (pollInterval) clearInterval(pollInterval);
+      isMounted = false;
     };
   }, [isOpen]);
+
+  const getDeviceInfo = (session: ActiveSession) => {
+    const defaultInfo = {
+      deviceType: "Unknown",
+      userAgent: "Unknown Device",
+    };
+
+    if (!session.deviceInfo) return defaultInfo;
+
+    try {
+      const deviceInfo =
+        typeof session.deviceInfo === "string"
+          ? JSON.parse(session.deviceInfo)
+          : session.deviceInfo;
+
+      return {
+        deviceType: deviceInfo.deviceType || defaultInfo.deviceType,
+        userAgent: deviceInfo.userAgent || defaultInfo.userAgent,
+      };
+    } catch (error) {
+      console.error("Error parsing device info:", error);
+      return defaultInfo;
+    }
+  };
+
+  const formatLastActive = (lastActive: string | null | undefined): string => {
+    if (!lastActive) return "Unknown time";
+
+    try {
+      const date = new Date(lastActive);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        return "Invalid date";
+      }
+      return `Active ${formatDistanceToNow(date)} ago`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Invalid date";
+    }
+  };
 
   const fetchActiveSessions = async () => {
     try {
@@ -109,9 +157,11 @@ export default function ProfileSwitcherModal({
 
     setIsLoading(true);
     try {
+      // Close modal immediately
+      onClose();
+      // Then perform the profile switch
       await switchProfile(staff);
       sessionService.updateStoredSession(staff.id);
-      toast.success(`Switched to ${staff.name}'s profile`);
       onClose();
     } catch (error) {
       console.error("Error switching profile:", error);
@@ -131,8 +181,19 @@ export default function ProfileSwitcherModal({
   const currentSessionId = sessionService.getSessionId();
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+    <Transition
+      appear
+      show={isOpen}
+      as={Fragment}
+      beforeLeave={() => {
+        // Cleanup state before transition starts
+        setSearchQuery("");
+        setShowSessions(false);
+        setError("");
+        setIsLoading(false);
+      }}
+    >
+      <Dialog as="div" className="relative z-50" onClose={onClose} static>
         <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"
@@ -246,31 +307,42 @@ export default function ProfileSwitcherModal({
                       const sessionStaff = staffList.find(
                         (s) => s.id === session.staffId
                       );
+                      const deviceInfo = getDeviceInfo(session);
+
                       return (
                         <div
-                          key={session.sessionId}
+                          key={`session-${session.sessionId}`}
                           className="p-3 rounded-lg border border-default-200"
                         >
                           <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-default-900">
+                            <div key={`info-${session.sessionId}`}>
+                              <p
+                                key={`name-${session.sessionId}`}
+                                className="font-medium text-default-900"
+                              >
                                 {sessionStaff?.name || "No profile selected"}
                               </p>
-                              <p className="text-sm text-default-500">
-                                {session.deviceInfo.deviceType} -{" "}
-                                {session.deviceInfo.userAgent}
+                              <p
+                                key={`device-${session.sessionId}`}
+                                className="text-sm text-default-500"
+                              >
+                                {deviceInfo.deviceType} - {deviceInfo.userAgent}
                               </p>
                             </div>
                             {session.sessionId === currentSessionId && (
-                              <span className="text-xs text-center bg-sky-100 text-sky-800 px-3 py-1 rounded-full">
+                              <span
+                                key={`current-${session.sessionId}`}
+                                className="text-xs text-center bg-sky-100 text-sky-800 px-3 py-1 rounded-full"
+                              >
                                 Current Device
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-default-400 mt-1">
-                            Active{" "}
-                            {formatDistanceToNow(new Date(session.lastActive))}{" "}
-                            ago
+                          <p
+                            key={`active-${session.sessionId}`}
+                            className="text-xs text-default-400 mt-1"
+                          >
+                            {formatLastActive(session.lastActive)}
                           </p>
                         </div>
                       );

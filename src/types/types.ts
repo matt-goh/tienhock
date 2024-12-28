@@ -9,7 +9,7 @@ export interface ActiveSession {
   staffId: string | null;
   staffName?: string | null;
   staffJob?: string[] | null;
-  deviceInfo: DeviceInfo;
+  deviceInfo?: DeviceInfo | string;
   lastActive: string;
   status: "active" | "ended" | "expired";
   metadata?: {

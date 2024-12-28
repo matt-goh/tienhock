@@ -9,6 +9,8 @@ import {
   SERVER_HOST,
 } from './src/configs/config.js';
 import router from './src/routes/sessions.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -16,6 +18,10 @@ const { json } = pkgBodyParser;
 const { Pool } = pkgPg;
 const app = express();
 const port = 5000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static(path.join(__dirname, 'build')));
 
 // MyInvois API Configuration
 const MYINVOIS_API_BASE_URL = 'https://preprod-api.myinvois.hasil.gov.my';
@@ -41,6 +47,15 @@ setInterval(async () => {
     console.error('Error cleaning up sessions:', error);
   }
 }, CLEANUP_INTERVAL);
+
+// Add this before your other middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,UPDATE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept');
+  next();
+});
 
 // Use middleware
 app.use(cors());
@@ -2778,4 +2793,8 @@ app.get('/api/health', async (req, res) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
