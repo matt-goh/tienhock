@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, Fragment, useRef } from "react";
 import { Staff, ActiveSession } from "../types/types";
 import { useProfile } from "../contexts/ProfileContext";
 import {
@@ -24,7 +24,7 @@ export default function ProfileSwitcherModal({
   isOpen,
   onClose,
 }: ProfileSwitcherModalProps) {
-  const { activeSessions, switchProfile, currentStaff } = useProfile();
+  const { switchProfile, currentStaff } = useProfile();
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSessions, setShowSessions] = useState(false);
@@ -32,30 +32,59 @@ export default function ProfileSwitcherModal({
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [lastEventId, setLastEventId] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout>();
+  const POLL_INTERVAL = 10000;
 
   useEffect(() => {
     let isMounted = true;
 
-    if (isOpen) {
-      const initializeModal = async () => {
-        try {
-          await fetchStaffList();
-          if (isMounted) {
-            setShowSessions(false);
-            setSearchQuery("");
-          }
-        } catch (error) {
-          console.error("Error initializing modal:", error);
-        }
-      };
+    const initializeModal = async () => {
+      if (!isMounted) return;
 
+      try {
+        await fetchStaffList();
+        if (showSessions) {
+          await fetchActiveSessions();
+          // Only start polling if sessions view is active
+          pollIntervalRef.current = setInterval(
+            fetchActiveSessions,
+            POLL_INTERVAL
+          );
+        }
+      } catch (error) {
+        console.error("Error initializing modal:", error);
+      }
+    };
+
+    if (isOpen) {
       initializeModal();
     }
 
     return () => {
       isMounted = false;
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
     };
-  }, [isOpen]);
+  }, [isOpen, showSessions]);
+
+  // Effect to handle sessions view toggle
+  useEffect(() => {
+    if (showSessions) {
+      fetchActiveSessions();
+      pollIntervalRef.current = setInterval(fetchActiveSessions, POLL_INTERVAL);
+    } else {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [showSessions]);
 
   const getDeviceInfo = (session: ActiveSession) => {
     const defaultInfo = {
@@ -186,7 +215,10 @@ export default function ProfileSwitcherModal({
       show={isOpen}
       as={Fragment}
       beforeLeave={() => {
-        // Cleanup state before transition starts
+        // Clear polling and state on close
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
         setSearchQuery("");
         setShowSessions(false);
         setError("");

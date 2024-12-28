@@ -20,7 +20,7 @@ import type {
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
-  const POLL_INTERVAL = 30000;
+  const POLL_INTERVAL = 10000;
 
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
@@ -147,10 +147,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       try {
         await sessionService.initialize();
         await checkSessionState();
-        await fetchActiveSessions();
-
-        // Start polling with longer interval
-        pollIntervalRef.current = setInterval(pollSessionEvents, POLL_INTERVAL);
+        // Don't fetch active sessions on initial load since modal is closed
+        pollIntervalRef.current = setInterval(checkSessionState, POLL_INTERVAL);
       } catch (error) {
         handleError(error, "Failed to initialize session");
       } finally {
@@ -168,7 +166,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [checkSessionState, fetchActiveSessions, pollSessionEvents, handleError]);
+  }, [checkSessionState, handleError]);
 
   const switchProfile = async (staff: Staff) => {
     if (!mountedRef.current) return;
