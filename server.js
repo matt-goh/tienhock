@@ -53,7 +53,7 @@ app.listen(port, '0.0.0.0', () => {
     ? 'localhost:5001 (development mode)'
     : `${SERVER_HOST || '0.0.0.0'}:${port}`;
     
-  console.log(`Server running on http://${displayHost}`);
+  console.log(`Server running on https://${displayHost}`);
   console.log(`Server environment: ${NODE_ENV}`);
 });
 
