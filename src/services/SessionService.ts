@@ -9,25 +9,21 @@ export interface StoredSession {
     deviceType: string;
     timestamp: string;
   };
-  lastActive: string;
-  metadata?: Record<string, unknown>;
 }
 
 export interface SessionError extends Error {
-  code: 'INITIALIZATION_ERROR' | 'NETWORK_ERROR' | 'STORAGE_ERROR' | 'SESSION_EXPIRED' | 'INVALID_STATE';
+  code: 'INITIALIZATION_ERROR' | 'NETWORK_ERROR' | 'STORAGE_ERROR';
 }
 
 class SessionService {
   private readonly SESSION_KEY = 'profileSwitcher_session';
   private readonly SESSION_ID_KEY = 'profileSwitcher_sessionId';
-  private readonly SESSION_EXPIRY_DAYS = 30;
   private currentSessionId: string;
   private initialized: boolean = false;
   private heartbeatInterval?: NodeJS.Timeout;
 
   constructor() {
     this.currentSessionId = this.initializeSessionId();
-    this.cleanupExpiredSessions();
   }
 
   private initializeSessionId(): string {
@@ -40,7 +36,6 @@ class SessionService {
       return existingSessionId;
     } catch (error) {
       console.error('Failed to initialize session ID:', error);
-      // Fallback to memory-only session ID if localStorage is unavailable
       return this.generateSessionId();
     }
   }
@@ -48,9 +43,7 @@ class SessionService {
   private generateSessionId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 15);
-    const userAgent = navigator.userAgent.split('').reduce((hash, char) => 
-      ((hash << 5) - hash) + char.charCodeAt(0), 0);
-    return `${timestamp}-${random}-${Math.abs(userAgent)}`;
+    return `${timestamp}-${random}`;
   }
 
   private createSessionError(message: string, code: SessionError['code'], originalError?: Error): SessionError {
@@ -66,13 +59,6 @@ class SessionService {
       deviceType: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
       timestamp: new Date().toISOString(),
     };
-  }
-
-  private isSessionExpired(lastActive: string): boolean {
-    const lastActiveDate = new Date(lastActive);
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() - this.SESSION_EXPIRY_DAYS);
-    return lastActiveDate < expiryDate;
   }
 
   async initialize(): Promise<void> {
@@ -98,7 +84,7 @@ class SessionService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Start heartbeat after successful initialization
+      // Keep heartbeat for session activity tracking in PostgreSQL
       this.startHeartbeat();
       this.initialized = true;
     } catch (error) {
@@ -137,23 +123,15 @@ class SessionService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          // Session not found or expired - reinitialize
+          // Session not found - reinitialize
           this.initialized = false;
           await this.initialize();
         } else {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       }
-
-      // Update last active timestamp in local storage
-      const storedSession = this.getStoredSession();
-      if (storedSession) {
-        storedSession.lastActive = new Date().toISOString();
-        this.saveSession(storedSession);
-      }
     } catch (error) {
       console.error('Failed to send heartbeat:', error);
-      // Don't throw here to prevent crashing the heartbeat interval
     }
   }
 
@@ -167,27 +145,9 @@ class SessionService {
       if (!sessionData) return null;
 
       const session: StoredSession = JSON.parse(sessionData);
-
-      // Validate session
-      if (session.sessionId !== this.currentSessionId) {
-        throw this.createSessionError(
-          'Session ID mismatch',
-          'INVALID_STATE'
-        );
-      }
-
-      if (this.isSessionExpired(session.lastActive)) {
-        this.clearSession();
-        throw this.createSessionError(
-          'Session has expired',
-          'SESSION_EXPIRED'
-        );
-      }
-
       return session;
     } catch (error) {
       console.error('Error retrieving stored session:', error);
-      // Clear invalid session data
       this.clearSession();
       return null;
     }
@@ -211,17 +171,9 @@ class SessionService {
       sessionId: this.currentSessionId,
       staffId,
       deviceInfo: this.getCurrentDeviceInfo(),
-      lastActive: new Date().toISOString(),
     };
 
     this.saveSession(session);
-  }
-
-  private cleanupExpiredSessions(): void {
-    const session = this.getStoredSession();
-    if (session && this.isSessionExpired(session.lastActive)) {
-      this.clearSession();
-    }
   }
 
   async endSession(): Promise<void> {
@@ -256,7 +208,7 @@ class SessionService {
   private clearSession(): void {
     try {
       localStorage.removeItem(this.SESSION_KEY);
-      // Note: We keep the sessionId for device tracking
+      // Keep the sessionId for device tracking
     } catch (error) {
       console.error('Error clearing session:', error);
     }
