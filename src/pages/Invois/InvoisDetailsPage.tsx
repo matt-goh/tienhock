@@ -159,7 +159,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [previousPath, setPreviousPath] = useState("/stock/invois");
+  const [previousPath, setPreviousPath] = useState("/sales/invois");
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(() => {
     if (location.state?.isNewInvoice) {
       return {
@@ -847,7 +847,7 @@ const InvoisDetailsPage: React.FC = () => {
         toast.success("New invoice created successfully");
       } else {
         // Determine if we're saving to the database or server memory
-        const saveToDb = location.pathname.includes("/stock/invois/details");
+        const saveToDb = location.pathname.includes("/sales/invois/details");
         savedInvoice = await saveInvoice(invoiceData, saveToDb);
         toast.success(
           saveToDb
