@@ -447,7 +447,7 @@ const InvoisPage: React.FC = () => {
       toast.success(`Successfully processed ${validFiles.length} file(s)`);
 
       // Navigate to the upload page with the updated invoices
-      navigate("/stock/invois/imported", {
+      navigate("/sales/invois/imported", {
         state: { importedData: updatedInvoices },
       });
     } catch (error) {
@@ -557,7 +557,7 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleCreateNewInvoice = () => {
-    navigate("/stock/invois/details", {
+    navigate("/sales/invois/details", {
       state: {
         isNewInvoice: true,
         previousPath: location.pathname,
@@ -566,7 +566,7 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleInvoiceClick = (invoiceId: string, invoiceData: InvoiceData) => {
-    navigate(`/stock/invois/details`, {
+    navigate(`/sales/invois/details`, {
       state: {
         invoiceData,
         isNewInvoice: false,

@@ -112,7 +112,7 @@ const Layout: React.FC = () => {
         `}
       >
         <Routes>
-          <Route path="/" element={<Navigate to="/stock/invois" replace />} />
+          <Route path="/" element={<Navigate to="/sales/invois" replace />} />
           {routes.map((route) => (
             <Route
               key={route.path}

@@ -138,28 +138,11 @@ export default function ProfileSwitcherModal({
     }
   };
 
-  const pollSessionEvents = async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sessions/events?lastEventId=${lastEventId}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch session events");
-
-      const events = await response.json();
-      if (events.length > 0) {
-        setLastEventId(events[events.length - 1].id);
-        await fetchActiveSessions();
-      }
-    } catch (error) {
-      console.error("Error polling session events:", error);
-    }
-  };
-
   const fetchStaffList = async () => {
     setError("");
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/staffs/office`);
+      const response = await fetch(`${API_BASE_URL}/api/profile/staffs/office`);
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
 

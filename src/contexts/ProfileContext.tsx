@@ -64,7 +64,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/session-state/${sessionService.getSessionId()}`,
+        `${API_BASE_URL}/api/sessions/session-state/${sessionService.getSessionId()}`,
         {
           method: "GET",
           headers: {

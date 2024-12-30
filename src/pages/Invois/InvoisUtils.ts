@@ -61,7 +61,7 @@ export const fetchDbInvoices = async (
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/db/invoices?${queryParams.toString()}`
+      `${API_BASE_URL}/api/invoices/db/?${queryParams.toString()}`
     );
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -100,7 +100,7 @@ export const fetchInvoices = async () => {
 export const deleteInvoice = async (id: string) => {
   try {
     // First, try to delete from the database
-    const dbResponse = await fetch(`${API_BASE_URL}/api/db/invoices/${id}`, {
+    const dbResponse = await fetch(`${API_BASE_URL}/api/invoices/db/${id}`, {
       method: "DELETE",
     });
 

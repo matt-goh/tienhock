@@ -50,17 +50,17 @@ export const SidebarData: SidebarItem[] = [
     defaultOpen: true,
   },
   {
-    name: "Stock",
+    name: "Sales",
     icon: IconPackage,
     subItems: [
       {
         name: "Invois",
-        path: "/stock/invois",
+        path: "/sales/invois",
         component: InvoisPage,
         subItems: [
           {
             name: "Invois Details",
-            path: "/stock/invois/:id",
+            path: "/sales/invois/:id",
             component: InvoisDetailsPage,
           },
           {
@@ -70,17 +70,17 @@ export const SidebarData: SidebarItem[] = [
           },
           {
             name: "Imported Invois Page",
-            path: "/stock/invois/imported",
+            path: "/sales/invois/imported",
             component: InvoisUploadPage,
           },
           {
             name: "Imported Invois Details",
-            path: "/stock/invois/imported/:id",
+            path: "/sales/invois/imported/:id",
             component: InvoisDetailsPage,
           },
           {
             name: "Create New Invois Page",
-            path: "/stock/invois/create",
+            path: "/sales/invois/create",
             component: InvoisDetailsPage,
           },
         ],
@@ -194,7 +194,7 @@ export const SidebarData: SidebarItem[] = [
         component: () => (
           <CatalogueBasicPage
             title="Agama Catalogue"
-            apiEndpoint="agamas"
+            apiEndpoint="agama"
             tableKey="catalogueAgama"
           />
         ),
