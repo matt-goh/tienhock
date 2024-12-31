@@ -20,8 +20,6 @@ import "../../index.css";
 import {
   IconArrowBarToLeft,
   IconArrowBarToRight,
-  IconSwitchHorizontal,
-  IconUserCircle,
 } from "@tabler/icons-react";
 import { API_BASE_URL } from "../../configs/config";
 import UserMenu from "../UserMenu";

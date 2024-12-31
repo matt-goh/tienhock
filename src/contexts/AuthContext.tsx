@@ -59,7 +59,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (ic_no: string, password: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        // Add API_BASE_URL
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -67,12 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ ic_no, password }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
+        throw new Error(data.message || "Login failed");
       }
 
-      const data = await response.json();
       sessionService.updateStoredSession(data.sessionId);
       setUser(data.user);
     } catch (error) {

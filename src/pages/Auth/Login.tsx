@@ -7,15 +7,23 @@ import Button from "../../components/Button";
 import { API_BASE_URL } from "../../configs/config";
 
 const Login: React.FC = () => {
-  const [step, setStep] = useState<"ic" | "password">("ic");
+  const [step, setStep] = useState<"ic" | "password" | "set-password">("ic");
   const [ic_no, setIcNo] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const validateIcNo = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check IC number length (including the two dashes)
+    if (ic_no.length < 14) {
+      toast.error("Please enter a valid IC number");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -25,7 +33,11 @@ const Login: React.FC = () => {
       const data = await response.json();
 
       if (data.exists) {
-        setStep("password");
+        if (data.hasPassword) {
+          setStep("password");
+        } else {
+          setStep("set-password");
+        }
       } else {
         toast.error(
           "IC number not registered. Please contact admin if this is an error."
@@ -46,7 +58,49 @@ const Login: React.FC = () => {
       await login(ic_no, password);
       navigate("/");
     } catch (error) {
+      // Display the specific error message from the server
       toast.error(error instanceof Error ? error.message : "Login failed");
+
+      // Clear password field on incorrect password
+      if (error instanceof Error && error.message === "Incorrect password") {
+        setPassword("");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/set-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ic_no, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to set password");
+      }
+
+      // After setting password, attempt to log in
+      await login(ic_no, password);
+      navigate("/");
+      toast.success("Password set successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to set password"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -79,17 +133,25 @@ const Login: React.FC = () => {
             className="h-24 w-auto mb-6"
           />
           <h1 className="text-3xl font-bold text-center text-default-900">
-            Welcome Back
+            {step === "set-password" ? "Set Up Password" : "Welcome Back"}
           </h1>
           <p className="mt-2 text-center text-default-600">
             {step === "ic"
               ? "Please enter your IC number"
-              : "Please enter your password"}
+              : step === "password"
+              ? "Please enter your password"
+              : "Please set up your password"}
           </p>
         </div>
 
         <form
-          onSubmit={step === "ic" ? validateIcNo : handleLogin}
+          onSubmit={
+            step === "ic"
+              ? validateIcNo
+              : step === "set-password"
+              ? handleSetPassword
+              : handleLogin
+          }
           className="mt-8 space-y-6"
         >
           <div className="space-y-4">
@@ -109,7 +171,7 @@ const Login: React.FC = () => {
                   placeholder="IC number"
                   required
                   disabled={step === "password"}
-                  className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors disabled:bg-default-50 focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors disabled:bg-default-50 focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
                   value={ic_no}
                   onChange={(e) => {
                     const formatted = formatIcNo(e.target.value);
@@ -137,12 +199,59 @@ const Login: React.FC = () => {
                     type="password"
                     placeholder="Password"
                     required
-                    className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                    className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
               </div>
+            )}
+
+            {step === "set-password" && (
+              <>
+                <div>
+                  <div className="relative group">
+                    <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
+                      <IconLock
+                        className="text-default-500 group-focus-within:text-default-600 transition-colors"
+                        size={20}
+                        stroke={1.5}
+                      />
+                    </div>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      placeholder="New Password"
+                      required
+                      className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="relative group">
+                    <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
+                      <IconLock
+                        className="text-default-500 group-focus-within:text-default-600 transition-colors"
+                        size={20}
+                        stroke={1.5}
+                      />
+                    </div>
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      placeholder="Confirm Password"
+                      required
+                      className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -159,6 +268,8 @@ const Login: React.FC = () => {
                 ? "Please wait..."
                 : step === "ic"
                 ? "Continue"
+                : step === "set-password"
+                ? "Set Password"
                 : "Sign In"}
             </Button>
           </div>
