@@ -9,13 +9,14 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Toaster } from "react-hot-toast";
 import { routes } from "./components/Sidebar/SidebarData";
 import { IconDeviceDesktop } from "@tabler/icons-react";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Login from "./pages/Auth/Login";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 
 const Layout: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
     return pinnedState ? JSON.parse(pinnedState) : true;
@@ -89,9 +90,18 @@ const Layout: React.FC = () => {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex">
-      {!isPDFRoute && (
+      {/* Only show sidebar if authenticated and not on PDF route */}
+      {isAuthenticated && !isPDFRoute && (
         <div
           className="fixed top-0 left-0 h-screen sidebar-hidden"
           style={{ width: isVisible ? "254px" : "6rem" }}
@@ -110,11 +120,16 @@ const Layout: React.FC = () => {
         className={`
           flex justify-center w-full transition-all duration-300 ease-in-out
           ${!isPDFRoute ? "py-[68px]" : ""} 
-          ${isVisible && !isPDFRoute ? "ml-[254px]" : ""}
+          ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
         `}
       >
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/login" 
+            element={
+              isAuthenticated ? <Navigate to="/sales/invois" replace /> : <Login />
+            } 
+          />
           <Route
             path="/"
             element={
@@ -143,20 +158,20 @@ const Layout: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-        <BrowserRouter>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                padding: "12px",
-                fontSize: "0.875rem",
-                lineHeight: "1.25rem",
-                fontWeight: 500,
-              },
-            }}
-          />
-          <Layout />
-        </BrowserRouter>
+      <BrowserRouter>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              padding: "12px",
+              fontSize: "0.875rem",
+              lineHeight: "1.25rem",
+              fontWeight: 500,
+            },
+          }}
+        />
+        <Layout />
+      </BrowserRouter>
     </AuthProvider>
   );
 };

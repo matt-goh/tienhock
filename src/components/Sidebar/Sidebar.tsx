@@ -45,7 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsPinned,
   setIsHovered,
 }) => {
-  const [SidebarData] = useState<SidebarItem[]>([]);
+  const [SidebarData, setSidebarData] = useState<SidebarItem[]>([]);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
     "production",
@@ -101,6 +101,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     },
     []
   );
+
+  useEffect(() => {
+    const updatedSidebarData = [...OriginalSidebarData];
+    if (!user || isLoading) {
+      updatedSidebarData.splice(0, 1);
+    }
+    setSidebarData(updatedSidebarData);
+  }, [user, isLoading]);
 
   // On mount, set initial open items
   useEffect(() => {
