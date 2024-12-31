@@ -16,8 +16,6 @@ import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
-import { useProfile } from "../../contexts/ProfileContext";
-import ProfileSwitcherModal from "../ProfileSwitcherModal";
 import "../../index.css";
 import {
   IconArrowBarToLeft,
@@ -26,6 +24,8 @@ import {
   IconUserCircle,
 } from "@tabler/icons-react";
 import { API_BASE_URL } from "../../configs/config";
+import UserMenu from "../UserMenu";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface SidebarProps {
   isPinned: boolean;
@@ -45,13 +45,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsPinned,
   setIsHovered,
 }) => {
-  const [SidebarData, setSidebarData] = useState<SidebarItem[]>([]);
+  const [SidebarData] = useState<SidebarItem[]>([]);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
     "production",
     "pinjam",
   ]);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [hoveredRegularOption, setHoveredRegularOption] = useState<
     string | null
   >(null);
@@ -74,8 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     new Set()
   );
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
-  const hasSetInitialState = useRef(false);
-  const { currentStaff, isInitializing } = useProfile();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -111,15 +109,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     ).map((item) => item.name);
     setOpenItems(defaultOpenItems);
   }, []);
-
-  // Update SidebarData when profile state changes
-  useEffect(() => {
-    const updatedSidebarData = [...OriginalSidebarData];
-    if (!currentStaff || isInitializing) {
-      updatedSidebarData.splice(0, 1);
-    }
-    setSidebarData(updatedSidebarData);
-  }, [currentStaff, isInitializing]);
 
   useEffect(() => {
     const currentPath = location.pathname;
@@ -191,10 +180,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const fetchBookmarks = async () => {
-      if (currentStaff?.id) {
+      if (user?.id) {
         try {
           const response = await fetch(
-            `${API_BASE_URL}/api/bookmarks/${currentStaff.id}`
+            `${API_BASE_URL}/api/bookmarks/${user.id}`
           );
           const data = await response.json();
           setBookmarks(data);
@@ -208,7 +197,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
 
     fetchBookmarks();
-  }, [currentStaff?.id]);
+  }, [user?.id]);
 
   const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLLIElement> }>(
     {}
@@ -553,41 +542,14 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Profile Switcher */}
+      {/* User Menu */}
       <div className="flex-none h-[64px] bg-default-100/75 relative">
         {/* Profile top shadow */}
         <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 z-[1] bg-gradient-to-t from-default-100 via-default-100/25 to-transparent"></div>
 
         <div className="mx-4 h-full flex items-center">
-          <button
-            onClick={() => setIsProfileModalOpen(true)}
-            className="w-full px-3 py-2.5 flex items-center rounded-lg hover:bg-default-200 active:bg-default-300 border border-default-300 transition-colors duration-200"
-          >
-            <div className="flex w-full justify-between">
-              <div className="flex items-center">
-                <IconUserCircle
-                  className="flex-shrink-0 mr-3 text-default-700"
-                  stroke={1.5}
-                />
-                <span className="text-sm font-medium text-default-700">
-                  {currentStaff?.id || "Select Profile"}
-                </span>
-              </div>
-              <div className="flex items-center">
-                <IconSwitchHorizontal
-                  stroke={1.75}
-                  size={18}
-                  className="text-default-700"
-                />
-              </div>
-            </div>
-          </button>
+          <UserMenu />
         </div>
-
-        <ProfileSwitcherModal
-          isOpen={isProfileModalOpen}
-          onClose={() => setIsProfileModalOpen(false)}
-        />
       </div>
     </div>
   );

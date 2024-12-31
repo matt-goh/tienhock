@@ -19,8 +19,8 @@ import {
 } from "@headlessui/react";
 import clsx from "clsx";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
-import { Job } from "../types/types";
-import { API_BASE_URL } from "../configs/config";
+import { Job } from "../../types/types";
+import { API_BASE_URL } from "../../configs/config";
 
 interface Section {
   id: string;

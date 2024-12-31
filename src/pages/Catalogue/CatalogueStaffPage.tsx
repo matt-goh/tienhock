@@ -11,7 +11,7 @@ import { API_BASE_URL } from "../../configs/config";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import StaffFilterMenu from "../../components/StaffFilterMenu";
+import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
 
 const EmployeeCard = ({

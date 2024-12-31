@@ -38,17 +38,6 @@ export const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-// Set up session cleanup interval
-const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-setInterval(async () => {
-  try {
-    await pool.query('SELECT cleanup_old_sessions($1)', [24]); // 24 hours max age
-    console.log('Cleaned up old sessions');
-  } catch (error) {
-    console.error('Error cleaning up sessions:', error);
-  }
-}, CLEANUP_INTERVAL);
-
 // Add this before your other middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');

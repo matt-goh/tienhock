@@ -1,18 +1,25 @@
 // services/SessionService.ts
 import { API_BASE_URL } from "../configs/config";
 
+export interface AuthenticatedUser {
+  id: string;
+  name: string;
+  ic_no: string;
+  job: string[];
+}
+
 export interface StoredSession {
   sessionId: string;
   staffId: string | null;
-  deviceInfo: {
-    userAgent: string;
-    deviceType: string;
-    timestamp: string;
-  };
+  user?: AuthenticatedUser | null;
 }
 
 export interface SessionError extends Error {
   code: 'INITIALIZATION_ERROR' | 'NETWORK_ERROR' | 'STORAGE_ERROR';
+}
+
+export interface AuthenticatedSession extends StoredSession {
+  user: AuthenticatedUser | null;
 }
 
 class SessionService {
@@ -53,20 +60,11 @@ class SessionService {
     return error;
   }
 
-  private getCurrentDeviceInfo() {
-    return {
-      userAgent: navigator.userAgent,
-      deviceType: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
-      timestamp: new Date().toISOString(),
-    };
-  }
-
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
       const storedSession = this.getStoredSession();
-      const deviceInfo = this.getCurrentDeviceInfo();
 
       const response = await fetch(`${API_BASE_URL}/api/sessions/check`, {
         method: 'POST',
@@ -76,7 +74,6 @@ class SessionService {
         body: JSON.stringify({
           sessionId: this.currentSessionId,
           staffId: storedSession?.staffId || null,
-          deviceInfo,
         }),
       });
 
@@ -84,16 +81,14 @@ class SessionService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Keep heartbeat for session activity tracking in PostgreSQL
       this.startHeartbeat();
       this.initialized = true;
     } catch (error) {
-      const sessionError = this.createSessionError(
+      throw this.createSessionError(
         'Failed to initialize session',
         'INITIALIZATION_ERROR',
         error as Error
       );
-      throw sessionError;
     }
   }
 
@@ -135,6 +130,62 @@ class SessionService {
     }
   }
 
+  async login(ic_no: string, password: string): Promise<AuthenticatedSession> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ic_no, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Login failed');
+      }
+
+      const data = await response.json();
+      const session: AuthenticatedSession = {
+        sessionId: data.sessionId,
+        staffId: data.user.id,
+        user: data.user
+      };
+
+      this.saveSession(session);
+      this.currentSessionId = data.sessionId;
+      await this.initialize();
+
+      return session;
+    } catch (error) {
+      throw this.createSessionError(
+        'Login failed',
+        'NETWORK_ERROR',
+        error as Error
+      );
+    }
+  }
+
+  async validateSession(): Promise<AuthenticatedUser | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sessions/state/${this.currentSessionId}`, {
+        headers: {
+          'x-session-id': this.currentSessionId,
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      return data.staff;
+    } catch (error) {
+      console.error('Session validation failed:', error);
+      return null;
+    }
+  }
+
   getSessionId(): string {
     return this.currentSessionId;
   }
@@ -166,14 +217,22 @@ class SessionService {
     }
   }
 
-  updateStoredSession(staffId: string | null): void {
+  updateStoredSession(staffId: string | null, user: AuthenticatedUser | null = null): void {
     const session: StoredSession = {
       sessionId: this.currentSessionId,
       staffId,
-      deviceInfo: this.getCurrentDeviceInfo(),
+      user
     };
 
     this.saveSession(session);
+  }
+
+  async logout(): Promise<void> {
+    await this.endSession();
+    this.clearSession();
+    // Generate new session ID for anonymous tracking
+    this.currentSessionId = this.generateSessionId();
+    localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
   }
 
   async endSession(): Promise<void> {
@@ -208,7 +267,6 @@ class SessionService {
   private clearSession(): void {
     try {
       localStorage.removeItem(this.SESSION_KEY);
-      // Keep the sessionId for device tracking
     } catch (error) {
       console.error('Error clearing session:', error);
     }
