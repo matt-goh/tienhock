@@ -6,10 +6,12 @@ import {
   Navigate,
 } from "react-router-dom";
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { ProfileProvider } from "./contexts/ProfileContext";
 import { Toaster } from "react-hot-toast";
 import { routes } from "./components/Sidebar/SidebarData";
 import { IconDeviceDesktop } from "@tabler/icons-react";
+import { AuthProvider } from "./contexts/AuthContext";
+import Login from "./pages/Auth/Login";
+import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 
@@ -112,12 +114,24 @@ const Layout: React.FC = () => {
         `}
       >
         <Routes>
-          <Route path="/" element={<Navigate to="/sales/invois" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/sales/invois" replace />
+              </ProtectedRoute>
+            }
+          />
           {routes.map((route) => (
             <Route
               key={route.path}
               path={route.path}
-              element={React.createElement(route.component)}
+              element={
+                <ProtectedRoute>
+                  {React.createElement(route.component)}
+                </ProtectedRoute>
+              }
             />
           ))}
         </Routes>
@@ -128,22 +142,22 @@ const Layout: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <ProfileProvider>
-      <BrowserRouter>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              padding: "12px",
-              fontSize: "0.875rem",
-              lineHeight: "1.25rem",
-              fontWeight: 500,
-            },
-          }}
-        />
-        <Layout />
-      </BrowserRouter>
-    </ProfileProvider>
+    <AuthProvider>
+        <BrowserRouter>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                padding: "12px",
+                fontSize: "0.875rem",
+                lineHeight: "1.25rem",
+                fontWeight: 500,
+              },
+            }}
+          />
+          <Layout />
+        </BrowserRouter>
+    </AuthProvider>
   );
 };
 

@@ -4,7 +4,7 @@ A desktop ERP application built with Electron, React, and Node.js, designed for 
 
 ## Features
 
-- Staff Management & Profile Switching
+- Staff Management & Authentication
 - Product Catalogue Management
 - Customer Database
 - Invoice Generation and Management

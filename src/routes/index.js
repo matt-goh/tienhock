@@ -2,7 +2,6 @@
 
 // Auth routes
 import sessionsRouter from './auth/sessions.js';
-import profileRouter from './auth/profile.js';
 
 // User routes
 import sidebarRouter from './user/sidebar.js';
@@ -37,8 +36,12 @@ export default function setupRoutes(app, pool) {
   };
 
   // Auth routes
+  app.use('/api/auth', authRouter(pool));
+
+  // Add auth middleware to protect other routes
+  app.use('/api', authMiddleware(pool));
   app.use('/api/sessions', sessionsRouter(pool));
-  app.use('/api/profile', profileRouter(pool));
+
 
   // User routes
   app.use('/api/bookmarks', sidebarRouter(pool));

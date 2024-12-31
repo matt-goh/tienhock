@@ -14,9 +14,9 @@ import {
   IconCheck,
   IconX,
 } from "@tabler/icons-react";
-import { FilterOptions } from "../types/types";
-import { LOCATION_MAP } from "../constants/locationConstants";
-import Button from "./Button";
+import { FilterOptions } from "../../types/types";
+import { LOCATION_MAP } from "../../constants/locationConstants";
+import Button from "../Button";
 
 type StaffFilterMenuProps = {
   onFilterChange: (filters: FilterOptions) => void;

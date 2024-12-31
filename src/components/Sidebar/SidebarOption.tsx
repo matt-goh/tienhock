@@ -5,7 +5,7 @@ import {
   IconChevronRight,
 } from "@tabler/icons-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useProfile } from "../../contexts/ProfileContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { API_BASE_URL } from "../../configs/config";
 import toast from "react-hot-toast";
 
@@ -34,17 +34,12 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   onBookmarkUpdate,
   onNavigate,
 }) => {
-  const { currentStaff, isInitializing } = useProfile();
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const handleBookmarkClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (!currentStaff?.id) {
-      toast.error("Please select a profile to bookmark items");
-      return;
-    }
 
     if (!name) return;
 
@@ -56,9 +51,9 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     try {
       if (isBookmarked) {
         await fetch(
-          `${API_BASE_URL}/api/bookmarks/${
-            currentStaff.id
-          }/${encodeURIComponent(name)}`,
+          `${API_BASE_URL}/api/bookmarks/${user?.id}/${encodeURIComponent(
+            name
+          )}`,
           {
             method: "DELETE",
           }
@@ -75,7 +70,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            staffId: currentStaff.id,
+            staffId: user?.id,
             name,
           }),
         });
@@ -126,8 +121,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     }`;
   };
 
-  // Only show bookmark icon if there's a selected profile and it's not initializing
-  const shouldShowBookmark = currentStaff && !isInitializing && path;
+  const shouldShowBookmark = user && path;
 
   const content = (
     <>
@@ -151,8 +145,8 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     </>
   );
 
-  // Don't show the Bookmarks section at all if no profile is selected
-  if (isInBookmarksSection && (!currentStaff || isInitializing)) {
+  // Don't show the Bookmarks section at all if not authenticated
+  if (isInBookmarksSection && (!user || isLoading)) {
     return null;
   }
 
