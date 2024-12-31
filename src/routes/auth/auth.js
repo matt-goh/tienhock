@@ -70,7 +70,7 @@ export default function authRouter(pool) {
   });
 
   router.get('/validate-session', async (req, res) => {
-    const sessionId = req.headers['x-session-id'];
+    const sessionId = req.headers['session-id'];
     
     if (!sessionId) {
       return res.status(401).json({ message: 'No session ID provided' });

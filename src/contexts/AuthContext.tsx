@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `${API_BASE_URL}/api/auth/validate-session`,
         {
           headers: {
-            "x-session-id": sessionId,
+            "session-id": sessionId,
           },
         }
       );

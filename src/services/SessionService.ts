@@ -15,7 +15,7 @@ export interface StoredSession {
 }
 
 export interface SessionError extends Error {
-  code: 'INITIALIZATION_ERROR' | 'NETWORK_ERROR' | 'STORAGE_ERROR';
+  code: "INITIALIZATION_ERROR" | "NETWORK_ERROR" | "STORAGE_ERROR";
 }
 
 export interface AuthenticatedSession extends StoredSession {
@@ -23,8 +23,8 @@ export interface AuthenticatedSession extends StoredSession {
 }
 
 class SessionService {
-  private readonly SESSION_KEY = 'profileSwitcher_session';
-  private readonly SESSION_ID_KEY = 'profileSwitcher_sessionId';
+  private readonly SESSION_KEY = "profileSwitcher_session";
+  private readonly SESSION_ID_KEY = "profileSwitcher_sessionId";
   private currentSessionId: string;
   private initialized: boolean = false;
   private heartbeatInterval?: NodeJS.Timeout;
@@ -42,7 +42,7 @@ class SessionService {
       }
       return existingSessionId;
     } catch (error) {
-      console.error('Failed to initialize session ID:', error);
+      console.error("Failed to initialize session ID:", error);
       return this.generateSessionId();
     }
   }
@@ -53,7 +53,11 @@ class SessionService {
     return `${timestamp}-${random}`;
   }
 
-  private createSessionError(message: string, code: SessionError['code'], originalError?: Error): SessionError {
+  private createSessionError(
+    message: string,
+    code: SessionError["code"],
+    originalError?: Error
+  ): SessionError {
     const error = new Error(message) as SessionError;
     error.code = code;
     error.cause = originalError;
@@ -67,9 +71,9 @@ class SessionService {
       const storedSession = this.getStoredSession();
 
       const response = await fetch(`${API_BASE_URL}/api/sessions/check`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           sessionId: this.currentSessionId,
@@ -85,8 +89,8 @@ class SessionService {
       this.initialized = true;
     } catch (error) {
       throw this.createSessionError(
-        'Failed to initialize session',
-        'INITIALIZATION_ERROR',
+        "Failed to initialize session",
+        "INITIALIZATION_ERROR",
         error as Error
       );
     }
@@ -96,7 +100,7 @@ class SessionService {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
-    
+
     this.heartbeatInterval = setInterval(() => {
       this.sendHeartbeat().catch(console.error);
     }, 30000); // 30 seconds
@@ -109,9 +113,9 @@ class SessionService {
       const response = await fetch(
         `${API_BASE_URL}/api/sessions/${this.currentSessionId}/heartbeat`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
@@ -126,30 +130,30 @@ class SessionService {
         }
       }
     } catch (error) {
-      console.error('Failed to send heartbeat:', error);
+      console.error("Failed to send heartbeat:", error);
     }
   }
 
   async login(ic_no: string, password: string): Promise<AuthenticatedSession> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ ic_no, password }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Login failed');
+        throw new Error(error.message || "Login failed");
       }
 
       const data = await response.json();
       const session: AuthenticatedSession = {
         sessionId: data.sessionId,
         staffId: data.user.id,
-        user: data.user
+        user: data.user,
       };
 
       this.saveSession(session);
@@ -159,8 +163,8 @@ class SessionService {
       return session;
     } catch (error) {
       throw this.createSessionError(
-        'Login failed',
-        'NETWORK_ERROR',
+        "Login failed",
+        "NETWORK_ERROR",
         error as Error
       );
     }
@@ -168,11 +172,14 @@ class SessionService {
 
   async validateSession(): Promise<AuthenticatedUser | null> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sessions/state/${this.currentSessionId}`, {
-        headers: {
-          'x-session-id': this.currentSessionId,
-        },
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/sessions/state/${this.currentSessionId}`,
+        {
+          headers: {
+            "session-id": this.currentSessionId,
+          },
+        }
+      );
 
       if (!response.ok) {
         return null;
@@ -181,7 +188,7 @@ class SessionService {
       const data = await response.json();
       return data.staff;
     } catch (error) {
-      console.error('Session validation failed:', error);
+      console.error("Session validation failed:", error);
       return null;
     }
   }
@@ -198,7 +205,7 @@ class SessionService {
       const session: StoredSession = JSON.parse(sessionData);
       return session;
     } catch (error) {
-      console.error('Error retrieving stored session:', error);
+      console.error("Error retrieving stored session:", error);
       this.clearSession();
       return null;
     }
@@ -208,20 +215,23 @@ class SessionService {
     try {
       localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
     } catch (error) {
-      console.error('Error saving session:', error);
+      console.error("Error saving session:", error);
       throw this.createSessionError(
-        'Failed to save session',
-        'STORAGE_ERROR',
+        "Failed to save session",
+        "STORAGE_ERROR",
         error as Error
       );
     }
   }
 
-  updateStoredSession(staffId: string | null, user: AuthenticatedUser | null = null): void {
+  updateStoredSession(
+    staffId: string | null,
+    user: AuthenticatedUser | null = null
+  ): void {
     const session: StoredSession = {
       sessionId: this.currentSessionId,
       staffId,
-      user
+      user,
     };
 
     this.saveSession(session);
@@ -240,7 +250,7 @@ class SessionService {
       const response = await fetch(
         `${API_BASE_URL}/api/sessions/${this.currentSessionId}`,
         {
-          method: 'DELETE',
+          method: "DELETE",
         }
       );
 
@@ -257,8 +267,8 @@ class SessionService {
       }
     } catch (error) {
       throw this.createSessionError(
-        'Failed to end session',
-        'NETWORK_ERROR',
+        "Failed to end session",
+        "NETWORK_ERROR",
         error as Error
       );
     }
@@ -268,7 +278,7 @@ class SessionService {
     try {
       localStorage.removeItem(this.SESSION_KEY);
     } catch (error) {
-      console.error('Error clearing session:', error);
+      console.error("Error clearing session:", error);
     }
   }
 }
