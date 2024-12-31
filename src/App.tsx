@@ -118,17 +118,21 @@ const Layout: React.FC = () => {
       )}
       <main
         className={`
-          flex justify-center w-full transition-all duration-300 ease-in-out
-          ${!isPDFRoute ? "py-[68px]" : ""} 
-          ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
-        `}
+    flex justify-center w-full transition-all duration-300 ease-in-out
+    ${!isPDFRoute && location.pathname !== "/login" ? "py-[68px]" : ""} 
+    ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
+  `}
       >
         <Routes>
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
-              isAuthenticated ? <Navigate to="/sales/invois" replace /> : <Login />
-            } 
+              isAuthenticated ? (
+                <Navigate to="/sales/invois" replace />
+              ) : (
+                <Login />
+              )
+            }
           />
           <Route
             path="/"
