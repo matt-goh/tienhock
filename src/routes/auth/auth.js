@@ -21,43 +21,38 @@ export default function authRouter(pool) {
         FROM staffs s
         WHERE s.ic_no = $1
           AND s.job ? 'OFFICE'
-          AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+          AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
       `;
       
       const staffResult = await pool.query(staffQuery, [ic_no]);
       
       if (staffResult.rows.length === 0) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'IC number not found' });
       }
-
+  
       const staff = staffResult.rows[0];
       
       if (!staff.password) {
         return res.status(401).json({ message: 'Password not set' });
       }
-
+  
       // Compare password
       const isValidPassword = await bcrypt.compare(password, staff.password);
       if (!isValidPassword) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'Incorrect password' });
       }
-
-      // Create new session
+  
+      // Create new session without device_info
       const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const deviceInfo = {
-        userAgent: req.headers['user-agent'],
-        deviceType: /Mobile|Android|iPhone/i.test(req.headers['user-agent']) ? 'Mobile' : 'Desktop',
-        timestamp: new Date().toISOString()
-      };
-
+  
       const sessionQuery = `
-        INSERT INTO active_sessions (session_id, staff_id, device_info)
-        VALUES ($1, $2, $3)
+        INSERT INTO active_sessions (session_id, staff_id)
+        VALUES ($1, $2)
         RETURNING *
       `;
-
-      const sessionResult = await pool.query(sessionQuery, [sessionId, staff.id, deviceInfo]);
-
+  
+      await pool.query(sessionQuery, [sessionId, staff.id]);
+  
       res.json({
         message: 'Login successful',
         sessionId,
@@ -193,22 +188,32 @@ export default function authRouter(pool) {
     }
   });
 
-  // In your auth.js routes file
   router.get('/check-ic/:ic_no', async (req, res) => {
     const { ic_no } = req.params;
-
+  
     try {
       const query = `
-        SELECT EXISTS(
-          SELECT 1 FROM staffs 
-          WHERE ic_no = $1 
-          AND job ? 'OFFICE'
-          AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
-        )
+        SELECT 
+          EXISTS(
+            SELECT 1 FROM staffs 
+            WHERE ic_no = $1 
+            AND job ? 'OFFICE'
+            AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+          ) as exists,
+          (
+            SELECT password IS NOT NULL 
+            FROM staffs 
+            WHERE ic_no = $1
+            AND job ? 'OFFICE'
+            AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+          ) as has_password
       `;
       
       const result = await pool.query(query, [ic_no]);
-      res.json({ exists: result.rows[0].exists });
+      res.json({ 
+        exists: result.rows[0].exists,
+        hasPassword: result.rows[0].has_password || false
+      });
     } catch (error) {
       console.error('Error checking IC:', error);
       res.status(500).json({ message: 'Error checking IC number' });
