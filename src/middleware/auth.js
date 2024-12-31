@@ -1,6 +1,6 @@
 // src/middleware/auth.js
 export const authMiddleware = (pool) => async (req, res, next) => {
-    const sessionId = req.headers['x-session-id'];
+    const sessionId = req.headers['session-id'];
     
     if (!sessionId) {
       return res.status(401).json({ message: 'No session ID provided' });
