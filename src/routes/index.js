@@ -1,7 +1,9 @@
 // src/routes/index.js
 
 // Auth routes
+import authRouter from './auth/auth.js';
 import sessionsRouter from './auth/sessions.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 // User routes
 import sidebarRouter from './user/sidebar.js';

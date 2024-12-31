@@ -25,7 +25,8 @@ const __dirname = path.dirname(__filename);
 const corsOptions = {
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization',
+    'x-session-id'],
   credentials: true
 };
 

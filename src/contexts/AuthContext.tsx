@@ -1,6 +1,7 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { sessionService } from '../services/SessionService';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { sessionService } from "../services/SessionService";
+import { API_BASE_URL } from "../configs/config";
 
 interface User {
   id: string;
@@ -35,18 +36,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const response = await fetch(`/api/auth/validate-session`, {
-        headers: {
-          'x-session-id': sessionId
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/validate-session`,
+        {
+          headers: {
+            "x-session-id": sessionId,
+          },
         }
-      });
+      );
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
       }
     } catch (error) {
-      console.error('Auth status check failed:', error);
+      console.error("Auth status check failed:", error);
     } finally {
       setIsLoading(false);
     }
@@ -54,17 +58,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (ic_no: string, password: string) => {
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        // Add API_BASE_URL
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ ic_no, password }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Login failed');
+        throw new Error(error.message || "Login failed");
       }
 
       const data = await response.json();
@@ -81,19 +86,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await sessionService.endSession();
       setUser(null);
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
       throw error;
     }
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        isAuthenticated: !!user, 
-        user, 
-        login, 
+    <AuthContext.Provider
+      value={{
+        isAuthenticated: !!user,
+        user,
+        login,
         logout,
-        isLoading 
+        isLoading,
       }}
     >
       {children}
@@ -104,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

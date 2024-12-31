@@ -1,81 +1,182 @@
-// src/pages/Auth/Login.tsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { IconArrowRight, IconLock, IconId } from "@tabler/icons-react";
+import toast from "react-hot-toast";
+import Button from "../../components/Button";
+import { API_BASE_URL } from "../../configs/config";
 
 const Login: React.FC = () => {
-  const [ic_no, setIcNo] = useState('');
-  const [password, setPassword] = useState('');
+  const [step, setStep] = useState<"ic" | "password">("ic");
+  const [ic_no, setIcNo] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateIcNo = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(ic_no, password);
-      navigate('/');
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/check-ic/${ic_no}`
+      );
+      const data = await response.json();
+
+      if (data.exists) {
+        setStep("password");
+      } else {
+        toast.error(
+          "IC number not registered. Please contact admin if this is an error."
+        );
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
+      toast.error("Failed to verify IC number");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      await login(ic_no, password);
+      navigate("/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatIcNo = (value: string) => {
+    // Remove all non-digits first
+    const digits = value.replace(/\D/g, "");
+
+    // Format as: 000000-00-0000
+    if (digits.length <= 6) {
+      return digits;
+    } else if (digits.length <= 8) {
+      return `${digits.slice(0, 6)}-${digits.slice(6)}`;
+    } else {
+      return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(
+        8,
+        12
+      )}`;
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="max-w-md w-full space-y-6 p-8 bg-white border-2 border-default-100 rounded-xl shadow-xl">
+        <div className="flex flex-col items-center">
+          <img
+            src="/tienhock.png"
+            alt="Tien Hock Logo"
+            className="h-24 w-auto mb-6"
+          />
+          <h1 className="text-3xl font-bold text-center text-default-900">
+            Welcome Back
+          </h1>
+          <p className="mt-2 text-center text-default-600">
+            {step === "ic"
+              ? "Please enter your IC number"
+              : "Please enter your password"}
+          </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+
+        <form
+          onSubmit={step === "ic" ? validateIcNo : handleLogin}
+          className="mt-8 space-y-6"
+        >
+          <div className="space-y-4">
             <div>
-              <label htmlFor="ic_no" className="sr-only">
-                IC Number
-              </label>
-              <input
-                id="ic_no"
-                name="ic_no"
-                type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="IC Number"
-                value={ic_no}
-                onChange={(e) => setIcNo(e.target.value)}
-              />
+              <div className="relative group">
+                <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
+                  <IconId
+                    className="text-default-500 group-focus-within:text-default-600 transition-colors"
+                    size={20}
+                    stroke={1.5}
+                  />
+                </div>
+                <input
+                  id="ic_no"
+                  name="ic_no"
+                  type="text"
+                  placeholder="IC number"
+                  required
+                  disabled={step === "password"}
+                  className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors disabled:bg-default-50 focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                  value={ic_no}
+                  onChange={(e) => {
+                    const formatted = formatIcNo(e.target.value);
+                    if (formatted.length <= 14) {
+                      setIcNo(formatted);
+                    }
+                  }}
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+
+            {step === "password" && (
+              <div>
+                <div className="relative group">
+                  <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
+                    <IconLock
+                      className="text-default-500 group-focus-within:text-default-600 transition-colors"
+                      size={20}
+                      stroke={1.5}
+                    />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Password"
+                    required
+                    className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              icon={IconArrowRight}
+              iconPosition="right"
+              className="w-full focus:outline-none"
+              size="lg"
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
+              {isLoading
+                ? "Please wait..."
+                : step === "ic"
+                ? "Continue"
+                : "Sign In"}
+            </Button>
           </div>
+
+          {step === "password" && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("ic");
+                  setPassword("");
+                }}
+                className="-py-3 text-sm text-default-600 hover:text-default-900 hover:underline focus:outline-none"
+              >
+                Use a different IC number
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>
