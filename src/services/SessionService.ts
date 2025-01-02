@@ -23,27 +23,22 @@ export interface AuthenticatedSession extends StoredSession {
 }
 
 class SessionService {
-  private readonly SESSION_KEY = "profileSwitcher_session";
-  private readonly SESSION_ID_KEY = "profileSwitcher_sessionId";
+  private readonly SESSION_KEY = "app_session";
+  private readonly SESSION_ID_KEY = "app_sessionId";
   private currentSessionId: string;
   private initialized: boolean = false;
   private heartbeatInterval?: NodeJS.Timeout;
 
   constructor() {
-    this.currentSessionId = this.initializeSessionId();
+    this.currentSessionId = this.getStoredSessionId() || this.generateSessionId();
   }
 
-  private initializeSessionId(): string {
+  private getStoredSessionId(): string | null {
     try {
-      let existingSessionId = localStorage.getItem(this.SESSION_ID_KEY);
-      if (!existingSessionId) {
-        existingSessionId = this.generateSessionId();
-        localStorage.setItem(this.SESSION_ID_KEY, existingSessionId);
-      }
-      return existingSessionId;
+      return localStorage.getItem(this.SESSION_ID_KEY);
     } catch (error) {
-      console.error("Failed to initialize session ID:", error);
-      return this.generateSessionId();
+      console.error("Failed to get stored session ID:", error);
+      return null;
     }
   }
 
@@ -64,6 +59,18 @@ class SessionService {
     return error;
   }
 
+  private getHeaders(includeContentType: boolean = true): HeadersInit {
+    const headers: HeadersInit = {
+      'x-session-id': this.currentSessionId
+    };
+    
+    if (includeContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
@@ -72,9 +79,7 @@ class SessionService {
 
       const response = await fetch(`${API_BASE_URL}/api/sessions/check`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify({
           sessionId: this.currentSessionId,
           staffId: storedSession?.staffId || null,
@@ -83,6 +88,11 @@ class SessionService {
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Save the session ID if it's not already saved
+      if (!this.getStoredSessionId()) {
+        localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
       }
 
       this.startHeartbeat();
@@ -114,9 +124,7 @@ class SessionService {
         `${API_BASE_URL}/api/sessions/${this.currentSessionId}/heartbeat`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: this.getHeaders(),
         }
       );
 
@@ -138,10 +146,12 @@ class SessionService {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ic_no, password }),
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          ic_no,
+          password,
+          sessionId: this.currentSessionId,
+        }),
       });
 
       if (!response.ok) {
@@ -156,8 +166,11 @@ class SessionService {
         user: data.user,
       };
 
-      this.saveSession(session);
+      // Update current session ID with the one from the server
       this.currentSessionId = data.sessionId;
+      localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
+      
+      this.saveSession(session);
       await this.initialize();
 
       return session;
@@ -172,21 +185,20 @@ class SessionService {
 
   async validateSession(): Promise<AuthenticatedUser | null> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sessions/state/${this.currentSessionId}`,
-        {
-          headers: {
-            "session-id": this.currentSessionId,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/auth/validate-session`, {
+        headers: this.getHeaders(false),
+      });
 
       if (!response.ok) {
         return null;
       }
 
       const data = await response.json();
-      return data.staff;
+      if (data.user) {
+        // Update stored session with latest user data
+        this.updateStoredSession(data.user.id, data.user);
+      }
+      return data.user;
     } catch (error) {
       console.error("Session validation failed:", error);
       return null;
@@ -202,8 +214,7 @@ class SessionService {
       const sessionData = localStorage.getItem(this.SESSION_KEY);
       if (!sessionData) return null;
 
-      const session: StoredSession = JSON.parse(sessionData);
-      return session;
+      return JSON.parse(sessionData);
     } catch (error) {
       console.error("Error retrieving stored session:", error);
       this.clearSession();
@@ -238,11 +249,16 @@ class SessionService {
   }
 
   async logout(): Promise<void> {
-    await this.endSession();
-    this.clearSession();
-    // Generate new session ID for anonymous tracking
-    this.currentSessionId = this.generateSessionId();
-    localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
+    try {
+      await this.endSession();
+    } catch (error) {
+      console.error("Logout failed, clearing session anyway:", error);
+    } finally {
+      this.clearSession();
+      // Generate new session ID for anonymous tracking
+      this.currentSessionId = this.generateSessionId();
+      localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
+    }
   }
 
   async endSession(): Promise<void> {
@@ -251,6 +267,7 @@ class SessionService {
         `${API_BASE_URL}/api/sessions/${this.currentSessionId}`,
         {
           method: "DELETE",
+          headers: this.getHeaders(),
         }
       );
 

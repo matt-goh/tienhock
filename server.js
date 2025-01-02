@@ -26,7 +26,7 @@ const corsOptions = {
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization',
-    'session-id', 'api-key'],
+    'x-session-id', 'api-key'],
   credentials: true
 };
 

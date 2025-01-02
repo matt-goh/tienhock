@@ -20,6 +20,16 @@ export default function(pool) {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 
+  // Validate session header middleware
+  const validateSessionHeader = (req, res, next) => {
+    const sessionId = req.headers['x-session-id'];
+    if (!sessionId) {
+      return res.status(401).json({ error: "Session ID header required" });
+    }
+    req.sessionId = sessionId;
+    next();
+  };
+
   // Register session
   router.post("/register", asyncHandler(async (req, res) => {
     const { sessionId, staffId = null } = req.body;
@@ -45,7 +55,7 @@ export default function(pool) {
   }));
 
   // Get active sessions
-  router.get("/active", asyncHandler(async (req, res) => {
+  router.get("/active", validateSessionHeader, asyncHandler(async (req, res) => {
     const query = `
       SELECT 
         a.session_id,
@@ -85,13 +95,19 @@ export default function(pool) {
   }));
 
   // Session heartbeat
-  router.post("/:sessionId/heartbeat", asyncHandler(async (req, res) => {
+  router.post("/:sessionId/heartbeat", validateSessionHeader, asyncHandler(async (req, res) => {
     const { sessionId } = req.params;
+    // Verify session ID matches header
+    if (sessionId !== req.sessionId) {
+      return res.status(401).json({ error: "Session ID mismatch" });
+    }
 
     const query = `
       UPDATE active_sessions 
       SET last_active = CURRENT_TIMESTAMP
-      WHERE session_id = $1 AND status = 'active'
+      WHERE session_id = $1 
+        AND status = 'active'
+        AND last_active > CURRENT_TIMESTAMP - INTERVAL '24 hours'
       RETURNING *
     `;
 
@@ -110,8 +126,12 @@ export default function(pool) {
   }));
 
   // Check session
-  router.post("/check", asyncHandler(async (req, res) => {
+  router.post("/check", validateSessionHeader, asyncHandler(async (req, res) => {
     const { sessionId, staffId = null } = req.body;
+    // Verify session ID matches header
+    if (sessionId !== req.sessionId) {
+      return res.status(401).json({ error: "Session ID mismatch" });
+    }
 
     const query = `
       INSERT INTO active_sessions (session_id, staff_id)
@@ -134,8 +154,12 @@ export default function(pool) {
   }));
 
   // Get session state
-  router.get("/state/:sessionId", asyncHandler(async (req, res) => {
+  router.get("/state/:sessionId", validateSessionHeader, asyncHandler(async (req, res) => {
     const { sessionId } = req.params;
+    // Verify session ID matches header
+    if (sessionId !== req.sessionId) {
+      return res.status(401).json({ error: "Session ID mismatch" });
+    }
 
     const query = `
       SELECT 
@@ -188,8 +212,12 @@ export default function(pool) {
   }));
 
   // End session
-  router.delete("/:sessionId", asyncHandler(async (req, res) => {
+  router.delete("/:sessionId", validateSessionHeader, asyncHandler(async (req, res) => {
     const { sessionId } = req.params;
+    // Verify session ID matches header
+    if (sessionId !== req.sessionId) {
+      return res.status(401).json({ error: "Session ID mismatch" });
+    }
     
     try {
       const query = `
