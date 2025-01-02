@@ -20,7 +20,7 @@ import {
 import clsx from "clsx";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 import { Job } from "../../types/types";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 interface Section {
   id: string;
@@ -62,15 +62,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
 
   const fetchSections = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sections`);
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("Server response:", text);
-        throw new Error(
-          `Failed to fetch sections: ${response.status} ${response.statusText}`
-        );
-      }
-      const data = await response.json();
+      const data = await api.get("/api/sections");
       setSections(data);
     } catch (error) {
       console.error("Error fetching sections:", error);

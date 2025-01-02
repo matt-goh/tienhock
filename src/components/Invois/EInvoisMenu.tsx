@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { API_BASE_URL } from "../../configs/config";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import { IconFileInvoice, IconCalendar, IconPlug } from "@tabler/icons-react";
 import { InvoiceData } from "../../types/types";
+import { api } from "../../routes/utils/api";
 
 interface TokenInfo {
   accessToken: string;
@@ -150,7 +150,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   const connectToMyInvois = useCallback(async () => {
     const storedLoginData = localStorage.getItem("myInvoisLoginData");
     if (storedLoginData) {
-      const parsedData: LoginResponse = JSON.parse(storedLoginData);
+      const parsedData = JSON.parse(storedLoginData);
       if (isTokenValid(parsedData)) {
         setLoginResponse(parsedData);
         return;
@@ -158,11 +158,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/einvoice/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data: LoginResponse = await response.json();
+      const data = await api.post("/api/einvoice/login");
       if (data.success && data.tokenInfo) {
         const loginDataWithTime = {
           ...data,
@@ -236,19 +232,11 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
 
     setIsSubmitting(true);
     setSubmissionResponse(null);
+
     try {
       const invoiceId = selectedInvoices[0].id;
+      const data = await api.post("/api/einvoice/submit", { invoiceId });
 
-      const response = await fetch(`${API_BASE_URL}/api/einvoice/submit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          invoiceId, // Include invoiceId in the request body
-        }),
-      });
-      const data: SubmissionResponse = await response.json();
       if (data.success) {
         toast.success(data.message);
         setSubmissionResponse(data);

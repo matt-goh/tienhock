@@ -9,7 +9,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 const CustomerCataloguePage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -65,11 +65,7 @@ const CustomerCataloguePage: React.FC = () => {
 
   const fetchSalesmen = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/staffs?salesmenOnly=true`
-      );
-      if (!response.ok) throw new Error("Failed to fetch salesmen");
-      const data: Employee[] = await response.json();
+      const data: Employee[] = await api.get("/api/staffs?salesmenOnly=true");
       const salesmenIds = data.map((employee) => employee.id);
       setSalesmen(["All Salesmen", ...salesmenIds]);
     } catch (error) {
@@ -81,9 +77,7 @@ const CustomerCataloguePage: React.FC = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/customers`);
-      if (!response.ok) throw new Error("Failed to fetch customers");
-      const data = await response.json();
+      const data = await api.get("/api/customers");
       setCustomers(data);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -118,15 +112,7 @@ const CustomerCataloguePage: React.FC = () => {
       );
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/customers`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customerIds: customerIdsToDelete }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete customers on the server");
-        }
+        await api.delete("/api/customers", customerIdsToDelete);
 
         setCustomers((prevCustomers) =>
           prevCustomers.filter(
@@ -196,22 +182,9 @@ const CustomerCataloguePage: React.FC = () => {
         id: customer.originalId || customer.id,
       }));
 
-      const response = await fetch(`${API_BASE_URL}/api/customers/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customers: customersToUpdate,
-        }),
+      const result = await api.post("/api/customers/batch", {
+        customers: customersToUpdate,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "An error occurred while saving customers"
-        );
-      }
-
-      const result = await response.json();
 
       // Update local state with the changes
       setCustomers((prevCustomers) => {

@@ -18,7 +18,7 @@ import { ColumnConfig, Job, JobDetail } from "../../types/types";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 type JobSelection = Job | null;
 
@@ -86,9 +86,7 @@ const CatalogueJobPage: React.FC = () => {
   const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/jobs`);
-      if (!response.ok) throw new Error("Failed to fetch jobs");
-      const data = await response.json();
+      const data = await api.get("/api/jobs");
       setJobs(data);
       if (data.length > 0 && !selectedJob) {
         setSelectedJob(data[0]);
@@ -108,9 +106,7 @@ const CatalogueJobPage: React.FC = () => {
   const fetchJobDetails = useCallback(async (jobId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/details`);
-      if (!response.ok) throw new Error("Failed to fetch job details");
-      const data = await response.json();
+      const data = await api.get(`/api/jobs/${jobId}/details`);
       setAllJobDetails(data);
       setFilteredJobDetails(data);
     } catch (error) {
@@ -144,18 +140,8 @@ const CatalogueJobPage: React.FC = () => {
 
   const handleJobAdded = useCallback(async (newJob: Omit<Job, "id">) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newJob),
-      });
+      const data = await api.post("/api/jobs", newJob);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message);
-      }
-
-      const data = await response.json();
       setJobs((prevJobs) => [...prevJobs, data.job]);
       setSelectedJob(data.job);
       setShowNewJobModal(false);
@@ -190,12 +176,7 @@ const CatalogueJobPage: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/jobs/${job.id}/details/count`
-      );
-      if (!response.ok)
-        throw new Error("Failed to check associated job details");
-      const { count } = await response.json();
+      const { count } = await api.get(`/api/jobs/${job.id}/details/count`);
 
       if (count > 0) {
         toast.error(
@@ -215,14 +196,7 @@ const CatalogueJobPage: React.FC = () => {
     if (!jobToDelete) return;
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/jobs/${jobToDelete.id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to delete job");
+      await api.delete(`/api/jobs/${jobToDelete.id}`);
 
       setJobs((jobs) => jobs.filter((job) => job.id !== jobToDelete.id));
       if (selectedJob && selectedJob.id === jobToDelete.id) {
@@ -346,13 +320,12 @@ const CatalogueJobPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!editedJob) return;
 
-    // Check for empty job ID
+    // Validation checks remain the same
     if (!editedJob.id.trim()) {
       toast.error("Job ID cannot be empty");
       return;
     }
 
-    // Check for duplicate job ID
     const isDuplicateJobId = jobs.some(
       (job) => job.id === editedJob.id && job.id !== selectedJob?.id
     );
@@ -361,14 +334,12 @@ const CatalogueJobPage: React.FC = () => {
       return;
     }
 
-    // Check for empty product IDs
     const emptyDetailId = allJobDetails.find((details) => !details.id.trim());
     if (emptyDetailId) {
       toast.error("Detail ID cannot be empty");
       return;
     }
 
-    // Check for duplicate product IDs
     const detailIds = new Set();
     const duplicateDetailId = allJobDetails.find((details) => {
       if (detailIds.has(details.id)) {
@@ -383,20 +354,17 @@ const CatalogueJobPage: React.FC = () => {
       return;
     }
 
-    // Check for changes in the job
     const jobChanged = ["id", "name", "section"].some(
       (key) =>
         selectedJob &&
         editedJob[key as keyof Job] !== selectedJob[key as keyof Job]
     );
 
-    // Check for changes in job details
     const detailsChanged = !_.isEqual(
       allJobDetails.map((detail) => _.omit(detail, ["newId"])),
       originalJobState?.jobDetails.map((detail) => _.omit(detail, ["newId"]))
     );
 
-    // Detect if there are any changes
     const hasChanges = jobChanged || detailsChanged;
 
     if (!hasChanges) {
@@ -407,55 +375,24 @@ const CatalogueJobPage: React.FC = () => {
 
     try {
       // Update job
-      const jobResponse = await fetch(
-        `${API_BASE_URL}/api/jobs/${selectedJob?.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: editedJob.name,
-            section: editedJob.section,
-            newId: editedJob.id !== selectedJob?.id ? editedJob.id : undefined,
-          }),
-        }
-      );
-
-      if (!jobResponse.ok) {
-        const errorData = await jobResponse.json();
-        throw new Error(errorData.message);
-      }
-
-      const updatedJob = await jobResponse.json();
+      const updatedJob = await api.put(`/api/jobs/${selectedJob?.id}`, {
+        name: editedJob.name,
+        section: editedJob.section,
+        newId: editedJob.id !== selectedJob?.id ? editedJob.id : undefined,
+      });
 
       // Send all job details to the server
-      const jobDetailsResponse = await fetch(
-        `${API_BASE_URL}/api/job-details/batch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jobId: updatedJob.job.id,
-            jobDetails: allJobDetails.map((jobDetail) => ({
-              ...jobDetail,
-              newId:
-                jobDetail.id !==
-                originalJobState?.jobDetails.find((d) => d.id === jobDetail.id)
-                  ?.id
-                  ? jobDetail.id
-                  : undefined,
-            })),
-          }),
-        }
-      );
-
-      if (!jobDetailsResponse.ok) {
-        const errorData = await jobDetailsResponse.json();
-        throw new Error(
-          `Failed to update/insert job details: ${errorData.message}`
-        );
-      }
-
-      const result = await jobDetailsResponse.json();
+      const result = await api.post("/api/job-details/batch", {
+        jobId: updatedJob.job.id,
+        jobDetails: allJobDetails.map((jobDetail) => ({
+          ...jobDetail,
+          newId:
+            jobDetail.id !==
+            originalJobState?.jobDetails.find((d) => d.id === jobDetail.id)?.id
+              ? jobDetail.id
+              : undefined,
+        })),
+      });
 
       // Update local state with the result from the server
       setAllJobDetails(result.jobDetails);
@@ -539,15 +476,7 @@ const CatalogueJobPage: React.FC = () => {
 
       if (jobDetailsToDeleteFromDB.length > 0) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/job-details`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jobDetailIds: jobDetailsToDeleteFromDB }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to delete job details on the server");
-          }
+          await api.delete("/api/job-details", jobDetailsToDeleteFromDB);
 
           toast.success("Selected job details deleted successfully");
           setIsEditing(false);

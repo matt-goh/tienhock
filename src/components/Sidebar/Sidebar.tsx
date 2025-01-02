@@ -17,13 +17,10 @@ import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
 import "../../index.css";
-import {
-  IconArrowBarToLeft,
-  IconArrowBarToRight,
-} from "@tabler/icons-react";
-import { API_BASE_URL } from "../../configs/config";
+import { IconArrowBarToLeft, IconArrowBarToRight } from "@tabler/icons-react";
 import UserMenu from "../UserMenu";
 import { useAuth } from "../../contexts/AuthContext";
+import { api } from "../../routes/utils/api";
 
 interface SidebarProps {
   isPinned: boolean;
@@ -188,16 +185,15 @@ const Sidebar: React.FC<SidebarProps> = ({
     const fetchBookmarks = async () => {
       if (user?.id) {
         try {
-          const response = await fetch(
-            `${API_BASE_URL}/api/bookmarks/${user.id}`
-          );
-          const data = await response.json();
+          const data = await api.get(`/api/bookmarks/${user.id}`);
           setBookmarks(data);
           setBookmarkedItems(
             new Set(data.map((bookmark: any) => bookmark.name))
           );
         } catch (error) {
           console.error("Error fetching bookmarks:", error);
+          setBookmarks([]);
+          setBookmarkedItems(new Set());
         }
       }
     };

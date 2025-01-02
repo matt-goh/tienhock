@@ -3,7 +3,7 @@ import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import _ from "lodash";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 interface Tax {
   id: number;
@@ -31,9 +31,7 @@ const CatalogueTaxPage: React.FC = () => {
   const fetchTaxes = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/taxes`);
-      if (!response.ok) throw new Error("Failed to fetch taxes");
-      const data = await response.json();
+      const data = await api.get("/api/taxes");
       setTaxes(data);
     } catch (error) {
       console.error("Error fetching taxes:", error);
@@ -64,17 +62,7 @@ const CatalogueTaxPage: React.FC = () => {
       const taxNamesToDelete = taxesToDelete.map((tax) => tax.name);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/taxes`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taxIds: taxNamesToDelete }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete taxes on the server");
-        }
-
-        const result = await response.json();
+        const result = await api.delete("/api/taxes", taxNamesToDelete);
 
         setTaxes((prevTaxes) =>
           prevTaxes.filter((tax) => !result.deletedTaxNames.includes(tax.name))
@@ -92,14 +80,13 @@ const CatalogueTaxPage: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     try {
-      // Check for empty tax names
+      // Validate tax names
       const emptyTaxName = editedTaxes.find((tax) => !tax.name.trim());
       if (emptyTaxName) {
         toast.error("Tax name cannot be empty");
         return;
       }
 
-      // Check for duplicate tax names
       const taxNames = new Set();
       const duplicateTaxName = editedTaxes.find((tax) => {
         if (taxNames.has(tax.name)) {
@@ -123,22 +110,10 @@ const CatalogueTaxPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/taxes/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taxes: editedTaxes,
-        }),
+      const result = await api.post("/api/taxes/batch", {
+        taxes: editedTaxes,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || "An error occurred while saving taxes"
-        );
-      }
-
-      const result = await response.json();
       setTaxes(result.taxes);
       setIsEditing(false);
       toast.success("Changes saved successfully");

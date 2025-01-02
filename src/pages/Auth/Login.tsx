@@ -4,7 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { IconArrowRight, IconLock, IconId } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 const Login: React.FC = () => {
   const [step, setStep] = useState<"ic" | "password" | "set-password">("ic");
@@ -15,7 +15,7 @@ const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const validateIcNo = async (e: React.FormEvent) => {
+  const validateIcNo = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
     // Check IC number length (including the two dashes)
@@ -27,10 +27,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/auth/check-ic/${ic_no}`
-      );
-      const data = await response.json();
+      const data = await api.get(`/api/auth/check-ic/${ic_no}`);
 
       if (data.exists) {
         if (data.hasPassword) {
@@ -70,7 +67,7 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleSetPassword = async (e: React.FormEvent) => {
+  const handleSetPassword = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
@@ -81,17 +78,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/set-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ic_no, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to set password");
-      }
+      await api.post("/api/auth/set-password", { ic_no, password });
 
       // After setting password, attempt to log in
       await login(ic_no, password);

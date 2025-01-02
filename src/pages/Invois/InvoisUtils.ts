@@ -4,7 +4,7 @@ import {
   InvoiceFilterOptions,
   OrderDetail,
 } from "../../types/types";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 let invoices: InvoiceData[] = [];
 
@@ -28,7 +28,6 @@ export const fetchDbInvoices = async (
   try {
     const queryParams = new URLSearchParams();
 
-    // Always include date range parameters since the filter is always active
     if (filters.dateRangeFilter?.start) {
       queryParams.append(
         "startDate",
@@ -60,13 +59,8 @@ export const fetchDbInvoices = async (
       queryParams.append("invoiceType", filters.invoiceTypeFilter);
     }
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/invoices/db/?${queryParams.toString()}`
-    );
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await api.get(`/api/invoices/db/?${queryParams.toString()}`);
+
     if (Array.isArray(data)) {
       return data;
     } else {
@@ -80,11 +74,8 @@ export const fetchDbInvoices = async (
 
 export const fetchInvoices = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/invoices`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await api.get("/api/invoices");
+
     if (Array.isArray(data)) {
       setInvoices(data);
       return data;
@@ -99,29 +90,17 @@ export const fetchInvoices = async () => {
 
 export const deleteInvoice = async (id: string) => {
   try {
-    // First, try to delete from the database
-    const dbResponse = await fetch(`${API_BASE_URL}/api/invoices/db/${id}`, {
-      method: "DELETE",
-    });
-
-    if (dbResponse.ok) {
-      // If successful, remove from local storage as well
+    // Try to delete from the database
+    try {
+      await api.delete(`/api/invoices/db/${id}`);
+      invoices = invoices.filter((invoice) => invoice.id !== id);
+      return true;
+    } catch {
+      // If not found in database, try to delete from server memory
+      await api.delete(`/api/invoices/${id}`);
       invoices = invoices.filter((invoice) => invoice.id !== id);
       return true;
     }
-
-    // If not found in database, try to delete from server memory
-    const memoryResponse = await fetch(`${API_BASE_URL}/api/invoices/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!memoryResponse.ok) {
-      throw new Error(`HTTP error! status: ${memoryResponse.status}`);
-    }
-
-    // Remove the invoice from the local storage
-    invoices = invoices.filter((invoice) => invoice.id !== id);
-    return true;
   } catch (error) {
     console.error("Error deleting invoice:", error);
     throw error;
@@ -130,13 +109,9 @@ export const deleteInvoice = async (id: string) => {
 
 const checkDuplicateInvoiceNo = async (invoiceNo: string): Promise<boolean> => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
+    const data = await api.get(
+      `/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
     );
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
     return data.isDuplicate;
   } catch (error) {
     console.error("Error checking for duplicate invoice number:", error);
@@ -149,7 +124,6 @@ export const saveInvoice = async (
   saveToDb: boolean = true
 ): Promise<InvoiceData> => {
   try {
-    // Normalize the order details before saving
     const normalizedOrderDetails = invoice.orderDetails.map((detail) => {
       if (detail.isless || detail.istax) {
         return {
@@ -170,7 +144,6 @@ export const saveInvoice = async (
       return detail;
     });
 
-    // Filter out total rows but keep special rows
     const filteredOrderDetails = normalizedOrderDetails.filter(
       (detail) => !detail.istotal
     );
@@ -180,33 +153,15 @@ export const saveInvoice = async (
       orderDetails: filteredOrderDetails,
     };
 
-    const url = `${API_BASE_URL}/api/invoices/submit?saveToDb=${saveToDb}`;
+    const savedInvoice: InvoiceData = await api.post(
+      `/api/invoices/submit?saveToDb=${saveToDb}`,
+      invoiceToSave
+    );
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(invoiceToSave),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        `HTTP error! status: ${response.status}, message: ${
-          errorData.message || "Unknown error"
-        }`
-      );
-    }
-
-    const savedInvoice: InvoiceData = await response.json();
-
-    // Recalculate total rows for the returned data
     savedInvoice.orderDetails = addCalculatedTotalRows(
       savedInvoice.orderDetails
     );
 
-    // Update the local cache if saving to memory
     if (!saveToDb) {
       const index = invoices.findIndex((inv) => inv.id === savedInvoice.id);
       if (index !== -1) {
@@ -227,7 +182,6 @@ export const createInvoice = async (
   invoiceData: InvoiceData
 ): Promise<InvoiceData> => {
   try {
-    // Check for duplicate invoice number
     const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.invoiceno);
     if (isDuplicate) {
       toast.error(
@@ -236,7 +190,6 @@ export const createInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
-    // Only filter out total rows, keep tax and less rows
     const filteredOrderDetails = invoiceData.orderDetails.filter(
       (detail) => !detail.istotal
     );
@@ -246,25 +199,11 @@ export const createInvoice = async (
       orderDetails: filteredOrderDetails,
     };
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/invoices/submit?saveToDb=true`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(invoiceToCreate),
-      }
+    const createdInvoice: InvoiceData = await api.post(
+      "/api/invoices/submit?saveToDb=true",
+      invoiceToCreate
     );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to create invoice");
-    }
-
-    const createdInvoice: InvoiceData = await response.json();
-
-    // Recalculate total rows for the returned data
     createdInvoice.orderDetails = addCalculatedTotalRows(
       createdInvoice.orderDetails
     );

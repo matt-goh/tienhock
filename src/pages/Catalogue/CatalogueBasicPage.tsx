@@ -3,7 +3,7 @@ import _ from "lodash";
 import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 interface CatalogueItem {
   originalId: string;
@@ -42,9 +42,7 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
   const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/${apiEndpoint}`);
-      if (!response.ok) throw new Error(`Failed to fetch ${apiEndpoint}`);
-      const data = await response.json();
+      const data = await api.get(`/api/${apiEndpoint}`);
       setItems(
         data.map((item: CatalogueItem) => ({ ...item, originalId: item.id }))
       );
@@ -77,15 +75,9 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
       const itemIdsToDelete = itemsToDelete.map((item) => item.id);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/${apiEndpoint}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [`${apiEndpoint}`]: itemIdsToDelete }),
+        await api.delete(`/api/${apiEndpoint}`, {
+          [`${apiEndpoint}`]: itemIdsToDelete,
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete ${apiEndpoint} on the server`);
-        }
 
         setItems((prevItems) =>
           prevItems.filter((item) => !itemIdsToDelete.includes(item.id))
@@ -145,22 +137,10 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
         id: item.originalId,
       }));
 
-      const response = await fetch(`${API_BASE_URL}/api/${apiEndpoint}/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          [apiEndpoint]: itemsToUpdate,
-        }),
+      const result = await api.post(`/api/${apiEndpoint}/batch`, {
+        [apiEndpoint]: itemsToUpdate,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || `An error occurred while saving ${apiEndpoint}`
-        );
-      }
-
-      const result = await response.json();
       setItems(
         result[apiEndpoint].map((item: CatalogueItem) => ({
           ...item,

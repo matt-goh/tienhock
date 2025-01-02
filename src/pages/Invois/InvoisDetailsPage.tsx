@@ -34,7 +34,7 @@ import {
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 interface SelectOption {
   id: string;
@@ -254,13 +254,11 @@ const InvoisDetailsPage: React.FC = () => {
     async (search: string, page: number) => {
       setIsFetchingCustomers(true);
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/customers/combobox?salesman=${
+        const data = await api.get(
+          `/api/customers/combobox?salesman=${
             invoiceData?.salesman || ""
           }&search=${search}&page=${page}&limit=20`
         );
-        if (!response.ok) throw new Error("Failed to fetch customers");
-        const data = await response.json();
         setCustomers((prevCustomers) =>
           page === 1 ? data.customers : [...prevCustomers, ...data.customers]
         );
@@ -344,9 +342,7 @@ const InvoisDetailsPage: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products/combobox`);
-        if (!response.ok) throw new Error("Failed to fetch products");
-        const data = await response.json();
+        const data = await api.get("/api/products/combobox");
         setProducts(data);
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -359,11 +355,7 @@ const InvoisDetailsPage: React.FC = () => {
 
   const fetchSalesmen = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/staffs?salesmenOnly=true`
-      );
-      if (!response.ok) throw new Error("Failed to fetch salesmen");
-      const data: Employee[] = await response.json();
+      const data: Employee[] = await api.get("/api/staffs?salesmenOnly=true");
       const salesmenIds = data.map((employee) => employee.id);
       setSalesmen(["All Salesmen", ...salesmenIds]);
     } catch (error) {
