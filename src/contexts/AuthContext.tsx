@@ -17,32 +17,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkAuthStatus();
+    initializeAuth();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const initializeAuth = async () => {
     try {
-      // First check if we have a stored session
       const storedSession = sessionService.getStoredSession();
-      if (!storedSession?.sessionId) {
+      if (!storedSession?.user) {
         setIsLoading(false);
         return;
       }
 
-      // Initialize session service if not already initialized
+      // Initialize session and check state
       await sessionService.initialize();
-
-      // Validate the session
-      const validatedUser = await sessionService.validateSession();
-      if (validatedUser) {
-        setUser(validatedUser);
+      const { staff, hasActiveProfile } = await sessionService.checkState();
+      
+      if (staff && hasActiveProfile) {
+        setUser(staff);
       } else {
         // Clear invalid session
         await sessionService.logout();
       }
     } catch (error) {
-      console.error("Auth Status Check Error:", error);
-      // Handle session initialization error
+      console.error("Auth initialization error:", error);
       await sessionService.logout();
     } finally {
       setIsLoading(false);
@@ -70,6 +67,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   };
+
+  // Listen for session expiry events
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('sessionExpired', handleSessionExpired);
+    return () => window.removeEventListener('sessionExpired', handleSessionExpired);
+  }, []);
 
   return (
     <AuthContext.Provider

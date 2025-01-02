@@ -8,17 +8,12 @@ export default function(pool) {
   const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
   setInterval(async () => {
     try {
-      await pool.query('SELECT cleanup_old_sessions($1)', [24]); // 24 hours max age
+      await pool.query('SELECT cleanup_old_sessions($1)', [24]); 
       console.log('Cleaned up old sessions');
     } catch (error) {
       console.error('Error cleaning up sessions:', error);
     }
   }, CLEANUP_INTERVAL);
-
-  // Error handling wrapper
-  const asyncHandler = (fn) => (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
 
   // Validate session header middleware
   const validateSessionHeader = (req, res, next) => {
@@ -31,7 +26,7 @@ export default function(pool) {
   };
 
   // Register session
-  router.post("/register", asyncHandler(async (req, res) => {
+  router.post("/register", async (req, res) => {
     const { sessionId, staffId = null } = req.body;
 
     const query = `
@@ -52,137 +47,42 @@ export default function(pool) {
       console.error("Session registration failed:", error);
       res.status(500).json({ error: "Failed to register session" });
     }
-  }));
+  });
 
-  // Get active sessions
-  router.get("/active", validateSessionHeader, asyncHandler(async (req, res) => {
-    const query = `
-      SELECT 
-        a.session_id,
-        a.staff_id,
-        a.last_active,
-        a.status,
-        s.name as staff_name,
-        s.job as staff_job
-      FROM active_sessions a
-      LEFT JOIN staffs s ON a.staff_id = s.id
-      WHERE a.status = 'active'
-        AND a.last_active > CURRENT_TIMESTAMP - INTERVAL '24 hours'
-    `;
-
-    try {
-      const result = await pool.query(query);
-      
-      const sessions = result.rows.map(row => ({
-        sessionId: row.session_id,
-        staffId: row.staff_id,
-        staffName: row.staff_name || null,
-        lastActive: row.last_active,
-        status: row.status,
-        job: typeof row.staff_job === 'string' 
-          ? JSON.parse(row.staff_job)
-          : row.staff_job
-      }));
-
-      res.json({
-        sessions,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error("Failed to get active sessions:", error);
-      res.status(500).json({ error: "Failed to get active sessions" });
-    }
-  }));
-
-  // Session heartbeat
-  router.post("/:sessionId/heartbeat", validateSessionHeader, asyncHandler(async (req, res) => {
+  // Get session state (validate-session, check, and state endpoints)
+  router.get("/state/:sessionId", validateSessionHeader, async (req, res) => {
     const { sessionId } = req.params;
-    // Verify session ID matches header
     if (sessionId !== req.sessionId) {
       return res.status(401).json({ error: "Session ID mismatch" });
     }
 
     const query = `
-      UPDATE active_sessions 
-      SET last_active = CURRENT_TIMESTAMP
-      WHERE session_id = $1 
-        AND status = 'active'
-        AND last_active > CURRENT_TIMESTAMP - INTERVAL '24 hours'
-      RETURNING *
-    `;
-
-    try {
-      const result = await pool.query(query, [sessionId]);
-
-      if (result.rows.length === 0) {
-        res.status(404).json({ error: "Session not found or inactive" });
-      } else {
-        res.json(result.rows[0]);
-      }
-    } catch (error) {
-      console.error("Failed to update session activity:", error);
-      res.status(500).json({ error: "Failed to update session activity" });
-    }
-  }));
-
-  // Check session
-  router.post("/check", validateSessionHeader, asyncHandler(async (req, res) => {
-    const { sessionId, staffId = null } = req.body;
-    // Verify session ID matches header
-    if (sessionId !== req.sessionId) {
-      return res.status(401).json({ error: "Session ID mismatch" });
-    }
-
-    const query = `
-      INSERT INTO active_sessions (session_id, staff_id)
-      VALUES ($1, $2)
-      ON CONFLICT (session_id) 
-      DO UPDATE SET 
-        staff_id = EXCLUDED.staff_id,
-        last_active = CURRENT_TIMESTAMP,
-        status = 'active'
-      RETURNING *
-    `;
-
-    try {
-      const result = await pool.query(query, [sessionId, staffId]);
-      res.json(result.rows[0]);
-    } catch (error) {
-      console.error("Session check failed:", error);
-      res.status(500).json({ error: "Failed to check session" });
-    }
-  }));
-
-  // Get session state
-  router.get("/state/:sessionId", validateSessionHeader, asyncHandler(async (req, res) => {
-    const { sessionId } = req.params;
-    // Verify session ID matches header
-    if (sessionId !== req.sessionId) {
-      return res.status(401).json({ error: "Session ID mismatch" });
-    }
-
-    const query = `
+      WITH updated_session AS (
+        UPDATE active_sessions 
+        SET last_active = CURRENT_TIMESTAMP
+        WHERE session_id = $1 
+          AND status = 'active'
+          AND last_active > CURRENT_TIMESTAMP - INTERVAL '7 days'
+        RETURNING *
+      )
       SELECT 
-        a.*,
-        s.id as staff_id,
-        s.name as staff_name,
-        s.job as staff_job
-      FROM active_sessions a
-      LEFT JOIN staffs s ON a.staff_id = s.id
-      WHERE a.session_id = $1 
-        AND a.status = 'active'
-        AND a.last_active > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+        s.*,
+        st.id as staff_id,
+        st.name as staff_name,
+        st.ic_no,
+        st.job as staff_job
+      FROM updated_session s
+      LEFT JOIN staffs st ON s.staff_id = st.id
     `;
 
     try {
       const result = await pool.query(query, [sessionId]);
       
       if (result.rows.length === 0) {
-        res.json({
-          hasActiveProfile: false,
-          staff: null
+        return res.status(401).json({ 
+          message: "Session expired or not found",
+          requireLogin: true 
         });
-        return;
       }
 
       const session = result.rows[0];
@@ -191,9 +91,8 @@ export default function(pool) {
       const staff = hasActiveProfile ? {
         id: session.staff_id,
         name: session.staff_name,
-        job: typeof session.staff_job === 'string' 
-          ? JSON.parse(session.staff_job)
-          : session.staff_job
+        ic_no: session.ic_no,
+        job: typeof session.staff_job === 'string' ? JSON.parse(session.staff_job) : session.staff_job
       } : null;
 
       res.json({
@@ -209,12 +108,11 @@ export default function(pool) {
       console.error("Failed to get session state:", error);
       res.status(500).json({ error: "Failed to get session state" });
     }
-  }));
+  });
 
   // End session
-  router.delete("/:sessionId", validateSessionHeader, asyncHandler(async (req, res) => {
+  router.delete("/:sessionId", validateSessionHeader, async (req, res) => {
     const { sessionId } = req.params;
-    // Verify session ID matches header
     if (sessionId !== req.sessionId) {
       return res.status(401).json({ error: "Session ID mismatch" });
     }
@@ -230,9 +128,7 @@ export default function(pool) {
       const result = await pool.query(query, [sessionId]);
 
       if (result.rows.length === 0) {
-        return res.status(404).json({ 
-          error: "Session not found or already ended" 
-        });
+        return res.status(404).json({ error: "Session not found or already ended" });
       }
 
       res.json({
@@ -241,11 +137,9 @@ export default function(pool) {
       });
     } catch (error) {
       console.error("Failed to end session:", error);
-      res.status(500).json({ 
-        error: "Failed to end session" 
-      });
+      res.status(500).json({ error: "Failed to end session" });
     }
-  }));
+  });
 
   return router;
 }

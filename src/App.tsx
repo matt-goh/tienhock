@@ -92,7 +92,11 @@ const Layout: React.FC = () => {
   }
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (

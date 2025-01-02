@@ -10,7 +10,6 @@ export default function authRouter(pool) {
     const { ic_no, password } = req.body;
     
     try {
-      // Verify staff credentials
       const staffQuery = `
         SELECT 
           s.id, 
@@ -36,28 +35,33 @@ export default function authRouter(pool) {
         return res.status(401).json({ message: 'Password not set' });
       }
   
-      // Compare password
       const isValidPassword = await bcrypt.compare(password, staff.password);
       if (!isValidPassword) {
         return res.status(401).json({ message: 'Incorrect password' });
       }
   
-      // First, end any existing active sessions for this staff
-      await pool.query(
-        'DELETE FROM active_sessions WHERE staff_id = $1 AND status = \'active\'', 
-        [staff.id]
-      );
-  
-      // Create session with the frontend-generated session ID
+      // End existing sessions and create new one in a single transaction
       const sessionId = req.body.sessionId || `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-      const sessionQuery = `
-        INSERT INTO active_sessions (session_id, staff_id, last_active)
-        VALUES ($1, $2, CURRENT_TIMESTAMP)
-        RETURNING *
-      `;
-  
-      await pool.query(sessionQuery, [sessionId, staff.id]);
+      
+      await pool.query('BEGIN');
+      try {
+        // End existing sessions
+        await pool.query(
+          'UPDATE active_sessions SET status = $1 WHERE staff_id = $2 AND status = $3',
+          ['ended', staff.id, 'active']
+        );
+    
+        // Create new session
+        await pool.query(
+          'INSERT INTO active_sessions (session_id, staff_id, last_active) VALUES ($1, $2, CURRENT_TIMESTAMP)',
+          [sessionId, staff.id]
+        );
+        
+        await pool.query('COMMIT');
+      } catch (error) {
+        await pool.query('ROLLBACK');
+        throw error;
+      }
   
       res.json({
         message: 'Login successful',
@@ -72,111 +76,6 @@ export default function authRouter(pool) {
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ message: 'Error during login' });
-    }
-  });
-
-  router.get('/validate-session', async (req, res) => {
-    const sessionId = req.headers['x-session-id'];
-    
-    console.log('Validating Session Full Details:', {
-      sessionId,
-      sessionIdType: typeof sessionId,
-      timestamp: new Date().toISOString()
-    });
-  
-    if (!sessionId) {
-      return res.status(401).json({ 
-        message: 'No session ID provided',
-        requireLogin: true 
-      });
-    }
-  
-    try {
-      // First, try to find the session directly
-      const query = `
-        SELECT 
-          session_id,
-          staff_id,
-          last_active,
-          status
-        FROM active_sessions
-        WHERE session_id = $1
-      `;
-      
-      const result = await pool.query(query, [sessionId]);
-      
-      console.log('Session Query Details:', {
-        rowCount: result.rows.length,
-        session: result.rows[0]
-      });
-  
-      if (result.rows.length > 0) {
-        const session = result.rows[0];
-        
-        // Check if session is active within 7 days
-        const lastActiveDate = new Date(session.last_active);
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  
-        if (lastActiveDate > sevenDaysAgo) {
-          // If staff_id is null, it's an unregistered session
-          if (!session.staff_id) {
-            return res.status(401).json({ 
-              message: 'Unregistered session',
-              requireLogin: true
-            });
-          }
-  
-          // Fetch staff details
-          const staffQuery = `
-            SELECT 
-              id, 
-              name, 
-              ic_no,
-              job
-            FROM staffs
-            WHERE id = $1
-          `;
-  
-          const staffResult = await pool.query(staffQuery, [session.staff_id]);
-  
-          if (staffResult.rows.length === 0) {
-            return res.status(401).json({ 
-              message: 'Staff not found',
-              requireLogin: true 
-            });
-          }
-  
-          const staff = staffResult.rows[0];
-  
-          // Update last_active to keep session alive
-          await pool.query(
-            'UPDATE active_sessions SET last_active = CURRENT_TIMESTAMP WHERE session_id = $1',
-            [sessionId]
-          );
-  
-          // Format the user data
-          const user = {
-            id: staff.id,
-            name: staff.name,
-            ic_no: staff.ic_no,
-            job: typeof staff.job === 'string' ? JSON.parse(staff.job) : staff.job
-          };
-  
-          return res.json({ user });
-        }
-      }
-  
-      // If no valid session found
-      return res.status(401).json({ 
-        message: 'Session expired',
-        requireLogin: true 
-      });
-    } catch (error) {
-      console.error('Detailed Session Validation Error:', error);
-      res.status(500).json({ 
-        message: 'Error validating session',
-        requireLogin: true 
-      });
     }
   });
 
