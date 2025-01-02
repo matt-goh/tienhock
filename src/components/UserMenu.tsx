@@ -1,33 +1,54 @@
 // components/UserMenu.tsx
-import { Fragment } from 'react';
-import { Menu, Transition } from '@headlessui/react';
-import { IconUserCircle, IconLogout, IconUser } from '@tabler/icons-react';
-import { useAuth } from '../contexts/AuthContext';
+import {
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
+  Transition,
+  Switch,
+} from "@headlessui/react";
+import {
+  IconUserCircle,
+  IconLogout,
+  IconMoon,
+  IconDatabaseExport,
+} from "@tabler/icons-react";
+import { useAuth } from "../contexts/AuthContext";
+import { Fragment, useEffect, useState } from "react";
 
 export default function UserMenu() {
   const { user, logout } = useAuth();
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   };
 
+  const toggleDarkMode = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDarkMode(!isDarkMode);
+  };
+
   return (
-    <Menu as="div" className="relative">
-      <Menu.Button className="w-full px-3 py-2.5 flex items-center rounded-lg hover:bg-default-200 active:bg-default-300 border border-default-300 transition-colors duration-200">
+    <Menu as="div" className="w-full relative">
+      <MenuButton className="w-full px-3 py-2.5 flex items-center rounded-lg hover:bg-default-200 active:bg-default-300 border border-default-300 transition-colors duration-200">
         <div className="flex w-full justify-between">
           <div className="flex items-center">
-            <IconUserCircle className="flex-shrink-0 mr-3 text-default-700" stroke={1.5} />
+            <IconUserCircle
+              className="flex-shrink-0 mr-3 text-default-700"
+              stroke={1.5}
+            />
             <span className="text-sm font-medium text-default-700">
-              {user?.name || 'Not logged in'}
+              {user?.id || "Not logged in"}
             </span>
           </div>
         </div>
-      </Menu.Button>
-      
+      </MenuButton>
+
       <Transition
         as={Fragment}
         enter="transition ease-out duration-100"
@@ -37,30 +58,57 @@ export default function UserMenu() {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 bottom-16 mt-2 w-56 origin-bottom-right rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <MenuItems className="absolute right-0 z-20 bottom-[52px] mt-2 w-[220.8px] bg-default-100 border border-default-300 origin-bottom-right rounded-lg focus:outline-none">
           <div className="px-1 py-1">
-            <Menu.Item>
-              {({ active }) => (
-                <button
-                  className={`${
-                    active ? 'bg-default-100' : ''
-                  } group flex w-full items-center rounded-md px-2 py-2 text-sm text-default-700`}
-                >
-                  <IconUser
+            {/* Dark Mode Toggle */}
+            <MenuItem>
+              <div 
+                onClick={toggleDarkMode}
+                className="h-9 group flex w-full items-center justify-between rounded-md px-2 text-sm text-default-700 hover:bg-default-200 active:bg-default-300 transition-colors duration-200 cursor-pointer"
+              >
+                <div className="flex items-center">
+                  <IconMoon
                     className="mr-2 h-5 w-5"
                     aria-hidden="true"
                     stroke={1.5}
                   />
-                  {user?.ic_no}
+                  Dark Mode
+                </div>
+                <Switch
+                  checked={isDarkMode}
+                  onChange={() => setIsDarkMode(!isDarkMode)}
+                  className={`${
+                    isDarkMode ? "bg-default-300" : "bg-default-200"
+                  } relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200`}
+                >
+                  <span
+                    className={`${
+                      isDarkMode ? "translate-x-6" : "translate-x-1"
+                    } inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200`}
+                  />
+                </Switch>
+              </div>
+            </MenuItem>
+
+            {/* Backup Option - Non-functional */}
+            <MenuItem>
+              {({ active }) => (
+                <button className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 hover:bg-default-200 active:bg-default-300 transition-colors duration-200">
+                  <IconDatabaseExport
+                    className="mr-2 h-5 w-5"
+                    aria-hidden="true"
+                    stroke={1.5}
+                  />
+                  Backup
                 </button>
               )}
-            </Menu.Item>
-            <Menu.Item>
+            </MenuItem>
+
+            {/* Logout Option */}
+            <MenuItem>
               {({ active }) => (
                 <button
-                  className={`${
-                    active ? 'bg-default-100' : ''
-                  } group flex w-full items-center rounded-md px-2 py-2 text-sm text-default-700`}
+                  className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
                   onClick={handleLogout}
                 >
                   <IconLogout
@@ -71,9 +119,9 @@ export default function UserMenu() {
                   Logout
                 </button>
               )}
-            </Menu.Item>
+            </MenuItem>
           </div>
-        </Menu.Items>
+        </MenuItems>
       </Transition>
     </Menu>
   );
