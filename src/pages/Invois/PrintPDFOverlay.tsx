@@ -4,6 +4,7 @@ import InvoisPDF from "./InvoisPDF";
 import { InvoiceData } from "../../types/types";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 const PrintPDFOverlay = ({
   invoices,
@@ -122,8 +123,7 @@ const PrintPDFOverlay = ({
       {/* Dialog */}
       <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
         <div className="flex flex-col items-center gap-3">
-          {/* Loading spinner */}
-          <div className="w-8 h-8 border-4 border-default-200 border-t-default-600 rounded-full animate-spin" />
+          <LoadingSpinner size="sm" hideText />
 
           {/* Text */}
           <p className="text-base font-medium text-default-900">
