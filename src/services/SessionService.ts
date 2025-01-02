@@ -26,12 +26,11 @@ class SessionService {
   private readonly SESSION_KEY = "app_session";
   private readonly SESSION_ID_KEY = "app_sessionId";
   private currentSessionId: string;
-  private initialized: boolean = false;
-  private heartbeatInterval?: NodeJS.Timeout;
+  private stateCheckInterval?: NodeJS.Timeout;
 
   constructor() {
-    this.currentSessionId =
-      this.getStoredSessionId() || this.generateSessionId();
+    this.currentSessionId = this.getStoredSessionId() || this.generateSessionId();
+    this.startStateCheck();
   }
 
   private getStoredSessionId(): string | null {
@@ -44,9 +43,7 @@ class SessionService {
   }
 
   private generateSessionId(): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
-    return `${timestamp}-${random}`;
+    return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
   private createSessionError(
@@ -60,36 +57,18 @@ class SessionService {
     return error;
   }
 
-  private getHeaders(includeContentType: boolean = true): HeadersInit {
-    const headers: HeadersInit = {
-      "x-session-id": this.currentSessionId,
-    };
-
-    if (includeContentType) {
-      headers["Content-Type"] = "application/json";
-    }
-
-    return headers;
-  }
-
   async initialize(): Promise<void> {
-    if (this.initialized) return;
-
     try {
       const storedSession = this.getStoredSession();
 
-      await api.post("/api/sessions/check", {
+      await api.post("/api/sessions/register", {
         sessionId: this.currentSessionId,
         staffId: storedSession?.staffId || null,
       });
 
-      // Save the session ID if it's not already saved
       if (!this.getStoredSessionId()) {
         localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
       }
-
-      this.startHeartbeat();
-      this.initialized = true;
     } catch (error) {
       throw this.createSessionError(
         "Failed to initialize session",
@@ -99,23 +78,33 @@ class SessionService {
     }
   }
 
-  private startHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
+  private startStateCheck(): void {
+    if (this.stateCheckInterval) {
+      clearInterval(this.stateCheckInterval);
     }
 
-    this.heartbeatInterval = setInterval(() => {
-      this.sendHeartbeat().catch(console.error);
-    }, 30000); // 30 seconds
+    // Check session state every minute
+    this.stateCheckInterval = setInterval(() => {
+      this.checkState().catch(console.error);
+    }, 60000);
   }
 
-  async sendHeartbeat(): Promise<void> {
-    if (!this.initialized) return;
-
+  async checkState(): Promise<{staff: AuthenticatedUser | null, hasActiveProfile: boolean}> {
     try {
-      await api.post(`/api/sessions/${this.currentSessionId}/heartbeat`);
+      const response = await api.get(`/api/sessions/state/${this.currentSessionId}`);
+      if (response.staff) {
+        this.updateStoredSession(response.staff.id, response.staff);
+      }
+      return {
+        staff: response.staff || null,
+        hasActiveProfile: response.hasActiveProfile
+      };
     } catch (error) {
-      console.error("Failed to send heartbeat:", error);
+      console.error("Session state check failed:", error);
+      return {
+        staff: null,
+        hasActiveProfile: false
+      };
     }
   }
 
@@ -133,12 +122,9 @@ class SessionService {
         user: data.user,
       };
 
-      // Update current session ID with the one from the server
       this.currentSessionId = data.sessionId;
       localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
-
       this.saveSession(session);
-      await this.initialize();
 
       return session;
     } catch (error) {
@@ -150,23 +136,6 @@ class SessionService {
     }
   }
 
-  async validateSession(): Promise<AuthenticatedUser | null> {
-    try {
-      const data = await api.get("/api/auth/validate-session", {
-        headers: this.getHeaders(false),
-      });
-
-      if (data.user) {
-        // Update stored session with latest user data
-        this.updateStoredSession(data.user.id, data.user);
-      }
-      return data.user;
-    } catch (error) {
-      console.error("Session validation failed:", error);
-      return null;
-    }
-  }
-
   getSessionId(): string {
     return this.currentSessionId;
   }
@@ -174,9 +143,7 @@ class SessionService {
   getStoredSession(): StoredSession | null {
     try {
       const sessionData = localStorage.getItem(this.SESSION_KEY);
-      if (!sessionData) return null;
-
-      return JSON.parse(sessionData);
+      return sessionData ? JSON.parse(sessionData) : null;
     } catch (error) {
       console.error("Error retrieving stored session:", error);
       this.clearSession();
@@ -188,7 +155,6 @@ class SessionService {
     try {
       localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
     } catch (error) {
-      console.error("Error saving session:", error);
       throw this.createSessionError(
         "Failed to save session",
         "STORAGE_ERROR",
@@ -206,15 +172,12 @@ class SessionService {
       staffId,
       user,
     };
-
     this.saveSession(session);
   }
 
   async logout(): Promise<void> {
     try {
       await this.endSession();
-    } catch (error) {
-      console.error("Logout failed, clearing session anyway:", error);
     } finally {
       this.clearSession();
       // Generate new session ID for anonymous tracking
@@ -226,13 +189,9 @@ class SessionService {
   async endSession(): Promise<void> {
     try {
       await api.delete(`/api/sessions/${this.currentSessionId}`);
-
       this.clearSession();
-      this.initialized = false;
-
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-        this.heartbeatInterval = undefined;
+      if (this.stateCheckInterval) {
+        clearInterval(this.stateCheckInterval);
       }
     } catch (error) {
       throw this.createSessionError(
