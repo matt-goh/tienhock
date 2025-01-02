@@ -25,7 +25,7 @@ export interface ActiveSession {
 export interface SessionEvent {
   id: number;
   sessionId: string;
-  eventType: "PROFILE_SWITCH" | "SESSION_END" | "SESSION_EXPIRED";
+  eventType: "SESSION_END" | "SESSION_EXPIRED";
   metadata: {
     previousStaffId?: string;
     newStaffId?: string;
@@ -53,15 +53,6 @@ export interface SessionError extends Error {
     | "STORAGE_ERROR"
     | "SESSION_EXPIRED"
     | "INVALID_STATE";
-}
-
-export interface ProfileContextType {
-  currentStaff: Staff | null;
-  activeSessions: ActiveSession[];
-  switchProfile: (staff: Staff) => Promise<void>;
-  isInitializing: boolean;
-  error: string | null;
-  clearError: () => void;
 }
 
 export interface Staff {
