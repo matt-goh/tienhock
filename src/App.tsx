@@ -14,6 +14,7 @@ import Login from "./pages/Auth/Login";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
+import LoadingSpinner from "./components/LoadingSpinner";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -91,11 +92,7 @@ const Layout: React.FC = () => {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
