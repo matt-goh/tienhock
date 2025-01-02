@@ -1,7 +1,6 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { sessionService, AuthenticatedUser } from "../services/SessionService";
-import { API_BASE_URL } from "../configs/config";
 
 interface AuthContextType {
   isAuthenticated: boolean;

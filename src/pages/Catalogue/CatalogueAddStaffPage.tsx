@@ -6,12 +6,12 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import { API_BASE_URL } from "../../configs/config";
 import {
   FormInput,
   FormListbox,
   FormCombobox,
 } from "../../components/FormComponents";
+import { api } from "../../routes/utils/api";
 
 interface SelectOption {
   id: string;
@@ -118,14 +118,17 @@ const CatalogueAddStaffPage: React.FC = () => {
 
   const fetchOptions = async (
     endpoint: string,
-    setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
+    setter: {
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (arg0: any): void;
+    }
   ) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await api.get(`/api/${endpoint}`);
       setter(data);
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
@@ -185,7 +188,7 @@ const CatalogueAddStaffPage: React.FC = () => {
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -202,31 +205,13 @@ const CatalogueAddStaffPage: React.FC = () => {
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/staffs`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dataToSend),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message ||
-            "An error occurred while creating the staff member."
-        );
-      }
-
-      await response.json();
+      const data = await api.post("/api/staffs", dataToSend);
       toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("An unexpected error occurred.");
-      }
+      toast.error(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
     } finally {
       setIsSaving(false);
     }

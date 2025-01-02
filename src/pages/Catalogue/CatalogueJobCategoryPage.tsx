@@ -9,7 +9,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 const CatalogueJobCategoryPage: React.FC = () => {
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
@@ -71,9 +71,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
 
   const fetchSections = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sections`);
-      if (!response.ok) throw new Error("Failed to fetch sections");
-      const data = await response.json();
+      const data = await api.get("/api/sections");
       setSections([...data.map((section: { name: string }) => section.name)]);
     } catch (error) {
       console.error("Error fetching sections:", error);
@@ -84,9 +82,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
   const fetchJobCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/job-categories`);
-      if (!response.ok) throw new Error("Failed to fetch job categories");
-      const data = await response.json();
+      const data = await api.get("/api/job-categories");
       setJobCategories(data);
     } catch (error) {
       console.error("Error fetching job categories:", error);
@@ -121,15 +117,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
       );
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/job-categories`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobCategoryIds: categoryIdsToDelete }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete job categories on the server");
-        }
+        await api.delete("/api/job-categories", categoryIdsToDelete);
 
         setJobCategories((prevCategories) =>
           prevCategories.filter(
@@ -149,7 +137,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     try {
-      // Check for invalid job category objects
+      // Validate job category objects
       const invalidCategory = editedJobCategories.find(
         (category) =>
           !category || typeof category.id !== "string" || !category.id.trim()
@@ -199,22 +187,9 @@ const CatalogueJobCategoryPage: React.FC = () => {
         id: category.originalId || category.id,
       }));
 
-      const response = await fetch(`${API_BASE_URL}/api/job-categories/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobCategories: jobCategoriesToUpdate,
-        }),
+      const result = await api.post("/api/job-categories/batch", {
+        jobCategories: jobCategoriesToUpdate,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "An error occurred while saving job categories"
-        );
-      }
-
-      const result = await response.json();
 
       // Update local state with the changes
       setJobCategories((prevCategories) => {

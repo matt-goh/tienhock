@@ -3,7 +3,7 @@ import _ from "lodash";
 import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 interface Product {
   originalId: string;
@@ -48,9 +48,7 @@ const CatalogueProductPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/products`);
-      if (!response.ok) throw new Error("Failed to fetch products");
-      const data = await response.json();
+      const data = await api.get('/api/products');
       setProducts(
         data.map((product: Product) => ({ ...product, originalId: product.id }))
       );
@@ -60,7 +58,7 @@ const CatalogueProductPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+   }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -81,24 +79,16 @@ const CatalogueProductPage: React.FC = () => {
     async (selectedIndices: number[]) => {
       const productsToDelete = selectedIndices.map((index) => products[index]);
       const productIdsToDelete = productsToDelete.map((product) => product.id);
-
+   
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ products: productIdsToDelete }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete products on the server");
-        }
-
+        await api.delete('/api/products', productIdsToDelete);
+   
         setProducts((prevProducts) =>
           prevProducts.filter(
             (product) => !productIdsToDelete.includes(product.id)
           )
         );
-
+   
         toast.success("Selected products deleted successfully");
         setIsEditing(false);
       } catch (error) {
@@ -107,11 +97,11 @@ const CatalogueProductPage: React.FC = () => {
       }
     },
     [products]
-  );
+   );
 
-  const handleSave = useCallback(async () => {
+   const handleSave = useCallback(async () => {
     try {
-      // Check for empty product IDs
+      // Validate product IDs
       const emptyProductId = editedProducts.find(
         (product) => !product.id.trim()
       );
@@ -119,8 +109,7 @@ const CatalogueProductPage: React.FC = () => {
         toast.error("Product ID cannot be empty");
         return;
       }
-
-      // Check for duplicate product IDs
+   
       const productIds = new Set();
       const duplicateProductId = editedProducts.find((product) => {
         if (productIds.has(product.id)) {
@@ -129,46 +118,34 @@ const CatalogueProductPage: React.FC = () => {
         productIds.add(product.id);
         return false;
       });
-
+   
       if (duplicateProductId) {
         toast.error(`Duplicate Product ID: ${duplicateProductId.id}`);
         return;
       }
-
+   
       // Check for changes
       const productsChanged = !_.isEqual(
         editedProducts.map((product) => _.omit(product, ["originalId"])),
         originalProducts.map((product) => _.omit(product, ["originalId"]))
       );
-
+   
       if (!productsChanged) {
         toast("No changes detected");
         setIsEditing(false);
         return;
       }
-
+   
       const productsToUpdate = editedProducts.map((product) => ({
         ...product,
         newId: product.id !== product.originalId ? product.id : undefined,
         id: product.originalId,
       }));
-
-      const response = await fetch(`${API_BASE_URL}/api/products/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          products: productsToUpdate,
-        }),
+   
+      const result = await api.post('/api/products/batch', {
+        products: productsToUpdate,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "An error occurred while saving products"
-        );
-      }
-
-      const result = await response.json();
+   
       setProducts(
         result.products.map((product: Product) => ({
           ...product,
@@ -181,7 +158,7 @@ const CatalogueProductPage: React.FC = () => {
       console.error("Error updating products:", error);
       toast.error((error as Error).message);
     }
-  }, [editedProducts, originalProducts]);
+   }, [editedProducts, originalProducts]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);

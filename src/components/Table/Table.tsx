@@ -35,7 +35,8 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
+import toast from "react-hot-toast";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -371,28 +372,19 @@ function Table<T extends Record<string, any>>({
   const deleteRow = async (rowIndex: number) => {
     if (rowToDelete && rowToDelete.id) {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/jobs/${rowToDelete.id}`,
-          {
-            method: "DELETE",
-          }
-        );
-        if (!response.ok) {
-          throw new Error("Failed to delete job from the database");
-        }
+        await api.delete(`/api/jobs/${rowToDelete.id}`);
+
+        setData((oldData) => {
+          const newData = oldData.filter((_, index) => index !== rowIndex);
+          return newData;
+        });
+
+        setRowToDelete(null);
       } catch (error) {
         console.error("Error deleting job:", error);
-        // Handle error (e.g., show error message to user)
-        return;
+        toast.error("Failed to delete job from the database");
       }
     }
-
-    setData((oldData) => {
-      const newData = oldData.filter((_, index) => index !== rowIndex);
-      return newData;
-    });
-
-    setRowToDelete(null);
   };
 
   // HDR

@@ -6,8 +6,8 @@ import {
 } from "@tabler/icons-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { API_BASE_URL } from "../../configs/config";
 import toast from "react-hot-toast";
+import { api } from "../../routes/utils/api";
 
 interface SidebarOptionProps {
   name: string;
@@ -37,7 +37,10 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const handleBookmarkClick = async (e: React.MouseEvent) => {
+  const handleBookmarkClick = async (e: {
+    preventDefault: () => void;
+    stopPropagation: () => void;
+  }) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -50,13 +53,8 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 
     try {
       if (isBookmarked) {
-        await fetch(
-          `${API_BASE_URL}/api/bookmarks/${user?.id}/${encodeURIComponent(
-            name
-          )}`,
-          {
-            method: "DELETE",
-          }
+        await api.delete(
+          `/api/bookmarks/${user?.id}/${encodeURIComponent(name)}`
         );
         await onBookmarkUpdate(name, false);
         // Update the loading toast with success message
@@ -64,15 +62,9 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           id: toastId,
         });
       } else {
-        await fetch(`${API_BASE_URL}/api/bookmarks`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            staffId: user?.id,
-            name,
-          }),
+        await api.post("/api/bookmarks", {
+          staffId: user?.id,
+          name,
         });
         await onBookmarkUpdate(name, true);
         // Update the loading toast with success message

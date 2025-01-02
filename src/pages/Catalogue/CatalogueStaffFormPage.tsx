@@ -11,7 +11,7 @@ import {
   FormListbox,
   FormCombobox,
 } from "../../components/FormComponents";
-import { API_BASE_URL } from "../../configs/config";
+import { api } from "../../routes/utils/api";
 
 interface SelectOption {
   id: string;
@@ -99,13 +99,8 @@ const CatalogueStaffFormPage: React.FC = () => {
   const fetchStaffDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/staffs/${id}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch staff details");
-      }
-      const data = await response.json();
+      const data = await api.get(`/api/staffs/${id}`);
 
-      // The job and location arrays now contain IDs, so we don't need to convert them
       setFormData(data);
       setInitialFormData(data);
       setError(null);
@@ -135,11 +130,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
   ) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await api.get(`/api/${endpoint}`);
       setter(data);
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
@@ -153,12 +144,7 @@ const CatalogueStaffFormPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (id) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/staffs/${id}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) {
-          throw new Error("Failed to delete staff member");
-        }
+        await api.delete(`/api/staffs/${id}`);
         setIsDeleteDialogOpen(false);
         toast.success("Staff member deleted successfully");
         navigate("/catalogue/staff");
@@ -250,41 +236,20 @@ const CatalogueStaffFormPage: React.FC = () => {
     };
 
     try {
-      let url = `${API_BASE_URL}/api/staffs`;
-      let method = "POST";
-
       if (isEditMode) {
         if (id !== formData.id) {
           // ID has changed, use PUT method with the new ID
-          url = `${API_BASE_URL}/api/staffs/${id}`;
-          method = "PUT";
-          dataToSend.newId = formData.id; // Add newId field to indicate ID change
+          await api.put(`/api/staffs/${id}`, dataToSend);
+          dataToSend.newId = formData.id;
         } else {
           // ID hasn't changed, use regular PUT
-          url = `${API_BASE_URL}/api/staffs/${id}`;
-          method = "PUT";
+          await api.put(`/api/staffs/${id}`, dataToSend);
         }
+      } else {
+        // Create new staff member
+        await api.post("/api/staffs", dataToSend);
       }
 
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dataToSend),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message ||
-            `An error occurred while ${
-              isEditMode ? "updating" : "creating"
-            } the staff member.`
-        );
-      }
-
-      await response.json();
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`
       );

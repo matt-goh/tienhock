@@ -21,7 +21,6 @@ import {
   IconPrinter,
   IconSearch,
 } from "@tabler/icons-react";
-import { API_BASE_URL } from "../../configs/config";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
 import FilterSummary from "../../components/Invois/FilterSummary";
@@ -31,6 +30,7 @@ import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import PrintPDFOverlay from "./PrintPDFOverlay";
 import PDFDownloadHandler from "./PDFDownloadHandler";
+import { api } from "../../routes/utils/api";
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -427,19 +427,7 @@ const InvoisPage: React.FC = () => {
       }
 
       // Upload parsed data to the server
-      const response = await fetch(`${API_BASE_URL}/api/invoices/upload`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newFileData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      await response.json();
+      await api.post("/api/invoices/upload", newFileData);
 
       const updatedInvoices = getInvoices();
       setInvoices(updatedInvoices);

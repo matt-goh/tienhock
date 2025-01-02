@@ -6,8 +6,8 @@ import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { fetchInvoices, getInvoices } from "./InvoisUtils";
-import { API_BASE_URL } from "../../configs/config";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { api } from "../../routes/utils/api";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
@@ -99,24 +99,10 @@ const InvoisUploadPage: React.FC = () => {
     try {
       // Check for duplicate invoice numbers
       const invoiceNumbers = fileData.map((invoice) => invoice.invoiceno);
-      const checkDuplicatesResponse = await fetch(
-        `${API_BASE_URL}/api/invoices/check-bulk-duplicates`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ invoiceNumbers }),
-        }
+      const duplicatesResult = await api.post(
+        "/api/invoices/check-bulk-duplicates",
+        { invoiceNumbers }
       );
-
-      if (!checkDuplicatesResponse.ok) {
-        throw new Error(
-          `HTTP error! status: ${checkDuplicatesResponse.status}`
-        );
-      }
-
-      const duplicatesResult = await checkDuplicatesResponse.json();
 
       if (duplicatesResult.duplicates.length > 0) {
         const duplicateList = duplicatesResult.duplicates.join(", ");
@@ -125,19 +111,8 @@ const InvoisUploadPage: React.FC = () => {
       }
 
       // If no duplicates, proceed with submission
-      const response = await fetch(`${API_BASE_URL}/api/invoices/bulk-submit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(fileData),
-      });
+      const result = await api.post("/api/invoices/bulk-submit", fileData);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
       toast.success(result.message);
       setFileData([]); // Clear the file data after successful submission
       navigate("/sales/invois");
@@ -169,12 +144,7 @@ const InvoisUploadPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/invoices/clear`, {
-        method: "POST",
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      await api.post("/api/invoices/clear");
       setFileData([]);
       toast.success("All data cleared successfully");
       navigate("/sales/invois");

@@ -7,12 +7,12 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { Employee, FilterOptions } from "../../types/types";
-import { API_BASE_URL } from "../../configs/config";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
+import { api } from "../../routes/utils/api";
 
 const EmployeeCard = ({
   employee,
@@ -196,11 +196,7 @@ const CatalogueStaffPage = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/staffs`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch employees");
-      }
-      const data = await response.json();
+      const data = await api.get("/api/staffs");
       setEmployees(data);
       setError(null);
     } catch (err) {
@@ -214,15 +210,8 @@ const CatalogueStaffPage = () => {
   const handleConfirmDelete = async () => {
     if (employeeToDelete) {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/staffs/${employeeToDelete.id}`,
-          {
-            method: "DELETE",
-          }
-        );
-        if (!response.ok) {
-          throw new Error("Failed to delete employee");
-        }
+        await api.delete(`/api/staffs/${employeeToDelete.id}`);
+
         setEmployees(employees.filter((emp) => emp.id !== employeeToDelete.id));
         setIsDeleteDialogOpen(false);
         setEmployeeToDelete(null);

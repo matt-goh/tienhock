@@ -1,5 +1,5 @@
 // services/SessionService.ts
-import { API_BASE_URL } from "../configs/config";
+import { api } from "../routes/utils/api";
 
 export interface AuthenticatedUser {
   id: string;
@@ -30,7 +30,8 @@ class SessionService {
   private heartbeatInterval?: NodeJS.Timeout;
 
   constructor() {
-    this.currentSessionId = this.getStoredSessionId() || this.generateSessionId();
+    this.currentSessionId =
+      this.getStoredSessionId() || this.generateSessionId();
   }
 
   private getStoredSessionId(): string | null {
@@ -61,13 +62,13 @@ class SessionService {
 
   private getHeaders(includeContentType: boolean = true): HeadersInit {
     const headers: HeadersInit = {
-      'x-session-id': this.currentSessionId
+      "x-session-id": this.currentSessionId,
     };
-    
+
     if (includeContentType) {
-      headers['Content-Type'] = 'application/json';
+      headers["Content-Type"] = "application/json";
     }
-    
+
     return headers;
   }
 
@@ -77,18 +78,10 @@ class SessionService {
     try {
       const storedSession = this.getStoredSession();
 
-      const response = await fetch(`${API_BASE_URL}/api/sessions/check`, {
-        method: "POST",
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          sessionId: this.currentSessionId,
-          staffId: storedSession?.staffId || null,
-        }),
+      await api.post("/api/sessions/check", {
+        sessionId: this.currentSessionId,
+        staffId: storedSession?.staffId || null,
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       // Save the session ID if it's not already saved
       if (!this.getStoredSessionId()) {
@@ -120,23 +113,7 @@ class SessionService {
     if (!this.initialized) return;
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sessions/${this.currentSessionId}/heartbeat`,
-        {
-          method: "POST",
-          headers: this.getHeaders(),
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Session not found - reinitialize
-          this.initialized = false;
-          await this.initialize();
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-      }
+      await api.post(`/api/sessions/${this.currentSessionId}/heartbeat`);
     } catch (error) {
       console.error("Failed to send heartbeat:", error);
     }
@@ -144,22 +121,12 @@ class SessionService {
 
   async login(ic_no: string, password: string): Promise<AuthenticatedSession> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          ic_no,
-          password,
-          sessionId: this.currentSessionId,
-        }),
+      const data = await api.post("/api/auth/login", {
+        ic_no,
+        password,
+        sessionId: this.currentSessionId,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
-      }
-
-      const data = await response.json();
       const session: AuthenticatedSession = {
         sessionId: data.sessionId,
         staffId: data.user.id,
@@ -169,7 +136,7 @@ class SessionService {
       // Update current session ID with the one from the server
       this.currentSessionId = data.sessionId;
       localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
-      
+
       this.saveSession(session);
       await this.initialize();
 
@@ -185,15 +152,10 @@ class SessionService {
 
   async validateSession(): Promise<AuthenticatedUser | null> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/validate-session`, {
+      const data = await api.get("/api/auth/validate-session", {
         headers: this.getHeaders(false),
       });
 
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
       if (data.user) {
         // Update stored session with latest user data
         this.updateStoredSession(data.user.id, data.user);
@@ -263,17 +225,7 @@ class SessionService {
 
   async endSession(): Promise<void> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sessions/${this.currentSessionId}`,
-        {
-          method: "DELETE",
-          headers: this.getHeaders(),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      await api.delete(`/api/sessions/${this.currentSessionId}`);
 
       this.clearSession();
       this.initialized = false;
