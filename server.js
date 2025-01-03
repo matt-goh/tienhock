@@ -9,6 +9,7 @@ import path from 'path';
 import { 
   NODE_ENV,
   SERVER_HOST,
+  MYINVOIS_API_BASE_URL,
 } from './src/configs/config.js';
 import { fileURLToPath } from 'url';
 
@@ -69,6 +70,7 @@ app.listen(port, '0.0.0.0', () => {
     
   console.log(`Server running on https://${displayHost}`);
   console.log(`Server environment: ${NODE_ENV}`);
+  console.log(`MyInvois URL, ID & Secret accessed: ${MYINVOIS_API_BASE_URL}...`)
 });
 
 // Handle graceful shutdown

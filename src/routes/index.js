@@ -29,12 +29,14 @@ import agamaRouter from './catalogue/entities/agama.js';
 import invoiceRouter from './sales/invoices/invoices.js';
 import eInvoiceRouter from './sales/invoices/e-invoices.js';
 
+import { MYINVOIS_API_BASE_URL, MYINVOIS_CLIENT_ID, MYINVOIS_CLIENT_SECRET } from '../configs/config.js';
+
 export default function setupRoutes(app, pool) {
   // MyInvois API Configuration
   const myInvoisConfig = {
-    MYINVOIS_API_BASE_URL: 'https://preprod-api.myinvois.hasil.gov.my',
-    MYINVOIS_CLIENT_ID: 'b0037953-93e3-4e8d-92b3-99efb15afe33',
-    MYINVOIS_CLIENT_SECRET: '1e612d39-da8d-42cc-b949-bcd04d9d3fab'
+    MYINVOIS_API_BASE_URL,
+    MYINVOIS_CLIENT_ID,
+    MYINVOIS_CLIENT_SECRET
   };
 
   // Auth routes
