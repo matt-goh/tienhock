@@ -1,34 +1,61 @@
 // transformInvoiceData.ts
 
 const formatAmount = (amount) => {
-  // Convert strings to numbers and handle invalid inputs
   const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
-  
-  // Check if it's a valid number
-  if (isNaN(num)) {
-    return 0.00; // Return 0 for invalid numbers
-  }
-  
-  return Number(num.toFixed(2));
+  return isNaN(num) ? 0.00 : Number(num.toFixed(2));
 };
 
-const calculateLineItemTax = (price, qty) => {
-  // Convert inputs to numbers
-  const numPrice = typeof price === 'string' ? parseFloat(price) : Number(price);
-  const numQty = typeof qty === 'string' ? parseFloat(qty) : Number(qty);
-  
-  // Check if either value is invalid
-  if (isNaN(numPrice) || isNaN(numQty)) {
-    return 0.00;
+const formatDate = (dateStr) => {
+  if (!dateStr) {
+    console.warn('No date provided, using current date');
+    const today = new Date();
+    return today.toISOString().split('T')[0];
   }
-  
-  return formatAmount(numPrice * numQty * 0.06);
+
+  try {
+    // Handle DD/MM/YYYY format (which is what our database returns)
+    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/').map(part => part.trim());
+      if (day && month && year) {
+        // Validate the parts
+        const numDay = parseInt(day, 10);
+        const numMonth = parseInt(month, 10);
+        const numYear = parseInt(year, 10);
+        
+        if (numDay >= 1 && numDay <= 31 && 
+            numMonth >= 1 && numMonth <= 12 && 
+            numYear >= 1900 && numYear <= 9999) {
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        } else {
+          console.warn('Invalid date parts:', { day, month, year });
+        }
+      }
+    }
+
+    // Try parsing as ISO date
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+
+    console.warn('Failed to parse date:', dateStr);
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  } catch (error) {
+    console.error('Error parsing date:', error, 'for date string:', dateStr);
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  }
 };
 
 const calculateTaxAndTotals = (invoiceData) => {
-  const normalItems = invoiceData.orderDetails
-    .filter(detail => !detail.isTotal && !detail.isSubtotal && !detail.isLess && !detail.isTax);
-    
+  
+  // Filter normal items (not special rows)
+  const normalItems = invoiceData.orderDetails.filter(detail => 
+    !detail.istotal && !detail.issubtotal && !detail.isless && !detail.istax
+  );
+  
+  // Calculate subtotal from normal items
   const subtotal = formatAmount(
     normalItems.reduce((sum, detail) => {
       const amount = typeof detail.total === 'string' ? parseFloat(detail.total) : Number(detail.total);
@@ -36,17 +63,10 @@ const calculateTaxAndTotals = (invoiceData) => {
     }, 0)
   );
 
-  const standardCharge = formatAmount(
-    normalItems.reduce((sum, detail) => {
-      const price = typeof detail.price === 'string' ? parseFloat(detail.price) : Number(detail.price);
-      const qty = typeof detail.qty === 'string' ? parseFloat(detail.qty) : Number(detail.qty);
-      return sum + ((!isNaN(price) && !isNaN(qty)) ? price * qty * 0.1 : 0);
-    }, 0)
-  );
-
+  // Calculate FOC items total
   const focAmount = formatAmount(
     normalItems
-      .filter(detail => detail.isFoc)
+      .filter(detail => detail.isfoc)
       .reduce((sum, detail) => {
         const price = typeof detail.price === 'string' ? parseFloat(detail.price) : Number(detail.price);
         const qty = typeof detail.qty === 'string' ? parseFloat(detail.qty) : Number(detail.qty);
@@ -54,16 +74,21 @@ const calculateTaxAndTotals = (invoiceData) => {
       }, 0)
   );
 
-  const itemLevelTax = formatAmount(
-    normalItems.reduce((sum, detail) => sum + calculateLineItemTax(detail.price, detail.qty), 0)
-  );
+  // Standard service charge (10%)
+  const standardCharge = formatAmount(subtotal * 0.10);
 
-  // Handle optional values
+  // Calculate item level tax (6%)
+  const itemLevelTax = formatAmount(subtotal * 0.06);
+
+  // Handle optional values with default 0
   const tax = formatAmount(invoiceData.tax || 0);
   const discount = formatAmount(invoiceData.discount || 0);
   const rounding = formatAmount(invoiceData.rounding || 0);
 
-  return {
+  // Calculate final total
+  const total = formatAmount(subtotal + tax - discount + rounding + standardCharge);
+
+  const result = {
     subtotal,
     tax,
     standardCharge,
@@ -71,16 +96,63 @@ const calculateTaxAndTotals = (invoiceData) => {
     itemLevelTax,
     discount,
     rounding,
-    total: formatAmount(subtotal + tax - discount + rounding + standardCharge)
+    total
   };
+
+  return result;
 };
 
-export function transformInvoiceToMyInvoisFormat(invoiceData) {
-  const [day, month, year] = invoiceData.date.split('/');
-  const invoiceDate = `${year}-${month}-${day}`;
-  const currentTime = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
+const validateInvoiceData = (invoiceData) => {
 
-  const totals = calculateTaxAndTotals(invoiceData);
+  if (!invoiceData) {
+    throw new Error('Invoice data is required');
+  }
+
+  // Check if orderDetails exists and is an array
+  if (!Array.isArray(invoiceData?.orderDetails)) {
+    console.error('Invalid orderDetails:', invoiceData?.orderDetails);
+    throw new Error('Invoice must contain order details array');
+  }
+
+  // Ensure required fields have default values if missing
+  const validatedData = {
+    ...invoiceData,
+    date: invoiceData.date || new Date().toISOString().split('T')[0],
+    time: invoiceData.time || new Date().toISOString().split('T')[1].split('.')[0] + 'Z',
+    invoiceno: invoiceData.invoiceno || 'UNKNOWN',
+    tax: invoiceData.tax || '0',
+    discount: invoiceData.discount || '0',
+    rounding: invoiceData.rounding || '0',
+    orderDetails: invoiceData.orderDetails.map(detail => ({
+      ...detail,
+      qty: Number(detail.qty || 0),
+      price: Number(detail.price || 0),
+      total: detail.total || '0',
+      isfoc: Boolean(detail.isfoc),
+      isreturned: Boolean(detail.isreturned),
+      istotal: Boolean(detail.istotal),
+      issubtotal: Boolean(detail.issubtotal),
+      isless: Boolean(detail.isless),
+      istax: Boolean(detail.istax)
+    }))
+  };
+  return validatedData;
+};
+
+export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
+  try {
+    if (!rawInvoiceData) {
+      throw new Error('No invoice data provided');
+    }
+
+    // Validate and sanitize input data
+    const invoiceData = validateInvoiceData(rawInvoiceData);
+    
+    // Format the date using our robust date formatter
+    const invoiceDate = formatDate(invoiceData.date);
+
+    const currentTime = invoiceData.time || new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
+    const totals = calculateTaxAndTotals(invoiceData);
 
   return {
     "_D": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
@@ -424,5 +496,9 @@ export function transformInvoiceToMyInvoisFormat(invoiceData) {
         }]
       }
     ]
-  }
-};
+  };
+} catch (error) {
+  console.error('Error transforming invoice data:', error);
+  throw new Error(`Failed to transform invoice: ${error.message}`);
+}
+}

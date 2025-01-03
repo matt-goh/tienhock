@@ -1,5 +1,5 @@
+// documentSubmissionHandler.js
 import { createHash } from 'crypto';
-import { transformInvoiceToMyInvoisFormat } from './transformInvoiceData.js';
 
 class DocumentSubmissionHandler {
   constructor(apiClient) {
@@ -8,17 +8,11 @@ class DocumentSubmissionHandler {
     this.POLLING_INTERVAL = 5000; // 5 seconds
   }
 
-  async submitAndPollDocument(invoiceData) {
+  async submitAndPollDocument(transformedInvoice) {
     try {
-      // Transform the invoice data to MyInvois format
-      const transformedInvoice = transformInvoiceToMyInvoisFormat(invoiceData);
-      console.log('Transformed invoice:', JSON.stringify(transformedInvoice, null, 2));
-      
       const requestBody = this.prepareRequestBody(transformedInvoice);
-      console.log('Submission payload:', JSON.stringify(requestBody, null, 2));
 
       const submissionResponse = await this.submitDocuments(requestBody);
-      console.log('Submission response:', JSON.stringify(submissionResponse, null, 2));
 
       this.validateSubmissionResponse(submissionResponse);
 
@@ -36,7 +30,6 @@ class DocumentSubmissionHandler {
     }
     
     const jsonDocument = JSON.stringify(invoice);
-    console.log('Preparing request body for invoice:', invoice.Invoice[0].ID[0]._);
     
     return {
       documents: [{
@@ -58,7 +51,6 @@ class DocumentSubmissionHandler {
 
   async submitDocuments(requestBody) {
     const response = await this.apiClient.makeApiCall('POST', '/api/v1.0/documentsubmissions/', requestBody);
-    console.log('Submit documents response:', JSON.stringify(response, null, 2));
     return response;
   }
 
@@ -75,9 +67,7 @@ class DocumentSubmissionHandler {
     let attempts = 0;
     while (attempts < this.MAX_POLLING_ATTEMPTS) {
       try {
-        console.log(`Polling attempt ${attempts + 1} for submissionUid: ${submissionUid}`);
         const submission = await this.apiClient.makeApiCall('GET', `/api/v1.0/documentsubmissions/${submissionUid}`);
-        console.log('Poll response:', JSON.stringify(submission, null, 2));
 
         if (submission.overallStatus !== 'InProgress') {
           return submission;
@@ -95,7 +85,6 @@ class DocumentSubmissionHandler {
   }
 
   processSubmissionResult(submissionStatus) {
-    console.log('Processing submission result:', JSON.stringify(submissionStatus, null, 2));
     return submissionStatus.overallStatus === 'Valid'
       ? this.createSuccessResult(submissionStatus)
       : this.createFailureResult(submissionStatus);

@@ -62,6 +62,11 @@ export default function(pool, config) {
       try {
         // 1. Fetch invoice data from database
         const invoiceData = await fetchInvoiceFromDb(pool, invoiceId);
+        console.log('Fetched invoice data:', JSON.stringify(invoiceData, null, 2));
+        
+        if (!invoiceData) {
+          throw new Error(`Invoice with ID ${invoiceId} not found`);
+        }
         
         // 2. Transform invoice data to MyInvois format
         const transformedInvoice = transformInvoiceToMyInvoisFormat(invoiceData);
@@ -101,7 +106,7 @@ export default function(pool, config) {
         errorDetails = error.response.data?.error?.details || null;
       }
 
-      // Check for specific errors
+      // Check for specific errors and provide more user-friendly messages
       if (errorMessage.includes('Document hash is not valid')) {
         errorMessage = 'Document hash validation failed. Please ensure the document content is correct and try again.';
       } else if (errorMessage.includes('Hash verification failed')) {
