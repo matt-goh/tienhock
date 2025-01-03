@@ -9,4 +9,5 @@
 
 # misc
 .env
+dev/docker-compose.yml
 prod/docker-compose.yml
