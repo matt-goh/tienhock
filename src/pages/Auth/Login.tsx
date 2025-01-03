@@ -7,10 +7,9 @@ import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
 
 const Login: React.FC = () => {
-  const [step, setStep] = useState<"ic" | "password" | "set-password">("ic");
+  const [step, setStep] = useState<"ic" | "password">("ic");
   const [ic_no, setIcNo] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -18,7 +17,6 @@ const Login: React.FC = () => {
   const validateIcNo = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
-    // Check IC number length (including the two dashes)
     if (ic_no.length < 14) {
       toast.error("Please enter a valid IC number");
       return;
@@ -30,15 +28,9 @@ const Login: React.FC = () => {
       const data = await api.get(`/api/auth/check-ic/${ic_no}`);
 
       if (data.exists) {
-        if (data.hasPassword) {
-          setStep("password");
-        } else {
-          setStep("set-password");
-        }
+        setStep("password");
       } else {
-        toast.error(
-          "IC number not registered. Please contact admin if this is an error."
-        );
+        toast.error("IC number not registered. Please contact admin if this is an error.");
       }
     } catch (error) {
       toast.error("Failed to verify IC number");
@@ -55,10 +47,8 @@ const Login: React.FC = () => {
       await login(ic_no, password);
       navigate("/");
     } catch (error) {
-      // Display the specific error message from the server
       toast.error(error instanceof Error ? error.message : "Login failed");
 
-      // Clear password field on incorrect password
       if (error instanceof Error && error.message === "Incorrect password") {
         setPassword("");
       }
@@ -67,46 +57,15 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleSetPassword = async (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await api.post("/api/auth/set-password", { ic_no, password });
-
-      // After setting password, attempt to log in
-      await login(ic_no, password);
-      navigate("/");
-      toast.success("Password set successfully");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to set password"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const formatIcNo = (value: string) => {
-    // Remove all non-digits first
     const digits = value.replace(/\D/g, "");
 
-    // Format as: 000000-00-0000
     if (digits.length <= 6) {
       return digits;
     } else if (digits.length <= 8) {
       return `${digits.slice(0, 6)}-${digits.slice(6)}`;
     } else {
-      return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(
-        8,
-        12
-      )}`;
+      return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 12)}`;
     }
   };
 
@@ -120,25 +79,15 @@ const Login: React.FC = () => {
             className="h-24 w-auto mb-6"
           />
           <h1 className="text-3xl font-bold text-center text-default-900">
-            {step === "set-password" ? "Set Up Password" : "Welcome Back"}
+            Welcome Back
           </h1>
           <p className="mt-2 text-center text-default-600">
-            {step === "ic"
-              ? "Please enter your IC number"
-              : step === "password"
-              ? "Please enter your password"
-              : "Please set up your password"}
+            {step === "ic" ? "Please enter your IC number" : "Please enter your password"}
           </p>
         </div>
 
         <form
-          onSubmit={
-            step === "ic"
-              ? validateIcNo
-              : step === "set-password"
-              ? handleSetPassword
-              : handleLogin
-          }
+          onSubmit={step === "ic" ? validateIcNo : handleLogin}
           className="mt-8 space-y-6"
         >
           <div className="space-y-4">
@@ -193,53 +142,6 @@ const Login: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {step === "set-password" && (
-              <>
-                <div>
-                  <div className="relative group">
-                    <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
-                      <IconLock
-                        className="text-default-500 group-focus-within:text-default-600 transition-colors"
-                        size={20}
-                        stroke={1.5}
-                      />
-                    </div>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="New Password"
-                      required
-                      className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="relative group">
-                    <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
-                      <IconLock
-                        className="text-default-500 group-focus-within:text-default-600 transition-colors"
-                        size={20}
-                        stroke={1.5}
-                      />
-                    </div>
-                    <input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="Confirm Password"
-                      required
-                      className="pl-10 pr-4 py-3 h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </div>
 
           <div>
@@ -251,13 +153,7 @@ const Login: React.FC = () => {
               className="w-full focus:outline-none"
               size="lg"
             >
-              {isLoading
-                ? "Please wait..."
-                : step === "ic"
-                ? "Continue"
-                : step === "set-password"
-                ? "Set Password"
-                : "Sign In"}
+              {isLoading ? "Please wait..." : step === "ic" ? "Continue" : "Sign In"}
             </Button>
           </div>
 

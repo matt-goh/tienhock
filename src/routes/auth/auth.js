@@ -79,61 +79,22 @@ export default function authRouter(pool) {
     }
   });
 
-  // Set/Reset password endpoint
-  router.post('/set-password', async (req, res) => {
-    const { ic_no, password } = req.body;
-    
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const query = `
-        UPDATE staffs 
-        SET password = $1 
-        WHERE ic_no = $2 
-        RETURNING id, name, ic_no
-      `;
-      
-      const result = await pool.query(query, [hashedPassword, ic_no]);
-      
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: 'Staff not found' });
-      }
-      
-      res.json({ 
-        message: 'Password updated successfully',
-        staff: result.rows[0]
-      });
-    } catch (error) {
-      console.error('Error setting password:', error);
-      res.status(500).json({ message: 'Error setting password' });
-    }
-  });
-
   router.get('/check-ic/:ic_no', async (req, res) => {
     const { ic_no } = req.params;
   
     try {
       const query = `
-        SELECT 
-          EXISTS(
-            SELECT 1 FROM staffs 
-            WHERE ic_no = $1 
-            AND job ? 'OFFICE'
-            AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
-          ) as exists,
-          (
-            SELECT password IS NOT NULL 
-            FROM staffs 
-            WHERE ic_no = $1
-            AND job ? 'OFFICE'
-            AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
-          ) as has_password
+        SELECT EXISTS(
+          SELECT 1 FROM staffs 
+          WHERE ic_no = $1 
+          AND job ? 'OFFICE'
+          AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+        ) as exists
       `;
       
       const result = await pool.query(query, [ic_no]);
       res.json({ 
-        exists: result.rows[0].exists,
-        hasPassword: result.rows[0].has_password || false
+        exists: result.rows[0].exists
       });
     } catch (error) {
       console.error('Error checking IC:', error);
