@@ -14,6 +14,7 @@ interface ConfirmationDialogProps {
   title: string;
   message: string;
   confirmButtonText?: string;
+  variant?: "danger" | "success" | "default";
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -22,8 +23,17 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmButtonText = "Delete",
+  confirmButtonText = "Confirm",
+  variant = "danger",
 }) => {
+  // Define button styles based on variant
+  const buttonStyles = {
+    danger: "text-white bg-rose-500 hover:bg-rose-600 active:bg-rose-700",
+    success:
+      "text-white bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700",
+    default: "text-white bg-sky-500 hover:bg-sky-600 active:bg-sky-700",
+  };
+
   return (
     <Transition appear show={isOpen} as={React.Fragment}>
       <Dialog
@@ -62,7 +72,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           >
             <DialogPanel
               className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
-              onClick={(e) => e.stopPropagation()} // Prevent click from bubbling up
+              onClick={(e) => e.stopPropagation()}
             >
               <DialogTitle
                 as="h3"
@@ -84,7 +94,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-rose-500 border border-transparent rounded-full hover:bg-rose-600 active:bg-rose-700 focus:outline-none"
+                  className={`inline-flex justify-center px-4 py-2 text-sm font-medium border border-transparent rounded-full focus:outline-none ${buttonStyles[variant]}`}
                   onClick={onConfirm}
                 >
                   {confirmButtonText}
