@@ -239,6 +239,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
               leaveTo="opacity-0 scale-95"
             >
               <DialogPanel className="inline-block w-full max-w-3xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+                {/* Modal Header */}
                 <div className="flex justify-between items-center">
                   <DialogTitle
                     as="h3"
@@ -259,6 +260,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
+                {/* Error Message */}
                 {error && (
                   <div className="mt-4 p-4 bg-rose-50 text-rose-700 rounded-lg flex items-center">
                     <IconAlertTriangle className="mr-2" size={20} />
@@ -266,146 +268,151 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 )}
 
+                {/* Action Buttons */}
                 <div className="mt-4">
-                  <div className="flex flex-col space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
-                        {!showBackupNameInput ? (
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center space-x-2">
+                      {!showBackupNameInput ? (
+                        <Button
+                          onClick={() => setShowBackupNameInput(true)}
+                          disabled={loading || restoring}
+                          icon={IconDatabasePlus}
+                        >
+                          Create New Backup
+                        </Button>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            placeholder={defaultBackUpName}
+                            value={backupName}
+                            onChange={(e) => setBackupName(e.target.value)}
+                            className="px-3 py-2 w-44 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                          />
                           <Button
-                            onClick={() => setShowBackupNameInput(true)}
+                            onClick={handleCreateBackup}
                             disabled={loading || restoring}
-                            icon={IconDatabasePlus}
                           >
-                            Create New Backup
+                            Create
                           </Button>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              placeholder={defaultBackUpName}
-                              value={backupName}
-                              onChange={(e) => setBackupName(e.target.value)}
-                              className="px-3 py-2 w-44 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                            />
-                            <Button
-                              onClick={handleCreateBackup}
-                              disabled={loading || restoring}
-                            >
-                              Create
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setShowBackupNameInput(false);
-                                setBackupName(defaultBackUpName);
-                              }}
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        onClick={fetchBackups}
-                        disabled={loading || restoring}
-                        variant="outline"
-                        icon={IconRefresh}
-                      >
-                        Refresh
-                      </Button>
+                          <Button
+                            onClick={() => {
+                              setShowBackupNameInput(false);
+                              setBackupName(defaultBackUpName);
+                            }}
+                            variant="outline"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
                     </div>
+                    <Button
+                      onClick={fetchBackups}
+                      disabled={loading || restoring}
+                      variant="outline"
+                      icon={IconRefresh}
+                    >
+                      Refresh
+                    </Button>
                   </div>
+                </div>
 
-                  {loading ? (
-                    <div className="flex flex-col items-center justify-center my-8 space-y-2">
-                      <LoadingSpinner />
+                {/* Table Section */}
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center my-8 space-y-2">
+                    <LoadingSpinner />
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    {/* Fixed Header */}
+                    <div className="bg-default-100 border-b">
+                      <table className="w-full">
+                        <thead>
+                          <tr>
+                            <th className="p-3 text-left font-medium text-default-700">
+                              Filename
+                            </th>
+                            <th className="p-3 text-left font-medium text-default-700">
+                              Created
+                            </th>
+                            <th className="p-3 text-left font-medium text-default-700">
+                              Size
+                            </th>
+                            <th className="p-3 text-left font-medium text-default-700">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                      </table>
                     </div>
-                  ) : (
-                    <div className="border rounded-lg overflow-hidden mt-4">
-                      <div className="max-h-96 overflow-auto">
-                        <table className="w-full">
-                          <thead className="sticky top-0 z-10 bg-default-100">
-                            <tr className="border-b">
-                              <th className="p-3 text-left font-medium text-default-700">
-                                Filename
-                              </th>
-                              <th className="p-3 text-left font-medium text-default-700">
-                                Created
-                              </th>
-                              <th className="p-3 text-left font-medium text-default-700">
-                                Size
-                              </th>
-                              <th className="p-3 text-left font-medium text-default-700">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white">
-                            {[...backups]
-                              .sort(
-                                (a, b) =>
-                                  new Date(b.created).getTime() -
-                                  new Date(a.created).getTime()
-                              )
-                              .map((backup) => (
-                                <tr
-                                  key={backup.filename}
-                                  className="border-b last:border-0"
-                                >
-                                  <td className="p-3 text-default-700">
-                                    {backup.filename}
-                                  </td>
-                                  <td className="p-3 text-default-700">
-                                    {formatDate(backup.created)}
-                                  </td>
-                                  <td className="p-3 text-default-700">
-                                    {formatSize(backup.size)}
-                                  </td>
-                                  <td className="p-3">
-                                    {restoring &&
-                                    selectedBackup === backup.filename ? (
-                                      <div className="flex items-center space-x-2">
-                                        <LoadingSpinner size="sm" hideText />
-                                        <span className="text-sm text-default-500">
-                                          {restorePhase === "COOLDOWN"
-                                            ? "Finalizing..."
-                                            : "Restoring..."}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <Button
-                                        onClick={() => {
-                                          setSelectedBackup(backup.filename);
-                                          setShowConfirmDialog(true);
-                                        }}
-                                        disabled={restoring}
-                                        variant="outline"
-                                        size="sm"
-                                      >
-                                        Restore
-                                      </Button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
 
-                            {backups.length === 0 && (
-                              <tr>
-                                <td
-                                  colSpan={4}
-                                  className="p-3 text-center text-default-500"
-                                >
-                                  No backups found
+                    {/* Scrollable Body */}
+                    <div className="max-h-96 overflow-y-auto">
+                      <table className="w-full">
+                        <tbody className="bg-white">
+                          {[...backups]
+                            .sort(
+                              (a, b) =>
+                                new Date(b.created).getTime() -
+                                new Date(a.created).getTime()
+                            )
+                            .map((backup) => (
+                              <tr
+                                key={backup.filename}
+                                className="border-b last:border-0"
+                              >
+                                <td className="p-3 text-default-700">
+                                  {backup.filename}
+                                </td>
+                                <td className="p-3 text-default-700">
+                                  {formatDate(backup.created)}
+                                </td>
+                                <td className="p-3 text-default-700">
+                                  {formatSize(backup.size)}
+                                </td>
+                                <td className="p-3">
+                                  {restoring &&
+                                  selectedBackup === backup.filename ? (
+                                    <div className="flex items-center space-x-2">
+                                      <LoadingSpinner size="sm" hideText />
+                                      <span className="text-sm text-default-500">
+                                        {restorePhase === "COOLDOWN"
+                                          ? "Finalizing..."
+                                          : "Restoring..."}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      onClick={() => {
+                                        setSelectedBackup(backup.filename);
+                                        setShowConfirmDialog(true);
+                                      }}
+                                      disabled={restoring}
+                                      variant="outline"
+                                      size="sm"
+                                    >
+                                      Restore
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                            ))}
+                          {backups.length === 0 && (
+                            <tr>
+                              <td
+                                colSpan={4}
+                                className="p-3 text-center text-default-500"
+                              >
+                                No backups found
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </DialogPanel>
             </TransitionChild>
           </div>
