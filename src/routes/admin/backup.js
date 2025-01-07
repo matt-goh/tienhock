@@ -156,7 +156,17 @@ export default function backupRouter(pool) {
         });
       }
 
-      const command = `DB_USER=${DB_USER} DB_HOST=${DB_HOST} DB_NAME=${DB_NAME} DB_PASSWORD=${DB_PASSWORD} DB_PORT=${DB_PORT} NODE_ENV=${env} MANUAL_BACKUP=true bash /backup.sh`;
+      const { name } = req.body;
+      let customNameEnv = '';
+      
+      if (name) {
+        // Sanitize the custom name by removing special characters and spaces
+        const sanitizedName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+        customNameEnv = `CUSTOM_NAME=${sanitizedName}`;
+      }
+
+      const command = `DB_USER=${DB_USER} DB_HOST=${DB_HOST} DB_NAME=${DB_NAME} DB_PASSWORD=${DB_PASSWORD} DB_PORT=${DB_PORT} NODE_ENV=${env} MANUAL_BACKUP=true ${customNameEnv} bash /backup.sh`;
+      
       const { stdout, stderr } = await execAsync(command);
       console.log('Backup stdout:', stdout);
       if (stderr) console.error('Backup stderr:', stderr);

@@ -40,7 +40,7 @@ export const {
   // Database Configuration
   DB_USER: getEnvVariable('DB_USER', 'postgres'),
   DB_HOST: getEnvVariable('DB_HOST', 'localhost'),
-  DB_NAME: getEnvVariable('DB_NAME', ''),
+  DB_NAME: getEnvVariable('DB_NAME', 'tienhock'),
   DB_PASSWORD: getEnvVariable('DB_PASSWORD', ''),
   DB_PORT: getEnvVariable('DB_PORT', '5432'),
 
