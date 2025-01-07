@@ -1,4 +1,4 @@
-import colors from 'tailwindcss/colors';
+import colors, { amber } from 'tailwindcss/colors';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -21,6 +21,8 @@ export default {
       green: colors.green,
       teal: colors.teal,
       black: colors.black,
+      amber: colors.amber,
+      emerald: colors.emerald
     }
   },
   variants: {

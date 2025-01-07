@@ -5,6 +5,9 @@ import authRouter from './auth/auth.js';
 import sessionsRouter from './auth/sessions.js';
 import { authMiddleware } from '../middleware/auth.js';
 
+// Admin routes
+import backupRouter from './admin/backup.js';
+
 // User routes
 import sidebarRouter from './user/sidebar.js';
 
@@ -31,6 +34,22 @@ import eInvoiceRouter from './sales/invoices/e-invoices.js';
 
 import { MYINVOIS_API_BASE_URL, MYINVOIS_CLIENT_ID, MYINVOIS_CLIENT_SECRET } from '../configs/config.js';
 
+const checkRestoreState = (req, res, next) => {
+  // Skip restore check for backup-related endpoints
+  if (req.path.startsWith('/api/backup/')) {
+    return next();
+  }
+
+  if (req.app.locals.isRestoringDatabase) {
+    return res.status(503).json({
+      error: 'Service temporarily unavailable',
+      code: '57P01',
+      message: 'Database restore in progress'
+    });
+  }
+  next();
+};
+
 export default function setupRoutes(app, pool) {
   // MyInvois API Configuration
   const myInvoisConfig = {
@@ -44,8 +63,11 @@ export default function setupRoutes(app, pool) {
 
   // Add auth middleware to protect other routes
   app.use('/api', authMiddleware(pool));
+  app.use('/api', checkRestoreState);
   app.use('/api/sessions', sessionsRouter(pool));
 
+  // Admin routes
+  app.use('/api/backup', backupRouter(pool));
 
   // User routes
   app.use('/api/bookmarks', sidebarRouter(pool));

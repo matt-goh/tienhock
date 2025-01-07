@@ -50,65 +50,157 @@ export default function(pool) {
   });
 
   // Get session state (validate-session, check, and state endpoints)
-  router.get("/state/:sessionId", validateSessionHeader, async (req, res) => {
-    const { sessionId } = req.params;
-    if (sessionId !== req.sessionId) {
-      return res.status(401).json({ error: "Session ID mismatch" });
-    }
+router.get("/state/:sessionId", validateSessionHeader, async (req, res) => {
+  const { sessionId } = req.params;
+  if (sessionId !== req.sessionId) {
+    return res.status(401).json({ error: "Session ID mismatch" });
+  }
 
-    const query = `
-      WITH updated_session AS (
-        UPDATE active_sessions 
-        SET last_active = CURRENT_TIMESTAMP
-        WHERE session_id = $1 
-          AND status = 'active'
-          AND last_active > CURRENT_TIMESTAMP - INTERVAL '7 days'
-        RETURNING *
-      )
-      SELECT 
-        s.*,
-        st.id as staff_id,
-        st.name as staff_name,
-        st.ic_no,
-        st.job as staff_job
-      FROM updated_session s
-      LEFT JOIN staffs st ON s.staff_id = st.id
-    `;
+  const maxRetries = 3;
+  let retryCount = 0;
+  let lastError = null;
 
+  while (retryCount < maxRetries) {
     try {
-      const result = await pool.query(query, [sessionId]);
-      
-      if (result.rows.length === 0) {
-        return res.status(401).json({ 
-          message: "Session expired or not found",
-          requireLogin: true 
+      // First, check maintenance mode explicitly
+      if (pool.pool.maintenanceMode) {
+        console.log('Session state: System in maintenance mode');
+        return res.status(503).json({
+          error: 'Service temporarily unavailable',
+          message: 'System maintenance in progress. Please try again in a few moments.',
+          maintenance: true,
+          preserveSession: true,
+          phase: 'SESSION_CHECK'
         });
       }
 
-      const session = result.rows[0];
-      const hasActiveProfile = !!session.staff_id;
+      // Add a small delay between retries
+      if (retryCount > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Progressive backoff
+      }
 
-      const staff = hasActiveProfile ? {
+      // Verify database connectivity first
+      try {
+        await pool.query('SELECT 1');
+      } catch (error) {
+        console.error('Database connectivity check failed:', error);
+        if (retryCount < maxRetries - 1) {
+          retryCount++;
+          continue;
+        }
+        return res.status(503).json({
+          error: 'Service temporarily unavailable',
+          message: 'System maintenance in progress. Please try again in a few moments.',
+          maintenance: true,
+          preserveSession: true,
+          phase: 'SESSION_CHECK'
+        });
+      }
+
+      // Main session query with staff information
+      const query = `
+        WITH updated_session AS (
+          UPDATE active_sessions 
+          SET last_active = CURRENT_TIMESTAMP
+          WHERE session_id = $1 
+            AND status = 'active'
+            AND last_active > CURRENT_TIMESTAMP - INTERVAL '7 days'
+          RETURNING *
+        )
+        SELECT 
+          s.*,
+          st.id as staff_id,
+          st.name as staff_name,
+          st.job as staff_job
+        FROM updated_session s
+        LEFT JOIN staffs st ON s.staff_id = st.id
+      `;
+
+      const result = await pool.query(query, [sessionId]);
+
+      if (result.rows.length === 0) {
+        // Double check maintenance mode before declaring session invalid
+        if (pool.pool.maintenanceMode) {
+          console.log('Session state: System in maintenance mode (after query)');
+          return res.status(503).json({
+            error: 'Service temporarily unavailable',
+            message: 'System maintenance in progress. Please try again in a few moments.',
+            maintenance: true,
+            preserveSession: true,
+            phase: 'SESSION_CHECK'
+          });
+        }
+
+        // Session is genuinely invalid
+        return res.status(401).json({
+          message: "Session expired or not found",
+          requireLogin: true,
+          maintenance: false
+        });
+      }
+
+      // Session is valid - prepare response
+      const session = result.rows[0];
+      const staffData = session.staff_id ? {
         id: session.staff_id,
         name: session.staff_name,
-        ic_no: session.ic_no,
-        job: typeof session.staff_job === 'string' ? JSON.parse(session.staff_job) : session.staff_job
+        job: Array.isArray(session.staff_job) ? session.staff_job : 
+             typeof session.staff_job === 'string' ? JSON.parse(session.staff_job) : null
       } : null;
 
-      res.json({
-        hasActiveProfile,
-        staff,
-        session: {
-          id: session.session_id,
-          lastActive: session.last_active,
-          status: session.status
-        }
+      // Success response
+      return res.json({
+        hasActiveProfile: !!session.staff_id,
+        staff: staffData,
+        lastActive: session.last_active,
+        status: session.status
       });
+
     } catch (error) {
-      console.error("Failed to get session state:", error);
-      res.status(500).json({ error: "Failed to get session state" });
+      lastError = error;
+      console.log(`Session state retry ${retryCount + 1}:`, error);
+
+      // Check for specific database errors that might indicate maintenance
+      if (error.code === '42P01' || // relation does not exist
+          error.code === '08006' || // connection lost
+          error.code === '57P01' || // database unavailable
+          error.code === 'ECONNREFUSED' ||
+          pool.pool.maintenanceMode) {
+
+        if (retryCount < maxRetries - 1) {
+          retryCount++;
+          continue;
+        }
+
+        return res.status(503).json({
+          error: 'Service temporarily unavailable',
+          message: 'System maintenance in progress. Please try again in a few moments.',
+          maintenance: true,
+          preserveSession: true,
+          phase: 'SESSION_CHECK'
+        });
+      }
+
+      // For other errors, increment retry counter
+      if (retryCount < maxRetries - 1) {
+        retryCount++;
+        continue;
+      }
+
+      // If we've exhausted retries, throw the error
+      throw error;
     }
+  }
+
+  // If we've exhausted retries with no success
+  console.error("Failed to get session state after retries:", lastError);
+  return res.status(503).json({
+    error: "Failed to get session state",
+    maintenance: true,
+    preserveSession: true,
+    phase: 'SESSION_CHECK'
   });
+});
 
   // End session
   router.delete("/:sessionId", validateSessionHeader, async (req, res) => {
