@@ -9,6 +9,7 @@ DB_NAME=${DB_NAME:-tienhock}
 DB_PORT=${DB_PORT:-5432}
 DB_PASSWORD=${DB_PASSWORD:-foodmaker}
 MANUAL_BACKUP=${MANUAL_BACKUP:-false}
+CUSTOM_NAME=${CUSTOM_NAME:-""}
 
 # Backup directory with environment
 BACKUP_DIR="/var/backups/postgres/${ENV}"
@@ -18,11 +19,21 @@ BACKUP_RETENTION_DAYS=180  # Keep backups for 6 months
 mkdir -p $BACKUP_DIR
 
 create_backup() {
+    local BACKUP_TYPE=$1
     # Generate timestamp
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     
-    # Create backup filename
-    BACKUP_FILENAME="${BACKUP_DIR}/backup_${DB_NAME}_${TIMESTAMP}"
+    # Create backup filename based on type and custom name
+    if [ "$BACKUP_TYPE" = "manual" ] && [ ! -z "$CUSTOM_NAME" ]; then
+        # For manual backups with custom name
+        BACKUP_FILENAME="${BACKUP_DIR}/${CUSTOM_NAME}_${TIMESTAMP}"
+    elif [ "$BACKUP_TYPE" = "manual" ]; then
+        # For manual backups without custom name
+        BACKUP_FILENAME="${BACKUP_DIR}/backup_${DB_NAME}_${TIMESTAMP}"
+    else
+        # For automatic monthly backups
+        BACKUP_FILENAME="${BACKUP_DIR}/auto_backup_${DB_NAME}_${TIMESTAMP}"
+    fi
     
     echo "Creating backup: ${BACKUP_FILENAME}.gz"
     
@@ -42,7 +53,7 @@ create_backup() {
         echo "[${ENV}] Backup completed: ${BACKUP_FILENAME}.gz" >> "${BACKUP_DIR}/backup.log"
         
         # Delete backups older than retention period
-        find $BACKUP_DIR -name "backup_${DB_NAME}_*.gz" -mtime +$BACKUP_RETENTION_DAYS -delete
+        find $BACKUP_DIR -name "*.gz" -mtime +$BACKUP_RETENTION_DAYS -delete
         return 0
     else
         echo "[${ENV}] Backup failed at $(date)" >> "${BACKUP_DIR}/backup.log"
@@ -53,7 +64,7 @@ create_backup() {
 # For manual backups, bypass the monthly check
 if [ "$MANUAL_BACKUP" = "true" ]; then
     echo "Starting manual backup..."
-    create_backup
+    create_backup "manual"
     exit $?
 fi
 
@@ -71,7 +82,7 @@ LAST_RUN_MONTH=$(cat "$LAST_RUN_FILE")
 # If we're in a new month compared to last run
 if [ "$CURRENT_MONTH" != "$LAST_RUN_MONTH" ]; then
     echo "Starting monthly backup..."
-    if create_backup; then
+    if create_backup "auto"; then
         echo "$CURRENT_MONTH" > "$LAST_RUN_FILE"
     fi
 else
