@@ -177,6 +177,49 @@ export default function backupRouter(pool) {
     }
   });
 
+  router.post('/delete', async (req, res) => {
+    try {
+      if (pool.pool.maintenanceMode) {
+        return res.status(503).json({ 
+          error: 'Service temporarily unavailable',
+          message: 'Database restore in progress. Please try again in a few moments.'
+        });
+      }
+  
+      const { filename } = req.body;
+      if (!filename) {
+        return res.status(400).json({ error: 'Filename is required' });
+      }
+  
+      const envBackupDir = path.join(backupDir, env);
+      const filePath = path.join(envBackupDir, filename);
+  
+      // Verify file exists and is within backup directory
+      if (!filePath.startsWith(envBackupDir)) {
+        return res.status(400).json({ error: 'Invalid backup file path' });
+      }
+  
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(404).json({ error: 'Backup file not found' });
+      }
+  
+      // Delete the backup file
+      await fs.unlink(filePath);
+      
+      // Log deletion
+      const logMessage = `[${env}] Backup deleted: ${filename} at ${new Date().toISOString()}\n`;
+      console.log(logMessage);
+      await fs.appendFile(path.join(envBackupDir, 'backup.log'), logMessage);
+  
+      res.json({ message: 'Backup deleted successfully' });
+    } catch (error) {
+      console.error('Delete failed:', error);
+      res.status(500).json({ error: 'Delete failed', details: error.message });
+    }
+  });
+
   router.get('/list', async (req, res) => {
     try {
       const envBackupDir = path.join(backupDir, env);

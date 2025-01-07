@@ -24,15 +24,15 @@ interface BackupModalProps {
   onClose: () => void;
 }
 
+interface Backup {
+  filename: string;
+  size: number;
+  created: string;
+}
+
 const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const defaultBackUpName = `backup_${DB_NAME}`;
-  const [backups, setBackups] = useState<
-    Array<{
-      filename: string;
-      size: number;
-      created: string;
-    }>
-  >([]);
+  const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
@@ -58,13 +58,9 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       setError(null);
       const response = await api.get("/api/backup/list");
       setBackups(response);
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("Failed to fetch backups:", error);
-      if (error instanceof Error) {
-        if (!error.message.includes("maintenance")) {
-          setError("Failed to fetch backups. Please try refreshing.");
-        }
-      } else {
+      if (!error.message?.includes("maintenance")) {
         setError("Failed to fetch backups. Please try refreshing.");
       }
     } finally {
@@ -76,19 +72,16 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     try {
       const status = await api.get("/api/backup/restore/status");
 
-      // Check for completed status regardless of isRestoring flag
       if (status.status === "COMPLETED") {
         if (statusCheckInterval) {
           clearInterval(statusCheckInterval);
           setStatusCheckInterval(null);
         }
 
-        // Show success toast
         toast.success("Database restored successfully!", {
-          duration: 1500, // Display for 2 seconds
+          duration: 1500,
         });
 
-        // Wait for 2 seconds before reloading
         setTimeout(() => {
           setRestorePhase(null);
           setRestoring(false);
@@ -116,7 +109,6 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       setError(null);
-
       await api.post("/api/backup/create", { name: backupName || undefined });
       toast.success("Backup created successfully!");
       setBackupName("");
@@ -131,6 +123,22 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleDelete = async (filename: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await api.post("/api/backup/delete", { filename });
+      toast.success("Backup deleted successfully!");
+      await fetchBackups();
+    } catch (error) {
+      console.error("Failed to delete backup:", error);
+      setError("Failed to delete backup. Please try again.");
+      toast.error("Failed to delete backup. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRestore = async () => {
     if (!selectedBackup) return;
 
@@ -139,10 +147,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       setError(null);
       setShowConfirmDialog(false);
 
-      // Start restore operation
       await api.post("/api/backup/restore", { filename: selectedBackup });
 
-      // Set up polling with cleanup
       const interval = setInterval(() => {
         checkRestoreStatus();
       }, 2000);
@@ -156,18 +162,15 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Format date utility function
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
 
-  // Format size utility function
   const formatSize = (bytes: number) => {
     const mb = bytes / (1024 * 1024);
     return `${mb.toFixed(2)} MB`;
   };
 
-  // Cleanup intervals on unmount or modal close
   useEffect(() => {
     return () => {
       if (statusCheckInterval) {
@@ -187,12 +190,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      // Initial backup list fetch
       const fetchInitialData = async () => {
         try {
           await fetchBackups();
         } catch (error) {
-          // Silently handle initial fetch error during maintenance
           console.error("Initial backup fetch failed:", error);
         }
       };
@@ -238,7 +239,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="inline-block w-full max-w-3xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              <DialogPanel className="inline-block w-full max-w-5xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
                 {/* Modal Header */}
                 <div className="flex justify-between items-center">
                   <DialogTitle
@@ -319,27 +320,29 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Table Section */}
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center my-8 space-y-2">
-                    <LoadingSpinner />
-                  </div>
-                ) : (
-                  <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="relative">
                     {/* Fixed Header */}
-                    <div className="bg-default-100 border-b">
-                      <table className="w-full">
+                    <div className="bg-default-100 border-b pr-[17px] ">
+                      <table className="w-full table-fixed">
+                        <colgroup>
+                          <col className="w-[40%]" />
+                          <col className="w-[25%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[20%]" />
+                        </colgroup>
                         <thead>
                           <tr>
-                            <th className="p-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-700">
                               Filename
                             </th>
-                            <th className="p-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-700">
                               Created
                             </th>
-                            <th className="p-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-700">
                               Size
                             </th>
-                            <th className="p-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-700">
                               Actions
                             </th>
                           </tr>
@@ -349,70 +352,100 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
                     {/* Scrollable Body */}
                     <div className="max-h-96 overflow-y-auto">
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
+                        <colgroup>
+                          <col className="w-[40%]" />
+                          <col className="w-[25%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[20%]" />
+                        </colgroup>
                         <tbody className="bg-white">
-                          {[...backups]
-                            .sort(
-                              (a, b) =>
-                                new Date(b.created).getTime() -
-                                new Date(a.created).getTime()
-                            )
-                            .map((backup) => (
-                              <tr
-                                key={backup.filename}
-                                className="border-b last:border-0"
-                              >
-                                <td className="p-3 text-default-700">
-                                  {backup.filename}
-                                </td>
-                                <td className="p-3 text-default-700">
-                                  {formatDate(backup.created)}
-                                </td>
-                                <td className="p-3 text-default-700">
-                                  {formatSize(backup.size)}
-                                </td>
-                                <td className="p-3">
-                                  {restoring &&
-                                  selectedBackup === backup.filename ? (
-                                    <div className="flex items-center space-x-2">
-                                      <LoadingSpinner size="sm" hideText />
-                                      <span className="text-sm text-default-500">
-                                        {restorePhase === "COOLDOWN"
-                                          ? "Finalizing..."
-                                          : "Restoring..."}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <Button
-                                      onClick={() => {
-                                        setSelectedBackup(backup.filename);
-                                        setShowConfirmDialog(true);
-                                      }}
-                                      disabled={restoring}
-                                      variant="outline"
-                                      size="sm"
-                                    >
-                                      Restore
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          {backups.length === 0 && (
+                          {loading ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center">
+                                <LoadingSpinner />
+                              </td>
+                            </tr>
+                          ) : backups.length === 0 ? (
                             <tr>
                               <td
                                 colSpan={4}
-                                className="p-3 text-center text-default-500"
+                                className="px-6 py-3 text-center text-default-500"
                               >
                                 No backups found
                               </td>
                             </tr>
+                          ) : (
+                            [...backups]
+                              .sort(
+                                (a, b) =>
+                                  new Date(b.created).getTime() -
+                                  new Date(a.created).getTime()
+                              )
+                              .map((backup) => (
+                                <tr
+                                  key={backup.filename}
+                                  className="border-b last:border-0"
+                                >
+                                  <td className="px-6 py-3 text-default-700 truncate">
+                                    {backup.filename}
+                                  </td>
+                                  <td className="px-6 py-3 text-default-700">
+                                    {formatDate(backup.created)}
+                                  </td>
+                                  <td className="px-6 py-3 text-default-700">
+                                    {formatSize(backup.size)}
+                                  </td>
+                                  <td className="px-6 py-3">
+                                    <div className="flex items-center space-x-2">
+                                      {restoring &&
+                                      selectedBackup === backup.filename ? (
+                                        <div className="flex items-center space-x-2">
+                                          <LoadingSpinner size="sm" hideText />
+                                          <span className="text-sm text-default-500">
+                                            {restorePhase === "COOLDOWN"
+                                              ? "Finalizing..."
+                                              : "Restoring..."}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <Button
+                                            onClick={() => {
+                                              setSelectedBackup(
+                                                backup.filename
+                                              );
+                                              setShowConfirmDialog(true);
+                                            }}
+                                            disabled={restoring}
+                                            variant="outline"
+                                            size="sm"
+                                          >
+                                            Restore
+                                          </Button>
+                                          <Button
+                                            onClick={() =>
+                                              handleDelete(backup.filename)
+                                            }
+                                            disabled={restoring}
+                                            variant="outline"
+                                            size="sm"
+                                            color="rose"
+                                          >
+                                            Delete
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
                           )}
                         </tbody>
                       </table>
                     </div>
                   </div>
-                )}
+                </div>
               </DialogPanel>
             </TransitionChild>
           </div>
