@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -43,6 +43,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [statusCheckInterval, setStatusCheckInterval] =
     useState<NodeJS.Timeout | null>(null);
   const [restorePhase, setRestorePhase] = useState<string | null>(null);
+  const [hasScrollbar, setHasScrollbar] = useState(false);
+  const tableBodyRef = useRef<HTMLDivElement>(null);
 
   // Reset backup name when modal closes
   useEffect(() => {
@@ -51,6 +53,27 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       setShowBackupNameInput(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const checkForScrollbar = () => {
+      if (tableBodyRef.current) {
+        const hasVerticalScrollbar =
+          tableBodyRef.current.scrollHeight > tableBodyRef.current.clientHeight;
+        setHasScrollbar(hasVerticalScrollbar);
+      }
+    };
+
+    checkForScrollbar();
+    // Add resize observer to check when content changes
+    const resizeObserver = new ResizeObserver(checkForScrollbar);
+    if (tableBodyRef.current) {
+      resizeObserver.observe(tableBodyRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [backups]);
 
   const fetchBackups = useCallback(async () => {
     try {
@@ -239,7 +262,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="inline-block w-full max-w-5xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              <DialogPanel className="inline-block w-full max-w-5xl p-6 my-4 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
                 {/* Modal Header */}
                 <div className="flex justify-between items-center">
                   <DialogTitle
@@ -323,7 +346,11 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                 <div className="border rounded-lg overflow-hidden">
                   <div className="relative">
                     {/* Fixed Header */}
-                    <div className="bg-default-100 border-b pr-[17px] ">
+                    <div
+                      className={`bg-default-100 border-b ${
+                        hasScrollbar ? "pr-[17px]" : ""
+                      }`}
+                    >
                       <table className="w-full table-fixed">
                         <colgroup>
                           <col className="w-[40%]" />
@@ -351,7 +378,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                     </div>
 
                     {/* Scrollable Body */}
-                    <div className="max-h-96 overflow-y-auto">
+                    <div
+                      ref={tableBodyRef}
+                      className="max-h-[calc(100vh-280px)] overflow-y-auto"
+                    >
                       <table className="w-full table-fixed">
                         <colgroup>
                           <col className="w-[40%]" />
