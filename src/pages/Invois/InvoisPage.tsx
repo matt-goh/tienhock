@@ -15,7 +15,6 @@ import {
 import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
 import {
   IconCloudUpload,
-  IconDownload,
   IconEye,
   IconPlus,
   IconPrinter,

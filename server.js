@@ -3,7 +3,6 @@ import setupRoutes from './src/routes/index.js';
 import pkgBodyParser from 'body-parser';
 import express from 'express';
 import dotenv from 'dotenv';
-import pkgPg from 'pg';
 import cors from 'cors';
 import path from 'path';
 import { 
@@ -12,11 +11,11 @@ import {
   MYINVOIS_API_BASE_URL,
 } from './src/configs/config.js';
 import { fileURLToPath } from 'url';
+import { createDatabasePool } from './src/routes/utils/db-pool.js';
 
 dotenv.config();
 
 const { json } = pkgBodyParser;
-const { Pool } = pkgPg;
 const app = express();
 const port = 5000;
 const __filename = fileURLToPath(import.meta.url);
@@ -26,13 +25,12 @@ const __dirname = path.dirname(__filename);
 const corsOptions = {
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization',
-    'x-session-id', 'api-key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'api-key'],
   credentials: true
 };
 
-// PostgreSQL connection
-export const pool = new Pool({
+// Create enhanced PostgreSQL pool
+export const pool = createDatabasePool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
@@ -40,7 +38,20 @@ export const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-// Add this before your other middleware
+// Middleware to handle database maintenance mode
+app.use(async (req, res, next) => {
+  if (pool.pool.maintenanceMode && 
+      !req.path.startsWith('/api/backup') && 
+      req.method !== 'OPTIONS') {
+    return res.status(503).json({
+      error: 'Service temporarily unavailable',
+      message: 'System maintenance in progress. Please try again in a few moments.'
+    });
+  }
+  next();
+});
+
+// Your existing middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Origin', req.headers.origin);
@@ -49,7 +60,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Use middleware
 app.use(cors(corsOptions));
 app.use(json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'build')));
@@ -70,14 +80,20 @@ app.listen(port, '0.0.0.0', () => {
     
   console.log(`Server running on https://${displayHost}`);
   console.log(`Server environment: ${NODE_ENV}`);
-  console.log(`MyInvois URL, ID & Secret accessed: ${MYINVOIS_API_BASE_URL}...`)
+  console.log(`MyInvois URL, ID & Secret accessed: ${MYINVOIS_API_BASE_URL}...`);
 });
 
-// Handle graceful shutdown
+// Enhanced graceful shutdown
 const shutdownGracefully = async (signal) => {
   console.log(`${signal} signal received. Closing HTTP server and database pool...`);
   
   try {
+    // Give active queries a chance to complete
+    if (pool.pool.maintenanceMode) {
+      console.log('Pool is in maintenance mode, waiting additional time...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    
     await pool.end();
     console.log('Database pool closed.');
     process.exit(0);

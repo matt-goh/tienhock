@@ -1,16 +1,22 @@
-FROM node:14
+FROM node:14-bullseye
 
 # Set working directory
 WORKDIR /usr/src/app
 
+# Add PostgreSQL official repository
+RUN sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+
+# Install PostgreSQL 16 client
+RUN apt-get update \
+    && apt-get install -y postgresql-client-16 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
-
-# Install nodemon globally
-RUN npm install -g nodemon
+# Install dependencies (production only)
+RUN npm install --only=production
 
 # Copy the rest of the application code
 COPY . .
