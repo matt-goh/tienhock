@@ -795,10 +795,7 @@ const InvoisPage: React.FC = () => {
               multiple
             />
             <div className="flex items-center gap-3">
-              <EInvoisMenu
-                selectedInvoices={selectedInvoices}
-                dateRange={filters.dateRangeFilter}
-              />
+              <EInvoisMenu selectedInvoices={selectedInvoices} />
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 icon={IconCloudUpload}
