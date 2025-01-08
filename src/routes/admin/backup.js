@@ -64,6 +64,8 @@ export default function backupRouter(pool) {
         -p ${DB_PORT} \
         -U ${DB_USER} \
         -d ${DB_NAME} \
+        --clean \
+        --if-exists \
         -c \
         -v \
         "${backupPath}"`;
