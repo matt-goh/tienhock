@@ -244,7 +244,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       <Transition appear show={isOpen} as={React.Fragment}>
         <Dialog
           className="fixed inset-0 z-10 overflow-y-auto"
-          open={isOpen} 
+          open={isOpen}
           onClose={restoring ? () => {} : onClose}
         >
           <div className="min-h-screen px-4 text-center">
@@ -401,8 +401,11 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                         <tbody className="bg-white">
                           {loading ? (
                             <tr>
-                              <td colSpan={4} className="px-6 py-8 text-center">
-                                <LoadingSpinner />
+                              <td
+                                colSpan={4}
+                                className="px-6 py-3 text-center text-default-500"
+                              >
+                                Loading...
                               </td>
                             </tr>
                           ) : backups.length === 0 ? (
