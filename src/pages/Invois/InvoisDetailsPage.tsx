@@ -1485,17 +1485,77 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "action", header: "", type: "action", width: 50 },
   ];
 
-  // Function to convert date from "DD/MM/YYYY" to "YYYY-MM-DD"
+  // Function to convert date from various formats to "YYYY-MM-DD"
   const formatDateForInput = (dateString: string) => {
     if (!dateString) return "";
-    const [day, month, year] = dateString.split("/");
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+
+    // Handle ISO timestamp format
+    if (dateString.includes("T")) {
+      try {
+        const date = new Date(dateString);
+        // Use toISOString() and slice to get just the date part
+        return date.toISOString().slice(0, 10);
+      } catch (error) {
+        console.warn(`Error parsing ISO date: ${dateString}`, error);
+        return "";
+      }
+    }
+
+    // Check if the date is already in "YYYY-MM-DD" format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+
+    // Split for "DD/MM/YYYY" format
+    const parts = dateString.split("/");
+
+    // Ensure we have exactly 3 parts
+    if (parts.length !== 3) {
+      console.warn(`Unexpected date format: ${dateString}`);
+      return "";
+    }
+
+    const [day, month, year] = parts;
+
+    // Pad day and month if needed, using default values if conversion fails
+    const paddedDay = day.padStart(2, "0");
+    const paddedMonth = month.padStart(2, "0");
+
+    return `${year}-${paddedMonth}-${paddedDay}`;
   };
 
-  // Function to convert date from "YYYY-MM-DD" to "DD/MM/YYYY"
+  // Updated formatDateForState to handle ISO timestamp
   const formatDateForState = (dateString: string) => {
     if (!dateString) return "";
-    const [year, month, day] = dateString.split("-");
+
+    // Handle ISO timestamp format
+    if (dateString.includes("T")) {
+      try {
+        const date = new Date(dateString);
+        // Convert to local date string format
+        return date.toLocaleDateString("en-GB");
+      } catch (error) {
+        console.warn(`Error parsing ISO date: ${dateString}`, error);
+        return "";
+      }
+    }
+
+    // Check if the date is in "DD/MM/YYYY" format
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+      return dateString;
+    }
+
+    // Split for "YYYY-MM-DD" format
+    const parts = dateString.split("-");
+
+    // Ensure we have exactly 3 parts
+    if (parts.length !== 3) {
+      console.warn(`Unexpected date format: ${dateString}`);
+      return "";
+    }
+
+    const [year, month, day] = parts;
+
     return `${day}/${month}/${year}`;
   };
 
