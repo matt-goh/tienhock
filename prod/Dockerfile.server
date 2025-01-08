@@ -1,4 +1,4 @@
-FROM node:14-bullseye
+FROM node:20-bullseye
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -15,8 +15,9 @@ RUN apt-get update \
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies (production only)
-RUN npm install --only=production
+# Clear npm cache and use clean install for production
+RUN npm cache clean --force
+RUN npm ci --only=production
 
 # Copy the rest of the application code
 COPY . .

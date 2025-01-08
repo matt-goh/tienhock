@@ -48,6 +48,39 @@ const formatDate = (dateStr) => {
   }
 };
 
+const formatTime = (timeStr) => {
+  try {
+    if (!timeStr) {
+      const now = new Date();
+      return now.toTimeString().split(' ')[0] + 'Z';
+    }
+
+    // If time already has 'Z' suffix and is in correct format, return as is
+    if (timeStr.match(/^\d{2}:\d{2}:\d{2}Z$/)) {
+      return timeStr;
+    }
+
+    // Handle ISO string format
+    if (timeStr.includes('T')) {
+      const time = timeStr.split('T')[1].split('.')[0];
+      return time + 'Z';
+    }
+
+    // Handle plain time format (HH:mm:ss)
+    if (timeStr.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      return timeStr + 'Z';
+    }
+
+    // If none of the above, generate current time
+    const now = new Date();
+    return now.toTimeString().split(' ')[0] + 'Z';
+  } catch (error) {
+    console.error('Error formatting time:', error, 'for time string:', timeStr);
+    const now = new Date();
+    return now.toTimeString().split(' ')[0] + 'Z';
+  }
+};
+
 const calculateTaxAndTotals = (invoiceData) => {
   
   // Filter normal items (not special rows)
@@ -150,8 +183,8 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
     
     // Format the date using our robust date formatter
     const invoiceDate = formatDate(invoiceData.date);
+    const formattedTime = formatTime(invoiceData.time);
 
-    const currentTime = invoiceData.time || new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
     const totals = calculateTaxAndTotals(invoiceData);
 
   return {
@@ -160,9 +193,9 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
     "_B": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
     "Invoice": [
       {
-        "ID": [{ "_": "invoiceData.invoiceno" }],
+        "ID": [{ "_": invoiceData.invoiceno }],
         "IssueDate": [{ "_": invoiceDate }],
-        "IssueTime": [{ "_": invoiceData.time || currentTime }],
+        "IssueTime": [{ "_": formattedTime }],
         "InvoiceTypeCode": [{ "_": "01", "listVersionID": "1.0" }],
         "DocumentCurrencyCode": [{ "_": "MYR" }],
         "TaxCurrencyCode": [{ "_": "MYR" }],
@@ -205,10 +238,10 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             "AdditionalAccountID": [{ "_": "CPT-CCN-W-211111-KL-000002", "schemeAgencyName": "CertEX" }],
             "Party": [
               {
-                "IndustryClassificationCode": [{ "_": "10741", "name": "	Manufacture of meehoon, noodles and other related products" }],
+                "IndustryClassificationCode": [{ "_": "10741", "name": "Manufacture of meehoon, noodles and other related products" }],
                 "PartyIdentification": [
                   { "ID": [{ "_": "C21636482050", "schemeID": "TIN" }] },
-                  { "ID": [{ "_": "NA", "schemeID": "BRN" }] },
+                  { "ID": [{ "_": "201101025173", "schemeID": "BRN" }] },
                   { "ID": [{ "_": "NA", "schemeID": "SST" }] },
                   { "ID": [{ "_": "NA", "schemeID": "TTX" }] }
                 ],
@@ -231,7 +264,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 ],
                 "PartyLegalEntity": [
                   {
-                    "RegistrationName": [{ "_": "Tien Hock Food Industries S/B" }],
+                    "RegistrationName": [{ "_": "TIEN HOCK FOOD INDUSTRIES S/B" }],
                   }
                 ],
                 "Contact": [

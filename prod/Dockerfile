@@ -1,9 +1,16 @@
 # Build stage
-FROM node:14 as builder
+FROM node:20 as builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+
+# Clear npm cache and use clean install
+RUN npm cache clean --force
+RUN npm ci
+
+# Copy the rest of the application code
 COPY . .
+
+# Build the application
 RUN npm run build
 
 # Production stage
