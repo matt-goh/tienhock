@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import InvoisPDF from "./InvoisPDF";
-import { InvoiceData } from "../../types/types";
+import { InvoiceData } from "../../../types/types";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
-import LoadingSpinner from "../../components/LoadingSpinner";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const PrintPDFOverlay = ({
   invoices,
