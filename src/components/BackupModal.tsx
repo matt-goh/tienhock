@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
+  Description,
   Dialog,
   DialogPanel,
   DialogTitle,
@@ -242,10 +243,9 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     <>
       <Transition appear show={isOpen} as={React.Fragment}>
         <Dialog
-          as="div"
           className="fixed inset-0 z-10 overflow-y-auto"
+          open={isOpen} 
           onClose={restoring ? () => {} : onClose}
-          static={restoring}
         >
           <div className="min-h-screen px-4 text-center">
             <TransitionChild
@@ -528,7 +528,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         }}
         onConfirm={handleRestore}
         title="Confirm Database Restore"
-        message="Please ensure all users have saved their work and logged out of the system before proceeding. Are you sure you want to restore this backup?"
+        message="Please ensure all users have saved their work before proceeding. Are you sure you want to restore this backup?"
         confirmButtonText="Yes, Restore Database"
         variant="default"
       />
