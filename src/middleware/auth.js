@@ -8,11 +8,11 @@ export const authMiddleware = (pool) => async (req, res, next) => {
 
   // Check if system is in maintenance mode
   if (pool.pool.maintenanceMode) {
-    return res.status(503).json({
-      error: 'Service temporarily unavailable',
-      message: 'System maintenance in progress. Please try again in a few moments.',
+    return res.status(200).json({
+      status: 'maintenance',
+      message: 'System is currently undergoing maintenance.',
       maintenance: true,
-      preserveSession: true  // Add flag to prevent frontend logout
+      preserveSession: true
     });
   }
 

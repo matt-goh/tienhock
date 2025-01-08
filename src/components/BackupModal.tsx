@@ -95,28 +95,41 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     try {
       const status = await api.get("/api/backup/restore/status");
 
+      // Update restore phase
+      if (status.phase) {
+        setRestorePhase(status.phase);
+      }
+
       if (status.status === "COMPLETED") {
         if (statusCheckInterval) {
           clearInterval(statusCheckInterval);
           setStatusCheckInterval(null);
         }
 
-        toast.success("Database restored successfully!", {
-          duration: 1500,
-        });
+        setRestorePhase("COOLDOWN");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        toast.success("Database restored successfully!");
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        setTimeout(() => {
-          setRestorePhase(null);
-          setRestoring(false);
-          onClose();
-          window.location.reload();
-        }, 1000);
+        setRestorePhase(null);
+        setRestoring(false);
+        onClose();
+        window.location.reload();
 
         return true;
       }
 
       return false;
-    } catch (error) {
+    } catch (error: any) {
+      // Check if error is due to maintenance mode
+      if (error?.message?.includes("maintenance")) {
+        // Don't treat maintenance mode as an error
+        // Keep showing loading state and continue polling
+        setRestorePhase("DATABASE_RESTORE");
+        return false;
+      }
+
+      // For other errors, handle as before
       console.error("Status check failed:", error);
       if (statusCheckInterval) {
         clearInterval(statusCheckInterval);
@@ -231,7 +244,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         <Dialog
           as="div"
           className="fixed inset-0 z-10 overflow-y-auto"
-          onClose={onClose}
+          onClose={restoring ? () => {} : onClose}
+          static={restoring}
         >
           <div className="min-h-screen px-4 text-center">
             <TransitionChild
@@ -246,12 +260,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
               <DialogPanel className="fixed inset-0 bg-black opacity-30" />
             </TransitionChild>
 
-            <span
-              className="inline-block h-screen align-middle"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
+            <span className="inline-block h-screen align-middle">&#8203;</span>
 
             <TransitionChild
               as={React.Fragment}
@@ -476,6 +485,35 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   </div>
                 </div>
+                {/* Full Modal Loading Overlay */}
+                {restoring && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="flex flex-col items-center space-y-4 p-6 rounded-lg text-center">
+                      <LoadingSpinner size="lg" hideText />
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-medium text-default-900">
+                          Restoring Database
+                        </h3>
+                        <p className="text-default-600">
+                          {restorePhase === "INITIALIZATION"
+                            ? "Preparing for restore..."
+                            : restorePhase === "CLEANUP"
+                            ? "Cleaning up existing data..."
+                            : restorePhase === "DATABASE_RESTORE"
+                            ? "Restoring database from backup..."
+                            : restorePhase === "SESSION_RESTORE"
+                            ? "Restoring active sessions..."
+                            : restorePhase === "COOLDOWN"
+                            ? "Finalizing restore process..."
+                            : "Please wait while the database is being restored"}
+                        </p>
+                        <p className="text-sm text-default-500">
+                          Please do not close this window or refresh the page
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </DialogPanel>
             </TransitionChild>
           </div>
