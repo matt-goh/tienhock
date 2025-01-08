@@ -401,11 +401,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                         <tbody className="bg-white">
                           {loading ? (
                             <tr>
-                              <td
-                                colSpan={4}
-                                className="px-6 py-3 text-center text-default-500"
-                              >
-                                Loading...
+                              <td colSpan={4} className="px-6 py-8 text-center">
+                                <LoadingSpinner />
                               </td>
                             </tr>
                           ) : backups.length === 0 ? (

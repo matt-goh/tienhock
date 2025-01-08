@@ -57,9 +57,7 @@ const ApiStatusDisplay: React.FC<{ loginResponse: LoginResponse }> = ({
       >
         {loginResponse.message}
       </p>
-      <p className="text-sm text-default-600">
-        API Endpoint: {loginResponse.apiEndpoint}
-      </p>
+      <p className="text-sm text-default-600">{loginResponse.apiEndpoint}</p>
       {loginResponse.error && (
         <p className="text-sm text-red-600 mt-1">{loginResponse.error}</p>
       )}

@@ -1,4 +1,4 @@
-FROM node:14-bullseye
+FROM node:20-bullseye
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -15,8 +15,9 @@ RUN apt-get update \
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Clear npm cache and use clean install
+RUN npm cache clean --force
+RUN npm ci
 
 # Install nodemon globally
 RUN npm install -g nodemon
