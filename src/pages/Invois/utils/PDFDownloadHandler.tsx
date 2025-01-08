@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
-import { InvoiceData } from "../../types/types";
+import { InvoiceData } from "../../../types/types";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import InvoisPDF from "./InvoisPDF";
+import Button from "../../../components/Button";
+import InvoisPDF from "./../utils/InvoisPDF";
 import toast from "react-hot-toast";
-import { generatePDFFilename } from "./generatePDFFilename";
+import { generatePDFFilename } from "./../utils/generatePDFFilename";
 
 interface PDFDownloadHandlerProps {
   invoices: InvoiceData[];

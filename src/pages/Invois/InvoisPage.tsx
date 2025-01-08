@@ -12,7 +12,11 @@ import {
   InvoiceFilterOptions,
   ProductData,
 } from "../../types/types";
-import { deleteInvoice, getInvoices, fetchDbInvoices } from "./InvoisUtils";
+import {
+  deleteInvoice,
+  getInvoices,
+  fetchDbInvoices,
+} from "./utils/InvoisUtils";
 import {
   IconCloudUpload,
   IconEye,
@@ -27,8 +31,8 @@ import TableEditing from "../../components/Table/TableEditing";
 import EInvoisMenu from "../../components/Invois/EInvoisMenu";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
-import PrintPDFOverlay from "./PrintPDFOverlay";
-import PDFDownloadHandler from "./PDFDownloadHandler";
+import PrintPDFOverlay from "./utils/PrintPDFOverlay";
+import PDFDownloadHandler from "./utils/PDFDownloadHandler";
 import { api } from "../../routes/utils/api";
 
 const STORAGE_KEY = "invoisDateFilters";
