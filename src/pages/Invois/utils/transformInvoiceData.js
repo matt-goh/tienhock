@@ -331,10 +331,10 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   "PostalAddress": [
                     {
                       "CityName": [{ "_": "KOTA KINABALU" }],
-                      "PostalZone": [{ "_": "88811" }],
+                      "PostalZone": [{ "_": " 88811" }],
                       "CountrySubentityCode": [{ "_": "12" }],
                       "AddressLine": [
-                        { "Line": [{ "_": "CL.215145645, KG KIBABAIG, PENAMPANG " }] },
+                        { "Line": [{ "_": "CL.215145645, KG KIBABAIG, PENAMPANG" }] },
                         { "Line": [{ "_": "" }] },
                         { "Line": [{ "_": "" }] }
                       ],
