@@ -97,6 +97,7 @@ export const isEmptyOrInvalid = (value) => {
   
       const orderDetailsQuery = `
         SELECT 
+          od.id,
           od.code,
           od.productname as "productname",
           od.qty,
