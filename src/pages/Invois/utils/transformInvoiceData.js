@@ -210,40 +210,40 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           {
             "AdditionalDocumentReference": [
               {
-                "ID": [{ "_": "NA" }]
+                "ID": [{ "_": "-" }]
               }
             ]
           }
         ],
         "AdditionalDocumentReference": [
           {
-            "ID": [{ "_": "NA" }],
-            "DocumentType": [{ "_": "NA" }]
+            "ID": [{ "_": "" }],
+            "DocumentType": [{ "_": "" }]
           },
           {
-            "ID": [{ "_": "NA" }],
-            "DocumentType": [{ "_": "NA" }],
-            "DocumentDescription": [{ "_": "NA" }]
+            "ID": [{ "_": "" }],
+            "DocumentType": [{ "_": "" }],
+            "DocumentDescription": [{ "_": "" }]
           },
           {
-            "ID": [{ "_": "NA" }],
-            "DocumentType": [{ "_": "K2" }]
+            "ID": [{ "_": "" }],
+            "DocumentType": [{ "_": "" }]
           },
           {
-            "ID": [{ "_": "CIF" }]
+            "ID": [{ "_": "" }]
           }
         ],
         "AccountingSupplierParty": [
           {
-            "AdditionalAccountID": [{ "_": "NA", "schemeAgencyName": "CertEX" }],
+            "AdditionalAccountID": [{ "_": "", "schemeAgencyName": "CertEX" }],
             "Party": [
               {
                 "IndustryClassificationCode": [{ "_": "10741", "name": "Manufacture of meehoon, noodles and other related products" }],
                 "PartyIdentification": [
                   { "ID": [{ "_": "C21636482050", "schemeID": "TIN" }] },
                   { "ID": [{ "_": "201101025173", "schemeID": "BRN" }] },
-                  { "ID": [{ "_": "NA", "schemeID": "SST" }] },
-                  { "ID": [{ "_": "NA", "schemeID": "TTX" }] }
+                  { "ID": [{ "_": "-", "schemeID": "SST" }] },
+                  { "ID": [{ "_": "-", "schemeID": "TTX" }] }
                 ],
                 "PostalAddress": [
                   {
@@ -305,9 +305,9 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 ],
                 "PartyIdentification": [
                   { "ID": [{ "_": "EI00000000010", "schemeID": "TIN" }] },
-                  { "ID": [{ "_": "NA", "schemeID": "BRN" }] },
-                  { "ID": [{ "_": "NA", "schemeID": "SST" }] },
-                  { "ID": [{ "_": "NA", "schemeID": "TTX" }] }
+                  { "ID": [{ "_": "-", "schemeID": "BRN" }] },
+                  { "ID": [{ "_": "-", "schemeID": "SST" }] },
+                  { "ID": [{ "_": "-", "schemeID": "TTX" }] }
                 ],
                 "Contact": [
                   {
@@ -324,17 +324,17 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             "DeliveryParty": [
               {
                 "PartyLegalEntity": [
-                  { "RegistrationName": [{ "_": "General Public" }] }
+                  { "RegistrationName": [{ "_": "General public" }] }
                 ],
                 "PostalAddress": [
                   {
-                    "CityName": [{ "_": "NA" }],
-                    "PostalZone": [{ "_": "NA" }],
+                    "CityName": [{ "_": "" }],
+                    "PostalZone": [{ "_": "" }],
                     "CountrySubentityCode": [{ "_": "17" }],
                     "AddressLine": [
-                      { "Line": [{ "_": "NA" }] },
-                      { "Line": [{ "_": "NA" }] },
-                      { "Line": [{ "_": "NA" }] }
+                      { "Line": [{ "_": "" }] },
+                      { "Line": [{ "_": "" }] },
+                      { "Line": [{ "_": "" }] }
                     ],
                     "Country": [
                       {
@@ -355,7 +355,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   {
                     "ID": [
                       {
-                        "_": "NA",
+                        "_": "-",
                         "schemeID": "BRN"
                       }
                     ]
@@ -367,19 +367,19 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               {
                 "ID": [
                   {
-                    "_": "1234"
+                    "_": "General public"
                   }
                 ],
                 "FreightAllowanceCharge": [
                   {
                     "ChargeIndicator": [
                       {
-                        "_": true
+                        "_": false
                       }
                     ],
                     "AllowanceChargeReason": [
                       {
-                        "_": "NA"
+                        "_": ""
                       }
                     ],
                     "Amount": [
@@ -397,7 +397,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         "PaymentMeans": [
           {
             "PaymentMeansCode": [{ "_": "01" }],
-            "PayeeFinancialAccount": [{ "ID": [{ "_": "NA"  }] }]
+            "PayeeFinancialAccount": [{ "ID": [{ "_": "-"  }] }]
           }
         ],
         "PaymentTerms": [
@@ -413,7 +413,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           {
             "ID": [
               {
-                "_": "NA"
+                "_": "-"
               }
             ],
             "PaidAmount": [
@@ -437,16 +437,16 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         "AllowanceCharge": [
           {
             "ChargeIndicator": [{ "_": false }],
-            "AllowanceChargeReason": [{ "_": "NA" }],
+            "AllowanceChargeReason": [{ "_": "" }],
             "Amount": [{ "_": 0, "currencyID": "MYR" }]
           },
           {
-            "ChargeIndicator": [{ "_": true }],
-            "AllowanceChargeReason": [{ "_": "NA" }],
+            "ChargeIndicator": [{ "_": false }],
+            "AllowanceChargeReason": [{ "_": "" }],
             "Amount": [{ "_": 0, "currencyID": "MYR" }]
           }
         ],
-        "TaxTotal": [
+        "TaxTotal": [ // needs rework
           {
             "TaxAmount": [{ "_": totals.itemLevelTax, "currencyID": "MYR" }],
             "TaxSubtotal": [
@@ -463,7 +463,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             ]
           }
         ],
-        "LegalMonetaryTotal": [
+        "LegalMonetaryTotal": [ // needs rework
           {
             "LineExtensionAmount": [{ "_": formatAmount(totals.subtotal), "currencyID": "MYR" }],
             "TaxExclusiveAmount": [{ "_": formatAmount(totals.subtotal), "currencyID": "MYR" }],
@@ -474,7 +474,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             "PayableAmount": [{ "_": formatAmount(totals.total), "currencyID": "MYR" }]
           }
         ],
-        "InvoiceLine": [{
+        "InvoiceLine": [{ // needs rework (allow batch submission)
           "ID": [{ "_": "1234" }],
           "InvoicedQuantity": [{ "_": 1, "unitCode": "C62" }],
           "LineExtensionAmount": [{ "_": formatAmount(totals.subtotal), "currencyID": "MYR" }],
@@ -517,10 +517,10 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           "Item": [
             {
               "CommodityClassification": [
-                { "ItemClassificationCode": [{ "_": "NA", "listID": "PTC" }] },
+                { "ItemClassificationCode": [{ "_": "", "listID": "PTC" }] },
                 { "ItemClassificationCode": [{ "_": "022", "listID": "CLASS" }] }
               ],
-              "Description": [{ "_": "Consolidate Items" }],
+              "Description": [{ "_": "ERP Testing Dummy Product" }],
               "OriginCountry": [{ "IdentificationCode": [{ "_": "MYS" }] }]
             }
           ],
