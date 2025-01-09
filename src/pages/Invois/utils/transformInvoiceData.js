@@ -300,11 +300,11 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 ],
                 "PartyLegalEntity": [
                   {
-                    "RegistrationName": [{ "_": "General Public" }],
+                    "RegistrationName": [{ "_": "General Public" }], // Recipient name
                   }
                 ],
                 "PartyIdentification": [
-                  { "ID": [{ "_": "EI00000000010", "schemeID": "TIN" }] },
+                  { "ID": [{ "_": "EI00000000010", "schemeID": "TIN" }] }, // Recipient TIN
                   { "ID": [{ "_": "-", "schemeID": "BRN" }] },
                   { "ID": [{ "_": "-", "schemeID": "SST" }] },
                   { "ID": [{ "_": "-", "schemeID": "TTX" }] }
@@ -324,7 +324,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             "DeliveryParty": [
               {
                 "PartyLegalEntity": [
-                  { "RegistrationName": [{ "_": "General public" }] }
+                  { "RegistrationName": [{ "_": "General public" }] } // Recipient name
                 ],
                 "PostalAddress": [
                   {
@@ -347,7 +347,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   {
                     "ID": [
                       {
-                        "_": "EI00000000010",
+                        "_": "EI00000000010", // Recipient TIN
                         "schemeID": "TIN"
                       }
                     ]
@@ -367,7 +367,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               {
                 "ID": [
                   {
-                    "_": "General public"
+                    "_": ""
                   }
                 ],
                 "FreightAllowanceCharge": [
@@ -396,7 +396,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         ],
         "PaymentMeans": [
           {
-            "PaymentMeansCode": [{ "_": "01" }],
+            "PaymentMeansCode": [{ "_": "01" }], // 01 Cash 02 Cheque 03 Bank Transfer 04 Credit Card 05 Debit Card 06 e-Wallet/Digital Wallet 07	Digital Bank 08	Others
             "PayeeFinancialAccount": [{ "ID": [{ "_": "-"  }] }]
           }
         ],
@@ -404,7 +404,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           {
             "Note": [
               {
-                "_": "Payment method is cash"
+                "_": "Payment method is cash" // depends on PaymentMeansCode
               }
             ]
           }
@@ -474,7 +474,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             "PayableAmount": [{ "_": formatAmount(totals.total), "currencyID": "MYR" }]
           }
         ],
-        "InvoiceLine": [{ // needs rework (allow batch submission)
+        "InvoiceLine": [{ // focus here, needs rework (allow batch submission)
           "ID": [{ "_": "1234" }],
           "InvoicedQuantity": [{ "_": 1, "unitCode": "C62" }],
           "LineExtensionAmount": [{ "_": formatAmount(totals.subtotal), "currencyID": "MYR" }],
