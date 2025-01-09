@@ -275,7 +275,7 @@ const CatalogueJobCategoryPage: React.FC = () => {
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-11 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {sections.map((section) => (
               <ListboxOption
                 key={section}

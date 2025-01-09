@@ -96,6 +96,7 @@ export default function(pool) {
 
       const orderDetailsQuery = `
         SELECT 
+          od.id,
           od.invoiceid, 
           od.code,
           CASE 
@@ -151,6 +152,7 @@ export default function(pool) {
         orderDetails: orderDetailsResult.rows
           .filter(detail => detail.invoiceid === invoice.id)
           .map(detail => ({
+            id: detail.id,
             code: detail.code,
             productname: detail.productname,
             qty: detail.qty,
