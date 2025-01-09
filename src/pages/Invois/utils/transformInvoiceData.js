@@ -203,30 +203,30 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           {
             "StartDate": [{ "_": invoiceDate }],
             "EndDate": [{ "_": invoiceDate }],
-            "Description": [{ "_": "Monthly" }]
+            "Description": [{ "_": "Not Applicable" }]
           }
         ],
         "BillingReference": [
           {
             "AdditionalDocumentReference": [
               {
-                "ID": [{ "_": "E12345678912" }]
+                "ID": [{ "_": "NA" }]
               }
             ]
           }
         ],
         "AdditionalDocumentReference": [
           {
-            "ID": [{ "_": "E12345678912" }],
-            "DocumentType": [{ "_": "CustomsImportForm" }]
+            "ID": [{ "_": "NA" }],
+            "DocumentType": [{ "_": "NA" }]
           },
           {
-            "ID": [{ "_": "sa313321312" }],
-            "DocumentType": [{ "_": "213312dddddd" }],
+            "ID": [{ "_": "NA" }],
+            "DocumentType": [{ "_": "NA" }],
             "DocumentDescription": [{ "_": "NA" }]
           },
           {
-            "ID": [{ "_": "E12345678912" }],
+            "ID": [{ "_": "NA" }],
             "DocumentType": [{ "_": "K2" }]
           },
           {
@@ -235,7 +235,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         ],
         "AccountingSupplierParty": [
           {
-            "AdditionalAccountID": [{ "_": "CPT-CCN-W-211111-KL-000002", "schemeAgencyName": "CertEX" }],
+            "AdditionalAccountID": [{ "_": "NA", "schemeAgencyName": "CertEX" }],
             "Party": [
               {
                 "IndustryClassificationCode": [{ "_": "10741", "name": "Manufacture of meehoon, noodles and other related products" }],
@@ -247,13 +247,13 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 ],
                 "PostalAddress": [
                   {
-                    "CityName": [{ "_": "Kota Kinabalu" }],
+                    "CityName": [{ "_": "KOTA KINABALU" }],
                     "PostalZone": [{ "_": "88811" }],
                     "CountrySubentityCode": [{ "_": "12" }],
                     "AddressLine": [
-                      { "Line": [{ "_": "Lot 66" }] },
-                      { "Line": [{ "_": "Bangunan Merdeka" }] },
-                      { "Line": [{ "_": "Persiaran Jaya" }] }
+                      { "Line": [{ "_": "CL.215145645, KG KIBABAIG, PENAMPANG" }] },
+                      { "Line": [{ "_": "" }] },
+                      { "Line": [{ "_": "" }] }
                     ],
                     "Country": [
                       {
@@ -269,7 +269,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 ],
                 "Contact": [
                   {
-                    "Telephone": [{ "_": "+60-88719715" }],
+                    "Telephone": [{ "_": "+60-168329291" }],
                     "ElectronicMail": [{ "_": "tienhockfood@gmail.com" }]
                   }
                 ]
@@ -283,9 +283,9 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               {
                 "PostalAddress": [
                   {
-                    "CityName": [{ "_": "Kuala Lumpur" }],
+                    "CityName": [{ "_": "Kota Kinabalu" }],
                     "PostalZone": [{ "_": "50480" }],
-                    "CountrySubentityCode": [{ "_": "10" }],
+                    "CountrySubentityCode": [{ "_": "12" }],
                     "AddressLine": [
                       { "Line": [{ "_": "Lot 66" }] },
                       { "Line": [{ "_": "Bangunan Merdeka" }] },
@@ -328,13 +328,13 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 ],
                 "PostalAddress": [
                   {
-                    "CityName": [{ "_": "Kuala Lumpur" }],
-                    "PostalZone": [{ "_": "50480" }],
-                    "CountrySubentityCode": [{ "_": "10" }],
+                    "CityName": [{ "_": "NA" }],
+                    "PostalZone": [{ "_": "NA" }],
+                    "CountrySubentityCode": [{ "_": "17" }],
                     "AddressLine": [
-                      { "Line": [{ "_": "Lot 66" }] },
-                      { "Line": [{ "_": "Bangunan Merdeka" }] },
-                      { "Line": [{ "_": "Persiaran Jaya" }] }
+                      { "Line": [{ "_": "NA" }] },
+                      { "Line": [{ "_": "NA" }] },
+                      { "Line": [{ "_": "NA" }] }
                     ],
                     "Country": [
                       {
@@ -379,12 +379,12 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                     ],
                     "AllowanceChargeReason": [
                       {
-                        "_": "Service charge"
+                        "_": "NA"
                       }
                     ],
                     "Amount": [
                       {
-                        "_": 100,
+                        "_": 0,
                         "currencyID": "MYR"
                       }
                     ]
@@ -396,8 +396,8 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         ],
         "PaymentMeans": [
           {
-            "PaymentMeansCode": [{ "_": "03" }],
-            "PayeeFinancialAccount": [{ "ID": [{ "_": "1234567890123"  }] }]
+            "PaymentMeansCode": [{ "_": "01" }],
+            "PayeeFinancialAccount": [{ "ID": [{ "_": "NA"  }] }]
           }
         ],
         "PaymentTerms": [
@@ -413,23 +413,23 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           {
             "ID": [
               {
-                "_": "E12345678912"
+                "_": "NA"
               }
             ],
             "PaidAmount": [
               {
-                "_": 1,
+                "_": 0,
                 "currencyID": "MYR"
               }
             ],
             "PaidDate": [
               {
-                "_": "2024-07-23"
+                "_": invoiceDate
               }
             ],
             "PaidTime": [
               {
-                "_": "00:30:00Z"
+                "_": formattedTime
               }
             ]
           }
@@ -437,13 +437,13 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         "AllowanceCharge": [
           {
             "ChargeIndicator": [{ "_": false }],
-            "AllowanceChargeReason": [{ "_": "Sample Description" }],
-            "Amount": [{ "_": formatAmount(totals.subtotal * 0.15), "currencyID": "MYR" }]
+            "AllowanceChargeReason": [{ "_": "NA" }],
+            "Amount": [{ "_": 0, "currencyID": "MYR" }]
           },
           {
             "ChargeIndicator": [{ "_": true }],
-            "AllowanceChargeReason": [{ "_": "Service charge" }],
-            "Amount": [{ "_": formatAmount(totals.standardCharge), "currencyID": "MYR" }]
+            "AllowanceChargeReason": [{ "_": "NA" }],
+            "Amount": [{ "_": 0, "currencyID": "MYR" }]
           }
         ],
         "TaxTotal": [
@@ -517,8 +517,8 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           "Item": [
             {
               "CommodityClassification": [
-                { "ItemClassificationCode": [{ "_": "9800.00.0010", "listID": "PTC" }] },
-                { "ItemClassificationCode": [{ "_": "004", "listID": "CLASS" }] }
+                { "ItemClassificationCode": [{ "_": "NA", "listID": "PTC" }] },
+                { "ItemClassificationCode": [{ "_": "022", "listID": "CLASS" }] }
               ],
               "Description": [{ "_": "Consolidate Items" }],
               "OriginCountry": [{ "IdentificationCode": [{ "_": "MYS" }] }]

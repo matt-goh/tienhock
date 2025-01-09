@@ -546,7 +546,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                   >
-                    <ListboxOptions className="absolute z-10 w-full mt-11 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                    <ListboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
                       {[
                         { id: "C", name: "Cash" },
                         { id: "I", name: "Invoice" },
