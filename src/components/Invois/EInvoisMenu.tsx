@@ -8,6 +8,7 @@ import {
   IconPlug,
   IconX,
   IconAlertTriangle,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import { InvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
@@ -459,7 +460,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({ selectedInvoices }) => {
 
           <div className="flex items-center justify-between p-4 border-b border-default-200">
             <h2 className="text-lg font-semibold text-default-900">
-              Submit to e-Invois
+              Submit to MyInvois
             </h2>
             <button
               onClick={() => setIsOpen(false)}
@@ -497,8 +498,22 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({ selectedInvoices }) => {
                 )}
 
                 {selectedInvoices.length === 0 ? (
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
-                    Please select invoices to submit to e-Invois
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <IconInfoCircle
+                        size={20}
+                        className="flex-shrink-0 mt-0.5 text-amber-500"
+                      />
+                      <div className="space-y-1">
+                        <p className="font-medium text-amber-800">
+                          Please select invoices to submit to MyInvois
+                        </p>
+                        <p className="text-sm text-amber-700">
+                          It is recommended to submit via batches instead of
+                          single document per submission.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <Button
