@@ -29,7 +29,8 @@ class SessionService {
   private stateCheckInterval?: NodeJS.Timeout;
 
   constructor() {
-    this.currentSessionId = this.getStoredSessionId() || this.generateSessionId();
+    this.currentSessionId =
+      this.getStoredSessionId() || this.generateSessionId();
     this.startStateCheck();
   }
 
@@ -82,28 +83,32 @@ class SessionService {
     if (this.stateCheckInterval) {
       clearInterval(this.stateCheckInterval);
     }
-
-    // Check session state every minute
+    // Check every 5 minutes
     this.stateCheckInterval = setInterval(() => {
       this.checkState().catch(console.error);
-    }, 60000);
+    }, 5 * 60 * 1000);
   }
 
-  async checkState(): Promise<{staff: AuthenticatedUser | null, hasActiveProfile: boolean}> {
+  async checkState(): Promise<{
+    staff: AuthenticatedUser | null;
+    hasActiveProfile: boolean;
+  }> {
     try {
-      const response = await api.get(`/api/sessions/state/${this.currentSessionId}`);
+      const response = await api.get(
+        `/api/sessions/state/${this.currentSessionId}`
+      );
       if (response.staff) {
         this.updateStoredSession(response.staff.id, response.staff);
       }
       return {
         staff: response.staff || null,
-        hasActiveProfile: response.hasActiveProfile
+        hasActiveProfile: response.hasActiveProfile,
       };
     } catch (error) {
       console.error("Session state check failed:", error);
       return {
         staff: null,
-        hasActiveProfile: false
+        hasActiveProfile: false,
       };
     }
   }
