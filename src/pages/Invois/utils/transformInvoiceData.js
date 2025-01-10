@@ -95,6 +95,16 @@ const calculateTaxAndTotals = (invoiceData) => {
     }, 0)
   );
 
+  // Calculate tax by summing all tax rows
+  const tax = formatAmount(
+    invoiceData.orderDetails
+      .filter(detail => detail.istax)
+      .reduce((sum, detail) => {
+        const amount = typeof detail.total === 'string' ? parseFloat(detail.total) : Number(detail.total);
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0)
+  );
+
   // Calculate FOC items total
   const focAmount = formatAmount(
     normalItems
@@ -107,7 +117,6 @@ const calculateTaxAndTotals = (invoiceData) => {
   );
 
   // Handle optional values with default 0
-  const tax = formatAmount(invoiceData.tax || 0);
   const discount = formatAmount(invoiceData.discount || 0);
   const rounding = formatAmount(invoiceData.rounding || 0);
 
@@ -190,7 +199,7 @@ const generateInvoiceLines = (orderDetails) => {
       "LineExtensionAmount": [{ 
         "_": lineAmount,
         "currencyID": "MYR" 
-      }],
+      }], // Sum of amount payable (inclusive of applicable discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
       "AllowanceCharge": [
         {
           "ChargeIndicator": [{ "_": false }],
@@ -207,17 +216,17 @@ const generateInvoiceLines = (orderDetails) => {
       ],
       "TaxTotal": [
         {
-          "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // total tax amount
+          "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable.
           "TaxSubtotal": [
             {
-              "TaxableAmount": [{ "_": 0, "currencyID": "MYR" }], // total tax amount
-              "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // total tax amount
+              "TaxableAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable.
+              "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable.t
               "BaseUnitMeasure": [{ "_": Number(item.qty), "unitCode": "NMP" }],
               "PerUnitAmount": [{ "_": formatAmount(item.price), "currencyID": "MYR" }],
               "TaxCategory": [
                 {
-                  "ID": [{ "_": "E" }],
-                  "TaxExemptionReason": [{ "_": "NA" }],
+                  "ID": [{ "_": "E" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
+                  "TaxExemptionReason": [{ "_": "-" }],
                   "TaxScheme": [{ 
                     "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }]
                   }]
@@ -245,10 +254,10 @@ const generateInvoiceLines = (orderDetails) => {
       }],
       "ItemPriceExtension": [{ 
         "Amount": [{ 
-          "_": lineAmount, 
+          "_": formatAmount(item.price), 
           "currencyID": "MYR" 
         }] 
-      }]
+      }] // Amount of each individual item / service within the invoice, excluding any taxes, charges or discounts
     };
   });
 };
@@ -531,14 +540,14 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
           ],
           "TaxTotal": [ // needs rework
             {
-              "TaxAmount": [{ "_": 0, "currencyID": "MYR" }],
+              "TaxAmount": [{ "_": totals.tax, "currencyID": "MYR" }], // Total amount of tax payable
               "TaxSubtotal": [
                 {
-                  "TaxableAmount": [{ "_": 0, "currencyID": "MYR" }],
-                  "TaxAmount": [{ "_": 0, "currencyID": "MYR" }],
+                  "TaxableAmount": [{ "_": totals.tax, "currencyID": "MYR" }], // (Optional) Sum of amount chargeable for each tax type
+                  "TaxAmount": [{ "_": totals.tax, "currencyID": "MYR" }], // Total amount of tax payable for each tax type
                   "TaxCategory": [
                     {
-                      "ID": [{ "_": "E" }],
+                      "ID": [{ "_": "E" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E	Tax exemption (where applicable)
                       "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
                     }
                   ]
@@ -547,13 +556,13 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             }
           ],
           "LegalMonetaryTotal": [{
-            "LineExtensionAmount": [{ "_": 0, "currencyID": "MYR" }],
-            "TaxExclusiveAmount": [{ "_": totals.total, "currencyID": "MYR" }],
-            "TaxInclusiveAmount": [{ "_": formatAmount(totals.total + totals.tax), "currencyID": "MYR" }],
-            "AllowanceTotalAmount": [{ "_": totals.total, "currencyID": "MYR" }],
-            "ChargeTotalAmount": [{ "_": totals.total, "currencyID": "MYR" }],
-            "PayableRoundingAmount": [{ "_": totals.rounding, "currencyID": "MYR" }],
-            "PayableAmount": [{ "_": totals.total, "currencyID": "MYR" }]
+            "LineExtensionAmount": [{ "_": totals.subtotal, "currencyID": "MYR" }], // (Optional) Sum of total amount payable (inclusive of applicable line item and invoice level discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
+            "TaxExclusiveAmount": [{ "_": totals.subtotal, "currencyID": "MYR" }], // Sum of amount payable (inclusive of applicable discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
+            "TaxInclusiveAmount": [{ "_": totals.total, "currencyID": "MYR" }], // Sum of amount payable inclusive of total taxes chargeable (e.g., sales tax, service tax).
+            "AllowanceTotalAmount": [{ "_": totals.total, "currencyID": "MYR" }], // (Optional) Total amount deducted from the original price of the product(s) or service(s).
+            "ChargeTotalAmount": [{ "_": totals.subtotal, "currencyID": "MYR" }], // (Optional) Total charge associated with the product(s) or service(s) imposed before tax.
+            "PayableRoundingAmount": [{ "_": totals.rounding, "currencyID": "MYR" }], // (Optional) Rounding amount added to the amount payable.
+            "PayableAmount": [{ "_": totals.total, "currencyID": "MYR" }] // Sum of amount payable (inclusive of total taxes chargeable and any rounding adjustment) excluding any amount paid in advance.
           }],
           "InvoiceLine": invoiceLines
         }
