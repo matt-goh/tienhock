@@ -7,7 +7,6 @@ import React, {
   useCallback,
 } from "react";
 import {
-  flexRender,
   getCoreRowModel,
   useReactTable,
   SortingState,
@@ -55,6 +54,7 @@ function TableEditing<T extends Record<string, any>>({
   columns,
   onSpecialRowDelete,
   onSelectionChange,
+  onClearSelection,
   onChange,
   tableKey,
 }: TableProps<T>) {
@@ -154,6 +154,21 @@ function TableEditing<T extends Record<string, any>>({
     },
     [pagination, tableKey, data, onSelectionChange]
   );
+
+  const handleClearAllSelections = useCallback(() => {
+    if (tableKey !== "invois") return;
+
+    setSelection((prev) => {
+      onSelectionChange?.(0, false, []); // Notify parent of cleared selection
+      return { ...prev, selectedRows: new Set() };
+    });
+  }, [tableKey, onSelectionChange]);
+
+  useEffect(() => {
+    if (onClearSelection) {
+      onClearSelection(handleClearAllSelections);
+    }
+  }, [handleClearAllSelections, onClearSelection]);
 
   // Update page selection state calculation for global selection
   const pageSelectionState = useMemo(() => {

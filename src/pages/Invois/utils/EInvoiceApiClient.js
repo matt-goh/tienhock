@@ -8,7 +8,7 @@ class EInvoiceApiClient {
     this.clientSecret = clientSecret;
     this.accessToken = null;
     this.tokenExpiryTime = null;
-    this.refreshThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
+    this.refreshThreshold = 5 * 60 * 1000;
     this.refreshTimeout = null;
   }
 
@@ -41,12 +41,20 @@ class EInvoiceApiClient {
 
       const req = request(options, (res) => {
         let data = '';
+        
         res.on('data', (chunk) => {
           data += chunk;
         });
+
         res.on('end', () => {
           try {
             const response = JSON.parse(data);
+            
+            if (res.statusCode !== 200) {
+              reject(new Error(`Token refresh failed: ${response.error || 'Unknown error'}`));
+              return;
+            }
+
             this.accessToken = response.access_token;
             this.tokenExpiryTime = Date.now() + response.expires_in * 1000;
             
@@ -70,52 +78,66 @@ class EInvoiceApiClient {
   }
 
   scheduleTokenRefresh(expiresIn) {
-    // Clear any existing refresh timeout
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
     }
 
-    // Schedule a refresh for 5 minutes before the token expires
-    const refreshTime = (expiresIn - 5 * 60) * 1000; // convert to milliseconds
+    const refreshTime = (expiresIn - 5 * 60) * 1000;
     this.refreshTimeout = setTimeout(() => {
       this.refreshToken()
         .catch(error => console.error('Failed to refresh token:', error));
     }, refreshTime);
   }
 
-  makeApiCall(method, endpoint, data = null) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        await this.ensureValidToken();
+  async makeApiCall(method, endpoint, data = null) {
+    try {
+      await this.ensureValidToken();
 
+      return new Promise((resolve, reject) => {
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
         const options = {
           hostname: new URL(this.baseUrl).hostname,
           port: 443,
-          path: endpoint,
+          path: normalizedEndpoint,
           method: method,
           headers: {
             'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
         };
 
-        console.log('API Request Options:', JSON.stringify(options, null, 2)); // Log request options
-
         const req = request(options, (res) => {
           let responseData = '';
+          
           res.on('data', (chunk) => {
             responseData += chunk;
           });
+
           res.on('end', () => {
-            console.log('API Response Status:', res.statusCode); // Log response status
-            console.log('API Response Body:', responseData); // Log raw response body
+            console.log('API Response Status:', res.statusCode);
+            console.log('API Response Body:', responseData);
 
             try {
+              // Handle empty response
+              if (!responseData.trim()) {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                  resolve({});
+                } else {
+                  reject(new Error(`Empty response with status ${res.statusCode}`));
+                }
+                return;
+              }
+
               const parsedData = JSON.parse(responseData);
+              
               if (res.statusCode >= 200 && res.statusCode < 300) {
                 resolve(parsedData);
               } else {
-                reject(new Error(`API request failed with status ${res.statusCode}: ${JSON.stringify(parsedData)}`));
+                const error = new Error(`API request failed with status ${res.statusCode}`);
+                error.status = res.statusCode;
+                error.response = parsedData;
+                reject(error);
               }
             } catch (error) {
               reject(new Error(`Failed to parse API response: ${error.message}\nRaw response: ${responseData}`));
@@ -124,21 +146,28 @@ class EInvoiceApiClient {
         });
 
         req.on('error', (error) => {
-          console.error('API Request Error:', error);
+          console.error('Request error:', error);
           reject(new Error(`API request failed: ${error.message}`));
         });
 
         if (data) {
           const stringData = JSON.stringify(data);
-          console.log('API Request Body:', stringData); // Log request body
           req.write(stringData);
         }
+
         req.end();
-      } catch (error) {
-        console.error('Error in makeApiCall:', error);
-        reject(error);
-      }
-    });
+      });
+
+    } catch (error) {
+      console.error('Error in makeApiCall:', error);
+      throw error;
+    }
+  }
+
+  cleanup() {
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+    }
   }
 }
 
