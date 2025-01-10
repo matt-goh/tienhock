@@ -49,54 +49,106 @@ export default function(pool, config) {
   // Submit invoice to MyInvois
   router.post('/submit', async (req, res) => {
     try {
-      console.log('Starting invoice submission process');
-      const { invoiceId } = req.body;
+      console.log('Starting batch invoice submission process');
+      const { invoiceIds } = req.body;
 
-      if (!invoiceId) {
+      if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'No invoice ID provided for submission'
+          message: 'No invoice IDs provided for submission'
         });
       }
 
-      try {
-        // 1. Fetch invoice data from database
-        const invoiceData = await fetchInvoiceFromDb(pool, invoiceId);
-        console.log('Fetched invoice data:', JSON.stringify(invoiceData, null, 2));
-        
-        if (!invoiceData) {
-          throw new Error(`Invoice with ID ${invoiceId} not found`);
-        }
-        
-        // 2. Transform invoice data to MyInvois format
-        const transformedInvoice = transformInvoiceToMyInvoisFormat(invoiceData);
-        
-        // 3. Submit transformed invoice
-        const result = await submissionHandler.submitAndPollDocument(transformedInvoice);
+      console.log(`Processing ${invoiceIds.length} invoices in batch`);
 
-        if (result.success) {
-          console.log('Invoice submission successful:', JSON.stringify(result, null, 2));
-          res.json({
-            success: true,
-            message: result.message,
-            submissionUid: result.submissionUid,
-            acceptedDocuments: result.acceptedDocuments
-          });
-        } else {
-          console.error('Invoice submission failed:', JSON.stringify(result, null, 2));
-          res.status(400).json({
-            success: false,
-            message: result.message,
-            submissionUid: result.submissionUid,
-            rejectedDocuments: result.rejectedDocuments
+      const results = {
+        success: true,
+        message: '',
+        submissionResults: [],
+        failedInvoices: [],
+        successCount: 0,
+        failureCount: 0
+      };
+
+      try {
+        // Process all invoices in the batch
+        const transformedInvoices = [];
+        const transformationErrors = [];
+
+        // 1. Fetch and transform all invoices
+        for (const invoiceId of invoiceIds) {
+          try {
+            // Fetch invoice data from database
+            const invoiceData = await fetchInvoiceFromDb(pool, invoiceId);
+            
+            if (!invoiceData) {
+              throw new Error(`Invoice with ID ${invoiceId} not found`);
+            }
+            
+            // Transform invoice data to MyInvois format
+            const transformedInvoice = transformInvoiceToMyInvoisFormat(invoiceData);
+            transformedInvoices.push(transformedInvoice);
+          } catch (error) {
+            transformationErrors.push({
+              invoiceId,
+              error: error.message
+            });
+          }
+        }
+
+        // If no invoices were successfully transformed
+        if (transformedInvoices.length === 0) {
+          throw new Error('Failed to transform any invoices in the batch. Errors: ' + 
+            JSON.stringify(transformationErrors));
+        }
+
+        // 2. Submit transformed invoices
+        const submissionResult = await submissionHandler.submitAndPollDocuments(transformedInvoices);
+
+        // 3. Process results
+        if (submissionResult.success) {
+          results.successCount = submissionResult.acceptedDocuments.length;
+          results.message = `Successfully submitted ${results.successCount} invoice(s)`;
+          results.submissionResults.push({
+            submissionUid: submissionResult.submissionUid,
+            acceptedDocuments: submissionResult.acceptedDocuments
           });
         }
+
+        if (submissionResult.rejectedDocuments?.length > 0) {
+          results.failureCount = submissionResult.rejectedDocuments.length;
+          results.failedInvoices = submissionResult.rejectedDocuments;
+        }
+
+        // Add transformation errors to results
+        if (transformationErrors.length > 0) {
+          results.failureCount += transformationErrors.length;
+          results.failedInvoices.push(...transformationErrors);
+        }
+
+        // Set overall success status
+        results.success = results.successCount > 0;
+
+        // If everything failed
+        if (results.failureCount === invoiceIds.length) {
+          throw new Error('All invoices failed processing');
+        }
+
+        // Send response
+        if (results.success) {
+          console.log('Batch submission completed:', JSON.stringify(results, null, 2));
+          res.json(results);
+        } else {
+          console.error('Batch submission failed:', JSON.stringify(results, null, 2));
+          res.status(400).json(results);
+        }
+
       } catch (error) {
-        console.error('Error in invoice processing:', error);
+        console.error('Error in batch processing:', error);
         throw error;
       }
     } catch (error) {
-      console.error('Error submitting invoice:', error);
+      console.error('Error submitting batch:', error);
       let errorMessage = error.message;
       let errorDetails = null;
 
@@ -106,16 +158,16 @@ export default function(pool, config) {
         errorDetails = error.response.data?.error?.details || null;
       }
 
-      // Check for specific errors and provide more user-friendly messages
+      // Enhanced error messages for batch processing
       if (errorMessage.includes('Document hash is not valid')) {
-        errorMessage = 'Document hash validation failed. Please ensure the document content is correct and try again.';
+        errorMessage = 'One or more documents failed hash validation. Please verify the document contents and try again.';
       } else if (errorMessage.includes('Hash verification failed')) {
         errorMessage = 'Internal hash verification failed. This may indicate an issue with the hash calculation process.';
       }
 
       res.status(500).json({ 
         success: false, 
-        message: 'Failed to submit invoice to MyInvois API', 
+        message: 'Failed to process batch submission', 
         error: errorMessage,
         details: errorDetails
       });

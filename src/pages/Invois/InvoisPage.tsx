@@ -83,6 +83,7 @@ const InvoisPage: React.FC = () => {
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const clearSelectionRef = useRef<(() => void) | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -133,6 +134,12 @@ const InvoisPage: React.FC = () => {
     []
   );
 
+  const handleSubmissionComplete = useCallback(() => {
+    setSelectedCount(0);
+    setIsAllSelected(false);
+    setSelectedInvoices([]);
+  }, []);
+
   const handleBulkDelete = async () => {
     // Close the dialog immediately
     setShowDeleteConfirmation(false);
@@ -173,9 +180,7 @@ const InvoisPage: React.FC = () => {
       setInvoices(fetchedInvoices);
 
       // Reset selection states
-      setSelectedCount(0);
-      setIsAllSelected(false);
-      setSelectedInvoices([]);
+      handleSubmissionComplete();
 
       toast.success("Selected invoices deleted successfully");
     } catch (error) {
@@ -253,9 +258,7 @@ const InvoisPage: React.FC = () => {
 
     if (filters.applyProductFilter) {
       // Reset selection when switching to product view
-      setSelectedCount(0);
-      setIsAllSelected(false);
-      setSelectedInvoices([]);
+      handleSubmissionComplete();
       const products: { [key: string]: ProductData } = {};
 
       filtered.forEach((invoice) => {
@@ -334,10 +337,8 @@ const InvoisPage: React.FC = () => {
   }, [invoices, filters, searchTerm]);
 
   useEffect(() => {
-    setSelectedCount(0);
-    setIsAllSelected(false);
-    setSelectedInvoices([]);
-  }, [invoices]);
+    handleSubmissionComplete();
+  }, [invoices, handleSubmissionComplete]);
 
   useEffect(() => {
     applyFilters();
@@ -799,7 +800,11 @@ const InvoisPage: React.FC = () => {
               multiple
             />
             <div className="flex items-center gap-3">
-              <EInvoisMenu selectedInvoices={selectedInvoices} />
+              <EInvoisMenu
+                selectedInvoices={selectedInvoices}
+                onSubmissionComplete={handleSubmissionComplete}
+                clearSelection={() => clearSelectionRef.current?.()}
+              />
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 icon={IconCloudUpload}
@@ -923,6 +928,9 @@ const InvoisPage: React.FC = () => {
               columns={invoiceColumns}
               onChange={setInvoices}
               onSelectionChange={handleSelectionChange}
+              onClearSelection={(fn) => {
+                clearSelectionRef.current = fn;
+              }}
               tableKey="invois"
             />
           ) : (

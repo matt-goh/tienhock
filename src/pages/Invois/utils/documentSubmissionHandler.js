@@ -8,69 +8,95 @@ class DocumentSubmissionHandler {
     this.POLLING_INTERVAL = 5000; // 5 seconds
   }
 
-  async submitAndPollDocument(transformedInvoice) {
+  async submitAndPollDocuments(transformedInvoices) {
     try {
-      const requestBody = this.prepareRequestBody(transformedInvoice);
+      // Handle both single and multiple invoice scenarios
+      const invoices = Array.isArray(transformedInvoices) 
+        ? transformedInvoices 
+        : [transformedInvoices];
 
-      const submissionResponse = await this.submitDocuments(requestBody);
+      console.log('Preparing request body for', invoices.length, 'invoices');
+      const requestBody = this.prepareRequestBody(invoices);
 
-      this.validateSubmissionResponse(submissionResponse);
+      const submissionResponse = await this.apiClient.makeApiCall(
+        'POST', 
+        '/api/v1.0/documentsubmissions', 
+        requestBody
+      );
+      
+      // Validate submission response
+      if (!submissionResponse || !submissionResponse.submissionUid) {
+        throw new Error('Invalid submission response: No submissionUid received');
+      }
 
-      const submissionStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
-      return this.processSubmissionResult(submissionStatus);
+      // Poll for final status
+      const finalStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
+      
+      // Return combined results
+      return {
+        success: finalStatus.overallStatus === 'Valid',
+        message: finalStatus.overallStatus === 'Valid' 
+          ? `Successfully submitted ${finalStatus.documentSummary.length} document(s)` 
+          : 'Document submission failed',
+        submissionUid: finalStatus.submissionUid,
+        acceptedDocuments: finalStatus.documentSummary || [],
+        documentCount: finalStatus.documentCount,
+        dateTimeReceived: finalStatus.dateTimeReceived,
+        overallStatus: finalStatus.overallStatus,
+        rejectedDocuments: submissionResponse.rejectedDocuments || []
+      };
     } catch (error) {
-      this.handleError(error);
+      console.error('Error in document submission process:', error);
       throw error;
     }
   }
 
-  prepareRequestBody(invoice) {
-    if (!invoice || !invoice.Invoice || !invoice.Invoice[0] || !invoice.Invoice[0].ID) {
-      throw new Error('Invalid invoice data structure');
+  // Keep existing prepareRequestBody, encodeDocument, and calculateHash methods as they are
+  prepareRequestBody(invoices) {
+    if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
+      throw new Error('Invalid invoice data: No invoices provided');
     }
-    
-    const jsonDocument = JSON.stringify(invoice);
-    
-    return {
-      documents: [{
+
+    const documents = invoices.map(invoice => {
+      if (!invoice || !invoice.Invoice || !invoice.Invoice[0] || !invoice.Invoice[0].ID) {
+        throw new Error('Invalid invoice data structure');
+      }
+
+      const jsonDocument = JSON.stringify(invoice);
+      
+      return {
         format: "JSON",
         document: this.encodeDocument(jsonDocument),
         documentHash: this.calculateHash(jsonDocument),
         codeNumber: invoice.Invoice[0].ID[0]._
-      }]
-    };
+      };
+    });
+
+    return { documents };
   }
 
+  // Keep existing encoding method
   encodeDocument(jsonDocument) {
     return Buffer.from(jsonDocument, 'utf8').toString('base64');
   }
 
+  // Keep existing hash calculation method
   calculateHash(jsonDocument) {
     return createHash('sha256').update(jsonDocument, 'utf8').digest('hex');
-  }
-
-  async submitDocuments(requestBody) {
-    const response = await this.apiClient.makeApiCall('POST', '/api/v1.0/documentsubmissions/', requestBody);
-    return response;
-  }
-
-  validateSubmissionResponse(submissionResponse) {
-    if (submissionResponse.rejectedDocuments && submissionResponse.rejectedDocuments.length > 0) {
-      throw new Error(`Document rejected: ${JSON.stringify(submissionResponse.rejectedDocuments)}`);
-    }
-    if (!submissionResponse.submissionUid) {
-      throw new Error('No submissionUid received from submitDocuments');
-    }
   }
 
   async pollSubmissionStatus(submissionUid) {
     let attempts = 0;
     while (attempts < this.MAX_POLLING_ATTEMPTS) {
       try {
-        const submission = await this.apiClient.makeApiCall('GET', `/api/v1.0/documentsubmissions/${submissionUid}`);
+        const response = await this.apiClient.makeApiCall(
+          'GET', 
+          `/api/v1.0/documentsubmissions/${submissionUid}`
+        );
 
-        if (submission.overallStatus !== 'InProgress') {
-          return submission;
+        // Return immediately if status is final
+        if (response.overallStatus !== 'InProgress') {
+          return response;
         }
 
         attempts++;
@@ -82,37 +108,6 @@ class DocumentSubmissionHandler {
       }
     }
     throw new Error(`Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`);
-  }
-
-  processSubmissionResult(submissionStatus) {
-    return submissionStatus.overallStatus === 'Valid'
-      ? this.createSuccessResult(submissionStatus)
-      : this.createFailureResult(submissionStatus);
-  }
-
-  createSuccessResult(submissionStatus) {
-    return {
-      success: true,
-      message: 'Document submitted successfully',
-      submissionUid: submissionStatus.submissionUid,
-      acceptedDocuments: submissionStatus.acceptedDocuments
-    };
-  }
-
-  createFailureResult(submissionStatus) {
-    return {
-      success: false,
-      message: 'Document submission failed',
-      submissionUid: submissionStatus.submissionUid,
-      rejectedDocuments: submissionStatus.rejectedDocuments
-    };
-  }
-
-  handleError(error) {
-    console.error('Error in document submission process:', error);
-    if (error.response) {
-      console.error('Full API error response:', JSON.stringify(error.response.data, null, 2));
-    }
   }
 
   wait(ms) {

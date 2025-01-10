@@ -61,6 +61,47 @@ export interface Staff {
   job: string[];
 }
 
+export interface DocumentSummary {
+  uuid: string;
+  submissionUid: string;
+  longId: string;
+  internalId: string;
+  typeName: string;
+  typeVersionName: string;
+  issuerTin: string;
+  issuerName: string;
+  receiverId: string;
+  receiverName: string;
+  dateTimeIssued: string;
+  dateTimeReceived: string;
+  dateTimeValidated: string;
+  totalPayableAmount: number;
+  totalExcludingTax: number;
+  totalDiscount: number;
+  totalNetAmount: number;
+  status: string;
+  cancelDateTime: string | null;
+  rejectRequestDateTime: string | null;
+  documentStatusReason: string | null;
+  createdByUserId: string;
+}
+
+export interface SubmissionResponse {
+  success: boolean;
+  message: string;
+  submissionInfo?: {
+    submissionUid: string;
+    documentCount: number;
+    dateTimeReceived: string;
+    overallStatus: string;
+  };
+  acceptedDocuments: DocumentSummary[];
+  rejectedDocuments: Array<{
+    invoiceCodeNumber: string;
+    error: any;
+  }>;
+}
+
 // Define column types
 export type ColumnType =
   | "selection"
@@ -110,6 +151,7 @@ export interface TableProps<T> {
     allSelected: boolean,
     selectedData: T[]
   ) => void;
+  onClearSelection?: (fn: () => void) => void;
   onDelete?: (selectedIds: number[]) => Promise<void>;
   onChange?: (changedData: T[]) => void;
   isEditing?: boolean;
