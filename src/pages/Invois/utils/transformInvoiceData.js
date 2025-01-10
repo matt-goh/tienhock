@@ -81,58 +81,6 @@ const formatTime = (timeStr) => {
   }
 };
 
-const calculateTaxAndTotals = (invoiceData) => {
-  // Filter normal items (not special rows)
-  const normalItems = invoiceData.orderDetails.filter(detail => 
-    !detail.istotal && !detail.issubtotal && !detail.isless && !detail.istax
-  );
-  
-  // Calculate subtotal from normal items
-  const subtotal = formatAmount(
-    normalItems.reduce((sum, detail) => {
-      const amount = typeof detail.total === 'string' ? parseFloat(detail.total) : Number(detail.total);
-      return sum + (isNaN(amount) ? 0 : amount);
-    }, 0)
-  );
-
-  // Calculate tax by summing all tax rows
-  const tax = formatAmount(
-    invoiceData.orderDetails
-      .filter(detail => detail.istax)
-      .reduce((sum, detail) => {
-        const amount = typeof detail.total === 'string' ? parseFloat(detail.total) : Number(detail.total);
-        return sum + (isNaN(amount) ? 0 : amount);
-      }, 0)
-  );
-
-  // Calculate FOC items total
-  const focAmount = formatAmount(
-    normalItems
-      .filter(detail => detail.isfoc)
-      .reduce((sum, detail) => {
-        const price = typeof detail.price === 'string' ? parseFloat(detail.price) : Number(detail.price);
-        const qty = typeof detail.qty === 'string' ? parseFloat(detail.qty) : Number(detail.qty);
-        return sum + ((!isNaN(price) && !isNaN(qty)) ? price * qty : 0);
-      }, 0)
-  );
-
-  // Handle optional values with default 0
-  const discount = formatAmount(invoiceData.discount || 0);
-  const rounding = formatAmount(invoiceData.rounding || 0);
-
-  // Calculate final total
-  const total = formatAmount(subtotal + tax - discount + rounding);
-
-  return {
-    subtotal,
-    tax,
-    focAmount,
-    discount,
-    rounding,
-    total
-  };
-};
-
 const validateInvoiceData = (invoiceData) => {
 
   if (!invoiceData) {
@@ -152,8 +100,6 @@ const validateInvoiceData = (invoiceData) => {
     time: invoiceData.time || new Date().toISOString().split('T')[1].split('.')[0] + 'Z',
     invoiceno: invoiceData.invoiceno || 'UNKNOWN',
     tax: invoiceData.tax || '0',
-    discount: invoiceData.discount || '0',
-    rounding: invoiceData.rounding || '0',
     orderDetails: invoiceData.orderDetails.map(detail => ({
       ...detail,
       qty: Number(detail.qty || 0),
@@ -170,19 +116,84 @@ const validateInvoiceData = (invoiceData) => {
   return validatedData;
 };
 
-// Handle multiple invoice lines
-const generateInvoiceLines = (orderDetails) => {
-  // Filter for regular items only (not FOC, not returned, not special rows)
-  const regularItems = orderDetails.filter(detail => 
-    !detail.isfoc && 
-    !detail.isreturned && 
-    !detail.istotal && 
-    !detail.issubtotal && 
-    !detail.isless && 
-    !detail.istax
+// Helper function to get payment details based on invoice type
+const getPaymentDetails = (invoiceType) => {
+  // Default to cash (01) if type is not provided
+  const type = invoiceType?.toUpperCase();
+
+  // Payment mapping
+  switch (type) {
+    case 'I': // Invoice
+      return {
+        code: "03", // Bank Transfer
+        description: "Payment via bank transfer"
+      };
+    case 'C': // Cash
+    default:
+      return {
+        code: "01", // Cash
+        description: "Payment method is cash"
+      };
+  }
+};
+
+// Helper function to calculate line item tax
+const calculateLineTax = (item, subtotal, totalTax) => {
+  const itemTotal = typeof item.total === 'string' ? parseFloat(item.total) : Number(item.total);
+  if (subtotal === 0) return 0;
+  return formatAmount((itemTotal / subtotal) * totalTax);
+};
+
+const calculateTaxAndTotals = (invoiceData) => {
+  // Filter normal items (not special rows)
+  const normalItems = invoiceData.orderDetails.filter(detail => 
+    !detail.istotal && !detail.issubtotal && !detail.isless && !detail.istax
+  );
+  
+  // Calculate subtotal from normal items
+  const subtotal = formatAmount(
+    normalItems.reduce((sum, detail) => {
+      const amount = typeof detail.total === 'string' ? parseFloat(detail.total) : Number(detail.total);
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0)
   );
 
-  return regularItems.map(item => {
+  // Calculate total tax from tax rows
+  const totalTax = formatAmount(
+    invoiceData.orderDetails
+      .filter(detail => detail.istax)
+      .reduce((sum, detail) => {
+        const amount = typeof detail.total === 'string' ? parseFloat(detail.total) : Number(detail.total);
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0)
+  );
+
+  // Calculate tax for each line item
+  const lineItemsWithTax = normalItems.map(item => ({
+    ...item,
+    lineTax: calculateLineTax(item, subtotal, totalTax)
+  }));
+
+  // Calculate final total
+  const total = formatAmount(subtotal + totalTax);
+
+  return {
+    subtotal,
+    tax: totalTax,
+    total,
+    lineItemsWithTax
+  };
+};
+
+// Handle multiple invoice lines
+const generateInvoiceLines = (orderDetails) => {
+  // First use calculateTaxAndTotals to get all the calculations
+  const {
+    lineItemsWithTax
+  } = calculateTaxAndTotals({ orderDetails });
+
+  // Generate invoice lines with tax calculations
+  return lineItemsWithTax.map(item => {
     const lineAmount = formatAmount(
       (typeof item.qty === 'string' ? parseFloat(item.qty) : Number(item.qty)) * 
       (typeof item.price === 'string' ? parseFloat(item.price) : Number(item.price))
@@ -214,13 +225,13 @@ const generateInvoiceLines = (orderDetails) => {
           "Amount": [{ "_": 0, "currencyID": "MYR" }]
         }
       ],
-      "TaxTotal": [
+      "TaxTotal": [ // Tax for individual items (not needed)
         {
           "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable.
           "TaxSubtotal": [
             {
               "TaxableAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable.
-              "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable.t
+              "TaxAmount": [{ "_": 0, "currencyID": "MYR" }], // The amount of tax payable
               "BaseUnitMeasure": [{ "_": Number(item.qty), "unitCode": "NMP" }],
               "PerUnitAmount": [{ "_": formatAmount(item.price), "currencyID": "MYR" }],
               "TaxCategory": [
@@ -254,7 +265,7 @@ const generateInvoiceLines = (orderDetails) => {
       }],
       "ItemPriceExtension": [{ 
         "Amount": [{ 
-          "_": formatAmount(item.price), 
+          "_": formatAmount(lineAmount), 
           "currencyID": "MYR" 
         }] 
       }] // Amount of each individual item / service within the invoice, excluding any taxes, charges or discounts
@@ -275,8 +286,13 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
     const invoiceDate = formatDate(invoiceData.date);
     const formattedTime = formatTime(invoiceData.time);
 
+    // Payment means function
+    const paymentDetails = getPaymentDetails(invoiceData.type);
+
+    // Total amounts calculation
     const totals = calculateTaxAndTotals(invoiceData);
 
+    // Allowing multi-lines invoice
     const invoiceLines = generateInvoiceLines(invoiceData.orderDetails);
 
     return {
@@ -340,7 +356,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   "PostalAddress": [
                     {
                       "CityName": [{ "_": "KOTA KINABALU" }],
-                      "PostalZone": [{ "_": " 88811" }],
+                      "PostalZone": [{ "_": "88811" }],
                       "CountrySubentityCode": [{ "_": "12" }],
                       "AddressLine": [
                         { "Line": [{ "_": "CL.215145645, KG KIBABAIG, PENAMPANG" }] },
@@ -486,17 +502,17 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               ]
             }
           ],
-          "PaymentMeans": [ // needs rework
+          "PaymentMeans": [
             {
-              "PaymentMeansCode": [{ "_": "01" }], // 01 Cash 02 Cheque 03 Bank Transfer 04 Credit Card 05 Debit Card 06 e-Wallet / Digital Wallet 07	Digital Bank 08	Others
+              "PaymentMeansCode": [{ "_": paymentDetails.code }], // 01 Cash 02 Cheque 03 Bank Transfer 04 Credit Card 05 Debit Card 06 e-Wallet / Digital Wallet 07	Digital Bank 08	Others
               "PayeeFinancialAccount": [{ "ID": [{ "_": "-"  }] }]
             }
           ],
-          "PaymentTerms": [ // needs rework
+          "PaymentTerms": [
             {
               "Note": [
                 {
-                  "_": "Payment method is cash" // depends on PaymentMeansCode
+                  "_": paymentDetails.description // In our case, cash = 01, invoice = 03 (bank transfer)
                 }
               ]
             }
@@ -538,7 +554,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               "Amount": [{ "_": 0, "currencyID": "MYR" }]
             }
           ],
-          "TaxTotal": [ // needs rework
+          "TaxTotal": [
             {
               "TaxAmount": [{ "_": totals.tax, "currencyID": "MYR" }], // Total amount of tax payable
               "TaxSubtotal": [
@@ -547,7 +563,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   "TaxAmount": [{ "_": totals.tax, "currencyID": "MYR" }], // Total amount of tax payable for each tax type
                   "TaxCategory": [
                     {
-                      "ID": [{ "_": "E" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E	Tax exemption (where applicable)
+                      "ID": [{ "_": totals.tax > 0 ? "01" : "E" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E	Tax exemption (where applicable)
                       "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
                     }
                   ]
@@ -561,7 +577,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             "TaxInclusiveAmount": [{ "_": totals.total, "currencyID": "MYR" }], // Sum of amount payable inclusive of total taxes chargeable (e.g., sales tax, service tax).
             "AllowanceTotalAmount": [{ "_": totals.total, "currencyID": "MYR" }], // (Optional) Total amount deducted from the original price of the product(s) or service(s).
             "ChargeTotalAmount": [{ "_": totals.subtotal, "currencyID": "MYR" }], // (Optional) Total charge associated with the product(s) or service(s) imposed before tax.
-            "PayableRoundingAmount": [{ "_": totals.rounding, "currencyID": "MYR" }], // (Optional) Rounding amount added to the amount payable.
+            "PayableRoundingAmount": [{ "_": 0, "currencyID": "MYR" }], // (Optional) Rounding amount added to the amount payable.
             "PayableAmount": [{ "_": totals.total, "currencyID": "MYR" }] // Sum of amount payable (inclusive of total taxes chargeable and any rounding adjustment) excluding any amount paid in advance.
           }],
           "InvoiceLine": invoiceLines

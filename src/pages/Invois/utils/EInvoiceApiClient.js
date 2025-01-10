@@ -108,7 +108,6 @@ class EInvoiceApiClient {
           });
           res.on('end', () => {
             console.log('API Response Status:', res.statusCode); // Log response status
-            console.log('API Response Headers:', JSON.stringify(res.headers, null, 2)); // Log response headers
             console.log('API Response Body:', responseData); // Log raw response body
 
             try {
