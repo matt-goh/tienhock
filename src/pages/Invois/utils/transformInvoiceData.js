@@ -82,42 +82,54 @@ const formatTime = (timeStr) => {
 };
 
 const isDateWithinRange = (dateStr, daysBack = 3) => {
-  // Get current date at start of day in local timezone
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  // Calculate the earliest allowed date
-  const earliestDate = new Date(today);
-  earliestDate.setDate(today.getDate() - daysBack);
-  
-  // Parse the input date
-  const [day, month, year] = dateStr.split('/').map(Number);
-  const inputDate = new Date(year, month - 1, day);
-  inputDate.setHours(0, 0, 0, 0);
-  
-  return inputDate >= earliestDate && inputDate <= today;
+  try {
+    // Get current date at start of day in local timezone
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Calculate the earliest allowed date
+    const earliestDate = new Date(today);
+    earliestDate.setDate(today.getDate() - daysBack);
+    
+    // Parse the input date
+    const [day, month, year] = dateStr.split('/').map(Number);
+    const inputDate = new Date(year, month - 1, day);
+    inputDate.setHours(0, 0, 0, 0);
+    
+    return inputDate >= earliestDate && inputDate <= today;
+  } catch (error) {
+    console.error('Error in isDateWithinRange:', error);
+    return false;
+  }
 };
 
 const validateInvoiceData = (invoiceData) => {
   const validationErrors = [];
 
-  // Validate invoice date
-  try {
-    if (!isDateWithinRange(invoiceData.date)) {
-      // This is our specific date validation error
-      throw {
-        type: 'validation',
-        message: 'Invoice date must be within the last 3 days. Please check the date and try again.',
-        invoiceNo: invoiceData.invoiceno
-      };
+  // First validate if date exists
+  if (!invoiceData.date) {
+    validationErrors.push('Invoice date is required');
+  } else {
+    // Split this into two separate try-catch blocks
+    try {
+      // First parse the date to ensure format is correct
+      const [day, month, year] = invoiceData.date.split('/').map(Number);
+      const inputDate = new Date(year, month - 1, day);
+      
+      if (isNaN(inputDate.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      // Then check the date range
+      const isValid = isDateWithinRange(invoiceData.date);
+      if (!isValid) {
+        validationErrors.push(
+          'Invoice date must be within the last 3 days. Please check the date and try again.'
+        );
+      }
+    } catch (error) {
+      validationErrors.push('Invalid date format. Date should be in DD/MM/YYYY format.');
     }
-  } catch (error) {
-    // If it's our specific date validation error, pass it through
-    if (error.type === 'validation') {
-      throw error;
-    }
-    // Otherwise it's a format error
-    validationErrors.push('Invalid date format. Date should be in DD/MM/YYYY format.');
   }
 
   // Check if orderDetails exists and is an array
@@ -153,7 +165,7 @@ const validateInvoiceData = (invoiceData) => {
   // If validation passes, return sanitized data
   return {
     ...invoiceData,
-    date: invoiceData.date || new Date().toISOString().split('T')[0],
+    date: invoiceData.date,  // Don't modify the date if it's valid
     time: invoiceData.time || new Date().toISOString().split('T')[1].split('.')[0] + 'Z',
     invoiceno: invoiceData.invoiceno || 'UNKNOWN',
     tax: invoiceData.tax || '0',
@@ -331,6 +343,13 @@ const generateInvoiceLines = (orderDetails) => {
 
 export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
   try {
+    if (!rawInvoiceData) {
+      throw {
+        type: 'validation',
+        message: 'No invoice data provided',
+        invoiceNo: 'Unknown'
+      };
+    }
     // Validate and sanitize input data
     const invoiceData = validateInvoiceData(rawInvoiceData);
     
@@ -460,19 +479,19 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   ],
                   "PartyLegalEntity": [
                     {
-                      "RegistrationName": [{ "_": "General Public" }], // Recipient name
+                      "RegistrationName": [{ "_": "Timothy Goh Vun Bing" }], // Recipient name
                     }
                   ],
                   "PartyIdentification": [
-                    { "ID": [{ "_": "EI00000000010", "schemeID": "TIN" }] }, // Recipient TIN
-                    { "ID": [{ "_": "-", "schemeID": "BRN" }] },
+                    { "ID": [{ "_": "IG28358919010", "schemeID": "TIN" }] }, // Recipient TIN
+                    { "ID": [{ "_": "981223125953", "schemeID": "NRIC" }] }, //ubl:Invoice / cac:AccountingSupplierParty / cac:Party / cac:PartyIdentification / cbc:ID [@schemeID=’NRIC’] OR / ubl:Invoice / cac:AccountingSupplierParty / cac:Party / cac:PartyIdentification / cbc:ID [@schemeID=’BRN’]
                     { "ID": [{ "_": "-", "schemeID": "SST" }] },
                     { "ID": [{ "_": "-", "schemeID": "TTX" }] }
                   ],
                   "Contact": [
                     {
-                      "Telephone": [{ "_": "+60-123456789" }],
-                      "ElectronicMail": [{ "_": "buyer@email.com" }]
+                      "Telephone": [{ "_": "+60-172464931" }],
+                      "ElectronicMail": [{ "_": "gvbtim98@gmail.com" }]
                     }
                   ]
                 }
@@ -484,7 +503,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               "DeliveryParty": [
                 {
                   "PartyLegalEntity": [
-                    { "RegistrationName": [{ "_": "General public" }] } // Recipient name
+                    { "RegistrationName": [{ "_": "Timothy Goh Vun Bing" }] } // Recipient name
                   ],
                   "PostalAddress": [
                     {
@@ -507,7 +526,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                     {
                       "ID": [
                         {
-                          "_": "EI00000000010", // Recipient TIN
+                          "_": "IG28358919010", // Recipient TIN
                           "schemeID": "TIN"
                         }
                       ]
@@ -637,7 +656,15 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
       ]
     };
 } catch (error) {
-  console.error('Error transforming invoice data:', error);
-  throw new Error(`${error.message}`);
+  // If it's a validation error, pass it through
+  if (error.type === 'validation') {
+    throw error;
+  }
+  // For any other errors, wrap them
+  throw {
+    type: 'validation',
+    message: `Failed to transform invoice: ${error.message}`,
+    invoiceNo: rawInvoiceData?.invoiceno || 'Unknown'
+  };
 }
 }
