@@ -88,9 +88,7 @@ export default function(pool, config) {
         } catch (error) {
           console.log('Caught transformation error:', error);
   
-          // Handle validation errors
           if (error.validationErrors) {
-            // Directly pass through the validation errors without wrapping them
             results.validationErrors.push({
               invoiceId,
               invoiceNo: error.invoiceNo,
@@ -110,7 +108,6 @@ export default function(pool, config) {
   
       // If no invoices were successfully transformed
       if (transformedInvoices.length === 0) {
-        // Keep the original validation messages intact
         const allErrors = [
           ...results.validationErrors,
           ...results.failedInvoices.map(error => ({
@@ -132,14 +129,47 @@ export default function(pool, config) {
         return res.status(400).json(errorResponse);
       }
   
-      // Rest of the code remains the same...
+      console.log(`Successfully transformed ${transformedInvoices.length} invoices, proceeding to submission`);
+  
+      // Only proceed with submission if there are valid invoices
+      const submissionResult = await submissionHandler.submitAndPollDocuments(transformedInvoices);
+      console.log('Submission result:', submissionResult);
+  
+      if (submissionResult.success) {
+        results.success = true;
+        results.message = `Successfully submitted ${submissionResult.acceptedDocuments.length} invoice(s)`;
+        results.submissionResults.push({
+          submissionUid: submissionResult.submissionUid,
+          acceptedDocuments: submissionResult.acceptedDocuments
+        });
+      }
+  
+      if (submissionResult.rejectedDocuments?.length > 0) {
+        results.failedInvoices.push(...submissionResult.rejectedDocuments.map(doc => ({
+          invoiceNo: doc.invoiceNo || doc.invoiceId,
+          errors: Array.isArray(doc.errors) ? doc.errors : [doc.error || doc.errors || 'Unknown error'],
+          type: 'submission'
+        })));
+      }
+  
+      return res.json({
+        ...results,
+        validationErrors: [
+          ...results.validationErrors,
+          ...results.failedInvoices.map(error => ({
+            invoiceNo: error.invoiceNo,
+            errors: Array.isArray(error.errors) ? error.errors : [error.errors],
+            type: 'validation'
+          }))
+        ]
+      });
     } catch (error) {
-      // Handle unexpected errors
+      console.error('Error submitting batch:', error);
       return res.status(500).json({ 
         success: false, 
         message: 'Failed to process batch submission',
         error: error.message,
-        validationErrors: error.validationErrors || [],
+        validationErrors: [],
         failedInvoices: [],
         shouldStopAtValidation: true
       });

@@ -223,8 +223,6 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
           batchSize: selectedInvoices.length,
         });
 
-        console.log("API Response:", response);
-
         // Handle validation phase
         if (!response.success && response.shouldStopAtValidation) {
           setSubmissionPhase(null);
