@@ -12,20 +12,31 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   validationErrors = [],
 }) => {
   // Helper function to get the actual error message
-  const getValidationMessage = (err: ValidationError | FailedInvoice): string[] => {
+  const getValidationMessage = (
+    err: ValidationError | FailedInvoice
+  ): string[] => {
+    // First check for explicit validation errors
     if ("validationErrors" in err && err.validationErrors) {
       return err.validationErrors;
     }
+
+    // Then check for errors array
     if ("errors" in err && Array.isArray(err.errors)) {
-      return err.errors;
+      return err.errors; // Return the errors directly without transformation
     }
+
+    // Check for single error string
     if ("errors" in err && typeof err.errors === "string") {
-      return [err.errors];
+      return [err.errors]; // Return the error string directly
     }
+
+    // Check for error property
     if ("error" in err && err.error) {
-      return [err.error];
+      return [err.error]; // Return the error directly
     }
-    return ["Failed to transform invoice: Invoice validation failed"];
+
+    // Fallback
+    return ["Invoice validation failed"];
   };
 
   // Combine all errors for display
@@ -33,7 +44,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
     ...validationErrors.map((ve) => ({
       invoiceNo: ve.invoiceNo || ve.invoiceId || "Unknown",
       errors: getValidationMessage(ve),
-      type: "validation" as const
+      type: "validation" as const,
     })),
     ...((typeof error !== "string" && error.validationErrors) || []).map(
       (ve) => ({
@@ -64,7 +75,8 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         <div className="flex items-center gap-2">
           <IconAlertTriangle className="text-red-600 flex-shrink-0" size={18} />
           <h3 className="font-semibold text-red-700 text-sm">
-            {errorCount} {errorCount === 1 ? 'invoice' : 'invoices'} failed validation
+            {errorCount} {errorCount === 1 ? "invoice" : "invoices"} failed
+            validation
           </h3>
         </div>
       </div>
@@ -75,9 +87,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
           <div
             key={`${error.invoiceNo}-${index}`}
             className={`p-3 ${
-              index !== uniqueErrors.length - 1
-                ? "border-b border-red-200"
-                : ""
+              index !== uniqueErrors.length - 1 ? "border-b border-red-200" : ""
             }`}
           >
             <p className="font-medium text-red-700 text-sm mb-1.5">
@@ -85,7 +95,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             </p>
             <div className="text-sm text-red-600 space-y-1">
               {error.errors.map((err, i) => (
-                <p key={i} className="leading-relaxed ml-1">
+                <p key={i} className="leading-relaxed">
                   {err}
                 </p>
               ))}

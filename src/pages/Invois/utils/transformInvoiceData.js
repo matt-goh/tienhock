@@ -102,21 +102,22 @@ const validateInvoiceData = (invoiceData) => {
   const validationErrors = [];
 
   // Validate invoice date
-  if (!invoiceData.date) {
-    validationErrors.push('Invoice date is required');
-  } else {
-    try {
-      if (!isDateWithinRange(invoiceData.date)) {
-        validationErrors.push(
-          'Invoice date must be within the last 3 days. ' +
-          'Please check the date and try again.'
-        );
-      }
-    } catch (error) {
-      validationErrors.push(
-        'Invalid date format. Date should be in DD/MM/YYYY format.'
-      );
+  try {
+    if (!isDateWithinRange(invoiceData.date)) {
+      // This is our specific date validation error
+      throw {
+        type: 'validation',
+        message: 'Invoice date must be within the last 3 days. Please check the date and try again.',
+        invoiceNo: invoiceData.invoiceno
+      };
     }
+  } catch (error) {
+    // If it's our specific date validation error, pass it through
+    if (error.type === 'validation') {
+      throw error;
+    }
+    // Otherwise it's a format error
+    validationErrors.push('Invalid date format. Date should be in DD/MM/YYYY format.');
   }
 
   // Check if orderDetails exists and is an array
@@ -142,11 +143,11 @@ const validateInvoiceData = (invoiceData) => {
 
   // If any validation errors were found, throw an error with all the details
   if (validationErrors.length > 0) {
-    const error = new Error('Invoice validation failed');
-    error.validationErrors = validationErrors;
-    error.invoiceNo = invoiceData.invoiceno || 'Unknown invoice number';
-    error.type = 'validation';  // Add error type for better error handling
-    throw error;
+    throw {
+      type: 'validation',
+      errors: validationErrors,
+      invoiceNo: invoiceData.invoiceno || 'Unknown invoice number',
+    };
   }
 
   // If validation passes, return sanitized data
@@ -330,10 +331,6 @@ const generateInvoiceLines = (orderDetails) => {
 
 export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
   try {
-    if (!rawInvoiceData) {
-      throw new Error('No invoice data provided');
-    }
-
     // Validate and sanitize input data
     const invoiceData = validateInvoiceData(rawInvoiceData);
     
@@ -641,6 +638,6 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
     };
 } catch (error) {
   console.error('Error transforming invoice data:', error);
-  throw new Error(`Failed to transform invoice: ${error.message}`);
+  throw new Error(`${error.message}`);
 }
 }
