@@ -307,7 +307,6 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     | "COOLDOWN"
     | null
   >(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
     if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
@@ -535,7 +534,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   };
 
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
+    <div className="relative inline-block text-left">
       <Button
         onClick={() => setIsOpen(!isOpen)}
         icon={IconFileInvoice}
@@ -644,11 +643,13 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
                               today.
                             </p>
                             <p className="text-sm text-amber-700">
-                              2. TIN number is recommended to be assigned to the involved customer in catalogue.
+                              2. TIN number is recommended to be assigned to the
+                              involved customer(s) in catalogue.
                             </p>
                             <p className="text-sm text-amber-700">
-                              3. It is recommended to submit via batches instead
-                              of single document per submission.
+                              3. It is recommended to submit in batches of up to
+                              100 instead of single document per
+                              submission.
                             </p>
                           </div>
                         </div>

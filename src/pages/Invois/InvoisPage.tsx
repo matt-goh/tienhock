@@ -744,165 +744,175 @@ const InvoisPage: React.FC = () => {
   }
 
   return (
-    <div className="px-6">
-      <div className="flex flex-col">
-        {/* Page Header aligned with table (excluding checkbox width) */}
-        <div
-          className={`flex items-start justify-between pb-4 ${
-            !filters.applyProductFilter ? "pl-[45px]" : ""
-          }`}
-        >
-          <h1 className="text-3xl font-semibold text-default-900">
-            Invois {selectedCount > 0 && `(${selectedCount})`}
-          </h1>
-          <div className="flex items-center gap-3">
-            {selectedCount > 0 && (
-              <button
-                onClick={() => setShowDeleteConfirmation(true)}
-                className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
-              >
-                Delete
-              </button>
-            )}
-            <Button
-              onClick={handlePDFClick}
-              icon={IconEye}
-              iconSize={16}
-              iconStroke={2}
-              variant="outline"
-              disabled={selectedCount === 0}
-            >
-              View
-            </Button>
-
-            <PDFDownloadHandler
-              invoices={selectedCount > 0 ? selectedInvoices : filteredInvoices}
-              disabled={selectedCount === 0}
-            />
-
-            <Button
-              onClick={handlePrintPDF}
-              icon={IconPrinter}
-              iconSize={16}
-              iconStroke={2}
-              variant="outline"
-              disabled={selectedCount === 0}
-            >
-              Print
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="fileUpload"
-              multiple
-            />
+    <div className="flex flex-col">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-white px-6 pt-4">
+        <div className="flex flex-col space-y-4">
+          {/* Title and Actions Row */}
+          <div
+            className={`flex items-center justify-between ${
+              !filters.applyProductFilter ? "pl-[45px]" : ""
+            }`}
+          >
+            <h1 className="text-3xl font-semibold text-default-900">
+              Invois {selectedCount > 0 && `(${selectedCount})`}
+            </h1>
             <div className="flex items-center gap-3">
-              <EInvoisMenu
-                selectedInvoices={selectedInvoices}
-                onSubmissionComplete={handleSubmissionComplete}
-                clearSelection={() => clearSelectionRef.current?.()}
-              />
+              {selectedCount > 0 && (
+                <button
+                  onClick={() => setShowDeleteConfirmation(true)}
+                  className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
+                >
+                  Delete
+                </button>
+              )}
               <Button
-                onClick={() => fileInputRef.current?.click()}
-                icon={IconCloudUpload}
+                onClick={handlePDFClick}
+                icon={IconEye}
                 iconSize={16}
                 iconStroke={2}
                 variant="outline"
+                disabled={selectedCount === 0}
               >
-                Import
+                View
               </Button>
-              <Button
-                onClick={handleCreateNewInvoice}
-                icon={IconPlus}
-                iconSize={16}
-                iconStroke={2}
-                variant="outline"
-              >
-                Create
-              </Button>
-            </div>
-          </div>
-        </div>
 
-        {/* Filters Section */}
-        <div
-          className={`space-y-4 ${
-            !filters.applyProductFilter ? "ml-[45px]" : ""
-          }`}
-        >
-          <div className="flex gap-4">
-            {/* Search Bar */}
-            <div className="w-[350px]">
-              <div className="relative">
-                <IconSearch
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
-                  size={20}
+              <PDFDownloadHandler
+                invoices={
+                  selectedCount > 0 ? selectedInvoices : filteredInvoices
+                }
+                disabled={selectedCount === 0}
+              />
+
+              <Button
+                onClick={handlePrintPDF}
+                icon={IconPrinter}
+                iconSize={16}
+                iconStroke={2}
+                variant="outline"
+                disabled={selectedCount === 0}
+              >
+                Print
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="fileUpload"
+                multiple
+              />
+              <div className="flex items-center gap-3">
+                <EInvoisMenu
+                  selectedInvoices={selectedInvoices}
+                  onSubmissionComplete={handleSubmissionComplete}
+                  clearSelection={() => clearSelectionRef.current?.()}
                 />
-                <input
-                  type="text"
-                  placeholder="Search invoices..."
-                  className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  icon={IconCloudUpload}
+                  iconSize={16}
+                  iconStroke={2}
+                  variant="outline"
+                >
+                  Import
+                </Button>
+                <Button
+                  onClick={handleCreateNewInvoice}
+                  icon={IconPlus}
+                  iconSize={16}
+                  iconStroke={2}
+                  variant="outline"
+                >
+                  Create
+                </Button>
               </div>
             </div>
+          </div>
 
-            {/* Date Range */}
-            <div className="flex-1">
-              <div
-                className={`flex items-center bg-white border ${
-                  isDateRangeFocused
-                    ? "border-default-500"
-                    : "border-default-300"
-                } rounded-full px-4`}
-              >
-                <div className="flex items-center gap-3 flex-1">
-                  <input
-                    type="date"
-                    value={formatDateForInput(
-                      filters.dateRangeFilter?.start ?? null
-                    )}
-                    onChange={(e) => handleDateChange("start", e.target.value)}
-                    onFocus={() => setIsDateRangeFocused(true)}
-                    onBlur={() => setIsDateRangeFocused(false)}
-                    className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
+          {/* Filters Row */}
+          <div
+            className={`space-y-4 ${
+              !filters.applyProductFilter ? "ml-[45px]" : ""
+            }`}
+          >
+            <div className="flex gap-4">
+              {/* Search Bar */}
+              <div className="w-[350px]">
+                <div className="relative">
+                  <IconSearch
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
+                    size={20}
                   />
-                  <span className="text-default-400">to</span>
                   <input
-                    type="date"
-                    value={formatDateForInput(
-                      filters.dateRangeFilter?.end ?? null
-                    )}
-                    onChange={(e) => handleDateChange("end", e.target.value)}
-                    onFocus={() => setIsDateRangeFocused(true)}
-                    onBlur={() => setIsDateRangeFocused(false)}
-                    className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
+                    type="text"
+                    placeholder="Search invoices..."
+                    className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
                   />
                 </div>
               </div>
+
+              {/* Date Range */}
+              <div className="flex-1">
+                <div
+                  className={`flex items-center bg-white border ${
+                    isDateRangeFocused
+                      ? "border-default-500"
+                      : "border-default-300"
+                  } rounded-full px-4`}
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <input
+                      type="date"
+                      value={formatDateForInput(
+                        filters.dateRangeFilter?.start ?? null
+                      )}
+                      onChange={(e) =>
+                        handleDateChange("start", e.target.value)
+                      }
+                      onFocus={() => setIsDateRangeFocused(true)}
+                      onBlur={() => setIsDateRangeFocused(false)}
+                      className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
+                    />
+                    <span className="text-default-400">to</span>
+                    <input
+                      type="date"
+                      value={formatDateForInput(
+                        filters.dateRangeFilter?.end ?? null
+                      )}
+                      onChange={(e) => handleDateChange("end", e.target.value)}
+                      onFocus={() => setIsDateRangeFocused(true)}
+                      onBlur={() => setIsDateRangeFocused(false)}
+                      className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Menu */}
+              <div className="flex justify-end">
+                <InvoiceFilterMenu
+                  onFilterChange={handleFilterChange}
+                  currentFilters={filters}
+                  salesmanOptions={salesmanOptions}
+                  customerOptions={customerOptions}
+                  today={today}
+                  tomorrow={tomorrow}
+                />
+              </div>
             </div>
 
-            {/* Filter Menu */}
-            <div className="flex justify-end">
-              <InvoiceFilterMenu
-                onFilterChange={handleFilterChange}
-                currentFilters={filters}
-                salesmanOptions={salesmanOptions}
-                customerOptions={customerOptions}
-                today={today}
-                tomorrow={tomorrow}
-              />
-            </div>
+            {/* Filter Summary */}
+            <FilterSummary filters={filters} />
           </div>
-
-          {/* Filter Summary */}
-          <FilterSummary filters={filters} />
         </div>
+      </div>
 
+      {/* Main Content Area */}
+      <div className="flex-1 px-6 pt-1 pb-4">
         {/* Table Section */}
         <div className="bg-white overflow-hidden">
           {filters.applyProductFilter ? (
