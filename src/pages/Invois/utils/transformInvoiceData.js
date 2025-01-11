@@ -106,30 +106,22 @@ const isDateWithinRange = (dateStr, daysBack = 3) => {
 const validateInvoiceData = (invoiceData) => {
   const validationErrors = [];
 
-  // First validate if date exists
-  if (!invoiceData.date) {
-    validationErrors.push('Invoice date is required');
-  } else {
-    // Split this into two separate try-catch blocks
-    try {
-      // First parse the date to ensure format is correct
-      const [day, month, year] = invoiceData.date.split('/').map(Number);
-      const inputDate = new Date(year, month - 1, day);
-      
-      if (isNaN(inputDate.getTime())) {
-        throw new Error('Invalid date format');
-      }
-      
-      // Then check the date range
-      const isValid = isDateWithinRange(invoiceData.date);
-      if (!isValid) {
-        validationErrors.push(
-          'Invoice date must be within the last 3 days. Please check the date and try again.'
-        );
-      }
-    } catch (error) {
-      validationErrors.push('Invalid date format. Date should be in DD/MM/YYYY format.');
+  try {
+    if (!isDateWithinRange(invoiceData.date)) {
+      // This is our specific date validation error
+      throw {
+        type: 'validation',
+        message: 'Invoice date must be within the last 3 days. Please check the date and try again.',
+        invoiceNo: invoiceData.invoiceno
+      };
     }
+  } catch (error) {
+    // If it's our specific date validation error, pass it through
+    if (error.type === 'validation') {
+      throw error;
+    }
+    // Otherwise it's a format error
+    validationErrors.push('Invalid date format. Date should be in DD/MM/YYYY format.');
   }
 
   // Check if orderDetails exists and is an array

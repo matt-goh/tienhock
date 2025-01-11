@@ -273,9 +273,15 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
 
         // Handle successful submission
         if (response.success && response.submissionResults?.length > 0) {
+          // Submission phase
           setSubmissionPhase("SUBMISSION");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          // Confirmation phase
           setSubmissionPhase("CONFIRMATION");
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 800));
+
+          // Cooldown phase
           setSubmissionPhase("COOLDOWN");
           await new Promise((resolve) => setTimeout(resolve, 500));
 
