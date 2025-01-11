@@ -447,7 +447,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
                       1. Invoice date must be in the past 3 days.
                     </p>
                     <p className="text-sm text-amber-700">
-                      2. TIN number is recommended to be assigned to the
+                      2. TIN number must be assigned to the
                       involved customer(s) in catalogue.
                     </p>
                     <p className="text-sm text-amber-700">
