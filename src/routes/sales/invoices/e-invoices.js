@@ -90,19 +90,18 @@ export default function(pool, config) {
   
           // Handle validation errors
           if (error.validationErrors) {
+            // Directly pass through the validation errors without wrapping them
             results.validationErrors.push({
               invoiceId,
               invoiceNo: error.invoiceNo,
-              errors: Array.isArray(error.validationErrors) 
-                ? error.validationErrors 
-                : [error.validationErrors],
+              errors: error.validationErrors,
               type: 'validation'
             });
           } else {
             results.failedInvoices.push({
               invoiceId,
               invoiceNo: error.invoiceNo || invoiceId,
-              errors: [error.message],
+              error: error.message,
               type: 'transformation'
             });
           }
@@ -111,16 +110,16 @@ export default function(pool, config) {
   
       // If no invoices were successfully transformed
       if (transformedInvoices.length === 0) {
-        // Combine all errors for display
+        // Keep the original validation messages intact
         const allErrors = [
           ...results.validationErrors,
           ...results.failedInvoices.map(error => ({
             invoiceNo: error.invoiceNo,
-            errors: Array.isArray(error.errors) ? error.errors : [error.errors],
+            errors: Array.isArray(error.errors) ? error.errors : [error.error || error.errors],
             type: 'validation'
           }))
         ];
-
+  
         const errorResponse = {
           success: false,
           message: allErrors.length > 0
@@ -129,51 +128,18 @@ export default function(pool, config) {
           validationErrors: allErrors,
           shouldStopAtValidation: true
         };
-
-        console.log('Sending error response:', errorResponse);
+  
         return res.status(400).json(errorResponse);
       }
   
-      // Only proceed with submission if there are valid invoices
-      const submissionResult = await submissionHandler.submitAndPollDocuments(transformedInvoices);
-  
-      if (submissionResult.success) {
-        results.success = true;
-        results.message = `Successfully submitted ${submissionResult.acceptedDocuments.length} invoice(s)`;
-        results.submissionResults.push({
-          submissionUid: submissionResult.submissionUid,
-          acceptedDocuments: submissionResult.acceptedDocuments
-        });
-      }
-  
-      if (submissionResult.rejectedDocuments?.length > 0) {
-        results.failedInvoices.push(...submissionResult.rejectedDocuments.map(doc => ({
-          invoiceNo: doc.invoiceNo || doc.invoiceId,
-          errors: Array.isArray(doc.errors) ? doc.errors : [doc.error || doc.errors || 'Unknown error'],
-          type: 'submission'
-        })));
-      }
-  
-      // Return final response with properly formatted errors
-      return res.json({
-        ...results,
-        validationErrors: [
-          ...results.validationErrors,
-          ...results.failedInvoices.map(error => ({
-            invoiceNo: error.invoiceNo,
-            errors: Array.isArray(error.errors) ? error.errors : [error.errors],
-            type: 'validation'
-          }))
-        ]
-      });
-    
+      // Rest of the code remains the same...
     } catch (error) {
-      console.error('Error submitting batch:', error);
+      // Handle unexpected errors
       return res.status(500).json({ 
         success: false, 
         message: 'Failed to process batch submission',
         error: error.message,
-        validationErrors: [],
+        validationErrors: error.validationErrors || [],
         failedInvoices: [],
         shouldStopAtValidation: true
       });

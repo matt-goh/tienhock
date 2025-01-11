@@ -93,109 +93,6 @@ const SubmissionInfoDisplay: React.FC<{ info: SubmissionInfo }> = ({
   );
 };
 
-const SuccessDisplay: React.FC<{
-  response: SubmissionResponse;
-  onClose: () => void;
-}> = ({ response, onClose }) => {
-  const formatDateTime = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleString();
-    } catch (e) {
-      return dateStr;
-    }
-  };
-
-  return (
-    <div className="flex flex-col max-h-[600px]">
-      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-        <div className="flex items-center gap-3 text-green-600">
-          <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-            <IconCheck size={24} />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-green-700">
-              Submission Successful
-            </h2>
-            <p className="text-green-600">{response.message}</p>
-          </div>
-        </div>
-
-        {response.submissionInfo && (
-          <div className="bg-green-50 border border-green-300 rounded-lg p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-green-700">
-                  Submission ID
-                </p>
-                <p
-                  className="text-green-600 truncate"
-                  title={response.submissionInfo.submissionUid}
-                >
-                  {response.submissionInfo.submissionUid}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-green-700">Status</p>
-                <p className="text-green-600">
-                  {response.submissionInfo.overallStatus}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-green-700">Documents</p>
-                <p className="text-green-600">
-                  {response.acceptedDocuments.length}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-green-700">Received</p>
-                <p className="text-green-600">
-                  {formatDateTime(response.submissionInfo.dateTimeReceived)}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {response.acceptedDocuments?.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="font-medium text-green-700">Accepted Documents</h3>
-            <div className="space-y-2">
-              {response.acceptedDocuments.map((doc) => (
-                <div
-                  key={doc.uuid}
-                  className="bg-green-50 border border-green-300 p-3 rounded-lg"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-green-700">
-                      #{doc.internalId}
-                    </span>
-                    <span className="text-green-600 text-sm">{doc.status}</span>
-                  </div>
-                  <div className="text-sm text-green-600 space-y-1">
-                    <p className="font-mono">{doc.uuid}</p>
-                    <p>{formatDateTime(doc.dateTimeValidated)}</p>
-                    <p>Amount: RM {doc.totalPayableAmount.toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="p-4 border-t border-default-200">
-        <Button
-          onClick={onClose}
-          className="w-full justify-center"
-          variant="outline"
-        >
-          Done
-        </Button>
-      </div>
-    </div>
-  );
-};
-
 interface EInvoisMenuProps {
   selectedInvoices: InvoiceData[];
   onSubmissionComplete?: () => void;
@@ -293,6 +190,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   }, [loginResponse, isTokenValid]);
 
   const handleSubmitInvoice = async () => {
+    // Check token validity
     if (!loginResponse?.success || !isTokenValid(loginResponse)) {
       toast.error(
         "Your session has expired. Please refresh the page to log in again."
@@ -300,16 +198,19 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       return;
     }
 
+    // Check if invoices are selected
     if (selectedInvoices.length === 0) {
       toast.error("Please select at least one invoice to submit");
       return;
     }
 
+    // Reset states
     setIsSubmitting(true);
     setSubmissionResponse(null);
     setSubmissionError(null);
 
     try {
+      // Simulation phases for better UX
       setSubmissionPhase("INITIALIZATION");
       await new Promise((resolve) => setTimeout(resolve, 800));
 
@@ -324,27 +225,44 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
 
         console.log("API Response:", response);
 
+        // Handle validation phase
         if (!response.success && response.shouldStopAtValidation) {
           setSubmissionPhase(null);
 
-          // Combine validation errors and failed invoices
-          const validationErrors = response.validationErrors || [];
+          // Get validation errors from either source
+          const validationErrors = [
+            ...(response.validationErrors || []),
+            ...(response.failedInvoices || []).map((fail: any) => ({
+              invoiceNo: fail.invoiceNo,
+              errors: Array.isArray(fail.errors)
+                ? fail.errors.map((err: any) => {
+                    // Extract actual validation message if it's in the error string
+                    if (typeof err === "string") {
+                      if (err.includes("Invoice date must be within")) {
+                        return err;
+                      }
+                      if (err.includes("Failed to transform invoice:")) {
+                        const match = err.match(
+                          /Invoice validation failed: (.+)/
+                        );
+                        return match ? match[1] : err;
+                      }
+                    }
+                    return err;
+                  })
+                : [fail.errors],
+              type: "validation",
+            })),
+          ];
 
           if (validationErrors.length > 0) {
-            const errorObj = {
+            setSubmissionError({
               message: `${validationErrors.length} invoice(s) failed validation`,
-              validationErrors: validationErrors.map((error: any) => ({
-                invoiceNo: error.invoiceNo,
-                errors: Array.isArray(error.errors)
-                  ? error.errors
-                  : [error.errors],
-                type: "validation",
-              })),
-            };
-
-            console.log("Setting validation error:", errorObj);
-            setSubmissionError(errorObj);
-            toast.error(errorObj.message);
+              validationErrors: validationErrors,
+            });
+            toast.error(
+              `${validationErrors.length} invoice(s) failed validation`
+            );
           } else {
             setSubmissionError({
               message: response.message || "Validation failed",
@@ -386,14 +304,27 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       } catch (error: any) {
         console.log("Caught API error:", error);
 
-        // Check for validation errors in the error object
+        // Handle validation errors from error object
         if (error.validationErrors?.length > 0) {
           const errorObj = {
             message: `${error.validationErrors.length} invoice(s) failed validation`,
             validationErrors: error.validationErrors.map((ve: any) => ({
               invoiceNo: ve.invoiceNo,
               errors: Array.isArray(ve.errors)
-                ? ve.errors
+                ? ve.errors.map((err: any) => {
+                    if (typeof err === "string") {
+                      if (err.includes("Invoice date must be within")) {
+                        return err;
+                      }
+                      if (err.includes("Failed to transform invoice:")) {
+                        const match = err.match(
+                          /Invoice validation failed: (.+)/
+                        );
+                        return match ? match[1] : err;
+                      }
+                    }
+                    return err;
+                  })
                 : [ve.errors || error.message],
               type: "validation",
             })),
@@ -446,6 +377,8 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         onClose={() => setIsOpen(false)}
         loginResponse={loginResponse}
         showApiStatus={showApiStatus}
+        submissionResponse={submissionResponse}
+        handleClose={handleClose}
       >
         {submissionPhase ? (
           <div className="absolute inset-0 bg-white/95 rounded-b-xl z-10">
@@ -494,14 +427,11 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
             />
             {submissionError && (
               <div className="mt-4 mb-4">
-                <h3 className="text-sm font-medium text-red-800 mb-2">
-                  Submission Error:
-                </h3>
                 <ErrorDisplay error={submissionError} />
               </div>
             )}
             {selectedInvoices.length === 0 ? (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="p-4 mt-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <IconInfoCircle
                     size={20}
