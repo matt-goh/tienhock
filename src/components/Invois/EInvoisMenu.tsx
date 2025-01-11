@@ -306,7 +306,6 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
           }
         }
       } catch (error: any) {
-        console.log("Caught API error:", error);
 
         // Handle validation errors from error object
         if (error.validationErrors?.length > 0) {
@@ -334,7 +333,6 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
             })),
           };
 
-          console.log("Setting error state from catch:", errorObj);
           setSubmissionError(errorObj);
           toast.error(errorObj.message);
         } else {
