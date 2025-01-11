@@ -6,22 +6,11 @@ const handleResponse = async (response) => {
   const data = await response.json();
   
   if (!response.ok) {
-    // Don't clear session if server explicitly says to preserve it
-    if (response.status === 503 && data.maintenance && data.preserveSession) {
-      throw new Error(data.message || 'Service temporarily unavailable');
-    }
-    
-    // Don't clear session during maintenance mode
-    if (response.status === 503 && data.maintenance) {
-      throw new Error(data.message || 'Service temporarily unavailable');
-    }
-    
-    // Clear session on unauthorized unless explicitly told not to
-    if (response.status === 401 && !data.preserveSession) {
-      sessionService.clearSession();
-    }
-    
-    throw new Error(data.message || 'API request failed');
+
+    const error = new Error(data.message || 'API request failed');
+    // Copy all properties from the response data
+    Object.assign(error, data);
+    throw error;
   }
   
   return data;

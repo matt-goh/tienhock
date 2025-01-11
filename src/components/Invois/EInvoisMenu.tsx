@@ -1,90 +1,97 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import toast from "react-hot-toast";
 import {
   IconFileInvoice,
-  IconCalendar,
-  IconPlug,
-  IconX,
-  IconAlertTriangle,
   IconInfoCircle,
   IconCheck,
 } from "@tabler/icons-react";
-import { InvoiceData, SubmissionResponse } from "../../types/types";
+import {
+  InvoiceData,
+  MyInvoisError,
+  SubmissionResponse,
+  LoginResponse,
+  SubmissionInfo,
+} from "../../types/types";
 import { api } from "../../routes/utils/api";
+import ErrorDisplay from "./ErrorDisplay";
+import InvoisModalContainer from "./InvoisModalContainer";
 
-interface TokenInfo {
-  accessToken: string;
-  expiresIn: number;
-  tokenType: string;
-}
+// Local components
+const SubmissionInfoDisplay: React.FC<{ info: SubmissionInfo }> = ({
+  info,
+}) => {
+  // Calculate actual date range from selected invoices
+  const getDateRange = () => {
+    if (info.selectedInvoices.length === 0) {
+      return { start: new Date(), end: new Date() };
+    }
 
-interface LoginResponse {
-  success: boolean;
-  message: string;
-  apiEndpoint: string;
-  tokenInfo?: TokenInfo;
-  tokenCreationTime?: number;
-  error?: string;
-  details?: any;
-}
+    const timestamps = info.selectedInvoices.map((invoice: any) => {
+      const [day, month, year] = invoice.date.split("/").map(Number);
+      return new Date(year, month - 1, day).getTime();
+    });
 
-interface SubmissionInfo {
-  startDate: Date;
-  endDate: Date;
-  selectedInvoices: InvoiceData[];
-}
+    return {
+      start: new Date(Math.min(...timestamps)),
+      end: new Date(Math.max(...timestamps)),
+    };
+  };
 
-interface MyInvoisError {
-  success?: boolean;
-  message: string;
-  error?: string;
-  details?: any;
-}
+  const dateRange = getDateRange();
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
-interface EInvoisMenuProps {
-  selectedInvoices: InvoiceData[];
-  onSubmissionComplete?: () => void;
-  clearSelection?: (() => void) | null;
-}
-
-const formatDate = (date: Date): string => {
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-};
-
-const ApiStatusDisplay: React.FC<{ loginResponse: LoginResponse }> = ({
-  loginResponse,
-}) => (
-  <div
-    className={`flex items-center gap-2 p-4 rounded-lg ${
-      loginResponse.success
-        ? "bg-green-50 border border-green-300"
-        : "bg-red-50 border border-red-200"
-    }`}
-  >
-    <IconPlug
-      size={20}
-      className={loginResponse.success ? "text-green-600" : "text-red-600"}
-    />
-    <div className="flex-1">
-      <p
-        className={`font-medium ${
-          loginResponse.success ? "text-green-600" : "text-red-600"
-        }`}
-      >
-        {loginResponse.message}
-      </p>
-      <p className="text-sm text-default-600">{loginResponse.apiEndpoint}</p>
-      {loginResponse.error && (
-        <p className="text-sm text-red-600 mt-1">{loginResponse.error}</p>
-      )}
+  return (
+    <div className="space-y-4">
+      {/* Selected Invoices Section */}
+      <div className="bg-default-50 border border-default-200 rounded-lg">
+        <div
+          className={`${
+            info.selectedInvoices.length > 0
+              ? "border-b border-default-200"
+              : ""
+          } p-4`}
+        >
+          <h3 className="font-medium text-default-800">
+            Selected Invoices ({info.selectedInvoices.length})
+          </h3>
+        </div>
+        <div className="divide-y divide-default-200 max-h-60 overflow-y-auto">
+          {info.selectedInvoices.map((invoice: any) => (
+            <div key={invoice.id} className="p-4 bg-white rounded-lg">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium text-default-800">
+                    #{invoice.invoiceno}
+                  </p>
+                  <p className="text-sm text-default-600 mt-1">
+                    {invoice.customername || "N/A"}
+                  </p>
+                </div>
+                <p className="text-sm text-default-500">{invoice.date}</p>
+              </div>
+              <div className="mt-1 flex gap-2 text-xs">
+                <span className="text-default-500">
+                  Order: {invoice.orderno}
+                </span>
+                <span className="text-default-500">
+                  Type: {invoice.type === "I" ? "Invoice" : "Cash"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const SuccessDisplay: React.FC<{
   response: SubmissionResponse;
@@ -189,100 +196,11 @@ const SuccessDisplay: React.FC<{
   );
 };
 
-const ErrorDisplay: React.FC<{ error: any }> = ({ error }) => {
-  const errorMessage =
-    typeof error === "string"
-      ? error
-      : error.message || "An unknown error occurred";
-  return (
-    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-      <div className="flex items-start gap-2">
-        <IconAlertTriangle className="text-red-600 mt-1" size={20} />
-        <div>
-          <h3 className="font-semibold text-red-700">
-            Submission Failed or Invalid.
-          </h3>
-          <p className="text-sm text-red-600 mt-1">{errorMessage}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SubmissionInfoDisplay: React.FC<{ info: SubmissionInfo }> = ({
-  info,
-}) => {
-  // Calculate actual date range from selected invoices
-  const getDateRange = () => {
-    if (info.selectedInvoices.length === 0) {
-      return { start: new Date(), end: new Date() };
-    }
-
-    const timestamps = info.selectedInvoices.map((invoice) => {
-      // Handle DD/MM/YYYY format
-      const [day, month, year] = invoice.date.split("/").map(Number);
-      return new Date(year, month - 1, day).getTime();
-    });
-
-    return {
-      start: new Date(Math.min(...timestamps)),
-      end: new Date(Math.max(...timestamps)),
-    };
-  };
-
-  const dateRange = getDateRange();
-
-  return (
-    <div className="mt-4 space-y-4">
-      {/* Date Range Section */}
-      <div className="p-4 bg-default-50 border border-default-200 rounded-lg">
-        <div className="flex items-center gap-3">
-          <IconCalendar size={20} className="text-default-500" />
-          <div>
-            <p className="text-sm font-medium text-default-800">
-              {formatDate(dateRange.start)} - {formatDate(dateRange.end)}
-            </p>
-            <p className="text-xs text-default-500">Submission Date Range</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Selected Invoices Section */}
-      <div className="bg-default-50 border border-default-200 rounded-lg">
-        <div className="p-4 border-b border-default-200">
-          <h3 className="font-medium text-default-800">
-            Selected Invoices ({info.selectedInvoices.length})
-          </h3>
-        </div>
-        <div className="divide-y divide-default-200 max-h-60 overflow-y-auto">
-          {info.selectedInvoices.map((invoice) => (
-            <div key={invoice.id} className="p-4 bg-white">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-medium text-default-800">
-                    #{invoice.invoiceno}
-                  </p>
-                  <p className="text-sm text-default-600 mt-1">
-                    {invoice.customername || "N/A"}
-                  </p>
-                </div>
-                <p className="text-sm text-default-500">{invoice.date}</p>
-              </div>
-              <div className="mt-1 flex gap-2 text-xs">
-                <span className="text-default-500">
-                  Order: {invoice.orderno}
-                </span>
-                <span className="text-default-500">
-                  Type: {invoice.type === "I" ? "Invoice" : "Cash"}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
+interface EInvoisMenuProps {
+  selectedInvoices: InvoiceData[];
+  onSubmissionComplete?: () => void;
+  clearSelection?: (() => void) | null;
+}
 
 const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   selectedInvoices,
@@ -290,6 +208,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   clearSelection,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showApiStatus, setShowApiStatus] = useState(true);
   const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
     null
   );
@@ -308,6 +227,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     | null
   >(null);
 
+  // Token validation and login handling
   const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
     if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
     const expirationTime =
@@ -356,6 +276,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     }
   }, [isOpen, connectToMyInvois]);
 
+  // Handle token expiration
   useEffect(() => {
     const checkTokenValidity = () => {
       if (loginResponse && !isTokenValid(loginResponse)) {
@@ -367,8 +288,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       }
     };
 
-    const intervalId = setInterval(checkTokenValidity, 60000); // Check every minute
-
+    const intervalId = setInterval(checkTokenValidity, 60000);
     return () => clearInterval(intervalId);
   }, [loginResponse, isTokenValid]);
 
@@ -390,133 +310,111 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     setSubmissionError(null);
 
     try {
-      // Simulate phases for better UX
       setSubmissionPhase("INITIALIZATION");
       await new Promise((resolve) => setTimeout(resolve, 800));
 
       setSubmissionPhase("VALIDATION");
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Process invoices in batches of 100
-      const batchSize = 100;
-      let successfulSubmissions = [];
-      let failedSubmissions = [];
+      try {
+        const response = await api.post("/api/einvoice/submit", {
+          invoiceIds: selectedInvoices.map((invoice) => invoice.id),
+          batchSize: selectedInvoices.length,
+        });
 
-      // Split invoices into batches
-      for (let i = 0; i < selectedInvoices.length; i += batchSize) {
-        const batch = selectedInvoices.slice(i, i + batchSize);
-        const batchIds = batch.map((invoice) => invoice.id);
-        const currentBatch = Math.floor(i / batchSize) + 1;
+        console.log("API Response:", response);
 
-        setSubmissionPhase("SUBMISSION");
-        const batchMessage = `Submitting batch...`;
-        toast.loading(batchMessage, { id: "submission-progress" });
+        if (!response.success && response.shouldStopAtValidation) {
+          setSubmissionPhase(null);
 
-        try {
-          const response = await api.post("/api/einvoice/submit", {
-            invoiceIds: batchIds,
-            batchSize: batch.length,
-          });
+          // Combine validation errors and failed invoices
+          const validationErrors = response.validationErrors || [];
 
-          if (response.success) {
-            successfulSubmissions.push({
-              ...response,
-              batchNumber: currentBatch,
-              invoices: batch,
-            });
+          if (validationErrors.length > 0) {
+            const errorObj = {
+              message: `${validationErrors.length} invoice(s) failed validation`,
+              validationErrors: validationErrors.map((error: any) => ({
+                invoiceNo: error.invoiceNo,
+                errors: Array.isArray(error.errors)
+                  ? error.errors
+                  : [error.errors],
+                type: "validation",
+              })),
+            };
+
+            console.log("Setting validation error:", errorObj);
+            setSubmissionError(errorObj);
+            toast.error(errorObj.message);
           } else {
-            failedSubmissions.push({
-              batch: currentBatch,
-              error: response.error || response.message,
-              details: response.details,
-              invoices: batch,
+            setSubmissionError({
+              message: response.message || "Validation failed",
+              validationErrors: [],
             });
+            toast.error(response.message || "Validation failed");
           }
-        } catch (err) {
-          failedSubmissions.push({
-            batch: currentBatch,
-            error: err instanceof Error ? err.message : "Unknown error",
-            invoices: batch,
-          });
+          return;
         }
 
-        // Small delay between batches
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Handle successful submission
+        if (response.success && response.submissionResults?.length > 0) {
+          setSubmissionPhase("SUBMISSION");
+          setSubmissionPhase("CONFIRMATION");
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          setSubmissionPhase("COOLDOWN");
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          const submissionResult = response.submissionResults[0];
+          if (submissionResult.acceptedDocuments?.length > 0) {
+            setSubmissionResponse({
+              success: true,
+              message: response.message,
+              submissionInfo: {
+                submissionUid: submissionResult.submissionUid,
+                documentCount: submissionResult.acceptedDocuments.length,
+                dateTimeReceived:
+                  submissionResult.acceptedDocuments[0]?.dateTimeReceived ||
+                  new Date().toISOString(),
+                overallStatus:
+                  submissionResult.acceptedDocuments[0]?.status || "Valid",
+              },
+              acceptedDocuments: submissionResult.acceptedDocuments,
+              rejectedDocuments: [],
+            });
+            toast.success(response.message);
+          }
+        }
+      } catch (error: any) {
+        console.log("Caught API error:", error);
+
+        // Check for validation errors in the error object
+        if (error.validationErrors?.length > 0) {
+          const errorObj = {
+            message: `${error.validationErrors.length} invoice(s) failed validation`,
+            validationErrors: error.validationErrors.map((ve: any) => ({
+              invoiceNo: ve.invoiceNo,
+              errors: Array.isArray(ve.errors)
+                ? ve.errors
+                : [ve.errors || error.message],
+              type: "validation",
+            })),
+          };
+
+          console.log("Setting error state from catch:", errorObj);
+          setSubmissionError(errorObj);
+          toast.error(errorObj.message);
+        } else {
+          setSubmissionError({
+            message: error.message || "An error occurred during submission",
+            validationErrors: [],
+          });
+          toast.error(error.message || "Submission failed");
+        }
       }
-
-      setSubmissionPhase("CONFIRMATION");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Clear the progress toast
-      toast.dismiss("submission-progress");
-
-      if (successfulSubmissions.length > 0) {
-        setSubmissionPhase("COOLDOWN");
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Get the latest successful submission
-        const latestSubmission =
-          successfulSubmissions[successfulSubmissions.length - 1];
-
-        // Extract submission info from the response
-        const submissionResult = latestSubmission.submissionResults[0];
-
-        setSubmissionResponse({
-          success: true,
-          message: `Successfully submitted ${
-            submissionResult.acceptedDocuments.length
-          } invoice${
-            submissionResult.acceptedDocuments.length !== 1 ? "s" : ""
-          }`,
-          submissionInfo: {
-            submissionUid: submissionResult.submissionUid,
-            documentCount: submissionResult.acceptedDocuments.length,
-            dateTimeReceived:
-              submissionResult.acceptedDocuments[0]?.dateTimeReceived ||
-              new Date().toISOString(),
-            overallStatus:
-              submissionResult.acceptedDocuments[0]?.status || "Valid",
-          },
-          acceptedDocuments: submissionResult.acceptedDocuments,
-          rejectedDocuments: [],
-        });
-
-        toast.success(
-          `Successfully submitted ${
-            submissionResult.acceptedDocuments.length
-          } invoice${
-            submissionResult.acceptedDocuments.length !== 1 ? "s" : ""
-          }`
-        );
-      }
-
-      if (failedSubmissions.length > 0) {
-        const totalFailed = failedSubmissions.reduce(
-          (acc, curr) => acc + curr.invoices.length,
-          0
-        );
-
-        setSubmissionError({
-          message: `Failed to submit ${totalFailed} invoice${
-            totalFailed !== 1 ? "s" : ""
-          }. Please contact admin if problem persists.`,
-        });
-
-        toast.error(
-          `${totalFailed} submission${totalFailed !== 1 ? "s" : ""} failed.`
-        );
-      }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Unknown error occurred during submission";
-      setSubmissionError({ message: errorMessage });
-      toast.error("Submission failed.");
-      console.error("Submission error:", err);
     } finally {
       setIsSubmitting(false);
-      setSubmissionPhase(null);
+      if (!submissionResponse) {
+        setSubmissionPhase(null);
+      }
     }
   };
 
@@ -543,136 +441,105 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         e-Invois
       </Button>
 
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-[450px] bg-white rounded-xl shadow-xl border border-default-200 z-10">
-          {submissionResponse?.success ? (
-            <SuccessDisplay
-              response={submissionResponse}
-              onClose={handleClose}
+      <InvoisModalContainer
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        loginResponse={loginResponse}
+        showApiStatus={showApiStatus}
+      >
+        {submissionPhase ? (
+          <div className="absolute inset-0 bg-white/95 rounded-b-xl z-10">
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center px-4">
+                <LoadingSpinner size="md" hideText />
+                <div className="mt-3">
+                  <h3 className="text-default-900 font-medium">
+                    {submissionPhase === "INITIALIZATION"
+                      ? "Preparing Submission"
+                      : submissionPhase === "VALIDATION"
+                      ? "Validating Invoice Data"
+                      : submissionPhase === "SUBMISSION"
+                      ? "Submitting to MyInvois"
+                      : submissionPhase === "CONFIRMATION"
+                      ? "Confirming Submission"
+                      : submissionPhase === "COOLDOWN"
+                      ? "Finalizing Submission"
+                      : "Processing Submission"}
+                  </h3>
+                  <p className="text-default-600 text-sm mt-1">
+                    {submissionPhase === "INITIALIZATION"
+                      ? "Preparing invoice data..."
+                      : submissionPhase === "VALIDATION"
+                      ? "Validating format and contents..."
+                      : submissionPhase === "SUBMISSION"
+                      ? "Submitting to MyInvois..."
+                      : submissionPhase === "CONFIRMATION"
+                      ? "Verifying status..."
+                      : submissionPhase === "COOLDOWN"
+                      ? "Completing submission..."
+                      : "Please wait..."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <SubmissionInfoDisplay
+              info={{
+                startDate: new Date(),
+                endDate: new Date(),
+                selectedInvoices,
+              }}
             />
-          ) : (
-            <>
-              {submissionPhase && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
-                  <div className="flex flex-col items-center space-y-4 p-6 rounded-lg text-center">
-                    <LoadingSpinner size="lg" hideText />
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-medium text-default-900">
-                        {submissionPhase === "INITIALIZATION"
-                          ? "Preparing Submission"
-                          : submissionPhase === "VALIDATION"
-                          ? "Validating Invoice Data"
-                          : submissionPhase === "SUBMISSION"
-                          ? "Submitting to MyInvois"
-                          : submissionPhase === "CONFIRMATION"
-                          ? "Confirming Submission"
-                          : submissionPhase === "COOLDOWN"
-                          ? "Finalizing Submission"
-                          : "Processing Submission"}
-                      </h3>
-                      <p className="text-default-600">
-                        {submissionPhase === "INITIALIZATION"
-                          ? "Preparing invoice data for submission..."
-                          : submissionPhase === "VALIDATION"
-                          ? "Validating invoice format and contents..."
-                          : submissionPhase === "SUBMISSION"
-                          ? "Submitting invoice to MyInvois API..."
-                          : submissionPhase === "CONFIRMATION"
-                          ? "Verifying submission status..."
-                          : submissionPhase === "COOLDOWN"
-                          ? "Completing submission process..."
-                          : "Please wait while your invoice is being processed"}
-                      </p>
-                      <p className="text-sm text-default-500">
-                        Please do not close this window or refresh the page
-                      </p>
-                    </div>
+            {submissionError && (
+              <div className="mt-4 mb-4">
+                <h3 className="text-sm font-medium text-red-800 mb-2">
+                  Submission Error:
+                </h3>
+                <ErrorDisplay error={submissionError} />
+              </div>
+            )}
+            {selectedInvoices.length === 0 ? (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <IconInfoCircle
+                    size={20}
+                    className="flex-shrink-0 mt-0.5 text-amber-500"
+                  />
+                  <div className="space-y-1">
+                    <p className="font-medium text-amber-800">
+                      Please select invoices to submit to MyInvois
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      1. Invoice date must be in the past 3 days.
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      2. TIN number is recommended to be assigned to the
+                      involved customer(s) in catalogue.
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      3. It is recommended to submit in batches of up to 100
+                      documents instead of single document per submission.
+                    </p>
                   </div>
                 </div>
-              )}
-
-              <div className="flex items-center justify-between p-4 border-b border-default-200">
-                <h2 className="text-lg font-semibold text-default-900">
-                  Submit to MyInvois
-                </h2>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-default-500 hover:text-default-700 transition-colors"
+              </div>
+            ) : (
+              <div className="mt-4">
+                <Button
+                  onClick={handleSubmitInvoice}
+                  disabled={isSubmitting || !loginResponse?.success}
+                  className="w-full justify-center"
+                  variant={loginResponse?.success ? "default" : "outline"}
                 >
-                  <IconX size={20} />
-                </button>
+                  {isSubmitting ? "Submitting..." : "Submit Selected Invoices"}
+                </Button>
               </div>
-
-              <div className="p-4 space-y-4">
-                {!loginResponse ? (
-                  <div className="py-8 text-center text-default-600">
-                    <div className="animate-spin w-6 h-6 border-2 border-default-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-                    <p>Connecting to MyInvois API...</p>
-                  </div>
-                ) : (
-                  <>
-                    <ApiStatusDisplay loginResponse={loginResponse} />
-                    <SubmissionInfoDisplay
-                      info={{
-                        startDate: new Date(),
-                        endDate: new Date(),
-                        selectedInvoices,
-                      }}
-                    />
-                    {submissionError && (
-                      <div className="mt-4">
-                        <h3 className="text-sm font-medium text-red-800 mb-2">
-                          Submission Error Details:
-                        </h3>
-                        <ErrorDisplay error={submissionError} />
-                      </div>
-                    )}
-                    {selectedInvoices.length === 0 ? (
-                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-start gap-3">
-                          <IconInfoCircle
-                            size={20}
-                            className="flex-shrink-0 mt-0.5 text-amber-500"
-                          />
-                          <div className="space-y-1">
-                            <p className="font-medium text-amber-800">
-                              Please select invoices to submit to MyInvois
-                            </p>
-                            <p className="text-sm text-amber-700">
-                              1. Invoice date must be within 3 days before
-                              today.
-                            </p>
-                            <p className="text-sm text-amber-700">
-                              2. TIN number is recommended to be assigned to the
-                              involved customer(s) in catalogue.
-                            </p>
-                            <p className="text-sm text-amber-700">
-                              3. It is recommended to submit in batches of up to
-                              100 instead of single document per
-                              submission.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={handleSubmitInvoice}
-                        disabled={isSubmitting || !loginResponse.success}
-                        className="w-full justify-center"
-                        variant={loginResponse.success ? "default" : "outline"}
-                      >
-                        {isSubmitting
-                          ? "Submitting..."
-                          : "Submit Selected Invoices"}
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </InvoisModalContainer>
     </div>
   );
 };

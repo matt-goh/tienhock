@@ -13,7 +13,7 @@ export async function batchTransformInvoices(invoices) {
 
   for (let i = 0; i < invoices.length; i++) {
     try {
-      const transformedInvoice = await transformInvoiceToMyInvoisFormat(invoices[i]);
+      const transformedInvoice = transformInvoiceToMyInvoisFormat(invoices[i]);
       results.transformedInvoices.push(transformedInvoice);
     } catch (error) {
       results.errors.push({
