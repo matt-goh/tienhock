@@ -18,7 +18,7 @@ export default {
       rose: colors.rose,
       red: colors.red,
       yellow: colors.yellow,
-      green: colors.green,
+      green: colors.emerald,
       teal: colors.teal,
       black: colors.black,
       amber: colors.amber,

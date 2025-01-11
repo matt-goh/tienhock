@@ -102,6 +102,74 @@ export interface SubmissionResponse {
   }>;
 }
 
+// Existing types remain the same
+export interface ValidationError {
+  invoiceNo: string;
+  invoiceId?: string;
+  errors: string[];
+  validationErrors?: string[]; // Added to handle nested validation errors
+  type?: "validation" | "submission"; // Added type field
+}
+
+export interface ValidationError {
+  invoiceNo: string;
+  invoiceId?: string;
+  errors: string[];
+  validationErrors?: string[];
+  type?: "validation" | "submission";
+}
+
+export interface FailedInvoice {
+  invoiceId?: string;
+  invoiceNo: string;
+  error?: string;
+  errors?: string[] | string;
+  type?: "validation" | "submission";
+}
+
+export interface MyInvoisError {
+  success?: boolean;
+  message: string;
+  error?: string;
+  details?: any;
+  validationErrors?: ValidationError[];
+}
+
+export interface ErrorDisplayProps {
+  error: MyInvoisError | string;
+  failedInvoices?: FailedInvoice[];
+  validationErrors?: ValidationError[];
+}
+
+export interface NormalizedError {
+  invoiceNo: string;
+  errors: string[];
+  type: "validation" | "submission";
+  message?: string;
+}
+
+export interface TokenInfo {
+  accessToken: string;
+  expiresIn: number;
+  tokenType: string;
+}
+
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  apiEndpoint: string;
+  tokenInfo?: TokenInfo;
+  tokenCreationTime?: number;
+  error?: string;
+  details?: any;
+}
+
+export interface SubmissionInfo {
+  startDate: Date;
+  endDate: Date;
+  selectedInvoices: InvoiceData[];
+}
+
 // Define column types
 export type ColumnType =
   | "selection"

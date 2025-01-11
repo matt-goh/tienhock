@@ -81,20 +81,76 @@ const formatTime = (timeStr) => {
   }
 };
 
-const validateInvoiceData = (invoiceData) => {
+const isDateWithinRange = (dateStr, daysBack = 3) => {
+  // Get current date at start of day in local timezone
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Calculate the earliest allowed date
+  const earliestDate = new Date(today);
+  earliestDate.setDate(today.getDate() - daysBack);
+  
+  // Parse the input date
+  const [day, month, year] = dateStr.split('/').map(Number);
+  const inputDate = new Date(year, month - 1, day);
+  inputDate.setHours(0, 0, 0, 0);
+  
+  return inputDate >= earliestDate && inputDate <= today;
+};
 
-  if (!invoiceData) {
-    throw new Error('Invoice data is required');
+const validateInvoiceData = (invoiceData) => {
+  const validationErrors = [];
+
+  // Validate invoice date
+  if (!invoiceData.date) {
+    validationErrors.push('Invoice date is required');
+  } else {
+    try {
+      if (!isDateWithinRange(invoiceData.date)) {
+        validationErrors.push(
+          'Invoice date must be within the last 3 days. ' +
+          'Please check the date and try again.'
+        );
+      }
+    } catch (error) {
+      validationErrors.push(
+        'Invalid date format. Date should be in DD/MM/YYYY format.'
+      );
+    }
   }
 
   // Check if orderDetails exists and is an array
   if (!Array.isArray(invoiceData?.orderDetails)) {
-    console.error('Invalid orderDetails:', invoiceData?.orderDetails);
-    throw new Error('Invoice must contain order details array');
+    validationErrors.push('Invoice must contain at least one order detail');
+  } else if (invoiceData.orderDetails.length === 0) {
+    validationErrors.push('Invoice must contain at least one order detail');
   }
 
-  // Ensure required fields have default values if missing
-  const validatedData = {
+  // Validate required fields
+  const requiredFields = {
+    invoiceno: 'Invoice number',
+    date: 'Invoice date',
+    time: 'Invoice time',
+    type: 'Invoice type'
+  };
+
+  Object.entries(requiredFields).forEach(([field, label]) => {
+    if (!invoiceData[field]) {
+      validationErrors.push(`${label} is required`);
+    }
+  });
+
+  // If any validation errors were found, throw an error with all the details
+  if (validationErrors.length > 0) {
+    const error = new Error('Invoice validation failed');
+    error.validationErrors = validationErrors;
+    error.invoiceNo = invoiceData.invoiceno || 'Unknown invoice number';
+    error.type = 'validation';  // Add error type for better error handling
+    throw error;
+  }
+
+  // If validation passes, return sanitized data
+  return {
     ...invoiceData,
     date: invoiceData.date || new Date().toISOString().split('T')[0],
     time: invoiceData.time || new Date().toISOString().split('T')[1].split('.')[0] + 'Z',
@@ -113,7 +169,6 @@ const validateInvoiceData = (invoiceData) => {
       istax: Boolean(detail.istax)
     }))
   };
-  return validatedData;
 };
 
 // Helper function to get payment details based on invoice type
