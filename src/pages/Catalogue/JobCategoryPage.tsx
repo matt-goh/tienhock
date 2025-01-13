@@ -10,8 +10,9 @@ import {
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
-const CatalogueJobCategoryPage: React.FC = () => {
+const JobCategoryPage: React.FC = () => {
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
   const [editedJobCategories, setEditedJobCategories] = useState<JobCategory[]>(
     []
@@ -313,7 +314,11 @@ const CatalogueJobCategoryPage: React.FC = () => {
   );
 
   if (loading) {
-    return <p className="mt-4 text-center">Loading...</p>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -378,4 +383,4 @@ const CatalogueJobCategoryPage: React.FC = () => {
   );
 };
 
-export default CatalogueJobCategoryPage;
+export default JobCategoryPage;

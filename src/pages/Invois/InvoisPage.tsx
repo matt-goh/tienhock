@@ -34,6 +34,7 @@ import toast from "react-hot-toast";
 import PrintPDFOverlay from "./utils/PrintPDFOverlay";
 import PDFDownloadHandler from "./utils/PDFDownloadHandler";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -736,7 +737,11 @@ const InvoisPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   if (error) {

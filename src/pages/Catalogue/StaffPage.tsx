@@ -13,6 +13,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 const EmployeeCard = ({
   employee,
@@ -168,7 +169,7 @@ const EmployeeCard = ({
   );
 };
 
-const CatalogueStaffPage = () => {
+const StaffPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -375,7 +376,11 @@ const CatalogueStaffPage = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   if (error) {
@@ -465,4 +470,4 @@ const CatalogueStaffPage = () => {
   );
 };
 
-export default CatalogueStaffPage;
+export default StaffPage;

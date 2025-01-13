@@ -26,15 +26,17 @@ interface InputProps {
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
   type?: string;
+  placeholder?: string;
 }
 
 export const FormInput: React.FC<InputProps> = ({
-  name,
-  label,
+  name = "",
+  label = "",
   value = "",
   onChange,
   disabled = false,
   type = "text",
+  placeholder = "",
 }) => (
   <div className="space-y-2">
     <label htmlFor={name} className="text-sm font-medium text-default-700">
@@ -44,9 +46,10 @@ export const FormInput: React.FC<InputProps> = ({
       type={type}
       id={name}
       name={name}
-      value={value}
+      value={value?.toString() ?? ""}
       onChange={onChange}
       disabled={disabled}
+      placeholder={placeholder}
       className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
     />
   </div>
@@ -72,10 +75,10 @@ export const FormListbox: React.FC<ListboxProps> = ({
       {label}
     </label>
     <Listbox value={value} onChange={onChange}>
-      <div className="relative mt-1">
+      <div className="relative">
         <ListboxButton
           className={clsx(
-            "relative w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left",
+            "relative w-full rounded-lg border border-default-300 bg-white py-[8.85px] pl-3 pr-10 text-left",
             "focus:outline-none focus:border-default-500"
           )}
         >

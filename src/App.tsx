@@ -120,7 +120,7 @@ const Layout: React.FC = () => {
       <main
         className={`
     flex justify-center w-full transition-all duration-300 ease-in-out
-    ${!isPDFRoute && location.pathname !== "/login" ? "py-[68px]" : ""} 
+    ${!isPDFRoute && location.pathname !== "/login" ? "my-[68px]" : ""} 
     ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
   `}
       >

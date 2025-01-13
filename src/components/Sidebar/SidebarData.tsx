@@ -7,19 +7,21 @@ import { Icon } from "@tabler/icons-react";
 import React from "react";
 
 // Import components here
-import CatalogueJobCategoryPage from "../../pages/Catalogue/CatalogueJobCategoryPage";
-import CatalogueStaffFormPage from "../../pages/Catalogue/CatalogueStaffFormPage";
-import CatalogueAddStaffPage from "../../pages/Catalogue/CatalogueAddStaffPage";
-import CatalogueCustomerPage from "../../pages/Catalogue/CatalogueCustomerPage";
-import CatalogueProductPage from "../../pages/Catalogue/CatalogueProductPage";
-import CatalogueBasicPage from "../../pages/Catalogue/CatalogueBasicPage";
-import CatalogueStaffPage from "../../pages/Catalogue/CatalogueStaffPage";
+import CustomerFormPage from "../../pages/Catalogue/CustomerFormPage";
 import InvoisDetailsPage from "../../pages/Invois/InvoisDetailsPage";
+import CustomerAddPage from "../../pages/Catalogue/CustomerAddPage";
+import JobCategoryPage from "../../pages/Catalogue/JobCategoryPage";
 import InvoisUploadPage from "../../pages/Invois/InvoisUploadPage";
-import CatalogueJobPage from "../../pages/Catalogue/CatalogueJobPage";
-import CatalogueTaxPage from "../../pages/Catalogue/CatalogueTaxPage";
-import InvoisPage from "../../pages/Invois/InvoisPage";
+import StaffFormPage from "../../pages/Catalogue/StaffFormPage";
+import CustomerPage from "../../pages/Catalogue/CustomerPage";
+import StaffAddPage from "../../pages/Catalogue/StaffAddPage";
 import PDFViewerPage from "../../pages/Invois/PDFViewerPage";
+import ProductPage from "../../pages/Catalogue/ProductPage";
+import BasicPage from "../../pages/Catalogue/BasicPage";
+import StaffPage from "../../pages/Catalogue/StaffPage";
+import InvoisPage from "../../pages/Invois/InvoisPage";
+import JobPage from "../../pages/Catalogue/JobPage";
+import TaxPage from "../../pages/Catalogue/TaxPage";
 
 export interface PopoverOption {
   name: string;
@@ -94,45 +96,57 @@ export const SidebarData: SidebarItem[] = [
       {
         name: "Staff",
         path: "/catalogue/staff",
-        component: CatalogueStaffPage,
+        component: StaffPage,
         subItems: [
           {
             name: "New Staff",
             path: "/catalogue/staff/new",
-            component: CatalogueAddStaffPage,
+            component: StaffAddPage,
           },
           {
             name: "Staff Edit",
             path: "/catalogue/staff/:id",
-            component: CatalogueStaffFormPage,
+            component: StaffFormPage,
           },
         ],
       },
       {
         name: "Customer",
         path: "/catalogue/customer",
-        component: CatalogueCustomerPage,
+        component: CustomerPage,
+        subItems: [
+          {
+            name: "New Staff",
+            path: "/catalogue/customer/new",
+            component: CustomerAddPage,
+          },
+          {
+            name: "Staff Edit",
+            path: "/catalogue/customer/:id",
+            component: CustomerFormPage,
+          },
+        ],
       },
       {
         name: "Product",
         path: "/catalogue/product",
-        component: CatalogueProductPage,
+        component: ProductPage,
       },
       {
         name: "Job",
         path: "/catalogue/job",
-        component: CatalogueJobPage,
+        component: JobPage,
       },
       {
         name: "Job Category",
         path: "/catalogue/job_category",
-        component: CatalogueJobCategoryPage,
+        component: JobCategoryPage,
       },
       {
         name: "Section",
         path: "/catalogue/section",
         component: () => (
-          <CatalogueBasicPage
+          <BasicPage
             title="Section Catalogue"
             apiEndpoint="sections"
             tableKey="catalogueSection"
@@ -143,7 +157,7 @@ export const SidebarData: SidebarItem[] = [
         name: "Location",
         path: "/catalogue/location",
         component: () => (
-          <CatalogueBasicPage
+          <BasicPage
             title="Location Catalogue"
             apiEndpoint="locations"
             tableKey="catalogueLocation"
@@ -154,7 +168,7 @@ export const SidebarData: SidebarItem[] = [
         name: "Bank",
         path: "/catalogue/bank",
         component: () => (
-          <CatalogueBasicPage
+          <BasicPage
             title="Bank Catalogue"
             apiEndpoint="banks"
             tableKey="catalogueBank"
@@ -164,13 +178,13 @@ export const SidebarData: SidebarItem[] = [
       {
         name: "Tax",
         path: "/catalogue/tax",
-        component: CatalogueTaxPage,
+        component: TaxPage,
       },
       {
         name: "Nationality",
         path: "/catalogue/nationality",
         component: () => (
-          <CatalogueBasicPage
+          <BasicPage
             title="Nationality Catalogue"
             apiEndpoint="nationalities"
             tableKey="catalogueNationality"
@@ -181,7 +195,7 @@ export const SidebarData: SidebarItem[] = [
         name: "Race",
         path: "/catalogue/race",
         component: () => (
-          <CatalogueBasicPage
+          <BasicPage
             title="Race Catalogue"
             apiEndpoint="races"
             tableKey="catalogueRace"
@@ -192,7 +206,7 @@ export const SidebarData: SidebarItem[] = [
         name: "Agama",
         path: "/catalogue/agama",
         component: () => (
-          <CatalogueBasicPage
+          <BasicPage
             title="Agama Catalogue"
             apiEndpoint="agama"
             tableKey="catalogueAgama"

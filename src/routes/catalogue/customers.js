@@ -7,7 +7,7 @@ export default function(pool) {
   // Get all customers
   router.get('/', async (req, res) => {
     try {
-      const query = 'SELECT * FROM customers';
+      const query = 'SELECT * FROM customers ORDER BY name';
       const result = await pool.query(query);
       res.json(result.rows);
     } catch (error) {
@@ -16,18 +16,114 @@ export default function(pool) {
     }
   });
 
+  // Get customers for combobox
+  router.get('/combobox', async (req, res) => {
+    const { salesman = '', search = '', page = 1, limit = 20 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    try {
+      let query = `
+        SELECT id, name, phone_number, email, city, salesman
+        FROM customers
+        WHERE 1=1
+      `;
+      
+      const values = [];
+      let valueIndex = 1;
+
+      // Add salesman filter if provided
+      if (salesman && salesman !== 'All Salesmen') {
+        query += ` AND salesman = $${valueIndex}`;
+        values.push(salesman);
+        valueIndex++;
+      }
+
+      // Add search filter if provided
+      if (search) {
+        query += ` AND (
+          LOWER(name) LIKE $${valueIndex}
+          OR LOWER(id) LIKE $${valueIndex}
+          OR LOWER(phone_number) LIKE $${valueIndex}
+          OR LOWER(email) LIKE $${valueIndex}
+          OR LOWER(city) LIKE $${valueIndex}
+        )`;
+        values.push(`%${search.toLowerCase()}%`);
+        valueIndex++;
+      }
+
+      // Get total count for pagination
+      const countQuery = `SELECT COUNT(*) FROM (${query}) AS filtered_customers`;
+      const { rows: [{ count }] } = await pool.query(countQuery, values);
+      const totalCount = parseInt(count);
+      const totalPages = Math.ceil(totalCount / Number(limit));
+
+      // Add pagination
+      query += ` ORDER BY name LIMIT $${valueIndex} OFFSET $${valueIndex + 1}`;
+      values.push(Number(limit), offset);
+
+      // Get paginated results
+      const { rows: customers } = await pool.query(query, values);
+
+      res.json({
+        customers,
+        totalCount,
+        totalPages,
+        currentPage: Number(page)
+      });
+    } catch (error) {
+      console.error('Error fetching customers for combobox:', error);
+      res.status(500).json({ 
+        message: 'Error fetching customers for combobox', 
+        error: error.message 
+      });
+    }
+  });
+
   // Create a new customer
   router.post('/', async (req, res) => {
-    const { id, name, closeness, salesman, tin_number } = req.body;
+    const { 
+      id, 
+      name, 
+      closeness, 
+      salesman, 
+      tin_number,
+      phone_number,
+      email,
+      address,
+      city,
+      id_number
+    } = req.body;
 
     try {
       const query = `
-        INSERT INTO customers (id, name, closeness, salesman, tin_number)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO customers (
+          id, 
+          name, 
+          closeness, 
+          salesman, 
+          tin_number,
+          phone_number,
+          email,
+          address,
+          city,
+          id_number
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
       
-      const values = [id, name, closeness, salesman, tin_number];
+      const values = [
+        id, 
+        name, 
+        closeness, 
+        salesman, 
+        tin_number,
+        phone_number,
+        email,
+        address,
+        city,
+        id_number
+      ];
 
       const result = await pool.query(query, values);
       res.status(201).json({ 
@@ -43,42 +139,14 @@ export default function(pool) {
     }
   });
 
-  // Update a customer
-  router.put('/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name, closeness, salesman, tin_number } = req.body;
-
-    try {
-      const query = `
-        UPDATE customers
-        SET name = $1, closeness = $2, salesman = $3, tin_number = $4
-        WHERE id = $5
-        RETURNING *
-      `;
-      
-      const values = [name, closeness, salesman, tin_number, id];
-
-      const result = await pool.query(query, values);
-      
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: 'Customer not found' });
-      }
-
-      res.json({ 
-        message: 'Customer updated successfully', 
-        customer: result.rows[0] 
-      });
-    } catch (error) {
-      console.error('Error updating customer:', error);
-      res.status(500).json({ message: 'Error updating customer', error: error.message });
-    }
-  });
-
   // Delete customers (batch delete)
   router.delete('/', async (req, res) => {
-    const { customerIds } = req.body;
+    // Extract customerIds from the request body
+    const customerIds = Array.isArray(req.body.customers) 
+      ? req.body.customers 
+      : [req.body.customers];
 
-    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+    if (!customerIds || customerIds.length === 0) {
       return res.status(400).json({ message: 'Invalid customer IDs provided' });
     }
 
@@ -86,8 +154,12 @@ export default function(pool) {
       const query = 'DELETE FROM customers WHERE id = ANY($1) RETURNING id';
       const result = await pool.query(query, [customerIds]);
 
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'No customers found with the provided IDs' });
+      }
+
       const deletedIds = result.rows.map(row => row.id);
-      res.status(200).json({ 
+      res.json({ 
         message: 'Customers deleted successfully', 
         deletedCustomerIds: deletedIds 
       });
@@ -97,6 +169,7 @@ export default function(pool) {
     }
   });
 
+  
   // Batch update/insert customers
   router.post('/batch', async (req, res) => {
     const { customers } = req.body;
@@ -113,19 +186,58 @@ export default function(pool) {
         const processedCustomers = [];
 
         for (const customer of customers) {
-          const { id, name, closeness, salesman, tin_number } = customer;
+          const { 
+            id, 
+            name, 
+            closeness, 
+            salesman, 
+            tin_number,
+            phone_number,
+            email,
+            address,
+            city,
+            id_number
+          } = customer;
           
           const upsertQuery = `
-            INSERT INTO customers (id, name, closeness, salesman, tin_number)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO customers (
+              id, 
+              name, 
+              closeness, 
+              salesman, 
+              tin_number,
+              phone_number,
+              email,
+              address,
+              city,
+              id_number
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (id) DO UPDATE
-            SET name = EXCLUDED.name,
-                closeness = EXCLUDED.closeness,
-                salesman = EXCLUDED.salesman,
-                tin_number = EXCLUDED.tin_number
+            SET 
+              name = EXCLUDED.name,
+              closeness = EXCLUDED.closeness,
+              salesman = EXCLUDED.salesman,
+              tin_number = EXCLUDED.tin_number,
+              phone_number = EXCLUDED.phone_number,
+              email = EXCLUDED.email,
+              address = EXCLUDED.address,
+              city = EXCLUDED.city,
+              id_number = EXCLUDED.id_number
             RETURNING *
           `;
-          const upsertValues = [id, name, closeness, salesman, tin_number];
+          const upsertValues = [
+            id, 
+            name, 
+            closeness, 
+            salesman, 
+            tin_number,
+            phone_number,
+            email,
+            address,
+            city,
+            id_number
+          ];
           const result = await client.query(upsertQuery, upsertValues);
           processedCustomers.push(result.rows[0]);
         }
@@ -147,58 +259,83 @@ export default function(pool) {
     }
   });
 
-  // Get customers for combobox
-  router.get('/combobox', async (req, res) => {
-    const { salesman, search, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+  // Get customer by ID
+  router.get('/:id', async (req, res) => {
+    const { id } = req.params;
 
     try {
-      let query = 'SELECT id, name FROM customers';
-      let countQuery = 'SELECT COUNT(*) FROM customers';
-      let whereClause = [];
-      let values = [];
-      let valueIndex = 1;
+      const query = 'SELECT * FROM customers WHERE id = $1';
+      const result = await pool.query(query, [id]);
 
-      if (salesman && salesman !== 'All Salesmen') {
-        whereClause.push(`salesman = $${valueIndex}`);
-        values.push(salesman);
-        valueIndex++;
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Customer not found' });
       }
 
-      if (search) {
-        whereClause.push(`(name ILIKE $${valueIndex} OR id ILIKE $${valueIndex})`);
-        values.push(`%${search}%`);
-        valueIndex++;
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error fetching customer:', error);
+      res.status(500).json({ message: 'Error fetching customer', error: error.message });
+    }
+  });
+
+  // Update a customer
+  router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+    const { 
+      name, 
+      closeness, 
+      salesman, 
+      tin_number,
+      phone_number,
+      email,
+      address,
+      city,
+      id_number
+    } = req.body;
+
+    try {
+      const query = `
+        UPDATE customers
+        SET 
+          name = $1, 
+          closeness = $2, 
+          salesman = $3, 
+          tin_number = $4,
+          phone_number = $5,
+          email = $6,
+          address = $7,
+          city = $8,
+          id_number = $9
+        WHERE id = $10
+        RETURNING *
+      `;
+      
+      const values = [
+        name, 
+        closeness, 
+        salesman, 
+        tin_number,
+        phone_number,
+        email,
+        address,
+        city,
+        id_number,
+        id
+      ];
+
+      const result = await pool.query(query, values);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Customer not found' });
       }
 
-      if (whereClause.length > 0) {
-        query += ' WHERE ' + whereClause.join(' AND ');
-        countQuery += ' WHERE ' + whereClause.join(' AND ');
-      }
-
-      query += ` ORDER BY name LIMIT $${valueIndex} OFFSET $${valueIndex + 1}`;
-      values.push(limit, offset);
-
-      const [resultCount, resultData] = await Promise.all([
-        pool.query(countQuery, values.slice(0, -2)),
-        pool.query(query, values)
-      ]);
-
-      const totalCount = parseInt(resultCount.rows[0].count);
-      const totalPages = Math.ceil(totalCount / limit);
-
-      res.json({
-        customers: resultData.rows,
-        totalCount,
-        totalPages,
-        currentPage: parseInt(page)
+      res.json({ 
+        message: 'Customer updated successfully', 
+        customer: result.rows[0] 
       });
     } catch (error) {
-      console.error('Error fetching customers for combobox:', error);
-      res.status(500).json({ 
-        message: 'Error fetching customers for combobox', 
-        error: error.message 
-      });
+      console.error('Error updating customer:', error);
+      res.status(500).json({ message: 'Error updating customer', error: error.message });
     }
   });
 

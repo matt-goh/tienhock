@@ -19,10 +19,11 @@ import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 type JobSelection = Job | null;
 
-const CatalogueJobPage: React.FC = () => {
+const JobPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [editedJob, setEditedJob] = useState<Job | null>(null);
@@ -685,7 +686,9 @@ const CatalogueJobPage: React.FC = () => {
           message="Are you sure you want to delete this job? This action cannot be undone."
         />
         {loading ? (
-          <p className="mt-4 text-center">Loading...</p>
+          <div className="mt-40 w-full flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
         ) : selectedJob ? (
           <div className="w-full">
             <div className="relative">
@@ -714,4 +717,4 @@ const CatalogueJobPage: React.FC = () => {
   );
 };
 
-export default CatalogueJobPage;
+export default JobPage;
