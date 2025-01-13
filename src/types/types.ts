@@ -326,7 +326,12 @@ export interface Customer {
   name: string;
   closeness: string;
   salesman: string;
-  tin_number: number;
+  tin_number: string;
+  phone_number: string;
+  email: string;
+  address: string;
+  city: string;
+  id_number: string;
   originalId?: string;
 }
 

@@ -4,6 +4,7 @@ import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import _ from "lodash";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface Tax {
   id: number;
@@ -11,7 +12,7 @@ interface Tax {
   rate: number;
 }
 
-const CatalogueTaxPage: React.FC = () => {
+const TaxPage: React.FC = () => {
   const [taxes, setTaxes] = useState<Tax[]>([]);
   const [editedTaxes, setEditedTaxes] = useState<Tax[]>([]);
   const [originalTaxes, setOriginalTaxes] = useState<Tax[]>([]);
@@ -133,7 +134,11 @@ const CatalogueTaxPage: React.FC = () => {
   }, []);
 
   if (loading) {
-    return <p className="mt-4 text-center">Loading...</p>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -163,4 +168,4 @@ const CatalogueTaxPage: React.FC = () => {
   );
 };
 
-export default CatalogueTaxPage;
+export default TaxPage;

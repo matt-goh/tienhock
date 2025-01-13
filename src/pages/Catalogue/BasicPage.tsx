@@ -4,6 +4,7 @@ import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface CatalogueItem {
   originalId: string;
@@ -18,7 +19,7 @@ interface CatalogueBasicPageProps {
   tableKey: string;
 }
 
-const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
+const BasicPage: React.FC<CatalogueBasicPageProps> = ({
   title,
   apiEndpoint,
   tableKey,
@@ -165,7 +166,11 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
   }, []);
 
   if (loading) {
-    return <p className="mt-4 text-center">Loading...</p>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -195,4 +200,4 @@ const CatalogueBasicPage: React.FC<CatalogueBasicPageProps> = ({
   );
 };
 
-export default CatalogueBasicPage;
+export default BasicPage;

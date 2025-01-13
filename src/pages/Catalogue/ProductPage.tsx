@@ -4,6 +4,7 @@ import Table from "../../components/Table/Table";
 import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface Product {
   originalId: string;
@@ -15,7 +16,7 @@ interface Product {
   [key: string]: any;
 }
 
-const CatalogueProductPage: React.FC = () => {
+const ProductPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [editedProducts, setEditedProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
@@ -48,7 +49,7 @@ const CatalogueProductPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.get('/api/products');
+      const data = await api.get("/api/products");
       setProducts(
         data.map((product: Product) => ({ ...product, originalId: product.id }))
       );
@@ -58,7 +59,7 @@ const CatalogueProductPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-   }, []);
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -79,16 +80,16 @@ const CatalogueProductPage: React.FC = () => {
     async (selectedIndices: number[]) => {
       const productsToDelete = selectedIndices.map((index) => products[index]);
       const productIdsToDelete = productsToDelete.map((product) => product.id);
-   
+
       try {
-        await api.delete('/api/products', productIdsToDelete);
-   
+        await api.delete("/api/products", productIdsToDelete);
+
         setProducts((prevProducts) =>
           prevProducts.filter(
             (product) => !productIdsToDelete.includes(product.id)
           )
         );
-   
+
         toast.success("Selected products deleted successfully");
         setIsEditing(false);
       } catch (error) {
@@ -97,9 +98,9 @@ const CatalogueProductPage: React.FC = () => {
       }
     },
     [products]
-   );
+  );
 
-   const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async () => {
     try {
       // Validate product IDs
       const emptyProductId = editedProducts.find(
@@ -109,7 +110,7 @@ const CatalogueProductPage: React.FC = () => {
         toast.error("Product ID cannot be empty");
         return;
       }
-   
+
       const productIds = new Set();
       const duplicateProductId = editedProducts.find((product) => {
         if (productIds.has(product.id)) {
@@ -118,34 +119,34 @@ const CatalogueProductPage: React.FC = () => {
         productIds.add(product.id);
         return false;
       });
-   
+
       if (duplicateProductId) {
         toast.error(`Duplicate Product ID: ${duplicateProductId.id}`);
         return;
       }
-   
+
       // Check for changes
       const productsChanged = !_.isEqual(
         editedProducts.map((product) => _.omit(product, ["originalId"])),
         originalProducts.map((product) => _.omit(product, ["originalId"]))
       );
-   
+
       if (!productsChanged) {
         toast("No changes detected");
         setIsEditing(false);
         return;
       }
-   
+
       const productsToUpdate = editedProducts.map((product) => ({
         ...product,
         newId: product.id !== product.originalId ? product.id : undefined,
         id: product.originalId,
       }));
-   
-      const result = await api.post('/api/products/batch', {
+
+      const result = await api.post("/api/products/batch", {
         products: productsToUpdate,
       });
-   
+
       setProducts(
         result.products.map((product: Product) => ({
           ...product,
@@ -158,7 +159,7 @@ const CatalogueProductPage: React.FC = () => {
       console.error("Error updating products:", error);
       toast.error((error as Error).message);
     }
-   }, [editedProducts, originalProducts]);
+  }, [editedProducts, originalProducts]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
@@ -170,7 +171,11 @@ const CatalogueProductPage: React.FC = () => {
   }, []);
 
   if (loading) {
-    return <p className="mt-4 text-center">Loading...</p>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -198,4 +203,4 @@ const CatalogueProductPage: React.FC = () => {
   );
 };
 
-export default CatalogueProductPage;
+export default ProductPage;

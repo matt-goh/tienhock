@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Tab from "../../components/Tab";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -18,11 +18,8 @@ interface SelectOption {
   name: string;
 }
 
-const CatalogueStaffFormPage: React.FC = () => {
+const StaffAddPage: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const isEditMode = !!id;
-
   const [formData, setFormData] = useState<Employee>({
     id: "",
     name: "",
@@ -48,23 +45,18 @@ const CatalogueStaffFormPage: React.FC = () => {
     dateResigned: "",
     newId: "",
   });
-  const [initialFormData, setInitialFormData] = useState<Employee>({
-    ...formData,
-  });
 
+  const initialFormDataRef = useRef<Employee>({ ...formData });
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [nationalities, setNationalities] = useState<SelectOption[]>([]);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [races, setRaces] = useState<SelectOption[]>([]);
   const [agamas, setAgamas] = useState<SelectOption[]>([]);
   const [jobs, setJobs] = useState<SelectOption[]>([]);
   const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
-  const [loading, setLoading] = useState(isEditMode);
-  const [error, setError] = useState<string | null>(null);
 
   const genderOptions = [
     { id: "male", name: "Male" },
@@ -91,69 +83,25 @@ const CatalogueStaffFormPage: React.FC = () => {
   ];
 
   useEffect(() => {
+    // Check if form data has changed by comparing with the initial ref
     const hasChanged =
-      JSON.stringify(formData) !== JSON.stringify(initialFormData);
+      JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
     setIsFormChanged(hasChanged);
-  }, [formData, initialFormData]);
-
-  const fetchStaffDetails = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get(`/api/staffs/${id}`);
-
-      setFormData(data);
-      setInitialFormData(data);
-      setError(null);
-    } catch (err) {
-      setError("Failed to fetch staff details. Please try again later.");
-      console.error("Error fetching staff details:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [formData]);
 
   useEffect(() => {
-    if (isEditMode) {
-      fetchStaffDetails();
-    } else {
-      setInitialFormData({ ...formData });
-    }
-    fetchOptions("nationalities", setNationalities);
-    fetchOptions("races", setRaces);
-    fetchOptions("agamas", setAgamas);
-    fetchOptions("jobs", setJobs);
-    fetchOptions("locations", setLocations);
+    const fetchAllOptions = async () => {
+      await Promise.all([
+        fetchOptions("nationalities", setNationalities),
+        fetchOptions("races", setRaces),
+        fetchOptions("agamas", setAgamas),
+        fetchOptions("jobs", setJobs),
+        fetchOptions("locations", setLocations),
+      ]);
+    };
+
+    fetchAllOptions();
   }, []);
-
-  const fetchOptions = async (
-    endpoint: string,
-    setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
-  ) => {
-    try {
-      const data = await api.get(`/api/${endpoint}`);
-      setter(data);
-    } catch (error) {
-      console.error(`Error fetching ${endpoint}:`, error);
-    }
-  };
-
-  const handleDeleteClick = () => {
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (id) {
-      try {
-        await api.delete(`/api/staffs/${id}`);
-        setIsDeleteDialogOpen(false);
-        toast.success("Staff member deleted successfully");
-        navigate("/catalogue/staff");
-      } catch (err) {
-        console.error("Error deleting staff member:", err);
-        toast.error("Failed to delete staff member. Please try again.");
-      }
-    }
-  };
 
   const handleBackClick = () => {
     if (isFormChanged) {
@@ -166,6 +114,25 @@ const CatalogueStaffFormPage: React.FC = () => {
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
     navigate("/catalogue/staff");
+  };
+
+  const fetchOptions = async (
+    endpoint: string,
+    setter: {
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (value: React.SetStateAction<SelectOption[]>): void;
+      (arg0: any): void;
+    }
+  ) => {
+    try {
+      const data = await api.get(`/api/${endpoint}`);
+      setter(data);
+    } catch (error) {
+      console.error(`Error fetching ${endpoint}:`, error);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,6 +153,7 @@ const CatalogueStaffFormPage: React.FC = () => {
   const handleComboboxChange = useCallback(
     (name: "job" | "location", value: string[] | null) => {
       if (value === null) {
+        // Do nothing when the input is cleared
         return;
       }
       setFormData((prevData) => ({
@@ -208,6 +176,7 @@ const CatalogueStaffFormPage: React.FC = () => {
       }
     }
 
+    // Email validation (only if email is not empty)
     if (formData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
@@ -219,7 +188,7 @@ const CatalogueStaffFormPage: React.FC = () => {
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -236,30 +205,13 @@ const CatalogueStaffFormPage: React.FC = () => {
     };
 
     try {
-      if (isEditMode) {
-        if (id !== formData.id) {
-          // ID has changed, use PUT method with the new ID
-          await api.put(`/api/staffs/${id}`, dataToSend);
-          dataToSend.newId = formData.id;
-        } else {
-          // ID hasn't changed, use regular PUT
-          await api.put(`/api/staffs/${id}`, dataToSend);
-        }
-      } else {
-        // Create new staff member
-        await api.post("/api/staffs", dataToSend);
-      }
-
-      toast.success(
-        `Staff member ${isEditMode ? "updated" : "created"} successfully!`
-      );
+      const data = await api.post("/api/staffs", dataToSend);
+      toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("An unexpected error occurred.");
-      }
+      toast.error(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
     } finally {
       setIsSaving(false);
     }
@@ -310,13 +262,6 @@ const CatalogueStaffFormPage: React.FC = () => {
       setQuery={setQuery}
     />
   );
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
 
   return (
     <div className="container mx-auto px-4">
@@ -324,12 +269,11 @@ const CatalogueStaffFormPage: React.FC = () => {
       <div className="bg-white rounded-lg">
         <div className="pl-6">
           <h1 className="text-xl font-semibold text-default-900">
-            {isEditMode ? "Edit Staff" : "Add New Staff"}
+            Add New Staff
           </h1>
           <p className="mt-1 text-sm text-default-500">
-            {isEditMode
-              ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
-              : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
+            Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
+            anda selesai.
           </p>
         </div>
         <form onSubmit={handleSubmit}>
@@ -395,16 +339,7 @@ const CatalogueStaffFormPage: React.FC = () => {
               </div>
             </Tab>
           </div>
-          <div className="mt-8 py-3 space-x-3 text-right">
-            {isEditMode && (
-              <button
-                type="button"
-                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
-                onClick={handleDeleteClick}
-              >
-                Delete
-              </button>
-            )}
+          <div className="mt-8 py-3 text-right">
             <Button
               type="submit"
               variant="boldOutline"
@@ -417,14 +352,6 @@ const CatalogueStaffFormPage: React.FC = () => {
         </form>
       </div>
       <ConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Staff"
-        message={`Are you sure you want to remove ${formData.name} from the staff list? This action cannot be undone.`}
-        confirmButtonText="Delete"
-      />
-      <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
@@ -436,4 +363,4 @@ const CatalogueStaffFormPage: React.FC = () => {
   );
 };
 
-export default CatalogueStaffFormPage;
+export default StaffAddPage;

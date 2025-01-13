@@ -1674,26 +1674,8 @@ const InvoisDetailsPage: React.FC = () => {
               });
             }}
           />
-          <FormListbox
-            name="type"
-            label="Type"
-            value={getTypeDisplayName(invoiceData.type as "C" | "I")}
-            onChange={(value) => {
-              setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  type: value === "Cash" ? "C" : "I",
-                };
-              });
-            }}
-            options={[
-              { id: "C", name: "Cash" },
-              { id: "I", name: "Invoice" },
-            ]}
-          />
         </div>
-        <div className="rounded-lg">
+        <div className="rounded-lg space-y-2">
           <FormInput
             name="customerId"
             label="Customer ID"
@@ -1739,6 +1721,24 @@ const InvoisDetailsPage: React.FC = () => {
               });
             }}
             options={salesmen.map((id) => ({ id, name: id }))}
+          />
+          <FormListbox
+            name="type"
+            label="Type"
+            value={getTypeDisplayName(invoiceData.type as "C" | "I")}
+            onChange={(value) => {
+              setInvoiceData((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  type: value === "Cash" ? "C" : "I",
+                };
+              });
+            }}
+            options={[
+              { id: "C", name: "Cash" },
+              { id: "I", name: "Invoice" },
+            ]}
           />
         </div>
       </div>

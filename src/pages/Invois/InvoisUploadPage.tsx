@@ -8,6 +8,7 @@ import Button from "../../components/Button";
 import { fetchInvoices, getInvoices } from "./utils/InvoisUtils";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 const InvoisUploadPage: React.FC = () => {
   const [fileData, setFileData] = useState<InvoiceData[]>([]);
@@ -198,7 +199,11 @@ const InvoisUploadPage: React.FC = () => {
   ];
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="mt-40 w-full flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   if (error) {
