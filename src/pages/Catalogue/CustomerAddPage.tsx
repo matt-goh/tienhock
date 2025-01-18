@@ -16,6 +16,18 @@ interface SelectOption {
 const CustomerAddPage: React.FC = () => {
   const navigate = useNavigate();
 
+  // Helper function for ID number placeholder
+  const getIdNumberPlaceholder = (idType: string) => {
+    switch (idType) {
+      case "BRN":
+        return "201101025173";
+      case "NRIC":
+        return "981223125953";
+      default:
+        return "";
+    }
+  };
+
   const [formData, setFormData] = useState<Customer>({
     id: "",
     name: "",
@@ -27,6 +39,7 @@ const CustomerAddPage: React.FC = () => {
     address: "",
     city: "KOTA KINABALU",
     id_number: "",
+    id_type: "",
   });
 
   const initialFormDataRef = useRef<Customer>({ ...formData });
@@ -38,6 +51,13 @@ const CustomerAddPage: React.FC = () => {
   const closenessOptions = [
     { id: "Local", name: "Local" },
     { id: "Outstation", name: "Outstation" },
+  ];
+
+  const idTypeOptions = [
+    { id: "BRN", name: "BRN" },
+    { id: "NRIC", name: "NRIC" },
+    { id: "PASSPORT", name: "PASSPORT" },
+    { id: "ARMY", name: "ARMY" },
   ];
 
   useEffect(() => {
@@ -195,21 +215,6 @@ const CustomerAddPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {renderInput(
-                "id_number",
-                "ID Number (BRN for businesses, NRIC for individuals)",
-                "text",
-                "201101025173"
-              )}
-              {renderInput(
-                "tin_number",
-                "TIN Number",
-                "text",
-                "C21636482050"
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {renderInput("phone_number", "Phone Number", "tel")}
               {renderInput("email", "Email", "email")}
             </div>
@@ -222,6 +227,17 @@ const CustomerAddPage: React.FC = () => {
               {renderInput("city", "City")}
               {renderListbox("closeness", "Closeness", closenessOptions)}
               {renderListbox("salesman", "Salesman", salesmen)}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              {renderListbox("id_type", "ID Type", idTypeOptions)}
+              {renderInput(
+                "id_number",
+                "ID Number",
+                "text",
+                getIdNumberPlaceholder(formData.id_type)
+              )}
+              {renderInput("tin_number", "TIN Number", "text", "C21636482050")}
             </div>
           </div>
 
