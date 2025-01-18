@@ -321,17 +321,20 @@ export interface ProductData {
   isSubtotalQty?: boolean;
 }
 
-export interface Customer {
+export interface CustomerList {
   id: string;
   name: string;
-  closeness: string;
   salesman: string;
-  tin_number: string;
-  phone_number: string;
-  email: string;
-  address: string;
+  phone_number?: string;
+  tin_number?: string;
+  id_number?: string;
+}
+
+export interface Customer extends CustomerList {
+  closeness: string;
+  email?: string;
+  address?: string;
   city: string;
-  id_number: string;
   originalId?: string;
 }
 
