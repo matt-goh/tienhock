@@ -1,24 +1,26 @@
 // src/routes/staff.js
-import { Router } from 'express';
+import { Router } from "express";
 
-export default function(pool) {
+export default function (pool) {
   const router = Router();
 
   // Helper functions
   async function checkDuplicateStaffId(id) {
-    const query = 'SELECT * FROM staffs WHERE id = $1';
+    const query = "SELECT * FROM staffs WHERE id = $1";
     const result = await pool.query(query, [id]);
     return result.rows.length > 0;
   }
 
   // Get all staff members
-  router.get('/', async (req, res) => {
+  router.get("/", async (req, res) => {
     try {
       const { salesmenOnly } = req.query;
-      
-      let query = `
-        SELECT 
-          s.id, 
+
+      // Dynamically build column selection based on salesmenOnly parameter
+      const columns =
+        salesmenOnly === "true"
+          ? "s.id" // Only select ID for salesmen
+          : `s.id, 
           s.name, 
           s.ic_no as "icNo", 
           s.telephone_no as "telephoneNo",
@@ -27,33 +29,43 @@ export default function(pool) {
           s.gender,
           s.race,
           s.job,
-          s.location
-        FROM 
-          staffs s
+          s.location`;
+
+      let query = `
+        SELECT ${columns}
+        FROM staffs s
       `;
-      
-      if (salesmenOnly === 'true') {
+
+      if (salesmenOnly === "true") {
         query += ` WHERE s.job::jsonb ? 'SALESMAN'`;
       }
-      
+
       const result = await pool.query(query);
-      
-      const staffs = result.rows.map(staff => ({
-        ...staff,
-        job: Array.isArray(staff.job) ? staff.job : [],
-        location: Array.isArray(staff.location) ? staff.location : [],
-        dateResigned: staff.dateResigned ? staff.dateResigned.toISOString().split('T')[0] : null
-      }));
+
+      // Process results based on query type
+      const staffs =
+        salesmenOnly === "true"
+          ? result.rows // Return raw results for salesmen-only query
+          : result.rows.map((staff) => ({
+              ...staff,
+              job: Array.isArray(staff.job) ? staff.job : [],
+              location: Array.isArray(staff.location) ? staff.location : [],
+              dateResigned: staff.dateResigned
+                ? staff.dateResigned.toISOString().split("T")[0]
+                : null,
+            }));
 
       res.json(staffs);
     } catch (error) {
-      console.error('Error fetching staffs:', error);
-      res.status(500).json({ message: 'Error fetching staffs', error: error.message });
+      console.error("Error fetching staffs:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching staffs", error: error.message });
     }
   });
 
   // Create new staff member
-  router.post('/', async (req, res) => {
+  router.post("/", async (req, res) => {
     const {
       id,
       name,
@@ -76,16 +88,18 @@ export default function(pool) {
       paymentPreference,
       race,
       agama,
-      dateResigned
+      dateResigned,
     } = req.body;
 
     try {
       // Check for duplicate ID
       const isDuplicateId = await checkDuplicateStaffId(id);
       if (isDuplicateId) {
-        return res.status(400).json({ message: 'A staff member with this ID already exists' });
+        return res
+          .status(400)
+          .json({ message: "A staff member with this ID already exists" });
       }
-      
+
       const query = `
         INSERT INTO staffs (
           id, name, telephone_no, email, gender, nationality, birthdate, address,
@@ -98,40 +112,45 @@ export default function(pool) {
       `;
 
       const values = [
-        id, 
-        name, 
-        telephoneNo, 
-        email || null, 
-        gender, 
-        nationality, 
-        birthdate ? new Date(birthdate) : null, 
+        id,
+        name,
+        telephoneNo,
+        email || null,
+        gender,
+        nationality,
+        birthdate ? new Date(birthdate) : null,
         address,
-        JSON.stringify(job), 
-        JSON.stringify(location), 
-        dateJoined ? new Date(dateJoined) : null, 
+        JSON.stringify(job),
+        JSON.stringify(location),
+        dateJoined ? new Date(dateJoined) : null,
         icNo,
-        bankAccountNumber, 
-        epfNo, 
-        incomeTaxNo, 
-        socsoNo, 
-        document, 
+        bankAccountNumber,
+        epfNo,
+        incomeTaxNo,
+        socsoNo,
+        document,
         paymentType,
-        paymentPreference, 
-        race, 
-        agama, 
-        dateResigned ? new Date(dateResigned) : null
+        paymentPreference,
+        race,
+        agama,
+        dateResigned ? new Date(dateResigned) : null,
       ];
 
       const result = await pool.query(query, values);
-      res.status(201).json({ message: 'Staff member created successfully', staff: result.rows[0] });
+      res.status(201).json({
+        message: "Staff member created successfully",
+        staff: result.rows[0],
+      });
     } catch (error) {
-      console.error('Error creating staff member:', error);
-      res.status(500).json({ message: 'Error creating staff member', error: error.message });
+      console.error("Error creating staff member:", error);
+      res
+        .status(500)
+        .json({ message: "Error creating staff member", error: error.message });
     }
   });
 
   // Get single staff member
-  router.get('/:id', async (req, res) => {
+  router.get("/:id", async (req, res) => {
     const { id } = req.params;
     try {
       const query = `
@@ -163,39 +182,49 @@ export default function(pool) {
         WHERE
           s.id = $1
       `;
-      
+
       const result = await pool.query(query, [id]);
-      
+
       if (result.rows.length === 0) {
-        return res.status(404).json({ message: 'Staff member not found' });
+        return res.status(404).json({ message: "Staff member not found" });
       }
 
       const staff = result.rows[0];
 
       // Format dates
-      const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
-      
+      const formatDate = (date) =>
+        date ? new Date(date).toISOString().split("T")[0] : "";
+
       // Convert null values to empty strings and format dates
-      const formattedStaff = Object.entries(staff).reduce((acc, [key, value]) => {
-        if (key === 'birthdate' || key === 'dateJoined' || key === 'dateResigned') {
-          acc[key] = formatDate(value);
-        } else if (key === 'job' || key === 'location') {
-          acc[key] = Array.isArray(value) ? value : [];
-        } else {
-          acc[key] = value === null ? '' : value;
-        }
-        return acc;
-      }, {});
+      const formattedStaff = Object.entries(staff).reduce(
+        (acc, [key, value]) => {
+          if (
+            key === "birthdate" ||
+            key === "dateJoined" ||
+            key === "dateResigned"
+          ) {
+            acc[key] = formatDate(value);
+          } else if (key === "job" || key === "location") {
+            acc[key] = Array.isArray(value) ? value : [];
+          } else {
+            acc[key] = value === null ? "" : value;
+          }
+          return acc;
+        },
+        {}
+      );
 
       res.json(formattedStaff);
     } catch (error) {
-      console.error('Error fetching staff member:', error);
-      res.status(500).json({ message: 'Error fetching staff member', error: error.message });
+      console.error("Error fetching staff member:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching staff member", error: error.message });
     }
   });
 
   // Update staff member
-  router.put('/:id', async (req, res) => {
+  router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const {
       name,
@@ -219,21 +248,21 @@ export default function(pool) {
       race,
       agama,
       dateResigned,
-      newId
+      newId,
     } = req.body;
 
     try {
       const client = await pool.connect();
       try {
-        await client.query('BEGIN');
+        await client.query("BEGIN");
 
         let updateId = id;
         if (newId && newId !== id) {
           // Check if the new ID already exists
-          const checkIdQuery = 'SELECT id FROM staffs WHERE id = $1';
+          const checkIdQuery = "SELECT id FROM staffs WHERE id = $1";
           const checkIdResult = await client.query(checkIdQuery, [newId]);
           if (checkIdResult.rows.length > 0) {
-            throw new Error('A staff member with the new ID already exists');
+            throw new Error("A staff member with the new ID already exists");
           }
           updateId = newId;
         }
@@ -250,67 +279,77 @@ export default function(pool) {
         `;
 
         const values = [
-          updateId, 
-          name, 
-          telephoneNo, 
-          email || null, 
-          gender, 
-          nationality, 
-          birthdate ? new Date(birthdate) : null, 
+          updateId,
+          name,
+          telephoneNo,
+          email || null,
+          gender,
+          nationality,
+          birthdate ? new Date(birthdate) : null,
           address,
-          JSON.stringify(job), 
-          JSON.stringify(location), 
-          dateJoined ? new Date(dateJoined) : null, 
+          JSON.stringify(job),
+          JSON.stringify(location),
+          dateJoined ? new Date(dateJoined) : null,
           icNo,
-          bankAccountNumber, 
-          epfNo, 
-          incomeTaxNo, 
-          socsoNo, 
-          document, 
+          bankAccountNumber,
+          epfNo,
+          incomeTaxNo,
+          socsoNo,
+          document,
           paymentType,
-          paymentPreference, 
-          race, 
-          agama, 
+          paymentPreference,
+          race,
+          agama,
           dateResigned ? new Date(dateResigned) : null,
-          id
+          id,
         ];
 
         const result = await client.query(query, values);
 
         if (result.rows.length === 0) {
-          throw new Error('Staff member not found');
+          throw new Error("Staff member not found");
         }
 
-        await client.query('COMMIT');
-        res.json({ message: 'Staff member updated successfully', staff: result.rows[0] });
+        await client.query("COMMIT");
+        res.json({
+          message: "Staff member updated successfully",
+          staff: result.rows[0],
+        });
       } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query("ROLLBACK");
         throw error;
       } finally {
         client.release();
       }
     } catch (error) {
-      console.error('Error updating staff member:', error);
-      res.status(500).json({ message: 'Error updating staff member', error: error.message });
+      console.error("Error updating staff member:", error);
+      res
+        .status(500)
+        .json({ message: "Error updating staff member", error: error.message });
     }
   });
 
   // Delete staff member
-  router.delete('/:id', async (req, res) => {
+  router.delete("/:id", async (req, res) => {
     const { id } = req.params;
 
     try {
-      const query = 'DELETE FROM staffs WHERE id = $1 RETURNING *';
+      const query = "DELETE FROM staffs WHERE id = $1 RETURNING *";
       const result = await pool.query(query, [id]);
 
       if (result.rows.length === 0) {
-        return res.status(404).json({ message: 'Staff member not found' });
+        return res.status(404).json({ message: "Staff member not found" });
       }
 
-      res.json({ message: 'Staff member deleted successfully', staff: result.rows[0] });
+      res.json({
+        message: "Staff member deleted successfully",
+        staff: result.rows[0],
+      });
     } catch (error) {
-      console.error('Error deleting staff member:', error);
-      res.status(500).json({ message: 'Error deleting staff member', error: error.message });
+      console.error("Error deleting staff member:", error);
+      res
+        .status(500)
+        .json({ message: "Error deleting staff member", error: error.message });
     }
   });
 

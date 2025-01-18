@@ -1,56 +1,62 @@
 // src/routes/jobs.js
-import { Router } from 'express';
+import { Router } from "express";
 
-export default function(pool) {
+export default function (pool) {
   const router = Router();
 
   // Helper functions
   async function checkDuplicateJobName(name, id = null) {
     const query = id
-      ? 'SELECT * FROM jobs WHERE name = $1 AND id != $2'
-      : 'SELECT * FROM jobs WHERE name = $1';
+      ? "SELECT * FROM jobs WHERE name = $1 AND id != $2"
+      : "SELECT * FROM jobs WHERE name = $1";
     const values = id ? [name, id] : [name];
     const result = await pool.query(query, values);
     return result.rows.length > 0;
   }
 
   async function checkDuplicateJobId(id) {
-    const query = 'SELECT * FROM jobs WHERE id = $1';
+    const query = "SELECT * FROM jobs WHERE id = $1";
     const result = await pool.query(query, [id]);
     return result.rows.length > 0;
   }
 
   // Get all jobs
-  router.get('/', async (req, res) => {
+  router.get("/", async (req, res) => {
     try {
-      const query = 'SELECT * FROM jobs';
+      const query = "SELECT * FROM jobs";
       const result = await pool.query(query);
-      
-      const jobs = result.rows.map(job => ({
+
+      const jobs = result.rows.map((job) => ({
         ...job,
-        section: job.section ? job.section.split(', ') : [],
+        section: job.section ? job.section.split(", ") : [],
       }));
 
       res.json(jobs);
     } catch (error) {
-      console.error('Error fetching jobs:', error);
-      res.status(500).json({ message: 'Error fetching jobs', error: error.message });
+      console.error("Error fetching jobs:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching jobs", error: error.message });
     }
   });
 
   // Create new job
-  router.post('/', async (req, res) => {
+  router.post("/", async (req, res) => {
     const { id, name, section } = req.body;
 
     try {
       const isDuplicateName = await checkDuplicateJobName(name);
       if (isDuplicateName) {
-        return res.status(400).json({ message: 'A job with this name already exists' });
+        return res
+          .status(400)
+          .json({ message: "A job with this name already exists" });
       }
 
       const isDuplicateId = await checkDuplicateJobId(id);
       if (isDuplicateId) {
-        return res.status(400).json({ message: 'A job with this ID already exists' });
+        return res
+          .status(400)
+          .json({ message: "A job with this ID already exists" });
       }
 
       const query = `
@@ -58,61 +64,69 @@ export default function(pool) {
         VALUES ($1, $2, $3)
         RETURNING *
       `;
-      
+
       const values = [
-        id, 
-        name, 
-        Array.isArray(section) ? section.join(', ') : section,
+        id,
+        name,
+        Array.isArray(section) ? section.join(", ") : section,
       ];
 
       const result = await pool.query(query, values);
-      res.status(201).json({ message: 'Job created successfully', job: result.rows[0] });
+      res
+        .status(201)
+        .json({ message: "Job created successfully", job: result.rows[0] });
     } catch (error) {
-      console.error('Error inserting job:', error);
-      res.status(500).json({ message: 'Error creating job', error: error.message });
+      console.error("Error inserting job:", error);
+      res
+        .status(500)
+        .json({ message: "Error creating job", error: error.message });
     }
   });
 
   // Delete job and its details
-  router.delete('/:id', async (req, res) => {
+  router.delete("/:id", async (req, res) => {
     const { id } = req.params;
 
     try {
-      await pool.query('BEGIN');
+      await pool.query("BEGIN");
 
       // Delete associated records in the jobs_job_details table
-      await pool.query('DELETE FROM jobs_job_details WHERE job_id = $1', [id]);
+      await pool.query("DELETE FROM jobs_job_details WHERE job_id = $1", [id]);
 
       // Delete the job
-      const deleteJobQuery = 'DELETE FROM jobs WHERE id = $1';
+      const deleteJobQuery = "DELETE FROM jobs WHERE id = $1";
       await pool.query(deleteJobQuery, [id]);
 
-      await pool.query('COMMIT');
-      res.status(200).json({ message: 'Job and associated details deleted successfully' });
+      await pool.query("COMMIT");
+      res
+        .status(200)
+        .json({ message: "Job and associated details deleted successfully" });
     } catch (error) {
-      await pool.query('ROLLBACK');
-      console.error('Error deleting job:', error);
-      res.status(500).json({ message: 'Error deleting job', error: error.message });
+      await pool.query("ROLLBACK");
+      console.error("Error deleting job:", error);
+      res
+        .status(500)
+        .json({ message: "Error deleting job", error: error.message });
     }
   });
 
   // Update job
-  router.put('/:id', async (req, res) => {
+  router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const { name, section, newId } = req.body;
 
     try {
       const client = await pool.connect();
       try {
-        await client.query('BEGIN');
+        await client.query("BEGIN");
 
         // Check if the job exists
-        const existingJobQuery = 'SELECT * FROM jobs WHERE id = $1';
+        const existingJobQuery = "SELECT * FROM jobs WHERE id = $1";
         const existingJobResult = await client.query(existingJobQuery, [id]);
-        
+
         if (existingJobResult.rows.length === 0) {
-          await client.query('ROLLBACK');
-          return res.status(404).json({ message: 'Job not found' });
+          await client.query("ROLLBACK");
+          return res.status(404).json({ message: "Job not found" });
         }
 
         const existingJob = existingJobResult.rows[0];
@@ -121,8 +135,10 @@ export default function(pool) {
         if (name !== existingJob.name) {
           const isDuplicateName = await checkDuplicateJobName(name, id);
           if (isDuplicateName) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'A job with this name already exists' });
+            await client.query("ROLLBACK");
+            return res
+              .status(400)
+              .json({ message: "A job with this name already exists" });
           }
         }
 
@@ -130,15 +146,23 @@ export default function(pool) {
         if (newId && newId !== id) {
           const isDuplicateId = await checkDuplicateJobId(newId);
           if (isDuplicateId) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'A job with this ID already exists' });
+            await client.query("ROLLBACK");
+            return res
+              .status(400)
+              .json({ message: "A job with this ID already exists" });
           }
 
           // Update job ID in jobs table
-          await client.query('UPDATE jobs SET id = $1 WHERE id = $2', [newId, id]);
+          await client.query("UPDATE jobs SET id = $1 WHERE id = $2", [
+            newId,
+            id,
+          ]);
 
           // Update job ID in jobs_job_details table
-          await client.query('UPDATE jobs_job_details SET job_id = $1 WHERE job_id = $2', [newId, id]);
+          await client.query(
+            "UPDATE jobs_job_details SET job_id = $1 WHERE job_id = $2",
+            [newId, id]
+          );
 
           updatedId = newId;
         }
@@ -150,26 +174,32 @@ export default function(pool) {
           WHERE id = $3
           RETURNING *
         `;
-        const values = [name, Array.isArray(section) ? section.join(', ') : section, updatedId];
+        const values = [
+          name,
+          Array.isArray(section) ? section.join(", ") : section,
+          updatedId,
+        ];
 
         const result = await client.query(query, values);
 
-        await client.query('COMMIT');
-        res.json({ message: 'Job updated successfully', job: result.rows[0] });
+        await client.query("COMMIT");
+        res.json({ message: "Job updated successfully", job: result.rows[0] });
       } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query("ROLLBACK");
         throw error;
       } finally {
         client.release();
       }
     } catch (error) {
-      console.error('Error updating job:', error);
-      res.status(500).json({ message: 'Error updating job', error: error.message });
+      console.error("Error updating job:", error);
+      res
+        .status(500)
+        .json({ message: "Error updating job", error: error.message });
     }
   });
 
   // Get all job details for a specific job
-  router.get('/:jobId/details', async (req, res) => {
+  router.get("/:jobId/details", async (req, res) => {
     const { jobId } = req.params;
 
     try {
@@ -182,13 +212,15 @@ export default function(pool) {
       const result = await pool.query(query, [jobId]);
       res.json(result.rows);
     } catch (error) {
-      console.error('Error fetching job details for job:', error);
-      res.status(500).json({ message: 'Error fetching job details', error: error.message });
+      console.error("Error fetching job details for job:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching job details", error: error.message });
     }
   });
 
   // Get job details count
-  router.get('/:jobId/details/count', async (req, res) => {
+  router.get("/:jobId/details/count", async (req, res) => {
     const { jobId } = req.params;
 
     try {
@@ -200,8 +232,10 @@ export default function(pool) {
       const result = await pool.query(query, [jobId]);
       res.json({ count: parseInt(result.rows[0].count) });
     } catch (error) {
-      console.error('Error counting job details:', error);
-      res.status(500).json({ message: 'Error counting job details', error: error.message });
+      console.error("Error counting job details:", error);
+      res
+        .status(500)
+        .json({ message: "Error counting job details", error: error.message });
     }
   });
 
