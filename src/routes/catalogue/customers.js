@@ -20,52 +20,63 @@ export default function(pool) {
   router.get('/combobox', async (req, res) => {
     const { salesman = '', search = '', page = 1, limit = 20 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
-
+  
     try {
-      let query = `
-        SELECT id, name, phone_number, email, city, salesman
+      // Base query for search across all data
+      let searchQuery = `
+        SELECT id, name
         FROM customers
         WHERE 1=1
       `;
       
-      const values = [];
+      const searchValues = [];
       let valueIndex = 1;
-
+  
       // Add salesman filter if provided
       if (salesman && salesman !== 'All Salesmen') {
-        query += ` AND salesman = $${valueIndex}`;
-        values.push(salesman);
+        searchQuery += ` AND salesman = $${valueIndex}`;
+        searchValues.push(salesman);
         valueIndex++;
       }
-
+  
       // Add search filter if provided
       if (search) {
-        query += ` AND (
-          LOWER(name) LIKE $${valueIndex}
-          OR LOWER(id) LIKE $${valueIndex}
-          OR LOWER(phone_number) LIKE $${valueIndex}
-          OR LOWER(email) LIKE $${valueIndex}
-          OR LOWER(city) LIKE $${valueIndex}
-        )`;
-        values.push(`%${search.toLowerCase()}%`);
+        searchQuery += ` AND (LOWER(name) LIKE $${valueIndex} OR LOWER(id) LIKE $${valueIndex})`;
+        searchValues.push(`%${search.toLowerCase()}%`);
         valueIndex++;
       }
-
+  
+      searchQuery += ` ORDER BY name`;
+  
+      // Add pagination only for the final results
+      if (limit) {
+        searchQuery += ` LIMIT $${valueIndex} OFFSET $${valueIndex + 1}`;
+        searchValues.push(Number(limit), offset);
+      }
+  
       // Get total count for pagination
-      const countQuery = `SELECT COUNT(*) FROM (${query}) AS filtered_customers`;
-      const { rows: [{ count }] } = await pool.query(countQuery, values);
-      const totalCount = parseInt(count);
+      const countQuery = `
+        SELECT COUNT(*) 
+        FROM customers 
+        WHERE 1=1
+        ${salesman && salesman !== 'All Salesmen' ? ' AND salesman = $1' : ''}
+        ${search ? ` AND (LOWER(name) LIKE $${salesman ? '2' : '1'} OR LOWER(id) LIKE $${salesman ? '2' : '1'})` : ''}
+      `;
+  
+      const countValues = [];
+      if (salesman && salesman !== 'All Salesmen') countValues.push(salesman);
+      if (search) countValues.push(`%${search.toLowerCase()}%`);
+  
+      const [searchResults, countResults] = await Promise.all([
+        pool.query(searchQuery, searchValues),
+        pool.query(countQuery, countValues)
+      ]);
+  
+      const totalCount = parseInt(countResults.rows[0].count);
       const totalPages = Math.ceil(totalCount / Number(limit));
-
-      // Add pagination
-      query += ` ORDER BY name LIMIT $${valueIndex} OFFSET $${valueIndex + 1}`;
-      values.push(Number(limit), offset);
-
-      // Get paginated results
-      const { rows: customers } = await pool.query(query, values);
-
+  
       res.json({
-        customers,
+        customers: searchResults.rows,
         totalCount,
         totalPages,
         currentPage: Number(page)
