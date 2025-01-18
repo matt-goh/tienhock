@@ -21,15 +21,12 @@ export default function (pool) {
         salesmenOnly === "true"
           ? "s.id" // Only select ID for salesmen
           : `s.id, 
-          s.name, 
-          s.ic_no as "icNo", 
-          s.telephone_no as "telephoneNo",
-          s.date_resigned as "dateResigned",
-          s.nationality,
-          s.gender,
-          s.race,
-          s.job,
-          s.location`;
+           s.name, 
+           s.ic_no as "icNo", 
+           s.telephone_no as "telephoneNo",
+           s.job,
+           s.location,
+           s.date_resigned as "dateResigned"`;
 
       let query = `
         SELECT ${columns}
@@ -45,7 +42,7 @@ export default function (pool) {
       // Process results based on query type
       const staffs =
         salesmenOnly === "true"
-          ? result.rows // Return raw results for salesmen-only query
+          ? result.rows
           : result.rows.map((staff) => ({
               ...staff,
               job: Array.isArray(staff.job) ? staff.job : [],
@@ -58,9 +55,10 @@ export default function (pool) {
       res.json(staffs);
     } catch (error) {
       console.error("Error fetching staffs:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching staffs", error: error.message });
+      res.status(500).json({
+        message: "Error fetching staffs",
+        error: error.message,
+      });
     }
   });
 
