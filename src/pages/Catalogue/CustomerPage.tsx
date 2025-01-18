@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Customer, Employee } from "../../types/types";
+import { Customer, CustomerList, Employee } from "../../types/types";
 import {
   IconSearch,
   IconChevronLeft,
@@ -26,7 +26,7 @@ const ITEMS_PER_PAGE = 12;
 
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,7 +35,7 @@ const CustomerPage: React.FC = () => {
   const [selectedSalesman, setSelectedSalesman] =
     useState<string>("All Salesmen");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
+  const [customerToDelete, setCustomerToDelete] = useState<CustomerList | null>(
     null
   );
 
@@ -68,7 +68,7 @@ const CustomerPage: React.FC = () => {
     Promise.all([fetchCustomers(), fetchSalesmen()]);
   }, [fetchSalesmen]);
 
-  const handleDeleteClick = (customer: Customer) => {
+  const handleDeleteClick = (customer: CustomerList) => {
     setCustomerToDelete(customer);
     setIsDeleteDialogOpen(true);
   };
@@ -76,7 +76,7 @@ const CustomerPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (customerToDelete) {
       try {
-        await api.delete("/api/customers", customerToDelete.id);
+        await api.delete("/api/customers", { customers: customerToDelete.id });
         setCustomers(
           customers.filter((cust) => cust.id !== customerToDelete.id)
         );
@@ -97,9 +97,6 @@ const CustomerPage: React.FC = () => {
         customer.id,
         customer.id_number,
         customer.phone_number,
-        customer.email,
-        customer.city,
-        customer.address,
       ].map((field) => field?.toLowerCase() || "");
 
       const matchesSearch = searchFields.some((field) =>

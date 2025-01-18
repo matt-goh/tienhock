@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Customer } from '../../types/types';
-import { IconTrash } from '@tabler/icons-react';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { CustomerList } from "../../types/types";
+import { IconTrash } from "@tabler/icons-react";
 
 interface CustomerCardProps {
-  customer: Customer;
-  onDeleteClick: (customer: Customer) => void;
+  customer: CustomerList;
+  onDeleteClick: (customer: CustomerList) => void;
 }
 
-const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onDeleteClick }) => {
+const CustomerCard: React.FC<CustomerCardProps> = ({
+  customer,
+  onDeleteClick,
+}) => {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isTrashHovered, setIsTrashHovered] = useState(false);
   const navigate = useNavigate();
@@ -26,13 +29,14 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onDeleteClick }) 
   return (
     <div
       className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered ? 'bg-default-100 active:bg-default-200' : ''
+        isCardHovered && !isTrashHovered
+          ? "bg-default-100 active:bg-default-200"
+          : ""
       }`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
     >
-      {/* Add pr-8 to create space for the trash button */}
       <div className="pr-8">
         <div className="mb-2">
           <h3 className="font-semibold">{customer.name}</h3>
@@ -43,11 +47,11 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onDeleteClick }) 
             {customer.salesman}
           </span>
         </div>
-        <p className="text-sm">Phone no: {customer.phone_number || '-'}</p>
-        <p className="text-sm">TIN: {customer.tin_number || '-'}</p>
-        <p className="text-sm">ID Number: {customer.id_number || '-'}</p>
+        <p className="text-sm">Phone no: {customer.phone_number || "-"}</p>
+        <p className="text-sm">TIN: {customer.tin_number || "-"}</p>
+        <p className="text-sm">ID Number: {customer.id_number || "-"}</p>
       </div>
-      
+
       <div className="absolute inset-y-0 top-2 right-2">
         <div className="relative w-8 h-8">
           {isCardHovered && (

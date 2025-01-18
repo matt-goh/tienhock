@@ -7,14 +7,25 @@ export default function (pool) {
   // Get all customers
   router.get("/", async (req, res) => {
     try {
-      const query = "SELECT * FROM customers ORDER BY name";
+      const query = `
+        SELECT 
+          id,
+          name,
+          salesman,
+          phone_number,
+          tin_number,
+          id_number
+        FROM customers 
+        ORDER BY name
+      `;
       const result = await pool.query(query);
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching customers:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching customers", error: error.message });
+      res.status(500).json({
+        message: "Error fetching customers",
+        error: error.message,
+      });
     }
   });
 
