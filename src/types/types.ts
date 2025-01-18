@@ -335,6 +335,7 @@ export interface Customer extends CustomerList {
   email?: string;
   address?: string;
   city: string;
+  id_type: string;
   originalId?: string;
 }
 

@@ -122,7 +122,23 @@ export default function (pool) {
       address,
       city,
       id_number,
+      id_type,
     } = req.body;
+
+    // Transform empty strings to null for numeric fields
+    const transformedValues = [
+      id,
+      name,
+      closeness,
+      salesman,
+      tin_number || null, // Handle possible empty string
+      phone_number || null, // Handle possible empty string
+      email || null, // Handle possible empty string
+      address || null, // Handle possible empty string
+      city || null, // Handle possible empty string
+      id_number || null, // Handle possible empty string
+      id_type || null, // Handle possible empty string
+    ];
 
     try {
       const query = `
@@ -136,33 +152,20 @@ export default function (pool) {
           email,
           address,
           city,
-          id_number
+          id_number,
+          id_type
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
       `;
 
-      const values = [
-        id,
-        name,
-        closeness,
-        salesman,
-        tin_number,
-        phone_number,
-        email,
-        address,
-        city,
-        id_number,
-      ];
-
-      const result = await pool.query(query, values);
+      const result = await pool.query(query, transformedValues);
       res.status(201).json({
         message: "Customer created successfully",
         customer: result.rows[0],
       });
     } catch (error) {
       if (error.code === "23505") {
-        // unique_violation error code
         return res
           .status(400)
           .json({ message: "A customer with this ID already exists" });
@@ -237,47 +240,54 @@ export default function (pool) {
             address,
             city,
             id_number,
+            id_type,
           } = customer;
 
           const upsertQuery = `
-            INSERT INTO customers (
-              id, 
-              name, 
-              closeness, 
-              salesman, 
-              tin_number,
-              phone_number,
-              email,
-              address,
-              city,
-              id_number
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (id) DO UPDATE
-            SET 
-              name = EXCLUDED.name,
-              closeness = EXCLUDED.closeness,
-              salesman = EXCLUDED.salesman,
-              tin_number = EXCLUDED.tin_number,
-              phone_number = EXCLUDED.phone_number,
-              email = EXCLUDED.email,
-              address = EXCLUDED.address,
-              city = EXCLUDED.city,
-              id_number = EXCLUDED.id_number
-            RETURNING *
-          `;
-          const upsertValues = [
-            id,
-            name,
-            closeness,
-            salesman,
+          INSERT INTO customers (
+            id, 
+            name, 
+            closeness, 
+            salesman, 
             tin_number,
             phone_number,
             email,
             address,
             city,
             id_number,
+            id_type
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE
+          SET 
+            name = EXCLUDED.name,
+            closeness = EXCLUDED.closeness,
+            salesman = EXCLUDED.salesman,
+            tin_number = EXCLUDED.tin_number,
+            phone_number = EXCLUDED.phone_number,
+            email = EXCLUDED.email,
+            address = EXCLUDED.address,
+            city = EXCLUDED.city,
+            id_number = EXCLUDED.id_number,
+            id_type = EXCLUDED.id_type
+          RETURNING *
+        `;
+
+          // Transform empty strings to null for numeric fields
+          const upsertValues = [
+            id,
+            name,
+            closeness,
+            salesman,
+            tin_number || null, // Handle possible empty string
+            phone_number || null, // Handle possible empty string
+            email || null, // Handle possible empty string
+            address || null, // Handle possible empty string
+            city || null, // Handle possible empty string
+            id_number || null, // Handle possible empty string
+            id_type || null, // Handle possible empty string
           ];
+
           const result = await client.query(upsertQuery, upsertValues);
           processedCustomers.push(result.rows[0]);
         }
@@ -335,35 +345,39 @@ export default function (pool) {
       address,
       city,
       id_number,
+      id_type,
     } = req.body;
 
     try {
       const query = `
-        UPDATE customers
-        SET 
-          name = $1, 
-          closeness = $2, 
-          salesman = $3, 
-          tin_number = $4,
-          phone_number = $5,
-          email = $6,
-          address = $7,
-          city = $8,
-          id_number = $9
-        WHERE id = $10
-        RETURNING *
-      `;
+      UPDATE customers
+      SET 
+        name = $1, 
+        closeness = $2, 
+        salesman = $3, 
+        tin_number = $4,
+        phone_number = $5,
+        email = $6,
+        address = $7,
+        city = $8,
+        id_number = $9,
+        id_type = $10
+      WHERE id = $11
+      RETURNING *
+    `;
 
+      // Transform empty strings to null for numeric fields
       const values = [
         name,
         closeness,
         salesman,
-        tin_number,
-        phone_number,
-        email,
-        address,
-        city,
-        id_number,
+        tin_number || null, // Handle possible empty string
+        phone_number || null, // Handle possible empty string
+        email || null, // Handle possible empty string
+        address || null, // Handle possible empty string
+        city || null, // Handle possible empty string
+        id_number || null, // Handle possible empty string
+        id_type || null, // Handle possible empty string
         id,
       ];
 
