@@ -68,11 +68,36 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState<SelectOption | null>(
     value.length > 0 ? { id: value[0], name: value[0] } : null
   );
+  const [searchValue, setSearchValue] = useState("");
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+
+  const handleSearch = (searchText: string) => {
+    setSearchValue(searchText);
+
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout for debouncing
+    searchTimeoutRef.current = setTimeout(() => {
+      setQuery(searchText);
+    }, 300);
+  };
 
   const handleCustomerSelection = (customer: SelectOption | null) => {
     setSelectedCustomer(customer);
     onChange(customer ? [customer.name] : null);
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="my-2 space-y-2">
@@ -86,8 +111,8 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
             displayValue={(customer: SelectOption | null) =>
               customer?.name || ""
             }
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Select a customer"
+            onChange={(event) => handleSearch(event.target.value)}
+            placeholder="Search customers..."
           />
           <ComboboxButton className="absolute inset-y-0 right-2 flex items-center pr-2">
             <IconChevronDown
@@ -98,7 +123,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
           <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {options.length === 0 ? (
               <div className="relative cursor-default select-none py-2 px-4 text-default-700">
-                No customers found.
+                {isLoading ? "Loading..." : "No customers found."}
               </div>
             ) : (
               <>
