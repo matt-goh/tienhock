@@ -76,7 +76,7 @@ const CustomerPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (customerToDelete) {
       try {
-        await api.delete("/api/customers", { customers: customerToDelete.id });
+        await api.delete(`/api/customers/${customerToDelete.id}`);
         setCustomers(
           customers.filter((cust) => cust.id !== customerToDelete.id)
         );

@@ -155,7 +155,7 @@ const CustomerFormPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (id) {
       try {
-        await api.delete("/api/customers", [id]);
+        await api.delete(`/api/customers/${id}`);
         setIsDeleteDialogOpen(false);
         toast.success("Customer deleted successfully");
         navigate("/catalogue/customer");
