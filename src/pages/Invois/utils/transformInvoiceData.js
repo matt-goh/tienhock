@@ -296,7 +296,7 @@ const generateInvoiceLines = (orderDetails) => {
               "PerUnitAmount": [{ "_": formatAmount(item.price), "currencyID": "MYR" }],
               "TaxCategory": [
                 {
-                  "ID": [{ "_": "E" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
+                  "ID": [{ "_": "06" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
                   "TaxExemptionReason": [{ "_": "-" }],
                   "TaxScheme": [{ 
                     "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }]
@@ -626,7 +626,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   "TaxAmount": [{ "_": totals.tax, "currencyID": "MYR" }], // Total amount of tax payable for each tax type
                   "TaxCategory": [
                     {
-                      "ID": [{ "_": totals.tax > 0 ? "01" : "E" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E	Tax exemption (where applicable)
+                      "ID": [{ "_": totals.tax > 0 ? "01" : "06" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E	Tax exemption (where applicable)
                       "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
                     }
                   ]

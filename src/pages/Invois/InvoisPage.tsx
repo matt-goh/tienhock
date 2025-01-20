@@ -619,7 +619,7 @@ const InvoisPage: React.FC = () => {
   const productColumns: ColumnConfig[] = [
     { id: "code", header: "Code", type: "readonly", width: 180 },
     { id: "productname", header: "Product Name", type: "readonly", width: 400 },
-    { id: "qty", header: "Quantity", type: "number", width: 180 },
+    { id: "qty", header: "Quantity", type: "amount", width: 180 },
     { id: "amount", header: "Amount", type: "amount", width: 180 },
   ];
 

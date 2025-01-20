@@ -85,10 +85,15 @@ export default function (pool) {
 
   // Delete tax entries (batch delete)
   router.delete("/", async (req, res) => {
-    const { taxIds } = req.body;
+    // Get the array from 'taxes' property instead of 'taxIds'
+    const taxIds = req.body.taxes;
 
+    // Input validation
     if (!Array.isArray(taxIds) || taxIds.length === 0) {
-      return res.status(400).json({ message: "Invalid tax IDs provided" });
+      return res.status(400).json({
+        message: "Invalid input: tax names array must be non-empty",
+        deletedTaxNames: [],
+      });
     }
 
     try {
@@ -96,19 +101,27 @@ export default function (pool) {
       try {
         await client.query("BEGIN");
 
-        // Delete the taxes
-        const deleteTaxesQuery =
-          "DELETE FROM taxes WHERE name = ANY($1) RETURNING name";
-        const result = await client.query(deleteTaxesQuery, [taxIds]);
+        // Log the query and values
+        const deleteTaxesQuery = `
+          DELETE FROM taxes 
+          WHERE name = ANY($1::text[]) 
+          RETURNING name
+        `;
 
+        const result = await client.query(deleteTaxesQuery, [taxIds]);
         await client.query("COMMIT");
 
         const deletedNames = result.rows.map((row) => row.name);
+
         res.status(200).json({
-          message: "Taxes deleted successfully",
+          message:
+            deletedNames.length > 0
+              ? `Successfully deleted ${deletedNames.length} tax entries`
+              : "No matching tax entries found to delete",
           deletedTaxNames: deletedNames,
         });
       } catch (error) {
+        console.error("Database error:", error);
         await client.query("ROLLBACK");
         throw error;
       } finally {
@@ -116,9 +129,11 @@ export default function (pool) {
       }
     } catch (error) {
       console.error("Error deleting taxes:", error);
-      res
-        .status(500)
-        .json({ message: "Error deleting taxes", error: error.message });
+      res.status(500).json({
+        message: "Error deleting taxes",
+        error: error.message,
+        deletedTaxNames: [],
+      });
     }
   });
 

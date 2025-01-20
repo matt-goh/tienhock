@@ -75,11 +75,15 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
       const itemsToDelete = selectedIndices.map((index) => items[index]);
       const itemIdsToDelete = itemsToDelete.map((item) => item.id);
 
-      try {
-        await api.delete(`/api/${apiEndpoint}`, {
-          [`${apiEndpoint}`]: itemIdsToDelete,
-        });
+      if (!itemIdsToDelete.length) {
+        toast.error("No items selected for deletion");
+        return;
+      }
 
+      try {
+        await api.delete(`/api/${apiEndpoint}`, itemIdsToDelete);
+
+        // Handle the response
         setItems((prevItems) =>
           prevItems.filter((item) => !itemIdsToDelete.includes(item.id))
         );
@@ -138,16 +142,37 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
         id: item.originalId,
       }));
 
+      // Get the entity name (singular form) from the endpoint
+      let entityName = apiEndpoint;
+      if (apiEndpoint === "nationalities") {
+        entityName = "nationality";
+      } else if (apiEndpoint.endsWith("ies")) {
+        entityName = apiEndpoint.slice(0, -3) + "y";
+      } else if (apiEndpoint.endsWith("s")) {
+        entityName = apiEndpoint.slice(0, -1);
+      }
+
+      const payloadKey = `${entityName}s`;
+
+      // Send the request
       const result = await api.post(`/api/${apiEndpoint}/batch`, {
-        [apiEndpoint]: itemsToUpdate,
+        [payloadKey]: itemsToUpdate,
       });
 
+      // Get the response data using the same key that we sent
+      const updatedItems = result[payloadKey];
+
+      if (!updatedItems) {
+        throw new Error(`No ${apiEndpoint} data received from server`);
+      }
+
       setItems(
-        result[apiEndpoint].map((item: CatalogueItem) => ({
+        updatedItems.map((item: CatalogueItem) => ({
           ...item,
           originalId: item.id,
         }))
       );
+
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {

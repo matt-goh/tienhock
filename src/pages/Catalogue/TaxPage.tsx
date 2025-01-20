@@ -60,16 +60,23 @@ const TaxPage: React.FC = () => {
   const handleDeleteTaxes = useCallback(
     async (selectedIndices: number[]) => {
       const taxesToDelete = selectedIndices.map((index) => taxes[index]);
+
       const taxNamesToDelete = taxesToDelete.map((tax) => tax.name);
 
       try {
+        // Pass array directly since api.js will wrap it with 'taxes' key
         const result = await api.delete("/api/taxes", taxNamesToDelete);
 
-        setTaxes((prevTaxes) =>
-          prevTaxes.filter((tax) => !result.deletedTaxNames.includes(tax.name))
-        );
-
-        toast.success("Selected taxes deleted successfully");
+        if (result.deletedTaxNames?.length > 0) {
+          setTaxes((prevTaxes) =>
+            prevTaxes.filter(
+              (tax) => !result.deletedTaxNames.includes(tax.name)
+            )
+          );
+          toast.success("Selected taxes deleted successfully");
+        } else {
+          throw new Error("No taxes were deleted");
+        }
         setIsEditing(false);
       } catch (error) {
         console.error("Error deleting selected taxes:", error);
