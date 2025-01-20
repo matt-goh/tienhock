@@ -38,6 +38,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [restoring, setRestoring] = useState(false);
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [backupName, setBackupName] = useState(defaultBackUpName);
   const [showBackupNameInput, setShowBackupNameInput] = useState(false);
@@ -46,6 +47,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [restorePhase, setRestorePhase] = useState<string | null>(null);
   const [hasScrollbar, setHasScrollbar] = useState(false);
   const tableBodyRef = useRef<HTMLDivElement>(null);
+  const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
 
   // Reset backup name when modal closes
   useEffect(() => {
@@ -160,11 +162,14 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleDelete = async (filename: string) => {
+  const handleDelete = async () => {
+    if (!backupToDelete) return;
+
     try {
       setLoading(true);
       setError(null);
-      await api.post("/api/backup/delete", { filename });
+      setShowDeleteConfirmDialog(false);
+      await api.post("/api/backup/delete", { filename: backupToDelete });
       toast.success("Backup deleted successfully!");
       await fetchBackups();
     } catch (error) {
@@ -173,6 +178,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       toast.error("Failed to delete backup. Please try again.");
     } finally {
       setLoading(false);
+      setBackupToDelete(null);
     }
   };
 
@@ -463,9 +469,12 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                             Restore
                                           </Button>
                                           <Button
-                                            onClick={() =>
-                                              handleDelete(backup.filename)
-                                            }
+                                            onClick={() => {
+                                              setBackupToDelete(
+                                                backup.filename
+                                              );
+                                              setShowDeleteConfirmDialog(true);
+                                            }}
                                             disabled={restoring}
                                             variant="outline"
                                             size="sm"
@@ -531,6 +540,19 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         message="Please ensure all users have saved their work before proceeding. Are you sure you want to restore this backup?"
         confirmButtonText="Yes, Restore Database"
         variant="default"
+      />
+
+      <ConfirmationDialog
+        isOpen={showDeleteConfirmDialog}
+        onClose={() => {
+          setShowDeleteConfirmDialog(false);
+          setBackupToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        title="Confirm Backup Deletion"
+        message="Are you sure you want to delete this backup? This action cannot be undone."
+        confirmButtonText="Yes, Delete Backup"
+        variant="danger"
       />
     </>
   );
