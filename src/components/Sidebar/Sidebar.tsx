@@ -379,7 +379,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             isOpen={openItems.includes(item.name)}
           >
             {openItems.includes(item.name) && (
-              <ul className="mt-1.5 space-y-1.5">
+              <ul className={bookmarks.length > 0 ? "mt-1.5 space-y-1.5" : ""}>
                 {bookmarks.map((bookmark) => {
                   const itemData = findSidebarItem(SidebarData, bookmark.name);
                   if (!itemData) return null;
