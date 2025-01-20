@@ -177,37 +177,27 @@ export default function (pool) {
     }
   });
 
-  // Delete customers (batch delete)
-  router.delete("/", async (req, res) => {
-    // Extract customerIds from the request body
-    const customerIds = Array.isArray(req.body.customers)
-      ? req.body.customers
-      : [req.body.customers];
-
-    if (!customerIds || customerIds.length === 0) {
-      return res.status(400).json({ message: "Invalid customer IDs provided" });
-    }
+  // Delete a single customer
+  router.delete("/:id", async (req, res) => {
+    const { id } = req.params;
 
     try {
-      const query = "DELETE FROM customers WHERE id = ANY($1) RETURNING id";
-      const result = await pool.query(query, [customerIds]);
+      const query = "DELETE FROM customers WHERE id = $1 RETURNING *";
+      const result = await pool.query(query, [id]);
 
       if (result.rows.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "No customers found with the provided IDs" });
+        return res.status(404).json({ message: "Customer not found" });
       }
 
-      const deletedIds = result.rows.map((row) => row.id);
       res.json({
-        message: "Customers deleted successfully",
-        deletedCustomerIds: deletedIds,
+        message: "Customer deleted successfully",
+        customer: result.rows[0],
       });
     } catch (error) {
-      console.error("Error deleting customers:", error);
+      console.error("Error deleting customer:", error);
       res
         .status(500)
-        .json({ message: "Error deleting customers", error: error.message });
+        .json({ message: "Error deleting customer", error: error.message });
     }
   });
 
