@@ -243,7 +243,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     <>
       <Transition appear show={isOpen} as={React.Fragment}>
         <Dialog
-          className="fixed inset-0 z-10 overflow-y-auto"
+          className="fixed inset-0 z-50 overflow-y-auto"
           open={isOpen}
           onClose={restoring ? () => {} : onClose}
         >
