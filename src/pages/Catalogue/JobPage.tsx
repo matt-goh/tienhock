@@ -212,13 +212,18 @@ const JobPage: React.FC = () => {
     }
   }, [jobToDelete, selectedJob]);
 
-  const isRowFromDatabase = useCallback((jobDetail: JobDetail) => {
-    return (
-      jobDetail.id !== undefined &&
-      jobDetail.id !== null &&
-      !jobDetail.id.startsWith("new_")
-    );
-  }, []);
+  const isRowFromDatabase = useCallback(
+    (jobDetail: JobDetail) => {
+      // Check if jobDetail and its ID exist and match the original data
+      return !!(
+        jobDetail?.id &&
+        originalJobState?.jobDetails.some(
+          (original) => original.id === jobDetail.id
+        )
+      );
+    },
+    [originalJobState?.jobDetails]
+  );
 
   const handleOptionClick = (e: React.MouseEvent, job: Job) => {
     if (!(e.target as HTMLElement).closest(".delete-button")) {
@@ -321,13 +326,7 @@ const JobPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!editedJob) return;
 
-    console.log("Saving data:", {
-      allJobDetails,
-      filteredJobDetails,
-      jobType,
-    });
-
-    // Validation checks
+    // Validation checks for job ID
     if (!editedJob.id.trim()) {
       toast.error("Job ID cannot be empty");
       return;
@@ -341,30 +340,42 @@ const JobPage: React.FC = () => {
       return;
     }
 
-    // Generate IDs for any new rows that don't have them
-    const jobDetailsWithIds = allJobDetails.map((detail) => {
-      if (!detail.id || detail.id.trim() === "") {
-        return {
-          ...detail,
-          id: `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        };
+    // Check for any row that has content but no ID
+    const invalidRows = allJobDetails.some((detail) => {
+      // A row has content if it has a description, non-zero amount, or remark
+      const hasContent =
+        (detail.description && detail.description.trim() !== "") ||
+        (detail.amount !== undefined &&
+          detail.amount !== null &&
+          detail.amount !== 0) ||
+        (detail.remark && detail.remark.trim() !== "");
+
+      // If the row has content, it must have an ID
+      if (hasContent && (!detail.id || detail.id.trim() === "")) {
+        console.log("Invalid row found:", detail);
+        return true;
       }
-      return detail;
+
+      return false;
     });
 
-    // Now check if there are any empty IDs after generation
-    const emptyDetailId = jobDetailsWithIds.find(
-      (detail) => !detail.id || detail.id.trim() === ""
-    );
-
-    if (emptyDetailId) {
-      console.error("Found empty ID after generation:", emptyDetailId);
-      toast.error("Detail ID cannot be empty");
+    if (invalidRows) {
+      toast.error("Please enter an ID for all rows that contain data");
       return;
     }
 
-    // Update allJobDetails with the generated IDs
-    setAllJobDetails(jobDetailsWithIds);
+    // Filter out completely empty rows
+    const rowsToSave = allJobDetails.filter((detail) => {
+      const hasContent =
+        (detail.description && detail.description.trim() !== "") ||
+        (detail.amount !== undefined &&
+          detail.amount !== null &&
+          detail.amount !== 0) ||
+        (detail.remark && detail.remark.trim() !== "") ||
+        (detail.id && detail.id.trim() !== "");
+
+      return hasContent;
+    });
 
     try {
       // Update job
@@ -374,10 +385,10 @@ const JobPage: React.FC = () => {
         newId: editedJob.id !== selectedJob?.id ? editedJob.id : undefined,
       });
 
-      // Send the data with generated IDs
+      // Send only non-empty rows
       const result = await api.post("/api/job-details/batch", {
         jobId: updatedJob.job.id,
-        jobDetails: jobDetailsWithIds.map((jobDetail) => ({
+        jobDetails: rowsToSave.map((jobDetail) => ({
           ...jobDetail,
           newId:
             jobDetail.id !==
@@ -435,8 +446,24 @@ const JobPage: React.FC = () => {
   const handleDataChange = useCallback(
     async (updatedData: JobDetail[]) => {
       await Promise.resolve();
-      // Generate IDs for new rows in a format matching the backend
-      const dataWithIds = updatedData.map((detail) => {
+
+      // Don't generate IDs for empty rows
+      const processedData = updatedData.map((detail) => {
+        // Check if it's an empty or default row
+        const isEmptyOrDefault =
+          (!detail.id || detail.id.trim() === "") &&
+          (!detail.description || detail.description.trim() === "") &&
+          (detail.amount === undefined ||
+            detail.amount === null ||
+            detail.amount === 0) &&
+          (!detail.remark || detail.remark.trim() === "");
+
+        // Return the row as-is without generating an ID if it's empty/default
+        if (isEmptyOrDefault) {
+          return detail;
+        }
+
+        // Only generate ID if the row has content but no ID
         if (!detail.id || detail.id.trim() === "") {
           return {
             ...detail,
@@ -445,25 +472,21 @@ const JobPage: React.FC = () => {
               .padStart(3, "0")}`,
           };
         }
+
         return detail;
       });
+
       if (jobType !== "All") {
         const otherTypeDetails = allJobDetails.filter(
-          (detail_1) => detail_1.type !== jobType
+          (detail) => detail.type !== jobType
         );
-        const mergedData = [...otherTypeDetails, ...dataWithIds];
-
-        console.log("Updating with merged data:", {
-          dataWithIds,
-          otherTypeDetails,
-          mergedData,
-        });
+        const mergedData = [...otherTypeDetails, ...processedData];
 
         setAllJobDetails(mergedData);
-        setFilteredJobDetails(dataWithIds);
+        setFilteredJobDetails(processedData);
       } else {
-        setAllJobDetails(dataWithIds);
-        setFilteredJobDetails(dataWithIds);
+        setAllJobDetails(processedData);
+        setFilteredJobDetails(processedData);
       }
     },
     [jobType, allJobDetails]
@@ -472,52 +495,77 @@ const JobPage: React.FC = () => {
   const handleDeleteJobDetails = useCallback(
     async (selectedIndices: number[]) => {
       if (!selectedJob) {
-        return;
+        return Promise.resolve();
       }
 
+      // Sort indices in descending order to avoid index shifting issues
       const sortedIndices = selectedIndices.sort((a, b) => b - a);
       const jobDetailsToDeleteFromDB: string[] = [];
-      let updatedJobDetails = [...jobDetails];
+      let updatedJobDetails = [...filteredJobDetails];
 
+      console.log("Starting deletion process:", {
+        selectedIndices: sortedIndices,
+        currentDetails: updatedJobDetails,
+      });
+
+      // Collect IDs and remove rows
       for (const index of sortedIndices) {
         const jobDetail = updatedJobDetails[index];
-        if (isRowFromDatabase(jobDetail)) {
+        if (!jobDetail) {
+          console.warn(`No job detail found at index ${index}`);
+          continue;
+        }
+
+        // Only add to deletion list if it's a valid database ID
+        if (isRowFromDatabase(jobDetail) && jobDetail.id) {
           jobDetailsToDeleteFromDB.push(jobDetail.id);
         }
         updatedJobDetails.splice(index, 1);
       }
 
-      // Update local state immediately
-      setJobDetails(updatedJobDetails);
+      try {
+        if (jobDetailsToDeleteFromDB.length > 0) {
+          console.log("Sending delete request with IDs:", {
+            jobDetailsToDeleteFromDB,
+          });
 
-      if (jobDetailsToDeleteFromDB.length > 0) {
-        try {
+          // Send the IDs directly as an array
           await api.delete("/api/job-details", jobDetailsToDeleteFromDB);
-
           toast.success("Selected job details deleted successfully");
-          setIsEditing(false);
-        } catch (error) {
-          console.error("Error deleting selected job details:", error);
-          toast.error(
-            "Failed to delete some job details from the server. Please try again."
-          );
-          // Refresh job details from the server in case of error
-          await fetchJobDetails(selectedJob.id);
-          return;
+        } else {
+          console.log("No database records to delete, only removing from UI");
+          toast.success("Selected rows removed");
         }
-      } else {
-        toast.success("Selected rows removed");
-      }
 
-      // Ensure the Table component is updated with the new data
-      handleDataChange(updatedJobDetails);
+        // Update both filtered and all job details
+        if (jobType !== "All") {
+          const otherTypeDetails = allJobDetails.filter(
+            (detail) => detail.type !== jobType
+          );
+          setAllJobDetails([...otherTypeDetails, ...updatedJobDetails]);
+        } else {
+          setAllJobDetails(updatedJobDetails);
+        }
+        setFilteredJobDetails(updatedJobDetails);
+        setIsEditing(false);
+
+        return Promise.resolve();
+      } catch (error) {
+        console.error("Error deleting job details:", error);
+        toast.error("Failed to delete job details. Please try again.");
+
+        // Refresh job details from the server in case of error
+        await fetchJobDetails(selectedJob.id);
+        return Promise.reject(error);
+      }
     },
     [
       selectedJob,
-      jobDetails,
+      jobType,
+      allJobDetails,
+      filteredJobDetails,
       isRowFromDatabase,
       fetchJobDetails,
-      handleDataChange,
     ]
   );
 
