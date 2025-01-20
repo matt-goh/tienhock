@@ -26,4 +26,4 @@ COPY . .
 EXPOSE 5000
 
 # Use the npm script to run the server
-CMD ["npm", "run", "server"]
+CMD ["npm", "run", "server-prod"]
