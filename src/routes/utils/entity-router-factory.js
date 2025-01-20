@@ -48,10 +48,6 @@ export default function createEntityRouter(pool, entityName, tableName) {
   router.delete('/', async (req, res) => {
     const entityIds = req.body[`${entityName}s`];
 
-    if (!Array.isArray(entityIds) || entityIds.length === 0) {
-      return res.status(400).json({ message: `Invalid ${entityName} IDs provided` });
-    }
-
     try {
       const client = await pool.connect();
       try {

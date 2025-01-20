@@ -2,5 +2,5 @@
 import createEntityRouter from "../../utils/entity-router-factory.js";
 
 export default function (pool) {
-  return createEntityRouter(pool, "nationalitie", "nationalities");
+  return createEntityRouter(pool, "nationality", "nationalities");
 }

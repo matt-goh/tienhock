@@ -1,19 +1,22 @@
 // src/routes/utils/api.js
-import { sessionService } from '../../services/SessionService.ts';
-import { API_BASE_URL } from '../../configs/config.js';
+import { sessionService } from "../../services/SessionService.ts";
+import { API_BASE_URL } from "../../configs/config.js";
 
 const handleResponse = async (response) => {
   const data = await response.json();
-  
-  if (!response.ok) {
 
-    const error = new Error(data.message || 'API request failed');
-    // Copy all properties from the response data
+  if (!response.ok) {
+    const error = new Error(data.message || "API request failed");
     Object.assign(error, data);
     throw error;
   }
-  
+
   return data;
+};
+
+// Mapping of route path to the payload key expected by backend
+const IRREGULAR_PLURALS = {
+  nationalities: "nationalitys", // Match backend expectation of ${entityName}s
 };
 
 export const api = {
@@ -24,10 +27,10 @@ export const api = {
         headers: {
           "Content-Type": "application/json",
           "x-session-id": sessionId,
-          ...options.headers
-        }
+          ...options.headers,
+        },
       });
-      
+
       return handleResponse(response);
     } catch (error) {
       throw error;
@@ -38,14 +41,14 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId
+          "x-session-id": sessionId,
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
-      
+
       return handleResponse(response);
     } catch (error) {
       throw error;
@@ -56,14 +59,14 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId
+          "x-session-id": sessionId,
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
-      
+
       return handleResponse(response);
     } catch (error) {
       throw error;
@@ -73,18 +76,27 @@ export const api = {
   delete: async (endpoint, payload) => {
     const sessionId = sessionService.getSessionId();
     try {
+      // Get the last part of the endpoint (e.g., 'nationalities' from '/api/nationalities')
+      const routeName = endpoint.split("/").pop() || "";
+
+      // Special case for job-details endpoint which expects {jobDetailIds: [...]}
+      const finalPayload =
+        routeName === "job-details"
+          ? payload // Send payload as-is for job-details
+          : { [IRREGULAR_PLURALS[routeName] || `${routeName}`]: payload };
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId
+          "x-session-id": sessionId,
         },
-        body: JSON.stringify(payload ? { [`${endpoint.split('/').pop()}`]: payload } : {})
+        body: JSON.stringify(finalPayload),
       });
-      
+
       return handleResponse(response);
     } catch (error) {
       throw error;
     }
-  }
+  },
 };
