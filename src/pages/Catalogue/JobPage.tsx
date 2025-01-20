@@ -321,7 +321,13 @@ const JobPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!editedJob) return;
 
-    // Validation checks remain the same
+    console.log("Saving data:", {
+      allJobDetails,
+      filteredJobDetails,
+      jobType,
+    });
+
+    // Validation checks
     if (!editedJob.id.trim()) {
       toast.error("Job ID cannot be empty");
       return;
@@ -335,44 +341,30 @@ const JobPage: React.FC = () => {
       return;
     }
 
-    const emptyDetailId = allJobDetails.find((details) => !details.id.trim());
+    // Generate IDs for any new rows that don't have them
+    const jobDetailsWithIds = allJobDetails.map((detail) => {
+      if (!detail.id || detail.id.trim() === "") {
+        return {
+          ...detail,
+          id: `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        };
+      }
+      return detail;
+    });
+
+    // Now check if there are any empty IDs after generation
+    const emptyDetailId = jobDetailsWithIds.find(
+      (detail) => !detail.id || detail.id.trim() === ""
+    );
+
     if (emptyDetailId) {
+      console.error("Found empty ID after generation:", emptyDetailId);
       toast.error("Detail ID cannot be empty");
       return;
     }
 
-    const detailIds = new Set();
-    const duplicateDetailId = allJobDetails.find((details) => {
-      if (detailIds.has(details.id)) {
-        return true;
-      }
-      detailIds.add(details.id);
-      return false;
-    });
-
-    if (duplicateDetailId) {
-      toast.error(`Duplicate product ID: ${duplicateDetailId.id}`);
-      return;
-    }
-
-    const jobChanged = ["id", "name", "section"].some(
-      (key) =>
-        selectedJob &&
-        editedJob[key as keyof Job] !== selectedJob[key as keyof Job]
-    );
-
-    const detailsChanged = !_.isEqual(
-      allJobDetails.map((detail) => _.omit(detail, ["newId"])),
-      originalJobState?.jobDetails.map((detail) => _.omit(detail, ["newId"]))
-    );
-
-    const hasChanges = jobChanged || detailsChanged;
-
-    if (!hasChanges) {
-      toast("No changes detected");
-      setIsEditing(false);
-      return;
-    }
+    // Update allJobDetails with the generated IDs
+    setAllJobDetails(jobDetailsWithIds);
 
     try {
       // Update job
@@ -382,10 +374,10 @@ const JobPage: React.FC = () => {
         newId: editedJob.id !== selectedJob?.id ? editedJob.id : undefined,
       });
 
-      // Send all job details to the server
+      // Send the data with generated IDs
       const result = await api.post("/api/job-details/batch", {
         jobId: updatedJob.job.id,
-        jobDetails: allJobDetails.map((jobDetail) => ({
+        jobDetails: jobDetailsWithIds.map((jobDetail) => ({
           ...jobDetail,
           newId:
             jobDetail.id !==
@@ -395,15 +387,14 @@ const JobPage: React.FC = () => {
         })),
       });
 
-      // Update local state with the result from the server
+      // Update state with server response
       setAllJobDetails(result.jobDetails);
       setFilteredJobDetails(
         jobType === "All"
           ? result.jobDetails
-          : result.jobDetails.filter(
-              (detail: { type: string }) => detail.type === jobType
-            )
+          : result.jobDetails.filter((detail: any) => detail.type === jobType)
       );
+
       setSelectedJob(updatedJob.job);
       setJobs((jobs) =>
         jobs.map((job) => (job.id === selectedJob?.id ? updatedJob.job : job))
@@ -442,16 +433,40 @@ const JobPage: React.FC = () => {
 
   // HDC
   const handleDataChange = useCallback(
-    (updatedData: JobDetail[]) => {
-      const updatedAllJobDetails = allJobDetails.map((detail) => {
-        const updatedDetail = updatedData.find((d) => d.id === detail.id);
-        return updatedDetail || detail;
+    async (updatedData: JobDetail[]) => {
+      await Promise.resolve();
+      // Generate IDs for new rows in a format matching the backend
+      const dataWithIds = updatedData.map((detail) => {
+        if (!detail.id || detail.id.trim() === "") {
+          return {
+            ...detail,
+            id: `JD${Date.now()}${Math.floor(Math.random() * 1000)
+              .toString()
+              .padStart(3, "0")}`,
+          };
+        }
+        return detail;
       });
+      if (jobType !== "All") {
+        const otherTypeDetails = allJobDetails.filter(
+          (detail_1) => detail_1.type !== jobType
+        );
+        const mergedData = [...otherTypeDetails, ...dataWithIds];
 
-      setAllJobDetails(updatedAllJobDetails);
-      setFilteredJobDetails(updatedData);
+        console.log("Updating with merged data:", {
+          dataWithIds,
+          otherTypeDetails,
+          mergedData,
+        });
+
+        setAllJobDetails(mergedData);
+        setFilteredJobDetails(dataWithIds);
+      } else {
+        setAllJobDetails(dataWithIds);
+        setFilteredJobDetails(dataWithIds);
+      }
     },
-    [allJobDetails]
+    [jobType, allJobDetails]
   );
 
   const handleDeleteJobDetails = useCallback(
