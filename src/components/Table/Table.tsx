@@ -368,37 +368,6 @@ function Table<T extends Record<string, any>>({
     updateRemovableRowsAbove();
   }, [updateRemovableRowsAbove]);
 
-  // DR
-  const deleteRow = async (rowIndex: number) => {
-    if (rowToDelete && rowToDelete.id) {
-      try {
-        await api.delete(`/api/jobs/${rowToDelete.id}`);
-
-        setData((oldData) => {
-          const newData = oldData.filter((_, index) => index !== rowIndex);
-          return newData;
-        });
-
-        setRowToDelete(null);
-      } catch (error) {
-        console.error("Error deleting job:", error);
-        toast.error("Failed to delete job from the database");
-      }
-    }
-  };
-
-  // HDR
-  const handleDeleteRow = async (rowIndex: number, event: React.MouseEvent) => {
-    event.stopPropagation();
-    const rowData = data[rowIndex];
-    if (rowData.id) {
-      setRowToDelete({ index: rowIndex, id: rowData.id });
-    } else {
-      // For rows not in the database, delete immediately
-      deleteRow(rowIndex);
-    }
-  };
-
   // HDS
   const handleDeleteSelected = useCallback(async () => {
     const selectedIndices = Array.from(selectedRows);
@@ -570,34 +539,6 @@ function Table<T extends Record<string, any>>({
             </button>
           </div>
         );
-      }
-
-      if (row.original.isSubtotal || row.original.isTotal) {
-        if (columnType === "action") {
-          return (
-            <div className="flex items-center justify-center h-full">
-              <button
-                className={`p-2 rounded-full text-default-500 hover:bg-default-100 active:bg-default-200 hover:text-default-600 ${
-                  isSorting ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                onClick={(event) => {
-                  if (!isSorting) {
-                    handleDeleteRow(row.index, event);
-                  }
-                }}
-                disabled={isSorting}
-              >
-                <IconTrash stroke={2} width={20} height={20} />
-              </button>
-            </div>
-          );
-        }
-        return null;
-      }
-
-      // Non-subtotal rows
-      if (columnType === "action") {
-        return flexRender(cell.column.columnDef.cell, cell.getContext());
       }
 
       if (
@@ -801,27 +742,6 @@ function Table<T extends Record<string, any>>({
     };
 
     switch (col.type) {
-      case "action":
-        return {
-          ...baseColumn,
-          cell: (info) => (
-            <div className="flex items-center justify-center h-full">
-              <button
-                className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
-                  isSorting ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                onClick={(event) => {
-                  if (!isSorting) {
-                    handleDeleteRow(info.row.index, event);
-                  }
-                }}
-                disabled={isSorting}
-              >
-                <IconTrash stroke={2} width={20} height={20} />
-              </button>
-            </div>
-          ),
-        } as ColumnDef<T>;
       case "readonly":
       case "amount":
         return {
