@@ -116,8 +116,14 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
     } else if (type === "number" || type === "rate" || type === "float") {
       newValue = formatEditValue(newValue);
       setEditValue(newValue);
+      // Call onChange immediately with the formatted value
+      const outputValue =
+        type === "rate" ? parseFloat(newValue) : parseInt(newValue, 10);
+      onChange(isNaN(outputValue) ? 0 : outputValue);
     } else {
       setEditValue(newValue);
+      // Call onChange immediately with the new value
+      onChange(newValue);
     }
   };
 
@@ -125,25 +131,15 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
     let finalValue: string = editValue;
 
     if (type === "number" || type === "rate") {
-      // Remove trailing decimal point
       finalValue = finalValue.replace(/\.$/, "");
-
-      // Ensure the value is not empty
       if (finalValue === "") {
         finalValue = "0";
       }
-
-      // Convert to number for onChange, but keep as string for display
-      let outputValue =
-        type === "rate" ? parseFloat(finalValue) : parseInt(finalValue, 10);
-
       setCellValue(finalValue);
       setEditValue(finalValue);
-      onChange(outputValue);
     } else {
       setCellValue(finalValue);
       setEditValue(finalValue);
-      onChange(finalValue);
     }
   };
 
