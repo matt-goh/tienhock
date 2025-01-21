@@ -7,7 +7,6 @@ import React, {
   useCallback,
 } from "react";
 import {
-  flexRender,
   getCoreRowModel,
   useReactTable,
   SortingState,
@@ -27,7 +26,6 @@ import {
   IconSortDescendingNumbers,
   IconSquare,
   IconSquareCheckFilled,
-  IconTrash,
 } from "@tabler/icons-react";
 import { ColumnType, TableProps, ColumnConfig } from "../../types/types";
 import TableEditableCell from "./TableEditableCell";
@@ -35,8 +33,6 @@ import DeleteButton from "./DeleteButton";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 import ToolTip from "../ToolTip";
-import { api } from "../../routes/utils/api";
-import toast from "react-hot-toast";
 
 function Table<T extends Record<string, any>>({
   initialData,
@@ -62,10 +58,6 @@ function Table<T extends Record<string, any>>({
     [key: string]: any;
   }>({});
   const [showDeleteButton, setShowDeleteButton] = useState(false);
-  const [rowToDelete, setRowToDelete] = useState<{
-    index: number;
-    id: string;
-  } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isSorting, setIsSorting] = useState(false);
   const [isAllSelectedGlobal, setIsAllSelectedGlobal] = useState(false);
