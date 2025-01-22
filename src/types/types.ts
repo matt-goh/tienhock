@@ -102,6 +102,13 @@ export interface SubmissionResponse {
   }>;
 }
 
+export type SubmissionPhase =
+  | "INITIALIZATION"
+  | "VALIDATION"
+  | "SUBMISSION"
+  | "CONFIRMATION"
+  | "COOLDOWN";
+
 // Existing types remain the same
 export interface ValidationError {
   invoiceNo: string;
@@ -109,14 +116,6 @@ export interface ValidationError {
   errors: string[];
   validationErrors?: string[]; // Added to handle nested validation errors
   type?: "validation" | "submission"; // Added type field
-}
-
-export interface ValidationError {
-  invoiceNo: string;
-  invoiceId?: string;
-  errors: string[];
-  validationErrors?: string[];
-  type?: "validation" | "submission";
 }
 
 export interface FailedInvoice {
