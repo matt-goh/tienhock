@@ -352,7 +352,6 @@ const JobPage: React.FC = () => {
 
       // If the row has content, it must have an ID
       if (hasContent && (!detail.id || detail.id.trim() === "")) {
-        console.log("Invalid row found:", detail);
         return true;
       }
 
@@ -503,11 +502,6 @@ const JobPage: React.FC = () => {
       const jobDetailsToDeleteFromDB: string[] = [];
       let updatedJobDetails = [...filteredJobDetails];
 
-      console.log("Starting deletion process:", {
-        selectedIndices: sortedIndices,
-        currentDetails: updatedJobDetails,
-      });
-
       // Collect IDs and remove rows
       for (const index of sortedIndices) {
         const jobDetail = updatedJobDetails[index];
@@ -525,15 +519,11 @@ const JobPage: React.FC = () => {
 
       try {
         if (jobDetailsToDeleteFromDB.length > 0) {
-          console.log("Sending delete request with IDs:", {
-            jobDetailsToDeleteFromDB,
-          });
 
           // Send the IDs directly as an array
           await api.delete("/api/job-details", jobDetailsToDeleteFromDB);
           toast.success("Selected job details deleted successfully");
         } else {
-          console.log("No database records to delete, only removing from UI");
           toast.success("Selected rows removed");
         }
 
