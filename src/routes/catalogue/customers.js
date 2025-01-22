@@ -4,7 +4,7 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get all customers
+  // Get customers infos for front page display
   router.get("/", async (req, res) => {
     try {
       const query = `
@@ -121,6 +121,7 @@ export default function (pool) {
       email,
       address,
       city,
+      state,
       id_number,
       id_type,
     } = req.body;
@@ -131,13 +132,14 @@ export default function (pool) {
       name,
       closeness,
       salesman,
-      tin_number || null, // Handle possible empty string
-      phone_number || null, // Handle possible empty string
-      email || null, // Handle possible empty string
-      address || null, // Handle possible empty string
-      city || null, // Handle possible empty string
-      id_number || null, // Handle possible empty string
-      id_type || null, // Handle possible empty string
+      tin_number || null,
+      phone_number || null,
+      email || null,
+      address || null,
+      city || null,
+      state || null,
+      id_number || null,
+      id_type || null,
     ];
 
     try {
@@ -152,10 +154,11 @@ export default function (pool) {
           email,
           address,
           city,
+          state,
           id_number,
           id_type
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
       `;
 
@@ -229,6 +232,7 @@ export default function (pool) {
             email,
             address,
             city,
+            state,
             id_number,
             id_type,
           } = customer;
@@ -244,10 +248,11 @@ export default function (pool) {
             email,
             address,
             city,
+            state,
             id_number,
             id_type
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           ON CONFLICT (id) DO UPDATE
           SET 
             name = EXCLUDED.name,
@@ -258,6 +263,7 @@ export default function (pool) {
             email = EXCLUDED.email,
             address = EXCLUDED.address,
             city = EXCLUDED.city,
+            state = EXCLUDED.state,
             id_number = EXCLUDED.id_number,
             id_type = EXCLUDED.id_type
           RETURNING *
@@ -269,13 +275,14 @@ export default function (pool) {
             name,
             closeness,
             salesman,
-            tin_number || null, // Handle possible empty string
-            phone_number || null, // Handle possible empty string
-            email || null, // Handle possible empty string
-            address || null, // Handle possible empty string
-            city || null, // Handle possible empty string
-            id_number || null, // Handle possible empty string
-            id_type || null, // Handle possible empty string
+            tin_number || null,
+            phone_number || null,
+            email || null,
+            address || null,
+            city || null,
+            state || null,
+            id_number || null,
+            id_type || null,
           ];
 
           const result = await client.query(upsertQuery, upsertValues);
@@ -334,40 +341,43 @@ export default function (pool) {
       email,
       address,
       city,
+      state,
       id_number,
       id_type,
     } = req.body;
 
     try {
       const query = `
-      UPDATE customers
-      SET 
-        name = $1, 
-        closeness = $2, 
-        salesman = $3, 
-        tin_number = $4,
-        phone_number = $5,
-        email = $6,
-        address = $7,
-        city = $8,
-        id_number = $9,
-        id_type = $10
-      WHERE id = $11
-      RETURNING *
-    `;
+        UPDATE customers
+        SET 
+          name = $1, 
+          closeness = $2, 
+          salesman = $3, 
+          tin_number = $4,
+          phone_number = $5,
+          email = $6,
+          address = $7,
+          city = $8,
+          state = $9,
+          id_number = $10,
+          id_type = $11
+        WHERE id = $12
+        RETURNING *
+      `;
 
       // Transform empty strings to null for numeric fields
       const values = [
         name,
         closeness,
         salesman,
-        tin_number || null, // Handle possible empty string
-        phone_number || null, // Handle possible empty string
-        email || null, // Handle possible empty string
-        address || null, // Handle possible empty string
-        city || null, // Handle possible empty string
-        id_number || null, // Handle possible empty string
-        id_type || null, // Handle possible empty string
+        tin_number || null,
+        phone_number || null,
+        email || null,
+        address || null,
+        city || null,
+        state || null,
+        id_number || null,
+        id_type || null,
         id,
       ];
 

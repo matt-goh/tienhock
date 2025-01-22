@@ -47,6 +47,7 @@ const CustomerFormPage: React.FC = () => {
     email: "",
     address: "",
     city: "KOTA KINABALU",
+    state: "12",
     id_number: "",
     id_type: "",
   });
@@ -74,6 +75,26 @@ const CustomerFormPage: React.FC = () => {
     { id: "NRIC", name: "NRIC" },
     { id: "PASSPORT", name: "PASSPORT" },
     { id: "ARMY", name: "ARMY" },
+  ];
+
+  const stateOptions: SelectOption[] = [
+    { id: "01", name: "JOHOR" },
+    { id: "02", name: "KEDAH" },
+    { id: "03", name: "KELANTAN" },
+    { id: "04", name: "MELAKA" },
+    { id: "05", name: "NEGERI SEMBILAN" },
+    { id: "06", name: "PAHANG" },
+    { id: "07", name: "PULAU PINANG" },
+    { id: "08", name: "PERAK" },
+    { id: "09", name: "PERLIS" },
+    { id: "10", name: "SELANGOR" },
+    { id: "11", name: "TERENGGANU" },
+    { id: "12", name: "SABAH" },
+    { id: "13", name: "SARAWAK" },
+    { id: "14", name: "WILAYAH PERSEKUTUAN KUALA LUMPUR" },
+    { id: "15", name: "WILAYAH PERSEKUTUAN LABUAN" },
+    { id: "16", name: "WILAYAH PERSEKUTUAN PUTRAJAYA" },
+    { id: "17", name: "NOT APPLICABLE" },
   ];
 
   // Form change detection
@@ -333,6 +354,29 @@ const CustomerFormPage: React.FC = () => {
   ) => {
     const value = formData[name]?.toString() || "";
 
+    // For state field, we want to show the name but save the code
+    if (name === "state") {
+      const selectedState = stateOptions.find((opt) => opt.id === value);
+      return (
+        <FormListbox
+          name={name}
+          label={label}
+          value={selectedState ? selectedState.name : value}
+          onChange={(selectedName) => {
+            const selectedOption = stateOptions.find(
+              (opt) => opt.name === selectedName
+            );
+            handleListboxChange(
+              name,
+              selectedOption ? selectedOption.id : selectedName
+            );
+          }}
+          options={options}
+        />
+      );
+    }
+
+    // For other fields, normal behavior
     return (
       <FormListbox
         name={name}
@@ -387,12 +431,15 @@ const CustomerFormPage: React.FC = () => {
               {renderInput("email", "Email", "email")}
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-              {renderInput("address", "Address")}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              <div className="sm:col-span-2">
+                {renderInput("address", "Address", "text")}
+              </div>
+              {renderInput("city", "City")}
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {renderInput("city", "City")}
+              {renderListbox("state", "State", stateOptions)}
               {renderListbox("closeness", "Closeness", closenessOptions)}
               {renderListbox("salesman", "Salesman", salesmen)}
             </div>
