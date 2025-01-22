@@ -7,6 +7,10 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
+import {
+  isValidationRequired,
+  validateCustomerIdentity,
+} from "../../routes/sales/invoices/customerValidation";
 
 interface SelectOption {
   id: string;
@@ -136,6 +140,17 @@ const CustomerAddPage: React.FC = () => {
     setIsSaving(true);
 
     try {
+      // Only perform validation if all required fields are present
+      if (isValidationRequired(formData)) {
+        const validationResult = await validateCustomerIdentity(formData);
+
+        if (!validationResult.isValid) {
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Proceed with creating the customer if validation passed
       await api.post("/api/customers", formData);
       toast.success("Customer created successfully!");
       navigate("/catalogue/customer");
@@ -241,7 +256,7 @@ const CustomerAddPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 py-3 px-6 text-right">
+          <div className="mt-6 py-3 px-6 text-right">
             <Button
               type="submit"
               variant="boldOutline"
