@@ -650,7 +650,7 @@ const InvoisPage: React.FC = () => {
     type: "start" | "end",
     currentRange: { start: Date | null; end: Date | null }
   ): { start: Date; end: Date } => {
-    const oneMonthMs = 32 * 24 * 60 * 60 * 1000;
+    const oneMonthMs = 31 * 24 * 60 * 60 * 1000;
 
     if (!currentRange.start || !currentRange.end) {
       // If we don't have both dates, set the other date one month apart
@@ -666,9 +666,6 @@ const InvoisPage: React.FC = () => {
         };
       }
     }
-
-    // Get the other existing date
-    const otherDate = type === "start" ? currentRange.end : currentRange.start;
 
     // Check if the new range would exceed one month
     const rangeInfo = getDateRangeInfo(

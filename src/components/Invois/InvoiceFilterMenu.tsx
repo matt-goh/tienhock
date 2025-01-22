@@ -131,31 +131,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     handleFilterChange("customerFilter", selectedCustomers);
   };
 
-  const formatDateForInput = (date: Date | null): string => {
-    if (!date) return "";
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear();
-    return `${year}-${month}-${day}`;
-  };
-
-  const handleDateChange = (type: "start" | "end", value: string) => {
-    if (!value) {
-      handleFilterChange("dateRangeFilter", {
-        ...currentFilters.dateRangeFilter,
-        [type]: null,
-      });
-      return;
-    }
-    const [year, month, day] = value.split("-").map(Number);
-    const newDate = new Date(year, month - 1, day);
-    const newDateRange = {
-      ...currentFilters.dateRangeFilter,
-      [type]: newDate,
-    };
-    handleFilterChange("dateRangeFilter", newDateRange);
-  };
-
   const handleInvoiceTypeSelection = (selectedType: InvoiceType) => {
     handleFilterChange("invoiceTypeFilter", selectedType);
   };
