@@ -13,6 +13,7 @@ import {
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import clsx from "clsx";
+import { StatusIndicator } from "./StatusIndicator";
 
 interface SelectOption {
   id: string;
@@ -27,6 +28,11 @@ interface InputProps {
   disabled?: boolean;
   type?: string;
   placeholder?: string;
+}
+
+interface ExtendedInputProps extends InputProps {
+  showStatus?: boolean;
+  isVerified?: boolean;
 }
 
 export const FormInput: React.FC<InputProps> = ({
@@ -47,6 +53,39 @@ export const FormInput: React.FC<InputProps> = ({
       id={name}
       name={name}
       value={value?.toString() ?? ""}
+      onChange={onChange}
+      disabled={disabled}
+      placeholder={placeholder}
+      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+    />
+  </div>
+);
+
+export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
+  name,
+  label,
+  value,
+  onChange,
+  disabled = false,
+  type = "text",
+  placeholder = "",
+  showStatus = false,
+  isVerified = false,
+}) => (
+  <div className="space-y-2">
+    <div className="flex items-center gap-2">
+      <label htmlFor={name} className="text-sm font-medium text-default-700">
+        {label}
+      </label>
+      {showStatus && isVerified && (
+        <StatusIndicator success={true} type="verification" />
+      )}
+    </div>
+    <input
+      type={type}
+      id={name}
+      name={name}
+      value={value}
       onChange={onChange}
       disabled={disabled}
       placeholder={placeholder}

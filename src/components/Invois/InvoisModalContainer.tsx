@@ -1,6 +1,6 @@
 import React from "react";
 import { IconX } from "@tabler/icons-react";
-import { ApiStatusIndicator } from "./ApiStatusComponents";
+import { StatusIndicator } from "../StatusIndicator";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { LoginResponse, SubmissionResponse } from "../../types/types";
 import SuccessDisplay from "./SuccessDisplay";
@@ -37,7 +37,7 @@ const InvoisModalContainer: React.FC<InvoisModalContainerProps> = ({
                 Submit to MyInvois
               </h2>
               {loginResponse && (
-                <ApiStatusIndicator success={loginResponse.success} />
+                <StatusIndicator success={loginResponse.success} />
               )}
             </div>
             <button

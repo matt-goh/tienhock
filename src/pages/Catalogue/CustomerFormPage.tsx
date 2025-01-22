@@ -5,9 +5,17 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import { FormInput, FormListbox } from "../../components/FormComponents";
+import {
+  FormInput,
+  FormInputWithStatus,
+  FormListbox,
+} from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import {
+  isValidationRequired,
+  validateCustomerIdentity,
+} from "../../routes/sales/invoices/customerValidation";
 
 interface SelectOption {
   id: string;
@@ -191,6 +199,17 @@ const CustomerFormPage: React.FC = () => {
     setIsSaving(true);
 
     try {
+      // Only perform validation if all required fields are present
+      if (isValidationRequired(formData)) {
+        const validationResult = await validateCustomerIdentity(formData);
+
+        if (!validationResult.isValid) {
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Proceed with saving the customer data
       if (isEditMode) {
         if (id !== formData.id) {
           await api.put(`/api/customers/${id}`, {
@@ -230,14 +249,30 @@ const CustomerFormPage: React.FC = () => {
       return val.toString();
     })();
 
-    return (
+    // Determine if this field should show verification status
+    const showStatus = name === "id_number" || name === "tin_number";
+
+    return showStatus ? (
+      <FormInputWithStatus
+        name={name}
+        label={label}
+        value={value}
+        onChange={handleInputChange}
+        type={type}
+        placeholder={placeholder}
+        showStatus={true}
+        isVerified={Boolean(
+          formData.id_type && formData.id_number && formData.tin_number
+        )}
+      />
+    ) : (
       <FormInput
         name={name}
         label={label}
         value={value}
         onChange={handleInputChange}
         type={type}
-        {...(placeholder ? { placeholder } : {})}
+        placeholder={placeholder}
       />
     );
   };
@@ -325,7 +360,7 @@ const CustomerFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 py-3 px-6 space-x-3 text-right">
+          <div className="mt-6 py-3 px-6 space-x-3 text-right">
             {isEditMode && (
               <Button
                 type="button"
