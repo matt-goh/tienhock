@@ -1,4 +1,25 @@
-// transformInvoiceData.ts
+// transformInvoiceData.js
+
+// Helper function to format phone number
+function formatPhoneNumber(phone) {
+  if (!phone) return "";
+  // Remove any non-digit characters
+  const cleaned = phone.replace(/\D/g, "");
+
+  // Remove leading country code if present (both +60 and 60)
+  let number = cleaned;
+  if (cleaned.startsWith("60")) {
+    number = cleaned.slice(2);
+  }
+
+  // Remove any leading zeros from the number itself
+  while (number.startsWith("0")) {
+    number = number.slice(1);
+  }
+
+  // Add custom leadings and return
+  return `0${number}`;
+}
 
 const formatAmount = (amount) => {
   const num = typeof amount === "string" ? parseFloat(amount) : Number(amount);
@@ -221,7 +242,12 @@ const calculateTaxAndTotals = (invoiceData) => {
   // Filter normal items (not special rows)
   const normalItems = invoiceData.orderDetails.filter(
     (detail) =>
-      !detail.istotal && !detail.issubtotal && !detail.isless && !detail.istax
+      !detail.istotal &&
+      !detail.issubtotal &&
+      !detail.isless &&
+      !detail.istax &&
+      !detail.isfoc &&
+      !detail.isreturned
   );
 
   // Calculate subtotal from normal items
@@ -380,7 +406,10 @@ const generateInvoiceLines = (orderDetails, totals) => {
   });
 };
 
-export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
+export async function transformInvoiceToMyInvoisFormat(
+  rawInvoiceData,
+  customerData
+) {
   try {
     if (!rawInvoiceData) {
       throw {
@@ -389,6 +418,15 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
         invoiceNo: "Unknown",
       };
     }
+
+    if (!customerData) {
+      throw {
+        type: "validation",
+        message: "Customer data is required",
+        invoiceNo: rawInvoiceData?.invoiceno || "Unknown",
+      };
+    }
+
     // Validate and sanitize input data
     const invoiceData = validateInvoiceData(rawInvoiceData);
 
@@ -502,7 +540,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   ],
                   Contact: [
                     {
-                      Telephone: [{ _: "+60-168329291" }],
+                      Telephone: [{ _: "0168329291" }],
                       ElectronicMail: [{ _: "tienhockfood@gmail.com" }],
                     },
                   ],
@@ -516,11 +554,11 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                 {
                   PostalAddress: [
                     {
-                      CityName: [{ _: "" }], // change: customer.city (eg. KOTA KINABALU)
+                      CityName: [{ _: customerData.city || "" }],
                       PostalZone: [{ _: "" }],
-                      CountrySubentityCode: [{ _: "" }], // change:customer.state (eg. 12)
+                      CountrySubentityCode: [{ _: customerData.state || "" }],
                       AddressLine: [
-                        { Line: [{ _: "" }] }, // change: customer.address
+                        { Line: [{ _: customerData.address || "" }] },
                         { Line: [{ _: "" }] },
                         { Line: [{ _: "" }] },
                       ],
@@ -539,19 +577,32 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   ],
                   PartyLegalEntity: [
                     {
-                      RegistrationName: [{ _: "Timothy Goh Vun Bing" }], // change: customer.name
+                      RegistrationName: [{ _: customerData.name }],
                     },
                   ],
                   PartyIdentification: [
-                    { ID: [{ _: "IG28358919010", schemeID: "TIN" }] }, // change: customer.tin_number
-                    { ID: [{ _: "981223125953", schemeID: "NRIC" }] }, // change: customer.id_number and customer.id_type for schemeID
+                    {
+                      ID: [
+                        { _: customerData.tin_number || "-", schemeID: "TIN" },
+                      ],
+                    },
+                    {
+                      ID: [
+                        {
+                          _: customerData.id_number || "-",
+                          schemeID: customerData.id_type || "BRN",
+                        },
+                      ],
+                    },
                     { ID: [{ _: "-", schemeID: "SST" }] },
                     { ID: [{ _: "-", schemeID: "TTX" }] },
                   ],
                   Contact: [
                     {
-                      Telephone: [{ _: "+60-172464931" }], // change: customer.phone_number (format it into "+60-123456789")
-                      ElectronicMail: [{ _: "gvbtim98@gmail.com" }], // change: customer.email
+                      Telephone: [
+                        { _: formatPhoneNumber(customerData.phone_number) },
+                      ],
+                      ElectronicMail: [{ _: customerData.email || "" }],
                     },
                   ],
                 },
@@ -563,13 +614,15 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
               DeliveryParty: [
                 {
                   PartyLegalEntity: [
-                    { RegistrationName: [{ _: "Timothy Goh Vun Bing" }] }, // change: customer.name
+                    {
+                      RegistrationName: [{ _: customerData.name }],
+                    },
                   ],
                   PostalAddress: [
                     {
                       CityName: [{ _: "" }],
                       PostalZone: [{ _: "" }],
-                      CountrySubentityCode: [{ _: "17" }], // change: customer.state
+                      CountrySubentityCode: [{ _: customerData.state || "" }],
                       AddressLine: [
                         { Line: [{ _: "" }] },
                         { Line: [{ _: "" }] },
@@ -592,7 +645,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                     {
                       ID: [
                         {
-                          _: "IG28358919010", // change: customer.tin_number
+                          _: customerData.tin_number || "-",
                           schemeID: "TIN",
                         },
                       ],
