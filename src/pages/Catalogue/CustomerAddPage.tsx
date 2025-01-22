@@ -7,9 +7,7 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
-import {
-  validateCustomerIdentity,
-} from "../../routes/sales/invoices/customerValidation";
+import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
 
 interface SelectOption {
   id: string;
@@ -41,6 +39,7 @@ const CustomerAddPage: React.FC = () => {
     email: "",
     address: "",
     city: "KOTA KINABALU",
+    state: "12",
     id_number: "",
     id_type: "",
   });
@@ -54,6 +53,26 @@ const CustomerAddPage: React.FC = () => {
   const closenessOptions = [
     { id: "Local", name: "Local" },
     { id: "Outstation", name: "Outstation" },
+  ];
+
+  const stateOptions: SelectOption[] = [
+    { id: "01", name: "JOHOR" },
+    { id: "02", name: "KEDAH" },
+    { id: "03", name: "KELANTAN" },
+    { id: "04", name: "MELAKA" },
+    { id: "05", name: "NEGERI SEMBILAN" },
+    { id: "06", name: "PAHANG" },
+    { id: "07", name: "PULAU PINANG" },
+    { id: "08", name: "PERAK" },
+    { id: "09", name: "PERLIS" },
+    { id: "10", name: "SELANGOR" },
+    { id: "11", name: "TERENGGANU" },
+    { id: "12", name: "SABAH" },
+    { id: "13", name: "SARAWAK" },
+    { id: "14", name: "WILAYAH PERSEKUTUAN KUALA LUMPUR" },
+    { id: "15", name: "WILAYAH PERSEKUTUAN LABUAN" },
+    { id: "16", name: "WILAYAH PERSEKUTUAN PUTRAJAYA" },
+    { id: "17", name: "NOT APPLICABLE" },
   ];
 
   const idTypeOptions = [
@@ -277,12 +296,15 @@ const CustomerAddPage: React.FC = () => {
               {renderInput("email", "Email", "email")}
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-              {renderInput("address", "Address")}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              <div className="sm:col-span-2">
+                {renderInput("address", "Address", "text")}
+              </div>
+              {renderInput("city", "City")}
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {renderInput("city", "City")}
+              {renderListbox("state", "State", stateOptions)}
               {renderListbox("closeness", "Closeness", closenessOptions)}
               {renderListbox("salesman", "Salesman", salesmen)}
             </div>
