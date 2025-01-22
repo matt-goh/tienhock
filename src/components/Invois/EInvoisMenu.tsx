@@ -13,41 +13,25 @@ import {
   SubmissionResponse,
   LoginResponse,
   SubmissionInfo,
+  SubmissionPhase,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import ErrorDisplay from "./ErrorDisplay";
 import InvoisModalContainer from "./InvoisModalContainer";
+import ValidationStatus from "./ValidationStatus";
+
+const PHASE_DELAYS = {
+  INITIALIZATION: 300,
+  VALIDATION: 500,
+  SUBMISSION: 500,
+  CONFIRMATION: 300,
+  COOLDOWN: 200,
+} as const;
 
 // Local components
 const SubmissionInfoDisplay: React.FC<{ info: SubmissionInfo }> = ({
   info,
 }) => {
-  // Calculate actual date range from selected invoices
-  const getDateRange = () => {
-    if (info.selectedInvoices.length === 0) {
-      return { start: new Date(), end: new Date() };
-    }
-
-    const timestamps = info.selectedInvoices.map((invoice: any) => {
-      const [day, month, year] = invoice.date.split("/").map(Number);
-      return new Date(year, month - 1, day).getTime();
-    });
-
-    return {
-      start: new Date(Math.min(...timestamps)),
-      end: new Date(Math.max(...timestamps)),
-    };
-  };
-
-  const dateRange = getDateRange();
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  };
-
   return (
     <div className="space-y-4">
       {/* Selected Invoices Section */}
@@ -105,7 +89,6 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   clearSelection,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [showApiStatus, setShowApiStatus] = useState(true);
   const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
     null
   );
@@ -115,14 +98,9 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   const [submissionResponse, setSubmissionResponse] =
     useState<SubmissionResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionPhase, setSubmissionPhase] = useState<
-    | "INITIALIZATION"
-    | "VALIDATION"
-    | "SUBMISSION"
-    | "CONFIRMATION"
-    | "COOLDOWN"
-    | null
-  >(null);
+
+  const [submissionPhase, setSubmissionPhase] =
+    useState<SubmissionPhase | null>(null);
 
   // Token validation and login handling
   const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
@@ -204,18 +182,23 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       return;
     }
 
-    // Reset states
-    setIsSubmitting(true);
-    setSubmissionResponse(null);
-    setSubmissionError(null);
-
     try {
-      // Simulation phases for better UX
-      setSubmissionPhase("INITIALIZATION");
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Reset states
+      setIsSubmitting(true);
+      setSubmissionResponse(null);
+      setSubmissionError(null);
 
+      // Initialization phase
+      setSubmissionPhase("INITIALIZATION");
+      await new Promise((resolve) =>
+        setTimeout(resolve, PHASE_DELAYS.INITIALIZATION)
+      );
+
+      // Validation phase
       setSubmissionPhase("VALIDATION");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) =>
+        setTimeout(resolve, PHASE_DELAYS.VALIDATION)
+      );
 
       try {
         const response = await api.post("/api/einvoice/submit", {
@@ -275,15 +258,21 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         if (response.success && response.submissionResults?.length > 0) {
           // Submission phase
           setSubmissionPhase("SUBMISSION");
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) =>
+            setTimeout(resolve, PHASE_DELAYS.SUBMISSION)
+          );
 
           // Confirmation phase
           setSubmissionPhase("CONFIRMATION");
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          await new Promise((resolve) =>
+            setTimeout(resolve, PHASE_DELAYS.CONFIRMATION)
+          );
 
           // Cooldown phase
           setSubmissionPhase("COOLDOWN");
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          await new Promise((resolve) =>
+            setTimeout(resolve, PHASE_DELAYS.COOLDOWN)
+          );
 
           const submissionResult = response.submissionResults[0];
           if (submissionResult.acceptedDocuments?.length > 0) {
@@ -306,7 +295,6 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
           }
         }
       } catch (error: any) {
-
         // Handle validation errors from error object
         if (error.validationErrors?.length > 0) {
           const errorObj = {
@@ -378,46 +366,16 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         loginResponse={loginResponse}
-        showApiStatus={showApiStatus}
         submissionResponse={submissionResponse}
         handleClose={handleClose}
       >
         {submissionPhase ? (
-          <div className="absolute inset-0 bg-white/95 rounded-b-xl z-10">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center px-4">
-                <LoadingSpinner size="md" hideText />
-                <div className="mt-3">
-                  <h3 className="text-default-900 font-medium">
-                    {submissionPhase === "INITIALIZATION"
-                      ? "Preparing Submission"
-                      : submissionPhase === "VALIDATION"
-                      ? "Validating Invoice Data"
-                      : submissionPhase === "SUBMISSION"
-                      ? "Submitting to MyInvois"
-                      : submissionPhase === "CONFIRMATION"
-                      ? "Confirming Submission"
-                      : submissionPhase === "COOLDOWN"
-                      ? "Finalizing Submission"
-                      : "Processing Submission"}
-                  </h3>
-                  <p className="text-default-600 text-sm mt-1">
-                    {submissionPhase === "INITIALIZATION"
-                      ? "Preparing invoice data..."
-                      : submissionPhase === "VALIDATION"
-                      ? "Validating format and contents..."
-                      : submissionPhase === "SUBMISSION"
-                      ? "Submitting to MyInvois..."
-                      : submissionPhase === "CONFIRMATION"
-                      ? "Verifying status..."
-                      : submissionPhase === "COOLDOWN"
-                      ? "Completing submission..."
-                      : "Please wait..."}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ValidationStatus
+            phase={
+              submissionPhase === "COOLDOWN" ? "CONFIRMATION" : submissionPhase
+            }
+            totalInvoices={selectedInvoices.length}
+          />
         ) : (
           <>
             <SubmissionInfoDisplay
@@ -447,8 +405,8 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
                       1. Invoice date must be in the past 3 days.
                     </p>
                     <p className="text-sm text-amber-700">
-                      2. TIN number must be assigned to the
-                      involved customer(s) in catalogue.
+                      2. TIN number must be assigned to the involved customer(s)
+                      in catalogue.
                     </p>
                     <p className="text-sm text-amber-700">
                       3. It is recommended to submit in batches of up to 100

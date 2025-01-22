@@ -9,7 +9,6 @@ interface InvoisModalContainerProps {
   isOpen: boolean;
   onClose: () => void;
   loginResponse: LoginResponse | null;
-  showApiStatus: boolean;
   children: React.ReactNode;
   submissionResponse: SubmissionResponse | null;
   handleClose: () => void;
@@ -19,20 +18,16 @@ const InvoisModalContainer: React.FC<InvoisModalContainerProps> = ({
   isOpen,
   onClose,
   loginResponse,
-  showApiStatus,
   children,
   submissionResponse,
-  handleClose
+  handleClose,
 }) => {
   if (!isOpen) return null;
 
   return (
     <div className="absolute right-0 top-14 w-[450px] bg-white rounded-xl shadow-xl border border-default-200 z-50">
       {submissionResponse?.success ? (
-        <SuccessDisplay 
-          response={submissionResponse}
-          onClose={handleClose}
-        />
+        <SuccessDisplay response={submissionResponse} onClose={handleClose} />
       ) : (
         <>
           {/* Fixed Header */}
@@ -58,15 +53,15 @@ const InvoisModalContainer: React.FC<InvoisModalContainerProps> = ({
             {!loginResponse ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <LoadingSpinner hideText/>
-                  <p className="mt-2 text-default-600">Connecting to MyInvois API...</p>
+                  <LoadingSpinner hideText />
+                  <p className="mt-2 text-default-600">
+                    Connecting to MyInvois API...
+                  </p>
                 </div>
               </div>
             ) : (
               <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
-                <div className="p-4">
-                  {children}
-                </div>
+                <div className="p-4">{children}</div>
               </div>
             )}
           </div>
