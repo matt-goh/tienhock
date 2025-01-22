@@ -511,19 +511,18 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             },
           ],
           AccountingCustomerParty: [
-            // needs rework
             {
               Party: [
                 {
                   PostalAddress: [
                     {
-                      CityName: [{ _: "Kota Kinabalu" }],
-                      PostalZone: [{ _: "50480" }],
-                      CountrySubentityCode: [{ _: "12" }],
+                      CityName: [{ _: "" }], // change: customer.city (eg. KOTA KINABALU)
+                      PostalZone: [{ _: "" }],
+                      CountrySubentityCode: [{ _: "" }], // change:customer.state (eg. 12)
                       AddressLine: [
-                        { Line: [{ _: "Lot 66" }] },
-                        { Line: [{ _: "Bangunan Merdeka" }] },
-                        { Line: [{ _: "Persiaran Jaya" }] },
+                        { Line: [{ _: "" }] }, // change: customer.address
+                        { Line: [{ _: "" }] },
+                        { Line: [{ _: "" }] },
                       ],
                       Country: [
                         {
@@ -540,19 +539,19 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                   ],
                   PartyLegalEntity: [
                     {
-                      RegistrationName: [{ _: "Timothy Goh Vun Bing" }], // Recipient name
+                      RegistrationName: [{ _: "Timothy Goh Vun Bing" }], // change: customer.name
                     },
                   ],
                   PartyIdentification: [
-                    { ID: [{ _: "IG28358919010", schemeID: "TIN" }] }, // Recipient TIN
-                    { ID: [{ _: "981223125953", schemeID: "NRIC" }] }, //ubl:Invoice / cac:AccountingSupplierParty / cac:Party / cac:PartyIdentification / cbc:ID [@schemeID=’NRIC’] OR / ubl:Invoice / cac:AccountingSupplierParty / cac:Party / cac:PartyIdentification / cbc:ID [@schemeID=’BRN’]
+                    { ID: [{ _: "IG28358919010", schemeID: "TIN" }] }, // change: customer.tin_number
+                    { ID: [{ _: "981223125953", schemeID: "NRIC" }] }, // change: customer.id_number and customer.id_type for schemeID
                     { ID: [{ _: "-", schemeID: "SST" }] },
                     { ID: [{ _: "-", schemeID: "TTX" }] },
                   ],
                   Contact: [
                     {
-                      Telephone: [{ _: "+60-172464931" }],
-                      ElectronicMail: [{ _: "gvbtim98@gmail.com" }],
+                      Telephone: [{ _: "+60-172464931" }], // change: customer.phone_number (format it into "+60-123456789")
+                      ElectronicMail: [{ _: "gvbtim98@gmail.com" }], // change: customer.email
                     },
                   ],
                 },
@@ -560,18 +559,17 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
             },
           ],
           Delivery: [
-            // needs rework
             {
               DeliveryParty: [
                 {
                   PartyLegalEntity: [
-                    { RegistrationName: [{ _: "Timothy Goh Vun Bing" }] }, // Recipient name
+                    { RegistrationName: [{ _: "Timothy Goh Vun Bing" }] }, // change: customer.name
                   ],
                   PostalAddress: [
                     {
                       CityName: [{ _: "" }],
                       PostalZone: [{ _: "" }],
-                      CountrySubentityCode: [{ _: "17" }],
+                      CountrySubentityCode: [{ _: "17" }], // change: customer.state
                       AddressLine: [
                         { Line: [{ _: "" }] },
                         { Line: [{ _: "" }] },
@@ -594,7 +592,7 @@ export function transformInvoiceToMyInvoisFormat(rawInvoiceData) {
                     {
                       ID: [
                         {
-                          _: "IG28358919010", // Recipient TIN
+                          _: "IG28358919010", // change: customer.tin_number
                           schemeID: "TIN",
                         },
                       ],
