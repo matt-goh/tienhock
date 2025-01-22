@@ -12,10 +12,7 @@ import {
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import {
-  isValidationRequired,
-  validateCustomerIdentity,
-} from "../../routes/sales/invoices/customerValidation";
+import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
 
 interface SelectOption {
   id: string;
@@ -72,6 +69,7 @@ const CustomerFormPage: React.FC = () => {
   ];
 
   const idTypeOptions = [
+    { id: "Select", name: "Select" },
     { id: "BRN", name: "BRN" },
     { id: "NRIC", name: "NRIC" },
     { id: "PASSPORT", name: "PASSPORT" },
@@ -196,16 +194,50 @@ const CustomerFormPage: React.FC = () => {
       return;
     }
 
+    // Check if any of the validation fields has input
+    const hasIdType = formData.id_type && formData.id_type !== "Select";
+    const hasIdNumber = Boolean(formData.id_number);
+    const hasTinNumber = Boolean(formData.tin_number);
+
     setIsSaving(true);
 
     try {
-      // Only perform validation if all required fields are present
-      if (isValidationRequired(formData)) {
-        const validationResult = await validateCustomerIdentity(formData);
-
-        if (!validationResult.isValid) {
+      // If any field has input, all fields are required
+      if (hasIdType || hasIdNumber || hasTinNumber) {
+        if (!hasIdType) {
+          toast.error(
+            "ID Type is required when providing identification details"
+          );
           setIsSaving(false);
           return;
+        }
+        if (!hasIdNumber) {
+          toast.error(
+            "ID Number is required when providing identification details"
+          );
+          setIsSaving(false);
+          return;
+        }
+        if (!hasTinNumber) {
+          toast.error(
+            "TIN Number is required when providing identification details"
+          );
+          setIsSaving(false);
+          return;
+        }
+
+        // Check if data is already verified (exists and unchanged)
+        const isDataVerified =
+          isEditMode &&
+          isValidationDataUnchanged(formData, initialFormDataRef.current);
+
+        // Only validate if data has changed or is new
+        if (!isDataVerified) {
+          const validationResult = await validateCustomerIdentity(formData);
+          if (!validationResult.isValid) {
+            setIsSaving(false);
+            return;
+          }
         }
       }
 
@@ -236,6 +268,22 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
+  const isValidationDataUnchanged = (
+    currentData: Customer,
+    initialData: Customer
+  ): boolean => {
+    return (
+      currentData.id_type === initialData.id_type &&
+      currentData.id_number === initialData.id_number &&
+      currentData.tin_number === initialData.tin_number &&
+      // Make sure all values exist
+      Boolean(currentData.id_type) &&
+      currentData.id_type !== "Select" &&
+      Boolean(currentData.id_number) &&
+      Boolean(currentData.tin_number)
+    );
+  };
+
   // Render helpers
   const renderInput = (
     name: keyof Customer,
@@ -249,8 +297,11 @@ const CustomerFormPage: React.FC = () => {
       return val.toString();
     })();
 
-    // Determine if this field should show verification status
+    // Determine if this field should have verification capability
     const showStatus = name === "id_number" || name === "tin_number";
+    const isVerified =
+      isEditMode &&
+      isValidationDataUnchanged(formData, initialFormDataRef.current);
 
     return showStatus ? (
       <FormInputWithStatus
@@ -261,9 +312,7 @@ const CustomerFormPage: React.FC = () => {
         type={type}
         placeholder={placeholder}
         showStatus={true}
-        isVerified={Boolean(
-          formData.id_type && formData.id_number && formData.tin_number
-        )}
+        isVerified={isVerified}
       />
     ) : (
       <FormInput

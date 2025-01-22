@@ -218,10 +218,6 @@ const InvoisPage: React.FC = () => {
       filtered = filtered.filter((invoice) =>
         customerSet.has(invoice.customername)
       );
-      console.log("After customer filter:", {
-        selectedCustomers: filters.customerFilter,
-        filteredCount: filtered.length,
-      });
     }
 
     // Salesman filter

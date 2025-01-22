@@ -8,7 +8,6 @@ import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import {
-  isValidationRequired,
   validateCustomerIdentity,
 } from "../../routes/sales/invoices/customerValidation";
 
@@ -58,6 +57,7 @@ const CustomerAddPage: React.FC = () => {
   ];
 
   const idTypeOptions = [
+    { id: "Select", name: "Select" },
     { id: "BRN", name: "BRN" },
     { id: "NRIC", name: "NRIC" },
     { id: "PASSPORT", name: "PASSPORT" },
@@ -133,33 +133,76 @@ const CustomerAddPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // First check if form passes basic validation
     if (!validateForm()) {
       return;
     }
 
-    setIsSaving(true);
+    // Check if any of the validation fields has input
+    const hasIdType = formData.id_type && formData.id_type !== "Select";
+    const hasIdNumber = Boolean(formData.id_number);
+    const hasTinNumber = Boolean(formData.tin_number);
 
-    try {
-      // Only perform validation if all required fields are present
-      if (isValidationRequired(formData)) {
+    // If any field has input, all fields are required
+    if (hasIdType || hasIdNumber || hasTinNumber) {
+      if (!hasIdType) {
+        toast.error(
+          "ID Type is required when providing identification details"
+        );
+        return;
+      }
+      if (!hasIdNumber) {
+        toast.error(
+          "ID Number is required when providing identification details"
+        );
+        return;
+      }
+      if (!hasTinNumber) {
+        toast.error(
+          "TIN Number is required when providing identification details"
+        );
+        return;
+      }
+
+      // If all required fields are present, proceed with validation
+      setIsSaving(true);
+      try {
         const validationResult = await validateCustomerIdentity(formData);
 
         if (!validationResult.isValid) {
           setIsSaving(false);
           return;
         }
-      }
 
-      // Proceed with creating the customer if validation passed
-      await api.post("/api/customers", formData);
-      toast.success("Customer created successfully!");
-      navigate("/catalogue/customer");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
-    } finally {
-      setIsSaving(false);
+        // Proceed with creating the customer if validation passed
+        await api.post("/api/customers", formData);
+        toast.success("Customer created successfully!");
+        navigate("/catalogue/customer");
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred"
+        );
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      // No validation fields have input, proceed with normal save
+      setIsSaving(true);
+      try {
+        await api.post("/api/customers", formData);
+        toast.success("Customer created successfully!");
+        navigate("/catalogue/customer");
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred"
+        );
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 

@@ -12,6 +12,7 @@ import backupRouter from "./admin/backup.js";
 import sidebarRouter from "./user/sidebar.js";
 
 // Catalogue routes
+import customerValidationRouter from "./catalogue/customer-validation.js";
 import jobCategoriesRouter from "./catalogue/job-categories.js";
 import jobDetailsRouter from "./catalogue/job-details.js";
 import customerRouter from "./catalogue/customers.js";
@@ -82,6 +83,10 @@ export default function setupRoutes(app, pool) {
 
   // Catalogue - Main routes
   app.use("/api/staffs", staffRouter(pool));
+  app.use(
+    "/api/customer-validation",
+    customerValidationRouter(pool, myInvoisConfig)
+  );
   app.use("/api/customers", customerRouter(pool));
   app.use("/api/products", productRouter(pool));
   app.use("/api/taxes", taxRouter(pool));
