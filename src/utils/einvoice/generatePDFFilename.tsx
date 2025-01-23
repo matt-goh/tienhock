@@ -1,4 +1,4 @@
-import { InvoiceData } from "../../../types/types";
+import { InvoiceData } from "../../types/types";
 
 export const generatePDFFilename = (invoices: InvoiceData[]): string => {
   if (!invoices || invoices.length === 0) {

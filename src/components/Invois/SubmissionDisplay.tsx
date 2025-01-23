@@ -71,7 +71,7 @@ const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
     <div className="bg-white border border-default-200 rounded-lg mt-4">
       <div className="px-4 py-3 border-b border-default-200">
         <h3 className="font-medium text-default-800">
-          Validation Results ({Object.keys(documents).length})
+          Results ({Object.keys(documents).length})
         </h3>
       </div>
       <div className="divide-y divide-default-200 max-h-[300px] overflow-y-auto">

@@ -1,6 +1,6 @@
 import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import { InvoiceData, OrderDetail } from "../../../types/types";
+import { InvoiceData, OrderDetail } from "../../types/types";
 
 interface InvoisPDFProps {
   invoices: InvoiceData[];
