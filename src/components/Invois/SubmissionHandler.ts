@@ -234,13 +234,19 @@ export class SubmissionHandler {
     this.tracker.processingUpdates.push({
       timestamp,
       status: response,
-      affectedDocuments: response.documentSummary.map((doc) => doc.internalId),
+      // Filter out undefined values and ensure string type
+      affectedDocuments: response.documentSummary
+        .map((doc) => doc.internalId)
+        .filter((id): id is string => id !== undefined),
     });
 
     // Update status for each document in the summary
     response.documentSummary.forEach((doc) => {
-      const status = this.mapApiStatus(doc.status);
-      this.updateDocumentStatus(doc.internalId, status, { summary: doc });
+      if (doc.internalId) {
+        // Only process if internalId exists
+        const status = this.mapApiStatus(doc.status);
+        this.updateDocumentStatus(doc.internalId, status, { summary: doc });
+      }
     });
 
     // Update overall status

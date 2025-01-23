@@ -90,31 +90,34 @@ export interface InitialSubmissionResponse {
   submissionUid: string;
   acceptedDocuments: AcceptedDocument[];
   rejectedDocuments: RejectedDocument[];
+  documentCount: number;
+  dateTimeReceived: string;
+  overallStatus: string;
 }
 
 export interface DocumentSummaryStatus {
-  uuid: string;
-  submissionUid: string;
-  longId: string;
-  internalId: string; // This is the invoice number
-  typeName: string;
-  typeVersionName: string;
-  issuerTin: string;
-  issuerName: string;
-  receiverId: string;
-  receiverName: string;
-  dateTimeIssued: string;
-  dateTimeReceived: string;
-  dateTimeValidated: string | null;
-  totalPayableAmount: number;
-  totalExcludingTax: number;
-  totalDiscount: number;
-  totalNetAmount: number;
+  uuid?: string;
+  submissionUid?: string;
+  longId?: string;
+  internalId?: string; // This is the invoice number
+  typeName?: string;
+  typeVersionName?: string;
+  issuerTin?: string;
+  issuerName?: string;
+  receiverId?: string;
+  receiverName?: string;
+  dateTimeIssued?: string;
+  dateTimeReceived?: string;
+  dateTimeValidated?: string | null;
+  totalPayableAmount?: number;
+  totalExcludingTax?: number;
+  totalDiscount?: number;
+  totalNetAmount?: number;
   status: "Submitted" | "Valid" | "Invalid" | "Rejected";
-  cancelDateTime: string | null;
-  rejectRequestDateTime: string | null;
-  documentStatusReason: string | null;
-  createdByUserId: string;
+  cancelDateTime?: string | null;
+  rejectRequestDateTime?: string | null;
+  documentStatusReason?: string | null;
+  createdByUserId?: string;
 }
 
 export interface ProcessingStatusResponse {
