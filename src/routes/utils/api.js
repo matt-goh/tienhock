@@ -5,12 +5,6 @@ import { API_BASE_URL } from "../../configs/config.js";
 const handleResponse = async (response) => {
   const data = await response.json();
 
-  if (!response.ok) {
-    const error = new Error(data.message || "API request failed");
-    Object.assign(error, data);
-    throw error;
-  }
-
   return data;
 };
 
