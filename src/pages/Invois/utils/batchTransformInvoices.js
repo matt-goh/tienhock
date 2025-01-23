@@ -1,14 +1,14 @@
 // batchTransformInvoices.js
-import { transformInvoiceToMyInvoisFormat } from './transformInvoiceData';
+import { transformInvoiceToMyInvoisFormat } from "./transformInvoiceData";
 
 export async function batchTransformInvoices(invoices) {
   if (!Array.isArray(invoices)) {
-    throw new Error('Input must be an array of invoices');
+    throw new Error("Input must be an array of invoices");
   }
 
   const results = {
     transformedInvoices: [],
-    errors: []
+    errors: [],
   };
 
   for (let i = 0; i < invoices.length; i++) {
@@ -18,14 +18,17 @@ export async function batchTransformInvoices(invoices) {
     } catch (error) {
       results.errors.push({
         invoiceNo: invoices[i]?.invoiceno || `Invoice at index ${i}`,
-        error: error.message
+        error: error.message,
       });
     }
   }
 
   // If no invoices were successfully transformed, throw an error
   if (results.transformedInvoices.length === 0) {
-    throw new Error(`Failed to transform any invoices. Errors: ${JSON.stringify(results.errors)}`);
+    const error = new Error(`Failed to transform any invoices`);
+    error.errors = results.errors; // Attach individual errors
+    error.type = "batch_validation";
+    throw error;
   }
 
   // Return both successful transformations and any errors

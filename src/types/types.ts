@@ -61,11 +61,42 @@ export interface Staff {
   job: string[];
 }
 
-export interface DocumentSummary {
+export interface ValidationDetail {
+  code: string;
+  message: string;
+  target?: string;
+  propertyPath?: string;
+}
+
+// Document response types
+export interface DocumentBase {
+  invoiceCodeNumber: string;
+  uuid?: string;
+}
+
+export interface AcceptedDocument extends DocumentBase {
+  uuid: string;
+  status: "ACCEPTED";
+}
+
+export interface RejectedDocument {
+  invoiceCodeNumber: string;
+  status: "REJECTED";
+  error: ValidationDetail;
+}
+
+// API Response types
+export interface InitialSubmissionResponse {
+  submissionUid: string;
+  acceptedDocuments: AcceptedDocument[];
+  rejectedDocuments: RejectedDocument[];
+}
+
+export interface DocumentSummaryStatus {
   uuid: string;
   submissionUid: string;
   longId: string;
-  internalId: string;
+  internalId: string; // This is the invoice number
   typeName: string;
   typeVersionName: string;
   issuerTin: string;
@@ -74,70 +105,115 @@ export interface DocumentSummary {
   receiverName: string;
   dateTimeIssued: string;
   dateTimeReceived: string;
-  dateTimeValidated: string;
+  dateTimeValidated: string | null;
   totalPayableAmount: number;
   totalExcludingTax: number;
   totalDiscount: number;
   totalNetAmount: number;
-  status: string;
+  status: "Submitted" | "Valid" | "Invalid" | "Rejected";
   cancelDateTime: string | null;
   rejectRequestDateTime: string | null;
   documentStatusReason: string | null;
   createdByUserId: string;
 }
 
-export interface SubmissionResponse {
-  success: boolean;
-  message: string;
-  submissionInfo?: {
-    submissionUid: string;
-    documentCount: number;
-    dateTimeReceived: string;
-    overallStatus: string;
-  };
-  acceptedDocuments: DocumentSummary[];
-  rejectedDocuments: Array<{
-    invoiceCodeNumber: string;
-    error: any;
-  }>;
+export interface ProcessingStatusResponse {
+  submissionUid: string;
+  documentCount: number;
+  dateTimeReceived: string;
+  overallStatus: "InProgress" | "Valid" | "Invalid" | "Rejected" | "Partial";
+  documentSummary: DocumentSummaryStatus[];
 }
 
+// Submission tracking types
+export interface BatchStatistics {
+  totalDocuments: number;
+  processed: number;
+  accepted: number;
+  rejected: number;
+  processing: number;
+  completed: number;
+}
+
+export interface DocumentStatus {
+  invoiceNo: string;
+  currentStatus:
+    | "ACCEPTED"
+    | "REJECTED"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "FAILED";
+  uuid?: string;
+  errors?: ValidationDetail[];
+  summary?: DocumentSummaryStatus;
+}
+
+export interface SubmissionTracker {
+  submissionUid: string;
+  batchInfo: {
+    size: number;
+    submittedAt: string;
+    completedAt?: string;
+  };
+  statistics: BatchStatistics;
+  documents: {
+    [invoiceNo: string]: DocumentStatus;
+  };
+  processingUpdates: Array<{
+    timestamp: string;
+    status: ProcessingStatusResponse;
+    affectedDocuments: string[]; // invoice numbers
+  }>;
+  initialResponse?: InitialSubmissionResponse;
+  finalStatus?: ProcessingStatusResponse;
+  overallStatus: "InProgress" | "Valid" | "Invalid" | "Rejected" | "Partial";
+}
+
+// UI State types
 export type SubmissionPhase =
   | "INITIALIZATION"
   | "VALIDATION"
   | "SUBMISSION"
-  | "CONFIRMATION"
-  | "COOLDOWN";
+  | "PROCESSING"
+  | "COMPLETED";
 
-// Existing types remain the same
-export interface ValidationError {
-  invoiceNo: string;
-  invoiceId?: string;
-  errors: string[];
-  validationErrors?: string[]; // Added to handle nested validation errors
-  type?: "validation" | "submission"; // Added type field
+export interface SubmissionState {
+  phase: SubmissionPhase;
+  tracker: SubmissionTracker | null;
+  error?: {
+    type: "SYSTEM" | "API" | "VALIDATION";
+    message: string;
+    details?: any;
+  };
 }
 
-export interface FailedInvoice {
-  invoiceId?: string;
-  invoiceNo: string;
-  error?: string;
-  errors?: string[] | string;
-  type?: "validation" | "submission";
+// Display component props
+export interface SubmissionDisplayProps {
+  state: SubmissionState;
+  onClose: () => void;
+  showDetails?: boolean;
 }
 
-export interface MyInvoisError {
-  success?: boolean;
-  message: string;
-  error?: string;
-  details?: any;
-  validationErrors?: ValidationError[];
+export interface BatchStatusDisplayProps {
+  statistics: BatchStatistics;
+  phase: SubmissionPhase;
+  showProgress?: boolean;
+}
+
+export interface DocumentListDisplayProps {
+  documents: {
+    [invoiceNo: string]: DocumentStatus;
+  };
+  filter?: "all" | "accepted" | "rejected" | "processing" | "completed";
+  showDetails?: boolean;
 }
 
 export interface ErrorDisplayProps {
-  error: MyInvoisError | string;
-  failedInvoices?: FailedInvoice[];
-  validationErrors?: ValidationError[];
+  documents: {
+    [invoiceNo: string]: DocumentStatus;
+  };
+  statistics: BatchStatistics;
+  showValidationDetails?: boolean;
 }
 
 export interface NormalizedError {

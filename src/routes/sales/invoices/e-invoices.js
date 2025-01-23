@@ -98,16 +98,9 @@ export default function (pool, config) {
 
       console.log(`Processing ${invoiceIds.length} invoices in batch`);
 
-      const results = {
-        success: false,
-        message: "",
-        submissionResults: [],
-        failedInvoices: [],
-        validationErrors: [],
-      };
-
       // Process all invoices in the batch
       const transformedInvoices = [];
+      const validationErrors = [];
 
       // 1. Fetch and transform all invoices
       for (const invoiceId of invoiceIds) {
@@ -134,101 +127,58 @@ export default function (pool, config) {
         } catch (error) {
           console.log("Caught transformation error:", error);
 
-          if (error.validationErrors) {
-            results.validationErrors.push({
-              invoiceId,
-              invoiceNo: error.invoiceNo,
-              errors: error.validationErrors,
-              type: "validation",
-            });
-          } else {
-            results.failedInvoices.push({
-              invoiceId,
-              invoiceNo: error.invoiceNo || invoiceId,
-              error: error.message,
-              type: "transformation",
-            });
-          }
+          // Handle validation errors
+          validationErrors.push({
+            invoiceCodeNumber: error.invoiceNo || invoiceId,
+            status: "REJECTED",
+            error: {
+              code: error.code || "VALIDATION_ERROR",
+              message: error.message || error.toString(),
+            },
+          });
         }
+      }
+
+      // If we have validation errors, return them immediately
+      if (validationErrors.length > 0) {
+        console.log("Validation errors found:", validationErrors);
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed for submitted documents",
+          shouldStopAtValidation: true,
+          rejectedDocuments: validationErrors,
+          overallStatus: "Invalid",
+        });
       }
 
       // If no invoices were successfully transformed
       if (transformedInvoices.length === 0) {
-        const allErrors = [
-          ...results.validationErrors,
-          ...results.failedInvoices.map((error) => ({
-            invoiceNo: error.invoiceNo,
-            errors: Array.isArray(error.errors)
-              ? error.errors
-              : [error.error || error.errors],
-            type: "validation",
-          })),
-        ];
-
-        const errorResponse = {
+        return res.status(400).json({
           success: false,
-          message:
-            allErrors.length > 0
-              ? `${allErrors.length} invoice(s) failed validation`
-              : "Failed to transform any invoices",
-          validationErrors: allErrors,
+          message: "No valid invoices to process",
           shouldStopAtValidation: true,
-        };
-
-        return res.status(400).json(errorResponse);
+          rejectedDocuments: [],
+          overallStatus: "Invalid",
+        });
       }
 
       console.log(
         `Successfully transformed ${transformedInvoices.length} invoices, proceeding to submission`
       );
 
-      // Only proceed with submission if there are valid invoices
+      // Proceed with actual submission if no validation errors
       const submissionResult = await submissionHandler.submitAndPollDocuments(
         transformedInvoices
       );
-      console.log("Submission result:", submissionResult);
-
-      if (submissionResult.success) {
-        results.success = true;
-        results.message = `Successfully submitted ${submissionResult.acceptedDocuments.length} invoice(s)`;
-        results.submissionResults.push({
-          submissionUid: submissionResult.submissionUid,
-          acceptedDocuments: submissionResult.acceptedDocuments,
-        });
-      }
-
-      if (submissionResult.rejectedDocuments?.length > 0) {
-        results.failedInvoices.push(
-          ...submissionResult.rejectedDocuments.map((doc) => ({
-            invoiceNo: doc.invoiceNo || doc.invoiceId,
-            errors: Array.isArray(doc.errors)
-              ? doc.errors
-              : [doc.error || doc.errors || "Unknown error"],
-            type: "submission",
-          }))
-        );
-      }
-
-      return res.json({
-        ...results,
-        validationErrors: [
-          ...results.validationErrors,
-          ...results.failedInvoices.map((error) => ({
-            invoiceNo: error.invoiceNo,
-            errors: Array.isArray(error.errors) ? error.errors : [error.errors],
-            type: "validation",
-          })),
-        ],
-      });
+      return res.json(submissionResult);
     } catch (error) {
       console.error("Error submitting batch:", error);
       return res.status(500).json({
         success: false,
-        message: "Failed to process batch submission",
-        error: error.message,
-        validationErrors: [],
-        failedInvoices: [],
+        message: error.message || "Failed to process batch submission",
         shouldStopAtValidation: true,
+        rejectedDocuments: [],
+        overallStatus: "Invalid",
       });
     }
   });
