@@ -210,6 +210,48 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         invoiceIds: selectedInvoices.map((invoice) => invoice.id),
       });
 
+      // Handle response in handleSubmitInvoice
+      if (response.shouldStopAtValidation) {
+        const documents: Record<string, DocumentStatus> = {};
+        response.rejectedDocuments.forEach((doc: any) => {
+          documents[doc.invoiceCodeNumber] = {
+            invoiceNo: doc.invoiceCodeNumber,
+            currentStatus: "REJECTED",
+            errors: [
+              {
+                code: doc.error.code,
+                message: doc.error.message,
+                details: doc.error.details,
+              },
+            ],
+          };
+        });
+
+        setSubmissionState({
+          phase: "COMPLETED",
+          tracker: {
+            submissionUid: "VALIDATION_FAILED",
+            batchInfo: {
+              size: selectedInvoices.length,
+              submittedAt: new Date().toISOString(),
+              completedAt: new Date().toISOString(),
+            },
+            statistics: {
+              totalDocuments: selectedInvoices.length,
+              processed: selectedInvoices.length,
+              accepted: 0,
+              rejected: selectedInvoices.length,
+              processing: 0,
+              completed: 0,
+            },
+            documents,
+            processingUpdates: [],
+            overallStatus: "Invalid",
+          },
+        });
+        return;
+      }
+
       const documents: Record<string, DocumentStatus> = {};
 
       // Handle successful submissions

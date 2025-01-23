@@ -112,18 +112,31 @@ export default function (pool, config) {
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
+          // Handle validation errors from transformInvoiceToMyInvoisFormat
+          const errorDetails = error.details || [];
           validationErrors.push({
             invoiceCodeNumber: error.invoiceNo || invoiceId,
-            status: "REJECTED",
             error: {
-              code: error.code || "VALIDATION_ERROR",
-              message: error.message || error.toString(),
+              code: error.code || "2",
+              message: "Validation Error",
+              target: error.invoiceNo || invoiceId,
+              details:
+                errorDetails.length > 0
+                  ? errorDetails
+                  : [
+                      {
+                        code: error.code || "CF001",
+                        message: error.message,
+                        target: "document",
+                        propertyPath: error.propertyPath,
+                      },
+                    ],
             },
           });
         }
       }
 
-      // Handle validation errors
+      // If there are any validation errors, return them
       if (validationErrors.length > 0) {
         return res.status(400).json({
           success: false,
@@ -140,7 +153,7 @@ export default function (pool, config) {
           success: false,
           message: "No valid invoices to process",
           shouldStopAtValidation: true,
-          rejectedDocuments: [],
+          rejectedDocuments: validationErrors,
           overallStatus: "Invalid",
         });
       }
@@ -151,11 +164,21 @@ export default function (pool, config) {
       );
       return res.json(submissionResult);
     } catch (error) {
+      console.error("Submission error:", error);
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to process batch submission",
         shouldStopAtValidation: true,
-        rejectedDocuments: [],
+        rejectedDocuments: [
+          {
+            invoiceCodeNumber: error.invoiceNo || "unknown",
+            error: {
+              code: error.code || "2",
+              message: error.message || "Unknown error occurred",
+              details: error.details || [],
+            },
+          },
+        ],
         overallStatus: "Invalid",
       });
     }
