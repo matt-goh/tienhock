@@ -3,8 +3,8 @@ import {
   InvoiceData,
   InvoiceFilterOptions,
   OrderDetail,
-} from "../../../types/types";
-import { api } from "../../../routes/utils/api";
+} from "../../types/types";
+import { api } from "../../routes/utils/api";
 
 let invoices: InvoiceData[] = [];
 

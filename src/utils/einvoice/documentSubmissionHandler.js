@@ -10,43 +10,61 @@ class DocumentSubmissionHandler {
 
   async submitAndPollDocuments(transformedInvoices) {
     try {
-      // Handle both single and multiple invoice scenarios
-      const invoices = Array.isArray(transformedInvoices) 
-        ? transformedInvoices 
-        : [transformedInvoices];
-
-      console.log('Preparing request body for', invoices.length, 'invoices');
+      const invoices = Array.isArray(transformedInvoices) ? transformedInvoices : [transformedInvoices];
       const requestBody = this.prepareRequestBody(invoices);
-
       const submissionResponse = await this.apiClient.makeApiCall(
-        'POST', 
-        '/api/v1.0/documentsubmissions', 
+        "POST",
+        "/api/v1.0/documentsubmissions",
         requestBody
       );
-      
-      // Validate submission response
-      if (!submissionResponse || !submissionResponse.submissionUid) {
-        throw new Error('Invalid submission response: No submissionUid received');
+  
+      const hasValidInvoices = submissionResponse.acceptedDocuments?.length > 0;
+      const hasInvalidInvoices = submissionResponse.rejectedDocuments?.length > 0;
+  
+      // Case 1: All valid invoices
+      if (hasValidInvoices && !hasInvalidInvoices) {
+        const finalStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
+        return {
+          success: true,
+          submissionUid: submissionResponse.submissionUid,
+          acceptedDocuments: finalStatus.documentSummary,
+          rejectedDocuments: [],
+          documentCount: invoices.length,
+          dateTimeReceived: finalStatus.dateTimeReceived,
+          overallStatus: finalStatus.overallStatus
+        };
       }
-
-      // Poll for final status
-      const finalStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
-      
-      // Return combined results
-      return {
-        success: finalStatus.overallStatus === 'Valid',
-        message: finalStatus.overallStatus === 'Valid' 
-          ? `Successfully submitted ${finalStatus.documentSummary.length} document(s)` 
-          : 'Document submission failed',
-        submissionUid: finalStatus.submissionUid,
-        acceptedDocuments: finalStatus.documentSummary || [],
-        documentCount: finalStatus.documentCount,
-        dateTimeReceived: finalStatus.dateTimeReceived,
-        overallStatus: finalStatus.overallStatus,
-        rejectedDocuments: submissionResponse.rejectedDocuments || []
-      };
+  
+      // Case 2: All invalid invoices
+      if (!hasValidInvoices && hasInvalidInvoices) {
+        return {
+          success: false,
+          submissionUid: null,
+          acceptedDocuments: [],
+          rejectedDocuments: submissionResponse.rejectedDocuments,
+          documentCount: invoices.length,
+          dateTimeReceived: new Date().toISOString(),
+          overallStatus: "Invalid"
+        };
+      }
+  
+      // Case 3: Mixed valid and invalid
+      if (hasValidInvoices && hasInvalidInvoices) {
+        const finalStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
+        return {
+          success: true,
+          submissionUid: submissionResponse.submissionUid,
+          acceptedDocuments: finalStatus.documentSummary,
+          rejectedDocuments: submissionResponse.rejectedDocuments,
+          documentCount: invoices.length,
+          dateTimeReceived: finalStatus.dateTimeReceived,
+          overallStatus: "Partial"
+        };
+      }
+  
+      throw new Error("Invalid submission response: No documents were processed");
     } catch (error) {
-      console.error('Error in document submission process:', error);
+      console.error("Error in document submission process:", error);
       throw error;
     }
   }

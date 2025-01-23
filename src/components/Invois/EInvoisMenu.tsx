@@ -1,5 +1,5 @@
 // src/components/Invoice/EInvoisMenu.tsx
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Button from "../Button";
 import toast from "react-hot-toast";
 import { IconFileInvoice, IconInfoCircle } from "@tabler/icons-react";
@@ -10,7 +10,6 @@ import {
   SubmissionState,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
-import { SubmissionHandler } from "./SubmissionHandler";
 import InvoisModalContainer from "./InvoisModalContainer";
 import { SubmissionDisplay } from "./SubmissionDisplay";
 
@@ -210,10 +209,27 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         invoiceIds: selectedInvoices.map((invoice) => invoice.id),
       });
 
-      // Handle response in handleSubmitInvoice
-      if (response.shouldStopAtValidation) {
-        const documents: Record<string, DocumentStatus> = {};
-        response.rejectedDocuments.forEach((doc: any) => {
+      const documents: Record<string, DocumentStatus> = {};
+
+      // Handle accepted documents
+      response.acceptedDocuments?.forEach((doc: any) => {
+        if (doc.internalId) {
+          // Make sure we have a valid ID
+          documents[doc.internalId] = {
+            invoiceNo: doc.internalId,
+            currentStatus: "COMPLETED",
+            summary: {
+              status: doc.status || "Valid",
+              receiverName: doc.receiverName,
+            },
+          };
+        }
+      });
+
+      // Handle rejected documents
+      response.rejectedDocuments?.forEach((doc: any) => {
+        if (doc.invoiceCodeNumber) {
+          // Make sure we have a valid ID
           documents[doc.invoiceCodeNumber] = {
             invoiceNo: doc.invoiceCodeNumber,
             currentStatus: "REJECTED",
@@ -221,64 +237,33 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
               {
                 code: doc.error.code,
                 message: doc.error.message,
-                details: doc.error.details,
+                details: doc.error.details || [],
               },
             ],
           };
-        });
-
-        setSubmissionState({
-          phase: "COMPLETED",
-          tracker: {
-            submissionUid: "VALIDATION_FAILED",
-            batchInfo: {
-              size: selectedInvoices.length,
-              submittedAt: new Date().toISOString(),
-              completedAt: new Date().toISOString(),
-            },
-            statistics: {
-              totalDocuments: selectedInvoices.length,
-              processed: selectedInvoices.length,
-              accepted: 0,
-              rejected: selectedInvoices.length,
-              processing: 0,
-              completed: 0,
-            },
-            documents,
-            processingUpdates: [],
-            overallStatus: "Invalid",
-          },
-        });
-        return;
-      }
-
-      const documents: Record<string, DocumentStatus> = {};
-
-      // Handle successful submissions
-      response.acceptedDocuments?.forEach((doc: any) => {
-        documents[doc.internalId] = {
-          invoiceNo: doc.internalId,
-          currentStatus: "COMPLETED",
-          summary: {
-            status: doc.status,
-            receiverName: doc.receiverName,
-          },
-        };
+        }
       });
 
-      // Handle rejected documents
-      response.rejectedDocuments?.forEach((doc: any) => {
-        documents[doc.invoiceCodeNumber] = {
-          invoiceNo: doc.invoiceCodeNumber,
-          currentStatus: "REJECTED",
-          errors: [
-            {
-              code: doc.error.code,
-              message: doc.error.message,
-            },
-          ],
-        };
+      // Ensure all selected invoices are accounted for in documents
+      selectedInvoices.forEach((invoice) => {
+        if (!documents[invoice.invoiceno]) {
+          // Add any missing invoices as rejected with unknown status
+          documents[invoice.invoiceno] = {
+            invoiceNo: invoice.invoiceno,
+            currentStatus: "REJECTED",
+            errors: [
+              {
+                code: "UNKNOWN",
+                message: "Processing failed",
+                details: [],
+              },
+            ],
+          };
+        }
       });
+
+      const acceptedCount = response.acceptedDocuments?.length || 0;
+      const rejectedCount = response.rejectedDocuments?.length || 0;
 
       setSubmissionState({
         phase: "COMPLETED",
@@ -291,17 +276,21 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
           },
           statistics: {
             totalDocuments: selectedInvoices.length,
-            processed:
-              (response.acceptedDocuments?.length || 0) +
-              (response.rejectedDocuments?.length || 0),
-            accepted: response.acceptedDocuments?.length || 0,
-            rejected: response.rejectedDocuments?.length || 0,
+            processed: acceptedCount + rejectedCount,
+            accepted: acceptedCount,
+            rejected: rejectedCount,
             processing: 0,
-            completed: response.acceptedDocuments?.length || 0,
+            completed: acceptedCount,
           },
           documents,
           processingUpdates: [],
-          overallStatus: response.overallStatus || "Invalid",
+          overallStatus:
+            response.overallStatus ||
+            (acceptedCount > 0 && rejectedCount > 0
+              ? "Partial"
+              : acceptedCount > 0
+              ? "Valid"
+              : "Invalid"),
         },
       });
     } catch (error: any) {
