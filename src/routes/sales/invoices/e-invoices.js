@@ -82,52 +82,36 @@ export default function (pool, config) {
   // Submit invoice to MyInvois
   router.post("/submit", async (req, res) => {
     try {
-      console.log("Starting batch invoice submission process");
       const { invoiceIds } = req.body;
 
-      if (
-        !invoiceIds ||
-        !Array.isArray(invoiceIds) ||
-        invoiceIds.length === 0
-      ) {
+      if (!invoiceIds?.length) {
         return res.status(400).json({
           success: false,
           message: "No invoice IDs provided for submission",
         });
       }
 
-      console.log(`Processing ${invoiceIds.length} invoices in batch`);
-
-      // Process all invoices in the batch
       const transformedInvoices = [];
       const validationErrors = [];
 
-      // 1. Fetch and transform all invoices
+      // Process invoices
       for (const invoiceId of invoiceIds) {
         try {
-          // Fetch invoice data from database
           const invoiceData = await fetchInvoiceFromDb(pool, invoiceId);
-
           if (!invoiceData) {
             throw new Error(`Invoice with ID ${invoiceId} not found`);
           }
 
-          // Fetch customer data
           const customerData = await fetchCustomerData(
             pool,
             invoiceData.customer
           );
-
-          // Transform invoice data to MyInvois format
           const transformedInvoice = await transformInvoiceToMyInvoisFormat(
             invoiceData,
             customerData
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
-          console.log("Caught transformation error:", error);
-
-          // Handle validation errors
           validationErrors.push({
             invoiceCodeNumber: error.invoiceNo || invoiceId,
             status: "REJECTED",
@@ -139,9 +123,8 @@ export default function (pool, config) {
         }
       }
 
-      // If we have validation errors, return them immediately
+      // Handle validation errors
       if (validationErrors.length > 0) {
-        console.log("Validation errors found:", validationErrors);
         return res.status(400).json({
           success: false,
           message: "Validation failed for submitted documents",
@@ -151,7 +134,7 @@ export default function (pool, config) {
         });
       }
 
-      // If no invoices were successfully transformed
+      // Handle no valid invoices
       if (transformedInvoices.length === 0) {
         return res.status(400).json({
           success: false,
@@ -162,17 +145,12 @@ export default function (pool, config) {
         });
       }
 
-      console.log(
-        `Successfully transformed ${transformedInvoices.length} invoices, proceeding to submission`
-      );
-
-      // Proceed with actual submission if no validation errors
+      // Submit valid invoices
       const submissionResult = await submissionHandler.submitAndPollDocuments(
         transformedInvoices
       );
       return res.json(submissionResult);
     } catch (error) {
-      console.error("Error submitting batch:", error);
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to process batch submission",

@@ -7,9 +7,7 @@ import {
   DocumentStatus,
   InvoiceData,
   LoginResponse,
-  RejectedDocument,
   SubmissionState,
-  SubmissionTracker,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import { SubmissionHandler } from "./SubmissionHandler";
@@ -102,16 +100,17 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   const [submissionState, setSubmissionState] =
     useState<SubmissionState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submissionHandler = useRef<SubmissionHandler | null>(null);
 
-  // Token validation and login handling
+  // Token validation
   const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
     if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
-    const expirationTime =
-      loginData.tokenCreationTime + loginData.tokenInfo.expiresIn * 1000;
-    return Date.now() < expirationTime;
+    return (
+      Date.now() <
+      loginData.tokenCreationTime + loginData.tokenInfo.expiresIn * 1000
+    );
   }, []);
 
+  // Handle login
   const connectToMyInvois = useCallback(async () => {
     const storedLoginData = localStorage.getItem("myInvoisLoginData");
     if (storedLoginData) {
@@ -125,10 +124,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     try {
       const data = await api.post("/api/einvoice/login");
       if (data.success && data.tokenInfo) {
-        const loginDataWithTime = {
-          ...data,
-          tokenCreationTime: Date.now(),
-        };
+        const loginDataWithTime = { ...data, tokenCreationTime: Date.now() };
         localStorage.setItem(
           "myInvoisLoginData",
           JSON.stringify(loginDataWithTime)
@@ -147,26 +143,18 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     }
   }, [isTokenValid]);
 
+  // Connect on open
   useEffect(() => {
-    if (isOpen) {
-      connectToMyInvois();
-    }
+    if (isOpen) connectToMyInvois();
   }, [isOpen, connectToMyInvois]);
 
   // Handle token expiration
   useEffect(() => {
-    const checkTokenValidity = () => {
-      if (loginResponse && !isTokenValid(loginResponse)) {
-        toast.error(
-          "Your session has expired. Please refresh the page to log in again."
-        );
-        setLoginResponse(null);
-        localStorage.removeItem("myInvoisLoginData");
-      }
-    };
-
-    const intervalId = setInterval(checkTokenValidity, 60000);
-    return () => clearInterval(intervalId);
+    if (loginResponse && !isTokenValid(loginResponse)) {
+      toast.error("Your session has expired. Please refresh the page.");
+      setLoginResponse(null);
+      localStorage.removeItem("myInvoisLoginData");
+    }
   }, [loginResponse, isTokenValid]);
 
   const handleSubmitInvoice = async () => {
@@ -188,77 +176,29 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         invoiceIds: selectedInvoices.map((invoice) => invoice.id),
       });
 
-      console.log("API Response:", response);
+      const documents: Record<string, DocumentStatus> = {};
 
-      // Handle validation response
-      if (response.rejectedDocuments?.length > 0) {
-        console.log(
-          "Processing rejected documents:",
-          response.rejectedDocuments
-        );
-
-        const documents: Record<string, DocumentStatus> = {};
-
-        response.rejectedDocuments.forEach((doc: any) => {
-          console.log("Processing document:", doc);
-          documents[doc.invoiceCodeNumber] = {
-            invoiceNo: doc.invoiceCodeNumber,
-            currentStatus: "REJECTED",
-            errors: [
-              {
-                code: doc.error.code,
-                message: doc.error.message,
-              },
-            ],
-          };
-        });
-
-        console.log("Processed documents:", documents);
-
-        const submissionState: SubmissionState = {
-          phase: "COMPLETED",
-          tracker: {
-            submissionUid: "VALIDATION_FAILED",
-            batchInfo: {
-              size: selectedInvoices.length,
-              submittedAt: new Date().toISOString(),
-              completedAt: new Date().toISOString(),
-            },
-            statistics: {
-              totalDocuments: selectedInvoices.length,
-              processed: response.rejectedDocuments.length,
-              accepted: 0,
-              rejected: response.rejectedDocuments.length,
-              processing: 0,
-              completed: 0,
-            },
-            documents,
-            processingUpdates: [],
-            overallStatus: "Invalid" as const,
+      // Handle successful submissions
+      response.acceptedDocuments?.forEach((doc: any) => {
+        documents[doc.internalId] = {
+          invoiceNo: doc.internalId,
+          currentStatus: "COMPLETED",
+          summary: {
+            status: doc.status,
+            receiverName: doc.receiverName,
           },
         };
+      });
 
-        console.log("Setting submission state:", submissionState);
-        setSubmissionState(submissionState);
-      } else {
-        // If there's an error but no rejected documents
-        if (!response.success) {
-          throw new Error(response.message || "Submission failed");
-        }
-      }
-    } catch (error: any) {
-      console.error("Submission Error:", error);
-
-      // Create error state for system errors
-      const documents: Record<string, DocumentStatus> = {};
-      selectedInvoices.forEach((invoice) => {
-        documents[invoice.invoiceno] = {
-          invoiceNo: invoice.invoiceno,
+      // Handle rejected documents
+      response.rejectedDocuments?.forEach((doc: any) => {
+        documents[doc.invoiceCodeNumber] = {
+          invoiceNo: doc.invoiceCodeNumber,
           currentStatus: "REJECTED",
           errors: [
             {
-              code: "SYSTEM_ERROR",
-              message: error.message,
+              code: doc.error.code,
+              message: doc.error.message,
             },
           ],
         };
@@ -267,7 +207,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       setSubmissionState({
         phase: "COMPLETED",
         tracker: {
-          submissionUid: `ERR-${Date.now()}`,
+          submissionUid: response.submissionUid || "VALIDATION_FAILED",
           batchInfo: {
             size: selectedInvoices.length,
             submittedAt: new Date().toISOString(),
@@ -275,18 +215,21 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
           },
           statistics: {
             totalDocuments: selectedInvoices.length,
-            processed: selectedInvoices.length,
-            accepted: 0,
-            rejected: selectedInvoices.length,
+            processed:
+              (response.acceptedDocuments?.length || 0) +
+              (response.rejectedDocuments?.length || 0),
+            accepted: response.acceptedDocuments?.length || 0,
+            rejected: response.rejectedDocuments?.length || 0,
             processing: 0,
-            completed: 0,
+            completed: response.acceptedDocuments?.length || 0,
           },
           documents,
           processingUpdates: [],
-          overallStatus: "Invalid" as const,
+          overallStatus: response.overallStatus || "Invalid",
         },
       });
-
+    } catch (error: any) {
+      console.error("Submission Error:", error);
       toast.error(`Submission failed: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -296,12 +239,8 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   const handleClose = () => {
     setIsOpen(false);
     setSubmissionState(null);
-    if (clearSelection) {
-      clearSelection();
-    }
-    if (onSubmissionComplete) {
-      onSubmissionComplete();
-    }
+    if (clearSelection) clearSelection();
+    if (onSubmissionComplete) onSubmissionComplete();
   };
 
   return (

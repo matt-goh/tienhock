@@ -5,122 +5,142 @@ import {
   DocumentStatus,
   BatchStatistics,
 } from "../../types/types";
-import { IconCheck, IconX, IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconX } from "@tabler/icons-react";
 import Button from "../Button";
 
-const StatusIcon: React.FC<{ status: DocumentStatus["currentStatus"] }> = ({
-  status,
-}) => {
-  switch (status) {
-    case "COMPLETED":
-      return <IconCheck className="text-emerald-500" size={18} />;
-    case "REJECTED":
-    case "FAILED":
-      return <IconX className="text-rose-500" size={18} />;
-    case "PROCESSING":
-      return (
-        <div className="h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
-      );
-    default:
-      return <IconAlertTriangle className="text-amber-500" size={18} />;
-  }
-};
+const ProgressItem: React.FC<{
+  color: string;
+  label: string;
+  count: number;
+}> = ({ color, label, count }) => (
+  <div className="flex items-center gap-1.5">
+    <div className={`h-3 w-3 bg-${color}-500 rounded`} />
+    <span className="text-default-600">
+      {label} ({count})
+    </span>
+  </div>
+);
 
 const BatchProgress: React.FC<{ statistics: BatchStatistics }> = ({
-  statistics,
-}) => {
-  const { totalDocuments, completed, rejected, processing } = statistics;
-  const completedWidth = (completed / totalDocuments) * 100;
-  const rejectedWidth = (rejected / totalDocuments) * 100;
-  const processingWidth = (processing / totalDocuments) * 100;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-sm">
-        <span className="font-medium text-default-700">Overall Progress</span>
-        <span className="text-default-500">
-          {completed + rejected}/{totalDocuments} Processed
-        </span>
+  statistics: { totalDocuments, completed, rejected, processing },
+}) => (
+  <div className="space-y-2">
+    <div className="flex justify-between text-sm">
+      <span className="font-medium text-default-700">Overall Progress</span>
+      <span className="text-default-500">
+        {completed + rejected}/{totalDocuments} Processed
+      </span>
+    </div>
+    <div className="h-2 w-full bg-default-100 rounded-full overflow-hidden">
+      <div className="h-full flex">
+        <div
+          className="bg-emerald-500 transition-all duration-500"
+          style={{ width: `${(completed / totalDocuments) * 100}%` }}
+        />
+        <div
+          className="bg-rose-500 transition-all duration-500"
+          style={{ width: `${(rejected / totalDocuments) * 100}%` }}
+        />
+        <div
+          className="bg-sky-500 transition-all duration-500"
+          style={{ width: `${(processing / totalDocuments) * 100}%` }}
+        />
       </div>
-      <div className="h-2 w-full bg-default-100 rounded-full overflow-hidden">
-        <div className="h-full flex">
-          <div
-            className="bg-emerald-500 transition-all duration-500"
-            style={{ width: `${completedWidth}%` }}
-          />
-          <div
-            className="bg-rose-500 transition-all duration-500"
-            style={{ width: `${rejectedWidth}%` }}
-          />
-          <div
-            className="bg-sky-500 transition-all duration-500"
-            style={{ width: `${processingWidth}%` }}
-          />
-        </div>
+    </div>
+    <div className="flex gap-4 text-sm">
+      <div className="flex items-center gap-1.5">
+        <div className="h-3 w-3 bg-emerald-500 rounded" />
+        <span className="text-default-600">Completed ({completed})</span>
       </div>
-      <div className="flex gap-4 text-sm">
-        <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 bg-emerald-500 rounded" />
-          <span className="text-default-600">Completed ({completed})</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 bg-rose-500 rounded" />
-          <span className="text-default-600">Failed ({rejected})</span>
-        </div>
+      <div className="flex items-center gap-1.5">
+        <div className="h-3 w-3 bg-rose-500 rounded" />
+        <span className="text-default-600">Failed ({rejected})</span>
+      </div>
+      {processing > 0 && (
         <div className="flex items-center gap-1.5">
           <div className="h-3 w-3 bg-sky-500 rounded" />
           <span className="text-default-600">Processing ({processing})</span>
         </div>
-      </div>
+      )}
     </div>
-  );
-};
+  </div>
+);
 
 const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
   documents,
 }) => {
+  // Helper function to render validation error details
+  const renderErrorDetails = (error: any) => {
+    if (error.details && Array.isArray(error.details)) {
+      return (
+        <div className="mt-1 space-y-1">
+          {error.details.map((detail: any, idx: number) => (
+            <p key={idx} className="text-sm text-rose-500 pl-6">
+              • {detail.message}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div className="space-y-2 mt-4">
-      <h3 className="font-medium text-default-700">Documents</h3>
-      <div className="max-h-[300px] overflow-y-auto space-y-2">
-        {Object.values(documents).map((doc) => (
-          <div
-            key={doc.invoiceNo}
-            className="p-3 bg-white border border-default-200 rounded-lg"
-          >
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <StatusIcon status={doc.currentStatus} />
-                  <span className="font-medium text-default-700">
-                    #{doc.invoiceNo}
-                  </span>
+    <div className="bg-white border border-default-200 rounded-lg mt-4">
+      <div className="px-4 py-3 border-b border-default-200">
+        <h3 className="font-medium text-default-800">
+          Validation Results ({Object.keys(documents).length})
+        </h3>
+      </div>
+      <div className="divide-y divide-default-200">
+        {Object.values(documents).map((doc) => {
+          const isSuccessful =
+            doc.currentStatus === "COMPLETED" ||
+            doc.summary?.status === "Valid" ||
+            doc.summary?.status === "Submitted";
+
+          return (
+            <div key={doc.invoiceNo} className="px-4 py-3">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 mt-1">
+                  {isSuccessful ? (
+                    <IconCheck size={16} className="text-emerald-500" />
+                  ) : (
+                    <IconX size={16} className="text-rose-500" />
+                  )}
                 </div>
-                {doc.errors?.map((error, idx) => (
-                  <p
-                    key={idx}
-                    className="text-rose-700 flex items-center gap-2"
-                  >
-                    <span>{error.message}</span>
+                <div className="ml-2 flex-1">
+                  <p className="font-medium text-default-900">
+                    #{doc.invoiceNo}
                   </p>
-                ))}
-                {doc.summary && (
-                  <div className="text-sm text-default-500">
-                    <p>Status: {doc.summary.status}</p>
-                    <p>
-                      Amount: RM {doc.summary.totalPayableAmount.toFixed(2)}
-                    </p>
-                  </div>
-                )}
+                  {isSuccessful ? (
+                    <>
+                      <p className="text-sm text-emerald-500 mt-0.5">
+                        Document successfully submitted
+                      </p>
+                      {doc.summary && (
+                        <p className="text-sm text-default-500 mt-0.5">
+                          {doc.summary.receiverName}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {doc.errors?.[0] && (
+                        <>
+                          <p className="text-sm text-rose-500 mt-0.5 font-medium">
+                            {doc.errors[0].message}
+                          </p>
+                          {renderErrorDetails(doc.errors[0])}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              {doc.currentStatus === "COMPLETED" && (
-                <span className="text-xs font-medium text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full">
-                  Valid
-                </span>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -131,9 +151,7 @@ export const SubmissionDisplay: React.FC<SubmissionDisplayProps> = ({
   onClose,
   showDetails = true,
 }) => {
-  if (!state.tracker) {
-    return null;
-  }
+  if (!state.tracker) return null;
 
   const {
     statistics = {
