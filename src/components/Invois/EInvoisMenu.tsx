@@ -170,7 +170,41 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
 
     try {
       setIsSubmitting(true);
-      setSubmissionState(null);
+
+      // Set initial submission state with documents
+      const initialDocuments: Record<string, DocumentStatus> = {};
+      selectedInvoices.forEach((invoice) => {
+        initialDocuments[invoice.invoiceno] = {
+          invoiceNo: invoice.invoiceno,
+          currentStatus: "PROCESSING",
+          summary: {
+            status: "Submitted",
+            receiverName: invoice.customername,
+          },
+        };
+      });
+
+      setSubmissionState({
+        phase: "SUBMISSION",
+        tracker: {
+          submissionUid: "pending",
+          batchInfo: {
+            size: selectedInvoices.length,
+            submittedAt: new Date().toISOString(),
+          },
+          statistics: {
+            totalDocuments: selectedInvoices.length,
+            processed: 0,
+            accepted: 0,
+            rejected: 0,
+            processing: selectedInvoices.length,
+            completed: 0,
+          },
+          documents: initialDocuments,
+          processingUpdates: [],
+          overallStatus: "InProgress",
+        },
+      });
 
       const response = await api.post("/api/einvoice/submit", {
         invoiceIds: selectedInvoices.map((invoice) => invoice.id),
@@ -231,6 +265,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
     } catch (error: any) {
       console.error("Submission Error:", error);
       toast.error(`Submission failed: ${error.message}`);
+      setSubmissionState(null);
     } finally {
       setIsSubmitting(false);
     }

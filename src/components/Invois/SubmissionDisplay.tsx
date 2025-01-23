@@ -5,21 +5,8 @@ import {
   DocumentStatus,
   BatchStatistics,
 } from "../../types/types";
-import { IconAlertTriangle, IconCheck, IconX } from "@tabler/icons-react";
+import { IconCheck, IconX } from "@tabler/icons-react";
 import Button from "../Button";
-
-const ProgressItem: React.FC<{
-  color: string;
-  label: string;
-  count: number;
-}> = ({ color, label, count }) => (
-  <div className="flex items-center gap-1.5">
-    <div className={`h-3 w-3 bg-${color}-500 rounded`} />
-    <span className="text-default-600">
-      {label} ({count})
-    </span>
-  </div>
-);
 
 const BatchProgress: React.FC<{ statistics: BatchStatistics }> = ({
   statistics: { totalDocuments, completed, rejected, processing },
@@ -69,20 +56,20 @@ const BatchProgress: React.FC<{ statistics: BatchStatistics }> = ({
 const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
   documents,
 }) => {
-  // Helper function to render validation error details
-  const renderErrorDetails = (error: any) => {
-    if (error.details && Array.isArray(error.details)) {
-      return (
-        <div className="mt-1 space-y-1">
-          {error.details.map((detail: any, idx: number) => (
-            <p key={idx} className="text-sm text-rose-500 pl-6">
-              • {detail.message}
-            </p>
-          ))}
-        </div>
-      );
+  const getStatusIcon = (doc: DocumentStatus) => {
+    switch (doc.currentStatus) {
+      case "COMPLETED":
+        return <IconCheck size={16} className="text-emerald-500" />;
+      case "REJECTED":
+      case "FAILED":
+        return <IconX size={16} className="text-rose-500" />;
+      case "PROCESSING":
+        return (
+          <div className="h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+        );
+      default:
+        return <IconX size={16} className="text-rose-500" />;
     }
-    return null;
   };
 
   return (
@@ -98,22 +85,21 @@ const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
             doc.currentStatus === "COMPLETED" ||
             doc.summary?.status === "Valid" ||
             doc.summary?.status === "Submitted";
+          const isProcessing = doc.currentStatus === "PROCESSING";
 
           return (
             <div key={doc.invoiceNo} className="px-4 py-3">
               <div className="flex items-start">
-                <div className="flex-shrink-0 mt-1">
-                  {isSuccessful ? (
-                    <IconCheck size={16} className="text-emerald-500" />
-                  ) : (
-                    <IconX size={16} className="text-rose-500" />
-                  )}
-                </div>
+                <div className="flex-shrink-0 mt-1">{getStatusIcon(doc)}</div>
                 <div className="ml-2 flex-1">
                   <p className="font-medium text-default-900">
                     #{doc.invoiceNo}
                   </p>
-                  {isSuccessful ? (
+                  {isProcessing ? (
+                    <p className="text-sm text-sky-500 mt-0.5">
+                      Processing document...
+                    </p>
+                  ) : isSuccessful ? (
                     <>
                       <p className="text-sm text-emerald-500 mt-0.5">
                         Document successfully submitted
@@ -127,12 +113,9 @@ const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
                   ) : (
                     <>
                       {doc.errors?.[0] && (
-                        <>
-                          <p className="text-sm text-rose-500 mt-0.5 font-medium">
-                            {doc.errors[0].message}
-                          </p>
-                          {renderErrorDetails(doc.errors[0])}
-                        </>
+                        <p className="text-sm text-rose-500 mt-0.5 font-medium">
+                          {doc.errors[0].message}
+                        </p>
                       )}
                     </>
                   )}
