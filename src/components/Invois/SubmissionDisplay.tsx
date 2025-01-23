@@ -1,11 +1,11 @@
 // src/components/einvoice/SubmissionDisplay.tsx
-import React from "react";
+import React, { useState } from "react";
 import {
   SubmissionDisplayProps,
   DocumentStatus,
   BatchStatistics,
 } from "../../types/types";
-import { IconCheck, IconX } from "@tabler/icons-react";
+import { IconCheck, IconChevronRight, IconX } from "@tabler/icons-react";
 import Button from "../Button";
 
 const BatchProgress: React.FC<{ statistics: BatchStatistics }> = ({
@@ -56,20 +56,15 @@ const BatchProgress: React.FC<{ statistics: BatchStatistics }> = ({
 const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
   documents,
 }) => {
-  const getStatusIcon = (doc: DocumentStatus) => {
-    switch (doc.currentStatus) {
-      case "COMPLETED":
-        return <IconCheck size={16} className="text-emerald-500" />;
-      case "REJECTED":
-      case "FAILED":
-        return <IconX size={16} className="text-rose-500" />;
-      case "PROCESSING":
-        return (
-          <div className="h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
-        );
-      default:
-        return <IconX size={16} className="text-rose-500" />;
-    }
+  const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>(
+    {}
+  );
+
+  const toggleErrorDetails = (invoiceNo: string) => {
+    setExpandedErrors((prev) => ({
+      ...prev,
+      [invoiceNo]: !prev[invoiceNo],
+    }));
   };
 
   return (
@@ -79,7 +74,7 @@ const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
           Validation Results ({Object.keys(documents).length})
         </h3>
       </div>
-      <div className="divide-y divide-default-200">
+      <div className="divide-y divide-default-200 max-h-[300px] overflow-y-auto">
         {Object.values(documents).map((doc) => {
           const isSuccessful =
             doc.currentStatus === "COMPLETED" ||
@@ -90,7 +85,15 @@ const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
           return (
             <div key={doc.invoiceNo} className="px-4 py-3">
               <div className="flex items-start">
-                <div className="flex-shrink-0 mt-1">{getStatusIcon(doc)}</div>
+                <div className="flex-shrink-0 mt-1">
+                  {isProcessing ? (
+                    <div className="h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+                  ) : isSuccessful ? (
+                    <IconCheck size={16} className="text-emerald-500" />
+                  ) : (
+                    <IconX size={16} className="text-rose-500" />
+                  )}
+                </div>
                 <div className="ml-2 flex-1">
                   <p className="font-medium text-default-900">
                     #{doc.invoiceNo}
@@ -111,13 +114,34 @@ const DocumentList: React.FC<{ documents: Record<string, DocumentStatus> }> = ({
                       )}
                     </>
                   ) : (
-                    <>
-                      {doc.errors?.[0] && (
-                        <p className="text-sm text-rose-500 mt-0.5 font-medium">
-                          {doc.errors[0].message}
-                        </p>
-                      )}
-                    </>
+                    doc.errors?.[0] && (
+                      <>
+                        <div
+                          onClick={() => toggleErrorDetails(doc.invoiceNo)}
+                          className="flex items-center gap-1.5 cursor-pointer mt-0.5"
+                        >
+                          <p className="text-sm text-rose-500 font-medium">
+                            {doc.errors[0].message}
+                          </p>
+                          <IconChevronRight
+                            size={16}
+                            className={`text-rose-500 transition-transform ${
+                              expandedErrors[doc.invoiceNo] ? "rotate-90" : ""
+                            }`}
+                          />
+                        </div>
+                        {expandedErrors[doc.invoiceNo] &&
+                          doc.errors[0].details && (
+                            <div className="ml-5 mt-1.5 space-y-1.5">
+                              {doc.errors[0].details.map((detail, idx) => (
+                                <p key={idx} className="text-sm text-rose-500">
+                                  • {detail.message}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                      </>
+                    )
                   )}
                 </div>
               </div>

@@ -66,6 +66,7 @@ export interface ValidationDetail {
   message: string;
   target?: string;
   propertyPath?: string;
+  details?: ValidationDetail[] | null;
 }
 
 // Document response types
