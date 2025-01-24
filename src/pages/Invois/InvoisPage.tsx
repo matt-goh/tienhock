@@ -554,7 +554,7 @@ const InvoisPage: React.FC = () => {
     });
   };
 
-  const handleInvoiceClick = (invoiceId: string, invoiceData: InvoiceData) => {
+  const handleInvoiceClick = (invoiceData: InvoiceData) => {
     navigate(`/sales/invois/details`, {
       state: {
         invoiceData,
@@ -596,9 +596,7 @@ const InvoisPage: React.FC = () => {
       width: 150,
       cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
         <button
-          onClick={() =>
-            handleInvoiceClick(info.row.original.id, info.row.original)
-          }
+          onClick={() => handleInvoiceClick(info.row.original)}
           className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer hover:font-semibold"
         >
           {info.row.original.type}
