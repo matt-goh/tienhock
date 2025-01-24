@@ -232,5 +232,19 @@ export default function (pool, config) {
     }
   });
 
+  router.get("/list", async (req, res) => {
+    try {
+      const query = `
+        SELECT * FROM einvoices 
+        ORDER BY datetime_validated DESC
+      `;
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Failed to fetch e-invoices:", error);
+      res.status(500).json({ error: "Failed to fetch e-invoices" });
+    }
+  });
+
   return router;
 }

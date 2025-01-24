@@ -583,8 +583,6 @@ const InvoisPage: React.FC = () => {
   };
 
   const handlePrintPDF = () => {
-    const invoicesToUse =
-      selectedCount > 0 ? selectedInvoices : filteredInvoices;
     setShowPrintOverlay(true);
   };
 
