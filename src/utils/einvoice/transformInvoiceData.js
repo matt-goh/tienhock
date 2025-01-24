@@ -764,7 +764,7 @@ export async function transformInvoiceToMyInvoisFormat(
               LineExtensionAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // (Optional) Sum of total amount payable (inclusive of applicable line item and invoice level discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
               TaxExclusiveAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // Sum of amount payable (inclusive of applicable discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
               TaxInclusiveAmount: [{ _: totals.total, currencyID: "MYR" }], // Sum of amount payable inclusive of total taxes chargeable (e.g., sales tax, service tax).
-              AllowanceTotalAmount: [{ _: totals.total, currencyID: "MYR" }], // (Optional) Total amount deducted from the original price of the product(s) or service(s).
+              AllowanceTotalAmount: [{ _: 0, currencyID: "MYR" }], // (Optional) Total amount deducted from the original price of the product(s) or service(s).
               ChargeTotalAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // (Optional) Total charge associated with the product(s) or service(s) imposed before tax.
               PayableRoundingAmount: [{ _: 0, currencyID: "MYR" }], // (Optional) Rounding amount added to the amount payable.
               PayableAmount: [{ _: totals.total, currencyID: "MYR" }], // Sum of amount payable (inclusive of total taxes chargeable and any rounding adjustment) excluding any amount paid in advance.
