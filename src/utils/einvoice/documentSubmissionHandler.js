@@ -1,5 +1,5 @@
 // documentSubmissionHandler.js
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 
 class DocumentSubmissionHandler {
   constructor(apiClient) {
@@ -10,20 +10,25 @@ class DocumentSubmissionHandler {
 
   async submitAndPollDocuments(transformedInvoices) {
     try {
-      const invoices = Array.isArray(transformedInvoices) ? transformedInvoices : [transformedInvoices];
+      const invoices = Array.isArray(transformedInvoices)
+        ? transformedInvoices
+        : [transformedInvoices];
       const requestBody = this.prepareRequestBody(invoices);
       const submissionResponse = await this.apiClient.makeApiCall(
         "POST",
         "/api/v1.0/documentsubmissions",
         requestBody
       );
-  
+
       const hasValidInvoices = submissionResponse.acceptedDocuments?.length > 0;
-      const hasInvalidInvoices = submissionResponse.rejectedDocuments?.length > 0;
-  
+      const hasInvalidInvoices =
+        submissionResponse.rejectedDocuments?.length > 0;
+
       // Case 1: All valid invoices
       if (hasValidInvoices && !hasInvalidInvoices) {
-        const finalStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
+        const finalStatus = await this.pollSubmissionStatus(
+          submissionResponse.submissionUid
+        );
         return {
           success: true,
           submissionUid: submissionResponse.submissionUid,
@@ -31,10 +36,10 @@ class DocumentSubmissionHandler {
           rejectedDocuments: [],
           documentCount: invoices.length,
           dateTimeReceived: finalStatus.dateTimeReceived,
-          overallStatus: finalStatus.overallStatus
+          overallStatus: finalStatus.overallStatus,
         };
       }
-  
+
       // Case 2: All invalid invoices
       if (!hasValidInvoices && hasInvalidInvoices) {
         return {
@@ -44,13 +49,15 @@ class DocumentSubmissionHandler {
           rejectedDocuments: submissionResponse.rejectedDocuments,
           documentCount: invoices.length,
           dateTimeReceived: new Date().toISOString(),
-          overallStatus: "Invalid"
+          overallStatus: "Invalid",
         };
       }
-  
+
       // Case 3: Mixed valid and invalid
       if (hasValidInvoices && hasInvalidInvoices) {
-        const finalStatus = await this.pollSubmissionStatus(submissionResponse.submissionUid);
+        const finalStatus = await this.pollSubmissionStatus(
+          submissionResponse.submissionUid
+        );
         return {
           success: true,
           submissionUid: submissionResponse.submissionUid,
@@ -58,11 +65,13 @@ class DocumentSubmissionHandler {
           rejectedDocuments: submissionResponse.rejectedDocuments,
           documentCount: invoices.length,
           dateTimeReceived: finalStatus.dateTimeReceived,
-          overallStatus: "Partial"
+          overallStatus: "Partial",
         };
       }
-  
-      throw new Error("Invalid submission response: No documents were processed");
+
+      throw new Error(
+        "Invalid submission response: No documents were processed"
+      );
     } catch (error) {
       console.error("Error in document submission process:", error);
       throw error;
@@ -72,21 +81,26 @@ class DocumentSubmissionHandler {
   // Keep existing prepareRequestBody, encodeDocument, and calculateHash methods as they are
   prepareRequestBody(invoices) {
     if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
-      throw new Error('Invalid invoice data: No invoices provided');
+      throw new Error("Invalid invoice data: No invoices provided");
     }
 
-    const documents = invoices.map(invoice => {
-      if (!invoice || !invoice.Invoice || !invoice.Invoice[0] || !invoice.Invoice[0].ID) {
-        throw new Error('Invalid invoice data structure');
+    const documents = invoices.map((invoice) => {
+      if (
+        !invoice ||
+        !invoice.Invoice ||
+        !invoice.Invoice[0] ||
+        !invoice.Invoice[0].ID
+      ) {
+        throw new Error("Invalid invoice data structure");
       }
 
       const jsonDocument = JSON.stringify(invoice);
-      
+
       return {
         format: "JSON",
         document: this.encodeDocument(jsonDocument),
         documentHash: this.calculateHash(jsonDocument),
-        codeNumber: invoice.Invoice[0].ID[0]._
+        codeNumber: invoice.Invoice[0].ID[0]._,
       };
     });
 
@@ -95,12 +109,12 @@ class DocumentSubmissionHandler {
 
   // Keep existing encoding method
   encodeDocument(jsonDocument) {
-    return Buffer.from(jsonDocument, 'utf8').toString('base64');
+    return Buffer.from(jsonDocument, "utf8").toString("base64");
   }
 
   // Keep existing hash calculation method
   calculateHash(jsonDocument) {
-    return createHash('sha256').update(jsonDocument, 'utf8').digest('hex');
+    return createHash("sha256").update(jsonDocument, "utf8").digest("hex");
   }
 
   async pollSubmissionStatus(submissionUid) {
@@ -108,12 +122,12 @@ class DocumentSubmissionHandler {
     while (attempts < this.MAX_POLLING_ATTEMPTS) {
       try {
         const response = await this.apiClient.makeApiCall(
-          'GET', 
+          "GET",
           `/api/v1.0/documentsubmissions/${submissionUid}`
         );
 
         // Return immediately if status is final
-        if (response.overallStatus !== 'InProgress') {
+        if (response.overallStatus !== "InProgress") {
           return response;
         }
 
@@ -125,11 +139,13 @@ class DocumentSubmissionHandler {
         await this.wait(this.POLLING_INTERVAL);
       }
     }
-    throw new Error(`Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`);
+    throw new Error(
+      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`
+    );
   }
 
   wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
