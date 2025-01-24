@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
-import { IconRefresh } from "@tabler/icons-react";
+import { IconRefresh, IconSearch } from "@tabler/icons-react";
 
 interface EInvoice {
   uuid: string;
@@ -18,12 +18,29 @@ interface EInvoice {
   total_net_amount: number;
 }
 
+interface PaginationState {
+  currentPage: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 const EInvoisPage: React.FC = () => {
   const [einvoices, setEInvoices] = useState<EInvoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasScrollbar, setHasScrollbar] = useState(false);
   const tableBodyRef = useRef<HTMLDivElement>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    pageSize: 25,
+    totalPages: 1,
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState({
+    start: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    end: new Date(new Date().setDate(new Date().getDate() + 1)),
+  });
+  const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
 
   useEffect(() => {
     const checkForScrollbar = () => {
@@ -45,14 +62,25 @@ const EInvoisPage: React.FC = () => {
     };
   }, [einvoices]);
 
+  // Update fetchEInvoices to use 300 records
   const fetchEInvoices = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get("/api/einvoice/list");
-      setEInvoices(response);
+      const response = await api.get("/api/einvoice/list", {
+        params: {
+          page: pagination.currentPage,
+          limit: pagination.pageSize,
+          startDate: dateRange.start.toISOString(),
+          endDate: dateRange.end.toISOString(),
+        },
+      });
+      setEInvoices(response.data);
+      setPagination((prev) => ({
+        ...prev,
+        totalPages: Math.ceil(response.total / prev.pageSize),
+      }));
     } catch (error: any) {
-      console.error("Failed to fetch e-invoices:", error);
       setError("Failed to fetch e-invoices. Please try refreshing.");
     } finally {
       setLoading(false);
@@ -61,7 +89,14 @@ const EInvoisPage: React.FC = () => {
 
   useEffect(() => {
     fetchEInvoices();
-  }, []);
+  }, [searchTerm, dateRange, pagination.currentPage]);
+
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
@@ -74,8 +109,97 @@ const EInvoisPage: React.FC = () => {
     });
   };
 
+  const PaginationControls = () => {
+    const pages = Array.from(
+      { length: pagination.totalPages },
+      (_, i) => i + 1
+    );
+    const showPages = pagination.totalPages <= 7;
+
+    const getVisiblePages = () => {
+      if (showPages) return pages;
+
+      const current = pagination.currentPage;
+      if (current <= 4)
+        return [...pages.slice(0, 5), "...", pagination.totalPages];
+      if (current >= pagination.totalPages - 3)
+        return [1, "...", ...pages.slice(-5)];
+      return [
+        1,
+        "...",
+        current - 1,
+        current,
+        current + 1,
+        "...",
+        pagination.totalPages,
+      ];
+    };
+
+    return (
+      <div className="flex items-center justify-between border-t border-default-200 bg-white px-4 py-3">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.currentPage === 1}
+            onClick={() =>
+              setPagination((prev) => ({
+                ...prev,
+                currentPage: prev.currentPage - 1,
+              }))
+            }
+          >
+            Previous
+          </Button>
+
+          {getVisiblePages().map((page, idx) =>
+            page === "..." ? (
+              <span key={`ellipsis-${idx}`} className="px-2">
+                ...
+              </span>
+            ) : (
+              <button
+                key={page}
+                onClick={() =>
+                  setPagination((prev) => ({
+                    ...prev,
+                    currentPage: page as number,
+                  }))
+                }
+                className={`px-3 py-1 rounded-md text-sm font-medium ${
+                  page === pagination.currentPage
+                    ? "bg-default-100 text-default-700"
+                    : "text-default-600 hover:bg-default-50"
+                }`}
+              >
+                {page}
+              </button>
+            )
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.currentPage === pagination.totalPages}
+            onClick={() =>
+              setPagination((prev) => ({
+                ...prev,
+                currentPage: prev.currentPage + 1,
+              }))
+            }
+          >
+            Next
+          </Button>
+        </div>
+        <div className="text-sm text-default-600">
+          Showing page {pagination.currentPage} of {pagination.totalPages}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex flex-col px-6 py-4">
+    <div className="flex flex-col px-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-semibold text-default-900">
           e-Invoices History
@@ -88,6 +212,62 @@ const EInvoisPage: React.FC = () => {
         >
           Refresh
         </Button>
+      </div>
+
+      <div className="flex gap-4 mb-4">
+        <div className="w-[350px]">
+          <div className="relative">
+            <IconSearch
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
+              size={20}
+            />
+            <input
+              type="text"
+              placeholder="Search e-invoices..."
+              className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex-1">
+          <div
+            className={`flex items-center w-fit bg-white border ${
+              isDateRangeFocused ? "border-default-500" : "border-default-300"
+            } rounded-full px-4`}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <input
+                type="date"
+                value={formatDateForInput(dateRange.start)}
+                onChange={(e) =>
+                  setDateRange((prev) => ({
+                    ...prev,
+                    start: new Date(e.target.value),
+                  }))
+                }
+                onFocus={() => setIsDateRangeFocused(true)}
+                onBlur={() => setIsDateRangeFocused(false)}
+                className="w-36 px-2 py-2 rounded-full bg-transparent outline-none"
+              />
+              <span className="text-default-400">to</span>
+              <input
+                type="date"
+                value={formatDateForInput(dateRange.end)}
+                onChange={(e) =>
+                  setDateRange((prev) => ({
+                    ...prev,
+                    end: new Date(e.target.value),
+                  }))
+                }
+                onFocus={() => setIsDateRangeFocused(true)}
+                onBlur={() => setIsDateRangeFocused(false)}
+                className="w-36 px-2 py-2 rounded-full bg-transparent outline-none"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -143,7 +323,7 @@ const EInvoisPage: React.FC = () => {
 
           <div
             ref={tableBodyRef}
-            className="max-h-[calc(100vh-180px)] overflow-y-auto"
+            className="max-h-[calc(100vh-300px)] overflow-y-auto"
           >
             <table className="w-full table-fixed">
               <colgroup>
@@ -209,6 +389,7 @@ const EInvoisPage: React.FC = () => {
             </table>
           </div>
         </div>
+        <PaginationControls />
       </div>
     </div>
   );
