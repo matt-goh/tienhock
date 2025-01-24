@@ -156,34 +156,21 @@ const validateInvoiceData = (invoiceData) => {
 
   // Check if orderDetails exists and is an array
   if (!Array.isArray(invoiceData?.orderDetails)) {
-    validationErrors.push("Invoice must contain at least one order detail");
-  } else if (invoiceData.orderDetails.length === 0) {
-    validationErrors.push("Invoice must contain at least one order detail");
-  }
-
-  // Validate required fields
-  const requiredFields = {
-    invoiceno: "Invoice number",
-    date: "Invoice date",
-    time: "Invoice time",
-    type: "Invoice type",
-  };
-
-  Object.entries(requiredFields).forEach(([field, label]) => {
-    if (!invoiceData[field]) {
-      validationErrors.push(`${label} is required`);
-    }
-  });
-
-  // If any validation errors were found, throw an error with all the details
-  if (validationErrors.length > 0) {
     throw {
       type: "validation",
-      errors: validationErrors,
-      invoiceNo: invoiceData.invoiceno || "Unknown invoice number",
+      code: "INV_VALIDATION",
+      message: "Invoice must contain at least one order detail",
+      invoiceNo: invoiceData.invoiceno,
+    };
+  } else if (invoiceData.orderDetails.length === 0) {
+    throw {
+      type: "validation",
+      code: "INV_VALIDATION",
+      message: "Invoice must contain at least one order detail",
+      invoiceNo: invoiceData.invoiceno,
     };
   }
-
+  
   // If validation passes, return sanitized data
   return {
     ...invoiceData,
