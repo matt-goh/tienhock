@@ -1,6 +1,6 @@
 // src/routes/catalogue/customer-validation.js
 import { Router } from "express";
-import EInvoiceApiClient from "../../utils/einvoice/EInvoiceApiClient.js";
+import EInvoiceApiClient from "../../utils/invoice/einvoice/EInvoiceApiClient.js";
 
 export default function (pool, config) {
   const router = Router();
