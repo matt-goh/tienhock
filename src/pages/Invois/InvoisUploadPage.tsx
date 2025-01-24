@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { ColumnConfig, InvoiceData } from "../../types/types";
 import { useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
-import { fetchInvoices, getInvoices } from "../../utils/einvoice/InvoisUtils";
+import { fetchInvoices, getInvoices } from "../../utils/invoice/InvoisUtils";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";

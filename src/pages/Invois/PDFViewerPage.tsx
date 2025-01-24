@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { InvoiceData } from "../../types/types";
-import InvoisPDF from "../../utils/einvoice/InvoisPDF";
+import InvoisPDF from "../../utils/invoice/PDF/InvoisPDF";
 import { PDFViewer, Document } from "@react-pdf/renderer";
-import { generatePDFFilename } from "../../utils/einvoice/generatePDFFilename";
+import { generatePDFFilename } from "../../utils/invoice/PDF/generatePDFFilename";
 
 const PDFViewerPage: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);

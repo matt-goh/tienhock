@@ -22,7 +22,7 @@ import {
   deleteInvoice,
   saveInvoice,
   createInvoice,
-} from "../../utils/einvoice/InvoisUtils";
+} from "../../utils/invoice/InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { debounce } from "lodash";
 import {

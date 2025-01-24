@@ -1,5 +1,5 @@
 // batchTransformInvoices.js
-import { transformInvoiceToMyInvoisFormat } from "./transformInvoiceData";
+import { transformInvoiceToMyInvoisFormat } from "../transformInvoiceData";
 
 export async function batchTransformInvoices(invoices) {
   if (!Array.isArray(invoices)) {

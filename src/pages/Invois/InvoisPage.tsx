@@ -16,7 +16,7 @@ import {
   deleteInvoice,
   getInvoices,
   fetchDbInvoices,
-} from "../../utils/einvoice/InvoisUtils";
+} from "../../utils/invoice/InvoisUtils";
 import {
   IconCloudUpload,
   IconEye,
@@ -31,8 +31,8 @@ import TableEditing from "../../components/Table/TableEditing";
 import EInvoisMenu from "../../components/Invois/EInvoisMenu";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
-import PrintPDFOverlay from "../../utils/einvoice/PrintPDFOverlay";
-import PDFDownloadHandler from "../../utils/einvoice/PDFDownloadHandler";
+import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 

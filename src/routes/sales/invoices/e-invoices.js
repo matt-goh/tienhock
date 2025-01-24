@@ -1,9 +1,9 @@
 // src/routes/sales/invoices/e-invoice.js
-import { transformInvoiceToMyInvoisFormat } from "../../../utils/einvoice/transformInvoiceData.js";
+import { transformInvoiceToMyInvoisFormat } from "../../../utils/invoice/einvoice/transformInvoiceData.js";
 import { fetchInvoiceFromDb } from "./helpers.js";
 import { Router } from "express";
-import DocumentSubmissionHandler from "../../../utils/einvoice/documentSubmissionHandler.js";
-import EInvoiceApiClient from "../../../utils/einvoice/EInvoiceApiClient.js";
+import DocumentSubmissionHandler from "../../../utils/invoice/einvoice/documentSubmissionHandler.js";
+import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";
 
 // Function to fetch customer data
 async function fetchCustomerData(pool, customerId) {
