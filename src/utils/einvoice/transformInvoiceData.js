@@ -170,7 +170,7 @@ const validateInvoiceData = (invoiceData) => {
       invoiceNo: invoiceData.invoiceno,
     };
   }
-  
+
   // If validation passes, return sanitized data
   return {
     ...invoiceData,

@@ -35,6 +35,45 @@ async function fetchCustomerData(pool, customerId) {
   }
 }
 
+// Helper function to insert accepted documents
+async function insertAcceptedDocuments(pool, documents) {
+  const query = `
+    INSERT INTO einvoices (
+      uuid, submission_uid, long_id, internal_id, type_name, 
+      receiver_id, receiver_name, datetime_validated,
+      total_payable_amount, total_excluding_tax, total_net_amount
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+  `;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    for (const doc of documents) {
+      await client.query(query, [
+        doc.uuid,
+        doc.submissionUid,
+        doc.longId,
+        doc.internalId,
+        doc.typeName,
+        doc.receiverId,
+        doc.receiverName,
+        doc.dateTimeValidated,
+        doc.totalPayableAmount,
+        doc.totalExcludingTax,
+        doc.totalNetAmount,
+      ]);
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export default function (pool, config) {
   const router = Router();
   const apiClient = new EInvoiceApiClient(
@@ -162,6 +201,15 @@ export default function (pool, config) {
       const submissionResult = await submissionHandler.submitAndPollDocuments(
         transformedInvoices
       );
+
+      // Add accepted documents to database
+      if (
+        submissionResult.success &&
+        submissionResult.acceptedDocuments?.length > 0
+      ) {
+        await insertAcceptedDocuments(pool, submissionResult.acceptedDocuments);
+      }
+
       return res.json(submissionResult);
     } catch (error) {
       console.error("Submission error:", error);
