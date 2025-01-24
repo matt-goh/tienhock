@@ -7,21 +7,21 @@ import { Icon } from "@tabler/icons-react";
 import React from "react";
 
 // Import components here
-import CustomerFormPage from "../../pages/Catalogue/CustomerFormPage";
-import InvoisDetailsPage from "../../pages/Invois/InvoisDetailsPage";
-import CustomerAddPage from "../../pages/Catalogue/CustomerAddPage";
-import JobCategoryPage from "../../pages/Catalogue/JobCategoryPage";
-import InvoisUploadPage from "../../pages/Invois/InvoisUploadPage";
-import StaffFormPage from "../../pages/Catalogue/StaffFormPage";
-import CustomerPage from "../../pages/Catalogue/CustomerPage";
-import StaffAddPage from "../../pages/Catalogue/StaffAddPage";
-import PDFViewerPage from "../../pages/Invois/PDFViewerPage";
-import ProductPage from "../../pages/Catalogue/ProductPage";
-import BasicPage from "../../pages/Catalogue/BasicPage";
-import StaffPage from "../../pages/Catalogue/StaffPage";
-import InvoisPage from "../../pages/Invois/InvoisPage";
-import JobPage from "../../pages/Catalogue/JobPage";
-import TaxPage from "../../pages/Catalogue/TaxPage";
+import CustomerFormPage from "./pages/Catalogue/CustomerFormPage";
+import InvoisDetailsPage from "./pages/Invois/InvoisDetailsPage";
+import CustomerAddPage from "./pages/Catalogue/CustomerAddPage";
+import JobCategoryPage from "./pages/Catalogue/JobCategoryPage";
+import InvoisUploadPage from "./pages/Invois/InvoisUploadPage";
+import StaffFormPage from "./pages/Catalogue/StaffFormPage";
+import CustomerPage from "./pages/Catalogue/CustomerPage";
+import StaffAddPage from "./pages/Catalogue/StaffAddPage";
+import PDFViewerPage from "./pages/Invois/PDFViewerPage";
+import ProductPage from "./pages/Catalogue/ProductPage";
+import BasicPage from "./pages/Catalogue/BasicPage";
+import StaffPage from "./pages/Catalogue/StaffPage";
+import InvoisPage from "./pages/Invois/InvoisPage";
+import JobPage from "./pages/Catalogue/JobPage";
+import TaxPage from "./pages/Catalogue/TaxPage";
 
 export interface PopoverOption {
   name: string;

@@ -10,7 +10,7 @@ import {
   PopoverOption,
   SidebarData as OriginalSidebarData,
   SidebarItem,
-} from "./SidebarData";
+} from "../../SidebarData";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
 import SidebarSubButton from "./SidebarSubButton";
