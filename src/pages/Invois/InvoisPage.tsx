@@ -832,23 +832,6 @@ const InvoisPage: React.FC = () => {
             }`}
           >
             <div className="flex gap-4">
-              {/* Search Bar */}
-              <div className="w-[350px]">
-                <div className="relative">
-                  <IconSearch
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
-                    size={20}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search invoices..."
-                    className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                  />
-                </div>
-              </div>
-
               {/* Date Range */}
               <div className="flex-1">
                 <div
@@ -883,6 +866,23 @@ const InvoisPage: React.FC = () => {
                       className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="w-[350px]">
+                <div className="relative">
+                  <IconSearch
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
+                    size={20}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search invoices..."
+                    className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                  />
                 </div>
               </div>
 
