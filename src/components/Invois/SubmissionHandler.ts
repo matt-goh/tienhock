@@ -127,12 +127,6 @@ export class SubmissionHandler {
       history: [],
     };
 
-    const historyEntry = {
-      timestamp,
-      status,
-      details,
-    };
-
     this.tracker.documents[invoiceNo] = {
       ...existingDoc,
       currentStatus: status,
