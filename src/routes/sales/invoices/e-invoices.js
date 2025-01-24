@@ -234,12 +234,40 @@ export default function (pool, config) {
 
   router.get("/list", async (req, res) => {
     try {
-      const query = `
-        SELECT * FROM einvoices 
-        ORDER BY datetime_validated DESC
-      `;
-      const result = await pool.query(query);
-      res.json(result.rows);
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 25;
+      const offset = (page - 1) * limit;
+      const startDate = req.query.startDate;
+      const endDate = req.query.endDate;
+
+      let query = "SELECT * FROM einvoices WHERE 1=1";
+      const params = [];
+
+      if (startDate) {
+        params.push(new Date(startDate));
+        query += ` AND datetime_validated >= $${params.length}`;
+      }
+
+      if (endDate) {
+        params.push(new Date(endDate));
+        query += ` AND datetime_validated < $${params.length}`;
+      }
+
+      const countQuery = query.replace("SELECT *", "SELECT COUNT(*)");
+      query += ` ORDER BY datetime_validated DESC LIMIT $${
+        params.length + 1
+      } OFFSET $${params.length + 2}`;
+      params.push(limit, offset);
+
+      const [countResult, dataResult] = await Promise.all([
+        pool.query(countQuery, params.slice(0, -2)),
+        pool.query(query, params),
+      ]);
+
+      res.json({
+        data: dataResult.rows,
+        total: parseInt(countResult.rows[0].count),
+      });
     } catch (error) {
       console.error("Failed to fetch e-invoices:", error);
       res.status(500).json({ error: "Failed to fetch e-invoices" });
