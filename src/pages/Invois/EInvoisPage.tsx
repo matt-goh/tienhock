@@ -204,33 +204,9 @@ const EInvoisPage: React.FC = () => {
         <h1 className="text-3xl font-semibold text-default-900">
           e-Invoices History
         </h1>
-        <Button
-          onClick={fetchEInvoices}
-          disabled={loading}
-          variant="outline"
-          icon={IconRefresh}
-        >
-          Refresh
-        </Button>
       </div>
 
       <div className="flex gap-4 mb-4">
-        <div className="w-[350px]">
-          <div className="relative">
-            <IconSearch
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Search e-invoices..."
-              className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
         <div className="flex-1">
           <div
             className={`flex items-center w-fit bg-white border ${
@@ -249,7 +225,7 @@ const EInvoisPage: React.FC = () => {
                 }
                 onFocus={() => setIsDateRangeFocused(true)}
                 onBlur={() => setIsDateRangeFocused(false)}
-                className="w-36 px-2 py-2 rounded-full bg-transparent outline-none"
+                className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
               />
               <span className="text-default-400">to</span>
               <input
@@ -263,11 +239,35 @@ const EInvoisPage: React.FC = () => {
                 }
                 onFocus={() => setIsDateRangeFocused(true)}
                 onBlur={() => setIsDateRangeFocused(false)}
-                className="w-36 px-2 py-2 rounded-full bg-transparent outline-none"
+                className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
               />
             </div>
           </div>
         </div>
+        <div className="w-[320px]">
+          <div className="relative">
+            <IconSearch
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
+              size={20}
+            />
+            <input
+              type="text"
+              placeholder="Search e-invoices..."
+              className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <Button
+          onClick={fetchEInvoices}
+          disabled={loading}
+          variant="outline"
+          icon={IconRefresh}
+        >
+          Refresh
+        </Button>
       </div>
 
       {error && (
