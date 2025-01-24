@@ -605,7 +605,7 @@ const InvoisPage: React.FC = () => {
     { id: "date", header: "Date", type: "readonly", width: 150 },
     { id: "customername", header: "Customer", type: "readonly", width: 350 },
     { id: "salesman", header: "Salesman", type: "readonly", width: 150 },
-    { id: "totalamount", header: "Amount", type: "readonly", width: 150 },
+    { id: "totalamount", header: "Amount", type: "amount", width: 150 },
   ];
 
   const productColumns: ColumnConfig[] = [
