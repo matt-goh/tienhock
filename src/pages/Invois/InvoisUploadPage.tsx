@@ -80,7 +80,7 @@ const InvoisUploadPage: React.FC = () => {
 
       // If all data is deleted, navigate back to invois page
       if (updatedFileData.length === 0) {
-        navigate("/sales/invois");
+        navigate("/sales/invoice");
       }
     } catch (error) {
       console.error("Error deleting invoices:", error);
@@ -116,7 +116,7 @@ const InvoisUploadPage: React.FC = () => {
 
       toast.success(result.message);
       setFileData([]); // Clear the file data after successful submission
-      navigate("/sales/invois");
+      navigate("/sales/invoice");
     } catch (error) {
       console.error("Error submitting invoices:", error);
       setError(
@@ -133,7 +133,7 @@ const InvoisUploadPage: React.FC = () => {
   };
 
   const handleInvoiceClick = (invoiceId: string, invoiceData: InvoiceData) => {
-    navigate(`/sales/invois/imported/${invoiceId}`, {
+    navigate(`/sales/invoice/imported/${invoiceId}`, {
       state: {
         invoiceData,
         previousPath: location.pathname,
@@ -148,7 +148,7 @@ const InvoisUploadPage: React.FC = () => {
       await api.post("/api/invoices/clear");
       setFileData([]);
       toast.success("All data cleared successfully");
-      navigate("/sales/invois");
+      navigate("/sales/invoice");
     } catch (error) {
       console.error("Error clearing data:", error);
       setError(

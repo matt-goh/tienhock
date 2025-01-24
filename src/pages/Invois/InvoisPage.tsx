@@ -436,7 +436,7 @@ const InvoisPage: React.FC = () => {
       toast.success(`Successfully processed ${validFiles.length} file(s)`);
 
       // Navigate to the upload page with the updated invoices
-      navigate("/sales/invois/imported", {
+      navigate("/sales/invoice/imported", {
         state: { importedData: updatedInvoices },
       });
     } catch (error) {
@@ -546,7 +546,7 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleCreateNewInvoice = () => {
-    navigate("/sales/invois/details", {
+    navigate("/sales/invoice/details", {
       state: {
         isNewInvoice: true,
         previousPath: location.pathname,
@@ -555,7 +555,7 @@ const InvoisPage: React.FC = () => {
   };
 
   const handleInvoiceClick = (invoiceData: InvoiceData) => {
-    navigate(`/sales/invois/details`, {
+    navigate(`/sales/invoice/details`, {
       state: {
         invoiceData,
         isNewInvoice: false,
@@ -749,7 +749,7 @@ const InvoisPage: React.FC = () => {
             }`}
           >
             <h1 className="text-3xl font-semibold text-default-900">
-              Invois {selectedCount > 0 && `(${selectedCount})`}
+              Invoice {selectedCount > 0 && `(${selectedCount})`}
             </h1>
             <div className="flex items-center gap-3">
               {selectedCount > 0 && (

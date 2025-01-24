@@ -57,13 +57,13 @@ export const SidebarData: SidebarItem[] = [
     icon: IconPackage,
     subItems: [
       {
-        name: "Invois",
-        path: "/sales/invois",
+        name: "Invoice",
+        path: "/sales/invoice",
         component: InvoisPage,
         subItems: [
           {
             name: "Invois Details",
-            path: "/sales/invois/:id",
+            path: "/sales/invoice/:id",
             component: InvoisDetailsPage,
           },
           {
@@ -73,24 +73,24 @@ export const SidebarData: SidebarItem[] = [
           },
           {
             name: "Imported Invois Page",
-            path: "/sales/invois/imported",
+            path: "/sales/invoice/imported",
             component: InvoisUploadPage,
           },
           {
             name: "Imported Invois Details",
-            path: "/sales/invois/imported/:id",
+            path: "/sales/invoice/imported/:id",
             component: InvoisDetailsPage,
           },
           {
             name: "Create New Invois Page",
-            path: "/sales/invois/create",
+            path: "/sales/invoice/create",
             component: InvoisDetailsPage,
           },
         ],
       },
       {
         name: "e-Invoice",
-        path: "/sales/einvois",
+        path: "/sales/einvoice",
         component: EInvoisPage,
       },
     ],
