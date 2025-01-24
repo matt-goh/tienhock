@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Toaster } from "react-hot-toast";
-import { routes } from "./SidebarData";
+import { routes } from "./pages/pagesRoute";
 import { IconDeviceDesktop } from "@tabler/icons-react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Login from "./pages/Auth/Login";
