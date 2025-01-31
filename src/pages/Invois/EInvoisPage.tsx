@@ -91,22 +91,71 @@ const EInvoisPage: React.FC = () => {
     );
   };
 
-  // Effect for date range changes
-  useEffect(() => {
-    fetchEInvoices();
-  }, [dateRange.start, dateRange.end]);
+  // Create a ref to store the fetch function
+  const fetchDataRef = useRef<(() => Promise<any>) | null>(null);
 
-  // Effect for search term changes
+  // Single effect for data fetching that handles both date range and pagination
   useEffect(() => {
-    setFilteredInvoices(applySearchFilter(einvoices, searchTerm));
-  }, [searchTerm, einvoices]);
+    // Define the fetch function
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  // Effect for pagination changes
+        const queryParams = new URLSearchParams({
+          page: pagination.currentPage.toString(),
+          limit: pagination.pageSize.toString(),
+          startDate: dateRange.start.toISOString(),
+          endDate: dateRange.end.toISOString(),
+        });
+
+        const response = await api.get(
+          `/api/einvoice/list?${queryParams.toString()}`
+        );
+
+        setEInvoices(response.data);
+        setFilteredInvoices(applySearchFilter(response.data, searchTerm));
+        setPagination((prev) => ({
+          ...prev,
+          totalPages: Math.ceil(response.total / prev.pageSize),
+        }));
+
+        return response; // Return the response for external use
+      } catch (error: any) {
+        console.error("Error fetching e-invoices:", error);
+        setError("Failed to fetch e-invoices. Please try refreshing.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Store the fetch function in ref for external use
+    fetchDataRef.current = fetchData;
+
+    // Execute initial fetch
+    fetchData();
+  }, [dateRange.start, dateRange.end, pagination.currentPage, searchTerm]);
+
+  // Create a handler for the refresh button
+  const handleRefresh = async () => {
+    if (fetchDataRef.current) {
+      try {
+        await fetchDataRef.current();
+      } catch (error) {
+        console.error("Error during refresh:", error);
+      }
+    }
+  };
+
+  // Client-side search effect - only needed if search changes but date/page don't
   useEffect(() => {
-    fetchEInvoices();
-  }, [pagination.currentPage]);
+    if (!loading) {
+      // Only apply client-side filtering if not fetching
+      setFilteredInvoices(applySearchFilter(einvoices, searchTerm));
+    }
+  }, [searchTerm, einvoices, loading]);
 
-  // Scrollbar detection effect
+  // Scrollbar detection effect - UI only
   useEffect(() => {
     const checkForScrollbar = () => {
       if (tableBodyRef.current) {
@@ -117,6 +166,7 @@ const EInvoisPage: React.FC = () => {
     };
 
     checkForScrollbar();
+
     const resizeObserver = new ResizeObserver(checkForScrollbar);
     if (tableBodyRef.current) {
       resizeObserver.observe(tableBodyRef.current);
@@ -124,37 +174,6 @@ const EInvoisPage: React.FC = () => {
 
     return () => resizeObserver.disconnect();
   }, [filteredInvoices]);
-
-  // Fetch e-invoices with date range
-  const fetchEInvoices = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const queryParams = new URLSearchParams({
-        page: pagination.currentPage.toString(),
-        limit: pagination.pageSize.toString(),
-        startDate: dateRange.start.toISOString(),
-        endDate: dateRange.end.toISOString(),
-      });
-
-      const response = await api.get(
-        `/api/einvoice/list?${queryParams.toString()}`
-      );
-
-      setEInvoices(response.data);
-      setFilteredInvoices(applySearchFilter(response.data, searchTerm));
-      setPagination((prev) => ({
-        ...prev,
-        totalPages: Math.ceil(response.total / prev.pageSize),
-      }));
-    } catch (error: any) {
-      console.error("Error fetching e-invoices:", error);
-      setError("Failed to fetch e-invoices. Please try refreshing.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Get date range info for validation
   const getDateRangeInfo = (start: Date, end: Date) => {
@@ -173,8 +192,6 @@ const EInvoisPage: React.FC = () => {
     type: "start" | "end",
     currentRange: { start: Date; end: Date }
   ): { start: Date; end: Date } => {
-    console.log("Adjusting date range:", { newDate, type, currentRange });
-
     const oneMonthMs = 31 * 24 * 60 * 60 * 1000;
 
     // Check if the new range would exceed one month
@@ -395,7 +412,7 @@ const EInvoisPage: React.FC = () => {
         </div>
 
         <Button
-          onClick={fetchEInvoices}
+          onClick={handleRefresh}
           disabled={loading}
           variant="outline"
           icon={IconRefresh}
@@ -419,13 +436,20 @@ const EInvoisPage: React.FC = () => {
           >
             <table className="w-full table-fixed">
               <colgroup>
-                <col className="w-[10%]" /> {/* Invoice No */}
-                <col className="w-[10%]" /> {/* Type */}
-                <col className="w-[20%]" /> {/* Customer */}
-                <col className="w-[17%]" /> {/* Validated At */}
-                <col className="w-[9%]" /> {/* Amount */}
-                <col className="w-[22%]" /> {/* Submission ID */}
-                <col className="w-[12%]" /> {/* Actions */}
+                <col className="w-[10%]" />
+                {/* Invoice No */}
+                <col className="w-[10%]" />
+                {/* Type */}
+                <col className="w-[20%]" />
+                {/* Customer */}
+                <col className="w-[17%]" />
+                {/* Validated At */}
+                <col className="w-[9%]" />
+                {/* Amount */}
+                <col className="w-[22%]" />
+                {/* Submission ID */}
+                <col className="w-[12%]" />
+                {/* Actions */}
               </colgroup>
               <thead>
                 <tr>
@@ -462,12 +486,19 @@ const EInvoisPage: React.FC = () => {
             <table className="w-full table-fixed">
               <colgroup>
                 <col className="w-[10%]" />
+                {/* Invoice No */}
                 <col className="w-[10%]" />
+                {/* Type */}
                 <col className="w-[20%]" />
+                {/* Customer */}
                 <col className="w-[17%]" />
+                {/* Validated At */}
                 <col className="w-[9%]" />
+                {/* Amount */}
                 <col className="w-[22%]" />
+                {/* Submission ID */}
                 <col className="w-[12%]" />
+                {/* Actions */}
               </colgroup>
               <tbody className="bg-white">
                 {loading ? (
