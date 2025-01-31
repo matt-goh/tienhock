@@ -4,6 +4,8 @@ import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
 import { IconRefresh, IconSearch } from "@tabler/icons-react";
 
+const STORAGE_KEY = "einvoisDateFilters";
+
 interface EInvoice {
   uuid: string;
   submission_uid: string;
@@ -25,7 +27,31 @@ interface PaginationState {
 }
 
 const EInvoisPage: React.FC = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Function to get initial dates from localStorage
+  const getInitialDates = () => {
+    const savedFilters = localStorage.getItem(STORAGE_KEY);
+    if (savedFilters) {
+      const { start, end } = JSON.parse(savedFilters);
+      return {
+        start: start
+          ? new Date(start)
+          : new Date(today.setMonth(today.getMonth() - 1)),
+        end: end ? new Date(end) : tomorrow,
+      };
+    }
+    return {
+      start: new Date(today.setMonth(today.getMonth() - 1)),
+      end: tomorrow,
+    };
+  };
+
   const [einvoices, setEInvoices] = useState<EInvoice[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<EInvoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasScrollbar, setHasScrollbar] = useState(false);
@@ -36,12 +62,51 @@ const EInvoisPage: React.FC = () => {
     totalPages: 1,
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setMonth(new Date().getMonth() - 1)),
-    end: new Date(new Date().setDate(new Date().getDate() + 1)),
-  });
+  const [dateRange, setDateRange] = useState(getInitialDates());
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
 
+  // Apply search filter locally
+  const applySearchFilter = (data: EInvoice[], term: string) => {
+    if (!term) return data;
+
+    const searchLower = term.toLowerCase();
+    return data.filter(
+      (invoice) =>
+        invoice.internal_id.toLowerCase().includes(searchLower) ||
+        invoice.receiver_name.toLowerCase().includes(searchLower) ||
+        invoice.submission_uid.toLowerCase().includes(searchLower) ||
+        invoice.type_name.toLowerCase().includes(searchLower) ||
+        invoice.total_payable_amount.toString().includes(searchLower)
+    );
+  };
+
+  // Function to save dates to localStorage
+  const saveDatesToStorage = (startDate: Date, endDate: Date) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      })
+    );
+  };
+
+  // Effect for date range changes
+  useEffect(() => {
+    fetchEInvoices();
+  }, [dateRange.start, dateRange.end]);
+
+  // Effect for search term changes
+  useEffect(() => {
+    setFilteredInvoices(applySearchFilter(einvoices, searchTerm));
+  }, [searchTerm, einvoices]);
+
+  // Effect for pagination changes
+  useEffect(() => {
+    fetchEInvoices();
+  }, [pagination.currentPage]);
+
+  // Scrollbar detection effect
   useEffect(() => {
     const checkForScrollbar = () => {
       if (tableBodyRef.current) {
@@ -57,39 +122,118 @@ const EInvoisPage: React.FC = () => {
       resizeObserver.observe(tableBodyRef.current);
     }
 
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [einvoices]);
+    return () => resizeObserver.disconnect();
+  }, [filteredInvoices]);
 
-  // Update fetchEInvoices to use 300 records
+  // Fetch e-invoices with date range
   const fetchEInvoices = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get("/api/einvoice/list", {
-        params: {
-          page: pagination.currentPage,
-          limit: pagination.pageSize,
-          startDate: dateRange.start.toISOString(),
-          endDate: dateRange.end.toISOString(),
-        },
+
+      const queryParams = new URLSearchParams({
+        page: pagination.currentPage.toString(),
+        limit: pagination.pageSize.toString(),
+        startDate: dateRange.start.toISOString(),
+        endDate: dateRange.end.toISOString(),
       });
+
+      const response = await api.get(
+        `/api/einvoice/list?${queryParams.toString()}`
+      );
+
       setEInvoices(response.data);
+      setFilteredInvoices(applySearchFilter(response.data, searchTerm));
       setPagination((prev) => ({
         ...prev,
         totalPages: Math.ceil(response.total / prev.pageSize),
       }));
     } catch (error: any) {
+      console.error("Error fetching e-invoices:", error);
       setError("Failed to fetch e-invoices. Please try refreshing.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchEInvoices();
-  }, [searchTerm, dateRange, pagination.currentPage]);
+  // Get date range info for validation
+  const getDateRangeInfo = (start: Date, end: Date) => {
+    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+    const rangeDuration = end.getTime() - start.getTime();
+    return {
+      isWithinMonth: rangeDuration <= oneMonthMs,
+      isValidDirection: rangeDuration > 0,
+      rangeDuration,
+    };
+  };
+
+  // Adjust date range to maintain constraints
+  const adjustDateRange = (
+    newDate: Date,
+    type: "start" | "end",
+    currentRange: { start: Date; end: Date }
+  ): { start: Date; end: Date } => {
+    console.log("Adjusting date range:", { newDate, type, currentRange });
+
+    const oneMonthMs = 31 * 24 * 60 * 60 * 1000;
+
+    // Check if the new range would exceed one month
+    const rangeInfo = getDateRangeInfo(
+      type === "start" ? newDate : currentRange.start,
+      type === "end" ? newDate : currentRange.end
+    );
+
+    if (!rangeInfo.isValidDirection) {
+      // If dates are in wrong order, adjust the other date
+      return type === "start"
+        ? {
+            start: newDate,
+            end: new Date(newDate.getTime() + 24 * 60 * 60 * 1000),
+          }
+        : {
+            start: new Date(newDate.getTime() - 24 * 60 * 60 * 1000),
+            end: newDate,
+          };
+    }
+
+    if (!rangeInfo.isWithinMonth) {
+      // If range exceeds one month, adjust the other date
+      return type === "start"
+        ? { start: newDate, end: new Date(newDate.getTime() + oneMonthMs) }
+        : { start: new Date(newDate.getTime() - oneMonthMs), end: newDate };
+    }
+
+    // If range is valid, return new date with existing other date
+    return {
+      start: type === "start" ? newDate : currentRange.start,
+      end: type === "end" ? newDate : currentRange.end,
+    };
+  };
+
+  const handleDateChange = (type: "start" | "end", value: string) => {
+    // If value is empty or invalid, keep the current date
+    if (!value) {
+      return;
+    }
+
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) {
+      return;
+    }
+    const newDate = new Date(year, month - 1, day);
+
+    if (isNaN(newDate.getTime())) {
+      return;
+    }
+    // Get adjusted date range
+    const adjustedRange = adjustDateRange(newDate, type, dateRange);
+
+    // Save to storage and update state
+    saveDatesToStorage(adjustedRange.start, adjustedRange.end);
+    setDateRange(adjustedRange);
+    // Reset to first page when date changes
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
 
   const formatDateForInput = (date: Date): string => {
     const year = date.getFullYear();
@@ -217,12 +361,7 @@ const EInvoisPage: React.FC = () => {
               <input
                 type="date"
                 value={formatDateForInput(dateRange.start)}
-                onChange={(e) =>
-                  setDateRange((prev) => ({
-                    ...prev,
-                    start: new Date(e.target.value),
-                  }))
-                }
+                onChange={(e) => handleDateChange("start", e.target.value)}
                 onFocus={() => setIsDateRangeFocused(true)}
                 onBlur={() => setIsDateRangeFocused(false)}
                 className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
@@ -231,12 +370,7 @@ const EInvoisPage: React.FC = () => {
               <input
                 type="date"
                 value={formatDateForInput(dateRange.end)}
-                onChange={(e) =>
-                  setDateRange((prev) => ({
-                    ...prev,
-                    end: new Date(e.target.value),
-                  }))
-                }
+                onChange={(e) => handleDateChange("end", e.target.value)}
                 onFocus={() => setIsDateRangeFocused(true)}
                 onBlur={() => setIsDateRangeFocused(false)}
                 className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
@@ -342,7 +476,7 @@ const EInvoisPage: React.FC = () => {
                       <LoadingSpinner />
                     </td>
                   </tr>
-                ) : einvoices.length === 0 ? (
+                ) : filteredInvoices.length === 0 ? (
                   <tr>
                     <td
                       colSpan={7}
@@ -352,7 +486,7 @@ const EInvoisPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  einvoices.map((einvoice) => (
+                  filteredInvoices.map((einvoice) => (
                     <tr key={einvoice.uuid} className="border-b last:border-0">
                       <td className="px-4 py-3 text-default-700">
                         {einvoice.internal_id}
