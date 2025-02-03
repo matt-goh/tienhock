@@ -3,6 +3,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
 import { IconRefresh, IconSearch } from "@tabler/icons-react";
+import PaginationControls from "../../components/Invois/Paginationcontrols";
 
 const STORAGE_KEY = "einvoisDateFilters";
 
@@ -270,95 +271,6 @@ const EInvoisPage: React.FC = () => {
     });
   };
 
-  const PaginationControls = () => {
-    const pages = Array.from(
-      { length: pagination.totalPages },
-      (_, i) => i + 1
-    );
-    const showPages = pagination.totalPages <= 7;
-
-    const getVisiblePages = () => {
-      if (showPages) return pages;
-
-      const current = pagination.currentPage;
-      if (current <= 4)
-        return [...pages.slice(0, 5), "...", pagination.totalPages];
-      if (current >= pagination.totalPages - 3)
-        return [1, "...", ...pages.slice(-5)];
-      return [
-        1,
-        "...",
-        current - 1,
-        current,
-        current + 1,
-        "...",
-        pagination.totalPages,
-      ];
-    };
-
-    return (
-      <div className="flex items-center justify-between border-t border-default-200 bg-white px-4 py-3">
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.currentPage === 1}
-            onClick={() =>
-              setPagination((prev) => ({
-                ...prev,
-                currentPage: prev.currentPage - 1,
-              }))
-            }
-          >
-            Previous
-          </Button>
-
-          {getVisiblePages().map((page, idx) =>
-            page === "..." ? (
-              <span key={`ellipsis-${idx}`} className="px-2">
-                ...
-              </span>
-            ) : (
-              <button
-                key={page}
-                onClick={() =>
-                  setPagination((prev) => ({
-                    ...prev,
-                    currentPage: page as number,
-                  }))
-                }
-                className={`px-3 py-1 rounded-md text-sm font-medium ${
-                  page === pagination.currentPage
-                    ? "bg-default-100 text-default-700"
-                    : "text-default-600 hover:bg-default-50"
-                }`}
-              >
-                {page}
-              </button>
-            )
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.currentPage === pagination.totalPages}
-            onClick={() =>
-              setPagination((prev) => ({
-                ...prev,
-                currentPage: prev.currentPage + 1,
-              }))
-            }
-          >
-            Next
-          </Button>
-        </div>
-        <div className="text-sm text-default-600">
-          Showing page {pagination.currentPage} of {pagination.totalPages}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col px-6">
       <div className="flex justify-between items-center mb-4">
@@ -554,7 +466,14 @@ const EInvoisPage: React.FC = () => {
             </table>
           </div>
         </div>
-        <PaginationControls />
+        <PaginationControls
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          itemsCount={filteredInvoices.length}
+          onPageChange={(page) =>
+            setPagination((prev) => ({ ...prev, currentPage: page }))
+          }
+        />
       </div>
     </div>
   );
