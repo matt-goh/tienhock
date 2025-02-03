@@ -4,6 +4,7 @@ import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
 import { IconRefresh, IconSearch } from "@tabler/icons-react";
 import PaginationControls from "../../components/Invois/Paginationcontrols";
+import QRCodeModal from "../../components/Invois/QRCodeModal";
 
 const STORAGE_KEY = "einvoisDateFilters";
 
@@ -65,6 +66,8 @@ const EInvoisPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState(getInitialDates());
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
@@ -462,7 +465,11 @@ const EInvoisPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <Button
-                          onClick={() => {}}
+                          onClick={() => {
+                            const url = `https://myinvois.hasil.gov.my/${einvoice.uuid}/share/${einvoice.long_id}`;
+                            setQrCodeUrl(url);
+                            setIsQRModalOpen(true);
+                          }}
                           disabled={false}
                           variant="outline"
                           size="sm"
@@ -486,6 +493,11 @@ const EInvoisPage: React.FC = () => {
           }
         />
       </div>
+      <QRCodeModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        url={qrCodeUrl}
+      />
     </div>
   );
 };
