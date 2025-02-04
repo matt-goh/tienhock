@@ -1,0 +1,255 @@
+// src/utils/invoice/einvoice/eInvoisPDF.tsx
+import React from "react";
+import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
+import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
+
+// Define styles
+const styles = StyleSheet.create({
+  page: {
+    padding: 40,
+    fontSize: 10,
+    fontFamily: "Helvetica",
+  },
+  logo: {
+    width: 120,
+    height: "auto",
+    marginBottom: 10,
+    objectFit: "contain",
+  },
+  section: {
+    marginBottom: 20,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  companyInfo: {
+    maxWidth: "60%",
+  },
+  companyName: {
+    fontSize: 16,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 8,
+  },
+  companyDetail: {
+    marginBottom: 4,
+  },
+  qrCode: {
+    width: 100,
+    height: 100,
+  },
+  title: {
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  col50: {
+    width: "50%",
+    paddingRight: 10,
+    marginBottom: 8,
+  },
+  label: {
+    color: "#6B7280",
+    marginBottom: 2,
+    fontSize: 8,
+  },
+  value: {
+    fontSize: 9,
+  },
+  bold: {
+    fontFamily: "Helvetica-Bold",
+  },
+  table: {
+    marginTop: 15,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#F9FAFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    padding: 8,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    padding: 8,
+  },
+  tableCell: {
+    fontSize: 9,
+  },
+  summary: {
+    marginTop: 20,
+    alignItems: "flex-end",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 4,
+  },
+  summaryLabel: {
+    width: 100,
+    textAlign: "right",
+    marginRight: 10,
+  },
+  summaryValue: {
+    width: 80,
+    textAlign: "right",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 30,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    color: "#6B7280",
+    fontSize: 8,
+  },
+});
+
+interface Props {
+  data: EInvoicePDFData;
+  qrCodeData: string;
+}
+
+const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
+  return (
+    <Page size="A4" style={styles.page}>
+      {/* Header Section */}
+      <View style={styles.header}>
+        <View style={styles.companyInfo}>
+          <Image src="../tienhock.png" style={styles.logo} />
+          <Text style={styles.companyName}>{data.company.name || ""}</Text>
+          <Text style={styles.companyDetail}>
+            Reg. No: {data.company.reg_no || ""}
+          </Text>
+          <Text style={styles.companyDetail}>{data.company.address || ""}</Text>
+          <Text style={styles.companyDetail}>
+            {data.company.postcode || ""} {data.company.city || ""}{" "}
+            {data.company.state || ""}
+          </Text>
+          <Text style={styles.companyDetail}>
+            Tel: {data.company.phone || ""}
+          </Text>
+          <Text style={styles.companyDetail}>
+            Email: {data.company.email || ""}
+          </Text>
+        </View>
+        <View style={styles.qrCode}>
+          <Image src={qrCodeData} style={styles.qrCode} />
+        </View>
+      </View>
+
+      {/* E-Invoice Title */}
+      <Text style={styles.title}>E-INVOICE</Text>
+
+      {/* Company Registration Details */}
+      <View style={styles.section}>
+        <View style={styles.grid}>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Supplier TIN</Text>
+            <Text style={styles.value}>{data.company.tin || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Invoice Number</Text>
+
+            <Text style={styles.value}>{data.invoice.number || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Supplier BRN / IC / Passport No</Text>
+            <Text style={styles.value}>{data.company.reg_no || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>UUID</Text>
+            <Text style={styles.value}>{data.invoice.uuid || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Supplier SST ID</Text>
+            <Text style={styles.value}>{data.company.sst_id || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Issued Date</Text>
+            <Text style={styles.value}>{data.invoice.date || ""}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Buyer Information */}
+      <View style={styles.section}>
+        <View style={styles.grid}>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Buyer TIN</Text>
+            <Text style={styles.value}>{data.buyer.tin || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Buyer SST No</Text>
+            <Text style={styles.value}>{data.buyer.sst_no || "NA"}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Buyer Name</Text>
+            <Text style={styles.value}>{data.buyer.name || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Buyer Contact No</Text>
+            <Text style={styles.value}>{data.buyer.contact || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Buyer Reg / IC / Passport No</Text>
+            <Text style={styles.value}>{data.buyer.reg_no || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text style={styles.label}>Buyer Email</Text>
+            <Text style={styles.value}>{data.buyer.email || ""}</Text>
+          </View>
+        </View>
+        <View style={[styles.col50, { width: "100%" }]}>
+          <Text style={styles.label}>Buyer Address</Text>
+          <Text style={styles.value}>
+            {data.buyer.address || ""}
+            {"\n"}
+            {data.buyer.city && data.buyer.state
+              ? `\n${data.buyer.city}, ${data.buyer.state}`
+              : ""}
+          </Text>
+        </View>
+      </View>
+
+      {/* Summary Section */}
+      <View style={styles.summary}>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Subtotal</Text>
+          <Text style={styles.summaryValue}>
+            RM {data.amounts.subtotal?.toFixed(2) || "0.00"}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Tax Amount</Text>
+          <Text style={styles.summaryValue}>
+            RM {data.amounts.tax?.toFixed(2) || "0.00"}
+          </Text>
+        </View>
+        <View style={[styles.summaryRow, styles.bold]}>
+          <Text style={styles.summaryLabel}>Total</Text>
+          <Text style={styles.summaryValue}>
+            RM {data.amounts.total?.toFixed(2) || "0.00"}
+          </Text>
+        </View>
+      </View>
+
+      {/* Footer */}
+      <Text style={styles.footer}>
+        This document is computer generated e-Invoice.
+      </Text>
+    </Page>
+  );
+};
+
+export default EInvoisPDF;

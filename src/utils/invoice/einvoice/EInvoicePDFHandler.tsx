@@ -1,56 +1,44 @@
+// src/utils/invoice/einvoice/EInvoicePDFHandler.tsx
 import React, { useState, useEffect } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
-import { InvoiceData } from "../../../types/types";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
 import Button from "../../../components/Button";
-import InvoisPDF from "./InvoisPDF";
 import toast from "react-hot-toast";
-import { generatePDFFilename } from "./generatePDFFilename";
+import { preparePDFData } from "../../../services/einvoice-pdf.service";
+import EInvoisPDF from "./eInvoisPDF";
+import { generateQRDataUrl } from "./generateQRCode";
 
 interface PDFDownloadHandlerProps {
-  invoices: InvoiceData[];
+  einvoice: any; // We'll type this properly once we have the exact type
   disabled?: boolean;
 }
 
-const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
-  invoices,
+const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
+  einvoice,
   disabled,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [logoImage, setLogoImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadImage = async () => {
-      try {
-        const response = await fetch("../tienhock.png");
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      } catch (error) {
-        console.warn("Error loading logo:", error);
-        return null;
-      }
-    };
-
-    loadImage().then(setLogoImage);
-  }, []);
 
   const handleDownload = async () => {
     if (isGenerating) return;
 
     setIsGenerating(true);
-    const toastId = toast.loading("Generating PDF...");
+    const toastId = toast.loading("Generating e-invoice PDF...");
 
     try {
-      // First render the PDF component
+      // Generate QR code first
+      const qrDataUrl = await generateQRDataUrl(
+        einvoice.uuid,
+        einvoice.long_id
+      );
+
+      // Prepare the data
+      const pdfData = await preparePDFData(einvoice);
+
+      // Create PDF
       const pdfComponent = (
-        <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-          <InvoisPDF invoices={invoices} logoData={logoImage} />
+        <Document title={`einvoice-${einvoice.internal_id}`}>
+          <EInvoisPDF data={pdfData} qrCodeData={qrDataUrl} />
         </Document>
       );
 
@@ -61,18 +49,18 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Create and trigger download
       const link = document.createElement("a");
       link.href = pdfUrl;
-      link.download = generatePDFFilename(invoices);
+      link.download = `einvoice-${einvoice.internal_id}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
       // Cleanup
       URL.revokeObjectURL(pdfUrl);
-      toast.success("PDF downloaded successfully", { id: toastId });
+      toast.success("E-invoice PDF downloaded successfully", { id: toastId });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error(
-        `Failed to generate PDF: ${
+        `Failed to generate e-invoice PDF: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
         { id: toastId }
@@ -82,10 +70,6 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
     }
   };
 
-  if (!invoices || invoices.length === 0) {
-    return null;
-  }
-
   return (
     <Button
       onClick={handleDownload}
@@ -94,10 +78,11 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       iconSize={16}
       iconStroke={2}
       variant="outline"
+      size="sm"
     >
       {isGenerating ? "Generating..." : "Download"}
     </Button>
   );
 };
 
-export default PDFDownloadHandler;
+export default EInvoicePDFHandler;
