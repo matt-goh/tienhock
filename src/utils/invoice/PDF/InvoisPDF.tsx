@@ -487,7 +487,10 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
                 {logoData ? (
                   <Image src={logoData} style={styles.logo} />
                 ) : (
-                  <Image src="/tienhock.png" style={styles.logo} />
+                  <Image
+                    src="../tienhock.png"
+                    style={styles.logo}
+                  />
                 )}
                 <View style={styles.headerTextContainer}>
                   <Text style={styles.companyName}>

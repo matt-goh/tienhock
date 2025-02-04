@@ -4,7 +4,7 @@ import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
 import { IconRefresh, IconSearch } from "@tabler/icons-react";
 import PaginationControls from "../../components/Invois/Paginationcontrols";
-import QRCodeModal from "../../components/Invois/QRCodeModal";
+import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 
 const STORAGE_KEY = "einvoisDateFilters";
 
@@ -464,18 +464,10 @@ const EInvoisPage: React.FC = () => {
                         {einvoice.submission_uid}
                       </td>
                       <td className="px-4 py-3">
-                        <Button
-                          onClick={() => {
-                            const url = `https://myinvois.hasil.gov.my/${einvoice.uuid}/share/${einvoice.long_id}`;
-                            setQrCodeUrl(url);
-                            setIsQRModalOpen(true);
-                          }}
+                        <EInvoicePDFHandler
+                          einvoice={einvoice}
                           disabled={false}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Download
-                        </Button>
+                        />
                       </td>
                     </tr>
                   ))
@@ -493,11 +485,6 @@ const EInvoisPage: React.FC = () => {
           }
         />
       </div>
-      <QRCodeModal
-        isOpen={isQRModalOpen}
-        onClose={() => setIsQRModalOpen(false)}
-        url={qrCodeUrl}
-      />
     </div>
   );
 };
