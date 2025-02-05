@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
   },
   logo: {
-    width: 120,
+    width: 80,
     height: "auto",
     marginBottom: 10,
     objectFit: "contain",
@@ -62,8 +62,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   qrCode: {
-    width: 100,
-    height: 100,
+    width: 75,
+    height: 75,
   },
   title: {
     fontSize: 14,
