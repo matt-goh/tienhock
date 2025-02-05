@@ -32,27 +32,24 @@ const getStateName = (stateId: string): string => {
 // Define styles
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 10,
+    padding: 35,
+    fontSize: 9,
     fontFamily: "Helvetica",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  section: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   companySection: {
     flexDirection: "row",
     flex: 1,
-    marginRight: 20,
+    marginRight: 15,
   },
   logo: {
-    width: 80,
-    height: 80,
-    marginRight: 15,
+    width: 70,
+    height: 70,
+    marginRight: 12,
   },
   companyInfo: {
     flex: 1,
@@ -60,23 +57,28 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   companyName: {
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   companyDetail: {
     fontSize: 9,
-    marginBottom: 2,
+    marginBottom: 1,
+    lineHeight: 1.3,
   },
   qrCode: {
-    width: 75,
-    height: 75,
+    width: 70,
+    height: 70,
     alignSelf: "flex-start",
   },
   title: {
-    fontSize: 14,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 15,
-    textAlign: "center",
+    marginBottom: 8,
+    textAlign: "right",
+  },
+  section: {
+    marginBottom: 12,
   },
   grid: {
     flexDirection: "row",
@@ -85,15 +87,12 @@ const styles = StyleSheet.create({
   col50: {
     width: "50%",
     paddingRight: 10,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  label: {
-    color: "#6B7280",
-    marginBottom: 2,
-    fontSize: 8,
-  },
-  value: {
-    fontSize: 9,
+  separator: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    marginVertical: 8,
   },
   bold: {
     fontFamily: "Helvetica-Bold",
@@ -169,7 +168,8 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
               {data.company.address || ""}
             </Text>
             <Text style={styles.companyDetail}>
-              {data.company.postcode || ""}, {data.company.city || ""}{", "}
+              {data.company.postcode || ""}, {data.company.city || ""}
+              {", "}
               {data.company.state || ""}
             </Text>
             <Text style={styles.companyDetail}>
@@ -184,75 +184,73 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
       </View>
 
       {/* E-Invoice Title */}
-      <Text style={styles.title}>E-INVOICE</Text>
+      <Text style={styles.title}>e-Invoice</Text>
 
       {/* Company Registration Details */}
       <View style={styles.section}>
         <View style={styles.grid}>
           <View style={styles.col50}>
-            <Text style={styles.label}>Supplier TIN</Text>
-            <Text style={styles.value}>{data.company.tin || ""}</Text>
+            <Text>Supplier TIN: {data.company.tin || ""}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Invoice Number</Text>
-
-            <Text style={styles.value}>{data.invoice.number || ""}</Text>
+            <Text>Invoice Number: {data.invoice.number || ""}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Supplier BRN / IC / Passport No</Text>
-            <Text style={styles.value}>{data.company.reg_no || ""}</Text>
+            <Text>
+              Supplier Reg / IC / Passport No: {data.company.reg_no || ""}
+            </Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>UUID</Text>
-            <Text style={styles.value}>{data.invoice.uuid || ""}</Text>
+            <Text>UUID: {data.invoice.uuid || ""}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Supplier SST ID</Text>
-            <Text style={styles.value}>{data.company.sst_id || ""}</Text>
+            <Text>Supplier SST ID: {data.company.sst_id || ""}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Issued Date</Text>
-            <Text style={styles.value}>{data.invoice.date || ""}</Text>
+            <Text>Issued Date: {data.invoice.date || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text>Supplier MSIC Code: {data.company.msic_code || ""}</Text>
           </View>
         </View>
+        <View style={styles.separator} />
       </View>
 
-      {/* Buyer Information */}
+      {/* Customer Information */}
       <View style={styles.section}>
         <View style={styles.grid}>
           <View style={styles.col50}>
-            <Text style={styles.label}>Buyer TIN</Text>
-            <Text style={styles.value}>{data.buyer.tin || ""}</Text>
+            <Text>Customer TIN: {data.buyer.tin || ""}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Buyer SST No</Text>
-            <Text style={styles.value}>{data.buyer.sst_no || "NA"}</Text>
+            <Text>Currency Code: MYR</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Buyer Name</Text>
-            <Text style={styles.value}>{data.buyer.name || ""}</Text>
+            <Text>Customer Name: {data.buyer.name || ""}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Buyer Contact No</Text>
-            <Text style={styles.value}>{data.buyer.contact || ""}</Text>
+            <Text>
+              Customer Reg / IC / Passport No: {data.buyer.reg_no || ""}
+            </Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Buyer Reg / IC / Passport No</Text>
-            <Text style={styles.value}>{data.buyer.reg_no || ""}</Text>
+            <Text>Customer SST No: {data.buyer.sst_no || "NA"}</Text>
           </View>
           <View style={styles.col50}>
-            <Text style={styles.label}>Buyer Email</Text>
-            <Text style={styles.value}>{data.buyer.email || ""}</Text>
+            <Text>Customer Contact No: {data.buyer.contact || ""}</Text>
           </View>
-        </View>
-        <View style={[styles.col50, { width: "100%" }]}>
-          <Text style={styles.label}>Buyer Address</Text>
-          <Text style={styles.value}>
-            {data.buyer.address || ""}
-            {data.buyer.city && data.buyer.state
-              ? `, ${data.buyer.city}, ${getStateName(data.buyer.state)}`
-              : ""}
-          </Text>
+          <View style={styles.col50}>
+            <Text>Customer Email: {data.buyer.email || ""}</Text>
+          </View>
+          <View style={styles.col50}>
+            <Text>
+              Customer Address: {data.buyer.address || ""}
+              {", "}
+              {data.buyer.city && data.buyer.state
+                ? `${data.buyer.city}, ${getStateName(data.buyer.state)}`
+                : ""}
+            </Text>
+          </View>
         </View>
       </View>
 
