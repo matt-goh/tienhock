@@ -8,7 +8,7 @@ export const COMPANY_INFO = {
   reg_no: "201101025173",
   sst_id: "N/A",
   msic_code: "10741",
-  address: "CL.215145645, KG KIBABAIG, PENAMPANG",
+  address: "CL.215145645, Kg. Kibabaig, Penampang",
   city: "Kota Kinabalu",
   postcode: "88811",
   state: "Sabah",
