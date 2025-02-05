@@ -36,34 +36,41 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Helvetica",
   },
-  logo: {
-    width: 80,
-    height: "auto",
-    marginBottom: 10,
-    objectFit: "contain",
-  },
-  section: {
-    marginBottom: 20,
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 20,
   },
+  section: {
+    marginBottom: 20,
+  },
+  companySection: {
+    flexDirection: "row",
+    flex: 1,
+    marginRight: 20,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginRight: 15,
+  },
   companyInfo: {
-    maxWidth: "60%",
+    flex: 1,
+    justifyContent: "center",
+    color: "#111827",
   },
   companyName: {
-    fontSize: 16,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   companyDetail: {
-    marginBottom: 4,
+    fontSize: 9,
+    marginBottom: 2,
   },
   qrCode: {
     width: 75,
     height: 75,
+    alignSelf: "flex-start",
   },
   title: {
     fontSize: 14,
@@ -151,27 +158,29 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
     <Page size="A4" style={styles.page}>
       {/* Header Section */}
       <View style={styles.header}>
-        <View style={styles.companyInfo}>
+        <View style={styles.companySection}>
           <Image src="../tienhock.png" style={styles.logo} />
-          <Text style={styles.companyName}>{data.company.name || ""}</Text>
-          <Text style={styles.companyDetail}>
-            Reg. No: {data.company.reg_no || ""}
-          </Text>
-          <Text style={styles.companyDetail}>{data.company.address || ""}</Text>
-          <Text style={styles.companyDetail}>
-            {data.company.postcode || ""} {data.company.city || ""}{" "}
-            {data.company.state || ""}
-          </Text>
-          <Text style={styles.companyDetail}>
-            Tel: {data.company.phone || ""}
-          </Text>
-          <Text style={styles.companyDetail}>
-            Email: {data.company.email || ""}
-          </Text>
+          <View style={styles.companyInfo}>
+            <Text style={styles.companyName}>{data.company.name || ""}</Text>
+            <Text style={styles.companyDetail}>
+              Reg. No: {data.company.reg_no || ""}
+            </Text>
+            <Text style={styles.companyDetail}>
+              {data.company.address || ""}
+            </Text>
+            <Text style={styles.companyDetail}>
+              {data.company.postcode || ""}, {data.company.city || ""}{", "}
+              {data.company.state || ""}
+            </Text>
+            <Text style={styles.companyDetail}>
+              Tel: {data.company.phone || ""}
+            </Text>
+            <Text style={styles.companyDetail}>
+              Email: {data.company.email || ""}
+            </Text>
+          </View>
         </View>
-        <View style={styles.qrCode}>
-          <Image src={qrCodeData} style={styles.qrCode} />
-        </View>
+        <Image src={qrCodeData} style={styles.qrCode} />
       </View>
 
       {/* E-Invoice Title */}
