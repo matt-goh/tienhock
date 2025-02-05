@@ -3,6 +3,32 @@ import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
 
+// State mapping
+const stateOptions = [
+  { id: "01", name: "Johor" },
+  { id: "02", name: "Kedah" },
+  { id: "03", name: "Kelantan" },
+  { id: "04", name: "Melaka" },
+  { id: "05", name: "Negeri Sembilan" },
+  { id: "06", name: "Pahang" },
+  { id: "07", name: "Pulau Pinang" },
+  { id: "08", name: "Perak" },
+  { id: "09", name: "Perlis" },
+  { id: "10", name: "Selangor" },
+  { id: "11", name: "Terengganu" },
+  { id: "12", name: "Sabah" },
+  { id: "13", name: "Sarawak" },
+  { id: "14", name: "Wilayah Persekutuan Kuala Lumpur" },
+  { id: "15", name: "Wilayah Persekutuan Labuan" },
+  { id: "16", name: "Wilayah Persekutuan Putrajaya" },
+  { id: "17", name: "N/A" },
+];
+
+const getStateName = (stateId: string): string => {
+  const state = stateOptions.find((state) => state.id === stateId);
+  return state ? state.name : stateId;
+};
+
 // Define styles
 const styles = StyleSheet.create({
   page: {
@@ -214,9 +240,8 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
           <Text style={styles.label}>Buyer Address</Text>
           <Text style={styles.value}>
             {data.buyer.address || ""}
-            {"\n"}
             {data.buyer.city && data.buyer.state
-              ? `\n${data.buyer.city}, ${data.buyer.state}`
+              ? `, ${data.buyer.city}, ${getStateName(data.buyer.state)}`
               : ""}
           </Text>
         </View>

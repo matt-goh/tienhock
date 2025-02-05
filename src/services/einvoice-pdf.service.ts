@@ -3,17 +3,17 @@ import { api } from "../routes/utils/api";
 
 // Static company configuration
 export const COMPANY_INFO = {
-  name: "TIENHOCK ENTERPRISE",
-  tin: "C3854941070",
-  reg_no: "198401001304",
-  sst_id: "W10-1808-32001143",
-  msic_code: "47612",
-  address: "8, Jalan 7/118B, Desa Tun Razak",
-  city: "Kuala Lumpur",
-  postcode: "56000",
-  state: "Wilayah Persekutuan Kuala Lumpur",
-  phone: "0391796333",
-  email: "my.einvoice-ar@tienhock.com",
+  name: "TIEN HOCK FOOD INDUSTRIES S/B",
+  tin: "C21636482050",
+  reg_no: "201101025173",
+  sst_id: "N/A",
+  msic_code: "10741",
+  address: "CL.215145645, KG KIBABAIG, PENAMPANG",
+  city: "Kota Kinabalu",
+  postcode: "88811",
+  state: "Sabah",
+  phone: "0168329291",
+  email: "tienhockfood@gmail.com",
 };
 
 // Types
