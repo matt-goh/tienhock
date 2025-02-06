@@ -24,7 +24,7 @@ export interface EInvoicePDFData {
     uuid: string;
     long_id: string;
     type: string;
-    date: string;
+    datetime_validated: string;
     submission_id: string;
   };
   buyer: {
@@ -69,11 +69,17 @@ const fetchCustomerDetails = async (receiverId: string) => {
 // Format date helper
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
-  return date.toLocaleDateString("en-MY", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12; // Convert 0 to 12
+
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 };
 
 // Format currency helper
@@ -105,7 +111,7 @@ export const preparePDFData = async (
       uuid: einvoiceData.uuid,
       long_id: einvoiceData.long_id,
       type: einvoiceData.type_name,
-      date: formatDate(einvoiceData.datetime_validated),
+      datetime_validated: formatDate(einvoiceData.datetime_validated),
       submission_id: einvoiceData.submission_uid,
     },
     buyer: {

@@ -1,5 +1,5 @@
 // src/utils/invoice/einvoice/EInvoicePDFHandler.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
 import Button from "../../../components/Button";

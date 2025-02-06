@@ -66,8 +66,6 @@ const EInvoisPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState(getInitialDates());
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
-  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
