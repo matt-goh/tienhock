@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   companySection: {
     flexDirection: "row",
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   invoiceDetails: {
-    marginBottom: 16,
+    marginBottom: 6,
   },
   detailRow: {
     flexDirection: "row",
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: "right",
   },
   infoContainer: {
@@ -101,24 +101,21 @@ const styles = StyleSheet.create({
     flex: 1,
     border: "1 solid #9CA3AF",
     borderRadius: 6,
-    padding: 12,
-  },
-  infoSection: {
-    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   infoTitle: {
     fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
-    fontSize: 10,
+    marginBottom: 6,
     textTransform: "uppercase",
   },
   infoRow: {
     flexDirection: "row",
-    marginBottom: 4,
+    lineHeight: 0.75,
   },
   infoLabel: {
-    width: "30%",
-    paddingRight: 8,
+    width: "35%",
+    paddingRight: 6,
   },
   infoValue: {
     flex: 1,
@@ -256,29 +253,35 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
         {/* FROM Container */}
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>FROM</Text>
-          <View style={styles.infoSection}>
+          <View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier TIN:</Text>
+              <Text style={styles.infoLabel}>Supplier TIN</Text>
               <Text style={styles.infoValue}>{data.company.tin}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier Name:</Text>
+              <Text style={styles.infoLabel}>Supplier Name</Text>
               <Text style={styles.infoValue}>{data.company.name}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier SST No:</Text>
-              <Text style={styles.infoValue}>{data.company.sst_id}</Text>
+              <Text style={styles.infoLabel}>Supplier BRN:</Text>
+              <Text style={styles.infoValue}>{data.company.reg_no}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Billing Address:</Text>
+              <Text style={styles.infoLabel}>Supplier SST No.</Text>
+              <Text style={styles.infoValue}>
+                {data.company.sst_id || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Billing Address</Text>
               <Text style={styles.infoValue}>{data.company.address}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Contact No:</Text>
+              <Text style={styles.infoLabel}>Contact No.</Text>
               <Text style={styles.infoValue}>{data.company.phone}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email:</Text>
+              <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{data.company.email}</Text>
             </View>
           </View>
@@ -287,21 +290,25 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
         {/* BILLING TO Container */}
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>BILLING TO</Text>
-          <View style={styles.infoSection}>
+          <View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer TIN:</Text>
+              <Text style={styles.infoLabel}>Customer TIN</Text>
               <Text style={styles.infoValue}>{data.buyer.tin}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer Name:</Text>
+              <Text style={styles.infoLabel}>Customer Name</Text>
               <Text style={styles.infoValue}>{data.buyer.name}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer SST No:</Text>
-              <Text style={styles.infoValue}>{data.buyer.sst_no}</Text>
+              <Text style={styles.infoLabel}>Customer Reg No.</Text>
+              <Text style={styles.infoValue}>{data.buyer.reg_no}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Billing Address:</Text>
+              <Text style={styles.infoLabel}>Customer SST No.</Text>
+              <Text style={styles.infoValue}>{data.buyer.sst_no || "N/A"}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Billing Address</Text>
               <Text style={styles.infoValue}>
                 {data.buyer.address}
                 {data.buyer.city && data.buyer.state
@@ -310,11 +317,11 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
               </Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Contact No:</Text>
+              <Text style={styles.infoLabel}>Contact No.</Text>
               <Text style={styles.infoValue}>{data.buyer.contact}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email:</Text>
+              <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{data.buyer.email}</Text>
             </View>
           </View>
