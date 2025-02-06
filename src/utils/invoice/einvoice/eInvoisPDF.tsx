@@ -32,7 +32,7 @@ const getStateName = (stateId: string): string => {
 // Define styles
 const styles = StyleSheet.create({
   page: {
-    padding: 35,
+    padding: 20,
     fontSize: 9,
     fontFamily: "Helvetica",
   },
@@ -71,24 +71,57 @@ const styles = StyleSheet.create({
     height: 70,
     alignSelf: "flex-start",
   },
-  title: {
-    fontSize: 10,
+  invoiceDetails: {
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  detailLabel: {
     fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
+    width: 120,
+  },
+  detailValue: {
+    flex: 1,
+    textAlign: "right",
+  },
+  title: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 10,
     textAlign: "right",
   },
   infoContainer: {
     flexDirection: "row",
-    marginTop: 4,
-    gap: 12,
+    gap: 8,
   },
   infoBox: {
     flex: 1,
     border: "1 solid #9CA3AF",
     borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 80,
+    padding: 12,
+  },
+  infoSection: {
+    marginBottom: 8,
+  },
+  infoTitle: {
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 8,
+    fontSize: 10,
+    textTransform: "uppercase",
+  },
+  infoRow: {
+    flexDirection: "row",
+    marginBottom: 4,
+  },
+  infoLabel: {
+    width: "30%",
+    paddingRight: 8,
+  },
+  infoValue: {
+    flex: 1,
   },
   infoColumns: {
     flexDirection: "row",
@@ -97,9 +130,6 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
     paddingRight: 15,
-  },
-  infoRow: {
-    lineHeight: 0.75,
   },
   section: {
     marginBottom: 12,
@@ -179,23 +209,17 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
         <View style={styles.companySection}>
           <Image src="../tienhock.png" style={styles.logo} />
           <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>{data.company.name || ""}</Text>
+            <Text style={styles.companyName}>{data.company.name}</Text>
             <Text style={styles.companyDetail}>
-              Reg. No: {data.company.reg_no || ""}
+              Reg. No: {data.company.reg_no}
             </Text>
+            <Text style={styles.companyDetail}>{data.company.address}</Text>
             <Text style={styles.companyDetail}>
-              {data.company.address || ""}
+              {data.company.postcode}, {data.company.city}, {data.company.state}
             </Text>
+            <Text style={styles.companyDetail}>Tel: {data.company.phone}</Text>
             <Text style={styles.companyDetail}>
-              {data.company.postcode || ""}, {data.company.city || ""}
-              {", "}
-              {data.company.state || ""}
-            </Text>
-            <Text style={styles.companyDetail}>
-              Tel: {data.company.phone || ""}
-            </Text>
-            <Text style={styles.companyDetail}>
-              Email: {data.company.email || ""}
+              Email: {data.company.email}
             </Text>
           </View>
         </View>
@@ -205,69 +229,94 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
       {/* E-Invoice Title */}
       <Text style={styles.title}>e-Invoice</Text>
 
-      {/* Two-Column Layout for Supplier and Customer Info */}
+      {/* Key Invoice Details */}
+      <View style={styles.invoiceDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Invoice Number</Text>
+          <Text style={styles.detailValue}>{data.invoice.number}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Unique ID No</Text>
+          <Text style={styles.detailValue}>{data.invoice.uuid}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Invoice Date & Time</Text>
+          <Text style={styles.detailValue}>
+            {data.invoice.datetime_validated}
+          </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Currency</Text>
+          <Text style={styles.detailValue}>MYR</Text>
+        </View>
+      </View>
+
+      {/* FROM and BILLING TO Containers */}
       <View style={styles.infoContainer}>
-        {/* Supplier Container */}
+        {/* FROM Container */}
         <View style={styles.infoBox}>
-          <View style={styles.infoRow}>
-            <Text>Supplier TIN: {data.company.tin || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>
-              Supplier BRN / IC / Passport No: {data.company.reg_no || ""}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Supplier SST ID: {data.company.sst_id || "N/A"}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Supplier MSIC Code: {data.company.msic_code || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Invoice Number: {data.invoice.number || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>UUID: {data.invoice.uuid || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>
-              Issued Date & Time: {data.invoice.datetime_validated || ""}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Currency Code: MYR</Text>
+          <Text style={styles.infoTitle}>FROM</Text>
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier TIN:</Text>
+              <Text style={styles.infoValue}>{data.company.tin}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier Name:</Text>
+              <Text style={styles.infoValue}>{data.company.name}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier SST No:</Text>
+              <Text style={styles.infoValue}>{data.company.sst_id}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Billing Address:</Text>
+              <Text style={styles.infoValue}>{data.company.address}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Contact No:</Text>
+              <Text style={styles.infoValue}>{data.company.phone}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Email:</Text>
+              <Text style={styles.infoValue}>{data.company.email}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Customer Container */}
+        {/* BILLING TO Container */}
         <View style={styles.infoBox}>
-          <View style={styles.infoRow}>
-            <Text>Customer TIN: {data.buyer.tin || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Customer Name: {data.buyer.name || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>
-              Customer BRN / IC / Passport No: {data.buyer.reg_no || ""}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Customer SST No: {data.buyer.sst_no || "N/A"}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>
-              Customer Address: {data.buyer.address || ""}
-              {data.buyer.city && data.buyer.state
-                ? `, ${data.buyer.city}, ${getStateName(data.buyer.state)}`
-                : ""}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Customer Contact No: {data.buyer.contact || ""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text>Customer Email: {data.buyer.email || ""}</Text>
+          <Text style={styles.infoTitle}>BILLING TO</Text>
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer TIN:</Text>
+              <Text style={styles.infoValue}>{data.buyer.tin}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer Name:</Text>
+              <Text style={styles.infoValue}>{data.buyer.name}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer SST No:</Text>
+              <Text style={styles.infoValue}>{data.buyer.sst_no}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Billing Address:</Text>
+              <Text style={styles.infoValue}>
+                {data.buyer.address}
+                {data.buyer.city && data.buyer.state
+                  ? `, ${data.buyer.city}, ${getStateName(data.buyer.state)}`
+                  : ""}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Contact No:</Text>
+              <Text style={styles.infoValue}>{data.buyer.contact}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Email:</Text>
+              <Text style={styles.infoValue}>{data.buyer.email}</Text>
+            </View>
           </View>
         </View>
       </View>
