@@ -19,7 +19,7 @@ export const COMPANY_INFO = {
 interface OrderDetail {
   productname: string;
   qty: number;
-  price: number;
+  price: string;
   total: string;
   istax: boolean;
 }
