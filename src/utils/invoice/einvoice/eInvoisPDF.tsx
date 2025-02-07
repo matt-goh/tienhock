@@ -144,24 +144,60 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
   },
   table: {
-    marginTop: 15,
+    marginTop: 20,
+    marginBottom: 20,
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#F9FAFB",
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    padding: 8,
+    borderBottomColor: "#000",
+    paddingBottom: 4,
   },
   tableRow: {
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    padding: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#666",
+    paddingVertical: 4,
   },
-  tableCell: {
+  classCol: {
+    width: "8%",
+  },
+  itemNameCol: {
+    width: "30%",
+  },
+  qtyCol: {
+    width: "5%",
+    textAlign: "center",
+  },
+  priceCol: {
+    width: "10%",
+    textAlign: "right",
+  },
+  subtotalCol: {
+    width: "10%",
+    textAlign: "right",
+  },
+  taxRateCol: {
+    width: "10%",
+    textAlign: "right",
+  },
+  taxCol: {
+    width: "10%",
+    textAlign: "right",
+  },
+  discCol: {
+    width: "7%",
+    textAlign: "right",
+  },
+  totalCol: {
+    width: "10%",
+    textAlign: "right",
+  },
+  headerText: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+  },
+  cellText: {
     fontSize: 9,
   },
   summary: {
@@ -327,6 +363,49 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
             </View>
           </View>
         </View>
+      </View>
+
+      {/* Table */}
+      <View style={styles.table}>
+        {/* Table Header */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.classCol, styles.headerText]}>Class</Text>
+          <Text style={[styles.itemNameCol, styles.headerText]}>
+            Product Name
+          </Text>
+          <Text style={[styles.qtyCol, styles.headerText]}>Qty</Text>
+          <Text style={[styles.priceCol, styles.headerText]}>U. Price</Text>
+          <Text style={[styles.subtotalCol, styles.headerText]}>Subtotal</Text>
+          <Text style={[styles.taxRateCol, styles.headerText]}>Tax %</Text>
+          <Text style={[styles.taxCol, styles.headerText]}>Tax</Text>
+          <Text style={[styles.discCol, styles.headerText]}>Disc.</Text>
+          <Text style={[styles.totalCol, styles.headerText]}>Total</Text>
+        </View>
+
+        {/* Table Rows */}
+        {data.orderDetails.map((item, index) => (
+          <View key={index} style={styles.tableRow}>
+            <Text style={[styles.classCol, styles.cellText]}>022</Text>
+            <Text style={[styles.itemNameCol, styles.cellText]}>
+              {item.productname}
+            </Text>
+            <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
+            <Text style={[styles.priceCol, styles.cellText]}>
+              {Number(item.price).toFixed(2)}
+            </Text>
+            <Text style={[styles.subtotalCol, styles.cellText]}>
+              {(item.qty * Number(item.price)).toFixed(2)}
+            </Text>
+            <Text style={[styles.taxRateCol, styles.cellText]}>
+              {item.istax ? "6" : "-"}
+            </Text>
+            <Text style={[styles.taxCol, styles.cellText]}>0.00</Text>
+            <Text style={[styles.discCol, styles.cellText]}>0.00</Text>
+            <Text style={[styles.totalCol, styles.cellText]}>
+              {Number(item.total).toFixed(2)}
+            </Text>
+          </View>
+        ))}
       </View>
 
       {/* Summary Section */}
