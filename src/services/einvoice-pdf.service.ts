@@ -16,6 +16,14 @@ export const COMPANY_INFO = {
   email: "tienhockfood@gmail.com",
 };
 
+interface OrderDetail {
+  productname: string;
+  qty: number;
+  price: number;
+  total: string;
+  istax: boolean;
+}
+
 // Types
 export interface EInvoicePDFData {
   company: typeof COMPANY_INFO;
@@ -26,6 +34,8 @@ export interface EInvoicePDFData {
     type: string;
     datetime_validated: string;
     submission_id: string;
+    date: string;
+    time: string;
   };
   buyer: {
     name: string;
@@ -43,7 +53,33 @@ export interface EInvoicePDFData {
     tax: number;
     total: number;
   };
+  orderDetails: OrderDetail[];
 }
+
+// Helper function to fetch invoice details
+const fetchInvoiceDetails = async (invoiceId: string) => {
+  try {
+    const response = await api.get(`/api/invoices/details/${invoiceId}/basic`);
+    return {
+      date: response.date,
+      time: response.time,
+    };
+  } catch (error) {
+    console.error("Error fetching invoice details:", error);
+    throw error;
+  }
+};
+
+// Helper function to fetch order details
+const fetchOrderDetails = async (invoiceId: string) => {
+  try {
+    const response = await api.get(`/api/invoices/details/${invoiceId}/items`);
+    return response;
+  } catch (error) {
+    console.error("Error fetching order details:", error);
+    throw error;
+  }
+};
 
 // Helper function to fetch customer details
 const fetchCustomerDetails = async (receiverId: string) => {
@@ -96,7 +132,11 @@ export const preparePDFData = async (
   einvoiceData: any
 ): Promise<EInvoicePDFData> => {
   // Fetch customer details
-  const customerDetails = await fetchCustomerDetails(einvoiceData.receiver_id);
+  const [customerDetails, invoiceDetails, orderDetails] = await Promise.all([
+    fetchCustomerDetails(einvoiceData.receiver_id),
+    fetchInvoiceDetails(einvoiceData.internal_id),
+    fetchOrderDetails(einvoiceData.internal_id),
+  ]);
 
   // Calculate tax amount
   const subtotal = Number(einvoiceData.total_excluding_tax);
@@ -113,6 +153,8 @@ export const preparePDFData = async (
       type: einvoiceData.type_name,
       datetime_validated: formatDate(einvoiceData.datetime_validated),
       submission_id: einvoiceData.submission_uid,
+      date: invoiceDetails.date,
+      time: invoiceDetails.time,
     },
     buyer: {
       name: customerDetails.name,
@@ -130,5 +172,6 @@ export const preparePDFData = async (
       tax,
       total,
     },
+    orderDetails: orderDetails,
   };
 };
