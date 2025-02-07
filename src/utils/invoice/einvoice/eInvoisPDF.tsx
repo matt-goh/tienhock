@@ -184,12 +184,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: "absolute",
-    bottom: 30,
+    bottom: 20,
     left: 0,
     right: 0,
     textAlign: "center",
     color: "#6B7280",
     fontSize: 8,
+    lineHeight: 1.5,
   },
 });
 
@@ -229,17 +230,17 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
       {/* Key Invoice Details */}
       <View style={styles.invoiceDetails}>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Invoice Number</Text>
+          <Text style={styles.detailLabel}>Invoice No.</Text>
           <Text style={styles.detailValue}>{data.invoice.number}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Unique ID No</Text>
+          <Text style={styles.detailLabel}>Unique ID No.</Text>
           <Text style={styles.detailValue}>{data.invoice.uuid}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Invoice Date & Time</Text>
           <Text style={styles.detailValue}>
-            {data.invoice.datetime_validated}
+            {data.invoice.date} {data.invoice.time}
           </Text>
         </View>
         <View style={styles.detailRow}>
@@ -353,6 +354,8 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
       {/* Footer */}
       <Text style={styles.footer}>
         This document is computer generated e-Invoice.
+        {"\n"}
+        Validated on {data.invoice.datetime_validated}
       </Text>
     </Page>
   );
