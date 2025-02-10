@@ -82,7 +82,7 @@ export default function (pool) {
 
       let invoiceQuery = `
         SELECT 
-          i.id, i.invoiceno, i.orderno, i.date, i.type, 
+          i.id, i.invoiceno, i.date, i.type, 
           i.customer, c.name as customername, 
           i.salesman, i.totalamount, i.time
         FROM 
@@ -276,11 +276,10 @@ export default function (pool) {
 
         // Now, either insert a new invoice or update the existing one
         const upsertInvoiceQuery = `
-          INSERT INTO Invoices (id, invoiceno, orderno, date, time, type, customer, customername, salesman, totalAmount)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          INSERT INTO Invoices (id, invoiceno, date, time, type, customer, customername, salesman, totalAmount)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (id) DO UPDATE
           SET invoiceno = EXCLUDED.invoiceno,
-              orderno = EXCLUDED.orderno,
               date = EXCLUDED.date,
               time = EXCLUDED.time,
               type = EXCLUDED.type,
@@ -292,7 +291,6 @@ export default function (pool) {
         `;
         const upsertResult = await client.query(upsertInvoiceQuery, [
           processedInvoice.id,
-          processedInvoice.invoiceno,
           processedInvoice.invoiceno,
           formattedDate,
           formattedTime,
@@ -483,17 +481,16 @@ export default function (pool) {
         // Insert invoice
         const insertInvoiceQuery = `
           INSERT INTO Invoices (
-            id, invoiceno, orderno, date, time, type, 
+            id, invoiceno, date, time, type, 
             customer, customername, salesman, totalAmount
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING *
         `;
 
         const invoiceResult = await client.query(insertInvoiceQuery, [
           invoice.invoiceno,
           invoice.invoiceno,
-          invoice.orderno,
           formattedDate,
           formattedTime,
           invoice.type,

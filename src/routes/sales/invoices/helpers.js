@@ -75,7 +75,6 @@ export const isEmptyOrInvalid = (value) => {
         SELECT 
           i.id, 
           i.invoiceno, 
-          i.orderno, 
           TO_CHAR(i.date, 'DD/MM/YYYY') as date,
           i.type,
           i.customer,

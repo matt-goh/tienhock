@@ -42,7 +42,7 @@ const SelectedInvoicesInfo: React.FC<{ selectedInvoices: InvoiceData[] }> = ({
             <p className="text-sm text-default-500">{invoice.date}</p>
           </div>
           <div className="mt-1 flex gap-2 text-xs">
-            <span className="text-default-500">Order: {invoice.orderno}</span>
+            <span className="text-default-500">Order: {invoice.invoiceno}</span>
             <span className="text-default-500">
               Type: {invoice.type === "I" ? "Invoice" : "Cash"}
             </span>

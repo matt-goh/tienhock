@@ -311,7 +311,6 @@ export interface TableProps<T> {
 export interface InvoiceData {
   id: string;
   invoiceno: string;
-  orderno: string;
   date: string;
   type: string;
   customer: string;
