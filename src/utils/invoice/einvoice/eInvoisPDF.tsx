@@ -201,7 +201,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   summary: {
-    marginTop: 20,
     alignItems: "flex-end",
   },
   summaryRow: {
@@ -210,7 +209,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   summaryLabel: {
-    width: 100,
+    width: 160,
     textAlign: "right",
     marginRight: 10,
   },
@@ -411,21 +410,31 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
       {/* Summary Section */}
       <View style={styles.summary}>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Subtotal</Text>
+          <Text style={styles.summaryLabel}>Total Discount (MYR)</Text>
+          <Text style={styles.summaryValue}>0.00</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Excl. Tax (MYR)</Text>
           <Text style={styles.summaryValue}>
-            RM {data.amounts.subtotal?.toFixed(2) || "0.00"}
+            {data.amounts.subtotal?.toFixed(2) || "0.00"}
           </Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Tax Amount</Text>
+          <Text style={styles.summaryLabel}>Tax Amount (MYR)</Text>
           <Text style={styles.summaryValue}>
-            RM {data.amounts.tax?.toFixed(2) || "0.00"}
+            {data.amounts.tax?.toFixed(2) || "0.00"}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Incl. Tax (MYR)</Text>
+          <Text style={styles.summaryValue}>
+            {data.amounts.total?.toFixed(2) || "0.00"}
           </Text>
         </View>
         <View style={[styles.summaryRow, styles.bold]}>
-          <Text style={styles.summaryLabel}>Total</Text>
+          <Text style={styles.summaryLabel}>Total Payable Amount (MYR)</Text>
           <Text style={styles.summaryValue}>
-            RM {data.amounts.total?.toFixed(2) || "0.00"}
+            {data.amounts.total?.toFixed(2) || "0.00"}
           </Text>
         </View>
       </View>
