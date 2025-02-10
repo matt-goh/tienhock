@@ -190,7 +190,6 @@ const InvoisDetailsPage: React.FC = () => {
       return {
         id: "",
         invoiceNo: "",
-        orderNo: "",
         date: new Date().toLocaleDateString("en-GB"),
         time: new Date().toLocaleTimeString("en-US", {
           hour: "2-digit",
@@ -1655,19 +1654,23 @@ const InvoisDetailsPage: React.FC = () => {
               });
             }}
           />
-          <FormInput
-            name="orderno"
-            label="Order No"
-            value={invoiceData.orderno}
-            onChange={(e) => {
+          <FormListbox
+            name="type"
+            label="Type"
+            value={getTypeDisplayName(invoiceData.type as "C" | "I")}
+            onChange={(value) => {
               setInvoiceData((prev) => {
                 if (!prev) return null;
                 return {
                   ...prev,
-                  orderno: e.target.value,
+                  type: value === "Cash" ? "C" : "I",
                 };
               });
             }}
+            options={[
+              { id: "C", name: "Cash" },
+              { id: "I", name: "Invoice" },
+            ]}
           />
           <FormInput
             name="date"
@@ -1746,24 +1749,6 @@ const InvoisDetailsPage: React.FC = () => {
               });
             }}
             options={salesmen.map((id) => ({ id, name: id }))}
-          />
-          <FormListbox
-            name="type"
-            label="Type"
-            value={getTypeDisplayName(invoiceData.type as "C" | "I")}
-            onChange={(value) => {
-              setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  type: value === "Cash" ? "C" : "I",
-                };
-              });
-            }}
-            options={[
-              { id: "C", name: "Cash" },
-              { id: "I", name: "Invoice" },
-            ]}
           />
         </div>
       </div>

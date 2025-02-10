@@ -2,7 +2,7 @@
 
 // Auth routes
 import authRouter from "./auth/auth.js";
-import testRouter from './test/test.js';
+import publicRouter from './public/public.js';
 import sessionsRouter from "./auth/sessions.js";
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -65,7 +65,7 @@ export default function setupRoutes(app, pool) {
   };
 
   // Test route
-  app.use('/api/public', testRouter(pool));
+  app.use('/api/public', publicRouter(pool));
   
   // Auth routes
   app.use("/api/auth", authRouter(pool));
