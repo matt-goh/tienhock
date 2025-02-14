@@ -1,14 +1,8 @@
 // src/routes/sales/invoices/invoices.js
 import { Router } from "express";
 import {
-  sanitizeOrderDetail,
   sanitizeNumeric,
-  shouldRemoveRow,
-  cleanupOrphanedTotalRows,
 } from "./helpers.js";
-
-// In-memory storage for uploaded invoices
-let uploadedInvoices = [];
 
 const formatDate = (date) => {
   if (date instanceof Date) {
@@ -39,345 +33,165 @@ const formatTime = (time) => {
 export default function (pool) {
   const router = Router();
 
-  // Get invoices from memory storage
+  // Get invoices with filters
   router.get("/", async (req, res) => {
     try {
-      const customerQuery = "SELECT id, name FROM customers";
-      const customerResult = await pool.query(customerQuery);
-      const customerMap = new Map(
-        customerResult.rows.map((row) => [row.id, row.name])
-      );
+      const { startDate, endDate, salesman, customer } = req.query;
 
-      const productQuery = "SELECT id, description FROM products";
-      const productResult = await pool.query(productQuery);
-      const productMap = new Map(
-        productResult.rows.map((row) => [row.id, row.description])
-      );
-
-      const invoicesWithDetails = uploadedInvoices.map((invoice) => ({
-        ...invoice,
-        customername: customerMap.get(invoice.customer) || invoice.customer,
-        orderDetails: invoice.orderDetails
-          .map((detail) => ({
-            ...sanitizeOrderDetail(detail),
-            productname: productMap.get(detail.code) || detail.code,
-          }))
-          .filter((detail) => !shouldRemoveRow(detail)),
-      }));
-
-      res.json(invoicesWithDetails);
-    } catch (error) {
-      console.error("Error fetching invoices:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching invoices", error: error.message });
-    }
-  });
-
-  // Get invoices from database with filters
-  router.get("/db", async (req, res) => {
-    try {
-      const { salesmen, customers, startDate, endDate, invoiceType } =
-        req.query;
-
-      let invoiceQuery = `
-        SELECT 
-          i.id, i.invoiceno, i.date, i.type, 
-          i.customer, c.name as customername, 
-          i.salesman, i.totalamount, i.time
-        FROM 
-          invoices i
-        LEFT JOIN 
-          customers c ON i.customer = c.id
-        WHERE 1=1
-      `;
+      let query = `
+      SELECT 
+        i.id,
+        i.salespersonid,
+        i.customerid,
+        i.createddate,
+        i.paymenttype,
+        i.totalmee,
+        i.totalbihun,
+        i.totalnontaxable,
+        i.totaltaxable,
+        i.totaladjustment,
+        json_agg(
+          json_build_object(
+            'code', od.code,
+            'price', od.price,
+            'quantity', od.quantity,
+            'freeproduct', od.freeproduct,
+            'returnproduct', od.returnproduct,
+            'invoiceid', od.invoiceid
+          )
+        ) as products
+      FROM invoices i
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE 1=1
+    `;
 
       const queryParams = [];
       let paramCounter = 1;
 
-      if (salesmen) {
-        const salesmenArray = salesmen.split(",");
-        invoiceQuery += ` AND i.salesman = ANY($${paramCounter})`;
-        queryParams.push(salesmenArray);
-        paramCounter++;
-      }
-
-      if (customers) {
-        const customersArray = customers.split(",");
-        invoiceQuery += ` AND i.customer = ANY($${paramCounter})`;
-        queryParams.push(customersArray);
-        paramCounter++;
-      }
-
       if (startDate && endDate) {
-        invoiceQuery += ` AND i.date BETWEEN $${paramCounter} AND $${
+        query += ` AND i.createddate BETWEEN $${paramCounter} AND $${
           paramCounter + 1
         }`;
         queryParams.push(startDate, endDate);
         paramCounter += 2;
       }
 
-      if (invoiceType) {
-        invoiceQuery += ` AND i.type = $${paramCounter}`;
-        queryParams.push(invoiceType);
+      if (salesman) {
+        query += ` AND i.salespersonid = $${paramCounter}`;
+        queryParams.push(salesman);
         paramCounter++;
       }
 
-      const invoiceResult = await pool.query(invoiceQuery, queryParams);
-
-      if (invoiceResult.rows.length === 0) {
-        return res.json([]);
+      if (customer) {
+        query += ` AND i.customerid = $${paramCounter}`;
+        queryParams.push(customer);
+        paramCounter++;
       }
 
-      const orderDetailsQuery = `
-        SELECT 
-          od.id,
-          od.invoiceid, 
-          od.code,
-          CASE 
-            WHEN od.isless OR od.istax THEN od.productname
-            ELSE p.description
-          END as productname,
-          od.qty, 
-          od.price, 
-          od.total, 
-          od.isfoc, 
-          od.isreturned,
-          od.istotal, 
-          od.issubtotal, 
-          od.isless, 
-          od.istax
-        FROM 
-          order_details od
-        LEFT JOIN 
-          products p ON od.code = p.id
-        WHERE
-          od.invoiceid = ANY($1)
-      `;
+      query += ` GROUP BY i.id`;
 
-      const orderDetailsResult = await pool.query(orderDetailsQuery, [
-        invoiceResult.rows.map((inv) => inv.id),
-      ]);
+      const result = await pool.query(query, queryParams);
 
-      const invoicesWithDetails = invoiceResult.rows.map((invoice) => ({
-        ...invoice,
-        date: formatDate(invoice.date),
-        time: formatTime(invoice.time),
-        totalAmount: invoice.totalamount,
-        orderDetails: orderDetailsResult.rows
-          .filter((detail) => detail.invoiceid === invoice.id)
-          .map((detail) => ({
-            id: detail.id,
-            code: detail.code,
-            productname: detail.productname,
-            qty: detail.qty,
-            price: detail.price,
-            total: detail.total,
-            isfoc: detail.isfoc,
-            isreturned: detail.isreturned,
-            istotal: detail.istotal,
-            issubtotal: detail.issubtotal,
-            isless: detail.isless,
-            istax: detail.istax,
-          })),
+      // Transform the results to ensure products is an empty array if null
+      const transformedResults = result.rows.map((row) => ({
+        ...row,
+        products: row.products[0] === null ? [] : row.products,
       }));
 
-      res.json(invoicesWithDetails);
+      res.json(transformedResults);
     } catch (error) {
       console.error("Error fetching invoices:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching invoices", error: error.message });
-    }
-  });
-
-  // Upload invoices to memory
-  router.post("/upload", (req, res) => {
-    const newInvoices = req.body.map((invoice) => ({
-      ...invoice,
-      orderDetails: invoice.orderDetails
-        .map(sanitizeOrderDetail)
-        .filter((detail) => !shouldRemoveRow(detail)),
-    }));
-
-    if (Array.isArray(newInvoices)) {
-      uploadedInvoices = [...uploadedInvoices, ...newInvoices];
-      res.json({
-        message: `${newInvoices.length} invoices uploaded successfully`,
-      });
-    } else {
-      res.status(400).json({
-        message: "Invalid data format. Expected an array of invoices.",
+      res.status(500).json({
+        message: "Error fetching invoices",
+        error: error.message,
       });
     }
   });
 
   // Submit invoice (single)
   router.post("/submit", async (req, res) => {
-    const { saveToDb } = req.query;
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
 
       const invoice = req.body;
-      const processedInvoice = {
-        ...invoice,
-        orderDetails: invoice.orderDetails.map(sanitizeOrderDetail),
-      };
 
-      const originalId = processedInvoice.id;
-      processedInvoice.id = processedInvoice.invoiceno;
+      // Check for duplicate invoice
+      const checkQuery = "SELECT id FROM invoices WHERE id = $1";
+      const checkResult = await client.query(checkQuery, [invoice.id]);
 
-      // Format date and time
-      const [day, month, year] = processedInvoice.date.split("/");
-      const formattedDate = `${year}-${month.padStart(2, "0")}-${day.padStart(
-        2,
-        "0"
-      )}`;
+      if (checkResult.rows.length > 0) {
+        throw new Error(`Invoice with ID ${invoice.id} already exists`);
+      }
 
-      const [time, period] = processedInvoice.time.split(" ");
-      let [hours, minutes] = time.split(":");
-      hours = parseInt(hours);
-      if (period.toLowerCase() === "pm" && hours !== 12) hours += 12;
-      else if (period.toLowerCase() === "am" && hours === 12) hours = 0;
-      const formattedTime = `${hours
-        .toString()
-        .padStart(2, "0")}:${minutes}:00`;
+      // Insert invoice
+      const insertInvoiceQuery = `
+        INSERT INTO invoices (
+          id,
+          salespersonid,
+          customerid,
+          createddate,
+          paymenttype,
+          totalmee,
+          totalbihun,
+          totalnontaxable,
+          totaltaxable,
+          totaladjustment
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `;
 
-      const sanitizedTotalAmount = sanitizeNumeric(
-        processedInvoice.totalAmount
-      );
+      const invoiceResult = await client.query(insertInvoiceQuery, [
+        invoice.id,
+        invoice.salespersonid,
+        invoice.customerid,
+        new Date(invoice.createddate),
+        invoice.paymenttype,
+        invoice.totalmee,
+        invoice.totalbihun,
+        invoice.totalnontaxable,
+        invoice.totaltaxable,
+        invoice.totaladjustment,
+      ]);
 
-      let savedInvoice;
-
-      if (saveToDb === "true") {
-        // Check if the invoice with the original id exists
-        const checkOriginalInvoiceQuery =
-          "SELECT id FROM Invoices WHERE id = $1";
-        const checkOriginalInvoiceResult = await client.query(
-          checkOriginalInvoiceQuery,
-          [originalId]
-        );
-
-        if (
-          checkOriginalInvoiceResult.rows.length > 0 &&
-          originalId !== processedInvoice.id
-        ) {
-          // The invoice exists and the invoice number has changed
-          // Delete the old invoice and its details
-          await client.query("DELETE FROM order_details WHERE invoiceId = $1", [
-            originalId,
-          ]);
-          await client.query("DELETE FROM Invoices WHERE id = $1", [
-            originalId,
-          ]);
-        }
-
-        // Now, either insert a new invoice or update the existing one
-        const upsertInvoiceQuery = `
-          INSERT INTO Invoices (id, invoiceno, date, time, type, customer, customername, salesman, totalAmount)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          ON CONFLICT (id) DO UPDATE
-          SET invoiceno = EXCLUDED.invoiceno,
-              date = EXCLUDED.date,
-              time = EXCLUDED.time,
-              type = EXCLUDED.type,
-              customer = EXCLUDED.customer,
-              customername = EXCLUDED.customername,
-              salesman = EXCLUDED.salesman,
-              totalAmount = EXCLUDED.totalAmount
-          RETURNING *
+      // Insert products
+      for (const product of invoice.products) {
+        const productQuery = `
+          INSERT INTO order_details (
+            invoiceid,
+            code,
+            price,
+            quantity,
+            freeproduct,
+            returnproduct
+          )
+          VALUES ($1, $2, $3, $4, $5, $6)
         `;
-        const upsertResult = await client.query(upsertInvoiceQuery, [
-          processedInvoice.id,
-          processedInvoice.invoiceno,
-          formattedDate,
-          formattedTime,
-          processedInvoice.type,
-          processedInvoice.customer,
-          processedInvoice.customername,
-          processedInvoice.salesman,
-          sanitizedTotalAmount,
+
+        await client.query(productQuery, [
+          invoice.id,
+          product.code,
+          product.price,
+          product.quantity,
+          product.freeproduct,
+          product.returnproduct,
         ]);
-        savedInvoice = upsertResult.rows[0];
-
-        // Delete existing order details and total rows for the new/updated invoice
-        await client.query("DELETE FROM order_details WHERE invoiceId = $1", [
-          savedInvoice.id,
-        ]);
-
-        // Insert new order details
-        for (const detail of processedInvoice.orderDetails) {
-          const detailQuery = `
-            INSERT INTO order_details (invoiceId, code, productname, qty, price, total, isfoc, isreturned, istotal, issubtotal, isless, istax)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          `;
-          await client.query(detailQuery, [
-            savedInvoice.id,
-            detail.code,
-            detail.productname,
-            detail.qty,
-            detail.price,
-            detail.total,
-            detail.isfoc || false,
-            detail.isreturned || false,
-            detail.istotal || false,
-            detail.issubtotal || false,
-            detail.isless || false,
-            detail.istax || false,
-          ]);
-        }
-
-        // Fetch order details for the saved invoice
-        const orderDetailsQuery = `
-          SELECT * FROM order_details WHERE invoiceId = $1
-          ORDER BY 
-            CASE 
-              WHEN istotal = true THEN 1
-              WHEN issubtotal = true THEN 2
-              WHEN isless = true THEN 3
-              WHEN istax = true THEN 4
-              WHEN isfoc = true THEN 5
-              WHEN isreturned = true THEN 6
-              ELSE 0
-            END,
-            id
-        `;
-        const orderDetailsResult = await client.query(orderDetailsQuery, [
-          savedInvoice.id,
-        ]);
-
-        // Cleanup any orphaned total rows
-        await cleanupOrphanedTotalRows(client);
-
-        savedInvoice.orderDetails = orderDetailsResult.rows;
-      } else {
-        // Memory storage operations
-        if (originalId !== processedInvoice.id) {
-          uploadedInvoices = uploadedInvoices.filter(
-            (inv) => inv.id !== originalId
-          );
-        }
-        const existingIndex = uploadedInvoices.findIndex(
-          (inv) => inv.id === processedInvoice.id
-        );
-        if (existingIndex !== -1) {
-          uploadedInvoices[existingIndex] = processedInvoice;
-        } else {
-          uploadedInvoices.push(processedInvoice);
-        }
-        savedInvoice = processedInvoice;
       }
 
       await client.query("COMMIT");
-      res.status(201).json(savedInvoice);
+      res.status(201).json({
+        message: "Invoice created successfully",
+        invoice: invoiceResult.rows[0],
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error submitting invoice:", error);
-      res
-        .status(500)
-        .json({ message: "Error submitting invoice", error: error.message });
+      res.status(500).json({
+        message: "Error submitting invoice",
+        error: error.message,
+      });
     } finally {
       client.release();
     }
@@ -531,7 +345,6 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
-      uploadedInvoices = []; // Clear memory storage
 
       res.json({
         message: `Successfully submitted ${insertedInvoices.length} invoices to the database.`,
@@ -545,23 +358,6 @@ export default function (pool) {
         .json({ message: "Error submitting invoices", error: error.message });
     } finally {
       client.release();
-    }
-  });
-
-  router.put("/:id", (req, res) => {
-    const { id } = req.params;
-    const updatedInvoice = req.body;
-
-    const index = uploadedInvoices.findIndex((invoice) => invoice.id === id);
-
-    if (index !== -1) {
-      updatedInvoice.orderDetails = updatedInvoice.orderDetails
-        .map(sanitizeOrderDetail)
-        .filter((detail) => !shouldRemoveRow(detail));
-      uploadedInvoices[index] = updatedInvoice;
-      res.status(200).json(updatedInvoice);
-    } else {
-      res.status(404).json({ message: "Invoice not found" });
     }
   });
 
@@ -633,12 +429,6 @@ export default function (pool) {
     }
   });
 
-  // Clear uploaded invoices from memory
-  router.post("/clear", (_req, res) => {
-    uploadedInvoices = [];
-    res.status(200).json({ message: "All invoices cleared successfully" });
-  });
-
   // Delete invoice from database
   router.delete("/db/:id", async (req, res) => {
     const { id } = req.params;
@@ -649,7 +439,7 @@ export default function (pool) {
         await client.query("BEGIN");
 
         // Delete order details first
-        await client.query("DELETE FROM order_details WHERE invoiceId = $1", [
+        await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
           id,
         ]);
 
@@ -677,25 +467,10 @@ export default function (pool) {
       }
     } catch (error) {
       console.error("Error deleting invoice from database:", error);
-      res
-        .status(500)
-        .json({ message: "Error deleting invoice", error: error.message });
-    }
-  });
-
-  // Delete invoice from memory
-  router.delete("/:id", (req, res) => {
-    const { id } = req.params;
-    const index = uploadedInvoices.findIndex((invoice) => invoice.id === id);
-
-    if (index !== -1) {
-      const deletedInvoice = uploadedInvoices.splice(index, 1)[0];
-      res.status(200).json({
-        message: "Invoice deleted successfully",
-        deletedInvoice,
+      res.status(500).json({
+        message: "Error deleting invoice",
+        error: error.message,
       });
-    } else {
-      res.status(404).json({ message: "Invoice not found" });
     }
   });
 

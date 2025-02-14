@@ -1,37 +1,26 @@
 import React from "react";
-import { InvoiceFilterOptions } from "../../types/types";
+import { InvoiceFilters } from "../../types/types";
 import { IconTags } from "@tabler/icons-react";
 
 interface FilterSummaryProps {
-  filters: InvoiceFilterOptions;
+  filters: InvoiceFilters;
 }
 
 const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
   const summaries: string[] = [];
-  if (filters.applyProductFilter) {
-    summaries.push("Sales by products");
-  }
 
-  if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
+  if (filters.applyPaymentTypeFilter && filters.paymentType) {
     summaries.push(
-      `Type: ${filters.invoiceTypeFilter === "C" ? "Cash" : "Invoice"}`
+      `Type: ${filters.paymentType === "Cash" ? "Cash" : "Invoice"}`
     );
   }
 
-  if (
-    filters.applySalesmanFilter &&
-    filters.salesmanFilter &&
-    filters.salesmanFilter.length > 0
-  ) {
-    summaries.push(`Salesman: ${filters.salesmanFilter.join(", ")}`);
+  if (filters.applySalespersonFilter && filters.salespersonId) {
+    summaries.push(`Salesman: ${filters.salespersonId}`);
   }
 
-  if (
-    filters.applyCustomerFilter &&
-    filters.customerFilter &&
-    filters.customerFilter.length > 0
-  ) {
-    summaries.push(`Customer: ${filters.customerFilter.join(", ")}`);
+  if (filters.applyCustomerFilter && filters.customerId) {
+    summaries.push(`Customer: ${filters.customerId}`);
   }
 
   return summaries.length === 0 ? (

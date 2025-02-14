@@ -6,19 +6,12 @@ import React, {
   useCallback,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  ColumnConfig,
-  InvoiceData,
-  InvoiceFilterOptions,
-  ProductData,
-} from "../../types/types";
+import { ColumnConfig, InvoiceData, InvoiceFilters } from "../../types/types";
 import {
   deleteInvoice,
-  getInvoices,
   fetchDbInvoices,
 } from "../../utils/invoice/InvoisUtils";
 import {
-  IconCloudUpload,
   IconEye,
   IconPlus,
   IconPrinter,
@@ -33,7 +26,6 @@ import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
-import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 
 const STORAGE_KEY = "invoisDateFilters";
@@ -68,22 +60,18 @@ const InvoisPage: React.FC = () => {
   const [selectedCount, setSelectedCount] = useState(0);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState<InvoiceData[]>([]);
-  const [filters, setFilters] = useState<InvoiceFilterOptions>({
-    salesmanFilter: null,
-    applySalesmanFilter: true,
-    customerFilter: null,
+  const [filters, setFilters] = useState<InvoiceFilters>({
+    dateRange: getInitialDates(),
+    salespersonId: null,
+    applySalespersonFilter: true,
+    customerId: null,
     applyCustomerFilter: true,
-    dateRangeFilter: getInitialDates(),
-    applyDateRangeFilter: true,
-    invoiceTypeFilter: null,
-    applyInvoiceTypeFilter: true,
-    applyProductFilter: false,
+    paymentType: null,
+    applyPaymentTypeFilter: true,
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [productData, setProductData] = useState<ProductData[]>([]);
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const clearSelectionRef = useRef<(() => void) | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,6 +94,7 @@ const InvoisPage: React.FC = () => {
       setError(null);
       try {
         const fetchedInvoices = await fetchDbInvoices(filters);
+        console.log("Fetched invoices:", fetchedInvoices);
         setInvoices(fetchedInvoices);
         setFilteredInvoices(fetchedInvoices);
       } catch (error) {
@@ -142,47 +131,40 @@ const InvoisPage: React.FC = () => {
   }, []);
 
   const handleBulkDelete = async () => {
-    // Close the dialog immediately
     setShowDeleteConfirmation(false);
 
     try {
-      const deletePromises = selectedInvoices.map((invoice) =>
-        deleteInvoice(invoice.id)
+      const deletePromises = selectedInvoices.map(
+        (invoice) => deleteInvoice(invoice.billNumber) // Changed from billNumber to id
       );
       await Promise.all(deletePromises);
 
       // Reset filters to initial state
       setFilters({
-        salesmanFilter: null,
-        applySalesmanFilter: true,
-        customerFilter: null,
+        dateRange: getInitialDates(),
+        salespersonId: null,
+        applySalespersonFilter: true,
+        customerId: null,
         applyCustomerFilter: true,
-        dateRangeFilter: getInitialDates(),
-        applyDateRangeFilter: true,
-        invoiceTypeFilter: null,
-        applyInvoiceTypeFilter: true,
-        applyProductFilter: false,
+        paymentType: null,
+        applyPaymentTypeFilter: true,
       });
 
       setSearchTerm("");
 
       // Load fresh data
       const fetchedInvoices = await fetchDbInvoices({
-        salesmanFilter: null,
-        applySalesmanFilter: true,
-        customerFilter: null,
+        dateRange: getInitialDates(),
+        salespersonId: null,
+        applySalespersonFilter: true,
+        customerId: null,
         applyCustomerFilter: true,
-        dateRangeFilter: getInitialDates(),
-        applyDateRangeFilter: true,
-        invoiceTypeFilter: null,
-        applyInvoiceTypeFilter: true,
-        applyProductFilter: false,
+        paymentType: null,
+        applyPaymentTypeFilter: true,
       });
       setInvoices(fetchedInvoices);
 
-      // Reset selection states
       handleSubmissionComplete();
-
       toast.success("Selected invoices deleted successfully");
     } catch (error) {
       console.error("Error deleting invoices:", error);
@@ -190,15 +172,17 @@ const InvoisPage: React.FC = () => {
     }
   };
 
-  const parseDate = (dateString: string): Date => {
-    const [day, month, year] = dateString.split("/").map(Number);
-    return new Date(year, month - 1, day);
-  };
-
   const applyFilters = useCallback(() => {
     let filtered = [...invoices];
+    console.log("Starting filter with:", filtered.length, "invoices");
 
-    // Apply search filter
+    // Debug log an example invoice if available
+    if (filtered.length > 0) {
+      console.log("Example invoice:", filtered[0]);
+      console.log("Current filters:", filters);
+    }
+
+    // Search filter
     if (searchTerm) {
       const lowercasedSearch = searchTerm.toLowerCase();
       filtered = filtered.filter((invoice) =>
@@ -206,131 +190,74 @@ const InvoisPage: React.FC = () => {
           String(value).toLowerCase().includes(lowercasedSearch)
         )
       );
+      console.log("After search filter:", filtered.length);
+    }
+
+    // Salesperson filter
+    if (
+      filters.applySalespersonFilter &&
+      filters.salespersonId &&
+      filters.salespersonId.length > 0
+    ) {
+      const salesmanSet = new Set(filters.salespersonId);
+      filtered = filtered.filter((invoice) =>
+        salesmanSet.has(invoice.salespersonId)
+      );
     }
 
     // Customer filter
     if (
       filters.applyCustomerFilter &&
-      filters.customerFilter &&
-      filters.customerFilter.length > 0
+      filters.customerId &&
+      filters.customerId.length > 0
     ) {
-      const customerSet = new Set(filters.customerFilter);
+      const customerSet = new Set(filters.customerId);
       filtered = filtered.filter((invoice) =>
-        customerSet.has(invoice.customername)
+        customerSet.has(invoice.customerId)
       );
     }
 
-    // Salesman filter
-    if (
-      filters.applySalesmanFilter &&
-      filters.salesmanFilter &&
-      filters.salesmanFilter.length > 0
-    ) {
-      const salesmanSet = new Set(filters.salesmanFilter);
-      filtered = filtered.filter((invoice) =>
-        salesmanSet.has(invoice.salesman)
+    // Payment type filter
+    if (filters.applyPaymentTypeFilter && filters.paymentType) {
+      filtered = filtered.filter(
+        (invoice) => invoice.paymentType === filters.paymentType
       );
+      console.log("After payment type filter:", filtered.length);
     }
 
-    // Date filter
-    if (filters.dateRangeFilter?.start || filters.dateRangeFilter?.end) {
+    // Date filter (always applied)
+    if (filters.dateRange.start || filters.dateRange.end) {
+      console.log("Date filter comparing:", {
+        start: filters.dateRange.start,
+        end: filters.dateRange.end,
+        exampleInvoiceDate:
+          filtered.length > 0 ? filtered[0].createdDate : null,
+      });
+
       filtered = filtered.filter((invoice) => {
-        const invoiceDate = parseDate(invoice.date);
-        const startDate = filters.dateRangeFilter?.start;
-        const endDate = filters.dateRangeFilter?.end;
+        const invoiceDate = new Date(invoice.createdDate);
+
+        // Debug single date comparison
+        console.log("Comparing invoice date:", {
+          invoiceDate,
+          original: invoice.createdDate,
+          passesStartFilter:
+            !filters.dateRange.start || invoiceDate >= filters.dateRange.start,
+          passesEndFilter:
+            !filters.dateRange.end || invoiceDate < filters.dateRange.end,
+        });
 
         return (
-          (!startDate || invoiceDate >= startDate) &&
-          (!endDate || invoiceDate < endDate)
+          (!filters.dateRange.start ||
+            invoiceDate >= filters.dateRange.start) &&
+          (!filters.dateRange.end || invoiceDate < filters.dateRange.end)
         );
       });
+      console.log("After date filter:", filtered.length);
     }
 
-    // Invoice type filter
-    if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
-      filtered = filtered.filter(
-        (invoice) => invoice.type === filters.invoiceTypeFilter
-      );
-    }
-
-    if (filters.applyProductFilter) {
-      // Reset selection when switching to product view
-      handleSubmissionComplete();
-      const products: { [key: string]: ProductData } = {};
-
-      filtered.forEach((invoice) => {
-        invoice.orderDetails.forEach((detail) => {
-          if (!detail.isfoc && !detail.isreturned) {
-            const key = `${detail.code}-${detail.productname}`;
-            if (products[key]) {
-              products[key].qty += parseFloat(detail.qty.toString()) || 0;
-              products[key].amount += parseFloat(detail.total) || 0;
-            } else {
-              products[key] = {
-                code: detail.code,
-                productname: detail.productname,
-                qty: parseFloat(detail.qty.toString()) || 0,
-                amount: parseFloat(detail.total) || 0,
-              };
-            }
-          }
-        });
-      });
-
-      const sortedProducts = Object.values(products)
-        .filter(
-          (product) => product.productname != null && product.productname !== ""
-        )
-        .map((product) => ({
-          ...product,
-          qty: Number(product.qty.toFixed(2)),
-          amount: Number(product.amount.toFixed(2)),
-        }))
-        .sort((a, b) => a.productname.localeCompare(b.productname));
-
-      const groupedProducts: ProductData[] = [];
-      let currentGroup = "";
-      let groupQty = 0;
-      let groupAmount = 0;
-
-      sortedProducts.forEach((product) => {
-        const productGroup = getProductGroup(product.code);
-
-        if (productGroup !== currentGroup) {
-          if (currentGroup !== "") {
-            groupedProducts.push({
-              code: `${currentGroup} Subtotal`,
-              productname: `${currentGroup} Subtotal`,
-              qty: groupQty,
-              amount: groupAmount,
-              isSubtotalQty: true,
-            });
-          }
-          currentGroup = productGroup;
-          groupQty = 0;
-          groupAmount = 0;
-        }
-
-        groupedProducts.push(product);
-        groupQty += product.qty;
-        groupAmount += product.amount;
-      });
-
-      // Add the last group's subtotal
-      if (currentGroup !== "") {
-        groupedProducts.push({
-          code: `${currentGroup} Subtotal`,
-          productname: `${currentGroup} Subtotal`,
-          qty: groupQty,
-          amount: groupAmount,
-          isSubtotalQty: true,
-        });
-      }
-
-      setProductData(groupedProducts);
-    } else {
-      setFilteredInvoices(filtered);
-    }
+    console.log("Final filtered count:", filtered.length);
+    setFilteredInvoices(filtered);
   }, [invoices, filters, searchTerm]);
 
   useEffect(() => {
@@ -340,16 +267,6 @@ const InvoisPage: React.FC = () => {
   useEffect(() => {
     applyFilters();
   }, [applyFilters]);
-
-  const getProductGroup = (code: string): string => {
-    if (code.startsWith("1-")) return "1";
-    if (code.startsWith("2-")) return "2";
-    if (code.startsWith("MEQ-")) return "MEQ";
-    if (code.startsWith("OTH")) return "OTH";
-    if (code.startsWith("S-")) return "S";
-    if (code.startsWith("WE-")) return "WE";
-    return "Other";
-  };
 
   // Function to save dates to localStorage
   const saveDatesToStorage = (startDate: Date | null, endDate: Date | null) => {
@@ -362,19 +279,18 @@ const InvoisPage: React.FC = () => {
     );
   };
 
-  const handleFilterChange = (newFilters: InvoiceFilterOptions) => {
+  const handleFilterChange = (newFilters: InvoiceFilters) => {
     // Save dates to localStorage
     saveDatesToStorage(
-      newFilters.dateRangeFilter?.start ?? null,
-      newFilters.dateRangeFilter?.end ?? null
+      newFilters.dateRange?.start ?? null,
+      newFilters.dateRange?.end ?? null
     );
 
     // Only reload data if date range changes
     if (
-      newFilters.dateRangeFilter?.start?.getTime() !==
-        filters.dateRangeFilter?.start?.getTime() ||
-      newFilters.dateRangeFilter?.end?.getTime() !==
-        filters.dateRangeFilter?.end?.getTime()
+      newFilters.dateRange?.start?.getTime() !==
+        filters.dateRange?.start?.getTime() ||
+      newFilters.dateRange?.end?.getTime() !== filters.dateRange?.end?.getTime()
     ) {
       const loadInvoices = async () => {
         try {
@@ -393,156 +309,6 @@ const InvoisPage: React.FC = () => {
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
-  };
-
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) {
-      toast.error("No files selected");
-      return;
-    }
-
-    const validFiles = Array.from(files).filter((file) =>
-      file.name.match(/^SLS_.+\.txt$/)
-    );
-
-    if (validFiles.length === 0) {
-      toast.error(
-        "No valid files found. Please upload files with the format SLS_*.txt"
-      );
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const newFileData: InvoiceData[] = [];
-
-      for (const file of validFiles) {
-        const content = await readFileContent(file);
-        const parsedData = parseFileContent(content);
-        newFileData.push(...parsedData);
-      }
-
-      // Upload parsed data to the server
-      await api.post("/api/invoices/upload", newFileData);
-
-      const updatedInvoices = getInvoices();
-      setInvoices(updatedInvoices);
-
-      toast.success(`Successfully processed ${validFiles.length} file(s)`);
-
-      // Navigate to the upload page with the updated invoices
-      navigate("/sales/invoice/imported", {
-        state: { importedData: updatedInvoices },
-      });
-    } catch (error) {
-      console.error("Error processing files:", error);
-      setError(
-        error instanceof Error ? error.message : "An unknown error occurred"
-      );
-      toast.error(
-        `Error processing files: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsLoading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
-  const readFileContent = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e: ProgressEvent<FileReader>) =>
-        resolve(e.target?.result as string);
-      reader.onerror = (error) => reject(error);
-      reader.readAsText(file);
-    });
-  };
-
-  const parseFileContent = (content: string): InvoiceData[] => {
-    const lines = content.split("\n");
-    return lines
-      .filter((line) => line.trim() !== "")
-      .map((line) => {
-        const [
-          invoiceno,
-          orderno,
-          date,
-          type,
-          customer,
-          salesman,
-          totalAmount,
-          ...rest // Use rest operator to capture unused values
-        ] = line.split("|");
-
-        // Get the last two items we need from rest
-        const time = rest[rest.length - 2];
-        const orderDetailsString = rest[rest.length - 1];
-
-        const [customerId, customername] = customer.split("\t");
-
-        const orderDetails = orderDetailsString
-          .split("&E&")
-          .filter(Boolean)
-          .flatMap((item) => {
-            const [code, qty, price, total, foc, returned] = item.split("&&");
-            const baseItem = {
-              code: code || "",
-              productname: "", // This will be filled by the server
-              qty: Number(qty) || 0,
-              price: Number((parseFloat(price) / 100).toFixed(2)),
-              total: (parseFloat(total) / 100).toFixed(2),
-              isfoc: false,
-              isreturned: false,
-            };
-
-            const items = [baseItem];
-
-            if (Number(foc) > 0) {
-              items.push({
-                ...baseItem,
-                qty: Number(foc),
-                price: Number((parseFloat(price) / 100).toFixed(2)),
-                total: (Number(baseItem.price) * Number(foc)).toFixed(2),
-                isfoc: true,
-              });
-            }
-
-            if (Number(returned) > 0) {
-              items.push({
-                ...baseItem,
-                qty: Number(returned),
-                price: Number((parseFloat(price) / 100).toFixed(2)),
-                total: (Number(baseItem.price) * Number(returned)).toFixed(2),
-                isreturned: true,
-              });
-            }
-
-            return items;
-          });
-
-        return {
-          id: invoiceno,
-          invoiceno,
-          orderno,
-          date,
-          type,
-          customer: customerId,
-          customername: customername || customerId,
-          salesman,
-          totalAmount,
-          time,
-          orderDetails,
-        };
-      });
   };
 
   const handleCreateNewInvoice = () => {
@@ -588,7 +354,7 @@ const InvoisPage: React.FC = () => {
 
   const invoiceColumns: ColumnConfig[] = [
     {
-      id: "invoiceno",
+      id: "id",
       header: "Invoice",
       type: "readonly",
       width: 150,
@@ -597,30 +363,51 @@ const InvoisPage: React.FC = () => {
           onClick={() => handleInvoiceClick(info.row.original)}
           className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer hover:font-semibold"
         >
-          {info.row.original.type}
+          {info.row.original.paymentType === "Cash" ? "C" : "I"}
           {info.getValue()}
         </button>
       ),
     },
-    { id: "date", header: "Date", type: "readonly", width: 150 },
-    { id: "customername", header: "Customer", type: "readonly", width: 350 },
-    { id: "salesman", header: "Salesman", type: "readonly", width: 150 },
-    { id: "totalamount", header: "Amount", type: "amount", width: 150 },
-  ];
-
-  const productColumns: ColumnConfig[] = [
-    { id: "code", header: "Code", type: "readonly", width: 180 },
-    { id: "productname", header: "Product Name", type: "readonly", width: 400 },
-    { id: "qty", header: "Quantity", type: "amount", width: 180 },
-    { id: "amount", header: "Amount", type: "amount", width: 180 },
+    {
+      id: "createddate",
+      header: "Date",
+      type: "readonly",
+      width: 150,
+      cell: (info: { getValue: () => any }) => {
+        const date = new Date(info.getValue());
+        return date.toLocaleDateString("en-GB");
+      },
+    },
+    {
+      id: "salespersonid",
+      header: "Salesman",
+      type: "readonly",
+      width: 150,
+    },
+    {
+      id: "customerid",
+      header: "Customer",
+      type: "readonly",
+      width: 350,
+    },
+    {
+      id: "totaltaxable",
+      header: "Amount",
+      type: "amount",
+      width: 150,
+      cell: (info: { getValue: () => any }) =>
+        Number(info.getValue() || 0).toFixed(2),
+    },
   ];
 
   const salesmanOptions = useMemo(() => {
-    return Array.from(new Set(invoices.map((invoice) => invoice.salesman)));
+    return Array.from(
+      new Set(invoices.map((invoice) => invoice.salespersonId))
+    );
   }, [invoices]);
 
   const customerOptions = useMemo(() => {
-    return Array.from(new Set(invoices.map((invoice) => invoice.customername)));
+    return Array.from(new Set(invoices.map((invoice) => invoice.customerId)));
   }, [invoices]);
 
   const formatDateForInput = (date: Date | null): string => {
@@ -699,12 +486,12 @@ const InvoisPage: React.FC = () => {
   const handleDateChange = (type: "start" | "end", value: string) => {
     if (!value) {
       const newDateRange = {
-        ...filters.dateRangeFilter,
+        ...filters.dateRange,
         [type]: null,
       };
       handleFilterChange({
         ...filters,
-        dateRangeFilter: newDateRange,
+        dateRange: newDateRange,
       });
       return;
     }
@@ -713,15 +500,11 @@ const InvoisPage: React.FC = () => {
     const newDate = new Date(year, month - 1, day);
 
     // Get adjusted date range
-    const adjustedRange = adjustDateRange(
-      newDate,
-      type,
-      filters.dateRangeFilter
-    );
+    const adjustedRange = adjustDateRange(newDate, type, filters.dateRange);
 
     handleFilterChange({
       ...filters,
-      dateRangeFilter: adjustedRange,
+      dateRange: adjustedRange,
     });
   };
 
@@ -743,11 +526,7 @@ const InvoisPage: React.FC = () => {
       <div className="sticky top-0 z-20 bg-white px-6 pt-4">
         <div className="flex flex-col space-y-4">
           {/* Title and Actions Row */}
-          <div
-            className={`flex items-center justify-between ${
-              !filters.applyProductFilter ? "pl-[45px]" : ""
-            }`}
-          >
+          <div className={`flex items-center justify-between`}>
             <h1 className="text-3xl font-semibold text-default-900">
               Invoice {selectedCount > 0 && `(${selectedCount})`}
             </h1>
@@ -788,30 +567,12 @@ const InvoisPage: React.FC = () => {
               >
                 Print
               </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="fileUpload"
-                multiple
-              />
               <div className="flex items-center gap-3">
                 <EInvoisMenu
                   selectedInvoices={selectedInvoices}
                   onSubmissionComplete={handleSubmissionComplete}
                   clearSelection={() => clearSelectionRef.current?.()}
                 />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  icon={IconCloudUpload}
-                  iconSize={16}
-                  iconStroke={2}
-                  variant="outline"
-                >
-                  Import
-                </Button>
                 <Button
                   onClick={handleCreateNewInvoice}
                   icon={IconPlus}
@@ -826,11 +587,7 @@ const InvoisPage: React.FC = () => {
           </div>
 
           {/* Filters Row */}
-          <div
-            className={`space-y-4 ${
-              !filters.applyProductFilter ? "ml-[45px]" : ""
-            }`}
-          >
+          <div className={`space-y-4`}>
             <div className="flex gap-4">
               {/* Date Range */}
               <div className="flex-1">
@@ -845,7 +602,7 @@ const InvoisPage: React.FC = () => {
                     <input
                       type="date"
                       value={formatDateForInput(
-                        filters.dateRangeFilter?.start ?? null
+                        filters.dateRange?.start ?? null
                       )}
                       onChange={(e) =>
                         handleDateChange("start", e.target.value)
@@ -857,9 +614,7 @@ const InvoisPage: React.FC = () => {
                     <span className="text-default-400">to</span>
                     <input
                       type="date"
-                      value={formatDateForInput(
-                        filters.dateRangeFilter?.end ?? null
-                      )}
+                      value={formatDateForInput(filters.dateRange?.end ?? null)}
                       onChange={(e) => handleDateChange("end", e.target.value)}
                       onFocus={() => setIsDateRangeFocused(true)}
                       onBlur={() => setIsDateRangeFocused(false)}
@@ -909,24 +664,7 @@ const InvoisPage: React.FC = () => {
       <div className="flex-1 px-6 pt-1 pb-4">
         {/* Table Section */}
         <div className="bg-white overflow-hidden">
-          {filters.applyProductFilter ? (
-            <>
-              {productData.length > 0 ? (
-                <div className="w-full">
-                  <TableEditing<ProductData>
-                    initialData={productData}
-                    columns={productColumns}
-                    onChange={() => {}}
-                    tableKey="invois-products"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-[200px]">
-                  <p className="text-default-500">No product data found.</p>
-                </div>
-              )}
-            </>
-          ) : filteredInvoices.length > 0 ? (
+          {filteredInvoices.length > 0 ? (
             <TableEditing<InvoiceData>
               initialData={filteredInvoices}
               columns={invoiceColumns}

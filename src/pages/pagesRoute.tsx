@@ -11,7 +11,6 @@ import CustomerFormPage from "./Catalogue/CustomerFormPage";
 import InvoisDetailsPage from "./Invois/InvoisDetailsPage";
 import CustomerAddPage from "./Catalogue/CustomerAddPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
-import InvoisUploadPage from "./Invois/InvoisUploadPage";
 import StaffFormPage from "./Catalogue/StaffFormPage";
 import CustomerPage from "./Catalogue/CustomerPage";
 import StaffAddPage from "./Catalogue/StaffAddPage";
@@ -70,16 +69,6 @@ export const SidebarData: SidebarItem[] = [
             name: "Invois PDF Viewer",
             path: "/pdf-viewer",
             component: PDFViewerPage,
-          },
-          {
-            name: "Imported Invois Page",
-            path: "/sales/invoice/imported",
-            component: InvoisUploadPage,
-          },
-          {
-            name: "Imported Invois Details",
-            path: "/sales/invoice/imported/:id",
-            component: InvoisDetailsPage,
           },
           {
             name: "Create New Invois Page",

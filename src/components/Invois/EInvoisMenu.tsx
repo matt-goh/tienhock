@@ -29,22 +29,24 @@ const SelectedInvoicesInfo: React.FC<{ selectedInvoices: InvoiceData[] }> = ({
     </div>
     <div className="divide-y divide-default-200 max-h-60 overflow-y-auto">
       {selectedInvoices.map((invoice) => (
-        <div key={invoice.id} className="p-4 bg-white rounded-lg">
+        <div key={invoice.billNumber} className="p-4 bg-white rounded-lg">
           <div className="flex justify-between items-start">
             <div>
               <p className="font-medium text-default-800">
-                #{invoice.invoiceno}
+                #{invoice.billNumber}
               </p>
               <p className="text-sm text-default-600 mt-1">
-                {invoice.customername || "N/A"}
+                {invoice.customerId || "N/A"}
               </p>
             </div>
-            <p className="text-sm text-default-500">{invoice.date}</p>
+            <p className="text-sm text-default-500">{invoice.createdDate}</p>
           </div>
           <div className="mt-1 flex gap-2 text-xs">
-            <span className="text-default-500">Order: {invoice.invoiceno}</span>
             <span className="text-default-500">
-              Type: {invoice.type === "I" ? "Invoice" : "Cash"}
+              Order: {invoice.billNumber}
+            </span>
+            <span className="text-default-500">
+              Type: {invoice.paymentType === "INVOICE" ? "Invoice" : "Cash"}
             </span>
           </div>
         </div>
@@ -173,12 +175,12 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       // Set initial submission state with documents
       const initialDocuments: Record<string, DocumentStatus> = {};
       selectedInvoices.forEach((invoice) => {
-        initialDocuments[invoice.invoiceno] = {
-          invoiceNo: invoice.invoiceno,
+        initialDocuments[invoice.billNumber] = {
+          invoiceNo: invoice.billNumber,
           currentStatus: "PROCESSING",
           summary: {
             status: "Submitted",
-            receiverName: invoice.customername,
+            receiverName: invoice.customerId,
           },
         };
       });
@@ -206,7 +208,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
       });
 
       const response = await api.post("/api/einvoice/submit", {
-        invoiceIds: selectedInvoices.map((invoice) => invoice.id),
+        invoiceIds: selectedInvoices.map((invoice) => invoice.billNumber),
       });
 
       const documents: Record<string, DocumentStatus> = {};
@@ -246,10 +248,10 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
 
       // Ensure all selected invoices are accounted for in documents
       selectedInvoices.forEach((invoice) => {
-        if (!documents[invoice.invoiceno]) {
+        if (!documents[invoice.billNumber]) {
           // Add any missing invoices as rejected with unknown status
-          documents[invoice.invoiceno] = {
-            invoiceNo: invoice.invoiceno,
+          documents[invoice.billNumber] = {
+            invoiceNo: invoice.billNumber,
             currentStatus: "REJECTED",
             errors: [
               {
