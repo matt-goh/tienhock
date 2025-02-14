@@ -308,38 +308,54 @@ export interface TableProps<T> {
   tableKey?: string;
 }
 
-export interface InvoiceData {
-  id: string;
-  invoiceno: string;
-  date: string;
-  type: string;
-  customer: string;
-  customername: string;
-  salesman: string;
-  totalAmount: string;
-  time: string;
-  orderDetails: OrderDetail[];
-  discount?: string;
-  tax?: string;
-  rounding?: string;
-  isSorting?: boolean;
+export interface ProductItem {
+  code: string;
+  price: number;
+  quantity: number;
+  description?: string;
+  freeProduct: number;
+  returnProduct: number;
+  tax: number;
+  discount: number;
+  total?: string;
+  issubtotal?: boolean;
+  istotal?: boolean;
 }
 
-export interface OrderDetail {
-  invoiceid?: string;
+// Product row interface for UI with all possible states
+export interface ExtendedProductItem extends ProductItem {
+  description?: string;
+  // Make all boolean flags required with default false
+  isSubtotal: boolean;
+  isTotal: boolean;
+}
+
+export interface InvoiceData {
+  billNumber: string;
+  salespersonId: string;
+  customerId: string;
+  createdDate: string;
+  paymentType: string;
+  products: ProductItem[];
+  totalMee: number;
+  totalBihun: number;
+  totalNonTaxable: number;
+  totalTaxable: number;
+  totalAdjustment: number;
+}
+
+// Extended invoice for UI
+export interface ExtendedInvoiceData extends InvoiceData {
+  customerName?: string; // For UI display
+  isEditing?: boolean; // UI state
+}
+
+// Helper type for special rows
+export interface SpecialRow {
   code: string;
-  productname: string;
-  qty: number;
-  price: number;
-  total: string;
-  isfoc?: boolean;
-  isreturned?: boolean;
-  istotal?: boolean;
-  issubtotal?: boolean;
-  isless?: boolean;
-  istax?: boolean;
-  colspan?: number;
-  action?: string;
+  description: string;
+  amount: number;
+  type: "subtotal";
 }
 
 export interface Employee {
@@ -379,24 +395,17 @@ export type FilterOptions = {
   race?: string;
 };
 
-export interface InvoiceFilterOptions {
-  salesmanFilter: string[] | null;
-  applySalesmanFilter: boolean;
-  customerFilter: string[] | null;
+export interface InvoiceFilters {
+  dateRange: {
+    start: Date | null;
+    end: Date | null;
+  };
+  salespersonId: string[] | null;
+  applySalespersonFilter: boolean;
+  customerId: string[] | null;
   applyCustomerFilter: boolean;
-  dateRangeFilter: { start: Date | null; end: Date | null };
-  applyDateRangeFilter: boolean;
-  invoiceTypeFilter: "C" | "I" | null;
-  applyInvoiceTypeFilter: boolean;
-  applyProductFilter: boolean;
-}
-
-export interface ProductData {
-  code: string;
-  productname: string;
-  qty: number;
-  amount: number;
-  isSubtotalQty?: boolean;
+  paymentType: "Cash" | "Invoice" | null;
+  applyPaymentTypeFilter: boolean;
 }
 
 export interface CustomerList {

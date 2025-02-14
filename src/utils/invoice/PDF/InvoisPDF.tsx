@@ -1,6 +1,6 @@
 import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import { InvoiceData, OrderDetail } from "../../../types/types";
+import { InvoiceData, ProductItem } from "../../../types/types";
 
 interface InvoisPDFProps {
   invoices: InvoiceData[];
@@ -229,91 +229,96 @@ const styles = StyleSheet.create({
 });
 
 const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
-  const getProcessedOrderDetails = (details: OrderDetail[]) => {
+  const getProcessedProducts = (products: ProductItem[]) => {
     // Keep track of all rows in their original order
-    const orderedRows: OrderDetail[] = [];
+    const orderedRows: ProductItem[] = [];
 
     // Map to store regular items with their FOC and returned quantities
-    const regularDetails = new Map<
+    const regularProducts = new Map<
       string,
       {
-        detail: OrderDetail;
+        product: ProductItem;
         foc: number;
         returned: number;
       }
     >();
 
     // First pass: Process regular items to combine FOC and returned quantities
-    details.forEach((detail) => {
+    products.forEach((product) => {
       // Skip special rows and total rows in first pass
-      if (
-        detail.isless ||
-        detail.istax ||
-        detail.issubtotal ||
-        detail.istotal
-      ) {
+      if (product.istotal || product.issubtotal) {
         return;
       }
 
-      const key = `${detail.code}-${detail.productname}`;
-      if (!regularDetails.has(key)) {
-        regularDetails.set(key, {
-          detail: { ...detail, isfoc: false, isreturned: false },
+      const key = `${product.code}-${product.description}`;
+      if (!regularProducts.has(key)) {
+        regularProducts.set(key, {
+          product: {
+            ...product,
+            freeProduct: 0,
+            returnProduct: 0,
+          },
           foc: 0,
           returned: 0,
         });
       }
 
-      const item = regularDetails.get(key)!;
-      if (detail.isfoc) {
-        item.foc += Math.round(detail.qty);
-      } else if (detail.isreturned) {
-        item.returned += Math.round(detail.qty);
-      } else {
-        item.detail = { ...detail, qty: Math.round(detail.qty) };
-      }
+      const item = regularProducts.get(key)!;
+      item.foc += product.freeProduct || 0;
+      item.returned += product.returnProduct || 0;
     });
 
     // Second pass: Build the ordered rows while maintaining original sequence
-    details.forEach((detail) => {
-      if (detail.istotal) return; // Skip total rows
+    products.forEach((product) => {
+      if (product.istotal) return; // Skip total rows
 
-      if (detail.isless || detail.istax || detail.issubtotal) {
-        // Format description for special rows
-        let formattedDescription = detail.productname || "";
-
-        if (detail.issubtotal) {
-          formattedDescription = "Subtotal";
-        } else if (detail.isless) {
-          formattedDescription = `${formattedDescription} (Less)`;
-        } else if (detail.istax) {
-          formattedDescription = `${formattedDescription} (Tax)`;
-        }
-
-        const specialRow = {
-          ...detail,
-          productname: formattedDescription,
-          issubtotal: detail.issubtotal,
+      if (product.issubtotal) {
+        // Format description for subtotal rows
+        const subtotalRow = {
+          ...product,
+          description: "Subtotal",
+          issubtotal: true,
         };
-        orderedRows.push(specialRow);
-      } else if (!detail.isfoc && !detail.isreturned) {
-        // Only process regular items once (not FOC or returned versions)
-        const key = `${detail.code}-${detail.productname}`;
-        const item = regularDetails.get(key);
-        if (item && !orderedRows.some((row) => row.code === detail.code)) {
-          orderedRows.push(item.detail);
+        orderedRows.push(subtotalRow);
+      } else {
+        // Only process regular items once
+        const key = `${product.code}-${product.description}`;
+        const item = regularProducts.get(key);
+        if (item && !orderedRows.some((row) => row.code === product.code)) {
+          orderedRows.push(item.product);
         }
       }
     });
 
     return {
-      regularItems: Array.from(regularDetails.values()),
+      regularItems: Array.from(regularProducts.values()),
       orderedRows: orderedRows,
     };
   };
 
+  const calculateTotal = (product: ProductItem): number => {
+    if (product.istotal || product.issubtotal) {
+      return parseFloat(product.total || "0");
+    }
+
+    const quantity = product.quantity || 0;
+    const price = product.price || 0;
+    const discount = product.discount || 0;
+    const tax = product.tax || 0;
+    const returnQty = product.returnProduct || 0;
+
+    // Calculate base total
+    const baseTotal = (quantity - returnQty) * price;
+
+    // Apply discounts and tax
+    const afterDiscount = baseTotal - discount;
+    const final = afterDiscount + tax;
+
+    return final;
+  };
+
   const calculateInvoiceRows = (invoice: InvoiceData) => {
-    const { orderedRows } = getProcessedOrderDetails(invoice.orderDetails);
+    const { orderedRows } = getProcessedProducts(invoice.products);
     return TABLE_HEADER_ROWS + orderedRows.length + 1; // +1 for the total row
   };
 
@@ -377,41 +382,38 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
   };
 
   const renderTableRow = (
-    detail: OrderDetail & { issubtotal?: boolean },
+    product: ProductItem,
     foc: number = 0,
     returned: number = 0,
-    isSpecialRow: boolean = false,
     index: number
   ) => (
     <View
       key={`row-${index}`}
-      style={detail.issubtotal ? styles.subtotalRow : styles.tableRow}
+      style={product.issubtotal ? styles.subtotalRow : styles.tableRow}
     >
       <Text
         style={
-          detail.issubtotal
+          product.issubtotal
             ? styles.subtotalText
             : [styles.tableCell, styles.descriptionCell]
         }
       >
-        {detail.productname}
+        {product.description}
       </Text>
       <Text style={[styles.tableCell, styles.focCell]}>
-        {!isSpecialRow && !detail.issubtotal ? foc || "" : ""}
+        {!product.issubtotal ? foc || "" : ""}
       </Text>
       <Text style={[styles.tableCell, styles.returnCell]}>
-        {!isSpecialRow && !detail.issubtotal ? returned || "" : ""}
+        {!product.issubtotal ? returned || "" : ""}
       </Text>
       <Text style={[styles.tableCell, styles.qtyCell]}>
-        {!isSpecialRow && !detail.issubtotal ? Math.round(detail.qty) : ""}
+        {!product.issubtotal ? Math.round(product.quantity || 0) : ""}
       </Text>
       <Text style={[styles.tableCell, styles.priceCell]}>
-        {!isSpecialRow && !detail.issubtotal
-          ? Number(detail.price).toFixed(2)
-          : ""}
+        {!product.issubtotal ? Number(product.price || 0).toFixed(2) : ""}
       </Text>
       <Text style={[styles.tableCell, styles.amountCell]}>
-        {Number(detail.total).toFixed(2)}
+        {calculateTotal(product).toFixed(2)}
       </Text>
     </View>
   );
@@ -420,11 +422,11 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
 
   const totals = invoices.reduce(
     (acc, invoice) => {
-      if (invoice.type === "C") {
-        acc.cashTotal += parseFloat(invoice.totalAmount);
+      if (invoice.paymentType === "Cash") {
+        acc.cashTotal += invoice.totalTaxable;
         acc.cashCount++;
       } else {
-        acc.invoiceTotal += parseFloat(invoice.totalAmount);
+        acc.invoiceTotal += invoice.totalTaxable;
         acc.invoiceCount++;
       }
       return acc;
@@ -438,18 +440,18 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
         <View style={styles.infoLeftSection}>
           <Text style={styles.customerInfo}>
             <Text style={styles.customerLabel}>Customer: </Text>
-            {invoice.customername}
+            {invoice.customerId}
           </Text>
         </View>
         <View style={styles.infoRightSection}>
           <View style={styles.infoRightContainer}>
             <Text style={[styles.customerInfo]}>
               <Text style={styles.customerLabel}>Type: </Text>
-              {invoice.type === "C" ? "Cash" : "Invoice"}
+              {invoice.paymentType}
             </Text>
             <Text style={styles.customerInfo}>
               <Text style={styles.customerLabel}>Invoice No: </Text>
-              {invoice.invoiceno}
+              {invoice.billNumber}
             </Text>
           </View>
         </View>
@@ -458,18 +460,14 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
         <View style={styles.infoLeftSection}>
           <Text style={styles.customerInfo}>
             <Text style={styles.customerLabel}>Salesman: </Text>
-            {invoice.salesman}
+            {invoice.salespersonId}
           </Text>
         </View>
         <View style={styles.infoRightSection}>
           <View style={styles.infoRightContainer}>
-            <Text style={[styles.customerInfo]}>
-              <Text style={styles.customerLabel}>Time: </Text>
-              {invoice.time}
-            </Text>
             <Text style={styles.customerInfo}>
               <Text style={styles.customerLabel}>Date: </Text>
-              {invoice.date}
+              {invoice.createdDate}
             </Text>
           </View>
         </View>
@@ -487,10 +485,7 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
                 {logoData ? (
                   <Image src={logoData} style={styles.logo} />
                 ) : (
-                  <Image
-                    src="../tienhock.png"
-                    style={styles.logo}
-                  />
+                  <Image src="../tienhock.png" style={styles.logo} />
                 )}
                 <View style={styles.headerTextContainer}>
                   <Text style={styles.companyName}>
@@ -508,8 +503,8 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
           )}
 
           {pageInvoices.map((invoice, invoiceIndex) => {
-            const { regularItems, orderedRows } = getProcessedOrderDetails(
-              invoice.orderDetails
+            const { regularItems, orderedRows } = getProcessedProducts(
+              invoice.products
             );
 
             return (
@@ -542,27 +537,22 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
                     </View>
 
                     {orderedRows.map((row, rowIndex) => {
-                      if (row.isless || row.istax || row.issubtotal) {
-                        return renderTableRow(row, 0, 0, true, rowIndex);
-                      } else {
-                        const item = regularItems.find(
-                          (item) => item.detail.code === row.code
-                        );
-                        return renderTableRow(
-                          row,
-                          item?.foc || 0,
-                          item?.returned || 0,
-                          false,
-                          rowIndex
-                        );
-                      }
+                      const item = regularItems.find(
+                        (item) => item.product.code === row.code
+                      );
+                      return renderTableRow(
+                        row,
+                        item?.foc || 0,
+                        item?.returned || 0,
+                        rowIndex
+                      );
                     })}
 
                     {/* Total row */}
                     <View key={`total-${invoiceIndex}`} style={styles.totalRow}>
                       <Text style={styles.bold}>
                         Total Amount Payable: RM{" "}
-                        {Number(invoice.totalAmount).toFixed(2)}
+                        {invoice.totalTaxable.toFixed(2)}
                       </Text>
                     </View>
                   </View>

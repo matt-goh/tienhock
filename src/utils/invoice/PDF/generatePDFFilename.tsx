@@ -8,19 +8,19 @@ export const generatePDFFilename = (invoices: InvoiceData[]): string => {
   // For single invoice, use invoice number
   if (invoices.length === 1) {
     const invoice = invoices[0];
-    return `invoice_${invoice.type}${invoice.invoiceno}.pdf`;
+    return `invoice_${invoice.paymentType}${invoice.billNumber}.pdf`;
   }
 
   // Sort invoices by date
   const sortedInvoices = [...invoices].sort((a, b) => {
-    const dateA = parseDateString(a.date);
-    const dateB = parseDateString(b.date);
+    const dateA = parseDateString(a.createdDate);
+    const dateB = parseDateString(b.createdDate);
     return dateA.getTime() - dateB.getTime();
   });
 
-  const firstDate = parseDateString(sortedInvoices[0].date);
+  const firstDate = parseDateString(sortedInvoices[0].createdDate);
   const lastDate = parseDateString(
-    sortedInvoices[sortedInvoices.length - 1].date
+    sortedInvoices[sortedInvoices.length - 1].createdDate
   );
 
   // Format dates for filename

@@ -12,8 +12,9 @@ import {
   ColumnConfig,
   Customer,
   Employee,
+  ExtendedInvoiceData,
   InvoiceData,
-  OrderDetail,
+  ProductItem,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
@@ -185,22 +186,22 @@ const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [previousPath, setPreviousPath] = useState("/sales/invoice");
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(() => {
+  const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData>(() => {
     if (location.state?.isNewInvoice) {
       return {
-        id: "",
-        invoiceNo: "",
-        date: new Date().toLocaleDateString("en-GB"),
-        time: new Date().toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        type: "I",
-        customer: "",
-        customername: "",
-        salesman: "",
-        totalAmount: "0",
-        orderDetails: [],
+        billNumber: 0,
+        salespersonId: "",
+        customerId: "",
+        createdDate: new Date().toLocaleDateString("en-GB"),
+        paymentType: "Invoice",
+        products: [],
+        totalMee: 0,
+        totalBihun: 0,
+        totalNonTaxable: 0,
+        totalTaxable: 0,
+        totalAdjustment: 0,
+        displayProducts: [],
+        customerName: "",
       };
     }
     return location.state?.invoiceData || null;
@@ -247,32 +248,34 @@ const InvoisDetailsPage: React.FC = () => {
     setIsFormChanged(hasChanged);
   }, [invoiceData, initialInvoiceData]);
 
-  const calculateTotal = useCallback((items: OrderDetail[]) => {
-    return items
-      .reduce((sum, detail) => {
-        if (detail.isless) {
-          return sum - parseFloat(detail.total || "0");
-        }
-        if (detail.istax) {
-          return sum + parseFloat(detail.total || "0");
-        }
-        if (detail.issubtotal || detail.istotal) {
-          return sum;
-        }
-        return sum + parseFloat(detail.total || "0");
-      }, 0)
-      .toFixed(2);
-  }, []);
+  const calculateTotal = (item: ProductItem): number => {
+    if (!item) return 0;
 
-  const calculateOverallTotal = useCallback(
-    (orderDetails: OrderDetail[]) => {
-      const regularItems = orderDetails.filter(
-        (item) => !item.isfoc && !item.isreturned && !item.istotal
-      );
-      return calculateTotal(regularItems);
-    },
-    [calculateTotal]
-  );
+    // For subtotal/total rows, return their total directly
+    if (item.issubtotal || item.istotal) {
+      return parseFloat(item.total || "0");
+    }
+
+    // Calculate regular product total
+    const regularTotal = item.quantity * item.price;
+    // Subtract returned items value
+    const returnCredit = item.returnProduct * item.price;
+    // Apply discount
+    const afterDiscount = regularTotal - returnCredit - (item.discount || 0);
+    // Add tax
+    const afterTax = afterDiscount + (item.tax || 0);
+    // FOC items don't affect total
+    return afterTax;
+  };
+
+  const calculateOverallTotal = (products: ProductItem[]): number => {
+    return products.reduce((total, item) => {
+      if (item.issubtotal || item.istotal) {
+        return total;
+      }
+      return total + calculateTotal(item);
+    }, 0);
+  };
 
   const fetchCustomers = useCallback(
     async (search: string, page: number) => {
@@ -280,7 +283,7 @@ const InvoisDetailsPage: React.FC = () => {
       try {
         const data = await api.get(
           `/api/customers/combobox?salesman=${
-            invoiceData?.salesman || ""
+            invoiceData?.salespersonId || ""
           }&search=${search}&page=${page}&limit=20`
         );
         setCustomers((prevCustomers) =>
@@ -294,7 +297,7 @@ const InvoisDetailsPage: React.FC = () => {
         setIsFetchingCustomers(false);
       }
     },
-    [invoiceData?.salesman]
+    [invoiceData?.salespersonId]
   );
 
   const debouncedFetchCustomers = useMemo(
@@ -316,34 +319,28 @@ const InvoisDetailsPage: React.FC = () => {
     setCustomerPage(1);
     setCustomerQuery("");
     fetchCustomers("", 1);
-  }, [invoiceData?.salesman, fetchCustomers]);
+  }, [invoiceData?.salespersonId, fetchCustomers]);
 
   useEffect(() => {
     if (invoiceData) {
-      setInvoiceData((prev) => {
-        if (!prev) return null;
-
-        const normalizedOrderDetails = prev.orderDetails.map((detail) => {
-          // Handle special rows
-          if (detail.isless || detail.istax) {
-            return normalizeSpecialRow(detail, detail.isless ? "Less" : "Tax");
-          }
-          return {
-            ...detail,
-            // Normalize standard fields
-            productname: detail.productname,
-            isless: detail.isless || false,
-            istax: detail.istax || false,
-            isfoc: detail.isfoc || false,
-            isreturned: detail.isreturned || false,
-            istotal: detail.istotal || false,
-            issubtotal: detail.issubtotal || false,
-          };
-        });
+      setInvoiceData((prev: ExtendedInvoiceData): ExtendedInvoiceData => {
+        const normalizedProducts = prev.products.map((product) => ({
+          code: product.code,
+          price: product.price || 0,
+          quantity: product.quantity || 0,
+          description: product.description || "",
+          freeProduct: product.freeProduct || 0,
+          returnProduct: product.returnProduct || 0,
+          tax: product.tax || 0,
+          discount: product.discount || 0,
+          total: product.total,
+          issubtotal: product.issubtotal || false,
+          istotal: product.istotal || false,
+        }));
 
         return {
           ...prev,
-          orderDetails: normalizedOrderDetails,
+          products: normalizedProducts,
         };
       });
     }
@@ -392,439 +389,313 @@ const InvoisDetailsPage: React.FC = () => {
     fetchSalesmen();
   }, [fetchSalesmen]);
 
-  const addTotalRow = useCallback(
-    (items: OrderDetail[], totalAmount: string): OrderDetail[] => {
-      const existingTotalRow = items.find((item) => item.istotal);
-      if (existingTotalRow) {
-        return items.map((item) =>
-          item.istotal ? { ...item, total: totalAmount } : item
-        );
-      } else {
-        return [
-          ...items,
-          {
-            code: "",
-            productname: "Total:",
-            qty: 0,
-            price: 0,
-            total: totalAmount,
-            istotal: true,
-          },
-        ];
-      }
-    },
-    []
-  );
+  const handleProductChange = (
+    productCode: string,
+    updatedProduct: ProductItem
+  ) => {
+    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+      const updatedProducts = prevData.products.map((product) =>
+        product.code === productCode ? updatedProduct : product
+      );
+
+      // Calculate totals
+      let totalMee = 0;
+      let totalBihun = 0;
+      let totalNonTaxable = 0;
+      let totalTaxable = 0;
+
+      updatedProducts.forEach((product) => {
+        // Skip subtotal and total rows
+        if (product.issubtotal || product.istotal) return;
+
+        const total = calculateTotal(product);
+
+        // Categorize based on product code
+        if (product.code.startsWith("1-")) {
+          totalMee += total;
+        } else if (product.code.startsWith("2-")) {
+          totalBihun += total;
+        }
+
+        // Add to taxable/non-taxable based on product type
+        if (product.code.startsWith("S-") || product.code.startsWith("MEQ-")) {
+          totalNonTaxable += total;
+        } else {
+          totalTaxable += total;
+        }
+      });
+
+      return {
+        ...prevData,
+        products: updatedProducts,
+        totalMee,
+        totalBihun,
+        totalNonTaxable,
+        totalTaxable,
+      };
+    });
+  };
+
+  const addTotalRow = (
+    items: ProductItem[],
+    totalAmount: string
+  ): ProductItem[] => {
+    const existingTotalRow = items.find((item) => item.istotal);
+    if (existingTotalRow) {
+      return items.map((item) =>
+        item.istotal ? { ...item, total: totalAmount } : item
+      );
+    } else {
+      return [
+        ...items,
+        {
+          code: "",
+          description: "Total:",
+          quantity: 0,
+          price: 0,
+          total: totalAmount,
+          freeProduct: 0,
+          returnProduct: 0,
+          tax: 0,
+          discount: 0,
+          istotal: true,
+          issubtotal: false,
+        },
+      ];
+    }
+  };
 
   const orderDetailsWithTotal = useMemo(() => {
     if (!invoiceData) return [];
-    const regularItems = invoiceData.orderDetails.filter(
-      (item) => !item.isfoc && !item.isreturned
+
+    const regularItems = invoiceData.products.filter(
+      (product) => !product.istotal
     );
-    const totalAmount = calculateTotal(regularItems);
+    const totalAmount = calculateOverallTotal(regularItems).toFixed(2);
     return addTotalRow(regularItems, totalAmount);
-  }, [invoiceData, calculateTotal, addTotalRow]);
+  }, [invoiceData, calculateOverallTotal, addTotalRow]);
 
-  const recalculateSubtotals = useCallback(
-    (details: OrderDetail[]): OrderDetail[] => {
-      const result: OrderDetail[] = [];
-      let runningTotal = 0;
+  const recalculateSubtotals = (details: ProductItem[]): ProductItem[] => {
+    const result: ProductItem[] = [];
+    let runningTotal = 0;
 
-      // First pass: calculate running total and maintain order
-      for (const item of details) {
-        if (item.issubtotal) {
-          // When we hit a subtotal, add it with the current running total
-          result.push({
-            ...item,
-            total: runningTotal.toFixed(2),
-          });
-          // Don't reset running total - it should continue accumulating
-        } else {
-          // Add the non-subtotal item as-is
-          result.push(item);
-          // Update running total based on item type
-          if (item.isless) {
-            runningTotal -= parseFloat(item.total || "0");
-          } else if (item.istax) {
-            runningTotal += parseFloat(item.total || "0");
-          } else if (!item.istotal) {
-            runningTotal += parseFloat(item.total || "0");
-          }
+    // First pass: calculate running total and maintain order
+    for (const item of details) {
+      if (item.issubtotal) {
+        // When we hit a subtotal, add it with the current running total
+        result.push({
+          ...item,
+          total: runningTotal.toFixed(2),
+        });
+        // Don't reset running total - it should continue accumulating
+      } else {
+        // Add the non-subtotal item as-is
+        result.push(item);
+        // Update running total for non-total rows
+        if (!item.istotal) {
+          runningTotal += calculateTotal(item);
         }
       }
+    }
 
-      return result;
-    },
-    []
-  );
+    return result;
+  };
 
-  const handleSpecialRowDelete = useCallback(
-    (code: string) => {
-      setInvoiceData((prevData) => {
-        if (!prevData) return null;
-        const newDetails = prevData.orderDetails.filter(
-          (item) => item.code !== code
-        );
-        return {
-          ...prevData,
-          orderDetails: recalculateSubtotals(newDetails),
-        };
+  const handleSpecialRowDelete = (code: string) => {
+    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+      // Filter out the row with the given code
+      const newProducts = prevData.products.filter(
+        (item) => item.code !== code
+      );
+
+      // Recalculate totals
+      let totalMee = 0;
+      let totalBihun = 0;
+      let totalNonTaxable = 0;
+      let totalTaxable = 0;
+
+      newProducts.forEach((product) => {
+        if (product.issubtotal || product.istotal) return;
+
+        const total = calculateTotal(product);
+
+        if (product.code.startsWith("1-")) {
+          totalMee += total;
+        } else if (product.code.startsWith("2-")) {
+          totalBihun += total;
+        }
+
+        if (product.code.startsWith("S-") || product.code.startsWith("MEQ-")) {
+          totalNonTaxable += total;
+        } else {
+          totalTaxable += total;
+        }
       });
-    },
-    [recalculateSubtotals]
-  );
 
-  const getAvailableProducts = useCallback(
-    (tableType: "details" | "foc" | "returned") => {
-      const usedProducts = invoiceData?.orderDetails
-        .filter((item) => {
-          switch (tableType) {
-            case "details":
-              return !item.isfoc && !item.isreturned;
-            case "foc":
-              return item.isfoc;
-            case "returned":
-              return item.isreturned;
-            default:
-              return false;
-          }
-        })
-        .map((item) => item.code);
-
-      return products.filter((p) => !usedProducts?.includes(p.id));
-    },
-    [products, invoiceData]
-  );
-
-  const addNewRow = useCallback(
-    (tableType: "details" | "foc" | "returned") => {
-      const availableProducts = getAvailableProducts(tableType);
-
-      if (availableProducts.length === 0) {
-        toast.error(`All products have been added to the ${tableType} table.`);
-        return null;
-      }
-
-      const randomProduct =
-        availableProducts[Math.floor(Math.random() * availableProducts.length)];
-
-      const newItem: OrderDetail = {
-        code: randomProduct.id,
-        productname: randomProduct.description,
-        qty: 1,
-        price: tableType === "details" ? 0 : 0,
-        total: "0",
-        isfoc: tableType === "foc",
-        isreturned: tableType === "returned",
+      return {
+        ...prevData,
+        products: newProducts,
+        totalMee,
+        totalBihun,
+        totalNonTaxable,
+        totalTaxable,
       };
+    });
+  };
 
-      return newItem;
-    },
-    [getAvailableProducts]
-  );
+  const getAvailableProducts = useCallback(() => {
+    const usedProducts = invoiceData?.products.map((item) => item.code);
+    return products.filter((p) => !usedProducts?.includes(p.id));
+  }, [products, invoiceData]);
+
+  const addNewRow = () => {
+    const availableProducts = getAvailableProducts();
+
+    if (availableProducts.length === 0) {
+      toast.error("All products have been added to the invoice.");
+      return null;
+    }
+
+    const randomProduct =
+      availableProducts[Math.floor(Math.random() * availableProducts.length)];
+
+    return {
+      code: randomProduct.id,
+      description: randomProduct.description,
+      quantity: 1,
+      price: 0,
+      freeProduct: 0,
+      returnProduct: 0,
+      tax: 0,
+      discount: 0,
+      issubtotal: false,
+      istotal: false,
+    };
+  };
 
   const newRowAddedRef = useRef(false);
-  const newFocRowAddedRef = useRef(false);
-  const newReturnedRowAddedRef = useRef(false);
 
   // Reset newRowAddedRef after each render
   useEffect(() => {
     newRowAddedRef.current = false;
-    newFocRowAddedRef.current = false;
-    newReturnedRowAddedRef.current = false;
   });
 
   // HC
-  const handleChange = useCallback(
-    (updatedItems: OrderDetail[]) => {
-      setTimeout(() => {
-        setInvoiceData((prevInvoiceData) => {
-          if (!prevInvoiceData) return null;
+  const handleChange = (updatedItems: ProductItem[]) => {
+    setTimeout(() => {
+      setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+        // Filter out total row
+        const filteredItems = updatedItems.filter((item) => !item.istotal);
 
-          const prevRegularItems = prevInvoiceData.orderDetails.filter(
-            (item) => !item.istotal && !item.isfoc && !item.isreturned
-          );
+        // Determine if this is a deletion operation
+        const isDeletion = filteredItems.length < prevData.products.length;
 
-          // Filter out total row from updated items
-          const filteredItems = updatedItems.filter((item) => !item.istotal);
-
-          // Get other types of items to preserve
-          const focItems = prevInvoiceData.orderDetails.filter(
-            (item) => item.isfoc
-          );
-          const returnedItems = prevInvoiceData.orderDetails.filter(
-            (item) => item.isreturned
-          );
-
-          let updatedOrderDetails: OrderDetail[];
-
-          // Check if this is a deletion operation
-          if (filteredItems.length < prevRegularItems.length) {
-            // For deletion, maintain the exact order from filteredItems
-            updatedOrderDetails = filteredItems;
-          } else {
-            // For updates/additions, maintain original order while updating values
-            updatedOrderDetails = prevRegularItems.map((item) => {
-              // If this is a subtotal, preserve its position
-              if (item.issubtotal) return item;
-
-              const updatedItem = filteredItems.find(
-                (updated) => updated.code === item.code
-              );
-              if (!updatedItem) return item;
-
-              // Handle product name changes
-              if (updatedItem.productname !== item.productname) {
-                const matchingProduct = products.find(
-                  (p) => p.description === updatedItem.productname
-                );
-                if (matchingProduct) {
-                  updatedItem.code = matchingProduct.id;
-                }
-              }
-
-              // Return updated item
-              if (item.isless || item.istax) {
-                return {
-                  ...item,
-                  ...updatedItem,
-                  total: updatedItem.total,
-                };
-              }
-              return {
-                ...item,
-                ...updatedItem,
-                total: (updatedItem.qty * updatedItem.price).toFixed(2),
-              };
-            });
-
-            // Handle new items
-            const newItems = filteredItems.filter(
-              (item) =>
-                !item.code && !item.istotal && !item.isfoc && !item.isreturned
+        let updatedProducts: ProductItem[];
+        if (isDeletion) {
+          // For deletion, just use filtered items
+          updatedProducts = filteredItems;
+        } else {
+          // For updates/additions, map existing products
+          updatedProducts = prevData.products.map((item) => {
+            const updatedItem = filteredItems.find(
+              (updated) => updated.code === item.code
             );
+            return updatedItem || item;
+          });
 
-            if (newItems.length > 0 && !newRowAddedRef.current) {
-              const newItem = addNewRow("details");
-              if (newItem) {
-                updatedOrderDetails.push(newItem);
-                newRowAddedRef.current = true;
-              }
+          // Handle new rows added through TableEditing
+          if (newRowAddedRef.current) {
+            const newItem = addNewRow();
+            if (newItem) {
+              updatedProducts.push(newItem);
             }
           }
+        }
 
-          // Recalculate the subtotals while maintaining positions
-          updatedOrderDetails = recalculateSubtotals(updatedOrderDetails);
+        // Calculate totals
+        let totalMee = 0;
+        let totalBihun = 0;
+        let totalNonTaxable = 0;
+        let totalTaxable = 0;
 
-          // Calculate total
-          const totalAmount = calculateTotal(updatedOrderDetails);
+        updatedProducts.forEach((product) => {
+          // Skip subtotal and total rows
+          if (product.issubtotal || product.istotal) return;
 
-          // Add total row
-          const totalRow = {
-            code: "",
-            productname: "Total:",
-            qty: 0,
-            price: 0,
-            total: totalAmount,
-            istotal: true,
-          };
+          const total = calculateTotal(product);
 
-          // Combine everything
-          const combinedOrderDetails = [
-            ...updatedOrderDetails,
-            ...focItems,
-            ...returnedItems,
-            totalRow,
-          ];
+          if (product.code.startsWith("1-")) {
+            totalMee += total;
+          } else if (product.code.startsWith("2-")) {
+            totalBihun += total;
+          }
 
-          // Calculate overall total
-          const overallTotalAmount =
-            calculateOverallTotal(combinedOrderDetails);
-
-          return {
-            ...prevInvoiceData,
-            orderDetails: combinedOrderDetails,
-            totalAmount: overallTotalAmount,
-          };
+          if (
+            product.code.startsWith("S-") ||
+            product.code.startsWith("MEQ-")
+          ) {
+            totalNonTaxable += total;
+          } else {
+            totalTaxable += total;
+          }
         });
-      }, 0);
-    },
-    [
-      calculateTotal,
-      addNewRow,
-      products,
-      calculateOverallTotal,
-      recalculateSubtotals,
-    ]
-  );
 
-  const getNextSpecialRowNumber = useCallback(
-    (type: string) => {
-      const existingRows =
-        invoiceData?.orderDetails.filter((item) =>
-          item.code?.startsWith(type)
-        ) || [];
-      const numbers = existingRows.map((item) => {
-        const match = item.code?.match(/-(\d+)$/);
-        return match ? parseInt(match[1]) : 0;
-      });
-      const maxNumber = Math.max(0, ...numbers);
-      return maxNumber + 1;
-    },
-    [invoiceData]
-  );
+        // Add or update total row if needed
+        const totalAmount = calculateOverallTotal(updatedProducts).toFixed(2);
+        const productsWithTotal = addTotalRow(updatedProducts, totalAmount);
 
-  const normalizeSpecialRow = useCallback(
-    (row: OrderDetail, type: "Less" | "Tax") => {
-      // If this is an existing row (has invoiceid), preserve its original productname
-      if (row.invoiceid || row.code) {
         return {
-          // Keep existing properties
-          invoiceid: row.invoiceid || "",
-          code: row.code,
-          productname: row.productname, // Keep original description
-          qty: row.qty || 1,
-          price: row.price || 0,
-          total: row.total || "0",
-          // Set flags
-          isfoc: false,
-          isreturned: false,
-          istotal: false,
-          issubtotal: false,
-          isless: type === "Less",
-          istax: type === "Tax",
+          ...prevData,
+          products: productsWithTotal,
+          totalMee,
+          totalBihun,
+          totalNonTaxable,
+          totalTaxable,
         };
-      }
-
-      // Only generate new code and description for new rows
-      const nextNumber = getNextSpecialRowNumber(type.toUpperCase());
-      return {
-        invoiceid: "",
-        code: `${type.toUpperCase()}-${nextNumber}`,
-        productname: `${type} ${nextNumber}`, // Only set default name for new rows
-        qty: 1,
-        price: 0,
-        total: "0",
-        isfoc: false,
-        isreturned: false,
-        istotal: false,
-        issubtotal: false,
-        isless: type === "Less",
-        istax: type === "Tax",
-      };
-    },
-    [getNextSpecialRowNumber]
-  );
-
-  const insertBeforeTotal = (
-    orderDetails: OrderDetail[],
-    newItem: OrderDetail
-  ) => {
-    const totalIndex = orderDetails.findIndex((item) => item.istotal);
-    if (totalIndex !== -1) {
-      return [
-        ...orderDetails.slice(0, totalIndex),
-        newItem,
-        ...orderDetails.slice(totalIndex),
-      ];
-    }
-    return [...orderDetails, newItem];
-  };
-
-  const handleAddLess = () => {
-    setInvoiceData((prevData) => {
-      if (!prevData) return null;
-      const newItem = normalizeSpecialRow({} as OrderDetail, "Less");
-      return {
-        ...prevData,
-        orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
-      };
-    });
-  };
-
-  const handleAddTax = () => {
-    setInvoiceData((prevData) => {
-      if (!prevData) return null;
-      const newItem = normalizeSpecialRow({} as OrderDetail, "Tax");
-      return {
-        ...prevData,
-        orderDetails: insertBeforeTotal(prevData.orderDetails, newItem),
-      };
-    });
+      });
+    }, 0);
   };
 
   const handleAddSubtotal = () => {
-    setInvoiceData((prevData) => {
-      if (!prevData) return null;
-      const nextNumber = getNextSpecialRowNumber("SUBTOTAL");
-
-      // Calculate subtotal only from non-special rows up to this point
-      const currentItems = prevData.orderDetails;
+    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+      // Calculate subtotal from non-total rows up to this point
+      const currentProducts = prevData.products;
       let runningTotal = 0;
 
-      for (const item of currentItems) {
-        if (item.istotal || item.issubtotal) continue;
-        if (item.isless) {
-          runningTotal -= parseFloat(item.total || "0");
-          continue;
-        }
-        if (item.istax) {
-          runningTotal += parseFloat(item.total || "0");
-          continue;
-        }
-        if (!item.isfoc && !item.isreturned) {
-          runningTotal += parseFloat(item.total || "0");
-        }
+      for (const product of currentProducts) {
+        if (product.istotal || product.issubtotal) continue;
+        runningTotal += calculateTotal(product);
       }
 
-      const newItem: OrderDetail = {
-        code: `SUBTOTAL-${nextNumber}`,
-        productname: `Subtotal ${nextNumber}`,
-        qty: 0,
+      const newProduct: ProductItem = {
+        code: "SUBTOTAL",
+        description: "Subtotal",
+        quantity: 0,
         price: 0,
+        freeProduct: 0,
+        returnProduct: 0,
+        tax: 0,
+        discount: 0,
         total: runningTotal.toFixed(2),
         issubtotal: true,
-        // Add other required properties with default values
-        isless: false,
-        istax: false,
-        isfoc: false,
-        isreturned: false,
         istotal: false,
       };
 
       // Insert before total but after all regular items
-      const totalRowIndex = prevData.orderDetails.findIndex(
-        (item) => item.istotal
-      );
-      const newOrderDetails = [...prevData.orderDetails];
+      const totalRowIndex = prevData.products.findIndex((item) => item.istotal);
+      const newProducts = [...prevData.products];
       if (totalRowIndex !== -1) {
-        newOrderDetails.splice(totalRowIndex, 0, newItem);
+        newProducts.splice(totalRowIndex, 0, newProduct);
       } else {
-        newOrderDetails.push(newItem);
+        newProducts.push(newProduct);
       }
 
       return {
         ...prevData,
-        orderDetails: newOrderDetails,
+        products: newProducts,
       };
     });
   };
-
-  const focItemsWithTotal = useMemo(() => {
-    if (!invoiceData) return [];
-    const focItems = invoiceData.orderDetails.filter((item) => item.isfoc);
-    const totalAmount = calculateTotal(focItems);
-    return addTotalRow(focItems, totalAmount);
-  }, [invoiceData, calculateTotal, addTotalRow]);
-
-  const returnedItemsWithTotal = useMemo(() => {
-    if (!invoiceData) return [];
-    const returnedItems = invoiceData.orderDetails.filter(
-      (item) => item.isreturned
-    );
-    const totalAmount = calculateTotal(returnedItems);
-    return addTotalRow(returnedItems, totalAmount);
-  }, [invoiceData, calculateTotal, addTotalRow]);
 
   if (!invoiceData) {
     return <div>No invoice data found.</div>;
@@ -850,27 +721,50 @@ const InvoisDetailsPage: React.FC = () => {
   const handleSaveClick = async () => {
     if (!invoiceData) return;
 
-    if (!invoiceData.invoiceno) {
+    if (!invoiceData.billNumber) {
       toast.error("Please enter an invoice number before saving.");
       return;
     }
 
     setIsSaving(true);
     try {
+      // Format products for saving
+      const productsToSave = invoiceData.products.map((product) => ({
+        ...product,
+        tax: product.tax || 0,
+        discount: product.discount || 0,
+        total: calculateTotal(product).toFixed(2),
+      }));
+
+      const dataToSave: ExtendedInvoiceData = {
+        ...invoiceData,
+        products: productsToSave,
+      };
+
       let savedInvoice;
       if (isNewInvoice) {
-        savedInvoice = await createInvoice(invoiceData);
+        const created = await createInvoice(dataToSave);
+        savedInvoice = {
+          ...created,
+          customerName: created.customerId || "",
+          isEditing: false,
+        };
         toast.success("New invoice created successfully");
       } else {
-        // Determine if we're saving to the database or server memory
         const saveToDb = location.pathname.includes("/sales/invoice/details");
-        savedInvoice = await saveInvoice(invoiceData, saveToDb);
+        const saved = await saveInvoice(dataToSave, saveToDb);
+        savedInvoice = {
+          ...saved,
+          customerName: saved.customerId || "",
+          isEditing: false,
+        };
         toast.success(
           saveToDb
             ? "Invoice updated successfully in database"
             : "Invoice updated successfully in memory"
         );
       }
+
       navigate(previousPath);
       setInvoiceData(savedInvoice);
       setIsFormChanged(false);
@@ -897,7 +791,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (invoiceData) {
       try {
-        await deleteInvoice(invoiceData.id);
+        await deleteInvoice(invoiceData.billNumber);
         toast.success("Invoice deleted successfully");
         navigate(previousPath);
       } catch (error) {
@@ -909,285 +803,61 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   const handleAddRegularItem = () => {
-    setInvoiceData((prevData) => {
-      if (!prevData) return null;
-      const newItem = addNewRow("details");
+    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+      if (!prevData) return prevData;
+
+      const newItem = addNewRow();
       if (!newItem) return prevData;
 
-      const totalIndex = prevData.orderDetails.findIndex(
-        (item) => item.istotal
+      // Remove total row if it exists
+      const productsWithoutTotal = prevData.products.filter(
+        (item) => !item.istotal
       );
-      const newOrderDetails = [...prevData.orderDetails];
 
-      if (totalIndex !== -1) {
-        newOrderDetails.splice(totalIndex, 0, newItem);
-      } else {
-        newOrderDetails.push(newItem);
-      }
+      // Add new item
+      const newProducts = [...productsWithoutTotal, newItem];
 
-      return {
-        ...prevData,
-        orderDetails: newOrderDetails,
-      };
-    });
-  };
+      // Recalculate totals
+      let totalMee = 0;
+      let totalBihun = 0;
+      let totalNonTaxable = 0;
+      let totalTaxable = 0;
 
-  const handleAddFOC = () => {
-    setInvoiceData((prevData) => {
-      if (!prevData) return null;
-      const newItem = addNewRow("foc");
-      if (!newItem) return prevData;
+      newProducts.forEach((product) => {
+        if (product.issubtotal || product.istotal) return;
 
-      const totalIndex = prevData.orderDetails.findIndex(
-        (item) => item.istotal && item.isfoc
-      );
-      const newOrderDetails = [...prevData.orderDetails];
+        const total = calculateTotal(product);
 
-      if (totalIndex !== -1) {
-        newOrderDetails.splice(totalIndex, 0, newItem);
-      } else {
-        const lastFocIndex = newOrderDetails
-          .map((item) => item.isfoc)
-          .lastIndexOf(true);
-        if (lastFocIndex !== -1) {
-          newOrderDetails.splice(lastFocIndex + 1, 0, newItem);
-        } else {
-          newOrderDetails.push(newItem);
-        }
-      }
-
-      return {
-        ...prevData,
-        orderDetails: newOrderDetails,
-      };
-    });
-  };
-
-  const handleAddReturnedGoods = () => {
-    setInvoiceData((prevData) => {
-      if (!prevData) return null;
-      const newItem = addNewRow("returned");
-      if (!newItem) return prevData;
-
-      const totalIndex = prevData.orderDetails.findIndex(
-        (item) => item.istotal && item.isreturned
-      );
-      const newOrderDetails = [...prevData.orderDetails];
-
-      if (totalIndex !== -1) {
-        newOrderDetails.splice(totalIndex, 0, newItem);
-      } else {
-        const lastReturnedIndex = newOrderDetails
-          .map((item) => item.isreturned)
-          .lastIndexOf(true);
-        if (lastReturnedIndex !== -1) {
-          newOrderDetails.splice(lastReturnedIndex + 1, 0, newItem);
-        } else {
-          newOrderDetails.push(newItem);
-        }
-      }
-
-      return {
-        ...prevData,
-        orderDetails: newOrderDetails,
-      };
-    });
-  };
-
-  // HFC
-  const handleFocChange = (updatedItems: OrderDetail[]) => {
-    setTimeout(() => {
-      setInvoiceData((prevInvoiceData) => {
-        if (!prevInvoiceData) return null;
-        const filteredItems = updatedItems.filter((item) => !item.istotal);
-        const currentFocItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isfoc && !item.istotal
-        );
-        const regularItems = prevInvoiceData.orderDetails.filter(
-          (item) => !item.isfoc && !item.isreturned
-        );
-        const returnedItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isreturned
-        );
-        let updatedFocItems: OrderDetail[];
-
-        if (filteredItems.length < currentFocItems.length) {
-          updatedFocItems = filteredItems;
-        } else {
-          const newItems = updatedItems.filter(
-            (item) => !item.code && !item.istotal && item.isfoc
-          );
-          updatedFocItems = currentFocItems.map((item) => {
-            const updatedItem = updatedItems.find(
-              (updated) => updated.code === item.code && updated.isfoc
-            );
-            if (updatedItem) {
-              // Check if the product name has changed
-              if (updatedItem.productname !== item.productname) {
-                // Find the matching product in the products array
-                const matchingProduct = products.find(
-                  (p) => p.description === updatedItem.productname
-                );
-                if (matchingProduct) {
-                  // Update the code to match the new product
-                  updatedItem.code = matchingProduct.id;
-                }
-              }
-              return {
-                ...item,
-                code: updatedItem.code || item.code,
-                productname: updatedItem.productname || item.productname,
-                qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
-                price:
-                  updatedItem.price !== undefined
-                    ? updatedItem.price
-                    : item.price,
-                total: (
-                  (updatedItem.qty !== undefined ? updatedItem.qty : item.qty) *
-                  (updatedItem.price !== undefined
-                    ? updatedItem.price
-                    : item.price)
-                ).toFixed(2),
-                isfoc: true,
-              };
-            }
-            return item;
-          });
-
-          if (newItems.length > 0 && !newFocRowAddedRef.current) {
-            const newItem = addNewRow("foc");
-            if (newItem) {
-              updatedFocItems.push(newItem);
-              newFocRowAddedRef.current = true;
-            }
-          }
+        if (product.code.startsWith("1-")) {
+          totalMee += total;
+        } else if (product.code.startsWith("2-")) {
+          totalBihun += total;
         }
 
-        const totalAmount = calculateTotal(updatedFocItems);
-
-        const totalRow = {
-          code: "",
-          productname: "Total:",
-          qty: 0,
-          price: 0,
-          total: totalAmount,
-          istotal: true,
-          isfoc: true,
-        };
-
-        const combinedOrderDetails = [
-          ...regularItems,
-          ...updatedFocItems,
-          ...returnedItems,
-          totalRow,
-        ];
-        return {
-          ...prevInvoiceData,
-          orderDetails: combinedOrderDetails,
-        };
+        if (product.code.startsWith("S-") || product.code.startsWith("MEQ-")) {
+          totalNonTaxable += total;
+        } else {
+          totalTaxable += total;
+        }
       });
-    }, 0);
-  };
 
-  const handleReturnedChange = (updatedItems: OrderDetail[]) => {
-    setTimeout(() => {
-      setInvoiceData((prevInvoiceData) => {
-        if (!prevInvoiceData) return null;
+      // Add total row back
+      const total = calculateOverallTotal(newProducts).toFixed(2);
+      const withTotal = addTotalRow(newProducts, total);
 
-        const filteredItems = updatedItems.filter((item) => !item.istotal);
-        const currentReturnedItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isreturned && !item.istotal
-        );
-        const regularItems = prevInvoiceData.orderDetails.filter(
-          (item) => !item.isfoc && !item.isreturned
-        );
-        const focItems = prevInvoiceData.orderDetails.filter(
-          (item) => item.isfoc
-        );
-        let updatedReturnedItems: OrderDetail[];
-
-        if (filteredItems.length < currentReturnedItems.length) {
-          updatedReturnedItems = filteredItems;
-        } else {
-          const newItems = updatedItems.filter(
-            (item) => !item.code && !item.istotal && item.isreturned
-          );
-          updatedReturnedItems = currentReturnedItems.map((item) => {
-            const updatedItem = updatedItems.find(
-              (updated) => updated.code === item.code && updated.isreturned
-            );
-            if (updatedItem) {
-              // Check if the product name has changed
-              if (updatedItem.productname !== item.productname) {
-                // Find the matching product in the products array
-                const matchingProduct = products.find(
-                  (p) => p.description === updatedItem.productname
-                );
-                if (matchingProduct) {
-                  // Update the code to match the new product
-                  updatedItem.code = matchingProduct.id;
-                }
-              }
-              return {
-                ...item,
-                code: updatedItem.code || item.code,
-                productname: updatedItem.productname || item.productname,
-                qty: updatedItem.qty !== undefined ? updatedItem.qty : item.qty,
-                price:
-                  updatedItem.price !== undefined
-                    ? updatedItem.price
-                    : item.price,
-                total: (
-                  (updatedItem.qty !== undefined ? updatedItem.qty : item.qty) *
-                  (updatedItem.price !== undefined
-                    ? updatedItem.price
-                    : item.price)
-                ).toFixed(2),
-                isreturned: true,
-              };
-            }
-            return item;
-          });
-
-          if (newItems.length > 0 && !newReturnedRowAddedRef.current) {
-            const newItem = addNewRow("returned");
-            if (newItem) {
-              updatedReturnedItems.push(newItem);
-              newReturnedRowAddedRef.current = true;
-            }
-          }
-        }
-
-        const totalAmount = calculateTotal(updatedReturnedItems);
-
-        const totalRow = {
-          code: "",
-          productname: "Total:",
-          qty: 0,
-          price: 0,
-          total: totalAmount,
-          istotal: true,
-          isreturned: true,
-        };
-
-        const combinedOrderDetails = [
-          ...regularItems,
-          ...focItems,
-          ...updatedReturnedItems,
-          totalRow,
-        ];
-        return {
-          ...prevInvoiceData,
-          orderDetails: combinedOrderDetails,
-        };
-      });
-    }, 0);
+      return {
+        ...prevData,
+        products: withTotal,
+        totalMee,
+        totalBihun,
+        totalNonTaxable,
+        totalTaxable,
+      };
+    });
   };
 
   const renderActionButtons = () => {
     const hasRegularItems = orderDetailsWithTotal.length > 1;
-    const hasFOC = focItemsWithTotal.length > 1;
-    const hasReturned = returnedItemsWithTotal.length > 1;
 
     const renderButton = (text: string, onClick?: () => void) => (
       <Button onClick={onClick} variant="outline" size="md">
@@ -1198,57 +868,41 @@ const InvoisDetailsPage: React.FC = () => {
     return (
       <div className="flex justify-center items-center space-x-2 mt-8 text-default-700">
         {!hasRegularItems && renderButton("Add Order", handleAddRegularItem)}
-        {!hasRegularItems && (!hasFOC || !hasReturned) && <span>or</span>}
-        {!hasFOC && renderButton("Add FOC", handleAddFOC)}
-        {!hasFOC && !hasReturned && <span>or</span>}
-        {!hasReturned &&
-          renderButton("Add Returned goods", handleAddReturnedGoods)}
       </div>
     );
   };
 
-  const columns: ColumnConfig[] = [
+  // PC
+  const productColumns: ColumnConfig[] = [
     {
       id: "code",
-      header: "ID",
+      header: "Code",
       type: "readonly",
       width: 150,
     },
     {
-      id: "productname",
-      header: "PRODUCT",
+      id: "description",
+      header: "Product",
       type: "combobox",
       width: 350,
       options: products.map((p) => p.description),
     },
     {
-      id: "qty",
-      header: "QUANTITY",
+      id: "quantity",
+      header: "Quantity",
       type: "number",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
-          min="1"
-          value={Math.max(1, info.getValue())}
+          min="0"
+          value={info.getValue()}
           onChange={(e) => {
-            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
-            const updatedItem = {
+            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
+            handleProductChange(info.row.original.code, {
               ...info.row.original,
-              qty: newValue,
-              total: (newValue * info.row.original.price).toFixed(2),
-            };
-
-            // Get all current order details
-            const allOrderDetails = invoiceData.orderDetails.map((item) => {
-              if (item.code === updatedItem.code) {
-                return updatedItem;
-              }
-              return item;
+              quantity: newValue,
             });
-
-            // Update all order details, including the modified item
-            handleChange(allOrderDetails);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -1256,235 +910,107 @@ const InvoisDetailsPage: React.FC = () => {
     },
     {
       id: "price",
-      header: "PRICE",
+      header: "Price",
       type: "float",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
           step="0.01"
+          min="0"
           value={info.getValue()}
           onChange={(e) => {
-            const newValue = parseFloat(e.target.value) || 0;
-            const updatedItem = {
+            const newValue = Math.max(0, parseFloat(e.target.value) || 0);
+            handleProductChange(info.row.original.code, {
               ...info.row.original,
               price: newValue,
-              total: (newValue * info.row.original.price).toFixed(2),
-            };
-
-            // Get all current order details
-            const allOrderDetails = invoiceData.orderDetails.map((item) => {
-              if (item.code === updatedItem.code) {
-                return updatedItem;
-              }
-              return item;
             });
-
-            // Update all order details, including the modified item
-            handleChange(allOrderDetails);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
       ),
     },
     {
-      id: "total",
-      header: "AMOUNT",
-      type: "amount",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => {
-        const isEditable = info.row.original.isless || info.row.original.istax;
-        return (
-          <input
-            type="float"
-            step="0.01"
-            value={
-              isEditable
-                ? info.getValue()
-                : (info.row.original.qty * info.row.original.price).toFixed(2)
-            }
-            onChange={(e) => {
-              if (isEditable) {
-                const updatedItem = {
-                  ...info.row.original,
-                  total: e.target.value,
-                };
-
-                const allOrderDetails = invoiceData.orderDetails.map((item) =>
-                  item.code === updatedItem.code ? updatedItem : item
-                );
-
-                handleChange(allOrderDetails);
-              }
-            }}
-            className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
-            disabled={!isEditable}
-          />
-        );
-      },
-    },
-    { id: "action", header: "", type: "action", width: 50 },
-  ];
-
-  const focItemsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "readonly", width: 150 },
-    {
-      id: "productname",
-      header: "PRODUCT",
-      type: "combobox",
-      width: 350,
-      options: products.map((p) => p.description),
-    },
-    {
-      id: "qty",
-      header: "QUANTITY",
+      id: "freeProduct",
+      header: "FOC",
       type: "number",
-      width: 150,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+      width: 80,
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
-          min="1"
-          value={Math.max(1, Number(info.row.original.qty) || 1)}
-          onChange={(e) => {
-            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
-            const updatedItem = {
-              ...info.row.original,
-              qty: newValue,
-              total: (newValue * info.row.original.price).toFixed(2),
-            };
-
-            // Get all current order details
-            const allOrderDetails = invoiceData.orderDetails.map((item) => {
-              if (item.code === updatedItem.code) {
-                return updatedItem;
-              }
-              return item;
-            });
-            // Update all order details, including the modified item
-            handleFocChange(allOrderDetails);
-          }}
-          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
-        />
-      ),
-    },
-    {
-      id: "price",
-      header: "PRICE",
-      type: "float",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <input
-          type="number"
-          step="0.01"
+          min="0"
           value={info.getValue()}
           onChange={(e) => {
-            const newValue = parseFloat(e.target.value) || 0;
-            const updatedItem = {
+            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
+            handleProductChange(info.row.original.code, {
               ...info.row.original,
-              price: newValue,
-              total: (newValue * info.row.original.qty).toFixed(2),
-            };
-
-            const allOrderDetails = invoiceData.orderDetails.map((item) => {
-              if (item.code === updatedItem.code) {
-                return updatedItem;
-              }
-              return item;
+              freeProduct: newValue,
             });
-
-            handleFocChange(allOrderDetails);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
       ),
     },
     {
-      id: "total",
-      header: "AMOUNT",
-      type: "amount",
-      width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.istotal
-            ? info.getValue()
-            : (
-                parseFloat(info.row.original.price.toString()) *
-                info.row.original.qty
-              ).toFixed(2)}
-        </div>
-      ),
-    },
-    { id: "action", header: "", type: "action", width: 50 },
-  ];
-
-  const returnedGoodsColumns: ColumnConfig[] = [
-    { id: "code", header: "ID", type: "readonly", width: 150 },
-    {
-      id: "productname",
-      header: "PRODUCT",
-      type: "combobox",
-      width: 350,
-      options: products.map((p) => p.description),
-    },
-    {
-      id: "qty",
-      header: "QUANTITY",
+      id: "returnProduct",
+      header: "Return",
       type: "number",
-      width: 150,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+      width: 80,
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
-          min="1"
-          value={Math.max(1, Number(info.row.original.qty) || 1)}
+          min="0"
+          value={info.getValue()}
           onChange={(e) => {
-            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
-            const updatedItem = {
+            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
+            handleProductChange(info.row.original.code, {
               ...info.row.original,
-              qty: newValue,
-              total: (newValue * info.row.original.price).toFixed(2),
-            };
-
-            // Get all current order details
-            const allOrderDetails = invoiceData.orderDetails.map((item) => {
-              if (item.code === updatedItem.code) {
-                return updatedItem;
-              }
-              return item;
+              returnProduct: newValue,
             });
-
-            // Update all order details, including the modified item
-            handleReturnedChange(allOrderDetails);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
       ),
     },
     {
-      id: "price",
-      header: "PRICE",
+      id: "discount",
+      header: "Discount",
       type: "float",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
           step="0.01"
+          min="0"
           value={info.getValue()}
           onChange={(e) => {
-            const newValue = parseFloat(e.target.value) || 0;
-            const updatedItem = {
+            const newValue = Math.max(0, parseFloat(e.target.value) || 0);
+            handleProductChange(info.row.original.code, {
               ...info.row.original,
-              price: newValue,
-              total: (newValue * info.row.original.qty).toFixed(2),
-            };
-
-            const allOrderDetails = invoiceData.orderDetails.map((item) => {
-              if (item.code === updatedItem.code) {
-                return updatedItem;
-              }
-              return item;
+              discount: newValue,
             });
-
-            handleReturnedChange(allOrderDetails);
+          }}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
+        />
+      ),
+    },
+    {
+      id: "tax",
+      header: "Tax",
+      type: "float",
+      width: 100,
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={info.getValue()}
+          onChange={(e) => {
+            const newValue = Math.max(0, parseFloat(e.target.value) || 0);
+            handleProductChange(info.row.original.code, {
+              ...info.row.original,
+              tax: newValue,
+            });
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -1492,17 +1018,12 @@ const InvoisDetailsPage: React.FC = () => {
     },
     {
       id: "total",
-      header: "AMOUNT",
+      header: "Amount",
       type: "amount",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: OrderDetail } }) => (
-        <div className="w-full h-full px-6 py-3 text-right outline-none bg-transparent">
-          {info.row.original.istotal
-            ? info.getValue()
-            : (
-                parseFloat(info.row.original.price.toString()) *
-                info.row.original.qty
-              ).toFixed(2)}
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
+        <div className="w-full h-full px-6 py-3 text-right">
+          {calculateTotal(info.row.original).toFixed(2)}
         </div>
       ),
     },
@@ -1639,17 +1160,42 @@ const InvoisDetailsPage: React.FC = () => {
             label="Invoice No"
             value={
               invoiceData
-                ? `${invoiceData.type || ""}${invoiceData.invoiceno || ""}`
+                ? `${invoiceData.paymentType || ""}${
+                    invoiceData.billNumber || ""
+                  }`
                 : ""
             }
             onChange={(e) => {
               const newValue = e.target.value;
               setInvoiceData((prev) => {
-                if (!prev) return null;
+                if (!prev) {
+                  // Return a default ExtendedInvoiceData object instead of null
+                  return {
+                    billNumber: "",
+                    salespersonId: "",
+                    customerId: "",
+                    createdDate: new Date().toLocaleDateString("en-GB"),
+                    paymentType: "Invoice",
+                    products: [],
+                    totalMee: 0,
+                    totalBihun: 0,
+                    totalNonTaxable: 0,
+                    totalTaxable: 0,
+                    totalAdjustment: 0,
+                    displayProducts: [],
+                    customerName: "",
+                    type: (newValue.charAt(0) as "C" | "I") || "I",
+                    date: new Date().toLocaleDateString("en-GB"),
+                    time: new Date().toLocaleTimeString("en-GB"),
+                    customer: "",
+                    customername: "",
+                    salesman: "",
+                  };
+                }
                 return {
                   ...prev,
-                  type: (newValue.charAt(0) as "C" | "I") || prev.type,
-                  invoiceno: newValue.slice(1),
+                  type: (newValue.charAt(0) as "C" | "I") || prev.paymentType,
+                  billNumber: newValue.slice(1),
                 };
               });
             }}
@@ -1657,14 +1203,15 @@ const InvoisDetailsPage: React.FC = () => {
           <FormListbox
             name="type"
             label="Type"
-            value={getTypeDisplayName(invoiceData.type as "C" | "I")}
+            value={getTypeDisplayName(invoiceData.paymentType as "C" | "I")}
             onChange={(value) => {
               setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
+                // Instead of potentially returning null, return a new ExtendedInvoiceData
+                const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  type: value === "Cash" ? "C" : "I",
+                  paymentType: value === "Cash" ? "Cash" : "Invoice",
                 };
+                return updatedData;
               });
             }}
             options={[
@@ -1676,29 +1223,14 @@ const InvoisDetailsPage: React.FC = () => {
             name="date"
             label="Date"
             type="date"
-            value={formatDateForInput(invoiceData.date)}
+            value={formatDateForInput(invoiceData.createdDate)}
             onChange={(e) => {
               setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
+                const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  date: formatDateForState(e.target.value),
+                  createdDate: formatDateForState(e.target.value),
                 };
-              });
-            }}
-          />
-          <FormInput
-            name="time"
-            label="Time"
-            type="time"
-            value={formatTimeForInput(invoiceData.time)}
-            onChange={(e) => {
-              setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  time: formatTimeForState(e.target.value),
-                };
+                return updatedData;
               });
             }}
           />
@@ -1707,25 +1239,38 @@ const InvoisDetailsPage: React.FC = () => {
           <FormInput
             name="customerId"
             label="Customer ID"
-            value={invoiceData.customer}
+            value={invoiceData.customerId}
             disabled
           />
           <CustomerCombobox
             name="customer"
             label="Customer"
-            value={invoiceData?.customername ? [invoiceData.customername] : []}
+            value={invoiceData?.customerId ? [invoiceData.customerId] : []}
             onChange={(value: string[] | null) => {
-              const selectedCustomerName = value ? value[0] : "";
-              const selectedCustomer = customers.find(
-                (c) => c.name === selectedCustomerName
-              );
               setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
+                const selectedCustomerName = value ? value[0] : "";
+                const selectedCustomer = customers.find(
+                  (c) => c.name === selectedCustomerName
+                );
+
+                // Create an updated state object that maintains ExtendedInvoiceData type
+                const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  customer: selectedCustomer?.id || "",
-                  customername: selectedCustomerName,
+                  // Ensure all required fields from ExtendedInvoiceData are present
+                  customerId: selectedCustomer?.id || prev.customerId,
+                  billNumber: prev.billNumber,
+                  salespersonId: prev.salespersonId,
+                  createdDate: prev.createdDate,
+                  paymentType: prev.paymentType,
+                  products: prev.products,
+                  totalMee: prev.totalMee,
+                  totalBihun: prev.totalBihun,
+                  totalNonTaxable: prev.totalNonTaxable,
+                  totalTaxable: prev.totalTaxable,
+                  totalAdjustment: prev.totalAdjustment,
                 };
+
+                return updatedData;
               });
             }}
             options={customers.map((c) => ({ id: c.id, name: c.name }))}
@@ -1738,14 +1283,26 @@ const InvoisDetailsPage: React.FC = () => {
           <FormListbox
             name="salesman"
             label="Salesman"
-            value={invoiceData.salesman}
+            value={invoiceData.salespersonId}
             onChange={(value) => {
               setInvoiceData((prev) => {
-                if (!prev) return null;
-                return {
+                // Create an updated state object that maintains ExtendedInvoiceData type
+                const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  salesman: value,
+                  customerId: prev.customerId,
+                  billNumber: prev.billNumber,
+                  salespersonId: prev.salespersonId,
+                  createdDate: prev.createdDate,
+                  paymentType: prev.paymentType,
+                  products: prev.products,
+                  totalMee: prev.totalMee,
+                  totalBihun: prev.totalBihun,
+                  totalNonTaxable: prev.totalNonTaxable,
+                  totalTaxable: prev.totalTaxable,
+                  totalAdjustment: prev.totalAdjustment,
                 };
+
+                return updatedData;
               });
             }}
             options={salesmen.map((id) => ({ id, name: id }))}
@@ -1758,20 +1315,14 @@ const InvoisDetailsPage: React.FC = () => {
           <div className="relative mb-6">
             <h2 className="text-xl font-semibold pt-2">Order Details</h2>
             <div className="absolute top-0 right-0 space-x-2">
-              <Button onClick={handleAddLess} variant="outline" size="md">
-                Less
-              </Button>
-              <Button onClick={handleAddTax} variant="outline" size="md">
-                Tax
-              </Button>
               <Button onClick={handleAddSubtotal} variant="outline" size="md">
                 Subtotal
               </Button>
             </div>
           </div>
-          <TableEditing<OrderDetail>
+          <TableEditing<ProductItem>
             initialData={orderDetailsWithTotal}
-            columns={columns}
+            columns={productColumns}
             onChange={handleChange}
             onSpecialRowDelete={handleSpecialRowDelete}
             tableKey="orderDetails"
@@ -1779,29 +1330,6 @@ const InvoisDetailsPage: React.FC = () => {
         </>
       )}
 
-      {focItemsWithTotal.length > 1 && (
-        <>
-          <h2 className="text-xl font-semibold mt-8 mb-4">FOC</h2>
-          <TableEditing<OrderDetail>
-            initialData={focItemsWithTotal}
-            columns={focItemsColumns}
-            onChange={handleFocChange}
-            tableKey="focItems"
-          />
-        </>
-      )}
-
-      {returnedItemsWithTotal.length > 1 && (
-        <>
-          <h2 className="text-xl font-semibold mt-8 mb-4">Returned Goods</h2>
-          <TableEditing<OrderDetail>
-            initialData={returnedItemsWithTotal}
-            columns={returnedGoodsColumns}
-            onChange={handleReturnedChange}
-            tableKey="returnedGoods"
-          />
-        </>
-      )}
       {renderActionButtons()}
       <ConfirmationDialog
         isOpen={showBackConfirmation}

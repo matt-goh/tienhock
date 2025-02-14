@@ -1,169 +1,136 @@
 import toast from "react-hot-toast";
 import {
+  ExtendedInvoiceData,
   InvoiceData,
-  InvoiceFilterOptions,
-  OrderDetail,
+  InvoiceFilters,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
 
-let invoices: InvoiceData[] = [];
+let invoices: ExtendedInvoiceData[] = [];
 
-export const getInvoices = () => invoices;
-
-export const setInvoices = (newInvoices: InvoiceData[]) => {
-  invoices = newInvoices;
-};
-
-export const updateInvoice = (updatedInvoice: InvoiceData) => {
+export const updateInvoice = (updatedInvoice: ExtendedInvoiceData) => {
   invoices = invoices.map((invoice) =>
-    invoice.id === updatedInvoice.id ? updatedInvoice : invoice
+    invoice.billNumber === updatedInvoice.billNumber ? updatedInvoice : invoice
   );
   // Dispatch an event to notify that invoices have been updated
   window.dispatchEvent(new CustomEvent("invoicesUpdated"));
 };
 
 export const fetchDbInvoices = async (
-  filters: InvoiceFilterOptions
+  filters: InvoiceFilters
 ): Promise<InvoiceData[]> => {
   try {
     const queryParams = new URLSearchParams();
 
-    if (filters.dateRangeFilter?.start) {
+    // Only add date filters if they exist and are actual Date objects
+    if (filters.dateRange?.start instanceof Date) {
       queryParams.append(
         "startDate",
-        filters.dateRangeFilter.start.toISOString().split("T")[0]
+        filters.dateRange.start.toISOString().split("T")[0]
       );
     }
-    if (filters.dateRangeFilter?.end) {
+    if (filters.dateRange?.end instanceof Date) {
       queryParams.append(
         "endDate",
-        filters.dateRangeFilter.end.toISOString().split("T")[0]
+        filters.dateRange.end.toISOString().split("T")[0]
       );
     }
 
+    // Add salesman filter
     if (
-      filters.applySalesmanFilter &&
-      filters.salesmanFilter &&
-      filters.salesmanFilter.length > 0
+      filters.applySalespersonFilter &&
+      filters.salespersonId &&
+      filters.salespersonId.length > 0
     ) {
-      queryParams.append("salesmen", filters.salesmanFilter.join(","));
+      queryParams.append("salesman", filters.salespersonId.join(","));
     }
+
+    // Add customer filter
     if (
       filters.applyCustomerFilter &&
-      filters.customerFilter &&
-      filters.customerFilter.length > 0
+      filters.customerId &&
+      filters.customerId.length > 0
     ) {
-      queryParams.append("customers", filters.customerFilter.join(","));
-    }
-    if (filters.applyInvoiceTypeFilter && filters.invoiceTypeFilter) {
-      queryParams.append("invoiceType", filters.invoiceTypeFilter);
+      queryParams.append("customer", filters.customerId.join(","));
     }
 
-    const data = await api.get(`/api/invoices/db/?${queryParams.toString()}`);
-
-    if (Array.isArray(data)) {
-      return data;
-    } else {
-      throw new Error("Received data is not an array");
+    // Add payment type filter
+    if (filters.applyPaymentTypeFilter && filters.paymentType) {
+      queryParams.append("type", filters.paymentType);
     }
-  } catch (error) {
-    console.error("Error fetching invoices:", error);
-    throw error;
-  }
-};
 
-export const fetchInvoices = async () => {
-  try {
-    const data = await api.get("/api/invoices");
-
-    if (Array.isArray(data)) {
-      setInvoices(data);
-      return data;
-    } else {
-      throw new Error("Received data is not an array");
-    }
-  } catch (error) {
-    console.error("Error fetching invoices:", error);
-    throw error;
-  }
-};
-
-export const deleteInvoice = async (id: string) => {
-  try {
-    // Try to delete from the database
     try {
-      await api.delete(`/api/invoices/db/${id}`);
-      invoices = invoices.filter((invoice) => invoice.id !== id);
-      return true;
-    } catch {
-      // If not found in database, try to delete from server memory
-      await api.delete(`/api/invoices/${id}`);
-      invoices = invoices.filter((invoice) => invoice.id !== id);
-      return true;
+      const response = await api.get(`/api/invoices?${queryParams.toString()}`);
+
+      if (!response || !Array.isArray(response)) {
+        throw new Error("Invalid response format from server");
+      }
+
+      return response;
+    } catch (error) {
+      // If the first attempt fails, try the alternative endpoint
+      const response = await api.get(
+        `/api/invoices/db?${queryParams.toString()}`
+      );
+
+      if (!response || !Array.isArray(response)) {
+        throw new Error("Invalid response format from server");
+      }
+
+      return response;
     }
   } catch (error) {
-    console.error("Error deleting invoice:", error);
-    throw error;
-  }
-};
+    console.error("Error fetching invoices:", error);
 
-const checkDuplicateInvoiceNo = async (invoiceNo: string): Promise<boolean> => {
-  try {
-    const data = await api.get(
-      `/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
-    );
-    return data.isDuplicate;
-  } catch (error) {
-    console.error("Error checking for duplicate invoice number:", error);
-    throw error;
+    // Provide a more user-friendly error message
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred while fetching invoices";
+
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
   }
 };
 
 export const saveInvoice = async (
-  invoice: InvoiceData,
+  invoice: ExtendedInvoiceData,
   saveToDb: boolean = true
-): Promise<InvoiceData> => {
+): Promise<ExtendedInvoiceData> => {
   try {
-    const normalizedOrderDetails = invoice.orderDetails.map((detail) => {
-      if (detail.isless || detail.istax) {
-        return {
-          invoiceid: detail.invoiceid,
-          code: detail.code,
-          productname: detail.productname,
-          qty: Number(detail.qty),
-          price: Number(detail.price),
-          total: detail.total.toString(),
-          isfoc: false,
-          isreturned: false,
-          istotal: false,
-          issubtotal: false,
-          isless: detail.isless || false,
-          istax: detail.istax || false,
-        };
-      }
-      return detail;
-    });
+    // Normalize products data
+    const normalizedProducts = invoice.products.map((product) => ({
+      code: product.code,
+      quantity: product.quantity || 0,
+      price: product.price || 0,
+      freeProduct: product.freeProduct || 0,
+      returnProduct: product.returnProduct || 0,
+      tax: product.tax || 0,
+      discount: product.discount || 0,
+      description: product.description || "",
+      issubtotal: product.issubtotal || false,
+      istotal: product.istotal || false,
+    }));
 
-    const filteredOrderDetails = normalizedOrderDetails.filter(
-      (detail) => !detail.istotal
+    // Remove total rows before saving
+    const productsToSave = normalizedProducts.filter(
+      (product) => !product.istotal
     );
 
     const invoiceToSave = {
       ...invoice,
-      orderDetails: filteredOrderDetails,
+      products: productsToSave,
     };
 
-    const savedInvoice: InvoiceData = await api.post(
+    const savedInvoice = await api.post(
       `/api/invoices/submit?saveToDb=${saveToDb}`,
       invoiceToSave
     );
 
-    savedInvoice.orderDetails = addCalculatedTotalRows(
-      savedInvoice.orderDetails
-    );
-
     if (!saveToDb) {
-      const index = invoices.findIndex((inv) => inv.id === savedInvoice.id);
+      const index = invoices.findIndex(
+        (inv) => inv.billNumber === savedInvoice.billNumber
+      );
       if (index !== -1) {
         invoices[index] = savedInvoice;
       } else {
@@ -174,15 +141,22 @@ export const saveInvoice = async (
     return savedInvoice;
   } catch (error) {
     console.error("Error saving invoice:", error);
-    throw error;
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred while saving the invoice";
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
   }
 };
 
 export const createInvoice = async (
-  invoiceData: InvoiceData
-): Promise<InvoiceData> => {
+  invoiceData: ExtendedInvoiceData
+): Promise<ExtendedInvoiceData> => {
   try {
-    const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.invoiceno);
+    const isDuplicate = await checkDuplicateInvoiceNo(
+      invoiceData.billNumber.toString()
+    );
     if (isDuplicate) {
       toast.error(
         "Duplicate invoice number. Please use a unique invoice number."
@@ -190,111 +164,72 @@ export const createInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
-    const filteredOrderDetails = invoiceData.orderDetails.filter(
-      (detail) => !detail.istotal
+    // Filter out total rows before saving
+    const productsToSave = invoiceData.products.filter(
+      (product) => !product.istotal
     );
 
     const invoiceToCreate = {
       ...invoiceData,
-      orderDetails: filteredOrderDetails,
+      products: productsToSave,
     };
 
-    const createdInvoice: InvoiceData = await api.post(
+    const createdInvoice = await api.post(
       "/api/invoices/submit?saveToDb=true",
       invoiceToCreate
-    );
-
-    createdInvoice.orderDetails = addCalculatedTotalRows(
-      createdInvoice.orderDetails
     );
 
     return createdInvoice;
   } catch (error) {
     console.error("Error creating invoice:", error);
-    throw error;
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred while creating the invoice";
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
   }
 };
 
-function addCalculatedTotalRows(orderDetails: OrderDetail[]): OrderDetail[] {
-  let subtotal = 0;
-  let focTotal = 0;
-  let returnedTotal = 0;
-  const detailsWithTotals = [...orderDetails];
+export const deleteInvoice = async (id: string): Promise<boolean> => {
+  try {
+    await api.delete(`/api/invoices/db/${id}`);
+    return true;
+  } catch (error) {
+    console.error("Error deleting invoice:", error);
 
-  // Calculate totals, considering tax and less rows
-  orderDetails.forEach((detail) => {
-    if (detail.isless) {
-      subtotal -= parseFloat(detail.total) || 0;
-    } else if (detail.istax) {
-      subtotal += parseFloat(detail.total) || 0;
-    } else if (!detail.isfoc && !detail.isreturned) {
-      subtotal += parseFloat(detail.total) || 0;
-    } else if (detail.isfoc) {
-      focTotal += parseFloat(detail.total) || 0;
-    } else if (detail.isreturned) {
-      returnedTotal += parseFloat(detail.total) || 0;
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred while deleting the invoice";
+
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
+export const checkDuplicateInvoiceNo = async (
+  invoiceNo: string
+): Promise<boolean> => {
+  try {
+    const response = await api.get(
+      `/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
+    );
+
+    if (typeof response?.isDuplicate !== "boolean") {
+      throw new Error("Invalid response format from server");
     }
-  });
 
-  // Sort the details to maintain proper order
-  detailsWithTotals.sort((a, b) => {
-    const getOrderValue = (item: OrderDetail) => {
-      if (item.istotal) return 6;
-      if (item.issubtotal) return 5;
-      if (item.isless) return 4;
-      if (item.istax) return 3;
-      if (item.isfoc) return 2;
-      if (item.isreturned) return 1;
-      return 0;
-    };
-    return getOrderValue(a) - getOrderValue(b);
-  });
+    return response.isDuplicate;
+  } catch (error) {
+    console.error("Error checking for duplicate invoice number:", error);
 
-  // Add subtotal row
-  detailsWithTotals.push({
-    code: "SUBTOTAL",
-    productname: "Subtotal",
-    qty: 0,
-    price: 0,
-    total: subtotal.toFixed(2),
-    issubtotal: true,
-  });
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred while checking for duplicate invoice";
 
-  // Add FOC total row if applicable
-  if (focTotal > 0) {
-    detailsWithTotals.push({
-      code: "FOC-TOTAL",
-      productname: "FOC Total",
-      qty: 0,
-      price: 0,
-      total: focTotal.toFixed(2),
-      isfoc: true,
-      istotal: true,
-    });
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
   }
-
-  // Add Returned total row if applicable
-  if (returnedTotal > 0) {
-    detailsWithTotals.push({
-      code: "RETURNED-TOTAL",
-      productname: "Returned Total",
-      qty: 0,
-      price: 0,
-      total: returnedTotal.toFixed(2),
-      isreturned: true,
-      istotal: true,
-    });
-  }
-
-  // Add grand total row
-  detailsWithTotals.push({
-    code: "GRAND-TOTAL",
-    productname: "Total",
-    qty: 0,
-    price: 0,
-    total: (subtotal - returnedTotal).toFixed(2),
-    istotal: true,
-  });
-
-  return detailsWithTotals;
-}
+};
