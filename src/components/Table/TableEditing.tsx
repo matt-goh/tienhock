@@ -1607,38 +1607,36 @@ function TableEditing<T extends Record<string, any>>({
           </table>
         </div>
       </div>
-      {isLastPage &&
-        !(tableKey === "invois") &&
-        !(tableKey === "invois-products") && (
-          <>
-            <ToolTip
-              content={"Klik untuk menambah baris baharu"}
-              position="bottom"
-              visible={isAddRowBarHovered}
-            >
-              <div
-                ref={addRowBarRef}
-                style={{
-                  width: `${tableWidth}px`,
-                  height: "16px",
-                  userSelect: "none",
-                  opacity:
-                    isLastRowHovered || isAddRowBarHovered || isAddRowBarActive
-                      ? 1
-                      : 0,
-                  transition: "opacity 0.2s ease-in-out",
-                }}
-                className={`bg-default-200 rounded-full hover:bg-default-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
-                  isAddRowBarActive ? "active-bg" : ""
-                } 
+      {isLastPage && !(tableKey === "invois") && (
+        <>
+          <ToolTip
+            content={"Klik untuk menambah baris baharu"}
+            position="bottom"
+            visible={isAddRowBarHovered}
+          >
+            <div
+              ref={addRowBarRef}
+              style={{
+                width: `${tableWidth}px`,
+                height: "16px",
+                userSelect: "none",
+                opacity:
+                  isLastRowHovered || isAddRowBarHovered || isAddRowBarActive
+                    ? 1
+                    : 0,
+                transition: "opacity 0.2s ease-in-out",
+              }}
+              className={`bg-default-200 rounded-full hover:bg-default-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
+                isAddRowBarActive ? "active-bg" : ""
+              } 
           }`}
-                onMouseDown={handleMouseDown}
-                onClick={handleAddRow}
-                onMouseEnter={() => setIsAddRowBarHovered(true)}
-                onMouseLeave={() => setIsAddRowBarHovered(false)}
-              ></div>
-            </ToolTip>
-            <style>{`
+              onMouseDown={handleMouseDown}
+              onClick={handleAddRow}
+              onMouseEnter={() => setIsAddRowBarHovered(true)}
+              onMouseLeave={() => setIsAddRowBarHovered(false)}
+            ></div>
+          </ToolTip>
+          <style>{`
           .active-bg {
             background-color: rgba(156, 163, 175, 0.75); /* bg-default-400/75 */
           }
@@ -1646,8 +1644,8 @@ function TableEditing<T extends Record<string, any>>({
             background-color: rgba(156, 163, 175, 0.75); /* bg-default-400/75 */
           }
         `}</style>
-          </>
-        )}
+        </>
+      )}
       <div className="flex justify-between items-center mt-4 w-full">
         {tableKey === "invois" && <div className="w-[48px]"></div>}
         {data.length >= 10 && <TablePagination table={table} />}

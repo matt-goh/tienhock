@@ -331,11 +331,11 @@ export interface ExtendedProductItem extends ProductItem {
 }
 
 export interface InvoiceData {
-  billNumber: string;
-  salespersonId: string;
-  customerId: string;
-  createdDate: string;
-  paymentType: string;
+  id: string;
+  salespersonid: string;
+  customerid: string;
+  createddate: string;
+  paymenttype: string;
   products: ProductItem[];
   totalMee: number;
   totalBihun: number;

@@ -5,13 +5,13 @@ import {
   InvoiceFilters,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
-import { formatDateForAPI } from "./dateUtitls";
+import { formatDateForAPI } from "./dateUtils";
 
 let invoices: ExtendedInvoiceData[] = [];
 
 export const updateInvoice = (updatedInvoice: ExtendedInvoiceData) => {
   invoices = invoices.map((invoice) =>
-    invoice.billNumber === updatedInvoice.billNumber ? updatedInvoice : invoice
+    invoice.id === updatedInvoice.id ? updatedInvoice : invoice
   );
   // Dispatch an event to notify that invoices have been updated
   window.dispatchEvent(new CustomEvent("invoicesUpdated"));
@@ -117,7 +117,7 @@ export const saveInvoice = async (
 
     if (!saveToDb) {
       const index = invoices.findIndex(
-        (inv) => inv.billNumber === savedInvoice.billNumber
+        (inv) => inv.id === savedInvoice.billNumber
       );
       if (index !== -1) {
         invoices[index] = savedInvoice;
@@ -143,7 +143,7 @@ export const createInvoice = async (
 ): Promise<ExtendedInvoiceData> => {
   try {
     const isDuplicate = await checkDuplicateInvoiceNo(
-      invoiceData.billNumber.toString()
+      invoiceData.id.toString()
     );
     if (isDuplicate) {
       toast.error(

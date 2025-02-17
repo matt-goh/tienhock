@@ -17,11 +17,11 @@ export const uiToApiFormat = (uiData: ExtendedInvoiceData): InvoiceData => {
     }));
 
   return {
-    billNumber: uiData.billNumber,
-    salespersonId: uiData.salespersonId,
-    customerId: uiData.customerId,
-    createdDate: uiData.createdDate,
-    paymentType: uiData.paymentType,
+    id: uiData.id,
+    salespersonid: uiData.salespersonid,
+    customerid: uiData.customerid,
+    createddate: uiData.createddate,
+    paymenttype: uiData.paymenttype,
     products: regularProducts,
     totalMee: calculateCategoryTotal(regularProducts, "1-"),
     totalBihun: calculateCategoryTotal(regularProducts, "2-"),

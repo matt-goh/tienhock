@@ -422,7 +422,7 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
 
   const totals = invoices.reduce(
     (acc, invoice) => {
-      if (invoice.paymentType === "Cash") {
+      if (invoice.paymenttype === "Cash") {
         acc.cashTotal += invoice.totalTaxable;
         acc.cashCount++;
       } else {
@@ -440,18 +440,18 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
         <View style={styles.infoLeftSection}>
           <Text style={styles.customerInfo}>
             <Text style={styles.customerLabel}>Customer: </Text>
-            {invoice.customerId}
+            {invoice.customerid}
           </Text>
         </View>
         <View style={styles.infoRightSection}>
           <View style={styles.infoRightContainer}>
             <Text style={[styles.customerInfo]}>
               <Text style={styles.customerLabel}>Type: </Text>
-              {invoice.paymentType}
+              {invoice.paymenttype}
             </Text>
             <Text style={styles.customerInfo}>
               <Text style={styles.customerLabel}>Invoice No: </Text>
-              {invoice.billNumber}
+              {invoice.id}
             </Text>
           </View>
         </View>
@@ -460,14 +460,14 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
         <View style={styles.infoLeftSection}>
           <Text style={styles.customerInfo}>
             <Text style={styles.customerLabel}>Salesman: </Text>
-            {invoice.salespersonId}
+            {invoice.salespersonid}
           </Text>
         </View>
         <View style={styles.infoRightSection}>
           <View style={styles.infoRightContainer}>
             <Text style={styles.customerInfo}>
               <Text style={styles.customerLabel}>Date: </Text>
-              {invoice.createdDate}
+              {invoice.createddate}
             </Text>
           </View>
         </View>

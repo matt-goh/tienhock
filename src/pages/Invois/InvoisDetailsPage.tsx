@@ -36,6 +36,10 @@ import {
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
+import {
+  dateInputToTimestamp,
+  formatDateForInput,
+} from "../../utils/invoice/dateUtils";
 
 interface SelectOption {
   id: string;
@@ -234,6 +238,7 @@ const InvoisDetailsPage: React.FC = () => {
     if (invoiceData) {
       updateInvoice(invoiceData);
     }
+    console.log(invoiceData);
   }, [invoiceData]);
 
   useEffect(() => {
@@ -283,7 +288,7 @@ const InvoisDetailsPage: React.FC = () => {
       try {
         const data = await api.get(
           `/api/customers/combobox?salesman=${
-            invoiceData?.salespersonId || ""
+            invoiceData?.salespersonid || ""
           }&search=${search}&page=${page}&limit=20`
         );
         setCustomers((prevCustomers) =>
@@ -297,7 +302,7 @@ const InvoisDetailsPage: React.FC = () => {
         setIsFetchingCustomers(false);
       }
     },
-    [invoiceData?.salespersonId]
+    [invoiceData?.salespersonid]
   );
 
   const debouncedFetchCustomers = useMemo(
@@ -319,7 +324,7 @@ const InvoisDetailsPage: React.FC = () => {
     setCustomerPage(1);
     setCustomerQuery("");
     fetchCustomers("", 1);
-  }, [invoiceData?.salespersonId, fetchCustomers]);
+  }, [invoiceData?.salespersonid, fetchCustomers]);
 
   useEffect(() => {
     if (invoiceData) {
@@ -600,7 +605,23 @@ const InvoisDetailsPage: React.FC = () => {
             const updatedItem = filteredItems.find(
               (updated) => updated.code === item.code
             );
-            return updatedItem || item;
+
+            if (updatedItem) {
+              // Handle product name changes
+              if (updatedItem.description !== item.description) {
+                const matchingProduct = products.find(
+                  (p) => p.description === updatedItem.description
+                );
+                if (matchingProduct) {
+                  return {
+                    ...updatedItem,
+                    code: matchingProduct.id,
+                  };
+                }
+              }
+              return updatedItem;
+            }
+            return item;
           });
 
           // Handle new rows added through TableEditing
@@ -640,9 +661,9 @@ const InvoisDetailsPage: React.FC = () => {
           }
         });
 
-        // Add or update total row if needed
-        const totalAmount = calculateOverallTotal(updatedProducts).toFixed(2);
-        const productsWithTotal = addTotalRow(updatedProducts, totalAmount);
+        // Add total row back
+        const total = calculateOverallTotal(updatedProducts).toFixed(2);
+        const productsWithTotal = addTotalRow(updatedProducts, total);
 
         return {
           ...prevData,
@@ -721,7 +742,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleSaveClick = async () => {
     if (!invoiceData) return;
 
-    if (!invoiceData.billNumber) {
+    if (!invoiceData.id) {
       toast.error("Please enter an invoice number before saving.");
       return;
     }
@@ -746,7 +767,7 @@ const InvoisDetailsPage: React.FC = () => {
         const created = await createInvoice(dataToSave);
         savedInvoice = {
           ...created,
-          customerName: created.customerId || "",
+          customerName: created.customerid || "",
           isEditing: false,
         };
         toast.success("New invoice created successfully");
@@ -755,7 +776,7 @@ const InvoisDetailsPage: React.FC = () => {
         const saved = await saveInvoice(dataToSave, saveToDb);
         savedInvoice = {
           ...saved,
-          customerName: saved.customerId || "",
+          customerName: saved.customerid || "",
           isEditing: false,
         };
         toast.success(
@@ -791,7 +812,7 @@ const InvoisDetailsPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (invoiceData) {
       try {
-        await deleteInvoice(invoiceData.billNumber);
+        await deleteInvoice(invoiceData.id);
         toast.success("Invoice deleted successfully");
         navigate(previousPath);
       } catch (error) {
@@ -876,7 +897,7 @@ const InvoisDetailsPage: React.FC = () => {
   const productColumns: ColumnConfig[] = [
     {
       id: "code",
-      header: "Code",
+      header: "ID",
       type: "readonly",
       width: 150,
     },
@@ -974,7 +995,7 @@ const InvoisDetailsPage: React.FC = () => {
     },
     {
       id: "discount",
-      header: "Discount",
+      header: "Disc",
       type: "float",
       width: 100,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
@@ -1030,103 +1051,6 @@ const InvoisDetailsPage: React.FC = () => {
     { id: "action", header: "", type: "action", width: 50 },
   ];
 
-  // Function to convert date from various formats to "YYYY-MM-DD"
-  const formatDateForInput = (dateString: string) => {
-    if (!dateString) return "";
-
-    // Handle ISO timestamp format
-    if (dateString.includes("T")) {
-      try {
-        const date = new Date(dateString);
-        // Use toISOString() and slice to get just the date part
-        return date.toISOString().slice(0, 10);
-      } catch (error) {
-        console.warn(`Error parsing ISO date: ${dateString}`, error);
-        return "";
-      }
-    }
-
-    // Check if the date is already in "YYYY-MM-DD" format
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      return dateString;
-    }
-
-    // Split for "DD/MM/YYYY" format
-    const parts = dateString.split("/");
-
-    // Ensure we have exactly 3 parts
-    if (parts.length !== 3) {
-      console.warn(`Unexpected date format: ${dateString}`);
-      return "";
-    }
-
-    const [day, month, year] = parts;
-
-    // Pad day and month if needed, using default values if conversion fails
-    const paddedDay = day.padStart(2, "0");
-    const paddedMonth = month.padStart(2, "0");
-
-    return `${year}-${paddedMonth}-${paddedDay}`;
-  };
-
-  // Updated formatDateForState to handle ISO timestamp
-  const formatDateForState = (dateString: string) => {
-    if (!dateString) return "";
-
-    // Handle ISO timestamp format
-    if (dateString.includes("T")) {
-      try {
-        const date = new Date(dateString);
-        // Convert to local date string format
-        return date.toLocaleDateString("en-GB");
-      } catch (error) {
-        console.warn(`Error parsing ISO date: ${dateString}`, error);
-        return "";
-      }
-    }
-
-    // Check if the date is in "DD/MM/YYYY" format
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
-      return dateString;
-    }
-
-    // Split for "YYYY-MM-DD" format
-    const parts = dateString.split("-");
-
-    // Ensure we have exactly 3 parts
-    if (parts.length !== 3) {
-      console.warn(`Unexpected date format: ${dateString}`);
-      return "";
-    }
-
-    const [year, month, day] = parts;
-
-    return `${day}/${month}/${year}`;
-  };
-
-  // Function to convert time from "HH:MM am/pm" to "HH:MM" (24-hour format)
-  const formatTimeForInput = (timeString: string) => {
-    if (!timeString) return "";
-    const [time, period] = timeString.toLowerCase().split(" ");
-    let [hours, minutes] = time.split(":");
-    if (period === "pm" && hours !== "12") {
-      hours = String(parseInt(hours) + 12);
-    } else if (period === "am" && hours === "12") {
-      hours = "00";
-    }
-    return `${hours.padStart(2, "0")}:${minutes}`;
-  };
-
-  // Function to convert time from "HH:MM" (24-hour format) to "HH:MM am/pm"
-  const formatTimeForState = (timeString: string) => {
-    if (!timeString) return "";
-    let [hours, minutes] = timeString.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "pm" : "am";
-    hours = String(hour % 12 || 12);
-    return `${hours}:${minutes} ${ampm}`;
-  };
-
   // Add this function to map the type value to its display name
   const getTypeDisplayName = (type: "C" | "I") => {
     return type === "C" ? "Cash" : "Invoice";
@@ -1160,9 +1084,13 @@ const InvoisDetailsPage: React.FC = () => {
             label="Invoice No"
             value={
               invoiceData
-                ? `${invoiceData.paymentType || ""}${
-                    invoiceData.billNumber || ""
-                  }`
+                ? `${
+                    invoiceData.paymenttype
+                      ? invoiceData.paymenttype === "Invoice"
+                        ? "I"
+                        : "C"
+                      : ""
+                  }${invoiceData.id ?? ""}`
                 : ""
             }
             onChange={(e) => {
@@ -1171,18 +1099,17 @@ const InvoisDetailsPage: React.FC = () => {
                 if (!prev) {
                   // Return a default ExtendedInvoiceData object instead of null
                   return {
-                    billNumber: "",
-                    salespersonId: "",
-                    customerId: "",
-                    createdDate: new Date().toLocaleDateString("en-GB"),
-                    paymentType: "Invoice",
+                    id: "",
+                    salespersonid: "",
+                    customerid: "",
+                    createddate: new Date().toLocaleDateString("en-GB"),
+                    paymenttype: "Invoice",
                     products: [],
                     totalMee: 0,
                     totalBihun: 0,
                     totalNonTaxable: 0,
                     totalTaxable: 0,
                     totalAdjustment: 0,
-                    displayProducts: [],
                     customerName: "",
                     type: (newValue.charAt(0) as "C" | "I") || "I",
                     date: new Date().toLocaleDateString("en-GB"),
@@ -1194,7 +1121,7 @@ const InvoisDetailsPage: React.FC = () => {
                 }
                 return {
                   ...prev,
-                  type: (newValue.charAt(0) as "C" | "I") || prev.paymentType,
+                  type: (newValue.charAt(0) as "C" | "I") || prev.paymenttype,
                   billNumber: newValue.slice(1),
                 };
               });
@@ -1203,13 +1130,13 @@ const InvoisDetailsPage: React.FC = () => {
           <FormListbox
             name="type"
             label="Type"
-            value={getTypeDisplayName(invoiceData.paymentType as "C" | "I")}
+            value={getTypeDisplayName(invoiceData.paymenttype as "C" | "I")}
             onChange={(value) => {
               setInvoiceData((prev) => {
                 // Instead of potentially returning null, return a new ExtendedInvoiceData
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  paymentType: value === "Cash" ? "Cash" : "Invoice",
+                  paymenttype: value === "Cash" ? "Cash" : "Invoice",
                 };
                 return updatedData;
               });
@@ -1223,15 +1150,12 @@ const InvoisDetailsPage: React.FC = () => {
             name="date"
             label="Date"
             type="date"
-            value={formatDateForInput(invoiceData.createdDate)}
+            value={formatDateForInput(invoiceData.createddate)}
             onChange={(e) => {
-              setInvoiceData((prev) => {
-                const updatedData: ExtendedInvoiceData = {
-                  ...prev,
-                  createdDate: formatDateForState(e.target.value),
-                };
-                return updatedData;
-              });
+              setInvoiceData((prev) => ({
+                ...prev,
+                createddate: dateInputToTimestamp(e.target.value),
+              }));
             }}
           />
         </div>
@@ -1239,13 +1163,13 @@ const InvoisDetailsPage: React.FC = () => {
           <FormInput
             name="customerId"
             label="Customer ID"
-            value={invoiceData.customerId}
+            value={invoiceData.customerid}
             disabled
           />
           <CustomerCombobox
             name="customer"
             label="Customer"
-            value={invoiceData?.customerId ? [invoiceData.customerId] : []}
+            value={invoiceData?.customerid ? [invoiceData.customerid] : []}
             onChange={(value: string[] | null) => {
               setInvoiceData((prev) => {
                 const selectedCustomerName = value ? value[0] : "";
@@ -1257,11 +1181,11 @@ const InvoisDetailsPage: React.FC = () => {
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
                   // Ensure all required fields from ExtendedInvoiceData are present
-                  customerId: selectedCustomer?.id || prev.customerId,
-                  billNumber: prev.billNumber,
-                  salespersonId: prev.salespersonId,
-                  createdDate: prev.createdDate,
-                  paymentType: prev.paymentType,
+                  customerid: selectedCustomer?.id || prev.customerid,
+                  id: prev.id,
+                  salespersonid: prev.salespersonid,
+                  createddate: prev.createddate,
+                  paymenttype: prev.paymenttype,
                   products: prev.products,
                   totalMee: prev.totalMee,
                   totalBihun: prev.totalBihun,
@@ -1283,17 +1207,17 @@ const InvoisDetailsPage: React.FC = () => {
           <FormListbox
             name="salesman"
             label="Salesman"
-            value={invoiceData.salespersonId}
+            value={invoiceData.salespersonid}
             onChange={(value) => {
               setInvoiceData((prev) => {
                 // Create an updated state object that maintains ExtendedInvoiceData type
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  customerId: prev.customerId,
-                  billNumber: prev.billNumber,
-                  salespersonId: prev.salespersonId,
-                  createdDate: prev.createdDate,
-                  paymentType: prev.paymentType,
+                  customerid: prev.customerid,
+                  id: prev.id,
+                  salespersonid: prev.salespersonid,
+                  createddate: prev.createddate,
+                  paymenttype: prev.paymenttype,
                   products: prev.products,
                   totalMee: prev.totalMee,
                   totalBihun: prev.totalBihun,
