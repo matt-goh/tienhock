@@ -30,7 +30,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   parseDatabaseTimestamp,
   formatDisplayDate,
-} from "../../utils/invoice/dateUtitls";
+} from "../../utils/invoice/dateUtils";
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -138,8 +138,8 @@ const InvoisPage: React.FC = () => {
     setShowDeleteConfirmation(false);
 
     try {
-      const deletePromises = selectedInvoices.map(
-        (invoice) => deleteInvoice(invoice.billNumber) // Changed from billNumber to id
+      const deletePromises = selectedInvoices.map((invoice) =>
+        deleteInvoice(invoice.id)
       );
       await Promise.all(deletePromises);
 
@@ -198,7 +198,7 @@ const InvoisPage: React.FC = () => {
     ) {
       const salesmanSet = new Set(filters.salespersonId);
       filtered = filtered.filter((invoice) =>
-        salesmanSet.has(invoice.salespersonId)
+        salesmanSet.has(invoice.salespersonid)
       );
     }
 
@@ -210,14 +210,14 @@ const InvoisPage: React.FC = () => {
     ) {
       const customerSet = new Set(filters.customerId);
       filtered = filtered.filter((invoice) =>
-        customerSet.has(invoice.customerId)
+        customerSet.has(invoice.customerid)
       );
     }
 
     // Payment type filter
     if (filters.applyPaymentTypeFilter && filters.paymentType) {
       filtered = filtered.filter(
-        (invoice) => invoice.paymentType === filters.paymentType
+        (invoice) => invoice.paymenttype === filters.paymentType
       );
       console.log("After payment type filter:", filtered.length);
     }
@@ -227,10 +227,10 @@ const InvoisPage: React.FC = () => {
       filtered = filtered.filter((invoice) => {
         // Handle the timestamp
         let timestamp: number;
-        if (typeof invoice.createdDate === "string") {
-          timestamp = parseInt(invoice.createdDate);
+        if (typeof invoice.createddate === "string") {
+          timestamp = parseInt(invoice.createddate);
         } else {
-          timestamp = invoice.createdDate;
+          timestamp = invoice.createddate;
         }
 
         // Create date object and set to start of day for comparison
@@ -360,7 +360,7 @@ const InvoisPage: React.FC = () => {
           onClick={() => handleInvoiceClick(info.row.original)}
           className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer hover:font-semibold"
         >
-          {info.row.original.paymentType === "Cash" ? "C" : "I"}
+          {info.row.original.paymenttype === "Cash" ? "C" : "I"}
           {info.getValue()}
         </button>
       ),
@@ -372,7 +372,7 @@ const InvoisPage: React.FC = () => {
       width: 150,
       cell: (info: { getValue: () => any }) => {
         const timestamp = info.getValue();
-        const date = parseDatabaseTimestamp(timestamp);
+        const { date } = parseDatabaseTimestamp(timestamp);
         return <div className="px-6 py-3">{formatDisplayDate(date)}</div>;
       },
     },
@@ -403,12 +403,12 @@ const InvoisPage: React.FC = () => {
 
   const salesmanOptions = useMemo(() => {
     return Array.from(
-      new Set(invoices.map((invoice) => invoice.salespersonId))
+      new Set(invoices.map((invoice) => invoice.salespersonid))
     );
   }, [invoices]);
 
   const customerOptions = useMemo(() => {
-    return Array.from(new Set(invoices.map((invoice) => invoice.customerId)));
+    return Array.from(new Set(invoices.map((invoice) => invoice.customerid)));
   }, [invoices]);
 
   const formatDateForInput = (date: Date | null): string => {
