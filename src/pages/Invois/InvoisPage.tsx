@@ -27,6 +27,10 @@ import toast from "react-hot-toast";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import {
+  parseDatabaseTimestamp,
+  formatDisplayDate,
+} from "../../utils/invoice/dateUtitls";
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -93,8 +97,8 @@ const InvoisPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
+        // Pass the filters directly - the date conversion happens inside fetchDbInvoices
         const fetchedInvoices = await fetchDbInvoices(filters);
-        console.log("Fetched invoices:", fetchedInvoices);
         setInvoices(fetchedInvoices);
         setFilteredInvoices(fetchedInvoices);
       } catch (error) {
@@ -176,12 +180,6 @@ const InvoisPage: React.FC = () => {
     let filtered = [...invoices];
     console.log("Starting filter with:", filtered.length, "invoices");
 
-    // Debug log an example invoice if available
-    if (filtered.length > 0) {
-      console.log("Example invoice:", filtered[0]);
-      console.log("Current filters:", filters);
-    }
-
     // Search filter
     if (searchTerm) {
       const lowercasedSearch = searchTerm.toLowerCase();
@@ -190,7 +188,6 @@ const InvoisPage: React.FC = () => {
           String(value).toLowerCase().includes(lowercasedSearch)
         )
       );
-      console.log("After search filter:", filtered.length);
     }
 
     // Salesperson filter
@@ -227,36 +224,36 @@ const InvoisPage: React.FC = () => {
 
     // Date filter (always applied)
     if (filters.dateRange.start || filters.dateRange.end) {
-      console.log("Date filter comparing:", {
-        start: filters.dateRange.start,
-        end: filters.dateRange.end,
-        exampleInvoiceDate:
-          filtered.length > 0 ? filtered[0].createdDate : null,
-      });
-
       filtered = filtered.filter((invoice) => {
-        const invoiceDate = new Date(invoice.createdDate);
+        // Handle the timestamp
+        let timestamp: number;
+        if (typeof invoice.createdDate === "string") {
+          timestamp = parseInt(invoice.createdDate);
+        } else {
+          timestamp = invoice.createdDate;
+        }
 
-        // Debug single date comparison
-        console.log("Comparing invoice date:", {
-          invoiceDate,
-          original: invoice.createdDate,
-          passesStartFilter:
-            !filters.dateRange.start || invoiceDate >= filters.dateRange.start,
-          passesEndFilter:
-            !filters.dateRange.end || invoiceDate < filters.dateRange.end,
-        });
+        // Create date object and set to start of day for comparison
+        const invoiceDate = new Date(timestamp);
+        invoiceDate.setHours(0, 0, 0, 0);
 
-        return (
-          (!filters.dateRange.start ||
-            invoiceDate >= filters.dateRange.start) &&
-          (!filters.dateRange.end || invoiceDate < filters.dateRange.end)
-        );
+        // Create start/end date copies and set to start/end of day
+        if (filters.dateRange.start) {
+          const startDate = new Date(filters.dateRange.start);
+          startDate.setHours(0, 0, 0, 0);
+          if (invoiceDate < startDate) return false;
+        }
+
+        if (filters.dateRange.end) {
+          const endDate = new Date(filters.dateRange.end);
+          endDate.setHours(23, 59, 59, 999);
+          if (invoiceDate > endDate) return false;
+        }
+
+        return true;
       });
-      console.log("After date filter:", filtered.length);
     }
 
-    console.log("Final filtered count:", filtered.length);
     setFilteredInvoices(filtered);
   }, [invoices, filters, searchTerm]);
 
@@ -374,8 +371,9 @@ const InvoisPage: React.FC = () => {
       type: "readonly",
       width: 150,
       cell: (info: { getValue: () => any }) => {
-        const date = new Date(info.getValue());
-        return date.toLocaleDateString("en-GB");
+        const timestamp = info.getValue();
+        const date = parseDatabaseTimestamp(timestamp);
+        return formatDisplayDate(date);
       },
     },
     {
@@ -498,6 +496,13 @@ const InvoisPage: React.FC = () => {
 
     const [year, month, day] = value.split("-").map(Number);
     const newDate = new Date(year, month - 1, day);
+
+    // Set time based on start or end
+    if (type === "end") {
+      newDate.setHours(23, 59, 59, 999); // End of the day
+    } else {
+      newDate.setHours(0, 0, 0, 0); // Start of the day
+    }
 
     // Get adjusted date range
     const adjustedRange = adjustDateRange(newDate, type, filters.dateRange);

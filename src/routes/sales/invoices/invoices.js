@@ -1,8 +1,6 @@
 // src/routes/sales/invoices/invoices.js
 import { Router } from "express";
-import {
-  sanitizeNumeric,
-} from "./helpers.js";
+import { sanitizeNumeric } from "./helpers.js";
 
 const formatDate = (date) => {
   if (date instanceof Date) {
@@ -43,7 +41,7 @@ export default function (pool) {
         i.id,
         i.salespersonid,
         i.customerid,
-        i.createddate,
+        i.createddate,  -- Keep as bigint
         i.paymenttype,
         i.totalmee,
         i.totalbihun,
@@ -69,10 +67,14 @@ export default function (pool) {
       let paramCounter = 1;
 
       if (startDate && endDate) {
+        // Convert input dates to Unix timestamps (milliseconds)
+        const startTimestamp = Math.floor(new Date(startDate).getTime());
+        const endTimestamp = Math.floor(new Date(endDate).getTime());
+
         query += ` AND i.createddate BETWEEN $${paramCounter} AND $${
           paramCounter + 1
         }`;
-        queryParams.push(startDate, endDate);
+        queryParams.push(startTimestamp, endTimestamp);
         paramCounter += 2;
       }
 
@@ -90,9 +92,12 @@ export default function (pool) {
 
       query += ` GROUP BY i.id`;
 
+      console.log("Executing query:", query);
+      console.log("With parameters:", queryParams);
+
       const result = await pool.query(query, queryParams);
 
-      // Transform the results to ensure products is an empty array if null
+      // Transform the results
       const transformedResults = result.rows.map((row) => ({
         ...row,
         products: row.products[0] === null ? [] : row.products,
