@@ -5,6 +5,7 @@ import {
   InvoiceFilters,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
+import { formatDateForAPI } from "./dateUtitls";
 
 let invoices: ExtendedInvoiceData[] = [];
 
@@ -22,35 +23,24 @@ export const fetchDbInvoices = async (
   try {
     const queryParams = new URLSearchParams();
 
-    // Only add date filters if they exist and are actual Date objects
-    if (filters.dateRange?.start instanceof Date) {
+    // Convert dates to API format
+    if (filters.dateRange.start) {
       queryParams.append(
         "startDate",
-        filters.dateRange.start.toISOString().split("T")[0]
+        formatDateForAPI(filters.dateRange.start)
       );
     }
-    if (filters.dateRange?.end instanceof Date) {
-      queryParams.append(
-        "endDate",
-        filters.dateRange.end.toISOString().split("T")[0]
-      );
+    if (filters.dateRange.end) {
+      queryParams.append("endDate", formatDateForAPI(filters.dateRange.end));
     }
 
     // Add salesman filter
-    if (
-      filters.applySalespersonFilter &&
-      filters.salespersonId &&
-      filters.salespersonId.length > 0
-    ) {
+    if (filters.applySalespersonFilter && filters.salespersonId) {
       queryParams.append("salesman", filters.salespersonId.join(","));
     }
 
     // Add customer filter
-    if (
-      filters.applyCustomerFilter &&
-      filters.customerId &&
-      filters.customerId.length > 0
-    ) {
+    if (filters.applyCustomerFilter && filters.customerId) {
       queryParams.append("customer", filters.customerId.join(","));
     }
 
@@ -81,8 +71,6 @@ export const fetchDbInvoices = async (
     }
   } catch (error) {
     console.error("Error fetching invoices:", error);
-
-    // Provide a more user-friendly error message
     const errorMessage =
       error instanceof Error
         ? error.message
