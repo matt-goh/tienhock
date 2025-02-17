@@ -373,7 +373,7 @@ const InvoisPage: React.FC = () => {
       cell: (info: { getValue: () => any }) => {
         const timestamp = info.getValue();
         const date = parseDatabaseTimestamp(timestamp);
-        return formatDisplayDate(date);
+        return <div className="px-6 py-3">{formatDisplayDate(date)}</div>;
       },
     },
     {
@@ -393,8 +393,11 @@ const InvoisPage: React.FC = () => {
       header: "Amount",
       type: "amount",
       width: 150,
-      cell: (info: { getValue: () => any }) =>
-        Number(info.getValue() || 0).toFixed(2),
+      cell: (info: { getValue: () => any }) => (
+        <div className="px-6 py-3 text-right">
+          {Number(info.getValue() || 0).toFixed(2)}
+        </div>
+      ),
     },
   ];
 
@@ -531,7 +534,7 @@ const InvoisPage: React.FC = () => {
       <div className="sticky top-0 z-20 bg-white px-6 pt-4">
         <div className="flex flex-col space-y-4">
           {/* Title and Actions Row */}
-          <div className={`flex items-center justify-between`}>
+          <div className={`flex items-center justify-between pl-[45px]`}>
             <h1 className="text-3xl font-semibold text-default-900">
               Invoice {selectedCount > 0 && `(${selectedCount})`}
             </h1>
@@ -592,7 +595,7 @@ const InvoisPage: React.FC = () => {
           </div>
 
           {/* Filters Row */}
-          <div className={`space-y-4`}>
+          <div className={`space-y-4 pl-[45px]`}>
             <div className="flex gap-4">
               {/* Date Range */}
               <div className="flex-1">
