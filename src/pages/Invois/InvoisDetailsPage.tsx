@@ -1070,7 +1070,9 @@ const InvoisDetailsPage: React.FC = () => {
           </Button>
         </div>
       </div>
-      <h1 className="text-2xl font-bold mb-4">Invoice Details</h1>
+      <h1 className="text-2xl font-bold mb-4">
+        Invoice Details
+      </h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="rounded-lg space-y-2">

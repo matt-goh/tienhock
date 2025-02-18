@@ -5,6 +5,7 @@ import { IconArrowRight, IconLock, IconId } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
+import TienHockLogo from "../../utils/TienHockLogo";
 
 const Login: React.FC = () => {
   const [step, setStep] = useState<"ic" | "password">("ic");
@@ -30,7 +31,9 @@ const Login: React.FC = () => {
       if (data.exists) {
         setStep("password");
       } else {
-        toast.error("IC number not registered. Please contact admin if this is an error.");
+        toast.error(
+          "IC number not registered. Please contact admin if this is an error."
+        );
       }
     } catch (error) {
       toast.error("Failed to verify IC number");
@@ -65,7 +68,10 @@ const Login: React.FC = () => {
     } else if (digits.length <= 8) {
       return `${digits.slice(0, 6)}-${digits.slice(6)}`;
     } else {
-      return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 12)}`;
+      return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(
+        8,
+        12
+      )}`;
     }
   };
 
@@ -73,16 +79,14 @@ const Login: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center">
       <div className="max-w-md w-full space-y-6 p-8 bg-white border-2 border-default-100 rounded-xl shadow-xl">
         <div className="flex flex-col items-center">
-          <img
-            src="/tienhock.png"
-            alt="Tien Hock Logo"
-            className="h-24 w-auto mb-6"
-          />
+          <TienHockLogo width={128} height={128} className="mb-4" />
           <h1 className="text-3xl font-bold text-center text-default-900">
             Welcome Back
           </h1>
           <p className="mt-2 text-center text-default-600">
-            {step === "ic" ? "Please enter your IC number" : "Please enter your password"}
+            {step === "ic"
+              ? "Please enter your IC number"
+              : "Please enter your password"}
           </p>
         </div>
 
@@ -153,7 +157,11 @@ const Login: React.FC = () => {
               className="w-full focus:outline-none"
               size="lg"
             >
-              {isLoading ? "Please wait..." : step === "ic" ? "Continue" : "Sign In"}
+              {isLoading
+                ? "Please wait..."
+                : step === "ic"
+                ? "Continue"
+                : "Sign In"}
             </Button>
           </div>
 
