@@ -272,7 +272,7 @@ export interface ColumnConfig {
   options?: string[];
   cell?: (info: {
     getValue: () => any;
-    row: { original: any };
+    row: { original: any; index?: any };
   }) => React.ReactNode;
   cellProps?: (info: { getValue: () => any; row: { original: any } }) => {
     value: any;

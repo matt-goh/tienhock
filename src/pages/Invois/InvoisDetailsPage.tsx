@@ -40,6 +40,7 @@ import {
   dateInputToTimestamp,
   formatDateForInput,
 } from "../../utils/invoice/dateUtils";
+import TableEditableCell from "../../components/Table/TableEditableCell";
 
 interface SelectOption {
   id: string;
@@ -403,40 +404,11 @@ const InvoisDetailsPage: React.FC = () => {
         product.code === productCode ? updatedProduct : product
       );
 
-      // Calculate totals
-      let totalMee = 0;
-      let totalBihun = 0;
-      let totalNonTaxable = 0;
-      let totalTaxable = 0;
-
-      updatedProducts.forEach((product) => {
-        // Skip subtotal and total rows
-        if (product.issubtotal || product.istotal) return;
-
-        const total = calculateTotal(product);
-
-        // Categorize based on product code
-        if (product.code.startsWith("1-")) {
-          totalMee += total;
-        } else if (product.code.startsWith("2-")) {
-          totalBihun += total;
-        }
-
-        // Add to taxable/non-taxable based on product type
-        if (product.code.startsWith("S-") || product.code.startsWith("MEQ-")) {
-          totalNonTaxable += total;
-        } else {
-          totalTaxable += total;
-        }
-      });
+      const totalAmount = calculateOverallTotal(updatedProducts);
 
       return {
         ...prevData,
         products: updatedProducts,
-        totalMee,
-        totalBihun,
-        totalNonTaxable,
-        totalTaxable,
       };
     });
   };
@@ -600,28 +572,25 @@ const InvoisDetailsPage: React.FC = () => {
           // For deletion, just use filtered items
           updatedProducts = filteredItems;
         } else {
-          // For updates/additions, map existing products
-          updatedProducts = prevData.products.map((item) => {
-            const updatedItem = filteredItems.find(
-              (updated) => updated.code === item.code
+          // For updates/additions, map items maintaining their position and relationship
+          updatedProducts = filteredItems.map((updatedItem, index) => {
+            console.log("Checking item:", updatedItem);
+
+            // If the code has changed, find the matching product
+            const matchingProduct = products.find(
+              (p) =>
+                p.id === updatedItem.code ||
+                p.description === updatedItem.description
             );
 
-            if (updatedItem) {
-              // Handle product name changes
-              if (updatedItem.description !== item.description) {
-                const matchingProduct = products.find(
-                  (p) => p.description === updatedItem.description
-                );
-                if (matchingProduct) {
-                  return {
-                    ...updatedItem,
-                    code: matchingProduct.id,
-                  };
-                }
-              }
-              return updatedItem;
+            if (matchingProduct) {
+              return {
+                ...updatedItem,
+                code: matchingProduct.id,
+                description: matchingProduct.description,
+              };
             }
-            return item;
+            return updatedItem;
           });
 
           // Handle new rows added through TableEditing
@@ -899,7 +868,7 @@ const InvoisDetailsPage: React.FC = () => {
       id: "code",
       header: "ID",
       type: "readonly",
-      width: 150,
+      width: 120,
     },
     {
       id: "description",
@@ -907,12 +876,38 @@ const InvoisDetailsPage: React.FC = () => {
       type: "combobox",
       width: 350,
       options: products.map((p) => p.description),
+      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
+        <TableEditableCell
+          value={info.getValue()}
+          onChange={(newDescription) => {
+            const matchingProduct = products.find(
+              (p) => p.description === newDescription
+            );
+            // Only update the specific row that was changed
+            if (matchingProduct) {
+              const updatedProduct = {
+                ...info.row.original,
+                code: matchingProduct.id,
+                description: matchingProduct.description,
+              };
+              handleProductChange(info.row.original.code, updatedProduct);
+            }
+          }}
+          type="combobox"
+          editable={true}
+          focus={false}
+          onKeyDown={() => {}}
+          isSorting={false}
+          previousCellValue={info.getValue()}
+          options={products.map((p) => p.description)}
+        />
+      ),
     },
     {
       id: "quantity",
-      header: "Quantity",
+      header: "QTY",
       type: "number",
-      width: 100,
+      width: 80,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
@@ -974,7 +969,7 @@ const InvoisDetailsPage: React.FC = () => {
     },
     {
       id: "returnProduct",
-      header: "Return",
+      header: "RTN",
       type: "number",
       width: 80,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
@@ -1039,7 +1034,7 @@ const InvoisDetailsPage: React.FC = () => {
     },
     {
       id: "total",
-      header: "Amount",
+      header: "Total",
       type: "amount",
       width: 100,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
@@ -1057,7 +1052,7 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   return (
-    <div className="px-4 max-w-6xl mx-auto">
+    <div className="px-4 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <BackButton onClick={handleBackClick} />
         <div className="space-x-2">
