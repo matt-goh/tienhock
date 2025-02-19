@@ -505,18 +505,25 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   const getAvailableProducts = useCallback(() => {
-    const usedProducts = invoiceData?.products.map((item) => item.code);
-    return products.filter((p) => !usedProducts?.includes(p.id));
+    // If no products are available for new selection,
+    // return all products to start over
+    if (products.length === 0) return [];
+
+    const usedProducts = invoiceData?.products
+      .filter((item) => !item.issubtotal && !item.istotal)
+      .map((item) => item.code);
+
+    // Get unused products first
+    const unusedProducts = products.filter(
+      (p) => !usedProducts?.includes(p.id)
+    );
+
+    // If no unused products, return all products to start over
+    return unusedProducts.length > 0 ? unusedProducts : products;
   }, [products, invoiceData]);
 
-  const addNewRow = () => {
+  const addNewRow = useCallback((): ProductItem => {
     const availableProducts = getAvailableProducts();
-
-    if (availableProducts.length === 0) {
-      toast.error("All products have been added to the invoice.");
-      return null;
-    }
-
     const randomProduct =
       availableProducts[Math.floor(Math.random() * availableProducts.length)];
 
@@ -533,7 +540,7 @@ const InvoisDetailsPage: React.FC = () => {
       issubtotal: false,
       istotal: false,
     };
-  };
+  }, [getAvailableProducts]);
 
   const newRowAddedRef = useRef(false);
 
@@ -551,12 +558,15 @@ const InvoisDetailsPage: React.FC = () => {
           const filteredItems = updatedItems.filter((item) => !item.istotal);
 
           let updatedProducts = filteredItems.map((item) => {
-            // If this is a new row (no uid), assign one
+            // If this is a new row (no uid), create it with a random product
             if (!item.uid) {
-              return {
-                ...item,
-                uid: crypto.randomUUID(),
-              };
+              const newItem = addNewRow();
+              if (newItem) {
+                return {
+                  ...newItem,
+                  uid: crypto.randomUUID(),
+                };
+              }
             }
             return item;
           });
