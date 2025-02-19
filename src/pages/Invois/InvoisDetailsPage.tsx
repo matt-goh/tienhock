@@ -239,7 +239,6 @@ const InvoisDetailsPage: React.FC = () => {
     if (invoiceData) {
       updateInvoice(invoiceData);
     }
-    console.log(invoiceData);
   }, [invoiceData]);
 
   useEffect(() => {
