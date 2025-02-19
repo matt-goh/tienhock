@@ -309,6 +309,7 @@ export interface TableProps<T> {
 }
 
 export interface ProductItem {
+  uid?: string;
   code: string;
   price: number;
   quantity: number;

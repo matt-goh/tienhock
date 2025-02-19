@@ -331,6 +331,7 @@ const InvoisDetailsPage: React.FC = () => {
     if (invoiceData) {
       setInvoiceData((prev: ExtendedInvoiceData): ExtendedInvoiceData => {
         const normalizedProducts = prev.products.map((product) => ({
+          uid: product.uid || crypto.randomUUID(),
           code: product.code,
           price: product.price || 0,
           quantity: product.quantity || 0,
@@ -395,24 +396,6 @@ const InvoisDetailsPage: React.FC = () => {
     fetchSalesmen();
   }, [fetchSalesmen]);
 
-  const handleProductChange = (
-    productCode: string,
-    updatedProduct: ProductItem
-  ) => {
-    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
-      const updatedProducts = prevData.products.map((product) =>
-        product.code === productCode ? updatedProduct : product
-      );
-
-      const totalAmount = calculateOverallTotal(updatedProducts);
-
-      return {
-        ...prevData,
-        products: updatedProducts,
-      };
-    });
-  };
-
   const addTotalRow = (
     items: ProductItem[],
     totalAmount: string
@@ -426,6 +409,7 @@ const InvoisDetailsPage: React.FC = () => {
       return [
         ...items,
         {
+          uid: crypto.randomUUID(),
           code: "",
           description: "Total:",
           quantity: 0,
@@ -537,6 +521,7 @@ const InvoisDetailsPage: React.FC = () => {
       availableProducts[Math.floor(Math.random() * availableProducts.length)];
 
     return {
+      uid: crypto.randomUUID(),
       code: randomProduct.id,
       description: randomProduct.description,
       quantity: 1,
@@ -558,93 +543,45 @@ const InvoisDetailsPage: React.FC = () => {
   });
 
   // HC
-  const handleChange = (updatedItems: ProductItem[]) => {
-    setTimeout(() => {
-      setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
-        // Filter out total row
-        const filteredItems = updatedItems.filter((item) => !item.istotal);
+  const handleChange = useCallback(
+    (updatedItems: ProductItem[]) => {
+      setTimeout(() => {
+        setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+          // Filter out total row from updated items
+          const filteredItems = updatedItems.filter((item) => !item.istotal);
 
-        // Determine if this is a deletion operation
-        const isDeletion = filteredItems.length < prevData.products.length;
-
-        let updatedProducts: ProductItem[];
-        if (isDeletion) {
-          // For deletion, just use filtered items
-          updatedProducts = filteredItems;
-        } else {
-          // For updates/additions, map items maintaining their position and relationship
-          updatedProducts = filteredItems.map((updatedItem, index) => {
-            console.log("Checking item:", updatedItem);
-
-            // If the code has changed, find the matching product
-            const matchingProduct = products.find(
-              (p) =>
-                p.id === updatedItem.code ||
-                p.description === updatedItem.description
-            );
-
-            if (matchingProduct) {
+          let updatedProducts = filteredItems.map((item) => {
+            // If this is a new row (no uid), assign one
+            if (!item.uid) {
               return {
-                ...updatedItem,
-                code: matchingProduct.id,
-                description: matchingProduct.description,
+                ...item,
+                uid: crypto.randomUUID(),
               };
             }
-            return updatedItem;
+            return item;
           });
 
           // Handle new rows added through TableEditing
           if (newRowAddedRef.current) {
             const newItem = addNewRow();
             if (newItem) {
-              updatedProducts.push(newItem);
+              updatedProducts = [...updatedProducts, newItem];
             }
           }
-        }
 
-        // Calculate totals
-        let totalMee = 0;
-        let totalBihun = 0;
-        let totalNonTaxable = 0;
-        let totalTaxable = 0;
+          // Add total row back
+          const total = calculateOverallTotal(updatedProducts).toFixed(2);
+          const productsWithTotal = addTotalRow(updatedProducts, total);
 
-        updatedProducts.forEach((product) => {
-          // Skip subtotal and total rows
-          if (product.issubtotal || product.istotal) return;
-
-          const total = calculateTotal(product);
-
-          if (product.code.startsWith("1-")) {
-            totalMee += total;
-          } else if (product.code.startsWith("2-")) {
-            totalBihun += total;
-          }
-
-          if (
-            product.code.startsWith("S-") ||
-            product.code.startsWith("MEQ-")
-          ) {
-            totalNonTaxable += total;
-          } else {
-            totalTaxable += total;
-          }
+          return {
+            ...prevData,
+            products: productsWithTotal,
+          };
         });
-
-        // Add total row back
-        const total = calculateOverallTotal(updatedProducts).toFixed(2);
-        const productsWithTotal = addTotalRow(updatedProducts, total);
-
-        return {
-          ...prevData,
-          products: productsWithTotal,
-          totalMee,
-          totalBihun,
-          totalNonTaxable,
-          totalTaxable,
-        };
-      });
-    }, 0);
-  };
+      }, 0);
+    },
+    [calculateOverallTotal, addNewRow, addTotalRow]
+  );
 
   const handleAddSubtotal = () => {
     setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
@@ -658,6 +595,7 @@ const InvoisDetailsPage: React.FC = () => {
       }
 
       const newProduct: ProductItem = {
+        uid: crypto.randomUUID(),
         code: "SUBTOTAL",
         description: "Subtotal",
         quantity: 0,
@@ -883,14 +821,18 @@ const InvoisDetailsPage: React.FC = () => {
             const matchingProduct = products.find(
               (p) => p.description === newDescription
             );
-            // Only update the specific row that was changed
             if (matchingProduct) {
-              const updatedProduct = {
-                ...info.row.original,
-                code: matchingProduct.id,
-                description: matchingProduct.description,
-              };
-              handleProductChange(info.row.original.code, updatedProduct);
+              const updatedProducts = invoiceData.products.map((product) => {
+                if (product.uid === info.row.original.uid) {
+                  return {
+                    ...product,
+                    code: matchingProduct.id,
+                    description: matchingProduct.description,
+                  };
+                }
+                return product;
+              });
+              handleChange(updatedProducts);
             }
           }}
           type="combobox"
@@ -915,10 +857,16 @@ const InvoisDetailsPage: React.FC = () => {
           value={info.getValue()}
           onChange={(e) => {
             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
-            handleProductChange(info.row.original.code, {
-              ...info.row.original,
-              quantity: newValue,
+            const updatedProducts = invoiceData.products.map((product) => {
+              if (product.code === info.row.original.code) {
+                return {
+                  ...product,
+                  quantity: newValue,
+                };
+              }
+              return product;
             });
+            handleChange(updatedProducts);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -937,10 +885,16 @@ const InvoisDetailsPage: React.FC = () => {
           value={info.getValue()}
           onChange={(e) => {
             const newValue = Math.max(0, parseFloat(e.target.value) || 0);
-            handleProductChange(info.row.original.code, {
-              ...info.row.original,
-              price: newValue,
+            const updatedProducts = invoiceData.products.map((product) => {
+              if (product.code === info.row.original.code) {
+                return {
+                  ...product,
+                  price: newValue,
+                };
+              }
+              return product;
             });
+            handleChange(updatedProducts);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -958,10 +912,16 @@ const InvoisDetailsPage: React.FC = () => {
           value={info.getValue()}
           onChange={(e) => {
             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
-            handleProductChange(info.row.original.code, {
-              ...info.row.original,
-              freeProduct: newValue,
+            const updatedProducts = invoiceData.products.map((product) => {
+              if (product.code === info.row.original.code) {
+                return {
+                  ...product,
+                  freeProduct: newValue,
+                };
+              }
+              return product;
             });
+            handleChange(updatedProducts);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -979,10 +939,16 @@ const InvoisDetailsPage: React.FC = () => {
           value={info.getValue()}
           onChange={(e) => {
             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
-            handleProductChange(info.row.original.code, {
-              ...info.row.original,
-              returnProduct: newValue,
+            const updatedProducts = invoiceData.products.map((product) => {
+              if (product.code === info.row.original.code) {
+                return {
+                  ...product,
+                  returnProduct: newValue,
+                };
+              }
+              return product;
             });
+            handleChange(updatedProducts);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -1001,10 +967,16 @@ const InvoisDetailsPage: React.FC = () => {
           value={info.getValue()}
           onChange={(e) => {
             const newValue = Math.max(0, parseFloat(e.target.value) || 0);
-            handleProductChange(info.row.original.code, {
-              ...info.row.original,
-              discount: newValue,
+            const updatedProducts = invoiceData.products.map((product) => {
+              if (product.code === info.row.original.code) {
+                return {
+                  ...product,
+                  discount: newValue,
+                };
+              }
+              return product;
             });
+            handleChange(updatedProducts);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -1023,10 +995,16 @@ const InvoisDetailsPage: React.FC = () => {
           value={info.getValue()}
           onChange={(e) => {
             const newValue = Math.max(0, parseFloat(e.target.value) || 0);
-            handleProductChange(info.row.original.code, {
-              ...info.row.original,
-              tax: newValue,
+            const updatedProducts = invoiceData.products.map((product) => {
+              if (product.code === info.row.original.code) {
+                return {
+                  ...product,
+                  tax: newValue,
+                };
+              }
+              return product;
             });
+            handleChange(updatedProducts);
           }}
           className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
         />
@@ -1070,9 +1048,7 @@ const InvoisDetailsPage: React.FC = () => {
           </Button>
         </div>
       </div>
-      <h1 className="text-2xl font-bold mb-4">
-        Invoice Details
-      </h1>
+      <h1 className="text-2xl font-bold mb-4">Invoice Details</h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="rounded-lg space-y-2">
