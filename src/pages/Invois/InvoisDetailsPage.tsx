@@ -1092,34 +1092,17 @@ const InvoisDetailsPage: React.FC = () => {
             }
             onChange={(e) => {
               const newValue = e.target.value;
+              // Extract the type (first character) and number (rest of the string)
+              const type = newValue.charAt(0).toUpperCase();
+              const number = newValue.slice(1);
+
               setInvoiceData((prev) => {
-                if (!prev) {
-                  // Return a default ExtendedInvoiceData object instead of null
-                  return {
-                    id: "",
-                    salespersonid: "",
-                    customerid: "",
-                    createddate: new Date().toLocaleDateString("en-GB"),
-                    paymenttype: "Invoice",
-                    products: [],
-                    totalMee: 0,
-                    totalBihun: 0,
-                    totalNonTaxable: 0,
-                    totalTaxable: 0,
-                    totalAdjustment: 0,
-                    customerName: "",
-                    type: (newValue.charAt(0) as "C" | "I") || "I",
-                    date: new Date().toLocaleDateString("en-GB"),
-                    time: new Date().toLocaleTimeString("en-GB"),
-                    customer: "",
-                    customername: "",
-                    salesman: "",
-                  };
-                }
+                if (!prev) return prev;
+
                 return {
                   ...prev,
-                  type: (newValue.charAt(0) as "C" | "I") || prev.paymenttype,
-                  billNumber: newValue.slice(1),
+                  id: number, // Update the ID with the number portion
+                  paymenttype: type === "C" ? "CASH" : "INVOICE", // Update payment type based on first character
                 };
               });
             }}
