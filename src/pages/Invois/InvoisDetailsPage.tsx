@@ -236,13 +236,6 @@ const InvoisDetailsPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (invoiceData) {
-      updateInvoice(invoiceData);
-    }
-    console.log(invoiceData);
-  }, [invoiceData]);
-
-  useEffect(() => {
     if (location.state?.previousPath) {
       setPreviousPath(location.state.previousPath);
     }
@@ -372,6 +365,24 @@ const InvoisDetailsPage: React.FC = () => {
       try {
         const data = await api.get("/api/products/combobox");
         setProducts(data);
+
+        // Fill in descriptions for existing products
+        if (invoiceData && invoiceData.products.length > 0) {
+          setInvoiceData((prev) => ({
+            ...prev,
+            products: prev.products.map((product) => {
+              const matchingProduct = data.find(
+                (p: { id: string }) => p.id === product.code
+              );
+              return {
+                ...product,
+                description: matchingProduct
+                  ? matchingProduct.description
+                  : product.description,
+              };
+            }),
+          }));
+        }
       } catch (error) {
         console.error("Error fetching products:", error);
         toast.error("Error fetching products");
@@ -666,6 +677,9 @@ const InvoisDetailsPage: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // Update the invoice first
+      updateInvoice(invoiceData);
+
       // Format products for saving
       const productsToSave = invoiceData.products.map((product) => ({
         ...product,

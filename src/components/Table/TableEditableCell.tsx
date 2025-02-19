@@ -245,7 +245,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
               displayValue={(item: string) => item}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+            <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2 overflow-visible">
               <IconChevronDown
                 className="text-default-400 w-5 h-5"
                 size={18}
