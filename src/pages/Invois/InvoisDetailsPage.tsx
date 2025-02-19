@@ -1192,23 +1192,12 @@ const InvoisDetailsPage: React.FC = () => {
             value={invoiceData.salespersonid}
             onChange={(value) => {
               setInvoiceData((prev) => {
-                // Create an updated state object that maintains ExtendedInvoiceData type
-                const updatedData: ExtendedInvoiceData = {
-                  ...prev,
-                  customerid: prev.customerid,
-                  id: prev.id,
-                  salespersonid: prev.salespersonid,
-                  createddate: prev.createddate,
-                  paymenttype: prev.paymenttype,
-                  products: prev.products,
-                  totalMee: prev.totalMee,
-                  totalBihun: prev.totalBihun,
-                  totalNonTaxable: prev.totalNonTaxable,
-                  totalTaxable: prev.totalTaxable,
-                  totalAdjustment: prev.totalAdjustment,
-                };
+                if (!prev) return prev;
 
-                return updatedData;
+                return {
+                  ...prev,
+                  salespersonid: value, // Directly update the salespersonid with the selected value
+                };
               });
             }}
             options={salesmen.map((id) => ({ id, name: id }))}
