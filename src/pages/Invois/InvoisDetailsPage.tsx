@@ -239,6 +239,7 @@ const InvoisDetailsPage: React.FC = () => {
     if (invoiceData) {
       updateInvoice(invoiceData);
     }
+    console.log(invoiceData);
   }, [invoiceData]);
 
   useEffect(() => {
@@ -1034,8 +1035,8 @@ const InvoisDetailsPage: React.FC = () => {
   ];
 
   // Add this function to map the type value to its display name
-  const getTypeDisplayName = (type: "C" | "I") => {
-    return type === "C" ? "Cash" : "Invoice";
+  const getTypeDisplayName = (type: "CASH" | "INVOICE") => {
+    return type === "CASH" ? "Cash" : "Invoice";
   };
 
   return (
@@ -1068,9 +1069,9 @@ const InvoisDetailsPage: React.FC = () => {
               invoiceData
                 ? `${
                     invoiceData.paymenttype
-                      ? invoiceData.paymenttype === "Invoice"
-                        ? "I"
-                        : "C"
+                      ? invoiceData.paymenttype === "CASH"
+                        ? "C"
+                        : "I"
                       : ""
                   }${invoiceData.id ?? ""}`
                 : ""
@@ -1112,13 +1113,15 @@ const InvoisDetailsPage: React.FC = () => {
           <FormListbox
             name="type"
             label="Type"
-            value={getTypeDisplayName(invoiceData.paymenttype as "C" | "I")}
+            value={getTypeDisplayName(
+              invoiceData.paymenttype as "CASH" | "INVOICE"
+            )}
             onChange={(value) => {
               setInvoiceData((prev) => {
                 // Instead of potentially returning null, return a new ExtendedInvoiceData
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  paymenttype: value === "Cash" ? "Cash" : "Invoice",
+                  paymenttype: value === "Cash" ? "CASH" : "INVOICE",
                 };
                 return updatedData;
               });
