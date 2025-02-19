@@ -387,7 +387,7 @@ const InvoisPage: React.FC = () => {
       width: 350,
     },
     {
-      id: "totaltaxable",
+      id: "totalnontaxable",
       header: "Amount",
       type: "amount",
       width: 150,
