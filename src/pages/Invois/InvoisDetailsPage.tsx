@@ -826,7 +826,7 @@ const InvoisDetailsPage: React.FC = () => {
       options: products.map((p) => p.description),
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <TableEditableCell
-          value={info.getValue()}
+          value={info.getValue() ?? ""}
           onChange={(newDescription) => {
             const matchingProduct = products.find(
               (p) => p.description === newDescription
@@ -864,7 +864,7 @@ const InvoisDetailsPage: React.FC = () => {
         <input
           type="number"
           min="0"
-          value={info.getValue()}
+          value={info.getValue() ?? 0}
           onChange={(e) => {
             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
             const updatedProducts = invoiceData.products.map((product) => {
@@ -892,7 +892,7 @@ const InvoisDetailsPage: React.FC = () => {
           type="number"
           step="0.01"
           min="0"
-          value={info.getValue()}
+          value={info.getValue() ?? 0}
           onChange={(e) => {
             const newValue = Math.max(0, parseFloat(e.target.value) || 0);
             const updatedProducts = invoiceData.products.map((product) => {
@@ -919,7 +919,7 @@ const InvoisDetailsPage: React.FC = () => {
         <input
           type="number"
           min="0"
-          value={info.getValue()}
+          value={info.getValue() ?? 0}
           onChange={(e) => {
             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
             const updatedProducts = invoiceData.products.map((product) => {
@@ -946,7 +946,7 @@ const InvoisDetailsPage: React.FC = () => {
         <input
           type="number"
           min="0"
-          value={info.getValue()}
+          value={info.getValue() ?? 0}
           onChange={(e) => {
             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
             const updatedProducts = invoiceData.products.map((product) => {
@@ -974,7 +974,7 @@ const InvoisDetailsPage: React.FC = () => {
           type="number"
           step="0.01"
           min="0"
-          value={info.getValue()}
+          value={info.getValue() ?? 0}
           onChange={(e) => {
             const newValue = Math.max(0, parseFloat(e.target.value) || 0);
             const updatedProducts = invoiceData.products.map((product) => {
@@ -1002,7 +1002,7 @@ const InvoisDetailsPage: React.FC = () => {
           type="number"
           step="0.01"
           min="0"
-          value={info.getValue()}
+          value={info.getValue() ?? 0}
           onChange={(e) => {
             const newValue = Math.max(0, parseFloat(e.target.value) || 0);
             const updatedProducts = invoiceData.products.map((product) => {
