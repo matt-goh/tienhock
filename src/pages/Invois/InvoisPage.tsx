@@ -178,7 +178,6 @@ const InvoisPage: React.FC = () => {
 
   const applyFilters = useCallback(() => {
     let filtered = [...invoices];
-    console.log("Starting filter with:", filtered.length, "invoices");
 
     // Search filter
     if (searchTerm) {
@@ -219,7 +218,6 @@ const InvoisPage: React.FC = () => {
       filtered = filtered.filter(
         (invoice) => invoice.paymenttype === filters.paymentType
       );
-      console.log("After payment type filter:", filtered.length);
     }
 
     // Date filter (always applied)
