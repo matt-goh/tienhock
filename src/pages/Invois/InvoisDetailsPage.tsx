@@ -38,6 +38,7 @@ import { api } from "../../routes/utils/api";
 import {
   dateInputToTimestamp,
   formatDateForInput,
+  parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 import TableEditableCell from "../../components/Table/TableEditableCell";
 import { debounce } from "lodash";
@@ -264,6 +265,10 @@ const InvoisDetailsPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    console.log(invoiceData);
+  }, [invoiceData]);
+
+  useEffect(() => {
     if (location.state?.previousPath) {
       setPreviousPath(location.state.previousPath);
     }
@@ -388,7 +393,7 @@ const InvoisDetailsPage: React.FC = () => {
       }, 300),
     [fetchCustomers]
   );
-  
+
   // Handle search changes after initial load
   useEffect(() => {
     if (!isInitialLoad && customerQuery !== undefined) {
@@ -1213,6 +1218,26 @@ const InvoisDetailsPage: React.FC = () => {
               setInvoiceData((prev) => ({
                 ...prev,
                 createddate: dateInputToTimestamp(e.target.value),
+              }));
+            }}
+          />{" "}
+          <FormInput
+            name="time"
+            label="Time"
+            type="time"
+            value={
+              parseDatabaseTimestamp(
+                invoiceData.createddate
+              ).formattedTime?.slice(0, 5) ?? ""
+            } // Just take HH:mm part
+            onChange={(e) => {
+              const [hours, minutes] = e.target.value.split(":").map(Number);
+              const currentDate = new Date(parseInt(invoiceData.createddate));
+              currentDate.setHours(hours, minutes);
+
+              setInvoiceData((prev) => ({
+                ...prev,
+                createddate: currentDate.getTime().toString(),
               }));
             }}
           />
