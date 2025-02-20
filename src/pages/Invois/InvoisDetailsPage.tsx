@@ -25,7 +25,6 @@ import {
   createInvoice,
 } from "../../utils/invoice/InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
-import { debounce } from "lodash";
 import {
   Combobox,
   ComboboxInput,
@@ -95,6 +94,16 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
     setSelectedCustomer(customer);
     onChange(customer ? [customer.name] : null);
   };
+
+  useEffect(() => {
+    // Update selected customer when value changes externally
+    if (
+      value.length > 0 &&
+      (!selectedCustomer || selectedCustomer.name !== value[0])
+    ) {
+      setSelectedCustomer({ id: "", name: value[0] });
+    }
+  }, [value]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -216,6 +225,7 @@ const InvoisDetailsPage: React.FC = () => {
   >([]);
   const [salesmen, setSalesmen] = useState<string[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string>("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerPage, setCustomerPage] = useState(1);
   const [totalCustomerPages, setTotalCustomerPages] = useState(1);
@@ -299,18 +309,24 @@ const InvoisDetailsPage: React.FC = () => {
     [invoiceData?.salespersonid]
   );
 
-  const debouncedFetchCustomers = useMemo(
-    () =>
-      debounce((search: string) => {
-        setCustomerPage(1);
-        fetchCustomers(search, 1);
-      }, 300),
-    [fetchCustomers]
-  );
-
   useEffect(() => {
-    debouncedFetchCustomers(customerQuery);
-  }, [customerQuery, debouncedFetchCustomers]);
+    const fetchCustomerName = async () => {
+      if (invoiceData?.customerid) {
+        try {
+          const response = await api.get(
+            `/api/customers/${invoiceData.customerid}`
+          );
+          setSelectedCustomerName(response.name);
+        } catch (error) {
+          console.error("Error fetching customer name:", error);
+          // If we can't fetch the name, use the ID as fallback
+          setSelectedCustomerName(invoiceData.customerid);
+        }
+      }
+    };
+
+    fetchCustomerName();
+  }, [invoiceData?.customerid]);
 
   useEffect(() => {
     // Reset customer data when salesman changes
@@ -1145,13 +1161,13 @@ const InvoisDetailsPage: React.FC = () => {
           <FormInput
             name="customerId"
             label="Customer ID"
-            value={invoiceData.customerid}
+            value={invoiceData.customerid || ""}
             disabled
           />
           <CustomerCombobox
             name="customer"
             label="Customer"
-            value={invoiceData?.customerid ? [invoiceData.customerid] : []}
+            value={selectedCustomerName ? [selectedCustomerName] : []}
             onChange={(value: string[] | null) => {
               setInvoiceData((prev) => {
                 const selectedCustomerName = value ? value[0] : "";
@@ -1159,22 +1175,13 @@ const InvoisDetailsPage: React.FC = () => {
                   (c) => c.name === selectedCustomerName
                 );
 
-                // Create an updated state object that maintains ExtendedInvoiceData type
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
-                  // Ensure all required fields from ExtendedInvoiceData are present
                   customerid: selectedCustomer?.id || prev.customerid,
-                  id: prev.id,
-                  salespersonid: prev.salespersonid,
-                  createddate: prev.createddate,
-                  paymenttype: prev.paymenttype,
-                  products: prev.products,
-                  totalMee: prev.totalMee,
-                  totalBihun: prev.totalBihun,
-                  totalNonTaxable: prev.totalNonTaxable,
-                  totalTaxable: prev.totalTaxable,
-                  totalAdjustment: prev.totalAdjustment,
                 };
+
+                // Update the selected customer name
+                setSelectedCustomerName(selectedCustomerName);
 
                 return updatedData;
               });
