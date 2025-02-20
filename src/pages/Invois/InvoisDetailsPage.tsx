@@ -244,7 +244,9 @@ const InvoisDetailsPage: React.FC = () => {
   >([]);
   const [salesmen, setSalesmen] = useState<string[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomerName, setSelectedCustomerName] = useState<string>("");
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string>(
+    () => invoiceData?.customerName || ""
+  );
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerPage, setCustomerPage] = useState(1);
   const [totalCustomerPages, setTotalCustomerPages] = useState(1);
@@ -331,25 +333,6 @@ const InvoisDetailsPage: React.FC = () => {
     },
     [invoiceData?.salespersonid]
   );
-
-  useEffect(() => {
-    const fetchCustomerName = async () => {
-      if (invoiceData?.customerid) {
-        try {
-          const response = await api.get(
-            `/api/customers/${invoiceData.customerid}`
-          );
-          setSelectedCustomerName(response.name);
-        } catch (error) {
-          console.error("Error fetching customer name:", error);
-          // If we can't fetch the name, use the ID as fallback
-          setSelectedCustomerName(invoiceData.customerid);
-        }
-      }
-    };
-
-    fetchCustomerName();
-  }, [invoiceData?.customerid]);
 
   // Initialize once at mount
   useEffect(() => {
@@ -1263,6 +1246,7 @@ const InvoisDetailsPage: React.FC = () => {
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
                   customerid: selectedCustomer?.id || prev.customerid,
+                  customerName: selectedCustomerName, // Update customerName in invoiceData
                 };
 
                 // Update the selected customer name
