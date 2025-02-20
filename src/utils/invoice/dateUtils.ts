@@ -32,9 +32,8 @@ export const parseDatabaseTimestamp = (
     .toLocaleTimeString("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
-      hour12: true,
+      hour12: false,
     })
-    .toLowerCase(); // Makes it like "02:47 pm"
 
   return { date, formattedTime };
 };
