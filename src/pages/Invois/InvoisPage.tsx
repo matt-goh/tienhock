@@ -31,6 +31,11 @@ import {
   parseDatabaseTimestamp,
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
+import { api } from "../../routes/utils/api";
+
+interface DisplayInvoice extends InvoiceData {
+  customerName?: string;
+}
 
 const STORAGE_KEY = "invoisDateFilters";
 
@@ -118,6 +123,36 @@ const InvoisPage: React.FC = () => {
 
     loadInvoices();
   }, []);
+
+  useEffect(() => {
+    const fetchCustomerNames = async () => {
+      const fetchedInvoices = await Promise.all(
+        invoices.map(async (invoice) => {
+          try {
+            const response = await api.get(
+              `/api/customers/${invoice.customerid}`
+            );
+            return {
+              ...invoice,
+              customerName: response.name,
+            };
+          } catch (error) {
+            console.error(
+              `Error fetching customer name for ${invoice.customerid}:`,
+              error
+            );
+            return {
+              ...invoice,
+              customerName: invoice.customerid, // Fallback to ID if name fetch fails
+            };
+          }
+        })
+      );
+      setFilteredInvoices(fetchedInvoices);
+    };
+
+    fetchCustomerNames();
+  }, [invoices]);
 
   const handleSelectionChange = useCallback(
     (count: number, allSelected: boolean, selectedRows: InvoiceData[]) => {
@@ -385,6 +420,14 @@ const InvoisPage: React.FC = () => {
       header: "Customer",
       type: "readonly",
       width: 350,
+      cell: (info: {
+        getValue: () => any;
+        row: { original: DisplayInvoice };
+      }) => (
+        <div className="px-6 py-3">
+          {info.row.original.customerName || info.getValue()}
+        </div>
+      ),
     },
     {
       id: "totalnontaxable",
