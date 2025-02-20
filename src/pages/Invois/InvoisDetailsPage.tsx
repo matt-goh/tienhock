@@ -40,6 +40,7 @@ import {
   formatDateForInput,
 } from "../../utils/invoice/dateUtils";
 import TableEditableCell from "../../components/Table/TableEditableCell";
+import { debounce } from "lodash";
 
 interface SelectOption {
   id: string;
@@ -71,7 +72,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
   isLoading,
 }) => {
   const [selectedCustomer, setSelectedCustomer] = useState<SelectOption | null>(
-    value.length > 0 ? { id: value[0], name: value[0] } : null
+    value.length > 0 ? { id: "", name: value[0] } : null
   );
   const [searchValue, setSearchValue] = useState("");
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
@@ -86,6 +87,7 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
 
     // Set new timeout for debouncing
     searchTimeoutRef.current = setTimeout(() => {
+      // Reset to first page when searching
       setQuery(searchText);
     }, 300);
   };
@@ -93,10 +95,12 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
   const handleCustomerSelection = (customer: SelectOption | null) => {
     setSelectedCustomer(customer);
     onChange(customer ? [customer.name] : null);
+    // Clear search value after selection
+    setSearchValue("");
   };
 
+  // Update selected customer when value changes externally
   useEffect(() => {
-    // Update selected customer when value changes externally
     if (
       value.length > 0 &&
       (!selectedCustomer || selectedCustomer.name !== value[0])
@@ -113,6 +117,16 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
       }
     };
   }, []);
+
+  // Filter options based on search value
+  const filteredOptions =
+    searchValue === ""
+      ? options
+      : options.filter(
+          (option) =>
+            option.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+            option.id.toLowerCase().includes(searchValue.toLowerCase())
+        );
 
   return (
     <div className="my-2 space-y-2">
@@ -136,13 +150,13 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
             />
           </ComboboxButton>
           <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-            {options.length === 0 ? (
+            {filteredOptions.length === 0 ? (
               <div className="relative cursor-default select-none py-2 px-4 text-default-700">
                 {isLoading ? "Loading..." : "No customers found."}
               </div>
             ) : (
               <>
-                {options.map((customer) => (
+                {filteredOptions.map((customer) => (
                   <ComboboxOption
                     key={customer.id}
                     value={customer}
@@ -162,6 +176,9 @@ const CustomerCombobox: React.FC<ComboboxProps> = ({
                           }`}
                         >
                           {customer.name}
+                          <span className="ml-2 text-default-400">
+                            ({customer.id})
+                          </span>
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -200,6 +217,7 @@ const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [previousPath, setPreviousPath] = useState("/sales/invoice");
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData>(() => {
     if (location.state?.isNewInvoice) {
       return {
@@ -328,13 +346,55 @@ const InvoisDetailsPage: React.FC = () => {
     fetchCustomerName();
   }, [invoiceData?.customerid]);
 
+  // Initialize once at mount
   useEffect(() => {
-    // Reset customer data when salesman changes
-    setCustomers([]);
-    setCustomerPage(1);
-    setCustomerQuery("");
-    fetchCustomers("", 1);
-  }, [invoiceData?.salespersonid, fetchCustomers]);
+    const initializeData = async () => {
+      setIsFetchingCustomers(true);
+      try {
+        const data = await api.get(
+          `/api/customers/combobox?salesman=${
+            invoiceData?.salespersonid || ""
+          }&search=&page=1&limit=20`
+        );
+        setCustomers(data.customers);
+        setTotalCustomerPages(data.totalPages);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        toast.error("Failed to fetch customers. Please try again.");
+      } finally {
+        setIsFetchingCustomers(false);
+        setIsInitialLoad(false);
+      }
+    };
+
+    initializeData();
+  }, []); // Run once at mount
+
+  // Handle salesman changes after initial load
+  useEffect(() => {
+    if (!isInitialLoad && invoiceData?.salespersonid) {
+      setCustomers([]);
+      setCustomerPage(1);
+      setCustomerQuery("");
+      fetchCustomers("", 1);
+    }
+  }, [invoiceData?.salespersonid, fetchCustomers, isInitialLoad]);
+
+  const debouncedFetchCustomers = useMemo(
+    () =>
+      debounce((search: string) => {
+        setCustomerPage(1);
+        fetchCustomers(search, 1);
+      }, 300),
+    [fetchCustomers]
+  );
+  
+  // Handle search changes after initial load
+  useEffect(() => {
+    if (!isInitialLoad && customerQuery !== undefined) {
+      debouncedFetchCustomers(customerQuery);
+    }
+  }, [customerQuery, debouncedFetchCustomers, isInitialLoad]);
 
   useEffect(() => {
     if (invoiceData) {
