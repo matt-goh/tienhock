@@ -15,17 +15,28 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({ filters }) => {
     );
   }
 
-  if (filters.applySalespersonFilter && filters.salespersonId) {
-    summaries.push(`Salesman: ${filters.salespersonId}`);
+  if (
+    filters.applySalespersonFilter &&
+    filters.salespersonId &&
+    filters.salespersonId.length > 0
+  ) {
+    summaries.push(`Salesman: ${filters.salespersonId.join(", ")}`);
   }
 
-  if (filters.applyCustomerFilter && filters.customerId) {
-    summaries.push(`Customer: ${filters.customerId}`);
+  if (
+    filters.applyCustomerFilter &&
+    filters.customerId &&
+    filters.customerId.length > 0
+  ) {
+    summaries.push(`Customer: ${filters.customerId.join(", ")}`);
   }
 
-  return summaries.length === 0 ? (
-    <div className="mb-2"></div>
-  ) : (
+  // Only render if there are actual filters applied
+  if (summaries.length === 0) {
+    return <div className="mb-2"></div>;
+  }
+
+  return (
     <div className={`pb-3.5 flex items-center text-sm text-default-600`}>
       <div className="flex items-center gap-1.5 text-default-500 font-medium">
         <IconTags size={16} className="text-default-400" />

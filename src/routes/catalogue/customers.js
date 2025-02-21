@@ -330,6 +330,28 @@ export default function (pool) {
     }
   });
 
+  // Add this new route in customers.js
+  router.get("/name/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const query = "SELECT name FROM customers WHERE id = $1";
+      const result = await pool.query(query, [id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      res.json({ name: result.rows[0].name });
+    } catch (error) {
+      console.error("Error fetching customer name:", error);
+      res.status(500).json({
+        message: "Error fetching customer name",
+        error: error.message,
+      });
+    }
+  });
+
   // Get customer by ID
   router.get("/:id", async (req, res) => {
     const { id } = req.params;

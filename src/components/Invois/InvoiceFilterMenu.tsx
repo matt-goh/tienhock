@@ -111,9 +111,9 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   const clearAllFilters = () => {
     const clearedFilters: InvoiceFilters = {
       dateRange: currentFilters.dateRange,
-      salespersonId: [],
+      salespersonId: null,
       applySalespersonFilter: true,
-      customerId: [],
+      customerId: null,
       applyCustomerFilter: true,
       paymentType: null,
       applyPaymentTypeFilter: true,

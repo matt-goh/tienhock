@@ -6,7 +6,12 @@ import React, {
   useCallback,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ColumnConfig, InvoiceData, InvoiceFilters } from "../../types/types";
+import {
+  ColumnConfig,
+  ExtendedInvoiceData,
+  InvoiceData,
+  InvoiceFilters,
+} from "../../types/types";
 import {
   deleteInvoice,
   fetchDbInvoices,
@@ -33,10 +38,6 @@ import {
 } from "../../utils/invoice/dateUtils";
 import { api } from "../../routes/utils/api";
 
-interface DisplayInvoice extends InvoiceData {
-  customerName?: string;
-}
-
 const STORAGE_KEY = "invoisDateFilters";
 
 const InvoisPage: React.FC = () => {
@@ -62,7 +63,9 @@ const InvoisPage: React.FC = () => {
   };
 
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
-  const [filteredInvoices, setFilteredInvoices] = useState<InvoiceData[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<
+    ExtendedInvoiceData[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -81,6 +84,9 @@ const InvoisPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [customerNames, setCustomerNames] = useState<Record<string, string>>(
+    {}
+  );
   const clearSelectionRef = useRef<(() => void) | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -126,33 +132,35 @@ const InvoisPage: React.FC = () => {
 
   useEffect(() => {
     const fetchCustomerNames = async () => {
-      const fetchedInvoices = await Promise.all(
+      const newCustomerNames: Record<string, string> = {};
+
+      await Promise.all(
         invoices.map(async (invoice) => {
-          try {
-            const response = await api.get(
-              `/api/customers/${invoice.customerid}`
-            );
-            return {
-              ...invoice,
-              customerName: response.name,
-            };
-          } catch (error) {
-            console.error(
-              `Error fetching customer name for ${invoice.customerid}:`,
-              error
-            );
-            return {
-              ...invoice,
-              customerName: invoice.customerid, // Fallback to ID if name fetch fails
-            };
+          // Only fetch if we don't already have this customer's name
+          if (!customerNames[invoice.customerid]) {
+            try {
+              const response = await api.get(
+                `/api/customers/name/${invoice.customerid}`
+              );
+              newCustomerNames[invoice.customerid] = response.name;
+            } catch (error) {
+              console.error(
+                `Error fetching customer name for ${invoice.customerid}:`,
+                error
+              );
+              newCustomerNames[invoice.customerid] = invoice.customerid;
+            }
           }
         })
       );
-      setFilteredInvoices(fetchedInvoices);
+
+      if (Object.keys(newCustomerNames).length > 0) {
+        setCustomerNames((prev) => ({ ...prev, ...newCustomerNames }));
+      }
     };
 
     fetchCustomerNames();
-  }, [invoices]);
+  }, [invoices, customerNames]);
 
   const handleSelectionChange = useCallback(
     (count: number, allSelected: boolean, selectedRows: InvoiceData[]) => {
@@ -211,6 +219,7 @@ const InvoisPage: React.FC = () => {
     }
   };
 
+  // In InvoisPage.tsx
   const applyFilters = useCallback(() => {
     let filtered = [...invoices];
 
@@ -255,10 +264,9 @@ const InvoisPage: React.FC = () => {
       );
     }
 
-    // Date filter (always applied)
+    // Date filter
     if (filters.dateRange.start || filters.dateRange.end) {
       filtered = filtered.filter((invoice) => {
-        // Handle the timestamp
         let timestamp: number;
         if (typeof invoice.createddate === "string") {
           timestamp = parseInt(invoice.createddate);
@@ -266,11 +274,9 @@ const InvoisPage: React.FC = () => {
           timestamp = invoice.createddate;
         }
 
-        // Create date object and set to start of day for comparison
         const invoiceDate = new Date(timestamp);
         invoiceDate.setHours(0, 0, 0, 0);
 
-        // Create start/end date copies and set to start/end of day
         if (filters.dateRange.start) {
           const startDate = new Date(filters.dateRange.start);
           startDate.setHours(0, 0, 0, 0);
@@ -287,8 +293,14 @@ const InvoisPage: React.FC = () => {
       });
     }
 
-    setFilteredInvoices(filtered);
-  }, [invoices, filters, searchTerm]);
+    // Map filtered invoices with customer names
+    const filteredWithNames = filtered.map((invoice) => ({
+      ...invoice,
+      customerName: customerNames[invoice.customerid] || invoice.customerid,
+    }));
+
+    setFilteredInvoices(filteredWithNames);
+  }, [invoices, filters, searchTerm, customerNames]);
 
   useEffect(() => {
     handleSubmissionComplete();
@@ -422,7 +434,7 @@ const InvoisPage: React.FC = () => {
       width: 350,
       cell: (info: {
         getValue: () => any;
-        row: { original: DisplayInvoice };
+        row: { original: ExtendedInvoiceData };
       }) => (
         <div className="px-6 py-3">
           {info.row.original.customerName || info.getValue()}
