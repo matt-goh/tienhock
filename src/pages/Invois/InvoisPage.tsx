@@ -259,9 +259,11 @@ const InvoisPage: React.FC = () => {
 
     // Payment type filter
     if (filters.applyPaymentTypeFilter && filters.paymentType) {
-      filtered = filtered.filter(
-        (invoice) => invoice.paymenttype === filters.paymentType
-      );
+      filtered = filtered.filter((invoice) => {
+        // Convert CASH/INVOICE to match the filter's Cash/Invoice format
+        const invoiceType = invoice.paymenttype === "CASH" ? "Cash" : "Invoice";
+        return invoiceType === filters.paymentType;
+      });
     }
 
     // Date filter
