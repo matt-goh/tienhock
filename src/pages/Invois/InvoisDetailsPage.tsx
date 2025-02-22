@@ -223,17 +223,13 @@ const InvoisDetailsPage: React.FC = () => {
     if (location.state?.isNewInvoice) {
       return {
         id: "",
-        salespersonId: "",
-        customerId: "",
-        paymentType: "Invoice",
         products: [],
         totalMee: 0,
         totalBihun: 0,
         totalNonTaxable: 0,
         totalTaxable: 0,
         totalAdjustment: 0,
-        displayProducts: [],
-        customerName: "",
+        customername: "",
       };
     }
     return location.state?.invoiceData || null;
@@ -1246,7 +1242,7 @@ const InvoisDetailsPage: React.FC = () => {
                 const updatedData: ExtendedInvoiceData = {
                   ...prev,
                   customerid: selectedCustomer?.id || prev.customerid,
-                  customerName: selectedCustomerName, // Update customerName in invoiceData
+                  customername: selectedCustomerName, // Update customerName in invoiceData
                 };
 
                 // Update the selected customer name

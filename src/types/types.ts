@@ -335,6 +335,7 @@ export interface InvoiceData {
   id: string;
   salespersonid: string;
   customerid: string;
+  customername?: string;
   createddate: string;
   paymenttype: string;
   products: ProductItem[];
