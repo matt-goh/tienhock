@@ -37,70 +37,65 @@ export default function (pool) {
       const { startDate, endDate, salesman, customer } = req.query;
 
       let query = `
-      SELECT 
-        i.id,
-        i.salespersonid,
-        i.customerid,
-        i.createddate,  -- Keep as bigint
-        i.paymenttype,
-        i.totalmee,
-        i.totalbihun,
-        i.totalnontaxable,
-        i.totaltaxable,
-        i.totaladjustment,
-        json_agg(
-          json_build_object(
-            'code', od.code,
-            'price', od.price,
-            'quantity', od.quantity,
-            'freeproduct', od.freeproduct,
-            'returnproduct', od.returnproduct,
-            'invoiceid', od.invoiceid
-          )
-        ) as products
-      FROM invoices i
-      LEFT JOIN order_details od ON i.id = od.invoiceid
-      WHERE 1=1
-    `;
+        SELECT 
+          i.id,
+          i.salespersonid,
+          i.customerid,
+          i.createddate,
+          i.paymenttype,
+          i.totalmee,
+          i.totalbihun,
+          i.totalnontaxable,
+          i.totaltaxable,
+          i.totaladjustment,
+          json_agg(
+            CASE WHEN od.id IS NOT NULL THEN 
+              json_build_object(
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct
+              )
+            ELSE NULL END
+          ) FILTER (WHERE od.id IS NOT NULL) as products
+        FROM invoices i
+        LEFT JOIN order_details od ON i.id = od.invoiceid
+        WHERE 1=1
+      `;
 
       const queryParams = [];
       let paramCounter = 1;
 
       if (startDate && endDate) {
-        // Convert input dates to Unix timestamps (milliseconds)
-        const startTimestamp = Math.floor(new Date(startDate).getTime());
-        const endTimestamp = Math.floor(new Date(endDate).getTime());
-
+        queryParams.push(Number(startDate), Number(endDate));
         query += ` AND i.createddate BETWEEN $${paramCounter} AND $${
           paramCounter + 1
         }`;
-        queryParams.push(startTimestamp, endTimestamp);
         paramCounter += 2;
       }
 
       if (salesman) {
-        query += ` AND i.salespersonid = $${paramCounter}`;
-        queryParams.push(salesman);
+        const salesmanArray = salesman.split(",");
+        queryParams.push(salesmanArray);
+        query += ` AND i.salespersonid = ANY($${paramCounter})`;
         paramCounter++;
       }
 
       if (customer) {
-        query += ` AND i.customerid = $${paramCounter}`;
-        queryParams.push(customer);
+        const customerArray = customer.split(",");
+        queryParams.push(customerArray);
+        query += ` AND i.customerid = ANY($${paramCounter})`;
         paramCounter++;
       }
 
-      query += ` GROUP BY i.id`;
-
-      console.log("Executing query:", query);
-      console.log("With parameters:", queryParams);
+      query += ` GROUP BY i.id ORDER BY i.createddate DESC`;
 
       const result = await pool.query(query, queryParams);
 
-      // Transform the results
       const transformedResults = result.rows.map((row) => ({
         ...row,
-        products: row.products[0] === null ? [] : row.products,
+        products: row.products || [],
       }));
 
       res.json(transformedResults);
@@ -121,6 +116,18 @@ export default function (pool) {
       await client.query("BEGIN");
 
       const invoice = req.body;
+
+      // Validate required fields
+      if (
+        !invoice.id ||
+        !invoice.salespersonid ||
+        !invoice.customerid ||
+        !invoice.createddate
+      ) {
+        throw new Error(
+          "Missing required fields: id, salespersonid, customerid, createddate"
+        );
+      }
 
       // Check for duplicate invoice
       const checkQuery = "SELECT id FROM invoices WHERE id = $1";
@@ -152,17 +159,17 @@ export default function (pool) {
         invoice.id,
         invoice.salespersonid,
         invoice.customerid,
-        new Date(invoice.createddate),
-        invoice.paymenttype,
-        invoice.totalmee,
-        invoice.totalbihun,
-        invoice.totalnontaxable,
-        invoice.totaltaxable,
-        invoice.totaladjustment,
+        invoice.createddate,
+        invoice.paymenttype || "INVOICE",
+        invoice.totalmee || 0,
+        invoice.totalbihun || 0,
+        invoice.totalnontaxable || 0,
+        invoice.totaltaxable || 0,
+        invoice.totaladjustment || 0,
       ]);
 
       // Insert products
-      for (const product of invoice.products) {
+      if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
           INSERT INTO order_details (
             invoiceid,
@@ -175,14 +182,19 @@ export default function (pool) {
           VALUES ($1, $2, $3, $4, $5, $6)
         `;
 
-        await client.query(productQuery, [
-          invoice.id,
-          product.code,
-          product.price,
-          product.quantity,
-          product.freeproduct,
-          product.returnproduct,
-        ]);
+        for (const product of invoice.products) {
+          if (!product.istotal && !product.issubtotal) {
+            // Skip total and subtotal rows
+            await client.query(productQuery, [
+              invoice.id,
+              product.code,
+              product.price || 0,
+              product.quantity || 0,
+              product.freeProduct || 0,
+              product.returnProduct || 0,
+            ]);
+          }
+        }
       }
 
       await client.query("COMMIT");
@@ -211,15 +223,16 @@ export default function (pool) {
     }
 
     try {
-      const query = "SELECT COUNT(*) FROM invoices WHERE invoiceno = $1";
+      // Query both id and invoiceno columns
+      const query =
+        "SELECT COUNT(*) FROM invoices WHERE id = $1";
       const result = await pool.query(query, [invoiceNo]);
       const count = parseInt(result.rows[0].count);
 
-      res.json({ isDuplicate: count > 0 });
+      return res.json({ isDuplicate: count > 0 });
     } catch (error) {
       console.error("Error checking for duplicate invoice number:", error);
-      // Continuing from the check-duplicate endpoint...
-      res.status(500).json({
+      return res.status(500).json({
         message: "Error checking for duplicate invoice number",
         error: error.message,
       });
@@ -239,7 +252,7 @@ export default function (pool) {
     try {
       // Check for duplicates in the database
       const dbQuery =
-        "SELECT invoiceno FROM invoices WHERE invoiceno = ANY($1)";
+        "SELECT id FROM invoices WHERE id = ANY($1)";
       const dbResult = await pool.query(dbQuery, [invoiceNumbers]);
 
       // Check for duplicates in the provided list itself
@@ -437,45 +450,44 @@ export default function (pool) {
   // Delete invoice from database
   router.delete("/db/:id", async (req, res) => {
     const { id } = req.params;
+    const client = await pool.connect();
 
     try {
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
+      await client.query("BEGIN");
 
-        // Delete order details first
-        await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
-          id,
-        ]);
+      // Check if invoice exists
+      const checkQuery = "SELECT id FROM invoices WHERE id = $1";
+      const checkResult = await client.query(checkQuery, [id]);
 
-        // Then delete the invoice
-        const result = await client.query(
-          "DELETE FROM invoices WHERE id = $1 RETURNING *",
-          [id]
-        );
-
-        await client.query("COMMIT");
-
-        if (result.rows.length === 0) {
-          res.status(404).json({ message: "Invoice not found" });
-        } else {
-          res.status(200).json({
-            message: "Invoice deleted successfully",
-            deletedInvoice: result.rows[0],
-          });
-        }
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
+      if (checkResult.rows.length === 0) {
+        return res.status(404).json({ message: "Invoice not found" });
       }
+
+      // Delete order details first
+      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
+        id,
+      ]);
+
+      // Then delete the invoice
+      const result = await client.query(
+        "DELETE FROM invoices WHERE id = $1 RETURNING *",
+        [id]
+      );
+
+      await client.query("COMMIT");
+      res.status(200).json({
+        message: "Invoice deleted successfully",
+        deletedInvoice: result.rows[0],
+      });
     } catch (error) {
-      console.error("Error deleting invoice from database:", error);
+      await client.query("ROLLBACK");
+      console.error("Error deleting invoice:", error);
       res.status(500).json({
         message: "Error deleting invoice",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 

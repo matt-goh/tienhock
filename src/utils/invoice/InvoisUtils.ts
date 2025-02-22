@@ -204,20 +204,36 @@ export const checkDuplicateInvoiceNo = async (
       `/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
     );
 
-    if (typeof response?.isDuplicate !== "boolean") {
-      throw new Error("Invalid response format from server");
+    // Handle both possible response formats
+    if (response && typeof response === "object") {
+      if ("isDuplicate" in response) {
+        return response.isDuplicate;
+      } else if (
+        "message" in response &&
+        response.message === "Invoice number is required"
+      ) {
+        toast.error("Invoice number is required");
+        return true; // Prevent creation if no invoice number
+      }
     }
 
-    return response.isDuplicate;
+    // If response format is unexpected, log it for debugging
+    console.error("Unexpected response format:", response);
+    throw new Error("Invalid response format from server");
   } catch (error) {
     console.error("Error checking for duplicate invoice number:", error);
 
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "An unknown error occurred while checking for duplicate invoice";
+    // Only show toast for network/server errors
+    if (
+      error instanceof Error &&
+      error.message !== "Invalid response format from server"
+    ) {
+      toast.error(
+        "Failed to check for duplicate invoice number. Please try again."
+      );
+    }
 
-    toast.error(errorMessage);
-    throw new Error(errorMessage);
+    // Re-throw the error to be handled by the caller
+    throw error;
   }
 };

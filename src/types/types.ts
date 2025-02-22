@@ -339,11 +339,11 @@ export interface InvoiceData {
   createddate: string;
   paymenttype: string;
   products: ProductItem[];
-  totalMee: number;
-  totalBihun: number;
-  totalNonTaxable: number;
-  totalTaxable: number;
-  totalAdjustment: number;
+  totalmee: number;
+  totalbihun: number;
+  totalnontaxable: number;
+  totaltaxable: number;
+  totaladjustment: number;
 }
 
 // Extended invoice for UI
