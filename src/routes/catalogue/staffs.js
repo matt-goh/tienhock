@@ -11,7 +11,7 @@ export default function (pool) {
     return result.rows.length > 0;
   }
 
-  // Get all staff members
+  // Get active salesmen
   router.get("/", async (req, res) => {
     try {
       const { salesmenOnly } = req.query;
