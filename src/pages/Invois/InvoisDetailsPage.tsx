@@ -225,7 +225,6 @@ const InvoisDetailsPage: React.FC = () => {
         id: "",
         salespersonId: "",
         customerId: "",
-        createdDate: new Date().toLocaleDateString("en-GB"),
         paymentType: "Invoice",
         products: [],
         totalMee: 0,
@@ -1266,14 +1265,14 @@ const InvoisDetailsPage: React.FC = () => {
           <FormListbox
             name="salesman"
             label="Salesman"
-            value={invoiceData.salespersonid}
+            value={invoiceData.salespersonid || ""}
             onChange={(value) => {
               setInvoiceData((prev) => {
                 if (!prev) return prev;
 
                 return {
                   ...prev,
-                  salespersonid: value, // Directly update the salespersonid with the selected value
+                  salespersonid: value || "", // Directly update the salespersonid with the selected value
                 };
               });
             }}
