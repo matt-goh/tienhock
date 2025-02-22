@@ -1296,11 +1296,21 @@ const InvoisDetailsPage: React.FC = () => {
           />
         </div>
         <div className="rounded-lg space-y-2">
-          <FormInput
-            name="customerId"
-            label="Customer ID"
-            value={invoiceData.customerid || ""}
-            disabled
+          <FormListbox
+            name="salesman"
+            label="Salesman"
+            value={invoiceData.salespersonid || ""}
+            onChange={(value) => {
+              setInvoiceData((prev) => {
+                if (!prev) return prev;
+
+                return {
+                  ...prev,
+                  salespersonid: value || "", // Directly update the salespersonid with the selected value
+                };
+              });
+            }}
+            options={salesmen.map((id) => ({ id, name: id }))}
           />
           <CustomerCombobox
             name="customer"
@@ -1332,21 +1342,11 @@ const InvoisDetailsPage: React.FC = () => {
             hasMore={customerPage < totalCustomerPages}
             isLoading={isFetchingCustomers}
           />
-          <FormListbox
-            name="salesman"
-            label="Salesman"
-            value={invoiceData.salespersonid || ""}
-            onChange={(value) => {
-              setInvoiceData((prev) => {
-                if (!prev) return prev;
-
-                return {
-                  ...prev,
-                  salespersonid: value || "", // Directly update the salespersonid with the selected value
-                };
-              });
-            }}
-            options={salesmen.map((id) => ({ id, name: id }))}
+          <FormInput
+            name="customerId"
+            label="Customer ID"
+            value={invoiceData.customerid || ""}
+            disabled
           />
         </div>
       </div>
