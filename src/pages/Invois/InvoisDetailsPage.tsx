@@ -21,7 +21,6 @@ import toast from "react-hot-toast";
 import {
   updateInvoice,
   deleteInvoice,
-  saveInvoice,
   createInvoice,
   checkDuplicateInvoiceNo,
 } from "../../utils/invoice/InvoisUtils";
@@ -233,7 +232,8 @@ const InvoisDetailsPage: React.FC = () => {
         customername: "",
       };
     }
-    return location.state?.invoiceData || null;
+    const data = location.state?.invoiceData;
+    return data ? { ...data, originalId: data.id } : null;
   });
   const [products, setProducts] = useState<
     { id: string; description: string }[]
@@ -812,7 +812,6 @@ const InvoisDetailsPage: React.FC = () => {
           // Update the invoice first
           updateInvoice(invoiceData);
 
-          const saveToDb = location.pathname.includes("/sales/invoice/details");
           const productsToSave = invoiceData.products
             .filter((product) => !product.istotal && !product.issubtotal)
             .map((product) => ({
@@ -843,18 +842,14 @@ const InvoisDetailsPage: React.FC = () => {
             customerName: invoiceData.customerName,
           };
 
-          const saved = await saveInvoice(dataToSave, saveToDb);
+          const saved = await updateInvoice(dataToSave);
           const savedInvoice = {
             ...saved,
             customerName: saved.customerid || "",
             isEditing: false,
           };
 
-          toast.success(
-            saveToDb
-              ? "Invoice updated successfully in database"
-              : "Invoice updated successfully in memory"
-          );
+          toast.success("Invoice updated successfully in database");
 
           navigate(previousPath);
           setInvoiceData(savedInvoice);
