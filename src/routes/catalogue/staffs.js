@@ -21,20 +21,21 @@ export default function (pool) {
         salesmenOnly === "true"
           ? "s.id" // Only select ID for salesmen
           : `s.id, 
-           s.name, 
-           s.ic_no as "icNo", 
-           s.telephone_no as "telephoneNo",
-           s.job,
-           s.location,
-           s.date_resigned as "dateResigned"`;
+             s.name, 
+             s.ic_no as "icNo", 
+             s.telephone_no as "telephoneNo",
+             s.job,
+             s.location,
+             s.date_resigned as "dateResigned"`;
 
       let query = `
         SELECT ${columns}
         FROM staffs s
+        WHERE (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
       `;
 
       if (salesmenOnly === "true") {
-        query += ` WHERE s.job::jsonb ? 'SALESMAN'`;
+        query += ` AND s.job::jsonb ? 'SALESMAN'`;
       }
 
       const result = await pool.query(query);
