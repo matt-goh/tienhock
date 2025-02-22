@@ -350,6 +350,7 @@ export interface InvoiceData {
 export interface ExtendedInvoiceData extends InvoiceData {
   customerName?: string; // For UI display
   isEditing?: boolean; // UI state
+  originalId?: string;
 }
 
 // Helper type for special rows

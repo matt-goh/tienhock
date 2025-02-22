@@ -14,7 +14,7 @@ import {
 } from "../../types/types";
 import {
   deleteInvoice,
-  fetchDbInvoices,
+  getInvoices,
 } from "../../utils/invoice/InvoisUtils";
 import {
   IconEye,
@@ -108,8 +108,8 @@ const InvoisPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        // Pass the filters directly - the date conversion happens inside fetchDbInvoices
-        const fetchedInvoices = await fetchDbInvoices(filters);
+        // Pass the filters directly - the date conversion happens inside getInvoices
+        const fetchedInvoices = await getInvoices(filters);
         setInvoices(fetchedInvoices);
         setFilteredInvoices(fetchedInvoices);
       } catch (error) {
@@ -200,7 +200,7 @@ const InvoisPage: React.FC = () => {
       setSearchTerm("");
 
       // Load fresh data
-      const fetchedInvoices = await fetchDbInvoices({
+      const fetchedInvoices = await getInvoices({
         dateRange: getInitialDates(),
         salespersonId: null,
         applySalespersonFilter: true,
@@ -338,7 +338,7 @@ const InvoisPage: React.FC = () => {
     ) {
       const loadInvoices = async () => {
         try {
-          const fetchedInvoices = await fetchDbInvoices(newFilters);
+          const fetchedInvoices = await getInvoices(newFilters);
           setInvoices(fetchedInvoices);
         } catch (error) {
           console.error("Error loading invoices:", error);

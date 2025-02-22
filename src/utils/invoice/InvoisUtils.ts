@@ -5,19 +5,49 @@ import {
   InvoiceFilters,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
-import { formatDateForAPI } from "./dateUtils";
 
-let invoices: ExtendedInvoiceData[] = [];
+export const createInvoice = async (
+  invoiceData: ExtendedInvoiceData
+): Promise<ExtendedInvoiceData> => {
+  try {
+    const isDuplicate = await checkDuplicateInvoiceNo(
+      invoiceData.id.toString()
+    );
+    if (isDuplicate) {
+      toast.error(
+        "Duplicate invoice number. Please use a unique invoice number."
+      );
+      throw new Error("Duplicate invoice number");
+    }
 
-export const updateInvoice = (updatedInvoice: ExtendedInvoiceData) => {
-  invoices = invoices.map((invoice) =>
-    invoice.id === updatedInvoice.id ? updatedInvoice : invoice
-  );
-  // Dispatch an event to notify that invoices have been updated
-  window.dispatchEvent(new CustomEvent("invoicesUpdated"));
+    // Filter out total rows before saving
+    const productsToSave = invoiceData.products.filter(
+      (product) => !product.istotal
+    );
+
+    const invoiceToCreate = {
+      ...invoiceData,
+      products: productsToSave,
+    };
+
+    const createdInvoice = await api.post(
+      "/api/invoices/submit",
+      invoiceToCreate
+    );
+
+    return createdInvoice;
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred while creating the invoice";
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
 };
 
-export const fetchDbInvoices = async (
+export const getInvoices = async (
   filters: InvoiceFilters
 ): Promise<InvoiceData[]> => {
   try {
@@ -71,11 +101,14 @@ export const fetchDbInvoices = async (
   }
 };
 
-export const saveInvoice = async (
-  invoice: ExtendedInvoiceData,
-  saveToDb: boolean = true
+export const updateInvoice = async (
+  invoice: ExtendedInvoiceData
 ): Promise<ExtendedInvoiceData> => {
   try {
+    if (!invoice.id) {
+      throw new Error("Cannot update invoice: missing ID");
+    }
+
     // Normalize products data
     const normalizedProducts = invoice.products.map((product) => ({
       code: product.code,
@@ -90,80 +123,27 @@ export const saveInvoice = async (
       istotal: product.istotal || false,
     }));
 
-    // Remove total rows before saving
+    // Remove special rows before saving
     const productsToSave = normalizedProducts.filter(
-      (product) => !product.istotal
+      (product) => !product.istotal && !product.issubtotal
     );
 
     const invoiceToSave = {
       ...invoice,
+      originalId: invoice.originalId, // Include the original ID if we're changing invoice numbers
       products: productsToSave,
     };
 
-    const savedInvoice = await api.post(
-      `/api/invoices/submit?saveToDb=${saveToDb}`,
-      invoiceToSave
-    );
-
-    if (!saveToDb) {
-      const index = invoices.findIndex(
-        (inv) => inv.id === savedInvoice.billNumber
-      );
-      if (index !== -1) {
-        invoices[index] = savedInvoice;
-      } else {
-        invoices.push(savedInvoice);
-      }
-    }
+    // Send to update endpoint
+    const savedInvoice = await api.post("/api/invoices/update", invoiceToSave);
 
     return savedInvoice;
   } catch (error) {
-    console.error("Error saving invoice:", error);
+    console.error("Error updating invoice:", error);
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "An unknown error occurred while saving the invoice";
-    toast.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
-export const createInvoice = async (
-  invoiceData: ExtendedInvoiceData
-): Promise<ExtendedInvoiceData> => {
-  try {
-    const isDuplicate = await checkDuplicateInvoiceNo(
-      invoiceData.id.toString()
-    );
-    if (isDuplicate) {
-      toast.error(
-        "Duplicate invoice number. Please use a unique invoice number."
-      );
-      throw new Error("Duplicate invoice number");
-    }
-
-    // Filter out total rows before saving
-    const productsToSave = invoiceData.products.filter(
-      (product) => !product.istotal
-    );
-
-    const invoiceToCreate = {
-      ...invoiceData,
-      products: productsToSave,
-    };
-
-    const createdInvoice = await api.post(
-      "/api/invoices/submit?saveToDb=true",
-      invoiceToCreate
-    );
-
-    return createdInvoice;
-  } catch (error) {
-    console.error("Error creating invoice:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "An unknown error occurred while creating the invoice";
+        : "An unknown error occurred while updating the invoice";
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }

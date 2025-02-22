@@ -1,6 +1,5 @@
 // src/routes/sales/invoices/invoices.js
 import { Router } from "express";
-import { sanitizeNumeric } from "./helpers.js";
 
 const formatDate = (date) => {
   if (date instanceof Date) {
@@ -204,6 +203,140 @@ export default function (pool) {
     }
   });
 
+  // Update existing invoice
+  router.post("/update", async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const invoice = req.body;
+      const originalId = req.body.originalId;
+
+      // Validate required fields
+      if (
+        !invoice.id ||
+        !invoice.salespersonid ||
+        !invoice.customerid ||
+        !invoice.createddate
+      ) {
+        throw new Error(
+          "Missing required fields: id, salespersonid, customerid, createddate"
+        );
+      }
+
+      // If invoice number is changing, check for duplicates
+      if (originalId && originalId !== invoice.id) {
+        const checkDuplicateQuery = "SELECT id FROM invoices WHERE id = $1";
+        const duplicateCheck = await client.query(checkDuplicateQuery, [
+          invoice.id,
+        ]);
+
+        if (duplicateCheck.rows.length > 0) {
+          throw new Error(`Invoice number ${invoice.id} already exists`);
+        }
+
+        // Update the invoice ID first
+        const updateIdQuery = `
+        UPDATE invoices 
+        SET id = $1
+        WHERE id = $2
+        RETURNING *
+      `;
+        await client.query(updateIdQuery, [invoice.id, originalId]);
+      }
+
+      // Update invoice using the appropriate ID
+      const updateInvoiceQuery = `
+      UPDATE invoices SET
+        salespersonid = $1,
+        customerid = $2,
+        createddate = $3,
+        paymenttype = $4,
+        totalmee = $5,
+        totalbihun = $6,
+        totalnontaxable = $7,
+        totaltaxable = $8,
+        totaladjustment = $9
+      WHERE id = $10
+      RETURNING *
+    `;
+
+      const invoiceResult = await client.query(updateInvoiceQuery, [
+        invoice.salespersonid,
+        invoice.customerid,
+        invoice.createddate,
+        invoice.paymenttype || "INVOICE",
+        invoice.totalmee || 0,
+        invoice.totalbihun || 0,
+        invoice.totalnontaxable || 0,
+        invoice.totaltaxable || 0,
+        invoice.totaladjustment || 0,
+        invoice.id,
+      ]);
+
+      if (invoiceResult.rows.length === 0) {
+        throw new Error(`Invoice with ID ${invoice.id} not found`);
+      }
+
+      // Update related order_details with new invoice ID if necessary
+      if (originalId && originalId !== invoice.id) {
+        await client.query(
+          "UPDATE order_details SET invoiceid = $1 WHERE invoiceid = $2",
+          [invoice.id, originalId]
+        );
+      }
+
+      // Delete existing products
+      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
+        invoice.id,
+      ]);
+
+      // Insert updated products
+      if (invoice.products && invoice.products.length > 0) {
+        const productQuery = `
+        INSERT INTO order_details (
+          invoiceid,
+          code,
+          price,
+          quantity,
+          freeproduct,
+          returnproduct
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `;
+
+        for (const product of invoice.products) {
+          if (!product.istotal && !product.issubtotal) {
+            await client.query(productQuery, [
+              invoice.id,
+              product.code,
+              product.price || 0,
+              product.quantity || 0,
+              product.freeProduct || 0,
+              product.returnProduct || 0,
+            ]);
+          }
+        }
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Invoice updated successfully",
+        invoice: invoiceResult.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating invoice:", error);
+      res.status(500).json({
+        message: "Error updating invoice",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // Check for duplicate invoice numbers
   router.get("/check-duplicate", async (req, res) => {
     const { invoiceNo } = req.query;
@@ -225,145 +358,6 @@ export default function (pool) {
         message: "Error checking for duplicate invoice number",
         error: error.message,
       });
-    }
-  });
-
-  // Check for bulk duplicates
-  router.post("/check-bulk-duplicates", async (req, res) => {
-    const { invoiceNumbers } = req.body;
-
-    if (!Array.isArray(invoiceNumbers) || invoiceNumbers.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Invalid invoice numbers provided" });
-    }
-
-    try {
-      // Check for duplicates in the database
-      const dbQuery = "SELECT id FROM invoices WHERE id = ANY($1)";
-      const dbResult = await pool.query(dbQuery, [invoiceNumbers]);
-
-      // Check for duplicates in the provided list itself
-      const duplicatesInList = invoiceNumbers.filter(
-        (item, index) => invoiceNumbers.indexOf(item) !== index
-      );
-
-      // Combine duplicates from database and list
-      const allDuplicates = [
-        ...new Set([
-          ...dbResult.rows.map((row) => row.invoiceno),
-          ...duplicatesInList,
-        ]),
-      ];
-
-      res.json({ duplicates: allDuplicates });
-    } catch (error) {
-      console.error("Error checking for duplicate invoice numbers:", error);
-      res.status(500).json({
-        message: "Error checking for duplicate invoice numbers",
-        error: error.message,
-      });
-    }
-  });
-
-  // Bulk submit invoices to database
-  router.post("/bulk-submit", async (req, res) => {
-    const invoices = req.body;
-
-    if (!Array.isArray(invoices) || invoices.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Invalid invoices data provided" });
-    }
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const insertedInvoices = [];
-
-      for (const invoice of invoices) {
-        // Format date and time
-        const [day, month, year] = invoice.date.split("/");
-        const formattedDate = `${year}-${month.padStart(2, "0")}-${day.padStart(
-          2,
-          "0"
-        )}`;
-
-        const [time, period] = invoice.time.split(" ");
-        let [hours, minutes] = time.split(":");
-        hours = parseInt(hours);
-        if (period.toLowerCase() === "pm" && hours !== 12) hours += 12;
-        else if (period.toLowerCase() === "am" && hours === 12) hours = 0;
-        const formattedTime = `${hours
-          .toString()
-          .padStart(2, "0")}:${minutes}:00`;
-
-        // Insert invoice
-        const insertInvoiceQuery = `
-          INSERT INTO Invoices (
-            id, invoiceno, date, time, type, 
-            customer, customername, salesman, totalAmount
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING *
-        `;
-
-        const invoiceResult = await client.query(insertInvoiceQuery, [
-          invoice.invoiceno,
-          invoice.invoiceno,
-          formattedDate,
-          formattedTime,
-          invoice.type,
-          invoice.customer,
-          invoice.customername,
-          invoice.salesman,
-          sanitizeNumeric(invoice.totalAmount),
-        ]);
-
-        const insertedInvoice = invoiceResult.rows[0];
-
-        // Insert order details
-        for (const detail of invoice.orderDetails) {
-          const detailQuery = `
-            INSERT INTO order_details (
-              invoiceId, code, productname, qty, price, total,
-              isfoc, isreturned, istotal, issubtotal, isless, istax
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          `;
-          await client.query(detailQuery, [
-            insertedInvoice.id,
-            detail.code,
-            detail.productname,
-            detail.qty,
-            detail.price,
-            detail.total,
-            detail.isfoc || false,
-            detail.isreturned || false,
-            detail.istotal || false,
-            detail.issubtotal || false,
-            detail.isless || false,
-            detail.istax || false,
-          ]);
-        }
-
-        insertedInvoices.push(insertedInvoice);
-      }
-
-      await client.query("COMMIT");
-
-      res.json({
-        message: `Successfully submitted ${insertedInvoices.length} invoices to the database.`,
-        invoices: insertedInvoices,
-      });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      console.error("Error submitting invoices:", error);
-      res
-        .status(500)
-        .json({ message: "Error submitting invoices", error: error.message });
-    } finally {
-      client.release();
     }
   });
 
