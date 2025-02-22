@@ -222,7 +222,7 @@ const InvoisDetailsPage: React.FC = () => {
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData>(() => {
     if (location.state?.isNewInvoice) {
       return {
-        billNumber: 0,
+        id: "",
         salespersonId: "",
         customerId: "",
         createdDate: new Date().toLocaleDateString("en-GB"),
@@ -1117,8 +1117,17 @@ const InvoisDetailsPage: React.FC = () => {
     return type === "CASH" ? "Cash" : "Invoice";
   };
 
+  // Add this helper function near the top of the component
+  const getFormattedInvoiceNumber = (
+    paymentType: string,
+    id: string
+  ): string => {
+    const prefix = paymentType === "CASH" ? "C" : "I";
+    return `${prefix}${id || ""}`;
+  };
+
   return (
-    <div className="px-4 max-w-7xl mx-auto">
+    <div className="px-6 max-w-7xl w-full">
       <div className="flex justify-between items-center mb-4">
         <BackButton onClick={handleBackClick} />
         <div className="space-x-2">
@@ -1143,17 +1152,10 @@ const InvoisDetailsPage: React.FC = () => {
           <FormInput
             name="invoiceno"
             label="Invoice No"
-            value={
-              invoiceData
-                ? `${
-                    invoiceData.paymenttype
-                      ? invoiceData.paymenttype === "CASH"
-                        ? "C"
-                        : "I"
-                      : ""
-                  }${invoiceData.id ?? ""}`
-                : ""
-            }
+            value={getFormattedInvoiceNumber(
+              invoiceData?.paymenttype || "INVOICE",
+              invoiceData?.id || ""
+            )}
             onChange={(e) => {
               const newValue = e.target.value;
               // Extract the type (first character) and number (rest of the string)
@@ -1162,7 +1164,6 @@ const InvoisDetailsPage: React.FC = () => {
 
               setInvoiceData((prev) => {
                 if (!prev) return prev;
-
                 return {
                   ...prev,
                   id: number, // Update the ID with the number portion
