@@ -23,11 +23,11 @@ export const uiToApiFormat = (uiData: ExtendedInvoiceData): InvoiceData => {
     createddate: uiData.createddate,
     paymenttype: uiData.paymenttype,
     products: regularProducts,
-    totalMee: calculateCategoryTotal(regularProducts, "1-"),
-    totalBihun: calculateCategoryTotal(regularProducts, "2-"),
-    totalNonTaxable: calculateNonTaxableTotal(regularProducts),
-    totalTaxable: calculateTaxableTotal(regularProducts),
-    totalAdjustment: calculateAdjustments(regularProducts)
+    totalmee: calculateCategoryTotal(regularProducts, "1-"),
+    totalbihun: calculateCategoryTotal(regularProducts, "2-"),
+    totalnontaxable: calculateNonTaxableTotal(regularProducts),
+    totaltaxable: calculateTaxableTotal(regularProducts),
+    totaladjustment: calculateAdjustments(regularProducts)
   };
 };
 

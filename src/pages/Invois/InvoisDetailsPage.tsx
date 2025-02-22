@@ -23,6 +23,7 @@ import {
   deleteInvoice,
   saveInvoice,
   createInvoice,
+  checkDuplicateInvoiceNo,
 } from "../../utils/invoice/InvoisUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import {
@@ -224,11 +225,11 @@ const InvoisDetailsPage: React.FC = () => {
       return {
         id: "",
         products: [],
-        totalMee: 0,
-        totalBihun: 0,
-        totalNonTaxable: 0,
-        totalTaxable: 0,
-        totalAdjustment: 0,
+        totalmee: 0,
+        totalbihun: 0,
+        totalnontaxable: 0,
+        totaltaxable: 0,
+        totaladjustment: 0,
         customername: "",
       };
     }
@@ -497,7 +498,9 @@ const InvoisDetailsPage: React.FC = () => {
   };
 
   const orderDetailsWithTotal = useMemo(() => {
-    if (!invoiceData) return [];
+    if (!invoiceData || !Array.isArray(invoiceData.products)) {
+      return [];
+    }
 
     const regularItems = invoiceData.products.filter(
       (product) => !product.istotal
@@ -539,37 +542,9 @@ const InvoisDetailsPage: React.FC = () => {
         (item) => item.code !== code
       );
 
-      // Recalculate totals
-      let totalMee = 0;
-      let totalBihun = 0;
-      let totalNonTaxable = 0;
-      let totalTaxable = 0;
-
-      newProducts.forEach((product) => {
-        if (product.issubtotal || product.istotal) return;
-
-        const total = calculateTotal(product);
-
-        if (product.code.startsWith("1-")) {
-          totalMee += total;
-        } else if (product.code.startsWith("2-")) {
-          totalBihun += total;
-        }
-
-        if (product.code.startsWith("S-") || product.code.startsWith("MEQ-")) {
-          totalNonTaxable += total;
-        } else {
-          totalTaxable += total;
-        }
-      });
-
       return {
         ...prevData,
         products: newProducts,
-        totalMee,
-        totalBihun,
-        totalNonTaxable,
-        totalTaxable,
       };
     });
   };
@@ -726,60 +701,175 @@ const InvoisDetailsPage: React.FC = () => {
     setShowDeleteConfirmation(true);
   };
 
+  const validateInvoiceData = (data: ExtendedInvoiceData): string[] => {
+    const errors: string[] = [];
+
+    if (!data.id) {
+      errors.push("Invoice number is required");
+    }
+
+    if (!data.createddate) {
+      errors.push("Created date is required");
+    }
+
+    if (!data.salespersonid) {
+      errors.push("Salesman selection is required");
+    }
+
+    if (!data.customerid) {
+      errors.push("Customer selection is required");
+    }
+
+    return errors;
+  };
+
   const handleSaveClick = async () => {
     if (!invoiceData) return;
 
-    if (!invoiceData.id) {
-      toast.error("Please enter an invoice number before saving.");
+    // Validate required fields
+    const validationErrors = validateInvoiceData(invoiceData);
+    if (validationErrors.length > 0) {
+      validationErrors.forEach((error) => toast.error(error));
       return;
     }
 
     setIsSaving(true);
     try {
-      // Update the invoice first
-      updateInvoice(invoiceData);
-
-      // Format products for saving
-      const productsToSave = invoiceData.products.map((product) => ({
-        ...product,
-        tax: product.tax || 0,
-        discount: product.discount || 0,
-        total: calculateTotal(product).toFixed(2),
-      }));
-
-      const dataToSave: ExtendedInvoiceData = {
-        ...invoiceData,
-        products: productsToSave,
-      };
-
-      let savedInvoice;
       if (isNewInvoice) {
-        const created = await createInvoice(dataToSave);
-        savedInvoice = {
-          ...created,
-          customerName: created.customerid || "",
-          isEditing: false,
-        };
-        toast.success("New invoice created successfully");
-      } else {
-        const saveToDb = location.pathname.includes("/sales/invoice/details");
-        const saved = await saveInvoice(dataToSave, saveToDb);
-        savedInvoice = {
-          ...saved,
-          customerName: saved.customerid || "",
-          isEditing: false,
-        };
-        toast.success(
-          saveToDb
-            ? "Invoice updated successfully in database"
-            : "Invoice updated successfully in memory"
-        );
-      }
+        try {
+          // Check for duplicate before proceeding
+          const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.id);
+          if (isDuplicate) {
+            toast.error(
+              "This invoice number already exists. Please use a different number."
+            );
+            return;
+          }
 
-      navigate(previousPath);
-      setInvoiceData(savedInvoice);
-      setIsFormChanged(false);
-      setIsNewInvoice(false);
+          // Format products for saving - including all required fields
+          const productsToSave = invoiceData.products
+            .filter((product) => !product.istotal && !product.issubtotal)
+            .map((product) => ({
+              code: product.code,
+              quantity: product.quantity || 0,
+              price: product.price || 0,
+              freeProduct: product.freeProduct || 0,
+              returnProduct: product.returnProduct || 0,
+              tax: product.tax || 0,
+              discount: product.discount || 0,
+              total: product.total,
+              description: product.description,
+            }));
+
+          const dataToSave: ExtendedInvoiceData = {
+            id: invoiceData.id,
+            salespersonid: invoiceData.salespersonid,
+            customerid: invoiceData.customerid,
+            customername: invoiceData.customername,
+            createddate: invoiceData.createddate,
+            paymenttype: invoiceData.paymenttype || "INVOICE",
+            totalmee: invoiceData.totalmee || 0,
+            totalbihun: invoiceData.totalbihun || 0,
+            totalnontaxable: invoiceData.totalnontaxable || 0,
+            totaltaxable: invoiceData.totaltaxable || 0,
+            totaladjustment: invoiceData.totaladjustment || 0,
+            products: productsToSave,
+            customerName: invoiceData.customerName,
+          };
+
+          // Try to create the invoice
+          const created = await createInvoice(dataToSave);
+          const savedInvoice = {
+            ...created,
+            customerName: created.customerid || "",
+            isEditing: false,
+          };
+
+          toast.success("New invoice created successfully");
+          navigate(previousPath);
+          setInvoiceData(savedInvoice);
+          setIsFormChanged(false);
+          setIsNewInvoice(false);
+        } catch (error) {
+          if (error instanceof Error) {
+            if (error.message.includes("duplicate")) {
+              toast.error(
+                "This invoice number already exists. Please use a different number."
+              );
+            } else {
+              toast.error(`Failed to create invoice: ${error.message}`);
+            }
+          } else {
+            toast.error(
+              "An unexpected error occurred while creating the invoice"
+            );
+          }
+          return;
+        }
+      } else {
+        // Handle existing invoice update
+        try {
+          // Update the invoice first
+          updateInvoice(invoiceData);
+
+          const saveToDb = location.pathname.includes("/sales/invoice/details");
+          const productsToSave = invoiceData.products
+            .filter((product) => !product.istotal && !product.issubtotal)
+            .map((product) => ({
+              code: product.code,
+              quantity: product.quantity || 0,
+              price: product.price || 0,
+              freeProduct: product.freeProduct || 0,
+              returnProduct: product.returnProduct || 0,
+              tax: product.tax || 0,
+              discount: product.discount || 0,
+              total: product.total,
+              description: product.description,
+            }));
+
+          const dataToSave: ExtendedInvoiceData = {
+            id: invoiceData.id,
+            salespersonid: invoiceData.salespersonid,
+            customerid: invoiceData.customerid,
+            customername: invoiceData.customername,
+            createddate: invoiceData.createddate,
+            paymenttype: invoiceData.paymenttype || "INVOICE",
+            totalmee: invoiceData.totalmee || 0,
+            totalbihun: invoiceData.totalbihun || 0,
+            totalnontaxable: invoiceData.totalnontaxable || 0,
+            totaltaxable: invoiceData.totaltaxable || 0,
+            totaladjustment: invoiceData.totaladjustment || 0,
+            products: productsToSave,
+            customerName: invoiceData.customerName,
+          };
+
+          const saved = await saveInvoice(dataToSave, saveToDb);
+          const savedInvoice = {
+            ...saved,
+            customerName: saved.customerid || "",
+            isEditing: false,
+          };
+
+          toast.success(
+            saveToDb
+              ? "Invoice updated successfully in database"
+              : "Invoice updated successfully in memory"
+          );
+
+          navigate(previousPath);
+          setInvoiceData(savedInvoice);
+          setIsFormChanged(false);
+        } catch (error) {
+          if (error instanceof Error) {
+            toast.error(`Failed to update invoice: ${error.message}`);
+          } else {
+            toast.error(
+              "An unexpected error occurred while updating the invoice"
+            );
+          }
+          return;
+        }
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error(
@@ -828,41 +918,25 @@ const InvoisDetailsPage: React.FC = () => {
       // Add new item
       const newProducts = [...productsWithoutTotal, newItem];
 
-      // Recalculate totals
-      let totalMee = 0;
-      let totalBihun = 0;
-      let totalNonTaxable = 0;
-      let totalTaxable = 0;
-
-      newProducts.forEach((product) => {
-        if (product.issubtotal || product.istotal) return;
-
-        const total = calculateTotal(product);
-
-        if (product.code.startsWith("1-")) {
-          totalMee += total;
-        } else if (product.code.startsWith("2-")) {
-          totalBihun += total;
-        }
-
-        if (product.code.startsWith("S-") || product.code.startsWith("MEQ-")) {
-          totalNonTaxable += total;
-        } else {
-          totalTaxable += total;
-        }
-      });
-
       // Add total row back
-      const total = calculateOverallTotal(newProducts).toFixed(2);
-      const withTotal = addTotalRow(newProducts, total);
+      const finalProducts = [
+        ...newProducts,
+        {
+          code: "TOTAL",
+          quantity: 0,
+          price: 0,
+          freeProduct: 0,
+          returnProduct: 0,
+          tax: 0,
+          discount: 0,
+          total: "0",
+          istotal: true,
+        },
+      ];
 
       return {
         ...prevData,
-        products: withTotal,
-        totalMee,
-        totalBihun,
-        totalNonTaxable,
-        totalTaxable,
+        products: finalProducts,
       };
     });
   };
