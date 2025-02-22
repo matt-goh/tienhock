@@ -34,7 +34,7 @@ export default function (pool) {
   // Get invoices with filters
   router.get("/", async (req, res) => {
     try {
-      const { startDate, endDate, salesman, customer } = req.query;
+      const { startDate, endDate } = req.query;
 
       let query = `
         SELECT 
@@ -48,17 +48,20 @@ export default function (pool) {
           i.totalnontaxable,
           i.totaltaxable,
           i.totaladjustment,
-          json_agg(
-            CASE WHEN od.id IS NOT NULL THEN 
-              json_build_object(
-                'code', od.code,
-                'quantity', od.quantity,
-                'price', od.price,
-                'freeProduct', od.freeproduct,
-                'returnProduct', od.returnproduct
-              )
-            ELSE NULL END
-          ) FILTER (WHERE od.id IS NOT NULL) as products
+          COALESCE(
+            json_agg(
+              CASE WHEN od.id IS NOT NULL THEN 
+                json_build_object(
+                  'code', od.code,
+                  'quantity', od.quantity,
+                  'price', od.price,
+                  'freeProduct', od.freeproduct,
+                  'returnProduct', od.returnproduct
+                )
+              ELSE NULL END
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
+          ) as products
         FROM invoices i
         LEFT JOIN order_details od ON i.id = od.invoiceid
         WHERE 1=1
@@ -68,25 +71,12 @@ export default function (pool) {
       let paramCounter = 1;
 
       if (startDate && endDate) {
-        queryParams.push(Number(startDate), Number(endDate));
-        query += ` AND i.createddate BETWEEN $${paramCounter} AND $${
+        // Ensure we're comparing bigint timestamps
+        queryParams.push(startDate, endDate);
+        query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
           paramCounter + 1
-        }`;
+        } AS bigint)`;
         paramCounter += 2;
-      }
-
-      if (salesman) {
-        const salesmanArray = salesman.split(",");
-        queryParams.push(salesmanArray);
-        query += ` AND i.salespersonid = ANY($${paramCounter})`;
-        paramCounter++;
-      }
-
-      if (customer) {
-        const customerArray = customer.split(",");
-        queryParams.push(customerArray);
-        query += ` AND i.customerid = ANY($${paramCounter})`;
-        paramCounter++;
       }
 
       query += ` GROUP BY i.id ORDER BY i.createddate DESC`;
@@ -224,8 +214,7 @@ export default function (pool) {
 
     try {
       // Query both id and invoiceno columns
-      const query =
-        "SELECT COUNT(*) FROM invoices WHERE id = $1";
+      const query = "SELECT COUNT(*) FROM invoices WHERE id = $1";
       const result = await pool.query(query, [invoiceNo]);
       const count = parseInt(result.rows[0].count);
 
@@ -251,8 +240,7 @@ export default function (pool) {
 
     try {
       // Check for duplicates in the database
-      const dbQuery =
-        "SELECT id FROM invoices WHERE id = ANY($1)";
+      const dbQuery = "SELECT id FROM invoices WHERE id = ANY($1)";
       const dbResult = await pool.query(dbQuery, [invoiceNumbers]);
 
       // Check for duplicates in the provided list itself

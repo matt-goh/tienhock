@@ -23,15 +23,17 @@ export const fetchDbInvoices = async (
   try {
     const queryParams = new URLSearchParams();
 
-    // Convert dates to API format
+    // Convert dates using the existing formatDateForAPI utility
     if (filters.dateRange.start) {
-      queryParams.append(
-        "startDate",
-        formatDateForAPI(filters.dateRange.start)
-      );
+      const startDate = new Date(filters.dateRange.start);
+      startDate.setHours(0, 0, 0, 0);
+      queryParams.append("startDate", startDate.getTime().toString());
     }
+
     if (filters.dateRange.end) {
-      queryParams.append("endDate", formatDateForAPI(filters.dateRange.end));
+      const endDate = new Date(filters.dateRange.end);
+      endDate.setHours(23, 59, 59, 999);
+      queryParams.append("endDate", endDate.getTime().toString());
     }
 
     // Add salesman filter
@@ -46,29 +48,17 @@ export const fetchDbInvoices = async (
 
     // Add payment type filter
     if (filters.applyPaymentTypeFilter && filters.paymentType) {
-      queryParams.append("type", filters.paymentType);
+      queryParams.append("paymenttype", filters.paymentType.toUpperCase());
     }
 
-    try {
-      const response = await api.get(`/api/invoices?${queryParams.toString()}`);
+    const response = await api.get(`/api/invoices?${queryParams.toString()}`);
 
-      if (!response || !Array.isArray(response)) {
-        throw new Error("Invalid response format from server");
-      }
-
-      return response;
-    } catch (error) {
-      // If the first attempt fails, try the alternative endpoint
-      const response = await api.get(
-        `/api/invoices/db?${queryParams.toString()}`
-      );
-
-      if (!response || !Array.isArray(response)) {
-        throw new Error("Invalid response format from server");
-      }
-
-      return response;
+    if (!response || !Array.isArray(response)) {
+      console.error("Invalid response format:", response);
+      throw new Error("Invalid response format from server");
     }
+
+    return response;
   } catch (error) {
     console.error("Error fetching invoices:", error);
     const errorMessage =
