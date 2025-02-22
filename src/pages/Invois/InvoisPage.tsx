@@ -407,7 +407,7 @@ const InvoisPage: React.FC = () => {
           onClick={() => handleInvoiceClick(info.row.original)}
           className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer hover:font-semibold"
         >
-          {info.row.original.paymenttype === "Cash" ? "C" : "I"}
+          {info.row.original.paymenttype === "CASH" ? "C" : "I"}
           {info.getValue()}
         </button>
       ),
