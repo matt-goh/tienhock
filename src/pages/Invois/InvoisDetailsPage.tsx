@@ -35,6 +35,7 @@ import {
 import TableEditableCell from "../../components/Table/TableEditableCell";
 import { debounce } from "lodash";
 import { CustomerCombobox } from "../../components/Invois/CustomerCombobox";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 const InvoisDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -57,9 +58,6 @@ const InvoisDetailsPage: React.FC = () => {
     const data = location.state?.invoiceData;
     return data ? { ...data, originalId: data.id } : null;
   });
-  const [products, setProducts] = useState<
-    { id: string; description: string }[]
-  >([]);
   const [salesmen, setSalesmen] = useState<string[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomerName, setSelectedCustomerName] = useState<string>(
@@ -83,6 +81,7 @@ const InvoisDetailsPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { products, isLoading: isLoadingProducts } = useProductsCache();
 
   useEffect(() => {
     console.log(invoiceData);
@@ -243,36 +242,22 @@ const InvoisDetailsPage: React.FC = () => {
   ]);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const data = await api.get("/api/products/combobox");
-        setProducts(data);
-
-        // Fill in descriptions for existing products
-        if (invoiceData && invoiceData.products.length > 0) {
-          setInvoiceData((prev) => ({
-            ...prev,
-            products: prev.products.map((product) => {
-              const matchingProduct = data.find(
-                (p: { id: string }) => p.id === product.code
-              );
-              return {
-                ...product,
-                description: matchingProduct
-                  ? matchingProduct.description
-                  : product.description,
-              };
-            }),
-          }));
-        }
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        toast.error("Error fetching products");
-      }
-    };
-
-    fetchProducts();
-  }, []);
+    // Fill in descriptions for existing products whenever products or invoiceData changes
+    if (invoiceData?.products.length > 0 && products.length > 0) {
+      setInvoiceData((prev) => ({
+        ...prev,
+        products: prev.products.map((product) => {
+          const matchingProduct = products.find((p) => p.id === product.code);
+          return {
+            ...product,
+            description: matchingProduct
+              ? matchingProduct.description
+              : product.description,
+          };
+        }),
+      }));
+    }
+  }, [products, invoiceData?.products]);
 
   const fetchSalesmen = useCallback(async () => {
     try {
