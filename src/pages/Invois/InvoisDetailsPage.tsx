@@ -153,53 +153,35 @@ const InvoisDetailsPage: React.FC = () => {
 
   // Initialize once at mount
   useEffect(() => {
-    const initializeData = async () => {
-      setIsFetchingCustomers(true);
-      try {
-        const data = await api.get(
-          `/api/customers/combobox?salesman=${
-            invoiceData?.salespersonid || ""
-          }&search=&page=1&limit=20`
-        );
-        setCustomers(data.customers);
-        setTotalCustomerPages(data.totalPages);
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-        toast.error("Failed to fetch customers. Please try again.");
-      } finally {
-        setIsFetchingCustomers(false);
-        setIsInitialLoad(false);
-      }
-    };
-
-    initializeData();
-  }, []); // Run once at mount
-
-  // Handle salesman changes after initial load
-  useEffect(() => {
-    if (!isInitialLoad && invoiceData?.salespersonid) {
+    // Handle both initial load and salesperson changes
+    if (isInitialLoad || (!isInitialLoad && invoiceData?.salespersonid)) {
       setCustomers([]);
       setCustomerPage(1);
       setCustomerQuery("");
-      fetchCustomers("", 1);
+      if (isInitialLoad) {
+        setIsInitialLoad(false);
+      }
     }
-  }, [invoiceData?.salespersonid, fetchCustomers, isInitialLoad]);
+  }, [invoiceData?.salespersonid, isInitialLoad]);
 
   const debouncedFetchCustomers = useMemo(
     () =>
       debounce((search: string) => {
+        setIsFetchingCustomers(true);
         setCustomerPage(1);
-        fetchCustomers(search, 1);
+        fetchCustomers(search, 1).finally(() => {
+          setIsFetchingCustomers(false);
+        });
       }, 300),
     [fetchCustomers]
   );
 
   // Handle search changes after initial load
   useEffect(() => {
-    if (!isInitialLoad && customerQuery !== undefined) {
+    if (customerQuery !== undefined) {
       debouncedFetchCustomers(customerQuery);
     }
-  }, [customerQuery, debouncedFetchCustomers, isInitialLoad]);
+  }, [customerQuery, debouncedFetchCustomers]);
 
   useEffect(() => {
     if (invoiceData) {
