@@ -54,8 +54,12 @@ export default function (pool) {
                   'code', od.code,
                   'quantity', od.quantity,
                   'price', od.price,
-                  'freeProduct', od.freeproduct,
-                  'returnProduct', od.returnproduct
+                  'freeProduct', od.freeProduct,
+                  'returnProduct', od.returnProduct,
+                  'description', od.description,
+                  'tax', od.tax,
+                  'discount', od.discount,
+                  'total', od.total
                 )
               ELSE NULL END
             ) FILTER (WHERE od.id IS NOT NULL),
@@ -70,7 +74,6 @@ export default function (pool) {
       let paramCounter = 1;
 
       if (startDate && endDate) {
-        // Ensure we're comparing bigint timestamps
         queryParams.push(startDate, endDate);
         query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
           paramCounter + 1
@@ -82,9 +85,19 @@ export default function (pool) {
 
       const result = await pool.query(query, queryParams);
 
+      // Transform results to ensure proper numeric values
       const transformedResults = result.rows.map((row) => ({
         ...row,
-        products: row.products || [],
+        products: (row.products || []).map((product) => ({
+          ...product,
+          price: parseFloat(product.price) || 0,
+          quantity: parseInt(product.quantity) || 0,
+          freeProduct: parseInt(product.freeProduct) || 0,
+          returnProduct: parseInt(product.returnProduct) || 0,
+          tax: parseFloat(product.tax) || 0,
+          discount: parseFloat(product.discount) || 0,
+          total: parseFloat(product.total) || 0,
+        })),
       }));
 
       res.json(transformedResults);
@@ -157,7 +170,7 @@ export default function (pool) {
         invoice.totaladjustment || 0,
       ]);
 
-      // Insert products
+      // Insert products with tax and discount
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
           INSERT INTO order_details (
@@ -165,22 +178,41 @@ export default function (pool) {
             code,
             price,
             quantity,
-            freeproduct,
-            returnproduct
+            freeProduct,
+            returnProduct,
+            description,
+            tax,
+            discount,
+            total
           )
-          VALUES ($1, $2, $3, $4, $5, $6)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `;
 
         for (const product of invoice.products) {
           if (!product.istotal && !product.issubtotal) {
-            // Skip total and subtotal rows
+            const quantity = product.quantity || 0;
+            const price = product.price || 0;
+            const freeProduct = product.freeProduct || 0;
+            const returnProduct = product.returnProduct || 0;
+            const tax = product.tax || 0;
+            const discount = product.discount || 0;
+
+            // Calculate total - this should match frontend calculation
+            const regularTotal = quantity * price;
+            const afterDiscount = regularTotal - discount;
+            const total = afterDiscount + tax;
+
             await client.query(productQuery, [
               invoice.id,
               product.code,
-              product.price || 0,
-              product.quantity || 0,
-              product.freeProduct || 0,
-              product.returnProduct || 0,
+              price,
+              quantity,
+              freeProduct,
+              returnProduct,
+              product.description || "",
+              tax,
+              discount,
+              total,
             ]);
           }
         }
@@ -211,7 +243,6 @@ export default function (pool) {
       await client.query("BEGIN");
 
       const invoice = req.body;
-      const originalId = req.body.originalId;
 
       // Validate required fields
       if (
@@ -225,42 +256,21 @@ export default function (pool) {
         );
       }
 
-      // If invoice number is changing, check for duplicates
-      if (originalId && originalId !== invoice.id) {
-        const checkDuplicateQuery = "SELECT id FROM invoices WHERE id = $1";
-        const duplicateCheck = await client.query(checkDuplicateQuery, [
-          invoice.id,
-        ]);
-
-        if (duplicateCheck.rows.length > 0) {
-          throw new Error(`Invoice number ${invoice.id} already exists`);
-        }
-
-        // Update the invoice ID first
-        const updateIdQuery = `
-        UPDATE invoices 
-        SET id = $1
-        WHERE id = $2
+      // Update invoice
+      const updateInvoiceQuery = `
+        UPDATE invoices SET
+          salespersonid = $1,
+          customerid = $2,
+          createddate = $3,
+          paymenttype = $4,
+          totalmee = $5,
+          totalbihun = $6,
+          totalnontaxable = $7,
+          totaltaxable = $8,
+          totaladjustment = $9
+        WHERE id = $10
         RETURNING *
       `;
-        await client.query(updateIdQuery, [invoice.id, originalId]);
-      }
-
-      // Update invoice using the appropriate ID
-      const updateInvoiceQuery = `
-      UPDATE invoices SET
-        salespersonid = $1,
-        customerid = $2,
-        createddate = $3,
-        paymenttype = $4,
-        totalmee = $5,
-        totalbihun = $6,
-        totalnontaxable = $7,
-        totaltaxable = $8,
-        totaladjustment = $9
-      WHERE id = $10
-      RETURNING *
-    `;
 
       const invoiceResult = await client.query(updateInvoiceQuery, [
         invoice.salespersonid,
@@ -279,42 +289,54 @@ export default function (pool) {
         throw new Error(`Invoice with ID ${invoice.id} not found`);
       }
 
-      // Update related order_details with new invoice ID if necessary
-      if (originalId && originalId !== invoice.id) {
-        await client.query(
-          "UPDATE order_details SET invoiceid = $1 WHERE invoiceid = $2",
-          [invoice.id, originalId]
-        );
-      }
-
       // Delete existing products
       await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
         invoice.id,
       ]);
 
-      // Insert updated products
+      // Insert updated products with tax and discount
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
-        INSERT INTO order_details (
-          invoiceid,
-          code,
-          price,
-          quantity,
-          freeproduct,
-          returnproduct
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `;
+          INSERT INTO order_details (
+            invoiceid,
+            code,
+            price,
+            quantity,
+            freeProduct,
+            returnProduct,
+            description,
+            tax,
+            discount,
+            total
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `;
 
         for (const product of invoice.products) {
           if (!product.istotal && !product.issubtotal) {
+            const quantity = product.quantity || 0;
+            const price = product.price || 0;
+            const freeProduct = product.freeProduct || 0;
+            const returnProduct = product.returnProduct || 0;
+            const tax = product.tax || 0;
+            const discount = product.discount || 0;
+
+            // Calculate total - this should match frontend calculation
+            const regularTotal = quantity * price;
+            const afterDiscount = regularTotal - discount;
+            const total = afterDiscount + tax;
+
             await client.query(productQuery, [
               invoice.id,
               product.code,
-              product.price || 0,
-              product.quantity || 0,
-              product.freeProduct || 0,
-              product.returnProduct || 0,
+              price,
+              quantity,
+              freeProduct,
+              returnProduct,
+              product.description || "",
+              tax,
+              discount,
+              total,
             ]);
           }
         }

@@ -52,7 +52,6 @@ const InvoisDetailsPage: React.FC = () => {
         totalnontaxable: 0,
         totaltaxable: 0,
         totaladjustment: 0,
-        customername: "",
       };
     }
     const data = location.state?.invoiceData;
@@ -108,12 +107,15 @@ const InvoisDetailsPage: React.FC = () => {
     }
 
     // Calculate regular product total
-    const regularTotal = item.quantity * item.price;
+    const regularTotal = (item.quantity || 0) * (item.price || 0);
+
     // Apply discount
     const afterDiscount = regularTotal - (item.discount || 0);
+
     // Add tax
     const afterTax = afterDiscount + (item.tax || 0);
-    // FOC items don't affect total
+
+    // Calculate final total
     return afterTax;
   };
 
@@ -377,11 +379,12 @@ const InvoisDetailsPage: React.FC = () => {
       returnProduct: 0,
       tax: 0,
       discount: 0,
+      total: "0",
       issubtotal: false,
       istotal: false,
     };
   }, [getAvailableProducts]);
-
+  
   const newRowAddedRef = useRef(false);
 
   // Reset newRowAddedRef after each render
@@ -852,54 +855,12 @@ const InvoisDetailsPage: React.FC = () => {
       header: "FOC",
       type: "number",
       width: 80,
-      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
-        <input
-          type="number"
-          min="0"
-          value={info.getValue() ?? 0}
-          onChange={(e) => {
-            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
-            const updatedProducts = invoiceData.products.map((product) => {
-              if (product.code === info.row.original.code) {
-                return {
-                  ...product,
-                  freeProduct: newValue,
-                };
-              }
-              return product;
-            });
-            handleChange(updatedProducts);
-          }}
-          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
-        />
-      ),
     },
     {
       id: "returnProduct",
       header: "RTN",
       type: "number",
       width: 80,
-      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
-        <input
-          type="number"
-          min="0"
-          value={info.getValue() ?? 0}
-          onChange={(e) => {
-            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
-            const updatedProducts = invoiceData.products.map((product) => {
-              if (product.code === info.row.original.code) {
-                return {
-                  ...product,
-                  returnProduct: newValue,
-                };
-              }
-              return product;
-            });
-            handleChange(updatedProducts);
-          }}
-          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
-        />
-      ),
     },
     {
       id: "discount",
