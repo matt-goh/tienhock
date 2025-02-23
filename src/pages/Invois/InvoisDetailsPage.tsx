@@ -109,10 +109,8 @@ const InvoisDetailsPage: React.FC = () => {
 
     // Calculate regular product total
     const regularTotal = item.quantity * item.price;
-    // Subtract returned items value
-    const returnCredit = item.returnProduct * item.price;
     // Apply discount
-    const afterDiscount = regularTotal - returnCredit - (item.discount || 0);
+    const afterDiscount = regularTotal - (item.discount || 0);
     // Add tax
     const afterTax = afterDiscount + (item.tax || 0);
     // FOC items don't affect total
@@ -224,22 +222,30 @@ const InvoisDetailsPage: React.FC = () => {
   ]);
 
   useEffect(() => {
-    // Fill in descriptions for existing products whenever products or invoiceData changes
     if (invoiceData?.products.length > 0 && products.length > 0) {
-      setInvoiceData((prev) => ({
-        ...prev,
-        products: prev.products.map((product) => {
-          const matchingProduct = products.find((p) => p.id === product.code);
-          return {
-            ...product,
-            description: matchingProduct
-              ? matchingProduct.description
-              : product.description,
-          };
-        }),
-      }));
+      const needsDescriptionUpdate = invoiceData.products.some(
+        (product) =>
+          !product.description &&
+          products.find((p) => p.id === product.code)?.description
+      );
+
+      if (needsDescriptionUpdate) {
+        setInvoiceData((prev) => ({
+          ...prev,
+          products: prev.products.map((product) => {
+            const matchingProduct = products.find((p) => p.id === product.code);
+            if (matchingProduct && !product.description) {
+              return {
+                ...product,
+                description: matchingProduct.description,
+              };
+            }
+            return product;
+          }),
+        }));
+      }
     }
-  }, [products, invoiceData?.products]);
+  }, [products]);
 
   const fetchSalesmen = useCallback(async () => {
     try {

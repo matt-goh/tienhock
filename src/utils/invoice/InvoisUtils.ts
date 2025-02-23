@@ -3,6 +3,7 @@ import {
   ExtendedInvoiceData,
   InvoiceData,
   InvoiceFilters,
+  ProductItem,
 } from "../../types/types";
 import { api } from "../../routes/utils/api";
 
@@ -20,22 +21,44 @@ export const createInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
-    // Filter out total rows before saving
-    const productsToSave = invoiceData.products.filter(
-      (product) => !product.istotal
-    );
+    // Ensure products array exists and filter out total/subtotal rows
+    const productsToSave = (invoiceData.products || [])
+      .filter((product) => !product.istotal && !product.issubtotal)
+      .map((product: ProductItem) => ({
+        code: product.code || "",
+        quantity: product.quantity || 0,
+        price: product.price || 0,
+        freeProduct: product.freeProduct || 0,
+        returnProduct: product.returnProduct || 0,
+        tax: product.tax || 0,
+        discount: product.discount || 0,
+        description: product.description || "",
+      }));
 
-    const invoiceToCreate = {
-      ...invoiceData,
+    const dataToSubmit = {
+      id: invoiceData.id,
+      salespersonid: invoiceData.salespersonid,
+      customerid: invoiceData.customerid,
+      customername: invoiceData.customername || invoiceData.customerName,
+      createddate: invoiceData.createddate,
+      paymenttype: invoiceData.paymenttype || "INVOICE",
+      totalmee: Number(invoiceData.totalmee || 0),
+      totalbihun: Number(invoiceData.totalbihun || 0),
+      totalnontaxable: Number(invoiceData.totalnontaxable || 0),
+      totaltaxable: Number(invoiceData.totaltaxable || 0),
+      totaladjustment: Number(invoiceData.totaladjustment || 0),
       products: productsToSave,
     };
 
-    const createdInvoice = await api.post(
-      "/api/invoices/submit",
-      invoiceToCreate
-    );
+    const response = await api.post("/api/invoices/submit", dataToSubmit);
 
-    return createdInvoice;
+    // Ensure we return a properly structured ExtendedInvoiceData
+    return {
+      ...response.invoice,
+      products: response.invoice.products || [],
+      customerName:
+        response.invoice.customername || response.invoice.customerid,
+    };
   } catch (error) {
     console.error("Error creating invoice:", error);
     const errorMessage =
