@@ -12,10 +12,7 @@ import {
   InvoiceData,
   InvoiceFilters,
 } from "../../types/types";
-import {
-  deleteInvoice,
-  getInvoices,
-} from "../../utils/invoice/InvoisUtils";
+import { deleteInvoice, getInvoices } from "../../utils/invoice/InvoisUtils";
 import {
   IconEye,
   IconPlus,
@@ -132,35 +129,43 @@ const InvoisPage: React.FC = () => {
 
   useEffect(() => {
     const fetchCustomerNames = async () => {
-      const newCustomerNames: Record<string, string> = {};
-
-      await Promise.all(
-        invoices.map(async (invoice) => {
-          // Only fetch if we don't already have this customer's name
-          if (!customerNames[invoice.customerid]) {
-            try {
-              const response = await api.get(
-                `/api/customers/name/${invoice.customerid}`
-              );
-              newCustomerNames[invoice.customerid] = response.name;
-            } catch (error) {
-              console.error(
-                `Error fetching customer name for ${invoice.customerid}:`,
-                error
-              );
-              newCustomerNames[invoice.customerid] = invoice.customerid;
-            }
-          }
-        })
+      const uniqueCustomerIds = Array.from(
+        new Set(invoices.map((invoice) => invoice.customerid))
       );
 
-      if (Object.keys(newCustomerNames).length > 0) {
-        setCustomerNames((prev) => ({ ...prev, ...newCustomerNames }));
+      const missingCustomerIds = uniqueCustomerIds.filter(
+        (id) => !(id in customerNames)
+      );
+
+      if (missingCustomerIds.length === 0) return;
+
+      try {
+        const customerNamesMap = await api.post("/api/customers/names", {
+          customerIds: missingCustomerIds,
+        });
+
+        setCustomerNames((prev) => ({
+          ...prev,
+          ...customerNamesMap,
+        }));
+      } catch (error) {
+        console.error("Error fetching customer names:", error);
+        const fallbackNames = missingCustomerIds.reduce<Record<string, string>>(
+          (map, id) => {
+            map[id] = id;
+            return map;
+          },
+          {}
+        );
+        setCustomerNames((prev) => ({
+          ...prev,
+          ...fallbackNames,
+        }));
       }
     };
 
     fetchCustomerNames();
-  }, [invoices, customerNames]);
+  }, [invoices]);
 
   const handleSelectionChange = useCallback(
     (count: number, allSelected: boolean, selectedRows: InvoiceData[]) => {
@@ -260,7 +265,6 @@ const InvoisPage: React.FC = () => {
     // Payment type filter
     if (filters.applyPaymentTypeFilter && filters.paymentType) {
       filtered = filtered.filter((invoice) => {
-        // Convert CASH/INVOICE to match the filter's Cash/Invoice format
         const invoiceType = invoice.paymenttype === "CASH" ? "Cash" : "Invoice";
         return invoiceType === filters.paymentType;
       });
@@ -433,7 +437,7 @@ const InvoisPage: React.FC = () => {
       id: "customerid",
       header: "Customer",
       type: "readonly",
-      width: 350,
+      width: 500,
       cell: (info: {
         getValue: () => any;
         row: { original: ExtendedInvoiceData };
