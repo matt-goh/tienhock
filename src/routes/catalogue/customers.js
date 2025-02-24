@@ -329,24 +329,37 @@ export default function (pool) {
         .json({ message: "Error processing customers", error: error.message });
     }
   });
+  
+  router.post("/names", async (req, res) => {
+    const { customerIds } = req.body;
 
-  // Add this new route in customers.js
-  router.get("/name/:id", async (req, res) => {
-    const { id } = req.params;
+    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+      return res
+        .status(400)
+        .json({
+          message: "Invalid input: customerIds must be a non-empty array",
+        });
+    }
 
     try {
-      const query = "SELECT name FROM customers WHERE id = $1";
-      const result = await pool.query(query, [id]);
+      const query = `
+      SELECT id, name 
+      FROM customers 
+      WHERE id = ANY($1)
+    `;
+      const result = await pool.query(query, [customerIds]);
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
+      // Transform the result into a key-value map for easier frontend use
+      const customerNamesMap = result.rows.reduce((map, row) => {
+        map[row.id] = row.name;
+        return map;
+      }, {});
 
-      res.json({ name: result.rows[0].name });
+      res.json(customerNamesMap);
     } catch (error) {
-      console.error("Error fetching customer name:", error);
+      console.error("Error fetching customer names:", error);
       res.status(500).json({
-        message: "Error fetching customer name",
+        message: "Error fetching customer names",
         error: error.message,
       });
     }

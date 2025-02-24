@@ -23,13 +23,13 @@ const TienHockLogo: React.FC<TienHockLogoProps> = ({
       <defs>
         <filter id="c" x="0%" y="0%" width="100%" height="100%">
           <feColorMatrix
-            color-interpolation-filters="sRGB"
+            colorInterpolationFilters="sRGB"
             values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"
           />
         </filter>
         <filter id="b" x="0%" y="0%" width="100%" height="100%">
           <feColorMatrix
-            color-interpolation-filters="sRGB"
+            colorInterpolationFilters="sRGB"
             values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.2126 0.7152 0.0722 0 0"
           />
         </filter>
