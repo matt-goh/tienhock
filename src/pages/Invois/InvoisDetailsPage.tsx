@@ -576,6 +576,7 @@ const InvoisDetailsPage: React.FC = () => {
               discount: product.discount || 0,
               total: product.total,
               description: product.description,
+              issubtotal: product.issubtotal || false,
             }));
 
           const dataToSave: ExtendedInvoiceData = {

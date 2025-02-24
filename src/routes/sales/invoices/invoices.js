@@ -59,9 +59,12 @@ export default function (pool) {
                   'description', od.description,
                   'tax', od.tax,
                   'discount', od.discount,
-                  'total', od.total
+                  'total', od.total,
+                  'issubtotal', od.issubtotal,
+                  'istotal', false
                 )
               ELSE NULL END
+              ORDER BY od.id  -- Maintain order of products and subtotals
             ) FILTER (WHERE od.id IS NOT NULL),
             '[]'::json
           ) as products
@@ -85,11 +88,12 @@ export default function (pool) {
 
       const result = await pool.query(query, queryParams);
 
-      // Transform results to ensure proper numeric values
+      // Transform results and ensure numeric values
       const transformedResults = result.rows.map((row) => ({
         ...row,
         products: (row.products || []).map((product) => ({
           ...product,
+          uid: crypto.randomUUID(),
           price: parseFloat(product.price) || 0,
           quantity: parseInt(product.quantity) || 0,
           freeProduct: parseInt(product.freeProduct) || 0,
@@ -97,6 +101,7 @@ export default function (pool) {
           tax: parseFloat(product.tax) || 0,
           discount: parseFloat(product.discount) || 0,
           total: parseFloat(product.total) || 0,
+          issubtotal: Boolean(product.issubtotal),
         })),
       }));
 
@@ -170,7 +175,7 @@ export default function (pool) {
         invoice.totaladjustment || 0,
       ]);
 
-      // Insert products with tax and discount
+      // Insert all products including subtotal rows
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
           INSERT INTO order_details (
@@ -183,13 +188,30 @@ export default function (pool) {
             description,
             tax,
             discount,
-            total
+            total,
+            issubtotal
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `;
 
         for (const product of invoice.products) {
-          if (!product.istotal && !product.issubtotal) {
+          if (product.issubtotal) {
+            // For subtotal rows, store as is
+            await client.query(productQuery, [
+              invoice.id,
+              product.code || "SUBTOTAL",
+              0,
+              0,
+              0,
+              0,
+              product.description || "Subtotal",
+              0,
+              0,
+              product.total || "0",
+              true,
+            ]);
+          } else {
+            // For regular products, calculate total
             const quantity = product.quantity || 0;
             const price = product.price || 0;
             const freeProduct = product.freeProduct || 0;
@@ -197,7 +219,6 @@ export default function (pool) {
             const tax = product.tax || 0;
             const discount = product.discount || 0;
 
-            // Calculate total - this should match frontend calculation
             const regularTotal = quantity * price;
             const afterDiscount = regularTotal - discount;
             const total = afterDiscount + tax;
@@ -213,15 +234,23 @@ export default function (pool) {
               tax,
               discount,
               total,
+              false,
             ]);
           }
         }
       }
 
       await client.query("COMMIT");
+
+      // Return the complete invoice with all products
+      const completeInvoice = {
+        ...invoiceResult.rows[0],
+        products: invoice.products,
+      };
+
       res.status(201).json({
         message: "Invoice created successfully",
-        invoice: invoiceResult.rows[0],
+        invoice: completeInvoice,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -258,19 +287,19 @@ export default function (pool) {
 
       // Update invoice
       const updateInvoiceQuery = `
-        UPDATE invoices SET
-          salespersonid = $1,
-          customerid = $2,
-          createddate = $3,
-          paymenttype = $4,
-          totalmee = $5,
-          totalbihun = $6,
-          totalnontaxable = $7,
-          totaltaxable = $8,
-          totaladjustment = $9
-        WHERE id = $10
-        RETURNING *
-      `;
+      UPDATE invoices SET
+        salespersonid = $1,
+        customerid = $2,
+        createddate = $3,
+        paymenttype = $4,
+        totalmee = $5,
+        totalbihun = $6,
+        totalnontaxable = $7,
+        totaltaxable = $8,
+        totaladjustment = $9
+      WHERE id = $10
+      RETURNING *
+    `;
 
       const invoiceResult = await client.query(updateInvoiceQuery, [
         invoice.salespersonid,
@@ -294,26 +323,43 @@ export default function (pool) {
         invoice.id,
       ]);
 
-      // Insert updated products with tax and discount
+      // Insert updated products including subtotals
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
-          INSERT INTO order_details (
-            invoiceid,
-            code,
-            price,
-            quantity,
-            freeProduct,
-            returnProduct,
-            description,
-            tax,
-            discount,
-            total
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `;
+        INSERT INTO order_details (
+          invoiceid,
+          code,
+          price,
+          quantity,
+          freeProduct,
+          returnProduct,
+          description,
+          tax,
+          discount,
+          total,
+          issubtotal
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `;
 
         for (const product of invoice.products) {
-          if (!product.istotal && !product.issubtotal) {
+          if (product.issubtotal) {
+            // Insert subtotal row
+            await client.query(productQuery, [
+              invoice.id,
+              product.code || "SUBTOTAL",
+              0, // price
+              0, // quantity
+              0, // freeProduct
+              0, // returnProduct
+              product.description || "Subtotal",
+              0, // tax
+              0, // discount
+              product.total || "0",
+              true, // issubtotal
+            ]);
+          } else if (!product.istotal) {
+            // Insert regular product
             const quantity = product.quantity || 0;
             const price = product.price || 0;
             const freeProduct = product.freeProduct || 0;
@@ -321,7 +367,6 @@ export default function (pool) {
             const tax = product.tax || 0;
             const discount = product.discount || 0;
 
-            // Calculate total - this should match frontend calculation
             const regularTotal = quantity * price;
             const afterDiscount = regularTotal - discount;
             const total = afterDiscount + tax;
@@ -337,8 +382,10 @@ export default function (pool) {
               tax,
               discount,
               total,
+              false, // issubtotal
             ]);
           }
+          // Total rows are not inserted as they are calculated
         }
       }
 

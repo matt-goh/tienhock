@@ -21,9 +21,9 @@ export const createInvoice = async (
       throw new Error("Duplicate invoice number");
     }
 
-    // Ensure products array exists and filter out total/subtotal rows
+    // Only filter out the total row, keep subtotals
     const productsToSave = (invoiceData.products || [])
-      .filter((product) => !product.istotal && !product.issubtotal)
+      .filter((product) => !product.istotal)
       .map((product: ProductItem) => ({
         code: product.code || "",
         quantity: product.quantity || 0,
@@ -33,6 +33,8 @@ export const createInvoice = async (
         tax: product.tax || 0,
         discount: product.discount || 0,
         description: product.description || "",
+        issubtotal: product.issubtotal || false,
+        total: product.total || "0",
       }));
 
     const dataToSubmit = {
@@ -52,12 +54,15 @@ export const createInvoice = async (
 
     const response = await api.post("/api/invoices/submit", dataToSubmit);
 
-    // Ensure we return a properly structured ExtendedInvoiceData
+    // Ensure we're getting the correct properties from response
+    const savedInvoice = response.invoice || response;
     return {
-      ...response.invoice,
-      products: response.invoice.products || [],
-      customerName:
-        response.invoice.customername || response.invoice.customerid,
+      ...savedInvoice,
+      products: (savedInvoice.products || []).map((product: ProductItem) => ({
+        ...product,
+        uid: crypto.randomUUID(),
+      })),
+      customerName: savedInvoice.customername || savedInvoice.customerid,
     };
   } catch (error) {
     console.error("Error creating invoice:", error);
@@ -132,35 +137,42 @@ export const updateInvoice = async (
       throw new Error("Cannot update invoice: missing ID");
     }
 
-    // Normalize products data
-    const normalizedProducts = invoice.products.map((product) => ({
-      code: product.code,
-      quantity: product.quantity || 0,
-      price: product.price || 0,
-      freeProduct: product.freeProduct || 0,
-      returnProduct: product.returnProduct || 0,
-      tax: product.tax || 0,
-      discount: product.discount || 0,
-      description: product.description || "",
-      issubtotal: product.issubtotal || false,
-      istotal: product.istotal || false,
-    }));
-
-    // Remove special rows before saving
-    const productsToSave = normalizedProducts.filter(
-      (product) => !product.istotal && !product.issubtotal
-    );
+    // Keep subtotal rows but filter out total row
+    const productsToSave = invoice.products
+      .filter((product) => !product.istotal)
+      .map((product) => ({
+        code: product.code,
+        quantity: product.quantity || 0,
+        price: product.price || 0,
+        freeProduct: product.freeProduct || 0,
+        returnProduct: product.returnProduct || 0,
+        tax: product.tax || 0,
+        discount: product.discount || 0,
+        description: product.description || "",
+        issubtotal: product.issubtotal || false,
+        total: product.total || "0",
+      }));
 
     const invoiceToSave = {
       ...invoice,
-      originalId: invoice.originalId, // Include the original ID if we're changing invoice numbers
+      originalId: invoice.originalId,
       products: productsToSave,
     };
 
-    // Send to update endpoint
-    const savedInvoice = await api.post("/api/invoices/update", invoiceToSave);
+    const response = await api.post("/api/invoices/update", invoiceToSave);
 
-    return savedInvoice;
+    const savedInvoice = response.invoice || response;
+
+    return {
+      ...savedInvoice,
+      products: (savedInvoice.products || invoice.products).map(
+        (product: ProductItem) => ({
+          ...product,
+          uid: crypto.randomUUID(),
+        })
+      ),
+      customerName: savedInvoice.customerid || "",
+    };
   } catch (error) {
     console.error("Error updating invoice:", error);
     const errorMessage =
@@ -178,12 +190,10 @@ export const deleteInvoice = async (id: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error("Error deleting invoice:", error);
-
     const errorMessage =
       error instanceof Error
         ? error.message
         : "An unknown error occurred while deleting the invoice";
-
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }
@@ -197,7 +207,6 @@ export const checkDuplicateInvoiceNo = async (
       `/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
     );
 
-    // Handle both possible response formats
     if (response && typeof response === "object") {
       if ("isDuplicate" in response) {
         return response.isDuplicate;
@@ -206,17 +215,14 @@ export const checkDuplicateInvoiceNo = async (
         response.message === "Invoice number is required"
       ) {
         toast.error("Invoice number is required");
-        return true; // Prevent creation if no invoice number
+        return true;
       }
     }
 
-    // If response format is unexpected, log it for debugging
     console.error("Unexpected response format:", response);
     throw new Error("Invalid response format from server");
   } catch (error) {
     console.error("Error checking for duplicate invoice number:", error);
-
-    // Only show toast for network/server errors
     if (
       error instanceof Error &&
       error.message !== "Invalid response format from server"
@@ -225,8 +231,6 @@ export const checkDuplicateInvoiceNo = async (
         "Failed to check for duplicate invoice number. Please try again."
       );
     }
-
-    // Re-throw the error to be handled by the caller
     throw error;
   }
 };
