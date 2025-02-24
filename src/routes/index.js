@@ -2,7 +2,6 @@
 
 // Auth routes
 import authRouter from "./auth/auth.js";
-import publicRouter from './public/public.js';
 import sessionsRouter from "./auth/sessions.js";
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -63,9 +62,6 @@ export default function setupRoutes(app, pool) {
     MYINVOIS_CLIENT_ID,
     MYINVOIS_CLIENT_SECRET,
   };
-
-  // Test route
-  app.use('/api/public', publicRouter(pool));
   
   // Auth routes
   app.use("/api/auth", authRouter(pool));
