@@ -292,7 +292,6 @@ export interface TableProps<T> {
   initialData: T[];
   columns: ColumnConfig[];
   onShowDeleteButton?: (show: boolean) => void;
-  onSpecialRowDelete?: (rowType: "less" | "tax") => void;
   onSelectionChange?: (
     count: number,
     allSelected: boolean,
