@@ -264,6 +264,164 @@ export default function (pool) {
     }
   });
 
+  // Submit invoices (single or batch)
+  router.post("/submit-invoices", async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Convert input to array if single invoice
+      const invoices = Array.isArray(req.body) ? req.body : [req.body];
+
+      const results = [];
+      const errors = [];
+
+      // Process each invoice
+      for (const invoice of invoices) {
+        try {
+          // Transform data to match database columns
+          const transformedInvoice = {
+            id: invoice.billNumber.toString(),
+            salespersonid: invoice.salespersonId,
+            customerid: invoice.customerId,
+            createddate: invoice.createdDate,
+            paymenttype: invoice.paymentType,
+            totalmee: invoice.totalMee || 0,
+            totalbihun: invoice.totalBihun || 0,
+            totalnontaxable: invoice.totalNonTaxable || 0,
+            totaltaxable: invoice.totalTaxable || 0,
+            totaladjustment: invoice.totalAdjustment || 0,
+          };
+
+          // Validate required fields
+          if (
+            !transformedInvoice.id ||
+            !transformedInvoice.customerid ||
+            !transformedInvoice.createddate
+          ) {
+            throw new Error(
+              `Invoice ${transformedInvoice.id}: Missing required fields`
+            );
+          }
+
+          // Check for duplicate invoice
+          const checkQuery = "SELECT id FROM invoices WHERE id = $1";
+          const checkResult = await client.query(checkQuery, [
+            transformedInvoice.id,
+          ]);
+          if (checkResult.rows.length > 0) {
+            throw new Error(`Invoice ${transformedInvoice.id} already exists`);
+          }
+
+          // Insert invoice
+          const insertInvoiceQuery = `
+          INSERT INTO invoices (
+            id,
+            salespersonid,
+            customerid,
+            createddate,
+            paymenttype,
+            totalmee,
+            totalbihun,
+            totalnontaxable,
+            totaltaxable,
+            totaladjustment
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
+
+          // Insert products
+          if (invoice.products && invoice.products.length > 0) {
+            const productQuery = `
+            INSERT INTO order_details (
+              invoiceid,
+              code,
+              price,
+              quantity,
+              freeProduct,
+              returnProduct,
+              tax,
+              discount,
+              total
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `;
+
+            for (const product of invoice.products) {
+              // Skip products with zero quantity and price
+              if (product.quantity === 0 && product.price === 0) continue;
+
+              const quantity = product.quantity || 0;
+              const price = product.price || 0;
+              const freeProduct = product.freeProduct || 0;
+              const returnProduct = product.returnProduct || 0;
+              const tax = product.tax || 0;
+              const discount = product.discount || 0;
+
+              // Calculate total
+              const regularTotal = quantity * price;
+              const afterDiscount = regularTotal - discount;
+              const total = afterDiscount + tax;
+
+              await client.query(productQuery, [
+                transformedInvoice.id,
+                product.code,
+                price,
+                quantity,
+                freeProduct,
+                returnProduct,
+                tax,
+                discount,
+                total,
+              ]);
+            }
+          }
+
+          results.push({
+            billNumber: transformedInvoice.id,
+            status: "success",
+            message: "Invoice created successfully",
+          });
+        } catch (error) {
+          errors.push({
+            billNumber: invoice.billNumber,
+            status: "error",
+            message: error.message,
+          });
+        }
+      }
+
+      // If all invoices failed, rollback and return error
+      if (errors.length === invoices.length) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "All invoices failed to process",
+          errors,
+        });
+      }
+
+      // Otherwise commit successful transactions
+      await client.query("COMMIT");
+
+      // Return response with results and any errors
+      res.status(207).json({
+        message: "Invoice processing completed",
+        results,
+        errors: errors.length > 0 ? errors : undefined,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error processing invoices:", error);
+      res.status(500).json({
+        message: "Error processing invoices",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // Update existing invoice
   router.post("/update", async (req, res) => {
     const client = await pool.connect();

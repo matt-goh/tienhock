@@ -80,7 +80,7 @@ const InvoisDetailsPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const { products, isLoading: isLoadingProducts } = useProductsCache();
+  const { products } = useProductsCache();
 
   useEffect(() => {
     console.log(invoiceData);
