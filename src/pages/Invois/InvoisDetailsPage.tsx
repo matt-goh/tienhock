@@ -306,46 +306,6 @@ const InvoisDetailsPage: React.FC = () => {
     return addTotalRow(regularItems, totalAmount);
   }, [invoiceData, calculateOverallTotal, addTotalRow]);
 
-  const recalculateSubtotals = (details: ProductItem[]): ProductItem[] => {
-    const result: ProductItem[] = [];
-    let runningTotal = 0;
-
-    // First pass: calculate running total and maintain order
-    for (const item of details) {
-      if (item.issubtotal) {
-        // When we hit a subtotal, add it with the current running total
-        result.push({
-          ...item,
-          total: runningTotal.toFixed(2),
-        });
-        // Don't reset running total - it should continue accumulating
-      } else {
-        // Add the non-subtotal item as-is
-        result.push(item);
-        // Update running total for non-total rows
-        if (!item.istotal) {
-          runningTotal += calculateTotal(item);
-        }
-      }
-    }
-
-    return result;
-  };
-
-  const handleSpecialRowDelete = (code: string) => {
-    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
-      // Filter out the row with the given code
-      const newProducts = prevData.products.filter(
-        (item) => item.code !== code
-      );
-
-      return {
-        ...prevData,
-        products: newProducts,
-      };
-    });
-  };
-
   const getAvailableProducts = useCallback(() => {
     // If no products are available for new selection,
     // return all products to start over
@@ -384,7 +344,7 @@ const InvoisDetailsPage: React.FC = () => {
       istotal: false,
     };
   }, [getAvailableProducts]);
-  
+
   const newRowAddedRef = useRef(false);
 
   // Reset newRowAddedRef after each render
@@ -400,40 +360,99 @@ const InvoisDetailsPage: React.FC = () => {
           // Filter out total row from updated items
           const filteredItems = updatedItems.filter((item) => !item.istotal);
 
+          // Map items and handle new rows
           let updatedProducts = filteredItems.map((item) => {
             // If this is a new row (no uid), create it with a random product
             if (!item.uid) {
-              const newItem = addNewRow();
-              if (newItem) {
-                return {
-                  ...newItem,
-                  uid: crypto.randomUUID(),
-                };
-              }
+              const availableProducts = getAvailableProducts();
+              const randomProduct =
+                availableProducts[
+                  Math.floor(Math.random() * availableProducts.length)
+                ];
+              return {
+                ...item,
+                uid: crypto.randomUUID(),
+                code: randomProduct.id,
+                description: randomProduct.description,
+              };
             }
             return item;
           });
 
-          // Handle new rows added through TableEditing
+          // Initialize variables for recalculation
+          let recalculatedProducts: ProductItem[] = [];
+          let currentSubtotalSum = 0;
+
+          // Process each product and calculate subtotals
+          updatedProducts.forEach((item) => {
+            if (item.issubtotal) {
+              // When we hit a subtotal row, add it with the accumulated sum
+              recalculatedProducts.push({
+                ...item,
+                total: currentSubtotalSum.toFixed(2),
+              });
+            } else {
+              // For regular products, calculate their total and add to current sum
+              const regularTotal = (item.quantity || 0) * (item.price || 0);
+              const afterDiscount = regularTotal - (item.discount || 0);
+              const productTotal = afterDiscount + (item.tax || 0);
+              currentSubtotalSum += productTotal;
+
+              recalculatedProducts.push({
+                ...item,
+                total: productTotal.toFixed(2),
+              });
+            }
+          });
+
+          // Calculate final total
+          const grandTotal = recalculatedProducts.reduce((sum, item) => {
+            if (item.issubtotal) return sum;
+            const regularTotal = (item.quantity || 0) * (item.price || 0);
+            const afterDiscount = regularTotal - (item.discount || 0);
+            return sum + (afterDiscount + (item.tax || 0));
+          }, 0);
+
+          // Add the total row
+          const productsWithTotal = [
+            ...recalculatedProducts,
+            {
+              uid: crypto.randomUUID(),
+              code: "",
+              description: "Total:",
+              quantity: 0,
+              price: 0,
+              freeProduct: 0,
+              returnProduct: 0,
+              tax: 0,
+              discount: 0,
+              total: grandTotal.toFixed(2),
+              istotal: true,
+              issubtotal: false,
+            },
+          ];
+
+          // If this is a new row addition
           if (newRowAddedRef.current) {
             const newItem = addNewRow();
             if (newItem) {
-              updatedProducts = [...updatedProducts, newItem];
+              productsWithTotal.splice(
+                productsWithTotal.length - 1,
+                0,
+                newItem
+              );
             }
           }
-
-          // Add total row back
-          const total = calculateOverallTotal(updatedProducts).toFixed(2);
-          const productsWithTotal = addTotalRow(updatedProducts, total);
 
           return {
             ...prevData,
             products: productsWithTotal,
+            totalnontaxable: grandTotal,
           };
         });
       }, 0);
     },
-    [calculateOverallTotal, addNewRow, addTotalRow]
+    [addNewRow, getAvailableProducts]
   );
 
   const handleAddSubtotal = () => {
@@ -1116,7 +1135,6 @@ const InvoisDetailsPage: React.FC = () => {
             initialData={orderDetailsWithTotal}
             columns={productColumns}
             onChange={handleChange}
-            onSpecialRowDelete={handleSpecialRowDelete}
             tableKey="orderDetails"
           />
         </>

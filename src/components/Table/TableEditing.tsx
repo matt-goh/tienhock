@@ -52,7 +52,6 @@ function TableEditing<T extends Record<string, any>>({
   ref,
   initialData,
   columns,
-  onSpecialRowDelete,
   onSelectionChange,
   onClearSelection,
   onChange,
@@ -669,17 +668,8 @@ function TableEditing<T extends Record<string, any>>({
         // Filter out the row to delete while maintaining original order
         const filteredData = prevData.filter((row, idx) => {
           if (row.istotal) return false; // Remove total row (we'll add it back)
-          if (rowToDelete.isless || rowToDelete.istax) {
-            // For special rows, filter by code
-            if (onSpecialRowDelete && row.code === rowToDelete.code) {
-              onSpecialRowDelete(row.code);
-              return false;
-            }
-            return true;
-          } else {
-            // For regular and subtotal rows, filter by index
-            return idx !== rowIndex;
-          }
+
+          return idx !== rowIndex;
         });
 
         // Recalculate subtotals while maintaining order
@@ -693,7 +683,7 @@ function TableEditing<T extends Record<string, any>>({
         return totalRow ? [...recalculatedData, totalRow] : recalculatedData;
       });
     },
-    [data, onChange, onSpecialRowDelete, recalculateSubtotals]
+    [data, onChange, recalculateSubtotals]
   );
 
   const allColumns = useMemo(() => columns, [columns]);
