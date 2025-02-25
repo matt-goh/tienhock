@@ -657,7 +657,7 @@ export default function (pool) {
   });
 
   // Delete invoice from database
-  router.delete("/db/:id", async (req, res) => {
+  router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
 
