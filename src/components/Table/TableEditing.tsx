@@ -1284,16 +1284,10 @@ function TableEditing<T extends Record<string, any>>({
       if (!row || row.original.istotal || row.original.isSubtotalQty) return;
 
       const column = columns[cellIndex];
-      const isEditableSpecialRow =
-        (row.original.isless || row.original.istax) &&
-        (cellIndex === 1 || cellIndex === columns.length - 2);
       const isEditableRegularRow =
-        !row.original.isless &&
-        !row.original.istax &&
-        !row.original.issubtotal &&
-        isEditableColumn(column);
+        !row.original.issubtotal && isEditableColumn(column);
 
-      if (isEditableSpecialRow || isEditableRegularRow) {
+      if (isEditableRegularRow) {
         setEditableRowId(rowId);
         setEditableCellIndex(cellIndex);
         setSelectedRowId(rowId);

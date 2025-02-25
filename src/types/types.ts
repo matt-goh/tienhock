@@ -307,21 +307,6 @@ export interface TableProps<T> {
   tableKey?: string;
 }
 
-export interface ProductItem {
-  uid?: string;
-  code: string;
-  price: number;
-  quantity: number;
-  description?: string;
-  freeProduct: number;
-  returnProduct: number;
-  tax: number;
-  discount: number;
-  total?: string;
-  issubtotal?: boolean;
-  istotal?: boolean;
-}
-
 // Product row interface for UI with all possible states
 export interface ExtendedProductItem extends ProductItem {
   description?: string;
@@ -338,11 +323,9 @@ export interface InvoiceData {
   createddate: string;
   paymenttype: string;
   products: ProductItem[];
-  totalmee: number;
-  totalbihun: number;
-  totalnontaxable: number;
-  totaltaxable: number;
-  totaladjustment: number;
+  amount: number;
+  rounding: number;
+  totalamountpayable: number;
 }
 
 // Extended invoice for UI
@@ -352,12 +335,19 @@ export interface ExtendedInvoiceData extends InvoiceData {
   originalId?: string;
 }
 
-// Helper type for special rows
-export interface SpecialRow {
+export interface ProductItem {
+  uid?: string;
   code: string;
-  description: string;
-  amount: number;
-  type: "subtotal";
+  price: number;
+  quantity: number;
+  description?: string;
+  freeProduct: number;
+  returnProduct: number;
+  tax: number;
+  discount: number;
+  total?: string;
+  issubtotal?: boolean;
+  istotal?: boolean;
 }
 
 export interface Employee {

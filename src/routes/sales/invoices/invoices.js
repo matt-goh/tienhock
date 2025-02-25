@@ -42,11 +42,9 @@ export default function (pool) {
           i.customerid,
           i.createddate,
           i.paymenttype,
-          i.totalmee,
-          i.totalbihun,
-          i.totalnontaxable,
-          i.totaltaxable,
-          i.totaladjustment,
+          i.amount,
+          i.rounding,
+          i.totalamountpayable,
           COALESCE(
             json_agg(
               CASE WHEN od.id IS NOT NULL THEN 
@@ -54,8 +52,8 @@ export default function (pool) {
                   'code', od.code,
                   'quantity', od.quantity,
                   'price', od.price,
-                  'freeProduct', od.freeProduct,
-                  'returnProduct', od.returnProduct,
+                  'freeProduct', od.freeproduct,
+                  'returnProduct', od.returnproduct,
                   'description', od.description,
                   'tax', od.tax,
                   'discount', od.discount,
@@ -103,6 +101,10 @@ export default function (pool) {
           total: parseFloat(product.total) || 0,
           issubtotal: Boolean(product.issubtotal),
         })),
+        // Ensure numeric values for new fields
+        amount: parseFloat(row.amount) || 0,
+        rounding: parseFloat(row.rounding) || 0,
+        totalamountpayable: parseFloat(row.totalamountpayable) || 0,
       }));
 
       res.json(transformedResults);
@@ -144,7 +146,7 @@ export default function (pool) {
         throw new Error(`Invoice with ID ${invoice.id} already exists`);
       }
 
-      // Insert invoice
+      // Insert invoice with new fields
       const insertInvoiceQuery = `
         INSERT INTO invoices (
           id,
@@ -152,13 +154,11 @@ export default function (pool) {
           customerid,
           createddate,
           paymenttype,
-          totalmee,
-          totalbihun,
-          totalnontaxable,
-          totaltaxable,
-          totaladjustment
+          amount,
+          rounding,
+          totalamountpayable
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `;
 
@@ -168,11 +168,9 @@ export default function (pool) {
         invoice.customerid,
         invoice.createddate,
         invoice.paymenttype || "INVOICE",
-        invoice.totalmee || 0,
-        invoice.totalbihun || 0,
-        invoice.totalnontaxable || 0,
-        invoice.totaltaxable || 0,
-        invoice.totaladjustment || 0,
+        invoice.amount || 0,
+        invoice.rounding || 0,
+        invoice.totalamountpayable || 0,
       ]);
 
       // Insert all products including subtotal rows
@@ -183,8 +181,8 @@ export default function (pool) {
             code,
             price,
             quantity,
-            freeProduct,
-            returnProduct,
+            freeproduct,
+            returnproduct,
             description,
             tax,
             discount,
@@ -211,7 +209,7 @@ export default function (pool) {
               true,
             ]);
           } else {
-            // For regular products, calculate total
+            // For regular products, calculate total if not provided
             const quantity = product.quantity || 0;
             const price = product.price || 0;
             const freeProduct = product.freeProduct || 0;
@@ -284,21 +282,15 @@ export default function (pool) {
             id: invoice.billNumber.toString(),
             salespersonid: invoice.salespersonId,
             customerid: invoice.customerId,
-            createddate: invoice.createdDate,
+            createddate: invoice.createddate, // Default to current time if not provided
             paymenttype: invoice.paymentType,
-            totalmee: invoice.totalMee || 0,
-            totalbihun: invoice.totalBihun || 0,
-            totalnontaxable: invoice.totalNonTaxable || 0,
-            totaltaxable: invoice.totalTaxable || 0,
-            totaladjustment: invoice.totalAdjustment || 0,
+            amount: invoice.amount || 0,
+            rounding: invoice.rounding || 0,
+            totalamountpayable: invoice.totalAmountPayable || 0,
           };
 
           // Validate required fields
-          if (
-            !transformedInvoice.id ||
-            !transformedInvoice.customerid ||
-            !transformedInvoice.createddate
-          ) {
+          if (!transformedInvoice.id || !transformedInvoice.customerid) {
             throw new Error(
               `Invoice ${transformedInvoice.id}: Missing required fields`
             );
@@ -315,38 +307,34 @@ export default function (pool) {
 
           // Insert invoice
           const insertInvoiceQuery = `
-          INSERT INTO invoices (
-            id,
-            salespersonid,
-            customerid,
-            createddate,
-            paymenttype,
-            totalmee,
-            totalbihun,
-            totalnontaxable,
-            totaltaxable,
-            totaladjustment
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          RETURNING *
-        `;
+            INSERT INTO invoices (
+              id,
+              salespersonid,
+              customerid,
+              createddate,
+              paymenttype,
+              amount,
+              rounding,
+              totalamountpayable
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+          `;
 
           // Insert products
           if (invoice.products && invoice.products.length > 0) {
             const productQuery = `
-            INSERT INTO order_details (
-              invoiceid,
-              code,
-              price,
-              quantity,
-              freeProduct,
-              returnProduct,
-              tax,
-              discount,
-              total
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          `;
+              INSERT INTO order_details (
+                invoiceid,
+                code,
+                price,
+                quantity,
+                freeproduct,
+                returnproduct,
+                total
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `;
 
             for (const product of invoice.products) {
               // Skip products with zero quantity and price
@@ -356,13 +344,9 @@ export default function (pool) {
               const price = product.price || 0;
               const freeProduct = product.freeProduct || 0;
               const returnProduct = product.returnProduct || 0;
-              const tax = product.tax || 0;
-              const discount = product.discount || 0;
 
               // Calculate total
-              const regularTotal = quantity * price;
-              const afterDiscount = regularTotal - discount;
-              const total = afterDiscount + tax;
+              const total = quantity * price;
 
               await client.query(productQuery, [
                 transformedInvoice.id,
@@ -371,8 +355,6 @@ export default function (pool) {
                 quantity,
                 freeProduct,
                 returnProduct,
-                tax,
-                discount,
                 total,
               ]);
             }
@@ -443,19 +425,17 @@ export default function (pool) {
         );
       }
 
-      // Update invoice
+      // Update invoice with new fields
       const updateInvoiceQuery = `
       UPDATE invoices SET
         salespersonid = $1,
         customerid = $2,
         createddate = $3,
         paymenttype = $4,
-        totalmee = $5,
-        totalbihun = $6,
-        totalnontaxable = $7,
-        totaltaxable = $8,
-        totaladjustment = $9
-      WHERE id = $10
+        amount = $5,
+        rounding = $6,
+        totalamountpayable = $7
+      WHERE id = $8
       RETURNING *
     `;
 
@@ -464,11 +444,9 @@ export default function (pool) {
         invoice.customerid,
         invoice.createddate,
         invoice.paymenttype || "INVOICE",
-        invoice.totalmee || 0,
-        invoice.totalbihun || 0,
-        invoice.totalnontaxable || 0,
-        invoice.totaltaxable || 0,
-        invoice.totaladjustment || 0,
+        invoice.amount || 0,
+        invoice.rounding || 0,
+        invoice.totalamountpayable || 0,
         invoice.id,
       ]);
 
@@ -489,8 +467,8 @@ export default function (pool) {
           code,
           price,
           quantity,
-          freeProduct,
-          returnProduct,
+          freeproduct,
+          returnproduct,
           description,
           tax,
           discount,
