@@ -187,7 +187,7 @@ export const updateInvoice = async (
 
 export const deleteInvoice = async (id: string): Promise<boolean> => {
   try {
-    await api.delete(`/api/invoices/db/${id}`);
+    await api.delete(`/api/invoices/${id}`);
     return true;
   } catch (error) {
     console.error("Error deleting invoice:", error);
