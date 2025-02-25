@@ -44,11 +44,9 @@ export const createInvoice = async (
       customername: invoiceData.customername || invoiceData.customerName,
       createddate: invoiceData.createddate,
       paymenttype: invoiceData.paymenttype || "INVOICE",
-      totalmee: Number(invoiceData.totalmee || 0),
-      totalbihun: Number(invoiceData.totalbihun || 0),
-      totalnontaxable: Number(invoiceData.totalnontaxable || 0),
-      totaltaxable: Number(invoiceData.totaltaxable || 0),
-      totaladjustment: Number(invoiceData.totaladjustment || 0),
+      amount: Number(invoiceData.amount || 0),
+      rounding: Number(invoiceData.rounding || 0),
+      totalamountpayable: Number(invoiceData.totalamountpayable || 0),
       products: productsToSave,
     };
 
@@ -156,6 +154,9 @@ export const updateInvoice = async (
     const invoiceToSave = {
       ...invoice,
       originalId: invoice.originalId,
+      amount: Number(invoice.amount || 0),
+      rounding: Number(invoice.rounding || 0),
+      totalamountpayable: Number(invoice.totalamountpayable || 0),
       products: productsToSave,
     };
 

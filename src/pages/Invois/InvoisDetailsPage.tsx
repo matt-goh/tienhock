@@ -47,11 +47,9 @@ const InvoisDetailsPage: React.FC = () => {
       return {
         id: "",
         products: [],
-        totalmee: 0,
-        totalbihun: 0,
-        totalnontaxable: 0,
-        totaltaxable: 0,
-        totaladjustment: 0,
+        amount: 0,
+        rounding: 0,
+        totalamountpayable: 0,
       };
     }
     const data = location.state?.invoiceData;
@@ -413,6 +411,10 @@ const InvoisDetailsPage: React.FC = () => {
             return sum + (afterDiscount + (item.tax || 0));
           }, 0);
 
+          const rounding = prevData.rounding || 0;
+
+          const totalAmountPayable = grandTotal + rounding;
+
           // Add the total row
           const productsWithTotal = [
             ...recalculatedProducts,
@@ -447,7 +449,9 @@ const InvoisDetailsPage: React.FC = () => {
           return {
             ...prevData,
             products: productsWithTotal,
-            totalnontaxable: grandTotal,
+            amount: grandTotal,
+            rounding: rounding,
+            totalamountpayable: totalAmountPayable,
           };
         });
       }, 0);
@@ -586,11 +590,9 @@ const InvoisDetailsPage: React.FC = () => {
             customername: invoiceData.customername,
             createddate: invoiceData.createddate,
             paymenttype: invoiceData.paymenttype || "INVOICE",
-            totalmee: invoiceData.totalmee || 0,
-            totalbihun: invoiceData.totalbihun || 0,
-            totalnontaxable: invoiceData.totalnontaxable || 0,
-            totaltaxable: invoiceData.totaltaxable || 0,
-            totaladjustment: invoiceData.totaladjustment || 0,
+            amount: invoiceData.amount || 0,
+            rounding: invoiceData.rounding || 0,
+            totalamountpayable: invoiceData.totalamountpayable || 0,
             products: productsToSave,
             customerName: invoiceData.customerName,
           };
@@ -651,11 +653,9 @@ const InvoisDetailsPage: React.FC = () => {
             customername: invoiceData.customername,
             createddate: invoiceData.createddate,
             paymenttype: invoiceData.paymenttype || "INVOICE",
-            totalmee: invoiceData.totalmee || 0,
-            totalbihun: invoiceData.totalbihun || 0,
-            totalnontaxable: invoiceData.totalnontaxable || 0,
-            totaltaxable: invoiceData.totaltaxable || 0,
-            totaladjustment: invoiceData.totaladjustment || 0,
+            amount: invoiceData.amount || 0,
+            rounding: invoiceData.rounding || 0,
+            totalamountpayable: invoiceData.totalamountpayable || 0,
             products: productsToSave,
             customerName: invoiceData.customerName,
           };

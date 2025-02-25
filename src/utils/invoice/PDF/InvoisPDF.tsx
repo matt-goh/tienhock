@@ -423,10 +423,10 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
   const totals = invoices.reduce(
     (acc, invoice) => {
       if (invoice.paymenttype === "Cash") {
-        acc.cashTotal += invoice.totaltaxable;
+        acc.cashTotal += invoice.totalamountpayable;
         acc.cashCount++;
       } else {
-        acc.invoiceTotal += invoice.totaltaxable;
+        acc.invoiceTotal += invoice.totalamountpayable;
         acc.invoiceCount++;
       }
       return acc;
@@ -552,7 +552,7 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
                     <View key={`total-${invoiceIndex}`} style={styles.totalRow}>
                       <Text style={styles.bold}>
                         Total Amount Payable: RM{" "}
-                        {invoice.totaltaxable.toFixed(2)}
+                        {invoice.totalamountpayable.toFixed(2)}
                       </Text>
                     </View>
                   </View>
