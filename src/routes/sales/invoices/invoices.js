@@ -279,14 +279,14 @@ export default function (pool) {
         try {
           // Transform data to match database columns
           const transformedInvoice = {
-            id: invoice.billNumber.toString(),
+            id: String(invoice.billNumber),
             salespersonid: invoice.salespersonId,
             customerid: invoice.customerId,
-            createddate: invoice.createddate, // Default to current time if not provided
+            createddate: invoice.createdDate || Date.now().toString(),
             paymenttype: invoice.paymentType,
-            amount: invoice.amount || 0,
-            rounding: invoice.rounding || 0,
-            totalamountpayable: invoice.totalAmountPayable || 0,
+            amount: Number(invoice.amount) || 0,
+            rounding: Number(invoice.rounding) || 0,
+            totalamountpayable: Number(invoice.totalAmountPayable) || 0,
           };
 
           // Validate required fields
@@ -305,58 +305,71 @@ export default function (pool) {
             throw new Error(`Invoice ${transformedInvoice.id} already exists`);
           }
 
-          // Insert invoice
+          // Build insert query
+          const columns = Object.keys(transformedInvoice);
+          const placeholders = columns
+            .map((_, idx) => `$${idx + 1}`)
+            .join(", ");
+          const values = columns.map((col) => transformedInvoice[col]);
+
           const insertInvoiceQuery = `
-            INSERT INTO invoices (
-              id,
-              salespersonid,
-              customerid,
-              createddate,
-              paymenttype,
-              amount,
-              rounding,
-              totalamountpayable
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *
-          `;
+          INSERT INTO invoices (${columns.join(", ")})
+          VALUES (${placeholders})
+          RETURNING *
+        `;
+
+          const invoiceResult = await client.query(insertInvoiceQuery, values);
 
           // Insert products
           if (invoice.products && invoice.products.length > 0) {
-            const productQuery = `
-              INSERT INTO order_details (
-                invoiceid,
-                code,
-                price,
-                quantity,
-                freeproduct,
-                returnproduct,
-                total
-              )
-              VALUES ($1, $2, $3, $4, $5, $6, $7)
-            `;
-
             for (const product of invoice.products) {
               // Skip products with zero quantity and price
               if (product.quantity === 0 && product.price === 0) continue;
 
-              const quantity = product.quantity || 0;
-              const price = product.price || 0;
-              const freeProduct = product.freeProduct || 0;
-              const returnProduct = product.returnProduct || 0;
+              const quantity = Number(product.quantity) || 0;
+              const price = Number(product.price) || 0;
+              const freeProduct = Number(product.freeProduct) || 0;
+              const returnProduct = Number(product.returnProduct) || 0;
+              const tax = Number(product.tax) || 0;
+              const discount = Number(product.discount) || 0;
+              const description = product.description || "";
 
               // Calculate total
-              const total = quantity * price;
+              const total = (
+                (quantity - returnProduct) * price -
+                discount +
+                tax
+              ).toFixed(2);
 
-              await client.query(productQuery, [
-                transformedInvoice.id,
-                product.code,
-                price,
-                quantity,
-                freeProduct,
-                returnProduct,
-                total,
-              ]);
+              const productData = {
+                invoiceid: transformedInvoice.id,
+                code: product.code,
+                price: price,
+                quantity: quantity,
+                freeproduct: freeProduct,
+                returnproduct: returnProduct,
+                description: description,
+                tax: tax,
+                discount: discount,
+                total: total,
+                issubtotal: false,
+              };
+
+              // Build insert query for product
+              const productColumns = Object.keys(productData);
+              const productPlaceholders = productColumns
+                .map((_, idx) => `$${idx + 1}`)
+                .join(", ");
+              const productValues = productColumns.map(
+                (col) => productData[col]
+              );
+
+              const insertProductQuery = `
+              INSERT INTO order_details (${productColumns.join(", ")})
+              VALUES (${productPlaceholders})
+            `;
+
+              await client.query(insertProductQuery, productValues);
             }
           }
 
@@ -394,7 +407,6 @@ export default function (pool) {
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error processing invoices:", error);
       res.status(500).json({
         message: "Error processing invoices",
         error: error.message,
