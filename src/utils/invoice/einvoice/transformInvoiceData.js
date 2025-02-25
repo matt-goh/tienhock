@@ -130,7 +130,6 @@ const isDateWithinRange = (dateStr, daysBack = 3) => {
 };
 
 const validateInvoiceData = (invoiceData) => {
-  const validationErrors = [];
 
   try {
     if (!isDateWithinRange(invoiceData.date)) {
