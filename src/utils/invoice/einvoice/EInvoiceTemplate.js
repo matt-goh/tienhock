@@ -238,7 +238,7 @@ const generateInvoiceLines = (orderDetails) => {
   });
 };
 
-export async function transformInvoiceToMyInvoisFormat(
+export async function EInvoiceTemplate(
   rawInvoiceData,
   customerData
 ) {
