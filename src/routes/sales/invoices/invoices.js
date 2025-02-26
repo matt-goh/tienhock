@@ -56,7 +56,6 @@ export default function (pool) {
                   'returnProduct', od.returnproduct,
                   'description', od.description,
                   'tax', od.tax,
-                  'discount', od.discount,
                   'total', od.total,
                   'issubtotal', od.issubtotal,
                   'istotal', false
@@ -97,7 +96,6 @@ export default function (pool) {
           freeProduct: parseInt(product.freeProduct) || 0,
           returnProduct: parseInt(product.returnProduct) || 0,
           tax: parseFloat(product.tax) || 0,
-          discount: parseFloat(product.discount) || 0,
           total: parseFloat(product.total) || 0,
           issubtotal: Boolean(product.issubtotal),
         })),
@@ -185,11 +183,10 @@ export default function (pool) {
             returnproduct,
             description,
             tax,
-            discount,
             total,
             issubtotal
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `;
 
         for (const product of invoice.products) {
@@ -204,7 +201,6 @@ export default function (pool) {
               0,
               product.description || "Subtotal",
               0,
-              0,
               product.total || "0",
               true,
             ]);
@@ -215,11 +211,9 @@ export default function (pool) {
             const freeProduct = product.freeProduct || 0;
             const returnProduct = product.returnProduct || 0;
             const tax = product.tax || 0;
-            const discount = product.discount || 0;
 
             const regularTotal = quantity * price;
-            const afterDiscount = regularTotal - discount;
-            const total = afterDiscount + tax;
+            const total = regularTotal + tax;
 
             await client.query(productQuery, [
               invoice.id,
@@ -230,7 +224,6 @@ export default function (pool) {
               returnProduct,
               product.description || "",
               tax,
-              discount,
               total,
               false,
             ]);
@@ -318,7 +311,7 @@ export default function (pool) {
           RETURNING *
         `;
 
-          const invoiceResult = await client.query(insertInvoiceQuery, values);
+          await client.query(insertInvoiceQuery, values);
 
           // Insert products
           if (invoice.products && invoice.products.length > 0) {
@@ -331,15 +324,12 @@ export default function (pool) {
               const freeProduct = Number(product.freeProduct) || 0;
               const returnProduct = Number(product.returnProduct) || 0;
               const tax = Number(product.tax) || 0;
-              const discount = Number(product.discount) || 0;
               const description = product.description || "";
 
               // Calculate total
-              const total = (
-                (quantity - returnProduct) * price -
-                discount +
-                tax
-              ).toFixed(2);
+              const total = ((quantity - returnProduct) * price + tax).toFixed(
+                2
+              );
 
               const productData = {
                 invoiceid: transformedInvoice.id,
@@ -350,7 +340,6 @@ export default function (pool) {
                 returnproduct: returnProduct,
                 description: description,
                 tax: tax,
-                discount: discount,
                 total: total,
                 issubtotal: false,
               };
@@ -483,11 +472,10 @@ export default function (pool) {
           returnproduct,
           description,
           tax,
-          discount,
           total,
           issubtotal
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
 
         for (const product of invoice.products) {
@@ -502,7 +490,6 @@ export default function (pool) {
               0, // returnProduct
               product.description || "Subtotal",
               0, // tax
-              0, // discount
               product.total || "0",
               true, // issubtotal
             ]);
@@ -513,11 +500,9 @@ export default function (pool) {
             const freeProduct = product.freeProduct || 0;
             const returnProduct = product.returnProduct || 0;
             const tax = product.tax || 0;
-            const discount = product.discount || 0;
 
             const regularTotal = quantity * price;
-            const afterDiscount = regularTotal - discount;
-            const total = afterDiscount + tax;
+            const total = regularTotal + tax;
 
             await client.query(productQuery, [
               invoice.id,
@@ -528,7 +513,6 @@ export default function (pool) {
               returnProduct,
               product.description || "",
               tax,
-              discount,
               total,
               false, // issubtotal
             ]);

@@ -107,11 +107,8 @@ const InvoisDetailsPage: React.FC = () => {
     // Calculate regular product total
     const regularTotal = (item.quantity || 0) * (item.price || 0);
 
-    // Apply discount
-    const afterDiscount = regularTotal - (item.discount || 0);
-
     // Add tax
-    const afterTax = afterDiscount + (item.tax || 0);
+    const afterTax = regularTotal + (item.tax || 0);
 
     // Calculate final total
     return afterTax;
@@ -193,7 +190,6 @@ const InvoisDetailsPage: React.FC = () => {
           freeProduct: product.freeProduct || 0,
           returnProduct: product.returnProduct || 0,
           tax: product.tax || 0,
-          discount: product.discount || 0,
           total: product.total,
           issubtotal: product.issubtotal || false,
           istotal: product.istotal || false,
@@ -284,7 +280,6 @@ const InvoisDetailsPage: React.FC = () => {
           freeProduct: 0,
           returnProduct: 0,
           tax: 0,
-          discount: 0,
           istotal: true,
           issubtotal: false,
         },
@@ -336,7 +331,6 @@ const InvoisDetailsPage: React.FC = () => {
       freeProduct: 0,
       returnProduct: 0,
       tax: 0,
-      discount: 0,
       total: "0",
       issubtotal: false,
       istotal: false,
@@ -392,8 +386,7 @@ const InvoisDetailsPage: React.FC = () => {
             } else {
               // For regular products, calculate their total and add to current sum
               const regularTotal = (item.quantity || 0) * (item.price || 0);
-              const afterDiscount = regularTotal - (item.discount || 0);
-              const productTotal = afterDiscount + (item.tax || 0);
+              const productTotal = regularTotal + (item.tax || 0);
               currentSubtotalSum += productTotal;
 
               recalculatedProducts.push({
@@ -407,8 +400,7 @@ const InvoisDetailsPage: React.FC = () => {
           const grandTotal = recalculatedProducts.reduce((sum, item) => {
             if (item.issubtotal) return sum;
             const regularTotal = (item.quantity || 0) * (item.price || 0);
-            const afterDiscount = regularTotal - (item.discount || 0);
-            return sum + (afterDiscount + (item.tax || 0));
+            return sum + (regularTotal + (item.tax || 0));
           }, 0);
 
           const rounding = prevData.rounding || 0;
@@ -427,7 +419,6 @@ const InvoisDetailsPage: React.FC = () => {
               freeProduct: 0,
               returnProduct: 0,
               tax: 0,
-              discount: 0,
               total: grandTotal.toFixed(2),
               istotal: true,
               issubtotal: false,
@@ -479,7 +470,6 @@ const InvoisDetailsPage: React.FC = () => {
         freeProduct: 0,
         returnProduct: 0,
         tax: 0,
-        discount: 0,
         total: runningTotal.toFixed(2),
         issubtotal: true,
         istotal: false,
@@ -577,7 +567,6 @@ const InvoisDetailsPage: React.FC = () => {
               freeProduct: product.freeProduct || 0,
               returnProduct: product.returnProduct || 0,
               tax: product.tax || 0,
-              discount: product.discount || 0,
               total: product.total,
               description: product.description,
               issubtotal: product.issubtotal || false,
@@ -641,7 +630,6 @@ const InvoisDetailsPage: React.FC = () => {
               freeProduct: product.freeProduct || 0,
               returnProduct: product.returnProduct || 0,
               tax: product.tax || 0,
-              discount: product.discount || 0,
               total: product.total,
               description: product.description,
             }));
@@ -741,7 +729,6 @@ const InvoisDetailsPage: React.FC = () => {
           freeProduct: 0,
           returnProduct: 0,
           tax: 0,
-          discount: 0,
           total: "0",
           istotal: true,
         },
@@ -782,7 +769,7 @@ const InvoisDetailsPage: React.FC = () => {
       id: "description",
       header: "Product",
       type: "combobox",
-      width: 350,
+      width: 400,
       options: products.map((p) => p.description),
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <TableEditableCell
@@ -819,7 +806,7 @@ const InvoisDetailsPage: React.FC = () => {
       id: "quantity",
       header: "QTY",
       type: "number",
-      width: 80,
+      width: 130,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
@@ -846,7 +833,7 @@ const InvoisDetailsPage: React.FC = () => {
       id: "price",
       header: "Price",
       type: "float",
-      width: 100,
+      width: 130,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <input
           type="number"
@@ -874,41 +861,13 @@ const InvoisDetailsPage: React.FC = () => {
       id: "freeProduct",
       header: "FOC",
       type: "number",
-      width: 80,
+      width: 100,
     },
     {
       id: "returnProduct",
       header: "RTN",
       type: "number",
-      width: 80,
-    },
-    {
-      id: "discount",
-      header: "Disc",
-      type: "float",
       width: 100,
-      cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={info.getValue() ?? 0}
-          onChange={(e) => {
-            const newValue = Math.max(0, parseFloat(e.target.value) || 0);
-            const updatedProducts = invoiceData.products.map((product) => {
-              if (product.code === info.row.original.code) {
-                return {
-                  ...product,
-                  discount: newValue,
-                };
-              }
-              return product;
-            });
-            handleChange(updatedProducts);
-          }}
-          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent"
-        />
-      ),
     },
     {
       id: "tax",
@@ -942,7 +901,7 @@ const InvoisDetailsPage: React.FC = () => {
       id: "total",
       header: "Total",
       type: "amount",
-      width: 100,
+      width: 120,
       cell: (info: { getValue: () => any; row: { original: ProductItem } }) => (
         <div className="w-full h-full px-6 py-3 text-right">
           {calculateTotal(info.row.original).toFixed(2)}

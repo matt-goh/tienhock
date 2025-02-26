@@ -1110,7 +1110,7 @@ function TableEditing<T extends Record<string, any>>({
       size: columnWidths[col.id],
       header: ({ column }) => (
         <div
-          className={`relative flex items-center h-full ${
+          className={`relative flex items-center w-full h-full ${
             isSortingDisabled ? "py-2" : ""
           }`}
         >
