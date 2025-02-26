@@ -8,6 +8,7 @@ import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
+import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 
 interface SelectOption {
   id: string;
@@ -195,6 +196,10 @@ const CustomerAddPage: React.FC = () => {
 
         // Proceed with creating the customer if validation passed
         await api.post("/api/customers", formData);
+
+        // Refresh the customers cache
+        await refreshCustomersCache();
+
         toast.success("Customer created successfully!");
         navigate("/catalogue/customer");
       } catch (error) {
@@ -211,6 +216,10 @@ const CustomerAddPage: React.FC = () => {
       setIsSaving(true);
       try {
         await api.post("/api/customers", formData);
+
+        // Refresh the customers cache
+        await refreshCustomersCache();
+
         toast.success("Customer created successfully!");
         navigate("/catalogue/customer");
       } catch (error) {

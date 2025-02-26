@@ -13,6 +13,7 @@ import {
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
+import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 
 interface SelectOption {
   id: string;
@@ -183,6 +184,10 @@ const CustomerFormPage: React.FC = () => {
     if (id) {
       try {
         await api.delete(`/api/customers/${id}`);
+
+        // Refresh the customers cache after deletion
+        await refreshCustomersCache();
+
         setIsDeleteDialogOpen(false);
         toast.success("Customer deleted successfully");
         navigate("/catalogue/customer");
@@ -272,8 +277,14 @@ const CustomerFormPage: React.FC = () => {
         } else {
           await api.put(`/api/customers/${id}`, formData);
         }
+
+        // Refresh the customers cache after update
+        await refreshCustomersCache();
       } else {
         await api.post("/api/customers", formData);
+
+        // Refresh the customers cache after creation
+        await refreshCustomersCache();
       }
 
       toast.success(
