@@ -192,48 +192,6 @@ export default function (pool, config) {
     }
   });
 
-  // In e-invoices.js
-  router.post("/test-submit", async (req, res) => {
-    try {
-      const { invoiceIds } = req.body;
-      if (!invoiceIds || !invoiceIds.length) {
-        return res.status(400).json({
-          success: false,
-          message: "No invoice IDs provided",
-        });
-      }
-      const invoiceData = await getInvoices(pool, invoiceIds[0]);
-      const customerData = await fetchCustomerData(
-        pool,
-        invoiceData.customerid
-      );
-
-      // Transform single invoice and log the exact data
-      const transformedInvoice = await transformInvoiceToMyInvoisFormat(
-        invoiceData,
-        customerData
-      );
-
-      console.log("Transformed invoice:", JSON.stringify(transformedInvoice));
-
-      // Submit and get detailed response
-      const result = await submissionHandler.submitAndPollDocuments(
-        transformedInvoice
-      );
-      res.json(result);
-    } catch (error) {
-      console.error("Test submission error:", error);
-      // Return full error details
-      res.status(500).json({
-        success: false,
-        message: error.message,
-        details: error.response || error.details || {},
-        // Include the original error for debugging
-        originalError: JSON.stringify(error),
-      });
-    }
-  });
-
   // Submit invoice to MyInvois
   router.post("/submit", async (req, res) => {
     try {
@@ -265,7 +223,6 @@ export default function (pool, config) {
             invoiceData,
             customerData
           );
-          console.log(transformedInvoice);
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
           // Handle validation errors from transformInvoiceToMyInvoisFormat
