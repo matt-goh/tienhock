@@ -100,22 +100,53 @@ const calculateTaxAndTotals = (invoiceData) => {
   // Get the provided values directly
   const subtotal = formatAmount(invoiceData.amount || 0);
 
-  // Calculate total tax from items with tax value
+  // Group tax items by tax category (taxed, exempt, etc.)
+  const taxGroups = {
+    ["01"]: { amount: 0, taxable: 0 }, // Sales Tax
+    ["02"]: { amount: 0, taxable: 0 }, // Service Tax
+    ["06"]: { amount: 0, taxable: 0 }, // Not Applicable
+    ["E"]: { amount: 0, taxable: 0 }, // Tax exemption
+  };
+
+  // Calculate tax by category
+  invoiceData.orderDetails.forEach((detail) => {
+    const taxAmount = parseFloat(detail.tax) || 0;
+    const lineAmount = (detail.qty || 0) * (Number(detail.price) || 0);
+
+    // Determine tax category based on tax amount
+    let taxCategory = "06"; // Default to not applicable
+    if (taxAmount > 0) {
+      taxCategory = "01"; // Default to Sales Tax when tax exists
+    } else if (lineAmount > 0) {
+      taxCategory = "E"; // Exempt if there's an amount but no tax
+    }
+
+    taxGroups[taxCategory].amount += taxAmount;
+    taxGroups[taxCategory].taxable += lineAmount;
+  });
+
+  // Filter out empty tax groups
+  const taxSubtotals = Object.entries(taxGroups)
+    .filter(([_, group]) => group.taxable > 0)
+    .map(([category, group]) => ({
+      category,
+      taxableAmount: formatAmount(group.taxable),
+      taxAmount: formatAmount(group.amount),
+    }));
+
+  // Calculate total tax
   const totalTax = formatAmount(
-    invoiceData.orderDetails.reduce((sum, detail) => {
-      const taxAmount = parseFloat(detail.tax) || 0;
-      return sum + taxAmount;
-    }, 0)
+    Object.values(taxGroups).reduce((sum, group) => sum + group.amount, 0)
   );
 
   // Use the totalamountpayable as the total
   const total = formatAmount(invoiceData.totalamountpayable || 0);
 
-  // Simply return the items with their original tax values
   return {
     subtotal,
     tax: totalTax,
     total,
+    taxSubtotals,
   };
 };
 
@@ -133,10 +164,13 @@ const generateInvoiceLines = (orderDetails) => {
     // Get the tax directly from the item's own tax field
     const productTax = formatAmount(Number(item.tax) || 0);
 
+    // Determine tax category based on tax amount
+    const taxCategory = productTax > 0 ? "01" : "06"; // 01 for Sales Tax, 06 for Not Applicable
+
     return {
       ID: [
         {
-          _: item.id.toString(),
+          _: item.id ? item.id.toString() : `00${index + 1}`.slice(-3),
         },
       ],
       InvoicedQuantity: [
@@ -150,7 +184,7 @@ const generateInvoiceLines = (orderDetails) => {
           _: lineAmount,
           currencyID: "MYR",
         },
-      ], // Sum of amount payable (inclusive of applicable discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
+      ],
       AllowanceCharge: [
         {
           ChargeIndicator: [{ _: false }],
@@ -166,13 +200,12 @@ const generateInvoiceLines = (orderDetails) => {
         },
       ],
       TaxTotal: [
-        // Tax for individual items (not needed)
         {
-          TaxAmount: [{ _: productTax, currencyID: "MYR" }], // The amount of tax payable.
+          TaxAmount: [{ _: productTax, currencyID: "MYR" }],
           TaxSubtotal: [
             {
-              TaxableAmount: [{ _: productTax, currencyID: "MYR" }], // The amount of tax payable.
-              TaxAmount: [{ _: productTax, currencyID: "MYR" }], // The amount of tax payable
+              TaxableAmount: [{ _: lineAmount, currencyID: "MYR" }],
+              TaxAmount: [{ _: productTax, currencyID: "MYR" }],
               BaseUnitMeasure: [{ _: Number(item.qty), unitCode: "NMP" }],
               PerUnitAmount: [
                 {
@@ -185,8 +218,7 @@ const generateInvoiceLines = (orderDetails) => {
               ],
               TaxCategory: [
                 {
-                  ID: [{ _: productTax > 0 ? "01" : "06" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
-                  TaxExemptionReason: [{ _: "NA" }],
+                  ID: [{ _: taxCategory }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
                   TaxScheme: [
                     {
                       ID: [
@@ -233,15 +265,12 @@ const generateInvoiceLines = (orderDetails) => {
             },
           ],
         },
-      ], // Amount of each individual item / service within the invoice, excluding any taxes, charges or discounts
+      ],
     };
   });
 };
 
-export async function EInvoiceTemplate(
-  rawInvoiceData,
-  customerData
-) {
+export async function EInvoiceTemplate(rawInvoiceData, customerData) {
   try {
     if (!rawInvoiceData) {
       throw {
@@ -337,8 +366,8 @@ export async function EInvoiceTemplate(
           TaxCurrencyCode: [{ _: "MYR" }],
           InvoicePeriod: [
             {
-              StartDate: [{ _: invoiceDate }],
-              EndDate: [{ _: invoiceDate }],
+              StartDate: [{ _: formattedDate }],
+              EndDate: [{ _: formattedDate }],
               Description: [{ _: "Not Applicable" }],
             },
           ],
@@ -503,29 +532,39 @@ export async function EInvoiceTemplate(
           ],
           TaxTotal: [
             {
-              TaxAmount: [{ _: totals.tax, currencyID: "MYR" }], // Total amount of tax payable
-              TaxSubtotal: [
-                {
-                  TaxableAmount: [{ _: totals.tax, currencyID: "MYR" }], // (Optional) Sum of amount chargeable for each tax type
-                  TaxAmount: [{ _: totals.tax, currencyID: "MYR" }], // Total amount of tax payable for each tax type
-                  TaxCategory: [
-                    {
-                      ID: [{ _: totals.tax > 0 ? "01" : "06" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E	Tax exemption (where applicable)
-                      TaxScheme: [
-                        {
-                          ID: [
-                            {
-                              _: "OTH",
-                              schemeID: "UN/ECE 5153",
-                              schemeAgencyID: "6",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
+              TaxAmount: [{ _: totals.tax, currencyID: "MYR" }],
+              // Convert tax subtotals array into proper structure
+              ...totals.taxSubtotals.map((subtotal) => ({
+                TaxSubtotal: [
+                  {
+                    TaxableAmount: [
+                      { _: subtotal.taxableAmount, currencyID: "MYR" },
+                    ],
+                    TaxAmount: [{ _: subtotal.taxAmount, currencyID: "MYR" }],
+                    TaxCategory: [
+                      {
+                        ID: [{ _: subtotal.category }],
+                        ...(subtotal.category === "E"
+                          ? {
+                              TaxExemptionReason: [{ _: "Tax Exemption" }],
+                            }
+                          : {}),
+                        TaxScheme: [
+                          {
+                            ID: [
+                              {
+                                _: "OTH",
+                                schemeID: "UN/ECE 5153",
+                                schemeAgencyID: "6",
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              })),
             },
           ],
           LegalMonetaryTotal: [
