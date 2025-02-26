@@ -614,9 +614,6 @@ const InvoisDetailsPage: React.FC = () => {
       } else {
         // Handle existing invoice update
         try {
-          // Update the invoice first
-          updateInvoice(invoiceData);
-
           const productsToSave = invoiceData.products
             .filter((product) => !product.istotal && !product.issubtotal)
             .map((product) => ({
@@ -632,6 +629,7 @@ const InvoisDetailsPage: React.FC = () => {
 
           const dataToSave: ExtendedInvoiceData = {
             id: invoiceData.id,
+            originalId: invoiceData.originalId,
             salespersonid: invoiceData.salespersonid,
             customerid: invoiceData.customerid,
             customername: invoiceData.customername,
