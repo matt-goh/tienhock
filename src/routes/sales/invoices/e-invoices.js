@@ -1,5 +1,5 @@
 // src/routes/sales/invoices/e-invoice.js
-import { transformInvoiceToMyInvoisFormat } from "../../../utils/invoice/einvoice/transformInvoiceData.js";
+import { transformInvoiceToMyInvoisFormat } from "../../../utils/invoice/einvoice/EInvoiceTemplate.js";
 import { Router } from "express";
 import DocumentSubmissionHandler from "../../../utils/invoice/einvoice/documentSubmissionHandler.js";
 import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";

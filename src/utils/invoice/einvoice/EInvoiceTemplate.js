@@ -1,4 +1,4 @@
-// transformInvoiceData.js
+// EInvoiceTemplate.js
 
 // Helper function to format phone number
 function formatPhoneNumber(phone) {
@@ -93,27 +93,6 @@ const isDateWithinRange = (dateStr, daysBack = 3) => {
   } catch (error) {
     console.error("Error in isDateWithinRange:", error);
     return false;
-  }
-};
-
-// Helper function to get payment details based on invoice type
-const getPaymentDetails = (invoiceType) => {
-  // Default to cash (01) if type is not provided
-  const type = invoiceType?.toUpperCase();
-
-  // Payment mapping
-  switch (type) {
-    case "INVOICE": // Invoice
-      return {
-        code: "03", // Bank Transfer
-        description: "Payment via bank transfer",
-      };
-    case "CASH": // Cash
-    default:
-      return {
-        code: "01", // Cash
-        description: "Payment method is cash",
-      };
   }
 };
 
@@ -324,9 +303,6 @@ export async function transformInvoiceToMyInvoisFormat(
         invoiceNo: rawInvoiceData.id,
       };
     }
-
-    // Payment means function - use paymenttype which is now either "CASH" or "INVOICE"
-    const paymentDetails = getPaymentDetails(rawInvoiceData.paymenttype);
 
     // Clean and prepare the order details
     const sanitizedOrderDetails = rawInvoiceData.orderDetails.map((detail) => ({
