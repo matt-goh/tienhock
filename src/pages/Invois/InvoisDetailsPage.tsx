@@ -81,10 +81,6 @@ const InvoisDetailsPage: React.FC = () => {
   const { products } = useProductsCache();
 
   useEffect(() => {
-    console.log(invoiceData);
-  }, [invoiceData]);
-
-  useEffect(() => {
     if (location.state?.previousPath) {
       setPreviousPath(location.state.previousPath);
     }
