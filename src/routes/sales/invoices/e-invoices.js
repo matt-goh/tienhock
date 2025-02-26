@@ -1,5 +1,5 @@
 // src/routes/sales/invoices/e-invoice.js
-import { transformInvoiceToMyInvoisFormat } from "../../../utils/invoice/einvoice/EInvoiceTemplate.js";
+import { EInvoiceTemplate } from "../../../utils/invoice/einvoice/EInvoiceTemplate.js";
 import { Router } from "express";
 import DocumentSubmissionHandler from "../../../utils/invoice/einvoice/documentSubmissionHandler.js";
 import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";
@@ -219,13 +219,13 @@ export default function (pool, config) {
             pool,
             invoiceData.customerid
           );
-          const transformedInvoice = await transformInvoiceToMyInvoisFormat(
+          const transformedInvoice = await EInvoiceTemplate(
             invoiceData,
             customerData
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
-          // Handle validation errors from transformInvoiceToMyInvoisFormat
+          // Handle validation errors from EInvoiceTemplate
           const errorDetails = error.details || [];
           validationErrors.push({
             invoiceCodeNumber: error.id || invoiceId,
