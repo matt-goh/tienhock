@@ -344,7 +344,6 @@ export interface ProductItem {
   freeProduct: number;
   returnProduct: number;
   tax: number;
-  discount: number;
   total?: string;
   issubtotal?: boolean;
   istotal?: boolean;

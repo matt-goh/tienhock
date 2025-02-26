@@ -73,7 +73,7 @@ function TableHeader({
             width: `${columnWidths[header.id]}px` || "auto",
           }}
         >
-          <div className="flex items-center h-full relative">
+          <div className="flex items-center w-full h-full relative">
             {header.column.id === "selection" &&
             isEditing &&
             !disableSelection ? (
