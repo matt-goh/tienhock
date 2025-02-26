@@ -434,10 +434,7 @@ export default function (pool) {
       const checkResult = await client.query(checkQuery, [lookupId]);
 
       if (checkResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(200).json({
-          message: `Invoice with ID ${lookupId} not found, updating with new ID`,
-        });
+        throw new Error(`Invoice with ID ${lookupId} not found`);
       }
 
       // First, delete existing products
@@ -476,10 +473,10 @@ export default function (pool) {
         throw new Error(`Invoice with ID ${lookupId} not found`);
       }
 
-      // Insert updated products always using the invoice ID from the database (post-update)
-      // This ensures we use the actual ID in the database, whether changed or not
+      // Get the new invoice ID after the update
       const actualInvoiceId = invoiceResult.rows[0].id;
 
+      // Insert updated products using the new invoice ID
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
           INSERT INTO order_details (
@@ -512,7 +509,7 @@ export default function (pool) {
               product.total || "0",
               true, // issubtotal
             ]);
-          } else if (!product.istotal) {
+          } else {
             // Insert regular product
             const quantity = product.quantity || 0;
             const price = product.price || 0;
