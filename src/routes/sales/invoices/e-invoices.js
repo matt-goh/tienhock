@@ -82,14 +82,13 @@ const getInvoices = async (pool, invoiceId) => {
     const invoiceQuery = `
         SELECT 
           i.id, 
-          i.invoiceno, 
-          TO_CHAR(i.date, 'DD/MM/YYYY') as date,
-          i.type,
-          i.customer,
-          i.customername,
-          i.salesman,
-          i.totalamount as "totalAmount",
-          TO_CHAR(i.time, 'HH24:MI') as time
+          i.salespersonid,
+          i.customerid,
+          i.createddate,
+          i.paymenttype,
+          i.amount,
+          i.rounding,
+          i.totalamountpayable
         FROM 
           invoices i
         WHERE 
@@ -106,28 +105,19 @@ const getInvoices = async (pool, invoiceId) => {
         SELECT 
           od.id,
           od.code,
-          od.productname as "productname",
-          od.qty,
           od.price,
+          od.quantity,
+          od.freeproduct,
+          od.returnproduct,
+          od.description,
+          od.tax,
           od.total,
-          od.isfoc as "isfoc",
-          od.isreturned as "isreturned",
-          od.istotal as "istotal",
-          od.issubtotal as "issubtotal",
-          od.isless as "isless",
-          od.istax as "istax"
+          od.issubtotal
         FROM 
           order_details od
         WHERE 
           od.invoiceid = $1
         ORDER BY 
-          CASE 
-            WHEN od.istotal = true THEN 4
-            WHEN od.issubtotal = true THEN 3
-            WHEN od.isless = true THEN 2
-            WHEN od.istax = true THEN 1
-            ELSE 0 
-          END,
           od.id
       `;
 
@@ -139,9 +129,13 @@ const getInvoices = async (pool, invoiceId) => {
 
     return {
       ...invoiceResult.rows[0],
+      date: new Date(Number(invoiceResult.rows[0].createddate)),
+      time: new Date(Number(invoiceResult.rows[0].createddate))
+        .toTimeString()
+        .substring(0, 5),
+      type: invoiceResult.rows[0].paymenttype,
       orderDetails: orderDetailsResult.rows.map((detail) => ({
         ...detail,
-        qty: Number(detail.qty),
         price: Number(detail.price),
         total: detail.total,
       })),
@@ -198,6 +192,48 @@ export default function (pool, config) {
     }
   });
 
+  // In e-invoices.js
+  router.post("/test-submit", async (req, res) => {
+    try {
+      const { invoiceIds } = req.body;
+      if (!invoiceIds || !invoiceIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "No invoice IDs provided",
+        });
+      }
+      const invoiceData = await getInvoices(pool, invoiceIds[0]);
+      const customerData = await fetchCustomerData(
+        pool,
+        invoiceData.customerid
+      );
+
+      // Transform single invoice and log the exact data
+      const transformedInvoice = await transformInvoiceToMyInvoisFormat(
+        invoiceData,
+        customerData
+      );
+
+      console.log("Transformed invoice:", JSON.stringify(transformedInvoice));
+
+      // Submit and get detailed response
+      const result = await submissionHandler.submitAndPollDocuments(
+        transformedInvoice
+      );
+      res.json(result);
+    } catch (error) {
+      console.error("Test submission error:", error);
+      // Return full error details
+      res.status(500).json({
+        success: false,
+        message: error.message,
+        details: error.response || error.details || {},
+        // Include the original error for debugging
+        originalError: JSON.stringify(error),
+      });
+    }
+  });
+
   // Submit invoice to MyInvois
   router.post("/submit", async (req, res) => {
     try {
@@ -223,22 +259,23 @@ export default function (pool, config) {
 
           const customerData = await fetchCustomerData(
             pool,
-            invoiceData.customer
+            invoiceData.customerid
           );
           const transformedInvoice = await transformInvoiceToMyInvoisFormat(
             invoiceData,
             customerData
           );
+          console.log(transformedInvoice);
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
           // Handle validation errors from transformInvoiceToMyInvoisFormat
           const errorDetails = error.details || [];
           validationErrors.push({
-            invoiceCodeNumber: error.invoiceNo || invoiceId,
+            invoiceCodeNumber: error.id || invoiceId,
             error: {
               code: error.code || "2",
               message: "Validation Error",
-              target: error.invoiceNo || invoiceId,
+              target: error.id || invoiceId,
               details:
                 errorDetails.length > 0
                   ? errorDetails
@@ -299,7 +336,7 @@ export default function (pool, config) {
         shouldStopAtValidation: true,
         rejectedDocuments: [
           {
-            invoiceCodeNumber: error.invoiceNo || "unknown",
+            invoiceCodeNumber: error.id || "unknown",
             error: {
               code: error.code || "2",
               message: error.message || "Unknown error occurred",

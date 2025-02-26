@@ -74,39 +74,6 @@ const formatDate = (dateStr) => {
   }
 };
 
-const formatTime = (timeStr) => {
-  try {
-    if (!timeStr) {
-      const now = new Date();
-      return now.toTimeString().split(" ")[0] + "Z";
-    }
-
-    // If time already has 'Z' suffix and is in correct format, return as is
-    if (timeStr.match(/^\d{2}:\d{2}:\d{2}Z$/)) {
-      return timeStr;
-    }
-
-    // Handle ISO string format
-    if (timeStr.includes("T")) {
-      const time = timeStr.split("T")[1].split(".")[0];
-      return time + "Z";
-    }
-
-    // Handle plain time format (HH:mm:ss)
-    if (timeStr.match(/^\d{2}:\d{2}:\d{2}$/)) {
-      return timeStr + "Z";
-    }
-
-    // If none of the above, generate current time
-    const now = new Date();
-    return now.toTimeString().split(" ")[0] + "Z";
-  } catch (error) {
-    console.error("Error formatting time:", error, "for time string:", timeStr);
-    const now = new Date();
-    return now.toTimeString().split(" ")[0] + "Z";
-  }
-};
-
 const isDateWithinRange = (dateStr, daysBack = 3) => {
   try {
     // Get current date at start of day in local timezone
@@ -129,71 +96,6 @@ const isDateWithinRange = (dateStr, daysBack = 3) => {
   }
 };
 
-const validateInvoiceData = (invoiceData) => {
-
-  try {
-    if (!isDateWithinRange(invoiceData.date)) {
-      throw {
-        type: "validation",
-        code: "DATE_VALIDATION",
-        message: "Invoice date must be within the last 3 days",
-        invoiceNo: invoiceData.invoiceno,
-      };
-    }
-  } catch (error) {
-    // Rethrow the validation error directly
-    if (error.type === "validation") {
-      throw error; // Let this bubble up
-    }
-    throw {
-      type: "validation",
-      code: "GENERIC_ERROR",
-      message: "Invalid invoice date format",
-      invoiceNo: invoiceData.invoiceno,
-    };
-  }
-
-  // Check if orderDetails exists and is an array
-  if (!Array.isArray(invoiceData?.orderDetails)) {
-    throw {
-      type: "validation",
-      code: "INV_VALIDATION",
-      message: "Invoice must contain at least one order detail",
-      invoiceNo: invoiceData.invoiceno,
-    };
-  } else if (invoiceData.orderDetails.length === 0) {
-    throw {
-      type: "validation",
-      code: "INV_VALIDATION",
-      message: "Invoice must contain at least one order detail",
-      invoiceNo: invoiceData.invoiceno,
-    };
-  }
-
-  // If validation passes, return sanitized data
-  return {
-    ...invoiceData,
-    date: invoiceData.date, // Don't modify the date if it's valid
-    time:
-      invoiceData.time ||
-      new Date().toISOString().split("T")[1].split(".")[0] + "Z",
-    invoiceno: invoiceData.invoiceno || "UNKNOWN",
-    tax: invoiceData.tax || "0",
-    orderDetails: invoiceData.orderDetails.map((detail) => ({
-      ...detail,
-      qty: Number(detail.qty || 0),
-      price: Number(detail.price || 0),
-      total: detail.total || "0",
-      isfoc: Boolean(detail.isfoc),
-      isreturned: Boolean(detail.isreturned),
-      istotal: Boolean(detail.istotal),
-      issubtotal: Boolean(detail.issubtotal),
-      isless: Boolean(detail.isless),
-      istax: Boolean(detail.istax),
-    })),
-  };
-};
-
 // Helper function to get payment details based on invoice type
 const getPaymentDetails = (invoiceType) => {
   // Default to cash (01) if type is not provided
@@ -201,12 +103,12 @@ const getPaymentDetails = (invoiceType) => {
 
   // Payment mapping
   switch (type) {
-    case "I": // Invoice
+    case "INVOICE": // Invoice
       return {
         code: "03", // Bank Transfer
         description: "Payment via bank transfer",
       };
-    case "C": // Cash
+    case "CASH": // Cash
     default:
       return {
         code: "01", // Cash
@@ -215,84 +117,42 @@ const getPaymentDetails = (invoiceType) => {
   }
 };
 
-// Helper function to calculate line item tax
-const calculateLineTax = (item, subtotal, totalTax) => {
-  const itemTotal =
-    typeof item.total === "string"
-      ? parseFloat(item.total)
-      : Number(item.total);
-  if (subtotal === 0) return 0;
-  return formatAmount((itemTotal / subtotal) * totalTax);
-};
-
 const calculateTaxAndTotals = (invoiceData) => {
-  // Filter normal items (not special rows)
-  const normalItems = invoiceData.orderDetails.filter(
-    (detail) =>
-      !detail.istotal &&
-      !detail.issubtotal &&
-      !detail.isless &&
-      !detail.istax &&
-      !detail.isfoc &&
-      !detail.isreturned
-  );
+  // Get the provided values directly
+  const subtotal = formatAmount(invoiceData.amount || 0);
 
-  // Calculate subtotal from normal items
-  const subtotal = formatAmount(
-    normalItems.reduce((sum, detail) => {
-      const amount =
-        typeof detail.total === "string"
-          ? parseFloat(detail.total)
-          : Number(detail.total);
-      return sum + (isNaN(amount) ? 0 : amount);
+  // Calculate total tax from items with tax value
+  const totalTax = formatAmount(
+    invoiceData.orderDetails.reduce((sum, detail) => {
+      const taxAmount = parseFloat(detail.tax) || 0;
+      return sum + taxAmount;
     }, 0)
   );
 
-  // Calculate total tax from tax rows
-  const totalTax = formatAmount(
-    invoiceData.orderDetails
-      .filter((detail) => detail.istax)
-      .reduce((sum, detail) => {
-        const amount =
-          typeof detail.total === "string"
-            ? parseFloat(detail.total)
-            : Number(detail.total);
-        return sum + (isNaN(amount) ? 0 : amount);
-      }, 0)
-  );
+  // Use the totalamountpayable as the total
+  const total = formatAmount(invoiceData.totalamountpayable || 0);
 
-  // Calculate tax for each line item
-  const lineItemsWithTax = normalItems.map((item) => ({
-    ...item,
-    lineTax: calculateLineTax(item, subtotal, totalTax),
-  }));
-
-  // Calculate final total
-  const total = formatAmount(subtotal + totalTax);
-
+  // Simply return the items with their original tax values
   return {
     subtotal,
     tax: totalTax,
     total,
-    lineItemsWithTax,
   };
 };
 
 // Handle multiple invoice lines
-const generateInvoiceLines = (orderDetails, totals) => {
-  // First use calculateTaxAndTotals to get all the calculations
-  const { lineItemsWithTax } = calculateTaxAndTotals({ orderDetails });
+const generateInvoiceLines = (orderDetails) => {
+  // First filter out any subtotal rows, we only want regular items
+  const regularItems = orderDetails.filter((item) => !item.issubtotal);
 
-  const distributedTaxAmount = totals.tax / lineItemsWithTax.length;
-
-  // Generate invoice lines with tax calculations
-  return lineItemsWithTax.map((item) => {
+  // Generate invoice lines with item's own tax values
+  return regularItems.map((item) => {
     const lineAmount = formatAmount(
-      (typeof item.qty === "string" ? parseFloat(item.qty) : Number(item.qty)) *
-        (typeof item.price === "string"
-          ? parseFloat(item.price)
-          : Number(item.price))
+      (item.qty || 0) * (Number(item.price) || 0)
     );
+
+    // Get the tax directly from the item's own tax field
+    const productTax = formatAmount(Number(item.tax) || 0);
 
     return {
       ID: [
@@ -329,18 +189,24 @@ const generateInvoiceLines = (orderDetails, totals) => {
       TaxTotal: [
         // Tax for individual items (not needed)
         {
-          TaxAmount: [{ _: distributedTaxAmount, currencyID: "MYR" }], // The amount of tax payable.
+          TaxAmount: [{ _: productTax, currencyID: "MYR" }], // The amount of tax payable.
           TaxSubtotal: [
             {
-              TaxableAmount: [{ _: distributedTaxAmount, currencyID: "MYR" }], // The amount of tax payable.
-              TaxAmount: [{ _: distributedTaxAmount, currencyID: "MYR" }], // The amount of tax payable
-              BaseUnitMeasure: [
-                { _: lineItemsWithTax.length, unitCode: "NMP" },
+              TaxableAmount: [{ _: productTax, currencyID: "MYR" }], // The amount of tax payable.
+              TaxAmount: [{ _: productTax, currencyID: "MYR" }], // The amount of tax payable
+              BaseUnitMeasure: [{ _: Number(item.qty), unitCode: "NMP" }],
+              PerUnitAmount: [
+                {
+                  _:
+                    Number(item.qty) > 0
+                      ? formatAmount(productTax / Number(item.qty))
+                      : 0,
+                  currencyID: "MYR",
+                },
               ],
-              PerUnitAmount: [{ _: 0, currencyID: "MYR" }],
               TaxCategory: [
                 {
-                  ID: [{ _: distributedTaxAmount > 0 ? "01" : "06" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
+                  ID: [{ _: productTax > 0 ? "01" : "06" }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
                   TaxExemptionReason: [{ _: "NA" }],
                   TaxScheme: [
                     {
@@ -410,25 +276,77 @@ export async function transformInvoiceToMyInvoisFormat(
       throw {
         type: "validation",
         message: "Customer data is required",
-        invoiceNo: rawInvoiceData?.invoiceno || "Unknown",
+        invoiceNo: rawInvoiceData?.id || "Unknown",
       };
     }
 
-    // Validate and sanitize input data
-    const invoiceData = validateInvoiceData(rawInvoiceData);
+    // Convert timestamp to date format
+    const timestamp = Number(rawInvoiceData.createddate);
+    const invoiceDate = new Date(timestamp);
 
-    // Format the date using our robust date formatter
-    const invoiceDate = formatDate(invoiceData.date);
-    const formattedTime = formatTime(invoiceData.time);
+    // Format the date using our robust date formatter (YYYY-MM-DD)
+    const formattedDate = formatDate(invoiceDate.toISOString().split("T")[0]);
 
-    // Payment means function
-    const paymentDetails = getPaymentDetails(invoiceData.type);
+    // Get time from the timestamp
+    const hours = invoiceDate.getHours().toString().padStart(2, "0");
+    const minutes = invoiceDate.getMinutes().toString().padStart(2, "0");
+    const seconds = invoiceDate.getSeconds().toString().padStart(2, "0");
+    const formattedTime = `${hours}:${minutes}:${seconds}Z`;
+
+    // Check if date is within range
+    const day = invoiceDate.getDate().toString().padStart(2, "0");
+    const month = (invoiceDate.getMonth() + 1).toString().padStart(2, "0");
+    const year = invoiceDate.getFullYear();
+    const formattedDateForValidation = `${day}/${month}/${year}`;
+
+    if (!isDateWithinRange(formattedDateForValidation)) {
+      throw {
+        type: "validation",
+        code: "DATE_VALIDATION",
+        message: "Invoice date must be within the last 3 days",
+        invoiceNo: rawInvoiceData.id,
+      };
+    }
+
+    // Validate order details
+    if (!Array.isArray(rawInvoiceData?.orderDetails)) {
+      throw {
+        type: "validation",
+        code: "INV_VALIDATION",
+        message: "Invoice must contain at least one order detail",
+        invoiceNo: rawInvoiceData.id,
+      };
+    } else if (rawInvoiceData.orderDetails.length === 0) {
+      throw {
+        type: "validation",
+        code: "INV_VALIDATION",
+        message: "Invoice must contain at least one order detail",
+        invoiceNo: rawInvoiceData.id,
+      };
+    }
+
+    // Payment means function - use paymenttype which is now either "CASH" or "INVOICE"
+    const paymentDetails = getPaymentDetails(rawInvoiceData.paymenttype);
+
+    // Clean and prepare the order details
+    const sanitizedOrderDetails = rawInvoiceData.orderDetails.map((detail) => ({
+      ...detail,
+      qty: Number(detail.quantity || 0),
+      productname: detail.description || "",
+      price: Number(detail.price || 0),
+      total: detail.total || "0",
+    }));
 
     // Total amounts calculation
-    const totals = calculateTaxAndTotals(invoiceData);
+    const totals = calculateTaxAndTotals({
+      orderDetails: sanitizedOrderDetails,
+      totalamountpayable: Number(rawInvoiceData.totalamountpayable || 0),
+      amount: Number(rawInvoiceData.amount || 0),
+    });
 
-    // Allowing multi-lines invoice
-    const invoiceLines = generateInvoiceLines(invoiceData.orderDetails, totals);
+    console.log(sanitizedOrderDetails);
+    // Generate invoice lines
+    const invoiceLines = generateInvoiceLines(sanitizedOrderDetails);
 
     return {
       _D: "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
@@ -436,8 +354,8 @@ export async function transformInvoiceToMyInvoisFormat(
       _B: "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
       Invoice: [
         {
-          ID: [{ _: invoiceData.invoiceno }],
-          IssueDate: [{ _: invoiceDate }],
+          ID: [{ _: rawInvoiceData.id }],
+          IssueDate: [{ _: formattedDate }],
           IssueTime: [{ _: formattedTime }],
           InvoiceTypeCode: [{ _: "01", listVersionID: "1.0" }],
           DocumentCurrencyCode: [{ _: "MYR" }],
@@ -709,7 +627,7 @@ export async function transformInvoiceToMyInvoisFormat(
               ],
               PaidDate: [
                 {
-                  _: invoiceDate,
+                  _: formattedDate,
                 },
               ],
               PaidTime: [
@@ -765,7 +683,9 @@ export async function transformInvoiceToMyInvoisFormat(
               TaxInclusiveAmount: [{ _: totals.total, currencyID: "MYR" }], // Sum of amount payable inclusive of total taxes chargeable (e.g., sales tax, service tax).
               AllowanceTotalAmount: [{ _: 0, currencyID: "MYR" }], // (Optional) Total amount deducted from the original price of the product(s) or service(s).
               ChargeTotalAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // (Optional) Total charge associated with the product(s) or service(s) imposed before tax.
-              PayableRoundingAmount: [{ _: 0, currencyID: "MYR" }], // (Optional) Rounding amount added to the amount payable.
+              PayableRoundingAmount: [
+                { _: rawInvoiceData.rounding || 0, currencyID: "MYR" },
+              ], // (Optional) Rounding amount added to the amount payable.
               PayableAmount: [{ _: totals.total, currencyID: "MYR" }], // Sum of amount payable (inclusive of total taxes chargeable and any rounding adjustment) excluding any amount paid in advance.
             },
           ],

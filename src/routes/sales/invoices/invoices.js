@@ -414,6 +414,9 @@ export default function (pool) {
 
       const invoice = req.body;
 
+      // Check which ID to use for finding the invoice
+      const lookupId = invoice.originalId || invoice.id;
+
       // Validate required fields
       if (
         !invoice.id ||
@@ -426,21 +429,39 @@ export default function (pool) {
         );
       }
 
-      // Update invoice with new fields
+      // Check if invoice exists before attempting update
+      const checkQuery = "SELECT id FROM invoices WHERE id = $1";
+      const checkResult = await client.query(checkQuery, [lookupId]);
+
+      if (checkResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(200).json({
+          message: `Invoice with ID ${lookupId} not found, updating with new ID`,
+        });
+      }
+
+      // First, delete existing products
+      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
+        lookupId,
+      ]);
+
+      // Now update the invoice
       const updateInvoiceQuery = `
-      UPDATE invoices SET
-        salespersonid = $1,
-        customerid = $2,
-        createddate = $3,
-        paymenttype = $4,
-        amount = $5,
-        rounding = $6,
-        totalamountpayable = $7
-      WHERE id = $8
-      RETURNING *
-    `;
+        UPDATE invoices SET
+          id = $1,
+          salespersonid = $2,
+          customerid = $3,
+          createddate = $4,
+          paymenttype = $5,
+          amount = $6,
+          rounding = $7,
+          totalamountpayable = $8
+        WHERE id = $9
+        RETURNING *
+      `;
 
       const invoiceResult = await client.query(updateInvoiceQuery, [
+        invoice.id,
         invoice.salespersonid,
         invoice.customerid,
         invoice.createddate,
@@ -448,41 +469,39 @@ export default function (pool) {
         invoice.amount || 0,
         invoice.rounding || 0,
         invoice.totalamountpayable || 0,
-        invoice.id,
+        lookupId,
       ]);
 
       if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${invoice.id} not found`);
+        throw new Error(`Invoice with ID ${lookupId} not found`);
       }
 
-      // Delete existing products
-      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
-        invoice.id,
-      ]);
+      // Insert updated products always using the invoice ID from the database (post-update)
+      // This ensures we use the actual ID in the database, whether changed or not
+      const actualInvoiceId = invoiceResult.rows[0].id;
 
-      // Insert updated products including subtotals
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
-        INSERT INTO order_details (
-          invoiceid,
-          code,
-          price,
-          quantity,
-          freeproduct,
-          returnproduct,
-          description,
-          tax,
-          total,
-          issubtotal
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      `;
+          INSERT INTO order_details (
+            invoiceid,
+            code,
+            price,
+            quantity,
+            freeproduct,
+            returnproduct,
+            description,
+            tax,
+            total,
+            issubtotal
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `;
 
         for (const product of invoice.products) {
           if (product.issubtotal) {
             // Insert subtotal row
             await client.query(productQuery, [
-              invoice.id,
+              actualInvoiceId,
               product.code || "SUBTOTAL",
               0, // price
               0, // quantity
@@ -505,7 +524,7 @@ export default function (pool) {
             const total = regularTotal + tax;
 
             await client.query(productQuery, [
-              invoice.id,
+              actualInvoiceId,
               product.code,
               price,
               quantity,
@@ -517,7 +536,6 @@ export default function (pool) {
               false, // issubtotal
             ]);
           }
-          // Total rows are not inserted as they are calculated
         }
       }
 
