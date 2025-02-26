@@ -12,6 +12,27 @@ import {
 import { api } from "../../routes/utils/api";
 import InvoisModalContainer from "./InvoisModalContainer";
 import { SubmissionDisplay } from "./SubmissionDisplay";
+import {
+  formatDisplayDate,
+  parseDatabaseTimestamp,
+} from "../../utils/invoice/dateUtils";
+
+const formatDateTime = (timestamp: string | number) => {
+  const { date, formattedTime } = parseDatabaseTimestamp(timestamp);
+
+  // Convert time from 24-hour to 12-hour format
+  let formattedTime12Hour = "";
+  if (formattedTime) {
+    const [hours, minutes] = formattedTime.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+    formattedTime12Hour = `${hours12}:${minutes
+      .toString()
+      .padStart(2, "0")} ${period}`;
+  }
+
+  return `${formatDisplayDate(date)} ${formattedTime12Hour}`;
+};
 
 // Extracted info component for better organization
 const SelectedInvoicesInfo: React.FC<{ selectedInvoices: InvoiceData[] }> = ({
@@ -32,19 +53,18 @@ const SelectedInvoicesInfo: React.FC<{ selectedInvoices: InvoiceData[] }> = ({
         <div key={invoice.id} className="p-4 bg-white rounded-lg">
           <div className="flex justify-between items-start">
             <div>
-              <p className="font-medium text-default-800">
-                #{invoice.id}
-              </p>
+              <p className="font-medium text-default-800">#{invoice.id}</p>
               <p className="text-sm text-default-600 mt-1">
                 {invoice.customerid || "N/A"}
               </p>
             </div>
-            <p className="text-sm text-default-500">{invoice.createddate}</p>
+
+            <p className="text-sm text-default-500">
+              {formatDateTime(invoice.createddate)}
+            </p>
           </div>
           <div className="mt-1 flex gap-2 text-xs">
-            <span className="text-default-500">
-              Order: {invoice.id}
-            </span>
+            <span className="text-default-500">Order: {invoice.id}</span>
             <span className="text-default-500">
               Type: {invoice.paymenttype === "INVOICE" ? "Invoice" : "Cash"}
             </span>
