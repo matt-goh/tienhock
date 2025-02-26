@@ -21,14 +21,16 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
+import {
+  refreshCustomersCache,
+  useCustomersCache,
+} from "../../utils/catalogue/useCustomerCache";
 
 const ITEMS_PER_PAGE = 12;
 
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
-  const [customers, setCustomers] = useState<CustomerList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { customers, isLoading, error } = useCustomersCache();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
@@ -50,22 +52,8 @@ const CustomerPage: React.FC = () => {
     }
   }, []);
 
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get("/api/customers");
-      setCustomers(data);
-      setError(null);
-    } catch (err) {
-      setError("Failed to fetch customers. Please try again later.");
-      console.error("Error fetching customers:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    Promise.all([fetchCustomers(), fetchSalesmen()]);
+    fetchSalesmen();
   }, [fetchSalesmen]);
 
   const handleDeleteClick = (customer: CustomerList) => {
@@ -77,9 +65,10 @@ const CustomerPage: React.FC = () => {
     if (customerToDelete) {
       try {
         await api.delete(`/api/customers/${customerToDelete.id}`);
-        setCustomers(
-          customers.filter((cust) => cust.id !== customerToDelete.id)
-        );
+
+        // Refresh the cache after deletion
+        await refreshCustomersCache();
+
         setIsDeleteDialogOpen(false);
         setCustomerToDelete(null);
         toast.success("Customer deleted successfully");
@@ -269,7 +258,7 @@ const CustomerPage: React.FC = () => {
     return buttons;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
         <LoadingSpinner />
@@ -278,7 +267,7 @@ const CustomerPage: React.FC = () => {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Error: {error.message}</div>;
   }
 
   return (
@@ -320,7 +309,7 @@ const CustomerPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {paginatedCustomers.map((customer) => (
+          {paginatedCustomers.map((customer: CustomerList) => (
             <CustomerCard
               key={customer.id}
               customer={customer}
