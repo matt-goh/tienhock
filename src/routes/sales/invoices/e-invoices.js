@@ -293,9 +293,10 @@ export default function (pool, config) {
         shouldStopAtValidation: true,
         rejectedDocuments: [
           {
-            invoiceCodeNumber: error.id || "unknown",
+            invoiceCodeNumber:
+              error.id || (error.invoiceNo ? error.invoiceNo : "unknown"),
             error: {
-              code: error.code || "2",
+              code: error.code || "Unknown",
               message: error.message || "Unknown error occurred",
               details: error.details || [],
             },
