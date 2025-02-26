@@ -344,7 +344,6 @@ export async function transformInvoiceToMyInvoisFormat(
       amount: Number(rawInvoiceData.amount || 0),
     });
 
-    console.log(sanitizedOrderDetails);
     // Generate invoice lines
     const invoiceLines = generateInvoiceLines(sanitizedOrderDetails);
 
@@ -510,129 +509,6 @@ export async function transformInvoiceToMyInvoisFormat(
                       ElectronicMail: [{ _: customerData.email || "" }],
                     },
                   ],
-                },
-              ],
-            },
-          ],
-          Delivery: [
-            {
-              DeliveryParty: [
-                {
-                  PartyLegalEntity: [
-                    {
-                      RegistrationName: [{ _: customerData.name }],
-                    },
-                  ],
-                  PostalAddress: [
-                    {
-                      CityName: [{ _: "" }],
-                      PostalZone: [{ _: "" }],
-                      CountrySubentityCode: [{ _: customerData.state || "" }],
-                      AddressLine: [
-                        { Line: [{ _: "" }] },
-                        { Line: [{ _: "" }] },
-                        { Line: [{ _: "" }] },
-                      ],
-                      Country: [
-                        {
-                          IdentificationCode: [
-                            {
-                              _: "MYS",
-                              listID: "ISO3166-1",
-                              listAgencyID: "6",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                  PartyIdentification: [
-                    {
-                      ID: [
-                        {
-                          _: customerData.tin_number || "-",
-                          schemeID: "TIN",
-                        },
-                      ],
-                    },
-                    {
-                      ID: [
-                        {
-                          _: "-",
-                          schemeID: "BRN",
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-              Shipment: [
-                {
-                  ID: [
-                    {
-                      _: "",
-                    },
-                  ],
-                  FreightAllowanceCharge: [
-                    {
-                      ChargeIndicator: [
-                        {
-                          _: false,
-                        },
-                      ],
-                      AllowanceChargeReason: [
-                        {
-                          _: "",
-                        },
-                      ],
-                      Amount: [
-                        {
-                          _: 0,
-                          currencyID: "MYR",
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-          PaymentMeans: [
-            {
-              PaymentMeansCode: [{ _: paymentDetails.code }], // 01 Cash 02 Cheque 03 Bank Transfer 04 Credit Card 05 Debit Card 06 e-Wallet / Digital Wallet 07	Digital Bank 08	Others
-              PayeeFinancialAccount: [{ ID: [{ _: "-" }] }],
-            },
-          ],
-          PaymentTerms: [
-            {
-              Note: [
-                {
-                  _: paymentDetails.description, // In our case, cash = 01, invoice = 03 (bank transfer)
-                },
-              ],
-            },
-          ],
-          PrepaidPayment: [
-            {
-              ID: [
-                {
-                  _: "-",
-                },
-              ],
-              PaidAmount: [
-                {
-                  _: 0,
-                  currencyID: "MYR",
-                },
-              ],
-              PaidDate: [
-                {
-                  _: formattedDate,
-                },
-              ],
-              PaidTime: [
-                {
-                  _: formattedTime,
                 },
               ],
             },

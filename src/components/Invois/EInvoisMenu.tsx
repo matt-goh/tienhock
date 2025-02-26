@@ -227,7 +227,7 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
         },
       });
 
-      const response = await api.post("/api/einvoice/test-submit", {
+      const response = await api.post("/api/einvoice/submit", {
         invoiceIds: selectedInvoices.map((invoice) => invoice.id),
       });
 
