@@ -4,7 +4,6 @@ import { API_BASE_URL } from "../../configs/config.js";
 
 const handleResponse = async (response) => {
   const data = await response.json();
-
   return data;
 };
 

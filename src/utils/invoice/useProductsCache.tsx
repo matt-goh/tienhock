@@ -9,6 +9,38 @@ interface CachedProducts {
 
 const CACHE_KEY = "products_cache";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const PRODUCTS_UPDATED_EVENT = "products-updated";
+
+// Create a global function to trigger cache refresh
+export const refreshProductsCache = async () => {
+  try {
+    // Remove the current cache
+    localStorage.removeItem(CACHE_KEY);
+
+    // Fetch new data
+    const data = await api.get("/api/products/combobox");
+
+    // Store in cache
+    const cacheData = {
+      data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
+    // Dispatch event to notify subscribers
+    window.dispatchEvent(
+      new CustomEvent(PRODUCTS_UPDATED_EVENT, { detail: data })
+    );
+  } catch (error) {
+    console.error("Error refreshing products cache:", error);
+  }
+};
+
+// Expose this to make it globally available
+if (typeof window !== "undefined") {
+  // @ts-ignore
+  window.refreshProductsCache = refreshProductsCache;
+}
 
 export const useProductsCache = () => {
   const [products, setProducts] = useState<
@@ -17,9 +49,11 @@ export const useProductsCache = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
+  const fetchProducts = async (forceRefresh = false) => {
+    setIsLoading(true);
+    try {
+      // Skip cache if force refresh is requested
+      if (!forceRefresh) {
         // Check cache first
         const cachedData = localStorage.getItem(CACHE_KEY);
         if (cachedData) {
@@ -29,33 +63,65 @@ export const useProductsCache = () => {
           if (!isExpired) {
             setProducts(data);
             setIsLoading(false);
-            return;
+            setError(null);
+            return data;
           }
         }
+      }
 
-        // If cache is missing or expired, fetch fresh data
-        const data = await api.get("/api/products/combobox");
+      // If cache is missing, expired, or force refresh is requested, fetch fresh data
+      const data = await api.get("/api/products/combobox");
 
-        // Update cache
-        const cacheData: CachedProducts = {
-          data,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      // Update cache
+      const cacheData: CachedProducts = {
+        data,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
-        setProducts(data);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        setError(
-          error instanceof Error ? error : new Error("Failed to fetch products")
-        );
-        toast.error("Error fetching products");
-      } finally {
-        setIsLoading(false);
+      setProducts(data);
+      setError(null);
+      return data;
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      const err =
+        error instanceof Error ? error : new Error("Failed to fetch products");
+      setError(err);
+      toast.error("Error fetching products");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Listen for product updates
+  useEffect(() => {
+    const handleProductsUpdated = (event: CustomEvent) => {
+      // If event contains data, use it directly
+      if (event.detail) {
+        setProducts(event.detail);
+      } else {
+        // Otherwise refresh from cache or API
+        fetchProducts(true);
       }
     };
 
-    fetchProducts();
+    window.addEventListener(
+      PRODUCTS_UPDATED_EVENT,
+      handleProductsUpdated as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        PRODUCTS_UPDATED_EVENT,
+        handleProductsUpdated as EventListener
+      );
+    };
   }, []);
 
   const invalidateCache = () => {
@@ -63,24 +129,7 @@ export const useProductsCache = () => {
   };
 
   const refreshProducts = async () => {
-    setIsLoading(true);
-    try {
-      const data = await api.get("/api/products/combobox");
-      const cacheData: CachedProducts = {
-        data,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-      setProducts(data);
-    } catch (error) {
-      console.error("Error refreshing products:", error);
-      setError(
-        error instanceof Error ? error : new Error("Failed to refresh products")
-      );
-      toast.error("Error refreshing products");
-    } finally {
-      setIsLoading(false);
-    }
+    return fetchProducts(true);
   };
 
   return {
