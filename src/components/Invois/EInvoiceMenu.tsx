@@ -1,4 +1,4 @@
-// src/components/Invoice/EInvoisMenu.tsx
+// src/components/Invoice/EInvoiceMenu.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import Button from "../Button";
 import toast from "react-hot-toast";
@@ -103,13 +103,13 @@ const InfoBox: React.FC = () => (
   </div>
 );
 
-interface EInvoisMenuProps {
+interface EInvoiceMenuProps {
   selectedInvoices: InvoiceData[];
   onSubmissionComplete?: () => void;
   clearSelection?: (() => void) | null;
 }
 
-const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
+const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
   selectedInvoices,
   onSubmissionComplete,
   clearSelection,
@@ -373,4 +373,4 @@ const EInvoisMenu: React.FC<EInvoisMenuProps> = ({
   );
 };
 
-export default EInvoisMenu;
+export default EInvoiceMenu;

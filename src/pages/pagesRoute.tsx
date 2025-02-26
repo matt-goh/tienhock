@@ -16,7 +16,7 @@ import CustomerPage from "./Catalogue/CustomerPage";
 import StaffAddPage from "./Catalogue/StaffAddPage";
 import PDFViewerPage from "./Invois/PDFViewerPage";
 import ProductPage from "./Catalogue/ProductPage";
-import EInvoisPage from "./Invois/EInvoisPage";
+import EInvoicePage from "./Invois/EInvoicePage";
 import BasicPage from "./Catalogue/BasicPage";
 import StaffPage from "./Catalogue/StaffPage";
 import InvoisPage from "./Invois/InvoisPage";
@@ -80,7 +80,7 @@ export const SidebarData: SidebarItem[] = [
       {
         name: "e-Invoice",
         path: "/sales/einvoice",
-        component: EInvoisPage,
+        component: EInvoicePage,
       },
     ],
   },

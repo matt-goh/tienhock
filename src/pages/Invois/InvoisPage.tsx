@@ -23,7 +23,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
 import FilterSummary from "../../components/Invois/FilterSummary";
 import TableEditing from "../../components/Table/TableEditing";
-import EInvoisMenu from "../../components/Invois/EInvoisMenu";
+import EInvoiceMenu from "../../components/Invois/EInvoiceMenu";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
@@ -635,7 +635,7 @@ const InvoisPage: React.FC = () => {
                 Print
               </Button>
               <div className="flex items-center gap-3">
-                <EInvoisMenu
+                <EInvoiceMenu
                   selectedInvoices={selectedInvoices}
                   onSubmissionComplete={handleSubmissionComplete}
                   clearSelection={() => clearSelectionRef.current?.()}
