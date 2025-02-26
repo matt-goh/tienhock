@@ -120,7 +120,6 @@ export class SubmissionHandler {
       summary?: DocumentSummaryStatus;
     }
   ) {
-    const timestamp = new Date().toISOString();
     const existingDoc = this.tracker.documents[invoiceNo] || {
       invoiceNo,
       currentStatus: status,
