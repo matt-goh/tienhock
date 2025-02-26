@@ -5,6 +5,7 @@ import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { refreshProductsCache } from "../../utils/invoice/useProductsCache";
 
 interface Product {
   originalId: string;
@@ -90,6 +91,9 @@ const ProductPage: React.FC = () => {
           )
         );
 
+        // Refresh products cache after deletion
+        await refreshProductsCache();
+
         toast.success("Selected products deleted successfully");
         setIsEditing(false);
       } catch (error) {
@@ -147,12 +151,16 @@ const ProductPage: React.FC = () => {
         products: productsToUpdate,
       });
 
-      setProducts(
-        result.products.map((product: Product) => ({
-          ...product,
-          originalId: product.id,
-        }))
-      );
+      const updatedProducts = result.products.map((product: Product) => ({
+        ...product,
+        originalId: product.id,
+      }));
+
+      setProducts(updatedProducts);
+
+      // After successfully saving, refresh the products cache
+      await refreshProductsCache();
+
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {
