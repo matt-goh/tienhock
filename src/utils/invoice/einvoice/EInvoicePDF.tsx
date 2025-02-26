@@ -1,4 +1,4 @@
-// src/utils/invoice/einvoice/eInvoisPDF.tsx
+// src/utils/invoice/einvoice/eInvoicePDF.tsx
 import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
@@ -234,7 +234,7 @@ interface Props {
   qrCodeData: string;
 }
 
-const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
+const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
   return (
     <Page size="A4" style={styles.page}>
       {/* Header Section */}
@@ -449,4 +449,4 @@ const EInvoisPDF: React.FC<Props> = ({ data, qrCodeData }) => {
   );
 };
 
-export default EInvoisPDF;
+export default EInvoicePDF;

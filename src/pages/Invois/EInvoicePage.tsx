@@ -28,7 +28,7 @@ interface PaginationState {
   totalPages: number;
 }
 
-const EInvoisPage: React.FC = () => {
+const EInvoicePage: React.FC = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -487,4 +487,4 @@ const EInvoisPage: React.FC = () => {
   );
 };
 
-export default EInvoisPage;
+export default EInvoicePage;

@@ -5,8 +5,8 @@ import { IconDownload, IconFileDownload } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import toast from "react-hot-toast";
 import { preparePDFData } from "../../../services/einvoice-pdf.service";
-import EInvoisPDF from "./eInvoisPDF";
 import { generateQRDataUrl } from "./generateQRCode";
+import EInvoicePDF from "./EInvoicePDF";
 
 interface PDFDownloadHandlerProps {
   einvoice: any; // We'll type this properly once we have the exact type
@@ -38,7 +38,7 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Create PDF
       const pdfComponent = (
         <Document title={`einvoice-${einvoice.internal_id}`}>
-          <EInvoisPDF data={pdfData} qrCodeData={qrDataUrl} />
+          <EInvoicePDF data={pdfData} qrCodeData={qrDataUrl} />
         </Document>
       );
 
