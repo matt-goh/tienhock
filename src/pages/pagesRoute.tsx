@@ -61,17 +61,17 @@ export const SidebarData: SidebarItem[] = [
         component: InvoicePage,
         subItems: [
           {
-            name: "Invois Details",
+            name: "Invoice Details",
             path: "/sales/invoice/:id",
             component: InvoiceDetailsPage,
           },
           {
-            name: "Invois PDF Viewer",
+            name: "Invoice PDF Viewer",
             path: "/pdf-viewer",
             component: PDFViewerPage,
           },
           {
-            name: "Create New Invois Page",
+            name: "Create New Invoice Page",
             path: "/sales/invoice/create",
             component: InvoiceDetailsPage,
           },

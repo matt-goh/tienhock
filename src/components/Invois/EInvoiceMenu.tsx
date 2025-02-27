@@ -338,7 +338,7 @@ const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
         icon={IconFileInvoice}
         variant="outline"
       >
-        e-Invois
+        e-Invoice
       </Button>
 
       <InvoisModalContainer
