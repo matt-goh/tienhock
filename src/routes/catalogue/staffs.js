@@ -148,6 +148,24 @@ export default function (pool) {
     }
   });
 
+  router.get("/get-salesmen", async (req, res) => {
+    try {
+      const query = `
+        SELECT
+          name, email
+        FROM staffs
+        WHERE (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+        AND job::jsonb ? 'SALESMAN'
+      `;
+
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching salesmen:", error);
+      res.status(500).json({ error: "Failed to fetch salesmen" });
+    }
+  });
+
   // Get single staff member
   router.get("/:id", async (req, res) => {
     const { id } = req.params;

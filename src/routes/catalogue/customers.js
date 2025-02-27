@@ -180,7 +180,22 @@ export default function (pool) {
     }
   });
 
-  // In customers.js
+  router.get("/get-customers", async (req, res) => {
+    try {
+      const query = `
+        SELECT
+          id, name, id_number, tin_number, salesman, email, phone_number, address, city
+        FROM customers
+      `;
+
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
   router.get("/by-tin/:tin", async (req, res) => {
     const { tin } = req.params;
 
@@ -225,16 +240,14 @@ export default function (pool) {
         .json({ message: "Error deleting customer", error: error.message });
     }
   });
-  
+
   router.post("/names", async (req, res) => {
     const { customerIds } = req.body;
 
     if (!Array.isArray(customerIds) || customerIds.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid input: customerIds must be a non-empty array",
-        });
+      return res.status(400).json({
+        message: "Invalid input: customerIds must be a non-empty array",
+      });
     }
 
     try {
