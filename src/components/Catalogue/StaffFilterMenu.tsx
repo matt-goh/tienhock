@@ -15,7 +15,6 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { FilterOptions } from "../../types/types";
-import { LOCATION_MAP } from "../../constants/locationConstants";
 import Button from "../Button";
 
 type StaffFilterMenuProps = {
@@ -23,6 +22,33 @@ type StaffFilterMenuProps = {
   currentFilters: FilterOptions;
   jobOptions: string[];
   locationOptions: string[];
+};
+
+const LOCATION_MAP: { [key: string]: string } = {
+  "01": "DIRECTOR'S REMUNERATION",
+  "02": "OFFICE",
+  "03": "SALESMAN",
+  "04": "IKUT LORI",
+  "05": "PENGANGKUTAN HABUK",
+  "06": "JAGA BOILER",
+  "07": "MESIN & SANGKUT MEE",
+  "08": "PACKING MEE",
+  "09": "MESIN BIHUN",
+  "10": "SANGKUT BIHUN",
+  "11": "PACKING BIHUN",
+  "12": "PEKEBUN",
+  "13": "TUKANG SAPU",
+  "14": "KILANG KERJA LUAR",
+  "15": "OTHER SABARINA",
+  "16": "COMM-MESIN MEE",
+  "17": "COMM-MESIN BIHUN",
+  "18": "COMM-KILANG",
+  "19": "COMM-LORI",
+  "20": "COMM-BOILER",
+  "21": "COMM-FORKLIFT/CASE",
+  "22": "KILANG HABUK",
+  "23": "CUTI TAHUNAN",
+  "24": "SPECIAL OT"
 };
 
 const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
