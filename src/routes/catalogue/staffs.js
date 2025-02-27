@@ -152,7 +152,7 @@ export default function (pool) {
     try {
       const query = `
         SELECT
-          name, email
+          id, name, email
         FROM staffs
         WHERE (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
         AND job::jsonb ? 'SALESMAN'
