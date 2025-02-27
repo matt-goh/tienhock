@@ -96,11 +96,23 @@ const isDateWithinRange = (dateStr, daysBack = 3) => {
   }
 };
 
+// XML escape function to prevent XML injection
+function escapeXml(unsafe) {
+  if (unsafe === undefined || unsafe === null) return "";
+  return unsafe
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 const calculateTaxAndTotals = (invoiceData) => {
   // Get the provided values directly
   const subtotal = formatAmount(invoiceData.amount || 0);
 
-  // Group tax items by tax category (taxed, exempt, etc.)
+  // Group tax items by tax category
   const taxGroups = {
     ["01"]: { amount: 0, taxable: 0 }, // Sales Tax
     ["02"]: { amount: 0, taxable: 0 }, // Service Tax
@@ -150,124 +162,110 @@ const calculateTaxAndTotals = (invoiceData) => {
   };
 };
 
+// Generate tax subtotal XML elements
+function generateTaxSubtotals(taxSubtotals) {
+  return taxSubtotals
+    .map(
+      (subtotal) => `
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="MYR">${subtotal.taxableAmount.toFixed(
+        2
+      )}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="MYR">${subtotal.taxAmount.toFixed(
+        2
+      )}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>${subtotal.category}</cbc:ID>
+        <cac:TaxScheme>
+          <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">OTH</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>`
+    )
+    .join("");
+}
+
 // Handle multiple invoice lines
 const generateInvoiceLines = (orderDetails) => {
   // First filter out any subtotal rows, we only want regular items
   const regularItems = orderDetails.filter((item) => !item.issubtotal);
 
   // Generate invoice lines with item's own tax values
-  return regularItems.map((item) => {
-    const lineAmount = formatAmount(
-      (item.qty || 0) * (Number(item.price) || 0)
-    );
+  return regularItems
+    .map((item, index) => {
+      const lineNumber = (index + 1).toString().padStart(3, "0");
+      const lineAmount = formatAmount(
+        (item.qty || 0) * (Number(item.price) || 0)
+      );
 
-    // Get the tax directly from the item's own tax field
-    const productTax = formatAmount(Number(item.tax) || 0);
+      // Get the tax directly from the item's own tax field
+      const productTax = formatAmount(Number(item.tax) || 0);
 
-    // Determine tax category based on tax amount
-    const taxCategory = productTax > 0 ? "01" : "06"; // 01 for Sales Tax, 06 for Not Applicable
+      // Determine tax category based on tax amount
+      const taxCategory = productTax > 0 ? "01" : "06"; // 01 for Sales Tax, 06 for Not Applicable
 
-    return {
-      ID: [
-        {
-          _: item.id ? item.id.toString() : `00${index + 1}`.slice(-3),
-        },
-      ],
-      InvoicedQuantity: [
-        {
-          _: Number(item.qty),
-          unitCode: "NMP",
-        },
-      ],
-      LineExtensionAmount: [
-        {
-          _: lineAmount,
-          currencyID: "MYR",
-        },
-      ],
-      AllowanceCharge: [
-        {
-          ChargeIndicator: [{ _: false }],
-          AllowanceChargeReason: [{ _: "-" }],
-          MultiplierFactorNumeric: [{ _: 0 }],
-          Amount: [{ _: 0, currencyID: "MYR" }],
-        },
-        {
-          ChargeIndicator: [{ _: false }],
-          AllowanceChargeReason: [{ _: "-" }],
-          MultiplierFactorNumeric: [{ _: 0 }],
-          Amount: [{ _: 0, currencyID: "MYR" }],
-        },
-      ],
-      TaxTotal: [
-        {
-          TaxAmount: [{ _: productTax, currencyID: "MYR" }],
-          TaxSubtotal: [
-            {
-              TaxableAmount: [{ _: lineAmount, currencyID: "MYR" }],
-              TaxAmount: [{ _: productTax, currencyID: "MYR" }],
-              BaseUnitMeasure: [{ _: Number(item.qty), unitCode: "NMP" }],
-              PerUnitAmount: [
-                {
-                  _:
-                    Number(item.qty) > 0
-                      ? formatAmount(productTax / Number(item.qty))
-                      : 0,
-                  currencyID: "MYR",
-                },
-              ],
-              TaxCategory: [
-                {
-                  ID: [{ _: taxCategory }], // 01	Sales Tax 02	Service Tax 03	Tourism Tax 04	High-Value Goods Tax 05	Sales Tax on Low Value Goods 06	Not Applicable E Tax exemption (where applicable)
-                  TaxScheme: [
-                    {
-                      ID: [
-                        {
-                          _: "OTH",
-                          schemeID: "UN/ECE 5153",
-                          schemeAgencyID: "6",
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      Item: [
-        {
-          CommodityClassification: [
-            { ItemClassificationCode: [{ _: "", listID: "PTC" }] },
-            { ItemClassificationCode: [{ _: "022", listID: "CLASS" }] }, // O22 = Others
-          ],
-          Description: [{ _: item.productname }],
-          OriginCountry: [{ IdentificationCode: [{ _: "MYS" }] }],
-        },
-      ],
-      Price: [
-        {
-          PriceAmount: [
-            {
-              _: formatAmount(item.price),
-              currencyID: "MYR",
-            },
-          ],
-        },
-      ],
-      ItemPriceExtension: [
-        {
-          Amount: [
-            {
-              _: formatAmount(lineAmount),
-              currencyID: "MYR",
-            },
-          ],
-        },
-      ],
-    };
-  });
+      return `
+  <cac:InvoiceLine>
+    <cbc:ID>${lineNumber}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="NMP">${item.qty}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="MYR">${lineAmount.toFixed(
+      2
+    )}</cbc:LineExtensionAmount>
+    <cac:AllowanceCharge>
+      <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+      <cbc:AllowanceChargeReason>-</cbc:AllowanceChargeReason>
+      <cbc:MultiplierFactorNumeric>0</cbc:MultiplierFactorNumeric>
+      <cbc:Amount currencyID="MYR">0.00</cbc:Amount>
+    </cac:AllowanceCharge>
+    <cac:AllowanceCharge>
+      <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
+      <cbc:AllowanceChargeReason>-</cbc:AllowanceChargeReason>
+      <cbc:MultiplierFactorNumeric>0</cbc:MultiplierFactorNumeric>
+      <cbc:Amount currencyID="MYR">0.00</cbc:Amount>
+    </cac:AllowanceCharge>
+    <cac:TaxTotal>
+      <cbc:TaxAmount currencyID="MYR">${productTax.toFixed(2)}</cbc:TaxAmount>
+      <cac:TaxSubtotal>
+        <cbc:TaxableAmount currencyID="MYR">${lineAmount.toFixed(
+          2
+        )}</cbc:TaxableAmount>
+        <cbc:TaxAmount currencyID="MYR">${productTax.toFixed(2)}</cbc:TaxAmount>
+        <cbc:BaseUnitMeasure unitCode="NMP">${item.qty}</cbc:BaseUnitMeasure>
+        <cbc:PerUnitAmount currencyID="MYR">${(item.qty > 0
+          ? productTax / item.qty
+          : 0
+        ).toFixed(2)}</cbc:PerUnitAmount>
+        <cac:TaxCategory>
+          <cbc:ID>${taxCategory}</cbc:ID>
+          <cac:TaxScheme>
+            <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">OTH</cbc:ID>
+          </cac:TaxScheme>
+        </cac:TaxCategory>
+      </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:Item>
+      <cbc:Description>${escapeXml(item.productname)}</cbc:Description>
+      <cac:OriginCountry>
+        <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
+      </cac:OriginCountry>
+      <cac:CommodityClassification>
+        <cbc:ItemClassificationCode listID="PTC"></cbc:ItemClassificationCode>
+      </cac:CommodityClassification>
+      <cac:CommodityClassification>
+        <cbc:ItemClassificationCode listID="CLASS">022</cbc:ItemClassificationCode>
+      </cac:CommodityClassification>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="MYR">${lineAmount.toFixed(
+        2
+      )}</cbc:PriceAmount>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="MYR">${lineAmount.toFixed(2)}</cbc:Amount>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>`;
+    })
+    .join("");
 };
 
 export async function EInvoiceTemplate(rawInvoiceData, customerData) {
@@ -349,241 +347,175 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
       amount: Number(rawInvoiceData.amount || 0),
     });
 
-    // Generate invoice lines
-    const invoiceLines = generateInvoiceLines(sanitizedOrderDetails);
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" 
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" 
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>${escapeXml(rawInvoiceData.id)}</cbc:ID>
+  <cbc:IssueDate>${formattedDate}</cbc:IssueDate>
+  <cbc:IssueTime>${formattedTime}</cbc:IssueTime>
+  <cbc:InvoiceTypeCode listVersionID="1.0">01</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
+  <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>
+  <cac:InvoicePeriod>
+    <cbc:StartDate>${formattedDate}</cbc:StartDate>
+    <cbc:EndDate>${formattedDate}</cbc:EndDate>
+    <cbc:Description>Not Applicable</cbc:Description>
+  </cac:InvoicePeriod>
+  <cac:BillingReference>
+    <cac:AdditionalDocumentReference>
+      <cbc:ID>-</cbc:ID>
+    </cac:AdditionalDocumentReference>
+  </cac:BillingReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID></cbc:ID>
+    <cbc:DocumentType></cbc:DocumentType>
+  </cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID></cbc:ID>
+    <cbc:DocumentType></cbc:DocumentType>
+    <cbc:DocumentDescription></cbc:DocumentDescription>
+  </cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID></cbc:ID>
+    <cbc:DocumentType></cbc:DocumentType>
+  </cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID></cbc:ID>
+  </cac:AdditionalDocumentReference>
+  <cac:AccountingSupplierParty>
+    <cbc:AdditionalAccountID schemeAgencyName="CertEX"></cbc:AdditionalAccountID>
+    <cac:Party>
+      <cbc:IndustryClassificationCode name="Manufacture of meehoon, noodles and other related products">10741</cbc:IndustryClassificationCode>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="TIN">C21636482050</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="BRN">201101025173</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="SST">-</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="TTX">-</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PostalAddress>
+        <cbc:CityName>KOTA KINABALU</cbc:CityName>
+        <cbc:PostalZone>88811</cbc:PostalZone>
+        <cbc:CountrySubentityCode>12</cbc:CountrySubentityCode>
+        <cac:AddressLine>
+          <cbc:Line>CL.215145645, KG KIBABAIG, PENAMPANG</cbc:Line>
+        </cac:AddressLine>
+        <cac:AddressLine>
+          <cbc:Line></cbc:Line>
+        </cac:AddressLine>
+        <cac:AddressLine>
+          <cbc:Line></cbc:Line>
+        </cac:AddressLine>
+        <cac:Country>
+          <cbc:IdentificationCode listID="ISO3166-1" listAgencyID="6">MYS</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>TIEN HOCK FOOD INDUSTRIES S/B</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Telephone>0168329291</cbc:Telephone>
+        <cbc:ElectronicMail>tienhockfood@gmail.com</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="TIN">${escapeXml(
+          customerData.tin_number || "-"
+        )}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="${escapeXml(
+          customerData.id_type || "BRN"
+        )}">${escapeXml(customerData.id_number || "-")}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="SST">-</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="TTX">-</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PostalAddress>
+        <cbc:CityName>${escapeXml(customerData.city || "")}</cbc:CityName>
+        <cbc:PostalZone></cbc:PostalZone>
+        <cbc:CountrySubentityCode>${escapeXml(
+          customerData.state || ""
+        )}</cbc:CountrySubentityCode>
+        <cac:AddressLine>
+          <cbc:Line>${escapeXml(customerData.address || "")}</cbc:Line>
+        </cac:AddressLine>
+        <cac:AddressLine>
+          <cbc:Line></cbc:Line>
+        </cac:AddressLine>
+        <cac:AddressLine>
+          <cbc:Line></cbc:Line>
+        </cac:AddressLine>
+        <cac:Country>
+          <cbc:IdentificationCode listID="ISO3166-1" listAgencyID="6">MYS</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>${escapeXml(
+          customerData.name
+        )}</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Telephone>${formatPhoneNumber(
+          customerData.phone_number
+        )}</cbc:Telephone>
+        <cbc:ElectronicMail>${escapeXml(
+          customerData.email || ""
+        )}</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:AllowanceCharge>
+    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason></cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="MYR">0.00</cbc:Amount>
+  </cac:AllowanceCharge>
+  <cac:AllowanceCharge>
+    <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason></cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="MYR">0.00</cbc:Amount>
+  </cac:AllowanceCharge>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="MYR">${totals.tax.toFixed(2)}</cbc:TaxAmount>
+    ${generateTaxSubtotals(totals.taxSubtotals)}
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="MYR">${totals.subtotal.toFixed(
+      2
+    )}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="MYR">${totals.subtotal.toFixed(
+      2
+    )}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="MYR">${totals.total.toFixed(
+      2
+    )}</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="MYR">0.00</cbc:AllowanceTotalAmount>
+    <cbc:ChargeTotalAmount currencyID="MYR">${totals.subtotal.toFixed(
+      2
+    )}</cbc:ChargeTotalAmount>
+    <cbc:PayableRoundingAmount currencyID="MYR">${Number(
+      rawInvoiceData.rounding || 0
+    ).toFixed(2)}</cbc:PayableRoundingAmount>
+    <cbc:PayableAmount currencyID="MYR">${totals.total.toFixed(
+      2
+    )}</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  ${generateInvoiceLines(sanitizedOrderDetails)}
+</Invoice>`;
 
-    return {
-      _D: "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
-      _A: "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
-      _B: "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
-      Invoice: [
-        {
-          ID: [{ _: rawInvoiceData.id }],
-          IssueDate: [{ _: formattedDate }],
-          IssueTime: [{ _: formattedTime }],
-          InvoiceTypeCode: [{ _: "01", listVersionID: "1.0" }],
-          DocumentCurrencyCode: [{ _: "MYR" }],
-          TaxCurrencyCode: [{ _: "MYR" }],
-          InvoicePeriod: [
-            {
-              StartDate: [{ _: formattedDate }],
-              EndDate: [{ _: formattedDate }],
-              Description: [{ _: "Not Applicable" }],
-            },
-          ],
-          BillingReference: [
-            {
-              AdditionalDocumentReference: [
-                {
-                  ID: [{ _: "-" }],
-                },
-              ],
-            },
-          ],
-          AdditionalDocumentReference: [
-            {
-              ID: [{ _: "" }],
-              DocumentType: [{ _: "" }],
-            },
-            {
-              ID: [{ _: "" }],
-              DocumentType: [{ _: "" }],
-              DocumentDescription: [{ _: "" }],
-            },
-            {
-              ID: [{ _: "" }],
-              DocumentType: [{ _: "" }],
-            },
-            {
-              ID: [{ _: "" }],
-            },
-          ],
-          AccountingSupplierParty: [
-            {
-              AdditionalAccountID: [{ _: "", schemeAgencyName: "CertEX" }],
-              Party: [
-                {
-                  IndustryClassificationCode: [
-                    {
-                      _: "10741",
-                      name: "Manufacture of meehoon, noodles and other related products",
-                    },
-                  ],
-                  PartyIdentification: [
-                    { ID: [{ _: "C21636482050", schemeID: "TIN" }] },
-                    { ID: [{ _: "201101025173", schemeID: "BRN" }] },
-                    { ID: [{ _: "-", schemeID: "SST" }] },
-                    { ID: [{ _: "-", schemeID: "TTX" }] },
-                  ],
-                  PostalAddress: [
-                    {
-                      CityName: [{ _: "KOTA KINABALU" }],
-                      PostalZone: [{ _: "88811" }],
-                      CountrySubentityCode: [{ _: "12" }],
-                      AddressLine: [
-                        {
-                          Line: [{ _: "CL.215145645, KG KIBABAIG, PENAMPANG" }],
-                        },
-                        { Line: [{ _: "" }] },
-                        { Line: [{ _: "" }] },
-                      ],
-                      Country: [
-                        {
-                          IdentificationCode: [
-                            {
-                              _: "MYS",
-                              listID: "ISO3166-1",
-                              listAgencyID: "6",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                  PartyLegalEntity: [
-                    {
-                      RegistrationName: [
-                        { _: "TIEN HOCK FOOD INDUSTRIES S/B" },
-                      ],
-                    },
-                  ],
-                  Contact: [
-                    {
-                      Telephone: [{ _: "0168329291" }],
-                      ElectronicMail: [{ _: "tienhockfood@gmail.com" }],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-          AccountingCustomerParty: [
-            {
-              Party: [
-                {
-                  PostalAddress: [
-                    {
-                      CityName: [{ _: customerData.city || "" }],
-                      PostalZone: [{ _: "" }],
-                      CountrySubentityCode: [{ _: customerData.state || "" }],
-                      AddressLine: [
-                        { Line: [{ _: customerData.address || "" }] },
-                        { Line: [{ _: "" }] },
-                        { Line: [{ _: "" }] },
-                      ],
-                      Country: [
-                        {
-                          IdentificationCode: [
-                            {
-                              _: "MYS",
-                              listID: "ISO3166-1",
-                              listAgencyID: "6",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                  PartyLegalEntity: [
-                    {
-                      RegistrationName: [{ _: customerData.name }],
-                    },
-                  ],
-                  PartyIdentification: [
-                    {
-                      ID: [
-                        { _: customerData.tin_number || "-", schemeID: "TIN" },
-                      ],
-                    },
-                    {
-                      ID: [
-                        {
-                          _: customerData.id_number || "-",
-                          schemeID: customerData.id_type || "BRN",
-                        },
-                      ],
-                    },
-                    { ID: [{ _: "-", schemeID: "SST" }] },
-                    { ID: [{ _: "-", schemeID: "TTX" }] },
-                  ],
-                  Contact: [
-                    {
-                      Telephone: [
-                        { _: formatPhoneNumber(customerData.phone_number) },
-                      ],
-                      ElectronicMail: [{ _: customerData.email || "" }],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-          AllowanceCharge: [
-            {
-              ChargeIndicator: [{ _: false }],
-              AllowanceChargeReason: [{ _: "" }],
-              Amount: [{ _: 0, currencyID: "MYR" }],
-            },
-            {
-              ChargeIndicator: [{ _: false }],
-              AllowanceChargeReason: [{ _: "" }],
-              Amount: [{ _: 0, currencyID: "MYR" }],
-            },
-          ],
-          TaxTotal: [
-            {
-              TaxAmount: [{ _: totals.tax, currencyID: "MYR" }],
-              // Convert tax subtotals array into proper structure
-              ...totals.taxSubtotals.map((subtotal) => ({
-                TaxSubtotal: [
-                  {
-                    TaxableAmount: [
-                      { _: subtotal.taxableAmount, currencyID: "MYR" },
-                    ],
-                    TaxAmount: [{ _: subtotal.taxAmount, currencyID: "MYR" }],
-                    TaxCategory: [
-                      {
-                        ID: [{ _: subtotal.category }],
-                        ...(subtotal.category === "E"
-                          ? {
-                              TaxExemptionReason: [{ _: "Tax Exemption" }],
-                            }
-                          : {}),
-                        TaxScheme: [
-                          {
-                            ID: [
-                              {
-                                _: "OTH",
-                                schemeID: "UN/ECE 5153",
-                                schemeAgencyID: "6",
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              })),
-            },
-          ],
-          LegalMonetaryTotal: [
-            {
-              LineExtensionAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // (Optional) Sum of total amount payable (inclusive of applicable line item and invoice level discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
-              TaxExclusiveAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // Sum of amount payable (inclusive of applicable discounts and charges), excluding any applicable taxes (e.g., sales tax, service tax).
-              TaxInclusiveAmount: [{ _: totals.total, currencyID: "MYR" }], // Sum of amount payable inclusive of total taxes chargeable (e.g., sales tax, service tax).
-              AllowanceTotalAmount: [{ _: 0, currencyID: "MYR" }], // (Optional) Total amount deducted from the original price of the product(s) or service(s).
-              ChargeTotalAmount: [{ _: totals.subtotal, currencyID: "MYR" }], // (Optional) Total charge associated with the product(s) or service(s) imposed before tax.
-              PayableRoundingAmount: [
-                { _: rawInvoiceData.rounding || 0, currencyID: "MYR" },
-              ], // (Optional) Rounding amount added to the amount payable.
-              PayableAmount: [{ _: totals.total, currencyID: "MYR" }], // Sum of amount payable (inclusive of total taxes chargeable and any rounding adjustment) excluding any amount paid in advance.
-            },
-          ],
-          InvoiceLine: invoiceLines,
-        },
-      ],
-    };
+    return xml;
   } catch (error) {
     // If it's a validation error, pass it through
     if (error.type === "validation") {
