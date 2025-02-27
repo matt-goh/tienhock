@@ -422,7 +422,7 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>${COMPANY_INFO.name}/cbc:RegistrationName>
+        <cbc:RegistrationName>${COMPANY_INFO.name}</cbc:RegistrationName>
       </cac:PartyLegalEntity>
       <cac:Contact>
         <cbc:Telephone>${COMPANY_INFO.phone}</cbc:Telephone>

@@ -584,11 +584,11 @@ export default function (pool) {
     try {
       const orderDetailsQuery = `
       SELECT 
-        productname,
-        qty,
+        description,
+        quantity as qty,
         price,
         total,
-        istax
+        tax
       FROM 
         order_details
       WHERE 
