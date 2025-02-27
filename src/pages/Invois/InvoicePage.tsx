@@ -37,7 +37,7 @@ import { api } from "../../routes/utils/api";
 
 const STORAGE_KEY = "invoisDateFilters";
 
-const InvoisPage: React.FC = () => {
+const InvoicePage: React.FC = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -224,7 +224,7 @@ const InvoisPage: React.FC = () => {
     }
   };
 
-  // In InvoisPage.tsx
+  // In InvoicePage.tsx
   const applyFilters = useCallback(() => {
     let filtered = [...invoices];
 
@@ -774,4 +774,4 @@ const InvoisPage: React.FC = () => {
   );
 };
 
-export default InvoisPage;
+export default InvoicePage;

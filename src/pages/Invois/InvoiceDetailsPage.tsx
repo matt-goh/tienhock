@@ -37,7 +37,7 @@ import { debounce } from "lodash";
 import { CustomerCombobox } from "../../components/Invois/CustomerCombobox";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
-const InvoisDetailsPage: React.FC = () => {
+const InvoiceDetailsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [previousPath, setPreviousPath] = useState("/sales/invoice");
@@ -1115,4 +1115,4 @@ const InvoisDetailsPage: React.FC = () => {
   );
 };
 
-export default InvoisDetailsPage;
+export default InvoiceDetailsPage;
