@@ -7,8 +7,8 @@ import { Icon } from "@tabler/icons-react";
 import React from "react";
 
 // Import components here
+import InvoiceDetailsPage from "./Invois/InvoiceDetailsPage";
 import CustomerFormPage from "./Catalogue/CustomerFormPage";
-import InvoisDetailsPage from "./Invois/InvoisDetailsPage";
 import CustomerAddPage from "./Catalogue/CustomerAddPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import StaffFormPage from "./Catalogue/StaffFormPage";
@@ -17,9 +17,9 @@ import StaffAddPage from "./Catalogue/StaffAddPage";
 import PDFViewerPage from "./Invois/PDFViewerPage";
 import ProductPage from "./Catalogue/ProductPage";
 import EInvoicePage from "./Invois/EInvoicePage";
+import InvoicePage from "./Invois/InvoicePage";
 import BasicPage from "./Catalogue/BasicPage";
 import StaffPage from "./Catalogue/StaffPage";
-import InvoisPage from "./Invois/InvoisPage";
 import JobPage from "./Catalogue/JobPage";
 import TaxPage from "./Catalogue/TaxPage";
 
@@ -58,12 +58,12 @@ export const SidebarData: SidebarItem[] = [
       {
         name: "Invoice",
         path: "/sales/invoice",
-        component: InvoisPage,
+        component: InvoicePage,
         subItems: [
           {
             name: "Invois Details",
             path: "/sales/invoice/:id",
-            component: InvoisDetailsPage,
+            component: InvoiceDetailsPage,
           },
           {
             name: "Invois PDF Viewer",
@@ -73,7 +73,7 @@ export const SidebarData: SidebarItem[] = [
           {
             name: "Create New Invois Page",
             path: "/sales/invoice/create",
-            component: InvoisDetailsPage,
+            component: InvoiceDetailsPage,
           },
         ],
       },
