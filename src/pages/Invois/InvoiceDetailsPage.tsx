@@ -392,16 +392,23 @@ const InvoiceDetailsPage: React.FC = () => {
             }
           });
 
-          // Calculate final total
-          const grandTotal = recalculatedProducts.reduce((sum, item) => {
+          // Calculate tax exclusive amount (subtotal)
+          const subtotalAmount = recalculatedProducts.reduce((sum, item) => {
             if (item.issubtotal) return sum;
             const regularTotal = (item.quantity || 0) * (item.price || 0);
-            return sum + (regularTotal + (item.tax || 0));
+            return sum + regularTotal;
+          }, 0);
+
+          // Calculate tax amount only
+          const taxAmount = recalculatedProducts.reduce((sum, item) => {
+            if (item.issubtotal) return sum;
+            return sum + (item.tax || 0);
           }, 0);
 
           const rounding = prevData.rounding || 0;
 
-          const totalAmountPayable = grandTotal + rounding;
+          // Calculate total amount payable (tax inclusive + rounding)
+          const totalAmountPayable = subtotalAmount + taxAmount + rounding;
 
           // Add the total row
           const productsWithTotal = [
@@ -415,7 +422,7 @@ const InvoiceDetailsPage: React.FC = () => {
               freeProduct: 0,
               returnProduct: 0,
               tax: 0,
-              total: grandTotal.toFixed(2),
+              total: totalAmountPayable.toFixed(2),
               istotal: true,
               issubtotal: false,
             },
@@ -436,9 +443,9 @@ const InvoiceDetailsPage: React.FC = () => {
           return {
             ...prevData,
             products: productsWithTotal,
-            amount: grandTotal,
+            amount: subtotalAmount, // Tax exclusive amount
             rounding: rounding,
-            totalamountpayable: totalAmountPayable,
+            totalamountpayable: totalAmountPayable, // Tax inclusive amount
           };
         });
       }, 0);
