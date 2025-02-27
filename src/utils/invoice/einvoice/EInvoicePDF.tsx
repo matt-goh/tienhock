@@ -246,9 +246,9 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
             <Text style={styles.companyDetail}>
               Reg. No: {data.company.reg_no}
             </Text>
-            <Text style={styles.companyDetail}>{data.company.address}</Text>
+            <Text style={styles.companyDetail}>{data.company.address_pdf}</Text>
             <Text style={styles.companyDetail}>
-              {data.company.postcode}, {data.company.city}, {data.company.state}
+              {data.company.postcode}, {data.company.city_pdf}, {data.company.state_pdf}
             </Text>
             <Text style={styles.companyDetail}>Tel: {data.company.phone}</Text>
             <Text style={styles.companyDetail}>
@@ -305,12 +305,12 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier SST No.</Text>
               <Text style={styles.infoValue}>
-                {data.company.sst_id || "N/A"}
+                {data.company.sst_id_pdf || "N/A"}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Billing Address</Text>
-              <Text style={styles.infoValue}>{data.company.address}</Text>
+              <Text style={styles.infoValue}>{data.company.address_pdf}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Contact No.</Text>

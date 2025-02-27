@@ -1,4 +1,5 @@
 // EInvoiceTemplate.js
+import { COMPANY_INFO } from "./companyInfo.js";
 
 // Helper function to format phone number
 function formatPhoneNumber(phone) {
@@ -386,25 +387,29 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
   <cac:AccountingSupplierParty>
     <cbc:AdditionalAccountID schemeAgencyName="CertEX"></cbc:AdditionalAccountID>
     <cac:Party>
-      <cbc:IndustryClassificationCode name="Manufacture of meehoon, noodles and other related products">10741</cbc:IndustryClassificationCode>
+      <cbc:IndustryClassificationCode name="${COMPANY_INFO.msic_description}">${
+      COMPANY_INFO.msic_code
+    }</cbc:IndustryClassificationCode>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="TIN">C21636482050</cbc:ID>
+        <cbc:ID schemeID="TIN">${COMPANY_INFO.tin}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="BRN">201101025173</cbc:ID>
+        <cbc:ID schemeID="BRN">${COMPANY_INFO.reg_no}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="SST">-</cbc:ID>
+        <cbc:ID schemeID="SST">${COMPANY_INFO.sst_id_xml || "-"}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
         <cbc:ID schemeID="TTX">-</cbc:ID>
       </cac:PartyIdentification>
       <cac:PostalAddress>
-        <cbc:CityName>KOTA KINABALU</cbc:CityName>
-        <cbc:PostalZone>88811</cbc:PostalZone>
-        <cbc:CountrySubentityCode>12</cbc:CountrySubentityCode>
-        <cac:AddressLine>
-          <cbc:Line>CL.215145645, KG KIBABAIG, PENAMPANG</cbc:Line>
+        <cbc:CityName>${COMPANY_INFO.city_xml}</cbc:CityName>
+        <cbc:PostalZone>${COMPANY_INFO.postcode}</cbc:PostalZone>
+        <cbc:CountrySubentityCode>${
+          COMPANY_INFO.country_code
+        }</cbc:CountrySubentityCode>
+          <cac:AddressLine>
+            <cbc:Line>${COMPANY_INFO.address_xml}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
           <cbc:Line></cbc:Line>
@@ -417,11 +422,11 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>TIEN HOCK FOOD INDUSTRIES S/B</cbc:RegistrationName>
+        <cbc:RegistrationName>${COMPANY_INFO.name}/cbc:RegistrationName>
       </cac:PartyLegalEntity>
       <cac:Contact>
-        <cbc:Telephone>0168329291</cbc:Telephone>
-        <cbc:ElectronicMail>tienhockfood@gmail.com</cbc:ElectronicMail>
+        <cbc:Telephone>${COMPANY_INFO.phone}</cbc:Telephone>
+        <cbc:ElectronicMail>${COMPANY_INFO.email}</cbc:ElectronicMail>
       </cac:Contact>
     </cac:Party>
   </cac:AccountingSupplierParty>
