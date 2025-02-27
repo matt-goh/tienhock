@@ -1,20 +1,6 @@
 // src/services/einvoice-pdf.service.ts
 import { api } from "../routes/utils/api";
-
-// Static company configuration
-export const COMPANY_INFO = {
-  name: "TIEN HOCK FOOD INDUSTRIES S/B",
-  tin: "C21636482050",
-  reg_no: "201101025173",
-  sst_id: "N/A",
-  msic_code: "10741",
-  address: "CL.215145645, Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah",
-  city: "Kota Kinabalu",
-  postcode: "88811",
-  state: "Sabah",
-  phone: "0168329291",
-  email: "tienhockfood@gmail.com",
-};
+import { COMPANY_INFO } from "../utils/invoice/einvoice/companyInfo";
 
 interface OrderDetail {
   productname: string;
