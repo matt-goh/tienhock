@@ -203,10 +203,9 @@ const styles = StyleSheet.create({
   summaryLabel: {
     width: 160,
     textAlign: "right",
-    marginRight: 10,
   },
   summaryValue: {
-    width: 80,
+    width: 60,
     textAlign: "right",
   },
   footer: {
@@ -365,7 +364,7 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
           <Text style={[styles.itemNameCol, styles.headerText]}>
             Product Name
           </Text>
-          <Text style={[styles.qtyCol, styles.headerText]}>Quantity</Text>
+          <Text style={[styles.qtyCol, styles.headerText]}>Qty</Text>
           <Text style={[styles.priceCol, styles.headerText]}>U. Price</Text>
           <Text style={[styles.subtotalCol, styles.headerText]}>Subtotal</Text>
           <Text style={[styles.taxCol, styles.headerText]}>Tax</Text>

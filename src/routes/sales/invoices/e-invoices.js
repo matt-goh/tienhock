@@ -207,9 +207,36 @@ export default function (pool, config) {
       const transformedInvoices = [];
       const validationErrors = [];
 
-      // Process invoices
+      // Check for duplicates first
       for (const invoiceId of invoiceIds) {
         try {
+          // Make a direct query to check for duplicates
+          const duplicateCheckResult = await pool.query(
+            "SELECT COUNT(*) FROM einvoices WHERE internal_id = $1",
+            [invoiceId]
+          );
+          const isDuplicate = parseInt(duplicateCheckResult.rows[0].count) > 0;
+
+          if (isDuplicate) {
+            validationErrors.push({
+              invoiceCodeNumber: invoiceId,
+              error: {
+                code: "DUPLICATE",
+                message: `Invoice number ${invoiceId} already exists in the system`,
+                target: invoiceId,
+                details: [
+                  {
+                    code: "DUPLICATE_INVOICE",
+                    message: "Duplicate invoice number found",
+                    target: "document",
+                  },
+                ],
+              },
+            });
+            continue; // Skip processing this invoice
+          }
+
+          // If not a duplicate, process the invoice
           const invoiceData = await getInvoices(pool, invoiceId);
           if (!invoiceData) {
             throw new Error(`Invoice with ID ${invoiceId} not found`);
@@ -225,7 +252,7 @@ export default function (pool, config) {
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
-          // Handle validation errors from EInvoiceTemplate
+          // Handle validation errors as before
           const errorDetails = error.details || [];
           validationErrors.push({
             invoiceCodeNumber: error.id || invoiceId,
