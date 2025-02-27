@@ -1,7 +1,7 @@
-// documentSubmissionHandler.js
+// EInvoiceSubmissionHandler.js
 import { createHash } from "crypto";
 
-class DocumentSubmissionHandler {
+class EInvoiceSubmissionHandler {
   constructor(apiClient) {
     this.apiClient = apiClient;
     this.MAX_POLLING_ATTEMPTS = 10;
@@ -78,43 +78,39 @@ class DocumentSubmissionHandler {
     }
   }
 
-  // Keep existing prepareRequestBody, encodeDocument, and calculateHash methods as they are
+  // Updated to handle XML documents
   prepareRequestBody(invoices) {
     if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
       throw new Error("Invalid invoice data: No invoices provided");
     }
 
-    const documents = invoices.map((invoice) => {
-      if (
-        !invoice ||
-        !invoice.Invoice ||
-        !invoice.Invoice[0] ||
-        !invoice.Invoice[0].ID
-      ) {
-        throw new Error("Invalid invoice data structure");
+    const documents = invoices.map((invoice, index) => {
+      // Extract the invoice ID from the XML
+      const invoiceMatch = invoice.match(/<cbc:ID>(.*?)<\/cbc:ID>/);
+      if (!invoiceMatch) {
+        throw new Error(
+          `Failed to extract invoice ID from XML document ${index}`
+        );
       }
-
-      const jsonDocument = JSON.stringify(invoice);
+      const invoiceId = invoiceMatch[1];
 
       return {
-        format: "JSON",
-        document: this.encodeDocument(jsonDocument),
-        documentHash: this.calculateHash(jsonDocument),
-        codeNumber: invoice.Invoice[0].ID[0]._,
+        format: "XML",
+        document: this.encodeDocument(invoice),
+        documentHash: this.calculateHash(invoice),
+        codeNumber: invoiceId,
       };
     });
 
     return { documents };
   }
 
-  // Keep existing encoding method
-  encodeDocument(jsonDocument) {
-    return Buffer.from(jsonDocument, "utf8").toString("base64");
+  encodeDocument(xmlDocument) {
+    return Buffer.from(xmlDocument, "utf8").toString("base64");
   }
 
-  // Keep existing hash calculation method
-  calculateHash(jsonDocument) {
-    return createHash("sha256").update(jsonDocument, "utf8").digest("hex");
+  calculateHash(xmlDocument) {
+    return createHash("sha256").update(xmlDocument, "utf8").digest("hex");
   }
 
   async pollSubmissionStatus(submissionUid) {
@@ -149,4 +145,4 @@ class DocumentSubmissionHandler {
   }
 }
 
-export default DocumentSubmissionHandler;
+export default EInvoiceSubmissionHandler;

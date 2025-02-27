@@ -1,7 +1,7 @@
 // src/routes/sales/invoices/e-invoice.js
 import { EInvoiceTemplate } from "../../../utils/invoice/einvoice/EInvoiceTemplate.js";
 import { Router } from "express";
-import DocumentSubmissionHandler from "../../../utils/invoice/einvoice/documentSubmissionHandler.js";
+import EInvoiceSubmissionHandler from "../../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
 import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";
 
 // Function to fetch customer data
@@ -155,7 +155,7 @@ export default function (pool, config) {
     config.MYINVOIS_CLIENT_ID,
     config.MYINVOIS_CLIENT_SECRET
   );
-  const submissionHandler = new DocumentSubmissionHandler(apiClient);
+  const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
 
   // Login/token endpoint
   router.post("/login", async (req, res) => {
