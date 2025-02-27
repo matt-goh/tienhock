@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     width: "8%",
   },
   itemNameCol: {
-    width: "30%",
+    width: "47%",
   },
   qtyCol: {
     width: "5%",
@@ -177,16 +177,8 @@ const styles = StyleSheet.create({
     width: "10%",
     textAlign: "right",
   },
-  taxRateCol: {
-    width: "10%",
-    textAlign: "right",
-  },
   taxCol: {
     width: "10%",
-    textAlign: "right",
-  },
-  discCol: {
-    width: "7%",
     textAlign: "right",
   },
   totalCol: {
@@ -248,7 +240,8 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
             </Text>
             <Text style={styles.companyDetail}>{data.company.address_pdf}</Text>
             <Text style={styles.companyDetail}>
-              {data.company.postcode}, {data.company.city_pdf}, {data.company.state_pdf}
+              {data.company.postcode}, {data.company.city_pdf},{" "}
+              {data.company.state_pdf}
             </Text>
             <Text style={styles.companyDetail}>Tel: {data.company.phone}</Text>
             <Text style={styles.companyDetail}>
@@ -372,12 +365,10 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
           <Text style={[styles.itemNameCol, styles.headerText]}>
             Product Name
           </Text>
-          <Text style={[styles.qtyCol, styles.headerText]}>Qty</Text>
+          <Text style={[styles.qtyCol, styles.headerText]}>Quantity</Text>
           <Text style={[styles.priceCol, styles.headerText]}>U. Price</Text>
           <Text style={[styles.subtotalCol, styles.headerText]}>Subtotal</Text>
-          <Text style={[styles.taxRateCol, styles.headerText]}>Tax %</Text>
           <Text style={[styles.taxCol, styles.headerText]}>Tax</Text>
-          <Text style={[styles.discCol, styles.headerText]}>Disc.</Text>
           <Text style={[styles.totalCol, styles.headerText]}>Total</Text>
         </View>
 
@@ -395,11 +386,9 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
             <Text style={[styles.subtotalCol, styles.cellText]}>
               {(item.qty * Number(item.price)).toFixed(2)}
             </Text>
-            <Text style={[styles.taxRateCol, styles.cellText]}>
-              {item.istax ? "6" : "-"}
+            <Text style={[styles.taxCol, styles.cellText]}>
+              {Number(item.tax || 0).toFixed(2)}
             </Text>
-            <Text style={[styles.taxCol, styles.cellText]}>0.00</Text>
-            <Text style={[styles.discCol, styles.cellText]}>0.00</Text>
             <Text style={[styles.totalCol, styles.cellText]}>
               {Number(item.total).toFixed(2)}
             </Text>
@@ -409,10 +398,6 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
 
       {/* Summary Section */}
       <View style={styles.summary}>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total Discount (MYR)</Text>
-          <Text style={styles.summaryValue}>0.00</Text>
-        </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Total Excl. Tax (MYR)</Text>
           <Text style={styles.summaryValue}>

@@ -7,7 +7,7 @@ interface OrderDetail {
   qty: number;
   price: string;
   total: string;
-  istax: boolean;
+  tax: number;
 }
 
 // Types
@@ -45,14 +45,35 @@ export interface EInvoicePDFData {
 // Helper function to fetch invoice details
 const fetchInvoiceDetails = async (invoiceId: string) => {
   try {
-    const response = await api.get(`/api/invoices/details/${invoiceId}/basic`);
-    return {
-      date: response.date,
-      time: response.time,
-    };
+    // Get the invoice from the main invoices endpoint
+    const response = await api.get(`/api/invoices?invoiceId=${invoiceId}`);
+
+    if (!response || !Array.isArray(response) || response.length === 0) {
+      throw new Error(`Invoice ${invoiceId} not found`);
+    }
+
+    const invoice = response[0];
+
+    // Format the timestamp into date and time
+    const createdDate = new Date(Number(invoice.createddate));
+    const day = String(createdDate.getDate()).padStart(2, "0");
+    const month = String(createdDate.getMonth() + 1).padStart(2, "0");
+    const year = createdDate.getFullYear();
+
+    // Format for display
+    const date = `${day}/${month}/${year}`;
+    const hours = String(createdDate.getHours()).padStart(2, "0");
+    const minutes = String(createdDate.getMinutes()).padStart(2, "0");
+    const time = `${hours}:${minutes}`;
+
+    return { date, time };
   } catch (error) {
     console.error("Error fetching invoice details:", error);
-    throw error;
+    // Return fallback values instead of throwing
+    return {
+      date: "N/A",
+      time: "N/A",
+    };
   }
 };
 
@@ -60,7 +81,17 @@ const fetchInvoiceDetails = async (invoiceId: string) => {
 const fetchOrderDetails = async (invoiceId: string) => {
   try {
     const response = await api.get(`/api/invoices/details/${invoiceId}/items`);
-    return response;
+    // Format the order details to ensure tax values are properly included
+    return response.map((item: any) => ({
+      ...item,
+      productname: item.description || "",
+      tax: Number(item.tax || 0),
+      qty: Number(item.qty || 0),
+      price:
+        typeof item.price === "number" ? item.price.toString() : item.price,
+      total:
+        typeof item.total === "number" ? item.total.toString() : item.total,
+    }));
   } catch (error) {
     console.error("Error fetching order details:", error);
     throw error;
