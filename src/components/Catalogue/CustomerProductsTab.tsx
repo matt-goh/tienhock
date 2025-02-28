@@ -189,13 +189,13 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       id: "product_id",
       header: "Product Code",
       type: "readonly",
-      width: 150,
+      width: 250,
     },
     {
       id: "description",
       header: "Description",
       type: "combobox",
-      width: 300,
+      width: 800,
       options: products.map((p) => p.description || ""),
       cell: (info: {
         getValue: () => any;
@@ -238,13 +238,13 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       id: "custom_price",
       header: "Custom Price",
       type: "float",
-      width: 150,
+      width: 200,
     },
     {
       id: "is_available",
       header: "Available",
       type: "checkbox",
-      width: 100,
+      width: 80,
     },
     {
       id: "action",

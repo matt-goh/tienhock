@@ -1029,7 +1029,7 @@ function TableEditing<T extends Record<string, any>>({
             ? "justify-end"
             : ""
         } ${
-          isSortingDisabled
+          !isSortingDisabled
             ? ["number", "rate", "amount", "float"].includes(col.type)
               ? "pl-2"
               : "pr-2"
@@ -1058,13 +1058,13 @@ function TableEditing<T extends Record<string, any>>({
                 {getSortIcon(col.id, col.type, column.getIsSorted())}
               </span>
             )}
-            <span className={`select-none ${isSortingDisabled ? "pl-2" : ""}`}>
+            <span className={`select-none ${!isSortingDisabled ? "pl-2" : ""}`}>
               {col.header}
             </span>
           </>
         ) : (
           <>
-            <span className={`select-none ${isSortingDisabled ? "pr-2" : ""}`}>
+            <span className={`select-none ${!isSortingDisabled ? "pr-2" : ""}`}>
               {col.header}
             </span>
             {!isSortingDisabled && (
