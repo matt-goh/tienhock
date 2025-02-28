@@ -733,7 +733,7 @@ function TableEditing<T extends Record<string, any>>({
       const columnType = allColumns[cellIndex].type;
       const columnConfig = allColumns[cellIndex];
 
-      // Show action column for subtotal rows
+      // Show action column
       if (columnType === "action") {
         return (
           <div className="flex items-center justify-center h-full">
@@ -747,6 +747,7 @@ function TableEditing<T extends Record<string, any>>({
                 }
               }}
               disabled={isSorting}
+              type="button"
             >
               <IconTrash stroke={2} width={20} height={20} />
             </button>
@@ -847,6 +848,7 @@ function TableEditing<T extends Record<string, any>>({
                   }
                 }}
                 disabled={isSorting}
+                type="button"
               >
                 <IconTrash stroke={2} width={20} height={20} />
               </button>
@@ -1133,6 +1135,7 @@ function TableEditing<T extends Record<string, any>>({
                   }
                 }}
                 disabled={isSorting}
+                type="button"
               >
                 <IconTrash stroke={2} width={20} height={20} />
               </button>
