@@ -4,7 +4,7 @@ import { api } from "../../routes/utils/api";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import TableEditableCell from "../Table/TableEditableCell";
 import TableEditing from "../Table/TableEditing";
-import { ColumnConfig } from "../../types/types";
+import { ColumnConfig, CustomProduct } from "../../types/types";
 import Button from "../Button";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import toast from "react-hot-toast";
@@ -13,23 +13,19 @@ import LoadingSpinner from "../LoadingSpinner";
 interface CustomerProductsTabProps {
   customerId: string;
   isNewCustomer: boolean;
-}
-
-interface CustomProduct {
-  uid?: string;
-  id?: string;
-  customer_id: string;
-  product_id: string;
-  description?: string;
-  custom_price: number;
-  is_available: boolean;
+  temporaryProducts?: CustomProduct[];
+  onTemporaryProductsChange?: (products: CustomProduct[]) => void;
 }
 
 const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   customerId,
   isNewCustomer,
+  temporaryProducts,
+  onTemporaryProductsChange,
 }) => {
-  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
+  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>(
+    temporaryProducts || []
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const { products } = useProductsCache();
@@ -38,8 +34,10 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   useEffect(() => {
     if (customerId && !isNewCustomer) {
       fetchCustomerProducts();
+    } else if (temporaryProducts) {
+      setCustomerProducts(temporaryProducts);
     }
-  }, [customerId, isNewCustomer]);
+  }, [customerId, isNewCustomer, temporaryProducts]);
 
   const fetchCustomerProducts = async () => {
     if (!customerId) return;
@@ -159,6 +157,11 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           return item;
         });
 
+        // Notify parent if the callback exists
+        if (isNewCustomer && onTemporaryProductsChange) {
+          onTemporaryProductsChange(processedProducts);
+        }
+
         return processedProducts;
       });
     }, 0);
@@ -256,17 +259,6 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     );
   }
 
-  if (isNewCustomer) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-default-600 mb-4">
-          Please save the customer details first before managing custom
-          products.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -298,9 +290,9 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           <Button
             onClick={handleSaveChanges}
             variant="outline"
-            disabled={customerProducts.length === 0}
+            disabled={customerProducts.length === 0 || isNewCustomer} // Disable save button for new customers
           >
-            Save Changes
+            {isNewCustomer ? "Save with Customer" : "Save Changes"}
           </Button>
         </div>
       </div>
