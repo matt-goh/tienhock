@@ -207,6 +207,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
           }}
           className="p-2 rounded-full hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
           disabled={isSorting}
+          type="button"
         >
           {cellValue === "true" ? (
             <IconSquareCheckFilled

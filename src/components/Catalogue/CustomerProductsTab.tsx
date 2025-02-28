@@ -286,6 +286,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
             iconSize={16}
             iconStroke={2}
             variant="outline"
+            type="button"
           >
             Add Product
           </Button>
@@ -294,6 +295,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
             onClick={handleSaveChanges}
             variant="outline"
             disabled={customerProducts.length === 0 || isNewCustomer} // Disable save button for new customers
+            type="button"
           >
             {isNewCustomer ? "Save with Customer" : "Save Changes"}
           </Button>
