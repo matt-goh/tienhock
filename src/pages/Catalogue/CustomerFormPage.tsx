@@ -428,7 +428,12 @@ const CustomerFormPage: React.FC = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault(); // Prevent default form submission behavior
+            handleSubmit(e);
+          }}
+        >
           <div className="pl-6 pt-5">
             <Tab labels={["Details", "Products"]}>
               {/* First tab - Customer Details */}

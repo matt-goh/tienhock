@@ -1,14 +1,14 @@
 // src/routes/catalogue/customer-products.js
 import { Router } from "express";
 
-export default function(pool) {
+export default function (pool) {
   const router = Router();
 
   // Get all custom products for a specific customer
   router.get("/:customerId", async (req, res) => {
     try {
       const { customerId } = req.params;
-      
+
       const query = `
         SELECT 
           cp.id,
@@ -21,14 +21,14 @@ export default function(pool) {
         JOIN products p ON cp.product_id = p.id
         WHERE cp.customer_id = $1
       `;
-      
+
       const result = await pool.query(query, [customerId]);
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching custom products:", error);
       res.status(500).json({
         message: "Error fetching custom products",
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -37,29 +37,34 @@ export default function(pool) {
   router.post("/", async (req, res) => {
     try {
       const { customerId, productId, customPrice, isAvailable } = req.body;
-      
+
       const query = `
         INSERT INTO customer_products (customer_id, product_id, custom_price, is_available)
         VALUES ($1, $2, $3, $4)
         RETURNING *
       `;
-      
-      const result = await pool.query(query, [customerId, productId, customPrice, isAvailable]);
+
+      const result = await pool.query(query, [
+        customerId,
+        productId,
+        customPrice,
+        isAvailable,
+      ]);
       res.status(201).json({
         message: "Custom product added successfully",
-        customerProduct: result.rows[0]
+        customerProduct: result.rows[0],
       });
     } catch (error) {
-      if (error.code === '23505') {
+      if (error.code === "23505") {
         return res.status(400).json({
-          message: "This product already exists for this customer"
+          message: "This product already exists for this customer",
         });
       }
-      
+
       console.error("Error adding custom product:", error);
       res.status(500).json({
-        message: "Error adding custom product", 
-        error: error.message
+        message: "Error adding custom product",
+        error: error.message,
       });
     }
   });
@@ -69,29 +74,29 @@ export default function(pool) {
     try {
       const { id } = req.params;
       const { customPrice, isAvailable } = req.body;
-      
+
       const query = `
         UPDATE customer_products
         SET custom_price = $1, is_available = $2
         WHERE id = $3
         RETURNING *
       `;
-      
+
       const result = await pool.query(query, [customPrice, isAvailable, id]);
-      
+
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Custom product not found" });
       }
-      
+
       res.json({
         message: "Custom product updated successfully",
-        customerProduct: result.rows[0]
+        customerProduct: result.rows[0],
       });
     } catch (error) {
       console.error("Error updating custom product:", error);
       res.status(500).json({
         message: "Error updating custom product",
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -100,23 +105,23 @@ export default function(pool) {
   router.delete("/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       const query = "DELETE FROM customer_products WHERE id = $1 RETURNING *";
       const result = await pool.query(query, [id]);
-      
+
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Custom product not found" });
       }
-      
+
       res.json({
         message: "Custom product deleted successfully",
-        customerProduct: result.rows[0]
+        customerProduct: result.rows[0],
       });
     } catch (error) {
       console.error("Error deleting custom product:", error);
       res.status(500).json({
         message: "Error deleting custom product",
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -124,74 +129,50 @@ export default function(pool) {
   // Batch add/update customer products
   router.post("/batch", async (req, res) => {
     const { customerId, products } = req.body;
-    
-    if (!customerId || !Array.isArray(products)) {
-      return res.status(400).json({
-        message: "Invalid input: customerId and products array are required"
-      });
+
+    if (!customerId) {
+      return res.status(400).json({ message: "Customer ID is required" });
     }
-    
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ message: "No products provided" });
+    }
+
     const client = await pool.connect();
-    
+
     try {
       await client.query("BEGIN");
-      
-      const results = [];
-      
+
+      // First delete any existing products for this customer
+      await client.query(
+        "DELETE FROM customer_products WHERE customer_id = $1",
+        [customerId]
+      );
+
+      // Then insert the new products
       for (const product of products) {
-        const { productId, customPrice, isAvailable } = product;
-        
-        // Check if the product already exists for this customer
-        const checkQuery = `
-          SELECT id FROM customer_products 
-          WHERE customer_id = $1 AND product_id = $2
-        `;
-        
-        const checkResult = await client.query(checkQuery, [customerId, productId]);
-        
-        if (checkResult.rows.length > 0) {
-          // Update existing relationship
-          const updateQuery = `
-            UPDATE customer_products
-            SET custom_price = $1, is_available = $2
-            WHERE customer_id = $3 AND product_id = $4
-            RETURNING *
-          `;
-          
-          const updateResult = await client.query(updateQuery, [
-            customPrice, isAvailable, customerId, productId
-          ]);
-          
-          results.push(updateResult.rows[0]);
-        } else {
-          // Create new relationship
-          const insertQuery = `
-            INSERT INTO customer_products (customer_id, product_id, custom_price, is_available)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *
-          `;
-          
-          const insertResult = await client.query(insertQuery, [
-            customerId, productId, customPrice, isAvailable
-          ]);
-          
-          results.push(insertResult.rows[0]);
-        }
+        await client.query(
+          "INSERT INTO customer_products (customer_id, product_id, custom_price, is_available) VALUES ($1, $2, $3, $4)",
+          [
+            customerId,
+            product.productId,
+            product.customPrice,
+            product.isAvailable,
+          ]
+        );
       }
-      
+
       await client.query("COMMIT");
-      
-      res.status(201).json({
-        message: "Batch operation completed successfully",
-        results
+      res.status(200).json({
+        message: "Products updated successfully",
+        count: products.length,
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      
-      console.error("Error in batch operation:", error);
+      console.error("Error updating customer products:", error);
       res.status(500).json({
-        message: "Error processing batch operation",
-        error: error.message
+        message: "Error updating customer products",
+        error: error.message,
       });
     } finally {
       client.release();

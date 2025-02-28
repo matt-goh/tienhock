@@ -205,19 +205,27 @@ const CustomerAddPage: React.FC = () => {
 
         // If we have temporary products, save them
         if (temporaryProducts.length > 0) {
-          await api.post("/api/customer-products/batch", {
-            customerId: newCustomerId,
-            products: temporaryProducts.map((cp) => ({
-              productId: cp.product_id,
-              customPrice: cp.custom_price,
-              isAvailable: cp.is_available,
-            })),
-          });
+          try {
+            await api.post("/api/customer-products/batch", {
+              customerId: newCustomerId,
+              products: temporaryProducts.map((cp) => ({
+                productId: cp.product_id,
+                customPrice: cp.custom_price || 0,
+                isAvailable:
+                  cp.is_available !== undefined ? cp.is_available : true,
+              })),
+            });
+            console.log("Successfully saved products for new customer");
+          } catch (productError) {
+            console.error("Failed to save products:", productError);
+            toast.error(
+              "Customer created but product pricing couldn't be saved"
+            );
+          }
         }
 
         // Refresh the customers cache
         await refreshCustomersCache();
-
         toast.success("Customer created successfully!");
         navigate("/catalogue/customer");
       } catch (error) {
@@ -247,7 +255,7 @@ const CustomerAddPage: React.FC = () => {
             })),
           });
         }
-        
+
         // Refresh the customers cache
         await refreshCustomersCache();
 
@@ -342,7 +350,12 @@ const CustomerAddPage: React.FC = () => {
             Enter new customer information here. Click "Save" when you're done.
           </p>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(e);
+          }}
+        >
           <div className="pl-6 pt-5">
             <Tab labels={["Details", "Products"]}>
               {/* First tab - Customer Details */}
@@ -398,7 +411,9 @@ const CustomerAddPage: React.FC = () => {
                   customerId=""
                   isNewCustomer={true}
                   temporaryProducts={temporaryProducts}
-                  onTemporaryProductsChange={setTemporaryProducts}
+                  onTemporaryProductsChange={(products) => {
+                    setTemporaryProducts(products);
+                  }}
                 />
               </div>
             </Tab>
