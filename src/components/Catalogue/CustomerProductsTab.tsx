@@ -25,7 +25,6 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
 }) => {
   const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const { products } = useProductsCache();
 
   // Load customer products when customerId changes
@@ -170,19 +169,6 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     }, 0);
   };
 
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm.trim()) return customerProducts;
-
-    return customerProducts.filter((cp) => {
-      const productName = cp.description?.toLowerCase() || "";
-      const productId = cp.product_id.toLowerCase();
-      return (
-        productName.includes(searchTerm.toLowerCase()) ||
-        productId.includes(searchTerm.toLowerCase())
-      );
-    });
-  }, [customerProducts, searchTerm]);
-
   // Define table columns
   const columns: ColumnConfig[] = [
     {
@@ -263,23 +249,9 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-default-900">
-          Custom Product Pricing
-        </h2>
-
+    <div className="">
+      <div className="flex justify-end items-center mb-6">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search products..."
-              className="px-4 py-2 rounded-full border border-default-300 focus:border-default-500 outline-none w-[250px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
           <Button
             onClick={handleAddProduct}
             icon={IconPlus}
@@ -308,7 +280,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
         </div>
       ) : (
         <TableEditing
-          initialData={filteredProducts}
+          initialData={customerProducts}
           columns={columns}
           onChange={handleTableChange}
           tableKey="customerProducts"
