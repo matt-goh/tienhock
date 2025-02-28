@@ -118,6 +118,13 @@ const CustomerFormPage: React.FC = () => {
     fetchSalesmen();
   }, []);
 
+  useEffect(() => {
+    // Only mark as changed if we have products
+    if (temporaryProducts.length > 0) {
+      setIsFormChanged(true);
+    }
+  }, [temporaryProducts]);
+
   // Data fetching functions
   const fetchCustomerDetails = async () => {
     try {
@@ -485,7 +492,7 @@ const CustomerFormPage: React.FC = () => {
           <div className="pl-6 pt-5">
             <Tab labels={["Details", "Products"]}>
               {/* First tab - Customer Details */}
-              <div className="space-y-6">
+              <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderInput("id", "ID", "text", "TIENHOCK")}
                   {renderInput(
