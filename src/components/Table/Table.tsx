@@ -82,8 +82,6 @@ function Table<T extends Record<string, any>>({
   const tableContainerRef = useRef<HTMLTableElement>(null);
   const isSortingDisabled = [
     "orderDetails",
-    "focItems",
-    "returnedGoods",
   ].includes(tableKey || "");
 
   const DRAG_THRESHOLD = 38; // Pixels to drag before adding/removing a row
