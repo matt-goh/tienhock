@@ -6,7 +6,7 @@ import TableEditableCell from "../Table/TableEditableCell";
 import TableEditing from "../Table/TableEditing";
 import { ColumnConfig, CustomProduct } from "../../types/types";
 import Button from "../Button";
-import { IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -23,9 +23,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   temporaryProducts,
   onTemporaryProductsChange,
 }) => {
-  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>(
-    temporaryProducts || []
-  );
+  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const { products } = useProductsCache();
@@ -82,18 +80,24 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
 
     // Add the first available product
     const newProduct = availableProducts[0];
-
-    setCustomerProducts([
+    const updatedProducts = [
       ...customerProducts,
       {
         uid: crypto.randomUUID(),
-        customer_id: customerId,
+        customer_id: customerId || "temp",
         product_id: newProduct.id,
         description: newProduct.description,
         custom_price: newProduct.price_per_unit || 0,
         is_available: true,
       },
-    ]);
+    ];
+
+    setCustomerProducts(updatedProducts);
+
+    // Notify parent component about the change
+    if (isNewCustomer && onTemporaryProductsChange) {
+      onTemporaryProductsChange(updatedProducts);
+    }
   };
 
   const handleSaveChanges = async () => {
@@ -123,47 +127,46 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
 
   const handleTableChange = (updatedItems: CustomProduct[]) => {
     setTimeout(() => {
-      setCustomerProducts((prevProducts) => {
-        // Map items and handle new rows
-        const processedProducts = updatedItems.map((item) => {
-          // If this is a new row (no uid), initialize it properly
-          if (!item.uid) {
-            const productInfo =
-              products.find((p) => p.id === item.product_id) ||
-              products.find((p) => p.description === item.description);
+      const processedProducts = updatedItems.map((item) => {
+        // If this is a new row (no uid), initialize it properly
+        if (!item.uid) {
+          const productInfo =
+            products.find((p) => p.id === item.product_id) ||
+            products.find((p) => p.description === item.description);
 
-            if (productInfo) {
-              return {
-                ...item,
-                uid: crypto.randomUUID(),
-                product_id: productInfo.id,
-                description: productInfo.description,
-                custom_price: item.custom_price || 0,
-                is_available:
-                  item.is_available !== undefined ? item.is_available : true,
-              };
-            }
-
-            // If no matching product found, create with defaults
+          if (productInfo) {
             return {
               ...item,
               uid: crypto.randomUUID(),
+              product_id: productInfo.id,
+              description: productInfo.description,
               custom_price: item.custom_price || 0,
               is_available:
                 item.is_available !== undefined ? item.is_available : true,
+              customer_id: customerId || "temp",
             };
           }
 
-          return item;
-        });
-
-        // Notify parent if the callback exists
-        if (isNewCustomer && onTemporaryProductsChange) {
-          onTemporaryProductsChange(processedProducts);
+          // If no matching product found, create with defaults
+          return {
+            ...item,
+            uid: crypto.randomUUID(),
+            custom_price: item.custom_price || 0,
+            is_available:
+              item.is_available !== undefined ? item.is_available : true,
+            customer_id: customerId || "temp",
+          };
         }
 
-        return processedProducts;
+        return item;
       });
+
+      setCustomerProducts(processedProducts);
+
+      // Notify parent if the callback exists
+      if (isNewCustomer && onTemporaryProductsChange) {
+        onTemporaryProductsChange(processedProducts);
+      }
     }, 0);
   };
 
