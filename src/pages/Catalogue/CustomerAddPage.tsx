@@ -9,6 +9,8 @@ import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
 import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
+import Tab from "../../components/Tab";
 
 interface SelectOption {
   id: string;
@@ -312,45 +314,60 @@ const CustomerAddPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {renderInput("id", "ID", "text", "TIENHOCK")}
-              {renderInput(
-                "name",
-                "Name",
-                "text",
-                "TIEN HOCK FOOD INDUSTRIES S/D"
-              )}
-            </div>
+          <div className="pl-6 pt-5">
+            <Tab labels={["Details", "Products"]}>
+              {/* First tab - Customer Details */}
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  {renderInput("id", "ID", "text", "TIENHOCK")}
+                  {renderInput(
+                    "name",
+                    "Name",
+                    "text",
+                    "TIEN HOCK FOOD INDUSTRIES S/D"
+                  )}
+                </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {renderInput("phone_number", "Phone Number", "tel")}
-              {renderInput("email", "Email", "email")}
-            </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  {renderInput("phone_number", "Phone Number", "tel")}
+                  {renderInput("email", "Email", "email")}
+                </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              <div className="sm:col-span-2">
-                {renderInput("address", "Address", "text")}
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    {renderInput("address", "Address", "text")}
+                  </div>
+                  {renderInput("city", "City")}
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  {renderListbox("state", "State", stateOptions)}
+                  {renderListbox("closeness", "Closeness", closenessOptions)}
+                  {renderListbox("salesman", "Salesman", salesmen)}
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  {renderListbox("id_type", "ID Type", idTypeOptions)}
+                  {renderInput(
+                    "id_number",
+                    "ID Number",
+                    "text",
+                    getIdNumberPlaceholder(formData.id_type)
+                  )}
+                  {renderInput(
+                    "tin_number",
+                    "TIN Number",
+                    "text",
+                    "C21636482050"
+                  )}
+                </div>
               </div>
-              {renderInput("city", "City")}
-            </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {renderListbox("state", "State", stateOptions)}
-              {renderListbox("closeness", "Closeness", closenessOptions)}
-              {renderListbox("salesman", "Salesman", salesmen)}
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {renderListbox("id_type", "ID Type", idTypeOptions)}
-              {renderInput(
-                "id_number",
-                "ID Number",
-                "text",
-                getIdNumberPlaceholder(formData.id_type)
-              )}
-              {renderInput("tin_number", "TIN Number", "text", "C21636482050")}
-            </div>
+              {/* Second tab - Customer Products */}
+              <div className="space-y-6">
+                <CustomerProductsTab customerId="" isNewCustomer={true} />
+              </div>
+            </Tab>
           </div>
 
           <div className="mt-6 py-3 px-6 text-right">

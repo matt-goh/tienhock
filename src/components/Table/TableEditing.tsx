@@ -295,10 +295,8 @@ function TableEditing<T extends Record<string, any>>({
   // Constants
   const isSortingDisabled = [
     "orderDetails",
-    "focItems",
-    "returnedGoods",
+    "customerProducts",
     "invois",
-    "invois-products",
   ].includes(tableKey || "");
 
   const isEditableColumn = (col: ColumnConfig) => {
