@@ -546,7 +546,7 @@ const CustomerFormPage: React.FC = () => {
             </Tab>
           </div>
 
-          <div className="mt-6 py-3 px-6 space-x-3 text-right">
+          <div className="mt-6 py-3 space-x-3 text-right">
             {isEditMode && (
               <Button
                 type="button"
