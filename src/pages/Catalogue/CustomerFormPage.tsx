@@ -64,6 +64,7 @@ const CustomerFormPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [originalProductIds, setOriginalProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,6 +137,13 @@ const CustomerFormPage: React.FC = () => {
       };
       setFormData(formattedData);
       initialFormDataRef.current = formattedData;
+
+      // Also fetch the customer's products to track original IDs
+      if (id) {
+        const productsData = await api.get(`/api/customer-products/${id}`);
+        setOriginalProductIds(productsData.map((p: any) => p.product_id));
+      }
+
       setError(null);
     } catch (err) {
       setError("Failed to fetch customer details. Please try again later.");
@@ -291,8 +299,16 @@ const CustomerFormPage: React.FC = () => {
         }
 
         // Save temporary products if any
-        if (temporaryProducts.length > 0) {
+        if (temporaryProducts.length > 0 || originalProductIds.length > 0) {
           try {
+            // Calculate which product IDs were removed
+            const currentProductIds = temporaryProducts.map(
+              (p) => p.product_id
+            );
+            const deletedProductIds = originalProductIds.filter(
+              (id) => !currentProductIds.includes(id)
+            );
+
             await api.post("/api/customer-products/batch", {
               customerId: formData.id,
               products: temporaryProducts.map((cp) => ({
@@ -301,6 +317,7 @@ const CustomerFormPage: React.FC = () => {
                 isAvailable:
                   cp.is_available !== undefined ? cp.is_available : true,
               })),
+              deletedProductIds: deletedProductIds, // Add this new field
             });
             console.log("Successfully saved products for customer");
           } catch (productError) {
