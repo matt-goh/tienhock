@@ -262,15 +262,6 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           >
             Add Product
           </Button>
-
-          <Button
-            onClick={handleSaveChanges}
-            variant="outline"
-            disabled={customerProducts.length === 0 || isNewCustomer} // Disable save button for new customers
-            type="button"
-          >
-            {isNewCustomer ? "Save with Customer" : "Save Changes"}
-          </Button>
         </div>
       </div>
 
