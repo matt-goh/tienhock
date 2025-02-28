@@ -15,18 +15,20 @@ const TablePagination = <T extends Record<string, unknown>>({
 }: TablePaginationProps<T>) => {
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalPages = table.getPageCount();
-  const totalItems = table.getFilteredRowModel().rows.filter(row => !row.original.isTotal).length;
+  const totalItems = table
+    .getFilteredRowModel()
+    .rows.filter((row) => !row.original.isTotal).length;
 
   useEffect(() => {
-    const storedPageSize = localStorage.getItem('tablePageSize');
+    const storedPageSize = localStorage.getItem("tablePageSize");
     if (storedPageSize) {
       table.setPageSize(Number(storedPageSize));
     }
   }, [table]);
-  
+
   const handlePageSizeChange = (newPageSize: number) => {
     table.setPageSize(newPageSize);
-    localStorage.setItem('tablePageSize', newPageSize.toString());
+    localStorage.setItem("tablePageSize", newPageSize.toString());
   };
 
   const renderPageNumbers = () => {
@@ -97,6 +99,7 @@ const TablePagination = <T extends Record<string, unknown>>({
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
           className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-accent hover:bg-default-100 active:bg-default-200 hover:text-accent-foreground h-10 w-10 py-2"
+          type="button"
         >
           <IconChevronLeft className="h-4 w-4" />
         </button>
@@ -114,6 +117,7 @@ const TablePagination = <T extends Record<string, unknown>>({
                     ? "border border-default-200 font-semibold"
                     : "font-medium"
                 }`}
+                type="button"
               >
                 {page}
               </button>
@@ -124,6 +128,7 @@ const TablePagination = <T extends Record<string, unknown>>({
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
           className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200 hover:bg-accent hover:text-accent-foreground h-10 w-10 py-2"
+          type="button"
         >
           <IconChevronRight className="h-4 w-4" />
         </button>
