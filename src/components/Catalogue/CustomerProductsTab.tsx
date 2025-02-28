@@ -207,7 +207,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                     product_id: matchingProduct.id,
                     description: matchingProduct.description,
                     price_per_unit: matchingProduct.price_per_unit || 0,
-                    custom_price: product.custom_price || 0,
+                    custom_price: matchingProduct.price_per_unit || 0,
                   };
                 }
                 return product;
