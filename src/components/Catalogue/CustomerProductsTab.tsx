@@ -34,7 +34,14 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     } else if (temporaryProducts) {
       setCustomerProducts(temporaryProducts);
     }
-  }, [customerId, isNewCustomer, temporaryProducts]);
+  }, [customerId, isNewCustomer]);
+
+  // Add a separate effect to sync with temporaryProducts changes
+  useEffect(() => {
+    if (temporaryProducts && temporaryProducts.length > 0) {
+      setCustomerProducts(temporaryProducts);
+    }
+  }, [temporaryProducts]);
 
   const fetchCustomerProducts = async () => {
     if (!customerId) return;
@@ -54,7 +61,16 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           };
         }
       );
-      setCustomerProducts(enrichedData);
+
+      // KEY CHANGE: Only update if we don't have temporary products already
+      if (!temporaryProducts || temporaryProducts.length === 0) {
+        setCustomerProducts(enrichedData);
+
+        // Only sync API data to parent if there are no temporary products
+        if (onTemporaryProductsChange) {
+          onTemporaryProductsChange(enrichedData);
+        }
+      }
     } catch (error) {
       console.error("Error fetching customer products:", error);
       toast.error("Failed to load customer products");
@@ -94,14 +110,10 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     setCustomerProducts(updatedProducts);
 
     // Notify parent component about the change
-    if (isNewCustomer && onTemporaryProductsChange) {
+    if (onTemporaryProductsChange) {
       onTemporaryProductsChange(updatedProducts);
     }
   };
-
-  useEffect(() => {
-    console.log(customerProducts);
-  }, [customerProducts]);
 
   const handleTableChange = (updatedItems: CustomProduct[]) => {
     setTimeout(() => {
@@ -122,7 +134,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           // Remove the empty row and return early
           const filteredItems = updatedItems.filter((item) => item.product_id);
           setCustomerProducts(filteredItems);
-          if (isNewCustomer && onTemporaryProductsChange) {
+          if (onTemporaryProductsChange) {
             onTemporaryProductsChange(filteredItems);
           }
           return;
@@ -155,8 +167,8 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
 
       setCustomerProducts(processedProducts);
 
-      // Notify parent if the callback exists
-      if (isNewCustomer && onTemporaryProductsChange) {
+      // Always notify parent if the callback exists
+      if (onTemporaryProductsChange) {
         onTemporaryProductsChange(processedProducts);
       }
     }, 0);
