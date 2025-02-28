@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { Customer, Employee } from "../../types/types";
+import { Customer, CustomProduct, Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import {
@@ -57,6 +57,9 @@ const CustomerFormPage: React.FC = () => {
 
   // UI state
   const initialFormDataRef = useRef<Customer>({ ...formData });
+  const [temporaryProducts, setTemporaryProducts] = useState<CustomProduct[]>(
+    []
+  );
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -280,14 +283,59 @@ const CustomerFormPage: React.FC = () => {
           await api.put(`/api/customers/${id}`, formData);
         }
 
+        // Save temporary products if any
+        if (temporaryProducts.length > 0) {
+          try {
+            await api.post("/api/customer-products/batch", {
+              customerId: formData.id,
+              products: temporaryProducts.map((cp) => ({
+                productId: cp.product_id,
+                customPrice: cp.custom_price || 0,
+                isAvailable:
+                  cp.is_available !== undefined ? cp.is_available : true,
+              })),
+            });
+            console.log("Successfully saved products for customer");
+          } catch (productError) {
+            console.error("Failed to save products:", productError);
+            toast.error(
+              "Customer updated but product pricing couldn't be saved"
+            );
+          }
+        }
+
         // Refresh the customers cache after update
         await refreshCustomersCache();
       } else {
         await api.post("/api/customers", formData);
 
+        // Save temporary products if any
+        if (temporaryProducts.length > 0) {
+          try {
+            await api.post("/api/customer-products/batch", {
+              customerId: formData.id,
+              products: temporaryProducts.map((cp) => ({
+                productId: cp.product_id,
+                customPrice: cp.custom_price || 0,
+                isAvailable:
+                  cp.is_available !== undefined ? cp.is_available : true,
+              })),
+            });
+            console.log("Successfully saved products for new customer");
+          } catch (productError) {
+            console.error("Failed to save products:", productError);
+            toast.error(
+              "Customer created but product pricing couldn't be saved"
+            );
+          }
+        }
+
         // Refresh the customers cache after creation
         await refreshCustomersCache();
       }
+
+      // After successful save, clear temporary products
+      setTemporaryProducts([]);
 
       toast.success(
         `Customer ${isEditMode ? "updated" : "created"} successfully!`
@@ -488,6 +536,11 @@ const CustomerFormPage: React.FC = () => {
                 <CustomerProductsTab
                   customerId={id || ""}
                   isNewCustomer={!isEditMode}
+                  temporaryProducts={temporaryProducts}
+                  onTemporaryProductsChange={(products) => {
+                    setTemporaryProducts(products);
+                    setIsFormChanged(true);
+                  }}
                 />
               </div>
             </Tab>

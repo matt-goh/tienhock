@@ -99,64 +99,57 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     }
   };
 
-  const handleSaveChanges = async () => {
-    if (!customerId) {
-      toast.error("Please save the customer details first");
-      return;
-    }
-
-    try {
-      await api.post("/api/customer-products/batch", {
-        customerId,
-        products: customerProducts.map((cp) => ({
-          uid: crypto.randomUUID(),
-          productId: cp.product_id,
-          customPrice: cp.custom_price,
-          isAvailable: cp.is_available,
-        })),
-      });
-
-      toast.success("Customer products updated successfully");
-      fetchCustomerProducts();
-    } catch (error) {
-      console.error("Error saving customer products:", error);
-      toast.error("Failed to save customer products");
-    }
-  };
+  useEffect(() => {
+    console.log(customerProducts);
+  }, [customerProducts]);
 
   const handleTableChange = (updatedItems: CustomProduct[]) => {
     setTimeout(() => {
-      const processedProducts = updatedItems.map((item) => {
-        // If this is a new row (no uid), initialize it properly
-        if (!item.uid) {
-          const productInfo =
-            products.find((p) => p.id === item.product_id) ||
-            products.find((p) => p.description === item.description);
+      // Check if a new row was added (will have empty product_id)
+      const newRowIndex = updatedItems.findIndex((item) => !item.product_id);
 
-          if (productInfo) {
-            return {
-              ...item,
-              uid: crypto.randomUUID(),
-              product_id: productInfo.id,
-              description: productInfo.description,
-              custom_price: item.custom_price || 0,
-              is_available:
-                item.is_available !== undefined ? item.is_available : true,
-              customer_id: customerId || "temp",
-            };
+      if (newRowIndex !== -1) {
+        // Get available products that aren't already in the list
+        const existingProductIds = new Set(
+          updatedItems.filter((cp) => cp.product_id).map((cp) => cp.product_id)
+        );
+        const availableProducts = products.filter(
+          (p) => !existingProductIds.has(p.id)
+        );
+
+        if (availableProducts.length === 0) {
+          toast.error("All products have already been added for this customer");
+          // Remove the empty row and return early
+          const filteredItems = updatedItems.filter((item) => item.product_id);
+          setCustomerProducts(filteredItems);
+          if (isNewCustomer && onTemporaryProductsChange) {
+            onTemporaryProductsChange(filteredItems);
           }
+          return;
+        }
 
-          // If no matching product found, create with defaults
+        // Use the first available product for the new row
+        const newProduct = availableProducts[0];
+        updatedItems[newRowIndex] = {
+          ...updatedItems[newRowIndex],
+          uid: crypto.randomUUID(),
+          product_id: newProduct.id,
+          description: newProduct.description,
+          custom_price: newProduct.price_per_unit || 0,
+          is_available: true,
+          customer_id: customerId || "temp",
+        };
+      }
+
+      const processedProducts = updatedItems.map((item) => {
+        // Handle other properties and existing rows
+        if (!item.uid) {
           return {
             ...item,
             uid: crypto.randomUUID(),
-            custom_price: item.custom_price || 0,
-            is_available:
-              item.is_available !== undefined ? item.is_available : true,
             customer_id: customerId || "temp",
           };
         }
-
         return item;
       });
 
@@ -181,7 +174,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       id: "description",
       header: "Description",
       type: "combobox",
-      width: 800,
+      width: 700,
       options: products.map((p) => p.description || ""),
       cell: (info: {
         getValue: () => any;
@@ -224,7 +217,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       id: "custom_price",
       header: "Custom Price",
       type: "float",
-      width: 200,
+      width: 400,
     },
     {
       id: "is_available",
@@ -250,8 +243,28 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
 
   return (
     <div className="">
-      <div className="flex justify-end items-center mb-6">
-        <div className="flex items-center gap-3">
+      {customerProducts.length > 0 && (
+        <div className="flex justify-end items-center mb-6">
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleAddProduct}
+              icon={IconPlus}
+              iconSize={16}
+              iconStroke={2}
+              variant="outline"
+              type="button"
+            >
+              Add Product
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {customerProducts.length === 0 ? (
+        <div className="flex flex-col items-center py-8">
+          <div className="text-center mb-4 text-default-500">
+            No custom products added for this customer yet.
+          </div>
           <Button
             onClick={handleAddProduct}
             icon={IconPlus}
@@ -262,12 +275,6 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           >
             Add Product
           </Button>
-        </div>
-      </div>
-
-      {customerProducts.length === 0 ? (
-        <div className="text-center py-8 text-default-500">
-          No custom products added for this customer yet.
         </div>
       ) : (
         <TableEditing

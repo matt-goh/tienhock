@@ -396,37 +396,13 @@ function TableEditing<T extends Record<string, any>>({
         if (row.istotal) return row;
         if (row.issubtotal) return row;
 
-        if (row.isless || row.istax) {
-          const currentTotal = parseFloat(row.total || "0");
-          if (row.isless) {
-            total -= currentTotal;
-          } else {
-            total += currentTotal;
-          }
-          // Preserve the special row's total
-          return {
-            ...row,
-            total: row.total, // Keep the original total
-          };
-        }
-
         const amount = calculateAmount(row);
         total += amount;
 
         return {
           ...row,
-          total: amount.toFixed(2),
         };
       });
-
-      // Update total row
-      const totalRowIndex = updatedData.findIndex((row) => row.istotal);
-      if (totalRowIndex !== -1) {
-        updatedData[totalRowIndex] = {
-          ...updatedData[totalRowIndex],
-          total: total.toFixed(2),
-        };
-      }
 
       return updatedData;
     },
@@ -657,7 +633,6 @@ function TableEditing<T extends Record<string, any>>({
   const handleDeleteRow = useCallback(
     (rowIndex: number, event: React.MouseEvent) => {
       event.stopPropagation();
-      const rowToDelete = data[rowIndex];
 
       setData((prevData) => {
         // Keep track of the total row
@@ -784,113 +759,9 @@ function TableEditing<T extends Record<string, any>>({
         });
       }
 
-      // Handle special rows (Less, Tax, Subtotal, Total)
-      if (row.original.isless || row.original.istax) {
-        if (cellIndex === 0) {
-          // Code column
-          return (
-            <input
-              className="w-full h-full px-6 py-3 m-0 outline-none bg-transparent cursor-default"
-              tabIndex={-1}
-              type="text"
-              readOnly
-              value={cell.getValue() as string}
-              style={{ boxSizing: "border-box" }}
-            />
-          );
-        } else if (cellIndex === 1) {
-          // Description column
-          return (
-            <TableEditableCell
-              value={cell.getValue()}
-              onChange={(val) =>
-                handleCellChange(row.index, cell.column.id, val)
-              }
-              type="string"
-              editable={!isSorting}
-              focus={
-                row.id === editableRowId && cellIndex === editableCellIndex
-              }
-              onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
-              isSorting={isSorting}
-              previousCellValue={cell.getValue()}
-            />
-          );
-        } else if (cellIndex === columns.length - 2) {
-          // Amount column
-          return (
-            <TableEditableCell
-              value={cell.getValue()}
-              onChange={(val) =>
-                handleCellChange(row.index, cell.column.id, val)
-              }
-              type="rate"
-              editable={!isSorting}
-              focus={
-                row.id === editableRowId && cellIndex === editableCellIndex
-              }
-              onKeyDown={(e) => handleKeyDown(e, row.id, cellIndex)}
-              isSorting={isSorting}
-              previousCellValue={cell.getValue()}
-            />
-          );
-        } else if (cellIndex === columns.length - 1) {
-          // Action column
-          return (
-            <div className="flex items-center justify-center h-full">
-              <button
-                className={`p-2 rounded-full text-default-500 hover:bg-default-200 active:bg-default-300 hover:text-default-600 ${
-                  isSorting ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                onClick={(event) => {
-                  if (!isSorting) {
-                    handleDeleteRow(row.index, event);
-                  }
-                }}
-                disabled={isSorting}
-                type="button"
-              >
-                <IconTrash stroke={2} width={20} height={20} />
-              </button>
-            </div>
-          );
-        }
-        return null;
-      }
-
-      // Handle Total, Subtotal, and SubtotalQty rows
-      if (
-        row.original.istotal ||
-        row.original.issubtotal ||
-        row.original.isSubtotalQty
-      ) {
-        if (row.original.isSubtotalQty) {
-          const qtyColumnId = columns.find((col) => col.id === "qty")?.id;
-          const amountColumnId = columns.find((col) => col.id === "amount")?.id;
-
-          if (
-            !(cell.column.id === qtyColumnId) &&
-            !(cell.column.id === amountColumnId)
-          ) {
-            return (
-              <td className="py-3 pr-6 text-right font-semibold rounded-bl-lg"></td>
-            );
-          }
-          if (cell.column.id === qtyColumnId) {
-            return (
-              <td className="py-3 px-6 text-right font-semibold rounded-bl-lg">
-                Total: {row.original.qty}
-              </td>
-            );
-          }
-          if (cell.column.id === amountColumnId) {
-            return (
-              <td className="py-3 px-6 text-right font-semibold rounded-bl-lg">
-                RM {row.original.amount.toFixed(2)}
-              </td>
-            );
-          }
-        } else if (
+      // Handle Total, Subtotal rows
+      if (row.original.istotal || row.original.issubtotal) {
+        if (
           cell.column.id === columns.find((col) => col.type === "amount")?.id
         ) {
           return (
@@ -1308,33 +1179,12 @@ function TableEditing<T extends Record<string, any>>({
         const updatedData = prevData.map((row, index) => {
           if (index === rowIndex) {
             const updatedRow = { ...row, [columnId]: value };
-            if (
-              columnId === "qty" ||
-              columnId === "price" ||
-              updatedRow.isless ||
-              updatedRow.istax
-            ) {
-              if (updatedRow.isless || updatedRow.istax) {
-                if (columnId === "productname") {
-                  // Handle description change for special rows
-                  return {
-                    ...updatedRow,
-                    productname: value,
-                  };
-                } else {
-                  // Handle amount change for special rows
-                  return {
-                    ...updatedRow,
-                    total: parseFloat(value || "0").toFixed(2),
-                  };
-                }
-              } else {
-                const newAmount = calculateAmount(updatedRow);
-                return {
-                  ...updatedRow,
-                  total: newAmount.toFixed(2),
-                };
-              }
+            if (columnId === "qty" || columnId === "price") {
+              const newAmount = calculateAmount(updatedRow);
+              return {
+                ...updatedRow,
+                total: newAmount.toFixed(2),
+              };
             }
             return updatedRow;
           }
@@ -1399,9 +1249,7 @@ function TableEditing<T extends Record<string, any>>({
                     } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
                      ${row.id === editableRowId ? "relative z-10" : ""}}`}
                     onClick={() =>
-                      row.original.issubtotal ||
-                      row.original.isSubtotalQty ||
-                      row.original.istotal
+                      row.original.issubtotal || row.original.istotal
                         ? setSelectedRowId(row.id)
                         : null
                     }
@@ -1412,67 +1260,7 @@ function TableEditing<T extends Record<string, any>>({
                       const isFirstCell = cellIndex === 0;
                       const isLastCell =
                         cellIndex === row.getVisibleCells().length - 1;
-                      // Special handling for Less, Tax, and Total rows
-                      if (row.original.isless || row.original.istax) {
-                        if (
-                          cellIndex === 0 ||
-                          cellIndex === 1 ||
-                          cellIndex === columns.length - 2 ||
-                          cellIndex === columns.length - 1
-                        ) {
-                          const isCellHighlighted =
-                            row.id === editableRowId &&
-                            cellIndex === editableCellIndex &&
-                            !isSorting;
-
-                          return (
-                            <td
-                              key={cell.id}
-                              className={`relative px-6 py-4 whitespace-no-wrap cursor-default
-                              ${
-                                isFirstCell
-                                  ? "border-l-0"
-                                  : "border-l border-default-300"
-                              }
-                              ${isLastCell ? "border-r-0" : ""}
-                              ${
-                                isLastRow
-                                  ? "border-b-0"
-                                  : "border-b border-default-300"
-                              }
-                              ${isLastCell && isLastRow ? "rounded-br-lg" : ""}
-                              ${isFirstCell && isLastRow ? "rounded-bl-lg" : ""}
-                              ${
-                                row.id === selectedRowId
-                                  ? "shadow-top-bottom"
-                                  : ""
-                              }
-                              ${
-                                isCellHighlighted
-                                  ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
-                                  : ""
-                              }`}
-                              colSpan={cellIndex === 1 ? columns.length - 3 : 1}
-                              style={{
-                                padding: "0",
-                                boxSizing: "border-box",
-                                width:
-                                  `${columnWidths[cell.column.id]}px` || "auto",
-                              }}
-                              onClick={() => handleCellClick(row.id, cellIndex)}
-                            >
-                              {renderCell(row, cell, cellIndex, isLastRow)}
-                            </td>
-                          );
-                        } else {
-                          return null;
-                        }
-                      }
-                      if (
-                        row.original.istotal ||
-                        row.original.issubtotal ||
-                        row.original.isSubtotalQty
-                      ) {
+                      if (row.original.istotal || row.original.issubtotal) {
                         const amountColumnId = columns.find(
                           (col) => col.id === "amount"
                         )?.id;
@@ -1480,41 +1268,7 @@ function TableEditing<T extends Record<string, any>>({
                           (col) => col.id === "qty"
                         )?.id;
 
-                        if (row.original.isSubtotalQty) {
-                          if (
-                            !(cell.column.id === qtyColumnId) &&
-                            !(cell.column.id === amountColumnId)
-                          ) {
-                            return (
-                              <td
-                                key={cell.id}
-                                className="py-3 pr-6 text-right font-semibold rounded-bl-lg"
-                              ></td>
-                            );
-                          }
-                          if (cell.column.id === qtyColumnId) {
-                            return (
-                              <td
-                                key={cell.id}
-                                className="py-3 px-6 text-right font-semibold rounded-bl-lg"
-                              >
-                                Total: {row.original.qty}
-                              </td>
-                            );
-                          }
-                          if (cell.column.id === amountColumnId) {
-                            return (
-                              <td
-                                key={cell.id}
-                                className="py-3 px-6 text-right font-semibold rounded-bl-lg"
-                              >
-                                RM {row.original.amount.toFixed(2)}
-                              </td>
-                            );
-                          } else {
-                            return null;
-                          }
-                        } else if (
+                        if (
                           cell.column.id ===
                           columns.find((col) => col.type === "amount")?.id
                         ) {
