@@ -340,7 +340,7 @@ const StaffFormPage: React.FC = () => {
         <form onSubmit={handleSubmit}>
           <div className="pl-6 pt-5">
             <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
-              <div className="space-y-6">
+              <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderInput("id", "ID")}
                   {renderInput("name", "Name")}

@@ -26,7 +26,7 @@ const Tab: React.FC<TabProps> = ({ children, labels }) => {
           </button>
         ))}
       </div>
-      <div className="mt-5">{children[activeTab]}</div>
+      <div className="">{children[activeTab]}</div>
     </div>
   );
 };
