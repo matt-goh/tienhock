@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { Customer, Employee } from "../../types/types";
+import { Customer, Employee, CustomProduct } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -19,6 +19,9 @@ interface SelectOption {
 
 const CustomerAddPage: React.FC = () => {
   const navigate = useNavigate();
+  const [temporaryProducts, setTemporaryProducts] = useState<CustomProduct[]>(
+    []
+  );
 
   // Helper function for ID number placeholder
   const getIdNumberPlaceholder = (idType: string) => {
@@ -196,8 +199,21 @@ const CustomerAddPage: React.FC = () => {
           return;
         }
 
-        // Proceed with creating the customer if validation passed
-        await api.post("/api/customers", formData);
+        // Create the customer
+        const response = await api.post("/api/customers", formData);
+        const newCustomerId = response.customer?.id || formData.id;
+
+        // If we have temporary products, save them
+        if (temporaryProducts.length > 0) {
+          await api.post("/api/customer-products/batch", {
+            customerId: newCustomerId,
+            products: temporaryProducts.map((cp) => ({
+              productId: cp.product_id,
+              customPrice: cp.custom_price,
+              isAvailable: cp.is_available,
+            })),
+          });
+        }
 
         // Refresh the customers cache
         await refreshCustomersCache();
@@ -217,8 +233,21 @@ const CustomerAddPage: React.FC = () => {
       // No validation fields have input, proceed with normal save
       setIsSaving(true);
       try {
-        await api.post("/api/customers", formData);
+        const response = await api.post("/api/customers", formData);
+        const newCustomerId = response.customer?.id || formData.id;
 
+        // If we have temporary products, save them
+        if (temporaryProducts.length > 0) {
+          await api.post("/api/customer-products/batch", {
+            customerId: newCustomerId,
+            products: temporaryProducts.map((cp) => ({
+              productId: cp.product_id,
+              customPrice: cp.custom_price,
+              isAvailable: cp.is_available,
+            })),
+          });
+        }
+        
         // Refresh the customers cache
         await refreshCustomersCache();
 
@@ -365,7 +394,12 @@ const CustomerAddPage: React.FC = () => {
 
               {/* Second tab - Customer Products */}
               <div className="space-y-6">
-                <CustomerProductsTab customerId="" isNewCustomer={true} />
+                <CustomerProductsTab
+                  customerId=""
+                  isNewCustomer={true}
+                  temporaryProducts={temporaryProducts}
+                  onTemporaryProductsChange={setTemporaryProducts}
+                />
               </div>
             </Tab>
           </div>

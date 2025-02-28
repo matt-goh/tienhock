@@ -307,6 +307,16 @@ export interface TableProps<T> {
   tableKey?: string;
 }
 
+export interface CustomProduct {
+  uid?: string;
+  id?: string;
+  customer_id: string;
+  product_id: string;
+  description?: string;
+  custom_price: number;
+  is_available: boolean;
+}
+
 // Product row interface for UI with all possible states
 export interface ExtendedProductItem extends ProductItem {
   description?: string;
