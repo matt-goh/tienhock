@@ -298,6 +298,13 @@ const CustomerFormPage: React.FC = () => {
           await api.put(`/api/customers/${id}`, formData);
         }
 
+        // Add to CustomerFormPage.tsx and CustomerAddPage.tsx before making the API call:
+        console.log("Saving products to server:", {
+          customerId: formData.id,
+          productsCount: temporaryProducts.length,
+          firstProduct: temporaryProducts[0],
+        });
+
         // Save temporary products if any
         if (temporaryProducts.length > 0 || originalProductIds.length > 0) {
           try {
@@ -309,15 +316,25 @@ const CustomerFormPage: React.FC = () => {
               (id) => !currentProductIds.includes(id)
             );
 
+            // Use the current form ID which should match what's in the database
+            // If ID was changed, we should use the new ID after the customer update
+            const customerIdToUse = formData.id;
+
+            // Log what we're sending for debugging
+            console.log("Saving products with customer ID:", customerIdToUse);
+
             await api.post("/api/customer-products/batch", {
-              customerId: formData.id,
+              customerId: customerIdToUse,
               products: temporaryProducts.map((cp) => ({
                 productId: cp.product_id,
-                customPrice: cp.custom_price || 0,
+                customPrice:
+                  typeof cp.custom_price === "number"
+                    ? cp.custom_price
+                    : parseFloat(cp.custom_price || "0"),
                 isAvailable:
                   cp.is_available !== undefined ? cp.is_available : true,
               })),
-              deletedProductIds: deletedProductIds, // Add this new field
+              deletedProductIds: deletedProductIds,
             });
           } catch (productError) {
             console.error("Failed to save products:", productError);
