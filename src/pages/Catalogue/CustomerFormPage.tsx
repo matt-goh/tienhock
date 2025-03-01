@@ -319,7 +319,6 @@ const CustomerFormPage: React.FC = () => {
               })),
               deletedProductIds: deletedProductIds, // Add this new field
             });
-            console.log("Successfully saved products for customer");
           } catch (productError) {
             console.error("Failed to save products:", productError);
             toast.error(

@@ -215,7 +215,6 @@ const CustomerAddPage: React.FC = () => {
                   cp.is_available !== undefined ? cp.is_available : true,
               })),
             });
-            console.log("Successfully saved products for new customer");
           } catch (productError) {
             console.error("Failed to save products:", productError);
             toast.error(
