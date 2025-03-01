@@ -44,6 +44,28 @@ export default function (pool) {
       });
     }
 
+    // Add this check to verify the customer exists before proceeding
+    try {
+      const customerCheck = await pool.query(
+        "SELECT id FROM customers WHERE id = $1",
+        [customerId]
+      );
+
+      if (customerCheck.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Customer with ID '${customerId}' not found`,
+        });
+      }
+    } catch (checkError) {
+      console.error("Error checking customer existence:", checkError);
+      return res.status(500).json({
+        success: false,
+        message: "Error verifying customer",
+        error: checkError.message,
+      });
+    }
+
     const client = await pool.connect();
 
     try {

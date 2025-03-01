@@ -298,7 +298,20 @@ export default function (pool) {
   // Update a customer
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { newId, ...customerData } = req.body;
+    const {
+      name,
+      closeness,
+      salesman,
+      tin_number,
+      phone_number,
+      email,
+      address,
+      city,
+      state,
+      id_number,
+      id_type,
+      newId,
+    } = req.body;
 
     // Are we trying to change the ID?
     const isChangingId = newId && newId !== id;
@@ -332,17 +345,17 @@ export default function (pool) {
 
           const insertValues = [
             newId,
-            customerData.name,
-            customerData.closeness,
-            customerData.salesman,
-            customerData.tin_number || null,
-            customerData.phone_number || null,
-            customerData.email || null,
-            customerData.address || null,
-            customerData.city || null,
-            customerData.state || null,
-            customerData.id_number || null,
-            customerData.id_type || null,
+            name,
+            closeness,
+            salesman,
+            tin_number || null,
+            phone_number || null,
+            email || null,
+            address || null,
+            city || null,
+            state || null,
+            id_number || null,
+            id_type || null,
           ];
 
           const insertResult = await client.query(insertQuery, insertValues);
@@ -385,7 +398,7 @@ export default function (pool) {
           `;
 
           const values = [
-            name,
+            name, // This is where the error was occurring
             closeness,
             salesman,
             tin_number || null,
