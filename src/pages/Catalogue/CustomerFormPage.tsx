@@ -290,35 +290,37 @@ const CustomerFormPage: React.FC = () => {
       // Proceed with saving the customer data
       if (isEditMode) {
         try {
-          // Check if ID is being changed
           const isChangingId = formData.id !== id;
 
-          if (isChangingId) {
-            // Update customer with ID change
-            await api.put(`/api/customers/${id}`, {
-              ...formData,
-              newId: formData.id, // Pass the new ID
-            });
+          // Step 1: Update the customer first
+          const customerResponse = await api.put(`/api/customers/${id}`, {
+            ...formData,
+            newId: isChangingId ? formData.id : undefined, // Only send newId if changing
+          });
 
-            // No need to handle products separately - the backend handles migration
-            toast.success("Customer updated successfully with new ID");
-          } else {
-            // Regular update without ID change
-            await api.put(`/api/customers/${id}`, formData);
+          // Step 2: After customer update completes, now handle products
+          // Use the NEW ID from the response for products
+          const updatedCustomerId = isChangingId ? formData.id : id;
 
-            // Handle product updates as normal
-            if (temporaryProducts.length > 0 || originalProductIds.length > 0) {
-              try {
-                // Calculate which product IDs were removed
-                const currentProductIds = temporaryProducts.map(
-                  (p) => p.product_id
-                );
-                const deletedProductIds = originalProductIds.filter(
-                  (id) => !currentProductIds.includes(id)
-                );
+          // Only proceed with product updates if the customer update succeeded
+          if (
+            customerResponse &&
+            (temporaryProducts.length > 0 || originalProductIds.length > 0)
+          ) {
+            try {
+              // Calculate which product IDs were removed
+              const currentProductIds = temporaryProducts.map(
+                (p) => p.product_id
+              );
+              const deletedProductIds = originalProductIds.filter(
+                (pid) => !currentProductIds.includes(pid)
+              );
 
-                await api.post("/api/customer-products/batch", {
-                  customerId: formData.id,
+              // IMPORTANT: Use the NEW customer ID here
+              const productResponse = await api.post(
+                "/api/customer-products/batch",
+                {
+                  customerId: updatedCustomerId, // Use new ID
                   products: temporaryProducts.map((cp) => ({
                     productId: cp.product_id,
                     customPrice:
@@ -329,19 +331,23 @@ const CustomerFormPage: React.FC = () => {
                       cp.is_available !== undefined ? cp.is_available : true,
                   })),
                   deletedProductIds: deletedProductIds,
-                });
-              } catch (productError) {
-                console.error("Failed to save products:", productError);
-                toast.error(
-                  "Customer updated but product pricing couldn't be saved"
-                );
+                }
+              );
+
+              if (!productResponse.success) {
+                console.error("Product update failed:", productResponse);
+                toast.error("Customer updated but products failed to update");
               }
+            } catch (productError) {
+              console.error("Failed to save products:", productError);
+              toast.error(
+                "Customer updated but product pricing couldn't be saved"
+              );
             }
           }
 
-          // Refresh the customers cache after update
+          // Refresh the customers cache
           await refreshCustomersCache();
-
           navigate("/catalogue/customer");
         } catch (error) {
           toast.error(
