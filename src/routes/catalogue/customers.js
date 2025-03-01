@@ -298,70 +298,132 @@ export default function (pool) {
   // Update a customer
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const {
-      name,
-      closeness,
-      salesman,
-      tin_number,
-      phone_number,
-      email,
-      address,
-      city,
-      state,
-      id_number,
-      id_type,
-    } = req.body;
+    const { newId, ...customerData } = req.body;
+
+    // Are we trying to change the ID?
+    const isChangingId = newId && newId !== id;
 
     try {
-      const query = `
-        UPDATE customers
-        SET 
-          name = $1, 
-          closeness = $2, 
-          salesman = $3, 
-          tin_number = $4,
-          phone_number = $5,
-          email = $6,
-          address = $7,
-          city = $8,
-          state = $9,
-          id_number = $10,
-          id_type = $11
-        WHERE id = $12
-        RETURNING *
-      `;
+      const client = await pool.connect();
 
-      // Transform empty strings to null for numeric fields
-      const values = [
-        name,
-        closeness,
-        salesman,
-        tin_number || null,
-        phone_number || null,
-        email || null,
-        address || null,
-        city || null,
-        state || null,
-        id_number || null,
-        id_type || null,
-        id,
-      ];
+      try {
+        await client.query("BEGIN");
 
-      const result = await pool.query(query, values);
+        if (isChangingId) {
+          console.log(`Changing customer ID from ${id} to ${newId}`);
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Customer not found" });
+          // 1. Check if new ID already exists
+          const checkQuery = "SELECT id FROM customers WHERE id = $1";
+          const checkResult = await client.query(checkQuery, [newId]);
+
+          if (checkResult.rows.length > 0) {
+            throw new Error(`Customer with ID ${newId} already exists`);
+          }
+
+          // 2. Insert new customer with new ID
+          const insertQuery = `
+            INSERT INTO customers (
+              id, name, closeness, salesman, tin_number, phone_number, email, 
+              address, city, state, id_number, id_type
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+            ) RETURNING *
+          `;
+
+          const insertValues = [
+            newId,
+            customerData.name,
+            customerData.closeness,
+            customerData.salesman,
+            customerData.tin_number || null,
+            customerData.phone_number || null,
+            customerData.email || null,
+            customerData.address || null,
+            customerData.city || null,
+            customerData.state || null,
+            customerData.id_number || null,
+            customerData.id_type || null,
+          ];
+
+          const insertResult = await client.query(insertQuery, insertValues);
+
+          // 3. Move all products to new customer ID
+          const updateProductsQuery = `
+            UPDATE customer_products 
+            SET customer_id = $1 
+            WHERE customer_id = $2
+          `;
+          await client.query(updateProductsQuery, [newId, id]);
+
+          // 4. Delete old customer record
+          await client.query("DELETE FROM customers WHERE id = $1", [id]);
+
+          await client.query("COMMIT");
+
+          res.json({
+            message: "Customer ID changed successfully",
+            customer: insertResult.rows[0],
+          });
+        } else {
+          // Regular update without ID change
+          const query = `
+            UPDATE customers
+            SET 
+              name = $1, 
+              closeness = $2, 
+              salesman = $3, 
+              tin_number = $4,
+              phone_number = $5,
+              email = $6,
+              address = $7,
+              city = $8,
+              state = $9,
+              id_number = $10,
+              id_type = $11
+            WHERE id = $12
+            RETURNING *
+          `;
+
+          const values = [
+            name,
+            closeness,
+            salesman,
+            tin_number || null,
+            phone_number || null,
+            email || null,
+            address || null,
+            city || null,
+            state || null,
+            id_number || null,
+            id_type || null,
+            id,
+          ];
+
+          const result = await client.query(query, values);
+
+          if (result.rows.length === 0) {
+            throw new Error("Customer not found");
+          }
+
+          await client.query("COMMIT");
+
+          res.json({
+            message: "Customer updated successfully",
+            customer: result.rows[0],
+          });
+        }
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
       }
-
-      res.json({
-        message: "Customer updated successfully",
-        customer: result.rows[0],
-      });
     } catch (error) {
       console.error("Error updating customer:", error);
-      res
-        .status(500)
-        .json({ message: "Error updating customer", error: error.message });
+      res.status(500).json({
+        message: "Error updating customer",
+        error: error.message,
+      });
     }
   });
 
