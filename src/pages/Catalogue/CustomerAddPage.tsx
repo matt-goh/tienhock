@@ -158,117 +158,50 @@ const CustomerAddPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // First check if form passes basic validation
+    // Validate form
     if (!validateForm()) {
       return;
     }
 
-    // Check if any of the validation fields has input
-    const hasIdType = formData.id_type && formData.id_type !== "Select";
-    const hasIdNumber = Boolean(formData.id_number);
-    const hasTinNumber = Boolean(formData.tin_number);
+    setIsSaving(true);
+    try {
+      // First, create the customer
+      const response = await api.post("/api/customers", formData);
 
-    // If any field has input, all fields are required
-    if (hasIdType || hasIdNumber || hasTinNumber) {
-      if (!hasIdType) {
-        toast.error(
-          "ID Type is required when providing identification details"
-        );
-        return;
-      }
-      if (!hasIdNumber) {
-        toast.error(
-          "ID Number is required when providing identification details"
-        );
-        return;
-      }
-      if (!hasTinNumber) {
-        toast.error(
-          "TIN Number is required when providing identification details"
-        );
-        return;
-      }
+      // Get the new customer ID from the response
+      const newCustomerId = response.customer?.id || formData.id;
 
-      // If all required fields are present, proceed with validation
-      setIsSaving(true);
-      try {
-        const validationResult = await validateCustomerIdentity(formData);
-
-        if (!validationResult.isValid) {
-          setIsSaving(false);
-          return;
-        }
-
-        // Create the customer
-        const response = await api.post("/api/customers", formData);
-        const newCustomerId = response.customer?.id || formData.id;
-
-        // If we have temporary products, save them
-        if (temporaryProducts.length > 0) {
-          try {
-            await api.post("/api/customer-products/batch", {
-              customerId: newCustomerId,
-              products: temporaryProducts.map((cp) => ({
-                productId: cp.product_id,
-                customPrice: cp.custom_price || 0,
-                isAvailable:
-                  cp.is_available !== undefined ? cp.is_available : true,
-              })),
-            });
-          } catch (productError) {
-            console.error("Failed to save products:", productError);
-            toast.error(
-              "Customer created but product pricing couldn't be saved"
-            );
-          }
-        }
-
-        // Refresh the customers cache
-        await refreshCustomersCache();
-        toast.success("Customer created successfully!");
-        navigate("/catalogue/customer");
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred"
-        );
-      } finally {
-        setIsSaving(false);
-      }
-    } else {
-      // No validation fields have input, proceed with normal save
-      setIsSaving(true);
-      try {
-        const response = await api.post("/api/customers", formData);
-        const newCustomerId = response.customer?.id || formData.id;
-
-        // If we have temporary products, save them
-        if (temporaryProducts.length > 0) {
+      // Only try to save products if there are any and we have a valid customer ID
+      if (temporaryProducts.length > 0 && newCustomerId) {
+        try {
           await api.post("/api/customer-products/batch", {
-            customerId: newCustomerId,
+            customerId: newCustomerId, // Use the ID from the response
             products: temporaryProducts.map((cp) => ({
               productId: cp.product_id,
-              customPrice: cp.custom_price,
-              isAvailable: cp.is_available,
+              customPrice:
+                typeof cp.custom_price === "number"
+                  ? cp.custom_price
+                  : parseFloat(cp.custom_price || "0"),
+              isAvailable:
+                cp.is_available !== undefined ? cp.is_available : true,
             })),
           });
+        } catch (productError) {
+          console.error("Failed to save products:", productError);
+          toast.error("Customer created but product pricing couldn't be saved");
         }
-
-        // Refresh the customers cache
-        await refreshCustomersCache();
-
-        toast.success("Customer created successfully!");
-        navigate("/catalogue/customer");
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred"
-        );
-      } finally {
-        setIsSaving(false);
       }
+
+      // Refresh the customers cache
+      await refreshCustomersCache();
+      toast.success("Customer created successfully!");
+      navigate("/catalogue/customer");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
