@@ -289,89 +289,69 @@ const CustomerFormPage: React.FC = () => {
 
       // Proceed with saving the customer data
       if (isEditMode) {
-        if (id !== formData.id) {
-          await api.put(`/api/customers/${id}`, {
-            ...formData,
-            newId: formData.id,
-          });
-        } else {
-          await api.put(`/api/customers/${id}`, formData);
-        }
+        try {
+          // Check if ID is being changed
+          const isChangingId = formData.id !== id;
 
-        // Add to CustomerFormPage.tsx and CustomerAddPage.tsx before making the API call:
-        console.log("Saving products to server:", {
-          customerId: formData.id,
-          productsCount: temporaryProducts.length,
-          firstProduct: temporaryProducts[0],
-        });
-
-        // Save temporary products if any
-        if (temporaryProducts.length > 0 || originalProductIds.length > 0) {
-          try {
-            // Calculate which product IDs were removed
-            const currentProductIds = temporaryProducts.map(
-              (p) => p.product_id
-            );
-            const deletedProductIds = originalProductIds.filter(
-              (id) => !currentProductIds.includes(id)
-            );
-
-            // Use the current form ID which should match what's in the database
-            // If ID was changed, we should use the new ID after the customer update
-            const customerIdToUse = formData.id;
-
-            // Log what we're sending for debugging
-            console.log("Saving products with customer ID:", customerIdToUse);
-
-            await api.post("/api/customer-products/batch", {
-              customerId: customerIdToUse,
-              products: temporaryProducts.map((cp) => ({
-                productId: cp.product_id,
-                customPrice:
-                  typeof cp.custom_price === "number"
-                    ? cp.custom_price
-                    : parseFloat(cp.custom_price || "0"),
-                isAvailable:
-                  cp.is_available !== undefined ? cp.is_available : true,
-              })),
-              deletedProductIds: deletedProductIds,
+          if (isChangingId) {
+            // Update customer with ID change
+            await api.put(`/api/customers/${id}`, {
+              ...formData,
+              newId: formData.id, // Pass the new ID
             });
-          } catch (productError) {
-            console.error("Failed to save products:", productError);
-            toast.error(
-              "Customer updated but product pricing couldn't be saved"
-            );
+
+            // No need to handle products separately - the backend handles migration
+            toast.success("Customer updated successfully with new ID");
+          } else {
+            // Regular update without ID change
+            await api.put(`/api/customers/${id}`, formData);
+
+            // Handle product updates as normal
+            if (temporaryProducts.length > 0 || originalProductIds.length > 0) {
+              try {
+                // Calculate which product IDs were removed
+                const currentProductIds = temporaryProducts.map(
+                  (p) => p.product_id
+                );
+                const deletedProductIds = originalProductIds.filter(
+                  (id) => !currentProductIds.includes(id)
+                );
+
+                await api.post("/api/customer-products/batch", {
+                  customerId: formData.id,
+                  products: temporaryProducts.map((cp) => ({
+                    productId: cp.product_id,
+                    customPrice:
+                      typeof cp.custom_price === "number"
+                        ? cp.custom_price
+                        : parseFloat(cp.custom_price || "0"),
+                    isAvailable:
+                      cp.is_available !== undefined ? cp.is_available : true,
+                  })),
+                  deletedProductIds: deletedProductIds,
+                });
+              } catch (productError) {
+                console.error("Failed to save products:", productError);
+                toast.error(
+                  "Customer updated but product pricing couldn't be saved"
+                );
+              }
+            }
           }
+
+          // Refresh the customers cache after update
+          await refreshCustomersCache();
+
+          navigate("/catalogue/customer");
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred"
+          );
+        } finally {
+          setIsSaving(false);
         }
-
-        // Refresh the customers cache after update
-        await refreshCustomersCache();
-      } else {
-        await api.post("/api/customers", formData);
-
-        // Save temporary products if any
-        if (temporaryProducts.length > 0) {
-          try {
-            await api.post("/api/customer-products/batch", {
-              customerId: formData.id,
-              products: temporaryProducts.map((cp) => ({
-                productId: cp.product_id,
-                customPrice: cp.custom_price || 0,
-                isAvailable:
-                  cp.is_available !== undefined ? cp.is_available : true,
-              })),
-            });
-            console.log("Successfully saved products for new customer");
-          } catch (productError) {
-            console.error("Failed to save products:", productError);
-            toast.error(
-              "Customer created but product pricing couldn't be saved"
-            );
-          }
-        }
-
-        // Refresh the customers cache after creation
-        await refreshCustomersCache();
       }
 
       // After successful save, clear temporary products
