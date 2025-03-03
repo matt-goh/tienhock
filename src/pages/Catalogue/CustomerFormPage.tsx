@@ -302,14 +302,37 @@ const CustomerFormPage: React.FC = () => {
           // Use the NEW ID from the response for products
           const updatedCustomerId = isChangingId ? formData.id : id;
 
+          let productsToUpdate = [...temporaryProducts];
+          if (
+            isChangingId &&
+            originalProductIds.length > 0 &&
+            temporaryProducts.length === 0
+          ) {
+            // If changing ID and we know there should be products but temporaryProducts is empty,
+            // fetch the current products directly and use those
+            try {
+              const productsData = await api.get(
+                `/api/customer-products/${id}`
+              );
+              setTemporaryProducts(productsData);
+              productsToUpdate = productsData; // Use these products
+            } catch (fallbackError) {
+              console.error(
+                "Error fetching products for ID change:",
+                fallbackError
+              );
+              toast.error("Could not transfer products to new customer ID");
+            }
+          }
+
           // Only proceed with product updates if the customer update succeeded
           if (
             customerResponse &&
-            (temporaryProducts.length > 0 || originalProductIds.length > 0)
+            (productsToUpdate.length > 0 || originalProductIds.length > 0)
           ) {
             try {
               // Calculate which product IDs were removed
-              const currentProductIds = temporaryProducts.map(
+              const currentProductIds = productsToUpdate.map(
                 (p) => p.product_id
               );
               const deletedProductIds = originalProductIds.filter(
@@ -321,7 +344,7 @@ const CustomerFormPage: React.FC = () => {
                 "/api/customer-products/batch",
                 {
                   customerId: updatedCustomerId, // Use new ID
-                  products: temporaryProducts.map((cp) => ({
+                  products: productsToUpdate.map((cp) => ({
                     productId: cp.product_id,
                     customPrice:
                       typeof cp.custom_price === "number"
