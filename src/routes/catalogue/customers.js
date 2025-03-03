@@ -220,24 +220,39 @@ export default function (pool) {
   // Delete a single customer
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
+    const client = await pool.connect();
 
     try {
+      await client.query("BEGIN");
+
+      // First delete associated customer products
+      await client.query(
+        "DELETE FROM customer_products WHERE customer_id = $1",
+        [id]
+      );
+
+      // Then delete the customer
       const query = "DELETE FROM customers WHERE id = $1 RETURNING *";
-      const result = await pool.query(query, [id]);
+      const result = await client.query(query, [id]);
 
       if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Customer not found" });
       }
 
+      await client.query("COMMIT");
       res.json({
         message: "Customer deleted successfully",
         customer: result.rows[0],
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Error deleting customer:", error);
       res
         .status(500)
         .json({ message: "Error deleting customer", error: error.message });
+    } finally {
+      client.release();
     }
   });
 
