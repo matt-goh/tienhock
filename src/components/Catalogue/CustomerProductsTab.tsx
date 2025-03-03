@@ -201,7 +201,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
             if (matchingProduct) {
               // Create a new array with the updated product
               const updatedProducts = customerProducts.map((product) => {
-                if (product.product_id === info.row.original.product_id) {
+                if (product.uid === info.row.original.uid) {
                   return {
                     ...product,
                     product_id: matchingProduct.id,
