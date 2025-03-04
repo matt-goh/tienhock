@@ -11,6 +11,7 @@ import Button from "../../components/Button";
 import {
   ColumnConfig,
   Customer,
+  CustomProduct,
   Employee,
   ExtendedInvoiceData,
   InvoiceData,
@@ -62,6 +63,7 @@ const InvoiceDetailsPage: React.FC = () => {
   );
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerPage, setCustomerPage] = useState(1);
+  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
   const [totalCustomerPages, setTotalCustomerPages] = useState(1);
   const [isFetchingCustomers, setIsFetchingCustomers] = useState(false);
   const [initialInvoiceData] = useState<InvoiceData | null>(
@@ -142,6 +144,18 @@ const InvoiceDetailsPage: React.FC = () => {
     [invoiceData?.salespersonid]
   );
 
+  const fetchCustomerProducts = useCallback(async (customerId: string) => {
+    if (!customerId) return;
+    try {
+      console.log(`Fetching customer products for ID: ${customerId}`);
+      const data = await api.get(`/api/customer-products/${customerId}`);
+      console.log("Fetched customer products:", data);
+      setCustomerProducts(data);
+    } catch (error) {
+      console.error("Error fetching customer products:", error);
+    }
+  }, []);
+
   // Initialize once at mount
   useEffect(() => {
     // Handle both initial load and salesperson changes
@@ -154,6 +168,14 @@ const InvoiceDetailsPage: React.FC = () => {
       }
     }
   }, [invoiceData?.salespersonid, isInitialLoad]);
+
+  useEffect(() => {
+    // Only fetch if we have a valid customer ID and we're not creating a new invoice from scratch
+    if (invoiceData?.customerid && invoiceData.customerid !== "") {
+      console.log("Fetching customer products for:", invoiceData.customerid);
+      fetchCustomerProducts(invoiceData.customerid);
+    }
+  }, [invoiceData?.customerid, fetchCustomerProducts]);
 
   const debouncedFetchCustomers = useMemo(
     () =>
@@ -213,31 +235,94 @@ const InvoiceDetailsPage: React.FC = () => {
     fetchCustomers,
   ]);
 
+  // Effect to update prices when customer changes
+  useEffect(() => {
+    if (invoiceData?.products.length > 0 && customerProducts.length > 0) {
+      setInvoiceData((prev) => ({
+        ...prev,
+        products: prev.products.map((product) => {
+          if (product.issubtotal || product.istotal) return product;
+
+          // Check if there's a custom price for this product
+          const customProduct = customerProducts.find(
+            (cp) => cp.product_id === product.code && cp.is_available
+          );
+
+          if (customProduct) {
+            return {
+              ...product,
+              price: Number(customProduct.custom_price),
+            };
+          }
+
+          // If no custom price, check for regular product price
+          const regularProduct = products.find((p) => p.id === product.code);
+          if (
+            regularProduct &&
+            regularProduct.price_per_unit &&
+            product.price === 0
+          ) {
+            return {
+              ...product,
+              price: Number(regularProduct.price_per_unit),
+            };
+          }
+
+          return product;
+        }),
+      }));
+    }
+  }, [customerProducts, products]);
+
   useEffect(() => {
     if (invoiceData?.products.length > 0 && products.length > 0) {
-      const needsDescriptionUpdate = invoiceData.products.some(
+      const needsUpdate = invoiceData.products.some(
         (product) =>
-          !product.description &&
-          products.find((p) => p.id === product.code)?.description
+          (!product.description &&
+            products.find((p) => p.id === product.code)?.description) ||
+          (product.price === 0 &&
+            products.find((p) => p.id === product.code)?.price_per_unit)
       );
 
-      if (needsDescriptionUpdate) {
+      if (needsUpdate) {
         setInvoiceData((prev) => ({
           ...prev,
           products: prev.products.map((product) => {
             const matchingProduct = products.find((p) => p.id === product.code);
+            const customProduct = customerProducts.find(
+              (cp) => cp.product_id === product.code && cp.is_available
+            );
+
+            let updates = {};
+
             if (matchingProduct && !product.description) {
-              return {
-                ...product,
+              updates = {
+                ...updates,
                 description: matchingProduct.description,
               };
             }
-            return product;
+
+            if (product.price === 0) {
+              // Prioritize custom price over regular price
+              const price = customProduct
+                ? Number(customProduct.custom_price)
+                : matchingProduct
+                ? Number(matchingProduct.price_per_unit)
+                : 0;
+
+              if (price > 0) {
+                updates = { ...updates, price };
+              }
+            }
+
+            return Object.keys(updates).length > 0
+              ? { ...product, ...updates }
+              : product;
           }),
         }));
       }
     }
-  }, [products]);
+  }, [products, customerProducts]);
 
   const fetchSalesmen = useCallback(async () => {
     try {
@@ -318,12 +403,21 @@ const InvoiceDetailsPage: React.FC = () => {
     const randomProduct =
       availableProducts[Math.floor(Math.random() * availableProducts.length)];
 
+    // Check if there's a custom price for this product
+    const customProduct = customerProducts.find(
+      (cp) => cp.product_id === randomProduct.id && cp.is_available
+    );
+
+    const price = customProduct
+      ? Number(customProduct.custom_price)
+      : Number(randomProduct.price_per_unit) || 0;
+
     return {
       uid: crypto.randomUUID(),
       code: randomProduct.id,
       description: randomProduct.description,
       quantity: 1,
-      price: 0,
+      price: price,
       freeProduct: 0,
       returnProduct: 0,
       tax: 0,
@@ -331,7 +425,7 @@ const InvoiceDetailsPage: React.FC = () => {
       issubtotal: false,
       istotal: false,
     };
-  }, [getAvailableProducts]);
+  }, [getAvailableProducts, customerProducts]);
 
   const newRowAddedRef = useRef(false);
 
@@ -357,11 +451,22 @@ const InvoiceDetailsPage: React.FC = () => {
                 availableProducts[
                   Math.floor(Math.random() * availableProducts.length)
                 ];
+
+              // Check if there's a custom price for this product
+              const customProduct = customerProducts.find(
+                (cp) => cp.product_id === randomProduct.id && cp.is_available
+              );
+
+              const price = customProduct
+                ? Number(customProduct.custom_price)
+                : Number(randomProduct.price_per_unit) || 0;
+
               return {
                 ...item,
                 uid: crypto.randomUUID(),
                 code: randomProduct.id,
                 description: randomProduct.description,
+                price: price,
               };
             }
             return item;
@@ -780,12 +885,22 @@ const InvoiceDetailsPage: React.FC = () => {
               (p) => p.description === newDescription
             );
             if (matchingProduct) {
+              // Check if there's a custom price for this product
+              const customProduct = customerProducts.find(
+                (cp) => cp.product_id === matchingProduct.id && cp.is_available
+              );
+
+              const price = customProduct
+                ? Number(customProduct.custom_price)
+                : Number(matchingProduct.price_per_unit) || 0;
+
               const updatedProducts = invoiceData.products.map((product) => {
                 if (product.uid === info.row.original.uid) {
                   return {
                     ...product,
                     code: matchingProduct.id,
                     description: matchingProduct.description,
+                    price: price,
                   };
                 }
                 return product;
@@ -799,7 +914,7 @@ const InvoiceDetailsPage: React.FC = () => {
           onKeyDown={() => {}}
           isSorting={false}
           previousCellValue={info.getValue()}
-          options={products.map((p) => p.description)}
+          options={products.map((p) => p.description || "")}
         />
       ),
     },
@@ -1048,22 +1163,26 @@ const InvoiceDetailsPage: React.FC = () => {
             label="Customer"
             value={selectedCustomerName ? [selectedCustomerName] : []}
             onChange={(value: string[] | null) => {
+              const selectedCustomerName = value ? value[0] : "";
+              const selectedCustomer = customers.find(
+                (c) => c.name === selectedCustomerName
+              );
+
+              // Set the selected customer name state
+              setSelectedCustomerName(selectedCustomerName);
+
+              // Update the invoice data
               setInvoiceData((prev) => {
-                const selectedCustomerName = value ? value[0] : "";
-                const selectedCustomer = customers.find(
-                  (c) => c.name === selectedCustomerName
-                );
+                const customerId = selectedCustomer?.id || "";
 
-                const updatedData: ExtendedInvoiceData = {
+                // Log the selected customer ID for debugging
+                console.log("Customer selected, ID:", customerId);
+
+                return {
                   ...prev,
-                  customerid: selectedCustomer?.id || prev.customerid,
-                  customername: selectedCustomerName, // Update customerName in invoiceData
+                  customerid: customerId,
+                  customername: selectedCustomerName,
                 };
-
-                // Update the selected customer name
-                setSelectedCustomerName(selectedCustomerName);
-
-                return updatedData;
               });
             }}
             options={customers.map((c) => ({ id: c.id, name: c.name }))}
