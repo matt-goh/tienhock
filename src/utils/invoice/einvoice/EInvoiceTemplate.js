@@ -257,9 +257,7 @@ const generateInvoiceLines = (orderDetails) => {
       </cac:CommodityClassification>
     </cac:Item>
     <cac:Price>
-      <cbc:PriceAmount currencyID="MYR">${lineAmount.toFixed(
-        2
-      )}</cbc:PriceAmount>
+      <cbc:PriceAmount currencyID="MYR">${item.price}</cbc:PriceAmount>
     </cac:Price>
     <cac:ItemPriceExtension>
       <cbc:Amount currencyID="MYR">${lineAmount.toFixed(2)}</cbc:Amount>
