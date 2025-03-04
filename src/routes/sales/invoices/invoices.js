@@ -1,5 +1,47 @@
 // src/routes/sales/invoices/invoices.js
 import { Router } from "express";
+import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
+import {
+  MYINVOIS_API_BASE_URL,
+  MYINVOIS_CLIENT_ID,
+  MYINVOIS_CLIENT_SECRET,
+} from "../../../configs/config.js";
+
+// Define the MyInvois configuration object
+const myInvoisConfig = {
+  MYINVOIS_API_BASE_URL,
+  MYINVOIS_CLIENT_ID,
+  MYINVOIS_CLIENT_SECRET,
+};
+
+const fetchCustomerData = async (pool, customerId) => {
+  try {
+    const query = `
+      SELECT 
+        city,
+        state,
+        address,
+        name,
+        tin_number,
+        id_number,
+        id_type,
+        phone_number,
+        email
+      FROM customers 
+      WHERE id = $1
+    `;
+    const result = await pool.query(query, [customerId]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error fetching customer data:", error);
+    throw error;
+  }
+};
 
 const formatDate = (date) => {
   if (date instanceof Date) {
@@ -266,8 +308,9 @@ export default function (pool) {
 
       const results = [];
       const errors = [];
+      const savedInvoiceData = [];
 
-      // Process each invoice
+      // Process each invoice for database save
       for (const invoice of invoices) {
         try {
           // Transform data to match database columns
@@ -311,9 +354,13 @@ export default function (pool) {
           RETURNING *
         `;
 
-          await client.query(insertInvoiceQuery, values);
+          const invoiceResult = await client.query(insertInvoiceQuery, values);
+          const savedInvoice = invoiceResult.rows[0];
 
-          // Insert products
+          // Prepare order details for both database and MyInvois
+          const orderDetails = [];
+
+          // Process products to save in database and track for MyInvois
           if (invoice.products && invoice.products.length > 0) {
             for (const product of invoice.products) {
               // Skip products with zero quantity and price
@@ -344,6 +391,18 @@ export default function (pool) {
                 issubtotal: false,
               };
 
+              // Store product data for MyInvois
+              orderDetails.push({
+                code: product.code,
+                price: price,
+                quantity: quantity,
+                freeProduct: freeProduct,
+                returnProduct: returnProduct,
+                tax: tax,
+                total: total.toString(),
+                description: description, // Capture this for MyInvois
+              });
+
               // Build insert query for product
               const productColumns = Object.keys(productData);
               const productPlaceholders = productColumns
@@ -367,6 +426,19 @@ export default function (pool) {
             status: "success",
             message: "Invoice created successfully",
           });
+
+          // Store the data needed for MyInvois submission
+          savedInvoiceData.push({
+            id: savedInvoice.id,
+            salespersonid: savedInvoice.salespersonid,
+            customerid: savedInvoice.customerid,
+            createddate: savedInvoice.createddate,
+            paymenttype: savedInvoice.paymenttype,
+            amount: Number(savedInvoice.amount) || 0,
+            rounding: Number(savedInvoice.rounding) || 0,
+            totalamountpayable: Number(savedInvoice.totalamountpayable) || 0,
+            orderDetails: orderDetails,
+          });
         } catch (error) {
           errors.push({
             billNumber: invoice.billNumber,
@@ -388,11 +460,75 @@ export default function (pool) {
       // Otherwise commit successful transactions
       await client.query("COMMIT");
 
+      // Process any invoice data that might be missing product descriptions
+      for (const invoice of savedInvoiceData) {
+        const productCodesWithoutDescription = invoice.orderDetails
+          .filter((product) => !product.description)
+          .map((product) => product.code);
+
+        if (productCodesWithoutDescription.length > 0) {
+          try {
+            // Fetch only the missing product descriptions
+            const descriptionQuery = `
+            SELECT id, description 
+            FROM products 
+            WHERE id = ANY($1)
+          `;
+            const descriptionResult = await client.query(descriptionQuery, [
+              productCodesWithoutDescription,
+            ]);
+
+            // Create a lookup map of product code to description
+            const descriptionMap = {};
+            descriptionResult.rows.forEach((row) => {
+              descriptionMap[row.id] = row.description;
+            });
+
+            // Update the product descriptions in our data
+            invoice.orderDetails = invoice.orderDetails.map((product) => {
+              if (!product.description && descriptionMap[product.code]) {
+                return {
+                  ...product,
+                  description: descriptionMap[product.code],
+                };
+              }
+              return product;
+            });
+          } catch (err) {
+            console.error(
+              `Error fetching product descriptions for invoice ${invoice.id}:`,
+              err
+            );
+            // Continue with whatever descriptions we have
+          }
+        }
+      }
+
+      // After successful database save, attempt MyInvois submission
+      let einvoiceResults = null;
+      if (savedInvoiceData.length > 0) {
+        try {
+          einvoiceResults = await submitInvoicesToMyInvois(
+            myInvoisConfig,
+            savedInvoiceData,
+            (customerId) => fetchCustomerData(pool, customerId)
+          );
+        } catch (einvoiceError) {
+          console.error("Error during submission to MyInvois:", einvoiceError);
+          einvoiceResults = {
+            success: false,
+            message: "Failed to submit to MyInvois API",
+            error: einvoiceError.message || "Unknown error",
+          };
+        }
+      }
+
       // Return response with results and any errors
       res.status(207).json({
         message: "Invoice processing completed",
         results,
         errors: errors.length > 0 ? errors : undefined,
+        einvoice: einvoiceResults,
       });
     } catch (error) {
       await client.query("ROLLBACK");
