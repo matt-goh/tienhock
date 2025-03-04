@@ -4,6 +4,46 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Get all customer-product relationships (for mobile app)
+  router.get("/all", async (req, res) => {
+    try {
+      // Optional customer filter
+      const customerId = req.query.customerId;
+
+      // Build the query with optional customer filter
+      let queryParams = [];
+      let whereClause = "";
+
+      if (customerId) {
+        whereClause = "WHERE customer_id = $1";
+        queryParams.push(customerId);
+      }
+
+      // Simple query for customer product relationships
+      const query = `
+      SELECT 
+        customer_id,
+        product_id,
+        custom_price,
+        is_available
+      FROM customer_products
+      ${whereClause}
+      ORDER BY customer_id, product_id
+    `;
+
+      const result = await pool.query(query, queryParams);
+
+      // Return just the data array
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching customer products:", error);
+      res.status(500).json({
+        message: "Error fetching customer products data",
+        error: error.message,
+      });
+    }
+  });
+
   // Get all custom products for a specific customer
   router.get("/:customerId", async (req, res) => {
     try {
