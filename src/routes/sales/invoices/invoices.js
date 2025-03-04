@@ -107,6 +107,39 @@ const formatTime = (time) => {
 export default function (pool) {
   const router = Router();
 
+  // Customer data cache
+  const customerCache = new Map();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Enhanced customer data function with caching
+  const fetchCustomerDataWithCache = async (customerId) => {
+    // Check cache first
+    const cacheKey = `customer_${customerId}`;
+    const cachedData = customerCache.get(cacheKey);
+
+    if (cachedData && cachedData.timestamp > Date.now() - CACHE_TTL) {
+      return cachedData.data;
+    }
+
+    // Not in cache or expired, fetch from database
+    try {
+      const data = await fetchCustomerData(pool, customerId);
+
+      // Store in cache if found
+      if (data) {
+        customerCache.set(cacheKey, {
+          data,
+          timestamp: Date.now(),
+        });
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error fetching customer data:", error);
+      throw error;
+    }
+  };
+
   // Get invoices with filters
   router.get("/", async (req, res) => {
     try {
@@ -546,7 +579,7 @@ export default function (pool) {
           einvoiceResults = await submitInvoicesToMyInvois(
             myInvoisConfig,
             savedInvoiceData,
-            (customerId) => fetchCustomerData(pool, customerId)
+            fetchCustomerDataWithCache
           );
 
           // Add this block to store accepted documents in the einvoices table
