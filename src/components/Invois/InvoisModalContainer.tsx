@@ -10,15 +10,13 @@ interface InvoisModalContainerProps {
   onClose: () => void;
   loginResponse: LoginResponse | null;
   children: React.ReactNode;
-  onSubmissionClose: () => void;
 }
 
 const InvoisModalContainer: React.FC<InvoisModalContainerProps> = ({
   isOpen,
   onClose,
   loginResponse,
-  children,
-  onSubmissionClose,
+  children
 }) => {
   if (!isOpen) return null;
 

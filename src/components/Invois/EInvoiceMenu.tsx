@@ -345,7 +345,6 @@ const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         loginResponse={loginResponse}
-        onSubmissionClose={handleClose}
       >
         {submissionState ? (
           <SubmissionDisplay state={submissionState} onClose={handleClose} />
