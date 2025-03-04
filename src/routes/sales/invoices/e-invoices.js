@@ -334,6 +334,7 @@ export default function (pool, config) {
     }
   });
 
+  // Get all submitted e-invoices
   router.get("/list", async (req, res) => {
     try {
       const page = parseInt(req.query.page) || 1;
@@ -373,6 +374,36 @@ export default function (pool, config) {
     } catch (error) {
       console.error("Failed to fetch e-invoices:", error);
       res.status(500).json({ error: "Failed to fetch e-invoices" });
+    }
+  });
+
+  // Delete e-invoice by UUID
+  router.delete("/:uuid", async (req, res) => {
+    const { uuid } = req.params;
+
+    try {
+      // Check if the e-invoice exists before attempting to delete
+      const checkQuery = "SELECT uuid FROM einvoices WHERE uuid = $1";
+      const checkResult = await pool.query(checkQuery, [uuid]);
+
+      if (checkResult.rows.length === 0) {
+        return res.status(404).json({ message: "E-invoice not found" });
+      }
+
+      // Delete the e-invoice
+      const deleteQuery = "DELETE FROM einvoices WHERE uuid = $1 RETURNING *";
+      const result = await pool.query(deleteQuery, [uuid]);
+
+      res.json({
+        message: "E-invoice deleted successfully",
+        einvoice: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error deleting e-invoice:", error);
+      res.status(500).json({
+        message: "Error deleting e-invoice",
+        error: error.message,
+      });
     }
   });
 
