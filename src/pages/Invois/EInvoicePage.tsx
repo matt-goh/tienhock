@@ -5,6 +5,9 @@ import Button from "../../components/Button";
 import { IconRefresh, IconSearch } from "@tabler/icons-react";
 import PaginationControls from "../../components/Invois/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { IconTrash } from "@tabler/icons-react";
+import toast from "react-hot-toast";
 
 const STORAGE_KEY = "einvoisDateFilters";
 
@@ -66,6 +69,10 @@ const EInvoicePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState(getInitialDates());
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [einvoiceToDelete, setEinvoiceToDelete] = useState<EInvoice | null>(
+    null
+  );
 
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
@@ -283,6 +290,27 @@ const EInvoicePage: React.FC = () => {
     });
   };
 
+  const handleDelete = async () => {
+    if (!einvoiceToDelete) return;
+
+    try {
+      await api.delete(`/api/einvoice/${einvoiceToDelete.uuid}`);
+      setEinvoiceToDelete(null);
+      setShowDeleteDialog(false);
+
+      // Refresh the data
+      if (fetchDataRef.current) {
+        await fetchDataRef.current();
+      }
+
+      // Show success message
+      toast.success("E-invoice deleted successfully");
+    } catch (error: any) {
+      console.error("Error deleting e-invoice:", error);
+      toast.error(error.message || "Failed to delete e-invoice");
+    }
+  };
+
   return (
     <div className="flex flex-col px-6">
       <div className="flex justify-between items-center mb-4">
@@ -360,20 +388,20 @@ const EInvoicePage: React.FC = () => {
           >
             <table className="w-full table-fixed">
               <colgroup>
-                <col className="w-[10%]" />
                 {/* Invoice No */}
                 <col className="w-[10%]" />
                 {/* Type */}
-                <col className="w-[20%]" />
+                <col className="w-[10%]" />
                 {/* Customer */}
-                <col className="w-[17%]" />
+                <col className="w-[18%]" />
                 {/* Validated At */}
-                <col className="w-[9%]" />
+                <col className="w-[15%]" />
                 {/* Amount */}
-                <col className="w-[22%]" />
+                <col className="w-[5%]" />
                 {/* Submission ID */}
-                <col className="w-[12%]" />
+                <col className="w-[22%]" />
                 {/* Actions */}
+                <col className="w-[20%]" />
               </colgroup>
               <thead>
                 <tr>
@@ -409,20 +437,20 @@ const EInvoicePage: React.FC = () => {
           >
             <table className="w-full table-fixed">
               <colgroup>
-                <col className="w-[10%]" />
                 {/* Invoice No */}
                 <col className="w-[10%]" />
                 {/* Type */}
-                <col className="w-[20%]" />
+                <col className="w-[10%]" />
                 {/* Customer */}
-                <col className="w-[17%]" />
+                <col className="w-[18%]" />
                 {/* Validated At */}
-                <col className="w-[9%]" />
+                <col className="w-[15%]" />
                 {/* Amount */}
-                <col className="w-[22%]" />
+                <col className="w-[5%]" />
                 {/* Submission ID */}
-                <col className="w-[12%]" />
+                <col className="w-[22%]" />
                 {/* Actions */}
+                <col className="w-[20%]" />
               </colgroup>
               <tbody className="bg-white">
                 {loading ? (
@@ -462,10 +490,24 @@ const EInvoicePage: React.FC = () => {
                         {einvoice.submission_uid}
                       </td>
                       <td className="px-4 py-3">
-                        <EInvoicePDFHandler
-                          einvoice={einvoice}
-                          disabled={false}
-                        />
+                        <div className="flex gap-2">
+                          <EInvoicePDFHandler
+                            einvoice={einvoice}
+                            disabled={false}
+                          />
+                          <Button
+                            onClick={() => {
+                              setEinvoiceToDelete(einvoice);
+                              setShowDeleteDialog(true);
+                            }}
+                            variant="outline"
+                            color="rose"
+                            size="sm"
+                            icon={IconTrash}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -483,6 +525,19 @@ const EInvoicePage: React.FC = () => {
           }
         />
       </div>
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDelete}
+        title="Delete E-Invoice"
+        message={
+          einvoiceToDelete
+            ? `Are you sure you want to delete e-invoice ${einvoiceToDelete.internal_id}? This action cannot be undone.`
+            : "Are you sure you want to delete this e-invoice?"
+        }
+        confirmButtonText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };
