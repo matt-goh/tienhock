@@ -304,10 +304,9 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
     const quantity = product.quantity || 0;
     const price = product.price || 0;
     const tax = product.tax || 0;
-    const returnQty = product.returnProduct || 0;
 
     // Calculate base total
-    const baseTotal = (quantity - returnQty) * price;
+    const baseTotal = quantity * price;
 
     // Apply tax
     const final = baseTotal + tax;
