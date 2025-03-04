@@ -29,34 +29,60 @@ export async function submitInvoicesToMyInvois(
   // Create submission handler
   const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
 
-  // Transform invoices to XML format
+  // Process XML transformations in parallel (with concurrency limit)
+  const BATCH_SIZE = 5; // Process 5 invoices at a time
   const transformedInvoices = [];
   const validationErrors = [];
 
-  for (const invoice of invoices) {
-    try {
-      const customerData = await getCustomerData(invoice.customerid);
-      if (!customerData) {
-        throw {
-          type: "validation",
-          code: "CUSTOMER_NOT_FOUND",
-          message: `Customer data not found for invoice ${invoice.id}`,
-          invoiceNo: invoice.id,
-        };
-      }
+  // Group invoices into batches
+  const batches = [];
+  for (let i = 0; i < invoices.length; i += BATCH_SIZE) {
+    batches.push(invoices.slice(i, i + BATCH_SIZE));
+  }
 
-      const transformedInvoice = await EInvoiceTemplate(invoice, customerData);
-      transformedInvoices.push(transformedInvoice);
-    } catch (error) {
-      validationErrors.push({
-        invoiceCodeNumber: error.invoiceNo || invoice.id,
-        error: {
-          code: error.code || "VALIDATION_ERROR",
-          message: error.message || "Validation error",
-          details: error.details || [],
-        },
-      });
-    }
+  // Process each batch in parallel
+  for (const batch of batches) {
+    const batchResults = await Promise.all(
+      batch.map(async (invoice) => {
+        try {
+          const customerData = await getCustomerData(invoice.customerid);
+          if (!customerData) {
+            return {
+              error: {
+                type: "validation",
+                code: "CUSTOMER_NOT_FOUND",
+                message: `Customer data not found for invoice ${invoice.id}`,
+                invoiceNo: invoice.id,
+              },
+            };
+          }
+
+          const transformedInvoice = await EInvoiceTemplate(
+            invoice,
+            customerData
+          );
+          return { transformedInvoice };
+        } catch (error) {
+          return { error };
+        }
+      })
+    );
+
+    // Process batch results
+    batchResults.forEach((result) => {
+      if (result.transformedInvoice) {
+        transformedInvoices.push(result.transformedInvoice);
+      } else if (result.error) {
+        validationErrors.push({
+          invoiceCodeNumber: result.error.invoiceNo || "unknown",
+          error: {
+            code: result.error.code || "VALIDATION_ERROR",
+            message: result.error.message || "Validation error",
+            details: result.error.details || [],
+          },
+        });
+      }
+    });
   }
 
   // If all invoices failed validation, return early
