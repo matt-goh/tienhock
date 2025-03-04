@@ -117,8 +117,11 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
       newValue = formatEditValue(newValue);
       setEditValue(newValue);
       // Call onChange immediately with the formatted value
+      // FIX: Use parseFloat for both rate and float types
       const outputValue =
-        type === "rate" ? parseFloat(newValue) : parseInt(newValue, 10);
+        type === "rate" || type === "float"
+          ? parseFloat(newValue)
+          : parseInt(newValue, 10);
       onChange(isNaN(outputValue) ? 0 : outputValue);
     } else {
       setEditValue(newValue);
