@@ -147,9 +147,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const fetchCustomerProducts = useCallback(async (customerId: string) => {
     if (!customerId) return;
     try {
-      console.log(`Fetching customer products for ID: ${customerId}`);
       const data = await api.get(`/api/customer-products/${customerId}`);
-      console.log("Fetched customer products:", data);
       setCustomerProducts(data);
     } catch (error) {
       console.error("Error fetching customer products:", error);
@@ -172,7 +170,6 @@ const InvoiceDetailsPage: React.FC = () => {
   useEffect(() => {
     // Only fetch if we have a valid customer ID and we're not creating a new invoice from scratch
     if (invoiceData?.customerid && invoiceData.customerid !== "") {
-      console.log("Fetching customer products for:", invoiceData.customerid);
       fetchCustomerProducts(invoiceData.customerid);
     }
   }, [invoiceData?.customerid, fetchCustomerProducts]);
@@ -1174,9 +1171,6 @@ const InvoiceDetailsPage: React.FC = () => {
               // Update the invoice data
               setInvoiceData((prev) => {
                 const customerId = selectedCustomer?.id || "";
-
-                // Log the selected customer ID for debugging
-                console.log("Customer selected, ID:", customerId);
 
                 return {
                   ...prev,
