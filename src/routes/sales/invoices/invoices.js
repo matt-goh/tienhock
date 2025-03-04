@@ -14,6 +14,41 @@ const myInvoisConfig = {
   MYINVOIS_CLIENT_SECRET,
 };
 
+const insertAcceptedDocuments = async (pool, documents) => {
+  const query = `
+    INSERT INTO einvoices (
+      uuid, submission_uid, long_id, internal_id, type_name, 
+      receiver_id, receiver_name, datetime_validated,
+      total_payable_amount, total_excluding_tax, total_net_amount
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+  `;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const doc of documents) {
+      await client.query(query, [
+        doc.uuid,
+        doc.submissionUid,
+        doc.longId,
+        doc.internalId,
+        doc.typeName,
+        doc.receiverId,
+        doc.receiverName,
+        doc.dateTimeValidated,
+        doc.totalPayableAmount,
+        doc.totalExcludingTax,
+        doc.totalNetAmount,
+      ]);
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const fetchCustomerData = async (pool, customerId) => {
   try {
     const query = `
@@ -513,6 +548,22 @@ export default function (pool) {
             savedInvoiceData,
             (customerId) => fetchCustomerData(pool, customerId)
           );
+
+          // Add this block to store accepted documents in the einvoices table
+          if (
+            einvoiceResults.success &&
+            einvoiceResults.acceptedDocuments?.length > 0
+          ) {
+            try {
+              await insertAcceptedDocuments(
+                pool,
+                einvoiceResults.acceptedDocuments
+              );
+            } catch (storageError) {
+              console.error("Error storing accepted documents:", storageError);
+              // Don't fail the whole operation if storing documents fails
+            }
+          }
         } catch (einvoiceError) {
           console.error("Error during submission to MyInvois:", einvoiceError);
           einvoiceResults = {
