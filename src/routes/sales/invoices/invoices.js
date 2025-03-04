@@ -442,9 +442,7 @@ export default function (pool) {
               const description = product.description || "";
 
               // Calculate total
-              const total = ((quantity - returnProduct) * price + tax).toFixed(
-                2
-              );
+              const total = (quantity * price + tax).toFixed(2);
 
               const productData = {
                 invoiceid: transformedInvoice.id,

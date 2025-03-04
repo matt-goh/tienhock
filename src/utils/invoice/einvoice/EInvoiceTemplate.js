@@ -163,11 +163,20 @@ const calculateTaxAndTotals = (invoiceData) => {
   };
 };
 
-// Generate tax subtotal XML elements
+// Precompile static template parts for performance
+const TEMPLATE_HEADER = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" 
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" 
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">`;
+
+const TEMPLATE_FOOTER = `</Invoice>`;
+
+// Optimized tax subtotal generation with string concatenation
 function generateTaxSubtotals(taxSubtotals) {
-  return taxSubtotals
-    .map(
-      (subtotal) => `
+  let result = "";
+
+  for (const subtotal of taxSubtotals) {
+    result += `
     <cac:TaxSubtotal>
       <cbc:TaxableAmount currencyID="MYR">${subtotal.taxableAmount.toFixed(
         2
@@ -181,31 +190,29 @@ function generateTaxSubtotals(taxSubtotals) {
           <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">OTH</cbc:ID>
         </cac:TaxScheme>
       </cac:TaxCategory>
-    </cac:TaxSubtotal>`
-    )
-    .join("");
+    </cac:TaxSubtotal>`;
+  }
+
+  return result;
 }
 
-// Handle multiple invoice lines
+// Optimized invoice lines generation with string concatenation
 const generateInvoiceLines = (orderDetails) => {
   // First filter out any subtotal rows, we only want regular items
   const regularItems = orderDetails.filter((item) => !item.issubtotal);
 
-  // Generate invoice lines with item's own tax values
-  return regularItems
-    .map((item, index) => {
-      const lineNumber = (index + 1).toString().padStart(3, "0");
-      const lineAmount = formatAmount(
-        (item.qty || 0) * (Number(item.price) || 0)
-      );
+  let result = "";
 
-      // Get the tax directly from the item's own tax field
-      const productTax = formatAmount(Number(item.tax) || 0);
+  for (let index = 0; index < regularItems.length; index++) {
+    const item = regularItems[index];
+    const lineNumber = (index + 1).toString().padStart(3, "0");
+    const lineAmount = formatAmount(
+      (item.qty || 0) * (Number(item.price) || 0)
+    );
+    const productTax = formatAmount(Number(item.tax) || 0);
+    const taxCategory = productTax > 0 ? "01" : "06"; // 01 for Sales Tax, 06 for Not Applicable
 
-      // Determine tax category based on tax amount
-      const taxCategory = productTax > 0 ? "01" : "06"; // 01 for Sales Tax, 06 for Not Applicable
-
-      return `
+    result += `
   <cac:InvoiceLine>
     <cbc:ID>${lineNumber}</cbc:ID>
     <cbc:InvoicedQuantity unitCode="NMP">${item.qty}</cbc:InvoicedQuantity>
@@ -263,8 +270,9 @@ const generateInvoiceLines = (orderDetails) => {
       <cbc:Amount currencyID="MYR">${lineAmount.toFixed(2)}</cbc:Amount>
     </cac:ItemPriceExtension>
   </cac:InvoiceLine>`;
-    })
-    .join("");
+  }
+
+  return result;
 };
 
 export async function EInvoiceTemplate(rawInvoiceData, customerData) {
@@ -346,26 +354,36 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
       amount: Number(rawInvoiceData.amount || 0),
     });
 
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" 
-         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" 
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    // Start XML document using optimized string concatenation
+    let xml = TEMPLATE_HEADER;
+
+    // Add invoice ID and basic information
+    xml += `
   <cbc:ID>${escapeXml(rawInvoiceData.id)}</cbc:ID>
   <cbc:IssueDate>${formattedDate}</cbc:IssueDate>
   <cbc:IssueTime>${formattedTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listVersionID="1.0">01</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
-  <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>
+  <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;
+
+    // Add invoice period
+    xml += `
   <cac:InvoicePeriod>
     <cbc:StartDate>${formattedDate}</cbc:StartDate>
     <cbc:EndDate>${formattedDate}</cbc:EndDate>
     <cbc:Description>Not Applicable</cbc:Description>
-  </cac:InvoicePeriod>
+  </cac:InvoicePeriod>`;
+
+    // Add billing reference
+    xml += `
   <cac:BillingReference>
     <cac:AdditionalDocumentReference>
       <cbc:ID>-</cbc:ID>
     </cac:AdditionalDocumentReference>
-  </cac:BillingReference>
+  </cac:BillingReference>`;
+
+    // Add additional document references
+    xml += `
   <cac:AdditionalDocumentReference>
     <cbc:ID></cbc:ID>
     <cbc:DocumentType></cbc:DocumentType>
@@ -381,7 +399,10 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
   </cac:AdditionalDocumentReference>
   <cac:AdditionalDocumentReference>
     <cbc:ID></cbc:ID>
-  </cac:AdditionalDocumentReference>
+  </cac:AdditionalDocumentReference>`;
+
+    // Add supplier party
+    xml += `
   <cac:AccountingSupplierParty>
     <cbc:AdditionalAccountID schemeAgencyName="CertEX"></cbc:AdditionalAccountID>
     <cac:Party>
@@ -427,7 +448,10 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
         <cbc:ElectronicMail>${COMPANY_INFO.email}</cbc:ElectronicMail>
       </cac:Contact>
     </cac:Party>
-  </cac:AccountingSupplierParty>
+  </cac:AccountingSupplierParty>`;
+
+    // Add customer party
+    xml += `
   <cac:AccountingCustomerParty>
     <cac:Party>
       <cac:PartyIdentification>
@@ -479,7 +503,10 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
         )}</cbc:ElectronicMail>
       </cac:Contact>
     </cac:Party>
-  </cac:AccountingCustomerParty>
+  </cac:AccountingCustomerParty>`;
+
+    // Add allowance charges
+    xml += `
   <cac:AllowanceCharge>
     <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
     <cbc:AllowanceChargeReason></cbc:AllowanceChargeReason>
@@ -489,11 +516,17 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
     <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
     <cbc:AllowanceChargeReason></cbc:AllowanceChargeReason>
     <cbc:Amount currencyID="MYR">0.00</cbc:Amount>
-  </cac:AllowanceCharge>
+  </cac:AllowanceCharge>`;
+
+    // Add tax information
+    xml += `
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="MYR">${totals.tax.toFixed(2)}</cbc:TaxAmount>
     ${generateTaxSubtotals(totals.taxSubtotals)}
-  </cac:TaxTotal>
+  </cac:TaxTotal>`;
+
+    // Add legal monetary total
+    xml += `
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="MYR">${totals.subtotal.toFixed(
       2
@@ -514,9 +547,13 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
     <cbc:PayableAmount currencyID="MYR">${totals.total.toFixed(
       2
     )}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-  ${generateInvoiceLines(sanitizedOrderDetails)}
-</Invoice>`;
+  </cac:LegalMonetaryTotal>`;
+
+    // Add invoice lines
+    xml += generateInvoiceLines(sanitizedOrderDetails);
+
+    // Close the XML document
+    xml += TEMPLATE_FOOTER;
 
     return xml;
   } catch (error) {
