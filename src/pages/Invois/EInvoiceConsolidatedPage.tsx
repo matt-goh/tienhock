@@ -1,5 +1,6 @@
 // src/pages/Invois/EInvoiceConsolidatedPage.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { api } from "../../routes/utils/api";
 import {
   Listbox,
   ListboxButton,
@@ -7,16 +8,28 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface MonthOption {
   id: number;
   name: string;
 }
 
+interface EligibleInvoice {
+  id: string;
+  salespersonid: string;
+  customerid: string;
+  createddate: string;
+  paymenttype: string;
+  amount: number;
+  rounding: number;
+  totalamountpayable: number;
+}
+
 const EInvoiceConsolidatedPage: React.FC = () => {
   // Get current month and year
   const currentDate = new Date();
-  const currentMonth = currentDate.getMonth(); // 0-indexed (0 = January)
+  const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
   // Define months
@@ -35,17 +48,48 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     { id: 11, name: "December" },
   ];
 
-  // Calculate previous month, handle January case (which would be December of previous year)
+  // Calculate previous month
   const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-  // Adjust year if current month is January
   const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-  // State for selected month
+  // States
   const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
     monthOptions[previousMonth]
   );
-  // Add state for year
   const [selectedYear] = useState<number>(previousYear);
+  const [eligibleInvoices, setEligibleInvoices] = useState<EligibleInvoice[]>(
+    []
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch eligible invoices when month/year changes
+  useEffect(() => {
+    const fetchEligibleInvoices = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.get(
+          `/api/einvoice/eligible-for-consolidation?month=${selectedMonth.id}&year=${selectedYear}`
+        );
+
+        if (response.success) {
+          setEligibleInvoices(response.data);
+          console.log("Eligible invoices:", response.data);
+        } else {
+          setError(response.message || "Failed to fetch eligible invoices");
+        }
+      } catch (err) {
+        console.error("Error fetching eligible invoices:", err);
+        setError("An error occurred while fetching eligible invoices");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEligibleInvoices();
+  }, [selectedMonth, selectedYear]);
 
   return (
     <div className="flex flex-col mt-4">
@@ -54,7 +98,8 @@ const EInvoiceConsolidatedPage: React.FC = () => {
           Consolidate e-Invoices
         </h1>
       </div>
-      <div className="flex items-center gap-4">
+
+      <div className="flex items-center gap-4 mb-6">
         <div className="w-60">
           <Listbox value={selectedMonth} onChange={setSelectedMonth}>
             <div className="relative">
@@ -109,6 +154,40 @@ const EInvoiceConsolidatedPage: React.FC = () => {
           {selectedYear}
         </div>
       </div>
+
+      {/* Display loading state */}
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      )}
+
+      {/* Display error message */}
+      {error && (
+        <div className="bg-rose-50 text-rose-600 p-4 rounded-lg mb-4">
+          {error}
+        </div>
+      )}
+
+      {/* Display results */}
+      {!isLoading && !error && (
+        <div className="bg-white rounded-lg border border-default-200 p-4">
+          <h2 className="text-lg font-medium mb-2">
+            Eligible Invoices: {eligibleInvoices.length}
+          </h2>
+
+          {eligibleInvoices.length === 0 ? (
+            <p className="text-default-500">
+              No eligible invoices found for {selectedMonth.name} {selectedYear}
+              .
+            </p>
+          ) : (
+            <div className="text-default-700">
+              Found {eligibleInvoices.length} invoices that can be consolidated.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
