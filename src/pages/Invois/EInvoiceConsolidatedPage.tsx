@@ -7,7 +7,7 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconFileSad } from "@tabler/icons-react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TableEditing from "../../components/Table/TableEditing";
 import { ColumnConfig } from "../../types/types";
@@ -54,15 +54,15 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     { id: 11, name: "December" },
   ];
 
-  // Calculate previous month
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+  // Calculate initial month and year
+  const initialMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const initialYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
   // States
   const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
-    monthOptions[previousMonth]
+    monthOptions[initialMonth]
   );
-  const [selectedYear] = useState<number>(previousYear);
+  const [selectedYear, setSelectedYear] = useState<number>(initialYear);
   const [eligibleInvoices, setEligibleInvoices] = useState<EligibleInvoice[]>(
     []
   );
@@ -139,6 +139,14 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     []
   );
 
+  // Handle month change and adjust year accordingly
+  const handleMonthChange = (month: MonthOption) => {
+    setSelectedMonth(month);
+    // If selected month is ahead of current month, show previous year
+    const newYear = month.id > currentMonth ? currentYear - 1 : currentYear;
+    setSelectedYear(newYear);
+  };
+
   // Fetch eligible invoices when month/year changes
   useEffect(() => {
     const fetchEligibleInvoices = async () => {
@@ -178,7 +186,7 @@ const EInvoiceConsolidatedPage: React.FC = () => {
 
       <div className="flex items-center gap-4 mb-6">
         <div className="w-60">
-          <Listbox value={selectedMonth} onChange={setSelectedMonth}>
+          <Listbox value={selectedMonth} onChange={handleMonthChange}>
             <div className="relative">
               <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
                 <span className="block truncate pl-2">
@@ -250,10 +258,16 @@ const EInvoiceConsolidatedPage: React.FC = () => {
       {!isLoading && !error && (
         <>
           {eligibleInvoices.length === 0 ? (
-            <p className="text-default-500">
-              No eligible invoices found for {selectedMonth.name} {selectedYear}
-              .
-            </p>
+            <div className="flex flex-col items-center justify-center p-8 bg-default-50 rounded-lg border border-default-200">
+              <IconFileSad className="w-12 h-12 text-default-400 mb-4" />
+              <h3 className="text-lg font-medium text-default-700 mb-2">
+                No Eligible Invoices Found
+              </h3>
+              <p className="text-default-500 text-center">
+                There are no invoices available for consolidation in{" "}
+                {selectedMonth.name} {selectedYear}.
+              </p>
+            </div>
           ) : (
             <div className="ml-[-44.1px]">
               <TableEditing<EligibleInvoice>
