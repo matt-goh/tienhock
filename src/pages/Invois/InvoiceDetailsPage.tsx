@@ -463,6 +463,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 uid: crypto.randomUUID(),
                 code: randomProduct.id,
                 description: randomProduct.description,
+                quantity: 1,
                 price: price,
               };
             }
