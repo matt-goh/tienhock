@@ -188,7 +188,7 @@ function TableEditing<T extends Record<string, any>>({
   }, [tableKey, data.length, selection.selectedRows]);
 
   const renderSelectionColumn = () => {
-    if (tableKey !== "invois") return null;
+    if (!tableKey || !["invois", "consolidate"].includes(tableKey)) return null;
 
     const visibleRows = table.getRowModel().rows;
     const { pageIndex, pageSize } = pagination;
