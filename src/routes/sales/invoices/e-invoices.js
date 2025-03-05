@@ -377,6 +377,68 @@ export default function (pool, config) {
     }
   });
 
+  // Get all invoices eligible for consolidation
+  router.get("/eligible-for-consolidation", async (req, res) => {
+    try {
+      const { month, year } = req.query;
+
+      if (!month || !year) {
+        return res.status(400).json({
+          success: false,
+          message: "Month and year are required",
+        });
+      }
+
+      // Convert month (0-indexed) and year to start and end timestamps
+      const startDate = new Date(parseInt(year), parseInt(month), 1);
+      const endDate = new Date(
+        parseInt(year),
+        parseInt(month) + 1,
+        0,
+        23,
+        59,
+        59,
+        999
+      );
+
+      // Convert to epoch and use string format which matches how it's stored
+      const startTimestamp = startDate.getTime().toString();
+      const endTimestamp = endDate.getTime().toString();
+
+      console.log(
+        `Looking for invoices between ${startDate.toISOString()} and ${endDate.toISOString()}`
+      );
+      console.log(`Timestamps: ${startTimestamp} - ${endTimestamp}`);
+
+      // Use a query that is more cautious about type handling
+      const query = `
+        SELECT i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+               i.amount, i.rounding, i.totalamountpayable
+        FROM invoices i
+        LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
+        WHERE (i.createddate >= $1 AND i.createddate <= $2)
+        AND e.internal_id IS NULL
+        ORDER BY i.createddate ASC
+      `;
+
+      const result = await pool.query(query, [startTimestamp, endTimestamp]);
+
+      console.log(`Found ${result.rows.length} eligible invoices`);
+
+      res.json({
+        success: true,
+        data: result.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching eligible invoices:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch eligible invoices",
+        error: error.message,
+      });
+    }
+  });
+
   // Delete e-invoice by UUID
   router.delete("/:uuid", async (req, res) => {
     const { uuid } = req.params;
