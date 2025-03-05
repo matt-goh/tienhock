@@ -6,7 +6,7 @@ import EInvoiceHistoryPage from "./EInvoiceHistoryPage";
 
 const EInvoicePage: React.FC = () => {
   return (
-    <div className="flex flex-col px-6">
+    <div className="flex flex-col px-12">
       <Tab labels={["Consolidated", "History"]}>
         <EInvoiceConsolidatedPage />
         <EInvoiceHistoryPage />
