@@ -7,7 +7,12 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck, IconFileSad } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconCheck,
+  IconFileSad,
+  IconFileInvoice,
+} from "@tabler/icons-react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TableEditing from "../../components/Table/TableEditing";
 import { ColumnConfig } from "../../types/types";
@@ -15,6 +20,7 @@ import {
   parseDatabaseTimestamp,
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
+import Button from "../../components/Button";
 
 interface MonthOption {
   id: number;
@@ -75,6 +81,34 @@ const EInvoiceConsolidatedPage: React.FC = () => {
   const [selectedInvoices, setSelectedInvoices] = useState<EligibleInvoice[]>(
     []
   );
+  const [totals, setTotals] = useState({
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+  });
+
+  useEffect(() => {
+    const calculateTotals = () => {
+      let subtotal = 0;
+      let total = 0;
+
+      selectedInvoices.forEach((invoice) => {
+        subtotal += Number(invoice.amount) || 0;
+        total += Number(invoice.totalamountpayable) || 0;
+      });
+
+      // Tax is the difference between total and subtotal
+      const tax = total - subtotal;
+
+      setTotals({
+        subtotal,
+        tax,
+        total,
+      });
+    };
+
+    calculateTotals();
+  }, [selectedInvoices]);
 
   // Define columns for the table
   const invoiceColumns: ColumnConfig[] = [
@@ -160,7 +194,6 @@ const EInvoiceConsolidatedPage: React.FC = () => {
 
         if (response.success) {
           setEligibleInvoices(response.data);
-          console.log("Eligible invoices:", response.data);
         } else {
           setError(response.message || "Failed to fetch eligible invoices");
         }
@@ -179,65 +212,124 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     <div className="flex flex-col mt-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-semibold text-default-900">
-          Consolidate e-Invoices{" "}
-          {selectedCount > 0 && `(${selectedCount} selected)`}
+          Consolidate e-Invoices
         </h1>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="w-60">
-          <Listbox value={selectedMonth} onChange={handleMonthChange}>
-            <div className="relative">
-              <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                <span className="block truncate pl-2">
-                  {selectedMonth.name}
-                </span>
-                <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                  <IconChevronDown
-                    className="h-5 w-5 text-default-400"
-                    aria-hidden="true"
-                  />
-                </span>
-              </ListboxButton>
-              <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                {monthOptions.map((month) => (
-                  <ListboxOption
-                    key={month.id}
-                    className={({ active }) =>
-                      `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                        active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
-                      }`
-                    }
-                    value={month}
-                  >
-                    {({ selected }) => (
-                      <>
-                        <span
-                          className={`block truncate ${
-                            selected ? "font-medium" : "font-normal"
-                          }`}
-                        >
-                          {month.name}
-                        </span>
-                        {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                            <IconCheck className="h-5 w-5" aria-hidden="true" />
-                          </span>
+      <div className="flex flex-col mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-60">
+              <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                <div className="relative">
+                  <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                    <span className="block truncate pl-2">
+                      {selectedMonth.name}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <IconChevronDown
+                        className="h-5 w-5 text-default-400"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </ListboxButton>
+                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                    {monthOptions.map((month) => (
+                      <ListboxOption
+                        key={month.id}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                            active
+                              ? "bg-default-100 text-default-900"
+                              : "text-default-900"
+                          }`
+                        }
+                        value={month}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              {month.name}
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </ListboxOption>
-                ))}
-              </ListboxOptions>
+                      </ListboxOption>
+                    ))}
+                  </ListboxOptions>
+                </div>
+              </Listbox>
             </div>
-          </Listbox>
+            <div className="text-lg font-medium text-default-700 ml-2">
+              {selectedYear}
+            </div>
+          </div>
         </div>
 
-        <div className="text-lg font-medium text-default-700">
-          {selectedYear}
-        </div>
+        {selectedInvoices.length > 0 && (
+          <div className="mt-4 p-4 bg-white rounded-lg border border-default-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-default-500 font-medium">
+                {selectedInvoices.length} invoice
+                {selectedInvoices.length !== 1 ? "s" : ""} selected
+              </div>
+
+              <div className="flex items-center space-x-6">
+                <div className="flex flex-col items-end">
+                  <span className="text-xs text-default-500">Subtotal</span>
+                  <span className="text-base font-semibold text-default-700">
+                    {totals.subtotal.toLocaleString("en-MY", {
+                      style: "currency",
+                      currency: "MYR",
+                    })}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-end">
+                  <span className="text-xs text-default-500">Tax</span>
+                  <span className="text-base font-semibold text-default-700">
+                    {totals.tax.toLocaleString("en-MY", {
+                      style: "currency",
+                      currency: "MYR",
+                    })}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-end pl-6 border-l border-default-200">
+                  <span className="text-xs text-left text-default-500">
+                    Total
+                  </span>
+                  <span className="text-lg font-semibold text-sky-600">
+                    {totals.total.toLocaleString("en-MY", {
+                      style: "currency",
+                      currency: "MYR",
+                    })}
+                  </span>
+                </div>
+
+                <Button
+                  onClick={() => console.log("Submit consolidated invoices")}
+                  icon={IconFileInvoice}
+                  color="sky"
+                  variant="primary"
+                >
+                  Submit Consolidated
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Display loading state */}
