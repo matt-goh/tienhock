@@ -1,5 +1,5 @@
 // src/pages/Invois/EInvoiceConsolidatedPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { api } from "../../routes/utils/api";
 import {
   Listbox,
@@ -9,6 +9,12 @@ import {
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import TableEditing from "../../components/Table/TableEditing";
+import { ColumnConfig } from "../../types/types";
+import {
+  parseDatabaseTimestamp,
+  formatDisplayDate,
+} from "../../utils/invoice/dateUtils";
 
 interface MonthOption {
   id: number;
@@ -63,6 +69,76 @@ const EInvoiceConsolidatedPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Selection states
+  const [selectedCount, setSelectedCount] = useState(0);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [selectedInvoices, setSelectedInvoices] = useState<EligibleInvoice[]>(
+    []
+  );
+
+  // Define columns for the table
+  const invoiceColumns: ColumnConfig[] = [
+    {
+      id: "id",
+      header: "Invoice",
+      type: "readonly",
+      width: 150,
+      cell: (info: {
+        getValue: () => any;
+        row: { original: EligibleInvoice };
+      }) => (
+        <div className="px-6 py-3">
+          {info.row.original.paymenttype === "CASH" ? "C" : "I"}
+          {info.getValue()}
+        </div>
+      ),
+    },
+    {
+      id: "createddate",
+      header: "Date",
+      type: "readonly",
+      width: 150,
+      cell: (info: { getValue: () => any }) => {
+        const timestamp = info.getValue();
+        const { date } = parseDatabaseTimestamp(timestamp);
+        return <div className="px-6 py-3">{formatDisplayDate(date)}</div>;
+      },
+    },
+    {
+      id: "salespersonid",
+      header: "Salesman",
+      type: "readonly",
+      width: 150,
+    },
+    {
+      id: "customerid",
+      header: "Customer",
+      type: "readonly",
+      width: 500,
+    },
+    {
+      id: "totalamountpayable",
+      header: "Amount",
+      type: "amount",
+      width: 150,
+      cell: (info: { getValue: () => any }) => (
+        <div className="px-6 py-3 text-right">
+          {Number(info.getValue() || 0).toFixed(2)}
+        </div>
+      ),
+    },
+  ];
+
+  // Handler for selection changes
+  const handleSelectionChange = useCallback(
+    (count: number, allSelected: boolean, selectedRows: EligibleInvoice[]) => {
+      setSelectedCount(count);
+      setIsAllSelected(allSelected);
+      setSelectedInvoices(selectedRows);
+    },
+    []
+  );
+
   // Fetch eligible invoices when month/year changes
   useEffect(() => {
     const fetchEligibleInvoices = async () => {
@@ -95,7 +171,8 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     <div className="flex flex-col mt-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-semibold text-default-900">
-          Consolidate e-Invoices
+          Consolidate e-Invoices{" "}
+          {selectedCount > 0 && `(${selectedCount} selected)`}
         </h1>
       </div>
 
@@ -171,22 +248,23 @@ const EInvoiceConsolidatedPage: React.FC = () => {
 
       {/* Display results */}
       {!isLoading && !error && (
-        <div className="bg-white rounded-lg border border-default-200 p-4">
-          <h2 className="text-lg font-medium mb-2">
-            Eligible Invoices: {eligibleInvoices.length}
-          </h2>
-
+        <>
           {eligibleInvoices.length === 0 ? (
             <p className="text-default-500">
               No eligible invoices found for {selectedMonth.name} {selectedYear}
               .
             </p>
           ) : (
-            <div className="text-default-700">
-              Found {eligibleInvoices.length} invoices that can be consolidated.
+            <div className="ml-[-44.1px]">
+              <TableEditing<EligibleInvoice>
+                initialData={eligibleInvoices}
+                columns={invoiceColumns}
+                onSelectionChange={handleSelectionChange}
+                tableKey="consolidate"
+              />
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
