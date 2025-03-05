@@ -94,7 +94,7 @@ function TableEditing<T extends Record<string, any>>({
     "invois",
     "consolidate",
   ].includes(tableKey || "");
-  
+
   const isSelectionEnabled = ["invois", "consolidate"].includes(tableKey || "");
 
   React.useImperativeHandle(ref, () => ({
@@ -1256,6 +1256,22 @@ function TableEditing<T extends Record<string, any>>({
                         ? setSelectedRowId(row.id)
                         : null
                     }
+                    onMouseEnter={() => {
+                      if (isSelectionEnabled) {
+                        setSelection((prev) => ({
+                          ...prev,
+                          hoveredRowIndex: rowIndex,
+                        }));
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (isSelectionEnabled) {
+                        setSelection((prev) => ({
+                          ...prev,
+                          hoveredRowIndex: null,
+                        }));
+                      }
+                    }}
                   >
                     {row.getVisibleCells().map((cell, cellIndex) => {
                       const isLastRow =
