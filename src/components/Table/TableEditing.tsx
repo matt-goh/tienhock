@@ -94,6 +94,8 @@ function TableEditing<T extends Record<string, any>>({
     "invois",
     "consolidate",
   ].includes(tableKey || "");
+  
+  const isSelectionEnabled = ["invois", "consolidate"].includes(tableKey || "");
 
   React.useImperativeHandle(ref, () => ({
     selection,
@@ -113,7 +115,7 @@ function TableEditing<T extends Record<string, any>>({
 
   // HSA
   const handleSelectAll = useCallback(() => {
-    if (tableKey !== "invois" && tableKey !== "consolidate") return;
+    if (!isSelectionEnabled) return;
 
     const allIndices = getAllRowIndices();
 
@@ -133,12 +135,12 @@ function TableEditing<T extends Record<string, any>>({
       onSelectionChange?.(newSelectedRows.size, true, selectedData);
       return { ...prev, selectedRows: newSelectedRows };
     });
-  }, [tableKey, data, onSelectionChange]);
+  }, [isSelectionEnabled, data, onSelectionChange]);
 
   // Handle row selection
   const handleRowSelection = useCallback(
     (visibleIndex: number) => {
-      if (tableKey !== "invois" && tableKey !== "consolidate") return;
+      if (!isSelectionEnabled) return;
 
       const actualIndex =
         pagination.pageIndex * pagination.pageSize + visibleIndex;
@@ -159,17 +161,17 @@ function TableEditing<T extends Record<string, any>>({
         return { ...prev, selectedRows: newSelectedRows };
       });
     },
-    [pagination, tableKey, data, onSelectionChange]
+    [pagination, isSelectionEnabled, data, onSelectionChange]
   );
 
   const handleClearAllSelections = useCallback(() => {
-    if (tableKey !== "invois" && tableKey !== "consolidate") return;
+    if (!isSelectionEnabled) return;
 
     setSelection((prev) => {
       onSelectionChange?.(0, false, []); // Notify parent of cleared selection
       return { ...prev, selectedRows: new Set() };
     });
-  }, [tableKey, onSelectionChange]);
+  }, [isSelectionEnabled, onSelectionChange]);
 
   useEffect(() => {
     if (onClearSelection) {
@@ -179,7 +181,7 @@ function TableEditing<T extends Record<string, any>>({
 
   // Update page selection state calculation for global selection
   const pageSelectionState = useMemo(() => {
-    if (tableKey !== "invois" && tableKey !== "consolidate") {
+    if (!isSelectionEnabled) {
       return { isAllSelected: false, isIndeterminate: false };
     }
 
@@ -193,10 +195,10 @@ function TableEditing<T extends Record<string, any>>({
         selectedCount === allIndices.length && allIndices.length > 0,
       isIndeterminate: selectedCount > 0 && selectedCount < allIndices.length,
     };
-  }, [tableKey, data.length, selection.selectedRows]);
+  }, [isSelectionEnabled, data.length, selection.selectedRows]);
 
   const renderSelectionColumn = () => {
-    if (!tableKey || !["invois", "consolidate"].includes(tableKey)) return null;
+    if (!isSelectionEnabled) return null;
 
     const visibleRows = table.getRowModel().rows;
     const { pageIndex, pageSize } = pagination;
@@ -1214,7 +1216,7 @@ function TableEditing<T extends Record<string, any>>({
     <div ref={tableRef} className="flex flex-col items-center w-auto">
       <div className="flex gap-2">
         {/* Separate Selection Column */}
-        {renderSelectionColumn()}
+        {isSelectionEnabled && renderSelectionColumn()}
 
         {/* Main Table */}
         <div className="rounded-lg border border-default-300 w-fit">
@@ -1347,7 +1349,7 @@ function TableEditing<T extends Record<string, any>>({
           </table>
         </div>
       </div>
-      {isLastPage && !(tableKey === "invois" || tableKey === "consolidate") && (
+      {isLastPage && !isSelectionEnabled && (
         <>
           <ToolTip
             content={"Klik untuk menambah baris baharu"}
@@ -1387,9 +1389,7 @@ function TableEditing<T extends Record<string, any>>({
         </>
       )}
       <div className="flex justify-between items-center mt-4 w-full">
-        {(tableKey === "invois" || tableKey !== "consolidate") && (
-          <div className="w-[48px]"></div>
-        )}
+        {isSelectionEnabled && <div className="w-[48px]"></div>}
         {data.length >= 10 && <TablePagination table={table} />}
       </div>
     </div>
