@@ -822,24 +822,35 @@ const InvoiceDetailsPage: React.FC = () => {
       // Add new item
       const newProducts = [...productsWithoutTotal, newItem];
 
-      // Add total row back
+      // Calculate the total for all regular items
+      const totalAmount = calculateOverallTotal(newProducts).toFixed(2);
+
+      // Add total row with the computed total
       const finalProducts = [
         ...newProducts,
         {
+          uid: crypto.randomUUID(), // Add uid for consistency
           code: "TOTAL",
+          description: "Total:",
           quantity: 0,
           price: 0,
           freeProduct: 0,
           returnProduct: 0,
           tax: 0,
-          total: "0",
+          total: totalAmount,
           istotal: true,
+          issubtotal: false,
         },
       ];
 
+      // Update the invoice data with the new products and totalamountpayable
       return {
         ...prevData,
         products: finalProducts,
+        amount: calculateOverallTotal(
+          newProducts.filter((item) => !item.issubtotal)
+        ), // Subtotal (tax-exclusive)
+        totalamountpayable: parseFloat(totalAmount), // Total (tax-inclusive)
       };
     });
   };
