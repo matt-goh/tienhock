@@ -1,13 +1,13 @@
 import React from "react";
 import { Icon } from "@tabler/icons-react";
- 
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   icon?: Icon;
   iconPosition?: "left" | "right";
   iconSize?: number;
   iconStroke?: number;
-  variant?: "default" | "outline" | "boldOutline";
+  variant?: "default" | "outline" | "boldOutline" | "primary";
   size?: "sm" | "md" | "lg";
   color?: string;
   additionalClasses?: string;
@@ -39,6 +39,18 @@ const Button: React.FC<ButtonProps> = ({
         "border border-default-300 text-default-700 hover:text-default-800 hover:bg-default-100 active:bg-default-200 disabled:hover:bg-transparent disabled:hover:text-default-700",
       boldOutline:
         "border-2 border-default-300 text-default-700 hover:text-default-800 hover:bg-default-100 active:bg-default-200 disabled:hover:bg-transparent disabled:hover:text-default-700",
+      primary:
+        "bg-default-700 text-white hover:bg-default-800 active:bg-default-900 disabled:hover:bg-default-700",
+    },
+    sky: {
+      default:
+        "bg-sky-100 text-sky-700 hover:text-sky-800 hover:bg-sky-200 active:bg-sky-300/75 disabled:hover:bg-sky-100 disabled:hover:text-sky-700",
+      outline:
+        "border border-sky-300 text-sky-700 hover:text-sky-800 hover:bg-sky-100 active:bg-sky-200 disabled:hover:bg-transparent disabled:hover:text-sky-700",
+      boldOutline:
+        "border-2 border-sky-300 text-sky-700 hover:text-sky-800 hover:bg-sky-100 active:bg-sky-200 disabled:hover:bg-transparent disabled:hover:text-sky-700",
+      primary:
+        "bg-sky-500 text-white hover:bg-sky-600 active:bg-sky-700 disabled:hover:bg-sky-500",
     },
     rose: {
       default:
@@ -47,6 +59,8 @@ const Button: React.FC<ButtonProps> = ({
         "border border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
       boldOutline:
         "border-2 border-rose-300 text-rose-700 hover:text-rose-800 hover:bg-rose-100 active:bg-rose-200 disabled:hover:bg-transparent disabled:hover:text-rose-700",
+      primary:
+        "bg-rose-500 text-white hover:bg-rose-600 active:bg-rose-700 disabled:hover:bg-rose-500",
     },
   };
 
