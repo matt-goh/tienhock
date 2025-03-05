@@ -11,6 +11,18 @@ import toast from "react-hot-toast";
 
 const STORAGE_KEY = "einvoisDateFilters";
 
+// Define column configuration as a single source of truth
+const COLUMN_CONFIG = [
+  { name: "Invoice No", width: "w-[8%]" },
+  { name: "Type", width: "w-[8%]" },
+  { name: "Customer", width: "w-[18%]" },
+  { name: "Validated At", width: "w-[15%]" },
+  { name: "Amount", width: "w-[7%]" },
+  { name: "Filler", width: "w-[4%]" },
+  { name: "Submission ID", width: "w-[20%]" },
+  { name: "Actions", width: "w-[20%]" },
+];
+
 interface EInvoice {
   uuid: string;
   submission_uid: string;
@@ -77,7 +89,6 @@ const EInvoiceHistoryPage: React.FC = () => {
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
     if (!term) return data;
-
     const searchLower = term.toLowerCase();
     return data.filter(
       (invoice) =>
@@ -110,18 +121,15 @@ const EInvoiceHistoryPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-
         const queryParams = new URLSearchParams({
           page: pagination.currentPage.toString(),
           limit: pagination.pageSize.toString(),
           startDate: dateRange.start.toISOString(),
           endDate: dateRange.end.toISOString(),
         });
-
         const response = await api.get(
           `/api/einvoice/list?${queryParams.toString()}`
         );
-
         setEInvoices(response.data);
         setFilteredInvoices(applySearchFilter(response.data, searchTerm));
         setPagination((prev) => ({
@@ -173,14 +181,11 @@ const EInvoiceHistoryPage: React.FC = () => {
         setHasScrollbar(hasVerticalScrollbar);
       }
     };
-
     checkForScrollbar();
-
     const resizeObserver = new ResizeObserver(checkForScrollbar);
     if (tableBodyRef.current) {
       resizeObserver.observe(tableBodyRef.current);
     }
-
     return () => resizeObserver.disconnect();
   }, [filteredInvoices]);
 
@@ -237,21 +242,11 @@ const EInvoiceHistoryPage: React.FC = () => {
   };
 
   const handleDateChange = (type: "start" | "end", value: string) => {
-    // If value is empty or invalid, keep the current date
-    if (!value) {
-      return;
-    }
-
+    if (!value) return;
     const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) {
-      return;
-    }
+    if (!year || !month || !day) return;
     const newDate = new Date(year, month - 1, day);
-
-    if (isNaN(newDate.getTime())) {
-      return;
-    }
-    // Get adjusted date range
+    if (isNaN(newDate.getTime())) return;
     const adjustedRange = adjustDateRange(newDate, type, dateRange);
 
     // Save to storage and update state
@@ -273,7 +268,6 @@ const EInvoiceHistoryPage: React.FC = () => {
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
-
     let hours = date.getHours();
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const ampm = hours >= 12 ? "PM" : "AM";
@@ -292,18 +286,11 @@ const EInvoiceHistoryPage: React.FC = () => {
 
   const handleDelete = async () => {
     if (!einvoiceToDelete) return;
-
     try {
       await api.delete(`/api/einvoice/${einvoiceToDelete.uuid}`);
       setEinvoiceToDelete(null);
       setShowDeleteDialog(false);
-
-      // Refresh the data
-      if (fetchDataRef.current) {
-        await fetchDataRef.current();
-      }
-
-      // Show success message
+      if (fetchDataRef.current) await fetchDataRef.current();
       toast.success("E-invoice deleted successfully");
     } catch (error: any) {
       console.error("Error deleting e-invoice:", error);
@@ -362,7 +349,6 @@ const EInvoiceHistoryPage: React.FC = () => {
             />
           </div>
         </div>
-
         <Button
           onClick={handleRefresh}
           disabled={loading}
@@ -388,44 +374,22 @@ const EInvoiceHistoryPage: React.FC = () => {
           >
             <table className="w-full table-fixed">
               <colgroup>
-                {/* Invoice No */}
-                <col className="w-[10%]" />
-                {/* Type */}
-                <col className="w-[10%]" />
-                {/* Customer */}
-                <col className="w-[18%]" />
-                {/* Validated At */}
-                <col className="w-[15%]" />
-                {/* Amount */}
-                <col className="w-[5%]" />
-                {/* Submission ID */}
-                <col className="w-[22%]" />
-                {/* Actions */}
-                <col className="w-[20%]" />
+                {COLUMN_CONFIG.map((col, index) => (
+                  <col key={index} className={col.width} />
+                ))}
               </colgroup>
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-default-700 truncate">
-                    Invoice No
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-default-700">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-default-700">
-                    Customer
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-default-700">
-                    Validated At
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-default-700">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-default-700">
-                    Submission ID
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-default-700">
-                    Actions
-                  </th>
+                  {COLUMN_CONFIG.map((col, index) => (
+                    <th
+                      key={index}
+                      className={`px-4 py-3 text-left font-medium text-default-700 ${
+                        col.name === "Amount" ? "text-right" : ""
+                      } truncate`}
+                    >
+                      {col.name !== "Filler" ? col.name : ""}
+                    </th>
+                  ))}
                 </tr>
               </thead>
             </table>
@@ -437,32 +401,24 @@ const EInvoiceHistoryPage: React.FC = () => {
           >
             <table className="w-full table-fixed">
               <colgroup>
-                {/* Invoice No */}
-                <col className="w-[10%]" />
-                {/* Type */}
-                <col className="w-[10%]" />
-                {/* Customer */}
-                <col className="w-[18%]" />
-                {/* Validated At */}
-                <col className="w-[15%]" />
-                {/* Amount */}
-                <col className="w-[5%]" />
-                {/* Submission ID */}
-                <col className="w-[22%]" />
-                {/* Actions */}
-                <col className="w-[20%]" />
+                {COLUMN_CONFIG.map((col, index) => (
+                  <col key={index} className={col.width} />
+                ))}
               </colgroup>
               <tbody className="bg-white">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center">
+                    <td
+                      colSpan={COLUMN_CONFIG.length}
+                      className="px-4 py-8 text-center"
+                    >
                       <LoadingSpinner />
                     </td>
                   </tr>
                 ) : filteredInvoices.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={COLUMN_CONFIG.length}
                       className="px-4 py-3 text-center text-default-500"
                     >
                       No e-invoices found
@@ -486,6 +442,7 @@ const EInvoiceHistoryPage: React.FC = () => {
                       <td className="px-4 py-3 text-default-700 text-right">
                         {formatAmount(einvoice.total_payable_amount)}
                       </td>
+                      <td className="px-4 py-3 text-default-700"></td>
                       <td className="px-4 py-3 text-default-700 truncate">
                         {einvoice.submission_uid}
                       </td>
