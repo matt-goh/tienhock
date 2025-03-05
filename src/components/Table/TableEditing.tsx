@@ -80,12 +80,20 @@ function TableEditing<T extends Record<string, any>>({
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
-  // Selection related states (only used when tableKey is "invois")
+  // Selection related states (only used when tableKey is "invois" or "consolidate")
   const [selection, setSelection] = useState<TableSelection>({
     selectedRows: new Set(),
     hoveredRowIndex: null,
     isHeaderHovered: false,
   });
+
+  // Constants
+  const isSortingDisabled = [
+    "orderDetails",
+    "customerProducts",
+    "invois",
+    "consolidate",
+  ].includes(tableKey || "");
 
   React.useImperativeHandle(ref, () => ({
     selection,
@@ -105,7 +113,7 @@ function TableEditing<T extends Record<string, any>>({
 
   // HSA
   const handleSelectAll = useCallback(() => {
-    if (tableKey !== "invois") return;
+    if (tableKey !== "invois" && tableKey !== "consolidate") return;
 
     const allIndices = getAllRowIndices();
 
@@ -130,7 +138,7 @@ function TableEditing<T extends Record<string, any>>({
   // Handle row selection
   const handleRowSelection = useCallback(
     (visibleIndex: number) => {
-      if (tableKey !== "invois") return;
+      if (tableKey !== "invois" && tableKey !== "consolidate") return;
 
       const actualIndex =
         pagination.pageIndex * pagination.pageSize + visibleIndex;
@@ -155,7 +163,7 @@ function TableEditing<T extends Record<string, any>>({
   );
 
   const handleClearAllSelections = useCallback(() => {
-    if (tableKey !== "invois") return;
+    if (tableKey !== "invois" && tableKey !== "consolidate") return;
 
     setSelection((prev) => {
       onSelectionChange?.(0, false, []); // Notify parent of cleared selection
@@ -171,7 +179,7 @@ function TableEditing<T extends Record<string, any>>({
 
   // Update page selection state calculation for global selection
   const pageSelectionState = useMemo(() => {
-    if (tableKey !== "invois") {
+    if (tableKey !== "invois" && tableKey !== "consolidate") {
       return { isAllSelected: false, isIndeterminate: false };
     }
 
@@ -291,13 +299,6 @@ function TableEditing<T extends Record<string, any>>({
   const addRowBarRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLTableElement>(null);
-
-  // Constants
-  const isSortingDisabled = [
-    "orderDetails",
-    "customerProducts",
-    "invois",
-  ].includes(tableKey || "");
 
   const isEditableColumn = (col: ColumnConfig) => {
     return !["selection", "readonly", "action", "amount", "checkbox"].includes(
@@ -1346,7 +1347,7 @@ function TableEditing<T extends Record<string, any>>({
           </table>
         </div>
       </div>
-      {isLastPage && !(tableKey === "invois") && (
+      {isLastPage && !(tableKey === "invois" || tableKey === "consolidate") && (
         <>
           <ToolTip
             content={"Klik untuk menambah baris baharu"}
@@ -1386,7 +1387,9 @@ function TableEditing<T extends Record<string, any>>({
         </>
       )}
       <div className="flex justify-between items-center mt-4 w-full">
-        {tableKey === "invois" && <div className="w-[48px]"></div>}
+        {(tableKey === "invois" || tableKey !== "consolidate") && (
+          <div className="w-[48px]"></div>
+        )}
         {data.length >= 10 && <TablePagination table={table} />}
       </div>
     </div>
