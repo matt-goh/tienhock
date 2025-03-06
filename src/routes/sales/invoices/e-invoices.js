@@ -1,8 +1,10 @@
 // src/routes/sales/invoices/e-invoice.js
 import { EInvoiceTemplate } from "../../../utils/invoice/einvoice/EInvoiceTemplate.js";
 import { Router } from "express";
+import { createHash } from "crypto";
 import EInvoiceSubmissionHandler from "../../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
 import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";
+import { EInvoiceConsolidatedTemplate } from "../../../utils/invoice/einvoice/EInvoiceConsolidatedTemplate.js";
 
 // Function to fetch customer data
 async function fetchCustomerData(pool, customerId) {
@@ -434,6 +436,160 @@ export default function (pool, config) {
         success: false,
         message: "Failed to fetch invoices",
         error: error.message,
+      });
+    }
+  });
+
+  router.post("/submit-consolidated", async (req, res) => {
+    try {
+      const { invoices: invoiceIds, month, year } = req.body;
+
+      if (!invoiceIds?.length) {
+        return res.status(400).json({
+          success: false,
+          message: "No invoice IDs provided for consolidation",
+        });
+      }
+
+      if (month === undefined || year === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: "Month and year are required",
+        });
+      }
+
+      // Fetch all invoice data
+      const invoiceData = [];
+      for (const invoiceId of invoiceIds) {
+        try {
+          const invoice = await getInvoices(pool, invoiceId);
+          if (invoice) {
+            invoiceData.push(invoice);
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch invoice ${invoiceId}:`, error);
+          // Continue with other invoices
+        }
+      }
+
+      if (invoiceData.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No valid invoices found for consolidation",
+        });
+      }
+
+      // Generate consolidated invoice XML
+      const consolidatedXml = await EInvoiceConsolidatedTemplate(
+        invoiceData,
+        month,
+        year
+      );
+
+      // Create a consolidated invoice document for submission
+      const consolidatedId = `CON-${year}${String(parseInt(month) + 1).padStart(
+        2,
+        "0"
+      )}`;
+
+      const requestBody = {
+        documents: [
+          {
+            format: "XML",
+            document: Buffer.from(consolidatedXml, "utf8").toString("base64"),
+            documentHash: createHash("sha256")
+              .update(consolidatedXml, "utf8")
+              .digest("hex"),
+            codeNumber: consolidatedId,
+          },
+        ],
+      };
+
+      // Submit to MyInvois API
+      const submissionResponse = await apiClient.makeApiCall(
+        "POST",
+        "/api/v1.0/documentsubmissions",
+        requestBody
+      );
+
+      if (submissionResponse.acceptedDocuments?.length > 0) {
+        // Poll for final status
+        const finalStatus = await submissionHandler.pollSubmissionStatus(
+          submissionResponse.submissionUid
+        );
+        const consolidatedData = finalStatus.documentSummary[0];
+
+        // Mark the original invoices as consolidated
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+
+          // Insert consolidated record
+          await client.query(
+            `INSERT INTO einvoices (
+              uuid, submission_uid, long_id, internal_id, type_name, 
+              receiver_id, receiver_name, datetime_validated,
+              total_payable_amount, total_excluding_tax, total_net_amount,
+              is_consolidated, consolidated_invoices
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [
+              consolidatedData.uuid,
+              submissionResponse.submissionUid,
+              consolidatedData.longId,
+              consolidatedId,
+              consolidatedData.typeName || "Consolidated Invoice",
+              "EI00000000010",
+              "Consolidated Buyers",
+              consolidatedData.dateTimeValidated || new Date().toISOString(),
+              invoiceData.reduce(
+                (sum, inv) => sum + Number(inv.totalamountpayable || 0),
+                0
+              ),
+              invoiceData.reduce(
+                (sum, inv) => sum + Number(inv.amount || 0),
+                0
+              ),
+              invoiceData.reduce(
+                (sum, inv) =>
+                  sum +
+                  (Number(inv.totalamountpayable || 0) -
+                    Number(inv.amount || 0)),
+                0
+              ),
+              true,
+              JSON.stringify(invoiceIds),
+            ]
+          );
+
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK");
+          console.error("Failed to record consolidated invoice:", error);
+        } finally {
+          client.release();
+        }
+
+        // Return success with details
+        return res.json({
+          success: true,
+          message: "Consolidated invoice submitted successfully",
+          submissionUid: submissionResponse.submissionUid,
+          consolidatedId,
+          uuid: consolidatedData.uuid,
+          longId: consolidatedData.longId,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Submission failed",
+          errors: submissionResponse.rejectedDocuments,
+        });
+      }
+    } catch (error) {
+      console.error("Consolidated submission error:", error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Failed to process consolidated submission",
       });
     }
   });

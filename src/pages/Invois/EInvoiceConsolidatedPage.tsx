@@ -1,5 +1,5 @@
 // src/pages/Invois/EInvoiceConsolidatedPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../routes/utils/api";
 import {
   Listbox,
@@ -15,12 +15,20 @@ import {
 } from "@tabler/icons-react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TableEditing from "../../components/Table/TableEditing";
-import { ColumnConfig } from "../../types/types";
+import {
+  ColumnConfig,
+  DocumentStatus,
+  LoginResponse,
+  SubmissionState,
+} from "../../types/types";
 import {
   parseDatabaseTimestamp,
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
 import Button from "../../components/Button";
+import toast from "react-hot-toast";
+import { SubmissionDisplay } from "../../components/Invois/SubmissionDisplay";
+import { StatusIndicator } from "../../components/StatusIndicator";
 
 interface MonthOption {
   id: number;
@@ -74,6 +82,13 @@ const EInvoiceConsolidatedPage: React.FC = () => {
   );
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
+    null
+  );
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionState, setSubmissionState] =
+    useState<SubmissionState | null>(null);
 
   // Selection states
   const [selectedCount, setSelectedCount] = useState(0);
@@ -87,6 +102,55 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     total: 0,
   });
 
+  // Token validation function
+  const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
+    if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
+    return (
+      Date.now() <
+      loginData.tokenCreationTime + loginData.tokenInfo.expiresIn * 1000
+    );
+  }, []);
+
+  // Authentication function
+  const connectToMyInvois = useCallback(async () => {
+    const storedLoginData = localStorage.getItem("myInvoisLoginData");
+    if (storedLoginData) {
+      const parsedData = JSON.parse(storedLoginData);
+      if (isTokenValid(parsedData)) {
+        setLoginResponse(parsedData);
+        return true;
+      }
+    }
+
+    try {
+      setIsConnecting(true);
+      const data = await api.post("/api/einvoice/login");
+      if (data.success && data.tokenInfo) {
+        const loginDataWithTime = { ...data, tokenCreationTime: Date.now() };
+        localStorage.setItem(
+          "myInvoisLoginData",
+          JSON.stringify(loginDataWithTime)
+        );
+        setLoginResponse(loginDataWithTime);
+        return true;
+      } else {
+        setLoginResponse(data);
+        return false;
+      }
+    } catch (err) {
+      setLoginResponse({
+        success: false,
+        message: "An error occurred while connecting to MyInvois API.",
+        apiEndpoint: "Unknown",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      return false;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [isTokenValid]);
+
+  // Calculate totals
   useEffect(() => {
     const calculateTotals = () => {
       let subtotal = 0;
@@ -181,32 +245,208 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     setSelectedYear(newYear);
   };
 
+  // Fetch eligible invoices function
+  const fetchEligibleInvoices = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.get(
+        `/api/einvoice/eligible-for-consolidation?month=${selectedMonth.id}&year=${selectedYear}`
+      );
+
+      if (response.success) {
+        setEligibleInvoices(response.data);
+      } else {
+        setError(response.message || "Failed to fetch eligible invoices");
+      }
+    } catch (err) {
+      console.error("Error fetching eligible invoices:", err);
+      setError("An error occurred while fetching eligible invoices");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedMonth.id, selectedYear]);
+
   // Fetch eligible invoices when month/year changes
   useEffect(() => {
-    const fetchEligibleInvoices = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await api.get(
-          `/api/einvoice/eligible-for-consolidation?month=${selectedMonth.id}&year=${selectedYear}`
-        );
-
-        if (response.success) {
-          setEligibleInvoices(response.data);
-        } else {
-          setError(response.message || "Failed to fetch eligible invoices");
-        }
-      } catch (err) {
-        console.error("Error fetching eligible invoices:", err);
-        setError("An error occurred while fetching eligible invoices");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchEligibleInvoices();
-  }, [selectedMonth, selectedYear]);
+  }, [fetchEligibleInvoices]);
+
+  // Handle consolidated submission
+  const handleSubmitConsolidated = async () => {
+    if (selectedInvoices.length === 0) {
+      toast.error("Please select at least one invoice");
+      return;
+    }
+
+    try {
+      // First authenticate with MyInvois
+      setIsSubmitting(true);
+
+      // Check if we're already authenticated
+      let isAuthenticated = false;
+      if (loginResponse && isTokenValid(loginResponse)) {
+        isAuthenticated = true;
+      } else {
+        // Try to connect
+        const toastId = toast.loading("Connecting to MyInvois...");
+        isAuthenticated = await connectToMyInvois();
+        toast.dismiss(toastId);
+      }
+
+      if (!isAuthenticated) {
+        toast.error("Failed to connect to MyInvois API");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Authentication successful - continue with submission
+      const loadingToastId = toast.loading(
+        "Submitting consolidated invoices..."
+      );
+
+      // Set initial submission state
+      const initialDocuments: Record<string, DocumentStatus> = {};
+      initialDocuments["consolidated"] = {
+        invoiceNo: `CON-${selectedYear}${String(selectedMonth.id + 1).padStart(
+          2,
+          "0"
+        )}`,
+        currentStatus: "PROCESSING",
+        summary: {
+          status: "Submitted",
+          receiverName: "Consolidated Buyers",
+        },
+      };
+
+      setSubmissionState({
+        phase: "SUBMISSION",
+        tracker: {
+          submissionUid: "pending",
+          batchInfo: {
+            size: 1, // Consolidated counts as one
+            submittedAt: new Date().toISOString(),
+          },
+          statistics: {
+            totalDocuments: 1,
+            processed: 0,
+            accepted: 0,
+            rejected: 0,
+            processing: 1,
+            completed: 0,
+          },
+          documents: initialDocuments,
+          processingUpdates: [],
+          overallStatus: "InProgress",
+        },
+      });
+
+      // Submit consolidated invoices
+      const response = await api.post("/api/einvoice/submit-consolidated", {
+        invoices: selectedInvoices.map((inv) => inv.id),
+        month: selectedMonth.id,
+        year: selectedYear,
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.success) {
+        const documents: Record<string, DocumentStatus> = {};
+
+        documents["consolidated"] = {
+          invoiceNo:
+            response.consolidatedId ||
+            `CON-${selectedYear}${String(selectedMonth.id + 1).padStart(
+              2,
+              "0"
+            )}`,
+          currentStatus: "COMPLETED",
+          summary: {
+            status: "Valid",
+            receiverName: "Consolidated Buyers",
+            uuid: response.uuid,
+            longId: response.longId,
+          },
+        };
+
+        setSubmissionState({
+          phase: "COMPLETED",
+          tracker: {
+            submissionUid: response.submissionUid,
+            batchInfo: {
+              size: 1,
+              submittedAt: new Date().toISOString(),
+              completedAt: new Date().toISOString(),
+            },
+            statistics: {
+              totalDocuments: 1,
+              processed: 1,
+              accepted: 1,
+              rejected: 0,
+              processing: 0,
+              completed: 1,
+            },
+            documents,
+            processingUpdates: [],
+            overallStatus: "Valid",
+          },
+        });
+
+        toast.success("Consolidated invoices submitted successfully");
+      } else {
+        throw new Error(
+          response.message || "Failed to submit consolidated invoices"
+        );
+      }
+    } catch (error: any) {
+      console.error("Submission Error:", error);
+      toast.dismiss();
+
+      // Set error state
+      const documents: Record<string, DocumentStatus> = {};
+      documents["consolidated"] = {
+        invoiceNo: `CON-${selectedYear}${String(selectedMonth.id + 1).padStart(
+          2,
+          "0"
+        )}`,
+        currentStatus: "REJECTED",
+        errors: [
+          {
+            code: "ERR",
+            message: error.message || "Failed to submit consolidated invoices",
+          },
+        ],
+      };
+
+      setSubmissionState({
+        phase: "COMPLETED",
+        tracker: {
+          submissionUid: "error",
+          batchInfo: {
+            size: 1,
+            submittedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+          },
+          statistics: {
+            totalDocuments: 1,
+            processed: 1,
+            accepted: 0,
+            rejected: 1,
+            processing: 0,
+            completed: 0,
+          },
+          documents,
+          processingUpdates: [],
+          overallStatus: "Invalid",
+        },
+      });
+
+      toast.error(`Submission failed: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex flex-col mt-4">
@@ -280,9 +520,17 @@ const EInvoiceConsolidatedPage: React.FC = () => {
         {selectedInvoices.length > 0 && (
           <div className="mt-4 p-4 bg-white rounded-lg border border-default-200 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-default-500 font-medium">
+              <div className="flex items-center text-sm text-default-500 font-medium">
                 {selectedInvoices.length} invoice
                 {selectedInvoices.length !== 1 ? "s" : ""} selected
+                {loginResponse && (
+                  <div className="ml-2">
+                    <StatusIndicator
+                      success={loginResponse.success}
+                      type="connection"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center space-x-6">
@@ -318,19 +566,45 @@ const EInvoiceConsolidatedPage: React.FC = () => {
                   </span>
                 </div>
 
-                <Button
-                  onClick={() => console.log("Submit consolidated invoices")}
-                  icon={IconFileInvoice}
-                  color="sky"
-                  variant="primary"
-                >
-                  Submit Consolidated
-                </Button>
+                <div className="flex items-center">
+                  <Button
+                    onClick={handleSubmitConsolidated}
+                    icon={IconFileInvoice}
+                    color="sky"
+                    variant="primary"
+                    disabled={
+                      isConnecting ||
+                      isSubmitting ||
+                      selectedInvoices.length === 0
+                    }
+                  >
+                    {isConnecting
+                      ? "Connecting..."
+                      : isSubmitting
+                      ? "Submitting..."
+                      : "Submit Consolidated"}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Submission status display */}
+      {submissionState && (
+        <div className="p-4 bg-white rounded-lg border border-default-200 mb-6">
+          <SubmissionDisplay
+            state={submissionState}
+            onClose={() => {
+              setSubmissionState(null);
+              // Refresh the eligible invoices
+              fetchEligibleInvoices();
+            }}
+            showDetails={true}
+          />
+        </div>
+      )}
 
       {/* Display loading state */}
       {isLoading && (

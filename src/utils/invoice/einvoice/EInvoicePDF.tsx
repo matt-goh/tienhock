@@ -128,18 +128,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 15,
   },
-  section: {
-    marginBottom: 12,
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  col50: {
-    width: "50%",
-    paddingRight: 10,
-    marginBottom: 2,
-  },
   bold: {
     fontFamily: "Helvetica-Bold",
   },
