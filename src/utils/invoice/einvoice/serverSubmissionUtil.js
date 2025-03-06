@@ -57,6 +57,19 @@ export async function submitInvoicesToMyInvois(
             };
           }
 
+          if (!customerData.tin_number || !customerData.id_number) {
+            return {
+              error: {
+                type: "validation",
+                code: "MISSING_REQUIRED_ID",
+                message: `Missing TIN Number or ID Number for customer ${
+                  customerData.name || "unknown"
+                }`,
+                invoiceNo: invoice.id,
+              },
+            };
+          }
+
           const transformedInvoice = await EInvoiceTemplate(
             invoice,
             customerData
