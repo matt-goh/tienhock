@@ -607,12 +607,41 @@ export default function (pool, config) {
         return res.status(404).json({ message: "E-invoice not found" });
       }
 
-      // Delete the e-invoice
+      // First, try to cancel the invoice in MyInvois
+      try {
+        await apiClient.makeApiCall(
+          "PUT",
+          `/api/v1.0/documents/state/${uuid}/state`,
+          {
+            status: "cancelled",
+            reason: "Wrong submission",
+          }
+        );
+      } catch (cancelError) {
+        console.error("Error cancelling e-invoice in MyInvois:", cancelError);
+
+        // Handle specific error cases from MyInvois API
+        if (
+          cancelError.status === 400 &&
+          cancelError.response?.error?.code === "OperationPeriodOver"
+        ) {
+          return res.status(400).json({
+            message: "The time limit for cancellation has expired",
+          });
+        }
+
+        return res.status(500).json({
+          message: "Failed to cancel e-invoice in MyInvois",
+          error: cancelError.message,
+        });
+      }
+
+      // If cancellation was successful, delete locally
       const deleteQuery = "DELETE FROM einvoices WHERE uuid = $1 RETURNING *";
       const result = await pool.query(deleteQuery, [uuid]);
 
       res.json({
-        message: "E-invoice deleted successfully",
+        message: "E-invoice cancelled and deleted successfully",
         einvoice: result.rows[0],
       });
     } catch (error) {
@@ -623,6 +652,6 @@ export default function (pool, config) {
       });
     }
   });
-
+  
   return router;
 }
