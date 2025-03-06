@@ -57,6 +57,23 @@ export async function submitInvoicesToMyInvois(
             };
           }
 
+          // Check for TIN Number and ID Number
+          const missingFields = [];
+          if (!customerData.tinNumber) missingFields.push("TIN Number");
+          if (!customerData.idNumber) missingFields.push("ID Number");
+          if (missingFields.length > 0) {
+            return {
+              error: {
+                code: "MISSING_REQUIRED_ID",
+                message: `Missing TIN Number or ID Number for customer ${
+                  customerData.name || "unknown"
+                }.`,
+                invoiceNo: invoice.id,
+                details: [],
+              },
+            };
+          }
+
           const transformedInvoice = await EInvoiceTemplate(
             invoice,
             customerData
