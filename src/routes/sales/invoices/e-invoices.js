@@ -410,10 +410,6 @@ export default function (pool, config) {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      console.log(
-        `Filtering invoices from ${startTimestamp} to ${endTimestamp}`
-      );
-
       const query = `
         SELECT i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
                i.amount, i.rounding, i.totalamountpayable
