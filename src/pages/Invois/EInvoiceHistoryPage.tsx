@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
@@ -7,6 +7,7 @@ import PaginationControls from "../../components/Invois/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { IconTrash } from "@tabler/icons-react";
+import { LoginResponse } from "../../types/types";
 import toast from "react-hot-toast";
 
 const STORAGE_KEY = "einvoisDateFilters";
@@ -85,6 +86,10 @@ const EInvoiceHistoryPage: React.FC = () => {
   const [einvoiceToDelete, setEinvoiceToDelete] = useState<EInvoice | null>(
     null
   );
+  const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
+    null
+  );
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
@@ -284,17 +289,96 @@ const EInvoiceHistoryPage: React.FC = () => {
     });
   };
 
+  // Token validation function
+  const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
+    if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
+    return (
+      Date.now() <
+      loginData.tokenCreationTime + loginData.tokenInfo.expiresIn * 1000
+    );
+  }, []);
+
+  // Authentication function
+  const connectToMyInvois = useCallback(async (): Promise<boolean> => {
+    const storedLoginData = localStorage.getItem("myInvoisLoginData");
+    if (storedLoginData) {
+      const parsedData = JSON.parse(storedLoginData);
+      if (isTokenValid(parsedData)) {
+        setLoginResponse(parsedData);
+        return true;
+      }
+    }
+
+    try {
+      setIsConnecting(true);
+      const data = await api.post("/api/einvoice/login");
+      if (data.success && data.tokenInfo) {
+        const loginDataWithTime = { ...data, tokenCreationTime: Date.now() };
+        localStorage.setItem(
+          "myInvoisLoginData",
+          JSON.stringify(loginDataWithTime)
+        );
+        setLoginResponse(loginDataWithTime);
+        return true;
+      } else {
+        setLoginResponse(data);
+        return false;
+      }
+    } catch (err) {
+      setLoginResponse({
+        success: false,
+        message: "An error occurred while connecting to MyInvois API.",
+        apiEndpoint: "Unknown",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      return false;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [isTokenValid]);
+
   const handleDelete = async () => {
     if (!einvoiceToDelete) return;
     try {
+      // First authenticate with MyInvois if needed
+      let isAuthenticated = false;
+      if (loginResponse && isTokenValid(loginResponse)) {
+        isAuthenticated = true;
+      } else {
+        // Try to connect
+        const toastId = toast.loading("Connecting to MyInvois...");
+        isAuthenticated = await connectToMyInvois();
+        toast.dismiss(toastId);
+
+        if (!isAuthenticated) {
+          toast.error("Failed to connect to MyInvois API");
+          return;
+        }
+      }
+
+      // Now proceed with deletion which will handle cancellation on backend
+      const deleteToastId = toast.loading("Cancelling e-invoice...");
       await api.delete(`/api/einvoice/${einvoiceToDelete.uuid}`);
+      toast.dismiss(deleteToastId);
+
       setEinvoiceToDelete(null);
       setShowDeleteDialog(false);
       if (fetchDataRef.current) await fetchDataRef.current();
-      toast.success("E-invoice deleted successfully");
+      toast.success("E-invoice cancelled and deleted successfully");
     } catch (error: any) {
-      console.error("Error deleting e-invoice:", error);
-      toast.error(error.message || "Failed to delete e-invoice");
+      console.error("Error cancelling e-invoice:", error);
+
+      // Handle specific error responses
+      if (
+        error?.response?.data?.message ===
+        "The time limit for cancellation has expired"
+      ) {
+        toast.error(
+          "Cannot cancel: The time limit for cancellation has expired"
+        );
+      } else {
+        toast.error(error.message || "Failed to cancel e-invoice");
+      }
     }
   };
 
