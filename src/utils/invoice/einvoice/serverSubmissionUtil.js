@@ -87,7 +87,7 @@ export async function submitInvoicesToMyInvois(
         transformedInvoices.push(result.transformedInvoice);
       } else if (result.error) {
         validationErrors.push({
-          invoiceCodeNumber: result.error.invoiceNo || "unknown",
+          internalId: result.error.invoiceNo || "unknown",
           error: {
             code: result.error.code || "VALIDATION_ERROR",
             message: result.error.message || "Validation error",
@@ -134,7 +134,7 @@ export async function submitInvoicesToMyInvois(
         rejectedDocuments: [
           ...validationErrors,
           ...invoices.map((invoice) => ({
-            invoiceCodeNumber: invoice.id,
+            internalId: invoice.id,
             error: {
               code: "SUBMISSION_ERROR",
               message: error.message || "Error during submission",

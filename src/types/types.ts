@@ -71,7 +71,7 @@ export interface ValidationDetail {
 
 // Document response types
 export interface DocumentBase {
-  invoiceCodeNumber: string;
+  internalId: string;
   uuid?: string;
 }
 
@@ -81,7 +81,7 @@ export interface AcceptedDocument extends DocumentBase {
 }
 
 export interface RejectedDocument {
-  invoiceCodeNumber: string;
+  internalId: string;
   status: "REJECTED";
   error: ValidationDetail;
 }
