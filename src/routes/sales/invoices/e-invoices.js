@@ -221,7 +221,7 @@ export default function (pool, config) {
 
           if (isDuplicate) {
             validationErrors.push({
-              invoiceCodeNumber: invoiceId,
+              internalId: invoiceId,
               error: {
                 code: "DUPLICATE",
                 message: `Invoice number ${invoiceId} already exists in the system`,
@@ -257,7 +257,7 @@ export default function (pool, config) {
           // Handle validation errors as before
           const errorDetails = error.details || [];
           validationErrors.push({
-            invoiceCodeNumber: error.id || invoiceId,
+            internalId: error.id || invoiceId,
             error: {
               code: error.code || "2",
               message: "Validation Error",
@@ -322,7 +322,7 @@ export default function (pool, config) {
         shouldStopAtValidation: true,
         rejectedDocuments: [
           {
-            invoiceCodeNumber:
+            internalId:
               error.id || (error.invoiceNo ? error.invoiceNo : "unknown"),
             error: {
               code: error.code || "Unknown",
@@ -648,6 +648,6 @@ export default function (pool, config) {
       });
     }
   });
-  
+
   return router;
 }
