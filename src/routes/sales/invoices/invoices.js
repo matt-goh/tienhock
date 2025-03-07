@@ -6,6 +6,7 @@ import {
   MYINVOIS_CLIENT_ID,
   MYINVOIS_CLIENT_SECRET,
 } from "../../../configs/config.js";
+import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";
 
 // Define the MyInvois configuration object
 const myInvoisConfig = {
@@ -104,8 +105,14 @@ const formatTime = (time) => {
   return "Invalid Time";
 };
 
-export default function (pool) {
+export default function (pool, config) {
   const router = Router();
+
+  const apiClient = new EInvoiceApiClient(
+    config.MYINVOIS_API_BASE_URL,
+    config.MYINVOIS_CLIENT_ID,
+    config.MYINVOIS_CLIENT_SECRET
+  );
 
   // Customer data cache
   const customerCache = new Map();
@@ -863,7 +870,7 @@ export default function (pool) {
     }
   });
 
-  // Delete invoice from database
+  // Delete invoice from database and cancel/delete e-invoice if found too
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
@@ -877,6 +884,35 @@ export default function (pool) {
 
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Check if there's also an e-invoice for this invoice
+      const eInvoiceQuery = "SELECT uuid FROM einvoices WHERE internal_id = $1";
+      const eInvoiceResult = await pool.query(eInvoiceQuery, [id]);
+
+      if (eInvoiceResult.rows.length > 0 && apiClient) {
+        const uuid = eInvoiceResult.rows[0].uuid;
+
+        // Try to cancel the e-invoice in MyInvois
+        try {
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${uuid}/state`,
+            {
+              status: "cancelled",
+              reason: "Invoice deleted",
+            }
+          );
+
+          // Delete the e-invoice from local database
+          await pool.query("DELETE FROM einvoices WHERE uuid = $1", [uuid]);
+          console.log(
+            `Cancelled and deleted e-invoice with UUID ${uuid} for invoice ID ${id}`
+          );
+        } catch (cancelError) {
+          console.error("Error cancelling e-invoice in MyInvois:", cancelError);
+          // We continue with invoice deletion even if e-invoice cancellation fails
+        }
       }
 
       // Delete order details first

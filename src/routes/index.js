@@ -79,7 +79,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/bookmarks", sidebarRouter(pool));
 
   // Sales routes
-  app.use("/api/invoices", invoiceRouter(pool));
+  app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
 
   // Catalogue - Main routes
