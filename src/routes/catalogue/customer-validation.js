@@ -1,14 +1,10 @@
 // src/routes/catalogue/customer-validation.js
 import { Router } from "express";
-import EInvoiceApiClient from "../../utils/invoice/einvoice/EInvoiceApiClient.js";
+import EInvoiceApiClientFactory from "../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 
 export default function (pool, config) {
   const router = Router();
-  const apiClient = new EInvoiceApiClient(
-    config.MYINVOIS_API_BASE_URL,
-    config.MYINVOIS_CLIENT_ID,
-    config.MYINVOIS_CLIENT_SECRET
-  );
+  const apiClient = EInvoiceApiClientFactory.getInstance(config);
 
   router.get("/validate/:tin", async (req, res) => {
     const { tin } = req.params;
