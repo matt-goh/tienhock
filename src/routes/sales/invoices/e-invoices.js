@@ -3,7 +3,7 @@ import { EInvoiceTemplate } from "../../../utils/invoice/einvoice/EInvoiceTempla
 import { Router } from "express";
 import { createHash } from "crypto";
 import EInvoiceSubmissionHandler from "../../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
-import EInvoiceApiClient from "../../../utils/invoice/einvoice/EInvoiceApiClient.js";
+import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 import { EInvoiceConsolidatedTemplate } from "../../../utils/invoice/einvoice/EInvoiceConsolidatedTemplate.js";
 
 // Function to fetch customer data
@@ -152,20 +152,12 @@ const getInvoices = async (pool, invoiceId) => {
 
 export default function (pool, config) {
   const router = Router();
-  const apiClient = new EInvoiceApiClient(
-    config.MYINVOIS_API_BASE_URL,
-    config.MYINVOIS_CLIENT_ID,
-    config.MYINVOIS_CLIENT_SECRET
-  );
+  const apiClient = EInvoiceApiClientFactory.getInstance(config);
   const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
 
   // Login/token endpoint
   router.post("/login", async (req, res) => {
     try {
-      console.log(
-        "Attempting to connect to:",
-        `${config.MYINVOIS_API_BASE_URL}/connect/token`
-      );
       const tokenResponse = await apiClient.refreshToken();
 
       if (tokenResponse && tokenResponse.access_token) {

@@ -1,4 +1,5 @@
 // src/utils/invoice/einvoice/myInvoisAuthUtil.js
+import EInvoiceApiClientFactory from "./EInvoiceApiClientFactory.js";
 
 // Simple in-memory token cache
 let tokenCache = {
@@ -9,10 +10,16 @@ let tokenCache = {
 
 /**
  * Ensures a valid MyInvois API token is available
- * @param {Object} apiClient - The EInvoiceApiClient instance
+ * @param {Object} apiClientOrConfig - Either the EInvoiceApiClient instance or configuration object
  * @returns {Promise<string>} - The valid access token
  */
-export async function ensureValidToken(apiClient) {
+export async function ensureValidToken(apiClientOrConfig) {
+  // Accept either an apiClient instance or a config object
+  const apiClient =
+    typeof apiClientOrConfig.makeApiCall === "function"
+      ? apiClientOrConfig
+      : EInvoiceApiClientFactory.getInstance(apiClientOrConfig);
+
   const now = Date.now();
 
   // Check if token exists and is not near expiration

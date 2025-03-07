@@ -2,7 +2,7 @@
 import { ensureValidToken } from "./myInvoisAuthUtil.js";
 import { EInvoiceTemplate } from "./EInvoiceTemplate.js";
 import EInvoiceSubmissionHandler from "./EInvoiceSubmissionHandler.js";
-import EInvoiceApiClient from "./EInvoiceApiClient.js";
+import EInvoiceApiClientFactory from "./EInvoiceApiClientFactory.js";
 
 /**
  * Submits invoices to MyInvois API
@@ -17,11 +17,7 @@ export async function submitInvoicesToMyInvois(
   getCustomerData
 ) {
   // Create API client
-  const apiClient = new EInvoiceApiClient(
-    config.MYINVOIS_API_BASE_URL,
-    config.MYINVOIS_CLIENT_ID,
-    config.MYINVOIS_CLIENT_SECRET
-  );
+  const apiClient = EInvoiceApiClientFactory.getInstance(config);
 
   // Ensure we have a valid token
   await ensureValidToken(apiClient);
