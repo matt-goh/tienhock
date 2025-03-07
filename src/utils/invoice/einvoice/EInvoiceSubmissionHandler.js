@@ -4,8 +4,8 @@ import { createHash } from "crypto";
 class EInvoiceSubmissionHandler {
   constructor(apiClient) {
     this.apiClient = apiClient;
-    this.MAX_POLLING_ATTEMPTS = 10;
-    this.POLLING_INTERVAL = 5000; // 5 seconds
+    this.MAX_POLLING_ATTEMPTS = 20;
+    this.POLLING_INTERVAL = 6000; // 6 seconds
   }
 
   async submitAndPollDocuments(transformedInvoices) {
