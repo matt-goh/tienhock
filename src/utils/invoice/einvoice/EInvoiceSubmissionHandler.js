@@ -163,7 +163,7 @@ class EInvoiceSubmissionHandler {
 
           // If all documents are in "Submitted" state for two consecutive polls,
           // consider it success (the API may take longer to fully validate)
-          if (allDocumentsSubmitted && attempts > 5) {
+          if (allDocumentsSubmitted && attempts > 8) {
             console.log(
               "All documents are in Submitted state, considering successful"
             );
@@ -196,7 +196,7 @@ class EInvoiceSubmissionHandler {
       );
       return {
         ...lastResponse,
-        overallStatus: "Valid", // Override to avoid timeout error
+        overallStatus: "Pending",
         _timedOut: true, // Flag that we timed out
       };
     }
