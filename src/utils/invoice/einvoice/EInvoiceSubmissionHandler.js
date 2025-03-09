@@ -195,7 +195,7 @@ class EInvoiceSubmissionHandler {
     );
   }
 
-  // Add this new method to simplify the submission response
+  // method to simplify the submission response
   simplifySubmissionResponse(response) {
     // Create the simplified structure
     const simplifiedResponse = {
@@ -203,21 +203,29 @@ class EInvoiceSubmissionHandler {
       submissionUid: response.submissionUid,
       overallStatus: response.overallStatus,
       documentCount: response.documentCount || 0,
+      pollingTimeoutOccurred: response._timedOut || false,
     };
 
-    // Transform the document summary array to the simplified format
+    // Transform the document summary array to accepted documents format
     if (response.documentSummary && response.documentSummary.length > 0) {
-      simplifiedResponse.documentSummary = response.documentSummary.map(
+      simplifiedResponse.acceptedDocuments = response.documentSummary.map(
         (doc) => ({
           uuid: doc.uuid,
-          submissionUid: doc.submissionUid,
+          submissionUid: doc.submissionUid || response.submissionUid,
           longId: doc.longId || "",
           internalId: doc.internalId,
           status: doc.status,
+          typeName: doc.typeName,
+          receiverId: doc.receiverId,
+          receiverName: doc.receiverName,
+          dateTimeValidated: doc.dateTimeValidated,
+          totalPayableAmount: doc.totalPayableAmount,
+          totalExcludingTax: doc.totalExcludingTax,
+          totalNetAmount: doc.totalNetAmount,
         })
       );
     } else {
-      simplifiedResponse.documentSummary = [];
+      simplifiedResponse.acceptedDocuments = [];
     }
 
     return simplifiedResponse;
