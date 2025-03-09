@@ -320,16 +320,6 @@ export default function (pool, config) {
         );
 
         await insertAcceptedDocuments(pool, filteredDocuments);
-
-        // Filter accepted documents in the response to include only necessary fields
-        submissionResult.acceptedDocuments =
-          submissionResult.acceptedDocuments.map((doc) => ({
-            uuid: doc.uuid,
-            submissionUid: doc.submissionUid || submissionResult.submissionUid,
-            longId: doc.longId || "",
-            internalId: doc.internalId,
-            status: doc.status,
-          }));
       }
 
       return res.json(submissionResult);
