@@ -104,7 +104,7 @@ const Layout: React.FC = () => {
       {/* Only show sidebar if authenticated and not on PDF route */}
       {isAuthenticated && !isPDFRoute && (
         <div
-          className="fixed top-0 left-0 h-screen sidebar-hidden"
+          className="fixed z-50 top-0 left-0 h-screen sidebar-hidden"
           style={{ width: isVisible ? "254px" : "6rem" }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
