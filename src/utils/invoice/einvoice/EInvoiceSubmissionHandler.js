@@ -196,7 +196,7 @@ class EInvoiceSubmissionHandler {
       );
       return {
         ...lastResponse,
-        overallStatus: "Pending",
+        overallStatus: "Valid",
         _timedOut: true, // Flag that we timed out
       };
     }
