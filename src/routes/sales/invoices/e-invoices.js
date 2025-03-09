@@ -246,7 +246,7 @@ export default function (pool, config) {
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
-          // Handle validation errors as before
+          // Handle validation errors
           const errorDetails = error.details || [];
           validationErrors.push({
             internalId: error.id || invoiceId,
@@ -297,12 +297,39 @@ export default function (pool, config) {
         transformedInvoices
       );
 
-      // Add accepted documents to database
+      // Filter accepted documents before insertion
       if (
         submissionResult.success &&
         submissionResult.acceptedDocuments?.length > 0
       ) {
-        await insertAcceptedDocuments(pool, submissionResult.acceptedDocuments);
+        const filteredDocuments = submissionResult.acceptedDocuments.map(
+          (doc) => ({
+            uuid: doc.uuid || "",
+            submission_uid:
+              doc.submissionUid || submissionResult.submissionUid || "",
+            long_id: doc.longId || "",
+            internal_id: doc.internalId || "",
+            type_name: doc.typeName || "Invoice",
+            receiver_id: doc.receiverId || "",
+            receiver_name: doc.receiverName || "",
+            datetime_validated: doc.dateTimeValidated || null,
+            total_payable_amount: doc.totalPayableAmount || 0,
+            total_excluding_tax: doc.totalExcludingTax || 0,
+            total_net_amount: doc.totalNetAmount || 0,
+          })
+        );
+
+        await insertAcceptedDocuments(pool, filteredDocuments);
+
+        // Filter accepted documents in the response to include only necessary fields
+        submissionResult.acceptedDocuments =
+          submissionResult.acceptedDocuments.map((doc) => ({
+            uuid: doc.uuid,
+            submissionUid: doc.submissionUid || submissionResult.submissionUid,
+            longId: doc.longId || "",
+            internalId: doc.internalId,
+            status: doc.status,
+          }));
       }
 
       return res.json(submissionResult);
@@ -324,6 +351,79 @@ export default function (pool, config) {
           },
         ],
         overallStatus: "Invalid",
+      });
+    }
+  });
+
+  // Fetch submission details by UUID and update missing longId
+  router.get("/submission/:uuid", async (req, res) => {
+    const { uuid } = req.params;
+
+    if (!uuid) {
+      return res.status(400).json({
+        success: false,
+        message: "UUID is required",
+      });
+    }
+
+    try {
+      // Call the MyInvois API to get document details
+      const documentDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${uuid}/raw`
+      );
+
+      // Filter down to only the fields we need
+      const filteredResponse = {
+        uuid: documentDetails.uuid,
+        longId: documentDetails.longId || "",
+        dateTimeValidated: documentDetails.dateTimeValidated || null,
+        status:
+          documentDetails.status === "Submitted"
+            ? "Valid"
+            : documentDetails.status,
+      };
+
+      // Update our database if we have new information (particularly the longId)
+      if (documentDetails.longId) {
+        try {
+          const dbResult = await pool.query(
+            `UPDATE einvoices 
+             SET long_id = $1, datetime_validated = $2
+             WHERE uuid = $3 AND (long_id IS NULL OR long_id = '')
+             RETURNING *`,
+            [documentDetails.longId, documentDetails.dateTimeValidated, uuid]
+          );
+
+          console.log(
+            `Updated einvoice record for UUID ${uuid}: ${dbResult.rowCount} rows affected`
+          );
+        } catch (dbError) {
+          console.error("Error updating einvoice record:", dbError);
+          // Continue with the response even if DB update fails
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: filteredResponse,
+      });
+    } catch (error) {
+      console.error("Error fetching document details:", error);
+
+      // Check for specific error responses from the MyInvois API
+      if (error.status === 404) {
+        return res.status(404).json({
+          success: false,
+          message: "Document not found",
+          error: "The requested document does not exist or is not accessible",
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch document details",
+        error: error.message,
       });
     }
   });
@@ -428,6 +528,7 @@ export default function (pool, config) {
     }
   });
 
+  // Submit consolidated invoice
   router.post("/submit-consolidated", async (req, res) => {
     try {
       const { invoices: invoiceIds, month, year } = req.body;
