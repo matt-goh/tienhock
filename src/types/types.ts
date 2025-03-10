@@ -81,7 +81,7 @@ export interface AcceptedDocument extends DocumentBase {
 }
 
 export interface RejectedDocument {
-  invoiceCodeNumber: string;
+  internalId: string;
   status: "REJECTED";
   error: ValidationDetail;
 }
