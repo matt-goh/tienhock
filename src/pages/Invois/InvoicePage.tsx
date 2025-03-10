@@ -18,6 +18,7 @@ import {
   IconPlus,
   IconPrinter,
   IconSearch,
+  IconRefresh,
 } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
@@ -366,6 +367,30 @@ const InvoicePage: React.FC = () => {
     });
   };
 
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Pass the current filters to get the latest data
+      const fetchedInvoices = await getInvoices(filters);
+      setInvoices(fetchedInvoices);
+      setFilteredInvoices(fetchedInvoices);
+      toast.success("Invoices refreshed successfully");
+    } catch (error) {
+      console.error("Error refreshing invoices:", error);
+      setError(
+        error instanceof Error ? error.message : "An unknown error occurred"
+      );
+      toast.error(
+        `Failed to refresh invoices: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handlePDFClick = () => {
     // Determine which invoices to use for the PDF
     const invoicesToUse =
@@ -621,6 +646,15 @@ const InvoicePage: React.FC = () => {
                 disabled={selectedCount === 0}
               >
                 Print
+              </Button>
+              <Button
+                onClick={handleRefresh}
+                icon={IconRefresh}
+                iconSize={16}
+                iconStroke={2}
+                variant="outline"
+              >
+                Refresh
               </Button>
               <div className="flex items-center gap-3">
                 <Button
