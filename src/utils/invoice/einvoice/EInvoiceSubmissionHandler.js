@@ -4,8 +4,8 @@ import { createHash } from "crypto";
 class EInvoiceSubmissionHandler {
   constructor(apiClient) {
     this.apiClient = apiClient;
-    this.MAX_POLLING_ATTEMPTS = 20;
-    this.POLLING_INTERVAL = 1; // 6 seconds
+    this.MAX_POLLING_ATTEMPTS = 10;
+    this.POLLING_INTERVAL = 5000; // 6 seconds
   }
 
   async submitAndPollDocuments(transformedInvoices) {
@@ -24,33 +24,41 @@ class EInvoiceSubmissionHandler {
       const hasInvalidInvoices =
         submissionResponse.rejectedDocuments?.length > 0;
 
+      // Case 1: All valid invoices
       if (hasValidInvoices && !hasInvalidInvoices) {
         try {
           const finalStatus = await this.pollSubmissionStatus(
             submissionResponse.submissionUid
           );
-          return finalStatus; // Already simplified by pollSubmissionStatus
+          return {
+            success: true,
+            submissionUid: submissionResponse.submissionUid,
+            acceptedDocuments:
+              finalStatus.documentSummary ||
+              submissionResponse.acceptedDocuments,
+            rejectedDocuments: [],
+            documentCount: invoices.length,
+            dateTimeReceived:
+              finalStatus.dateTimeReceived ||
+              submissionResponse.dateTimeReceived,
+            overallStatus: finalStatus.overallStatus,
+          };
         } catch (pollingError) {
           // If polling fails, still return success if documents were accepted
           console.warn(
             "Polling failed but documents were accepted:",
             pollingError.message
           );
-          return this.simplifySubmissionResponse({
+          return {
             success: true,
             submissionUid: submissionResponse.submissionUid,
-            documentSummary: submissionResponse.acceptedDocuments.map(
-              (doc) => ({
-                uuid: doc.uuid,
-                submissionUid: submissionResponse.submissionUid,
-                longId: doc.longId || "",
-                internalId: doc.internalId,
-                status: "Valid", // Consider it valid since it was accepted
-              })
-            ),
-            overallStatus: "Valid",
+            acceptedDocuments: submissionResponse.acceptedDocuments,
+            rejectedDocuments: [],
+            documentCount: invoices.length,
+            dateTimeReceived: submissionResponse.dateTimeReceived,
+            overallStatus: "Valid", // Consider it valid since documents were accepted
             pollingTimeoutOccurred: true,
-          });
+          };
         }
       }
 
@@ -59,9 +67,11 @@ class EInvoiceSubmissionHandler {
         return {
           success: false,
           submissionUid: null,
-          overallStatus: "Invalid",
-          documentSummary: [], // No need to include rejected documents here since we have rejectedDocuments
+          acceptedDocuments: [],
           rejectedDocuments: submissionResponse.rejectedDocuments,
+          documentCount: invoices.length,
+          dateTimeReceived: new Date().toISOString(),
+          overallStatus: "Invalid",
         };
       }
 
@@ -70,10 +80,15 @@ class EInvoiceSubmissionHandler {
         const finalStatus = await this.pollSubmissionStatus(
           submissionResponse.submissionUid
         );
-
-        // Add rejectedDocuments to the final status
-        finalStatus.rejectedDocuments = submissionResponse.rejectedDocuments;
-        return finalStatus;
+        return {
+          success: true,
+          submissionUid: submissionResponse.submissionUid,
+          acceptedDocuments: finalStatus.documentSummary,
+          rejectedDocuments: submissionResponse.rejectedDocuments,
+          documentCount: invoices.length,
+          dateTimeReceived: finalStatus.dateTimeReceived,
+          overallStatus: "Partial",
+        };
       }
 
       throw new Error(
@@ -136,11 +151,11 @@ class EInvoiceSubmissionHandler {
 
         // Return immediately if status is final
         if (response.overallStatus !== "InProgress") {
-          // Simplify the response before returning
-          return this.simplifySubmissionResponse(response);
+          return response;
         }
 
         // Check if all documents in summary have a status of "Submitted"
+        // and there are documents in the summary (meaning they were processed)
         if (response.documentSummary && response.documentSummary.length > 0) {
           const allDocumentsSubmitted = response.documentSummary.every(
             (doc) => doc.status === "Submitted"
@@ -153,13 +168,11 @@ class EInvoiceSubmissionHandler {
               "All documents are in Submitted state, considering successful"
             );
             // Create a copy with a different status for our internal handling
-            const modifiedResponse = {
+            return {
               ...response,
               overallStatus: "Valid", // Override to avoid timeout error
               _actualStatus: "InProgress", // Keep track of actual status
             };
-
-            return this.simplifySubmissionResponse(modifiedResponse);
           }
         }
 
@@ -181,54 +194,16 @@ class EInvoiceSubmissionHandler {
       console.log(
         "Polling timed out, but documents were processed. Returning last status."
       );
-      const modifiedResponse = {
+      return {
         ...lastResponse,
         overallStatus: "Valid",
         _timedOut: true, // Flag that we timed out
       };
-
-      return this.simplifySubmissionResponse(modifiedResponse);
     }
 
     throw new Error(
       `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`
     );
-  }
-
-  // method to simplify the submission response
-  simplifySubmissionResponse(response) {
-    // Create the simplified structure
-    const simplifiedResponse = {
-      success: true,
-      submissionUid: response.submissionUid,
-      overallStatus: response.overallStatus,
-      documentCount: response.documentCount || 0,
-      pollingTimeoutOccurred: response._timedOut || false,
-    };
-
-    // Transform the document summary array to accepted documents format
-    if (response.documentSummary && response.documentSummary.length > 0) {
-      simplifiedResponse.acceptedDocuments = response.documentSummary.map(
-        (doc) => ({
-          uuid: doc.uuid,
-          submissionUid: doc.submissionUid || response.submissionUid,
-          longId: doc.longId || "",
-          internalId: doc.internalId,
-          status: doc.status,
-          typeName: doc.typeName,
-          receiverId: doc.receiverId,
-          receiverName: doc.receiverName,
-          dateTimeValidated: doc.dateTimeValidated,
-          totalPayableAmount: doc.totalPayableAmount,
-          totalExcludingTax: doc.totalExcludingTax,
-          totalNetAmount: doc.totalNetAmount,
-        })
-      );
-    } else {
-      simplifiedResponse.acceptedDocuments = [];
-    }
-
-    return simplifiedResponse;
   }
 
   wait(ms) {

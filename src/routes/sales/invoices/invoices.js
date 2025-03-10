@@ -15,7 +15,7 @@ const myInvoisConfig = {
   MYINVOIS_CLIENT_SECRET,
 };
 
-const insertAcceptedDocuments = async (pool, documents) => {
+async function insertAcceptedDocuments(pool, documents) {
   const query = `
     INSERT INTO einvoices (
       uuid, submission_uid, long_id, internal_id, type_name, 
@@ -23,10 +23,16 @@ const insertAcceptedDocuments = async (pool, documents) => {
       total_payable_amount, total_excluding_tax, total_net_amount
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
   `;
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
     for (const doc of documents) {
+      // Add a default datetime_validated if missing
+      const datetime_validated =
+        doc.dateTimeValidated || new Date().toISOString();
+
       await client.query(query, [
         doc.uuid,
         doc.submissionUid,
@@ -35,12 +41,13 @@ const insertAcceptedDocuments = async (pool, documents) => {
         doc.typeName,
         doc.receiverId,
         doc.receiverName,
-        doc.dateTimeValidated,
+        datetime_validated, // Use our modified value
         doc.totalPayableAmount,
         doc.totalExcludingTax,
         doc.totalNetAmount,
       ]);
     }
+
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -48,7 +55,7 @@ const insertAcceptedDocuments = async (pool, documents) => {
   } finally {
     client.release();
   }
-};
+}
 
 const fetchCustomerData = async (pool, customerId) => {
   try {

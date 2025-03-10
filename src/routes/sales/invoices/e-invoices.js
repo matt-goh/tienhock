@@ -37,7 +37,7 @@ async function fetchCustomerData(pool, customerId) {
 }
 
 // Helper function to insert accepted documents
-async function insertAcceptedDocuments(pool, documents) {
+const insertAcceptedDocuments = async (pool, documents) => {
   const query = `
     INSERT INTO einvoices (
       uuid, submission_uid, long_id, internal_id, type_name, 
@@ -45,12 +45,14 @@ async function insertAcceptedDocuments(pool, documents) {
       total_payable_amount, total_excluding_tax, total_net_amount
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
   `;
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     for (const doc of documents) {
+      // Add a default datetime_validated if missing
+      const datetime_validated =
+        doc.dateTimeValidated || new Date().toISOString();
+
       await client.query(query, [
         doc.uuid,
         doc.submissionUid,
@@ -59,13 +61,12 @@ async function insertAcceptedDocuments(pool, documents) {
         doc.typeName,
         doc.receiverId,
         doc.receiverName,
-        doc.dateTimeValidated,
+        datetime_validated, // Use our modified value
         doc.totalPayableAmount,
         doc.totalExcludingTax,
         doc.totalNetAmount,
       ]);
     }
-
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -73,7 +74,7 @@ async function insertAcceptedDocuments(pool, documents) {
   } finally {
     client.release();
   }
-}
+};
 
 // Helper function to fetch invoice from database
 const getInvoices = async (pool, invoiceId) => {
@@ -213,7 +214,7 @@ export default function (pool, config) {
 
           if (isDuplicate) {
             validationErrors.push({
-              internalId: invoiceId,
+              invoiceCodeNumber: invoiceId,
               error: {
                 code: "DUPLICATE",
                 message: `Invoice number ${invoiceId} already exists in the system`,
@@ -240,16 +241,40 @@ export default function (pool, config) {
             pool,
             invoiceData.customerid
           );
+
+          if (!customerData.tin_number || !customerData.id_number) {
+            validationErrors.push({
+              internalId: invoiceId,
+              error: {
+                code: "MISSING_REQUIRED_ID",
+                message: `Missing TIN Number or ID Number for customer ${
+                  customerData.name || "unknown"
+                }`,
+                target: invoiceId,
+                details: [
+                  {
+                    code: "MISSING_REQUIRED_ID",
+                    message: `Customer ${
+                      customerData.name || "unknown"
+                    } must have both TIN Number and ID Number defined in the system.`,
+                    target: "document",
+                  },
+                ],
+              },
+            });
+            continue; // Skip processing this invoice
+          }
+
           const transformedInvoice = await EInvoiceTemplate(
             invoiceData,
             customerData
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
-          // Handle validation errors
+          // Handle validation errors as before
           const errorDetails = error.details || [];
           validationErrors.push({
-            internalId: error.id || invoiceId,
+            invoiceCodeNumber: error.id || invoiceId,
             error: {
               code: error.code || "2",
               message: "Validation Error",
@@ -297,29 +322,12 @@ export default function (pool, config) {
         transformedInvoices
       );
 
-      // Filter accepted documents before insertion
+      // Add accepted documents to database
       if (
         submissionResult.success &&
         submissionResult.acceptedDocuments?.length > 0
       ) {
-        const filteredDocuments = submissionResult.acceptedDocuments.map(
-          (doc) => ({
-            uuid: doc.uuid || "",
-            submission_uid:
-              doc.submissionUid || submissionResult.submissionUid || "",
-            long_id: doc.longId || "",
-            internal_id: doc.internalId || "",
-            type_name: doc.typeName || "Invoice",
-            receiver_id: doc.receiverId || "",
-            receiver_name: doc.receiverName || "",
-            datetime_validated: doc.dateTimeValidated || null,
-            total_payable_amount: doc.totalPayableAmount || 0,
-            total_excluding_tax: doc.totalExcludingTax || 0,
-            total_net_amount: doc.totalNetAmount || 0,
-          })
-        );
-
-        await insertAcceptedDocuments(pool, filteredDocuments);
+        await insertAcceptedDocuments(pool, submissionResult.acceptedDocuments);
       }
 
       return res.json(submissionResult);
@@ -331,7 +339,7 @@ export default function (pool, config) {
         shouldStopAtValidation: true,
         rejectedDocuments: [
           {
-            internalId:
+            invoiceCodeNumber:
               error.id || (error.invoiceNo ? error.invoiceNo : "unknown"),
             error: {
               code: error.code || "Unknown",
@@ -360,7 +368,7 @@ export default function (pool, config) {
       // Call the MyInvois API to get document details
       const documentDetails = await apiClient.makeApiCall(
         "GET",
-        `/api/v1.0/documents/${uuid}/raw`
+        `/api/v1.0/documents/${uuid}/details`
       );
 
       // Filter down to only the fields we need

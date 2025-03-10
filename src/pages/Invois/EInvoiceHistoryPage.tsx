@@ -2,11 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
 import Button from "../../components/Button";
-import { IconRefresh, IconSearch } from "@tabler/icons-react";
+import {
+  IconRefresh,
+  IconSearch,
+  IconRotateClockwise,
+  IconTrash,
+} from "@tabler/icons-react";
 import PaginationControls from "../../components/Invois/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { IconTrash } from "@tabler/icons-react";
 import { LoginResponse } from "../../types/types";
 import toast from "react-hot-toast";
 
@@ -90,6 +94,9 @@ const EInvoiceHistoryPage: React.FC = () => {
     null
   );
   const [isConnecting, setIsConnecting] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
@@ -337,6 +344,28 @@ const EInvoiceHistoryPage: React.FC = () => {
     }
   }, [isTokenValid]);
 
+  const checkEInvoiceStatus = async (uuid: string) => {
+    try {
+      const loadingToastId = toast.loading("Checking e-invoice status...");
+      const response = await api.get(`/api/einvoice/submission/${uuid}`);
+      toast.dismiss(loadingToastId);
+
+      if (response.success && response.data.longId) {
+        toast.success("E-invoice status updated successfully");
+        // Refresh the data to show updated longId
+        if (fetchDataRef.current) await fetchDataRef.current();
+        return true;
+      } else {
+        toast.error("E-invoice is still pending in MyInvois system");
+        return false;
+      }
+    } catch (error: any) {
+      console.error("Error checking e-invoice status:", error);
+      toast.error(error.message || "Failed to check e-invoice status");
+      return false;
+    }
+  };
+
   const handleDelete = async () => {
     if (!einvoiceToDelete) return;
     try {
@@ -513,6 +542,11 @@ const EInvoiceHistoryPage: React.FC = () => {
                     <tr key={einvoice.uuid} className="border-b last:border-0">
                       <td className="px-4 py-3 text-default-700">
                         {einvoice.internal_id}
+                        {!einvoice.long_id && (
+                          <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                            Pending
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-default-700">
                         {einvoice.type_name}
@@ -532,10 +566,22 @@ const EInvoiceHistoryPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          <EInvoicePDFHandler
-                            einvoice={einvoice}
-                            disabled={false}
-                          />
+                          {einvoice.long_id ? (
+                            <EInvoicePDFHandler
+                              einvoice={einvoice}
+                              disabled={false}
+                            />
+                          ) : (
+                            <Button
+                              onClick={() => checkEInvoiceStatus(einvoice.uuid)}
+                              variant="outline"
+                              color="sky"
+                              size="sm"
+                              icon={IconRotateClockwise}
+                            >
+                              Check Status
+                            </Button>
+                          )}
                           <Button
                             onClick={() => {
                               setEinvoiceToDelete(einvoice);
