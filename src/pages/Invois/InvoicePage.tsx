@@ -23,7 +23,6 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
 import FilterSummary from "../../components/Invois/FilterSummary";
 import TableEditing from "../../components/Table/TableEditing";
-import EInvoiceMenu from "../../components/Invois/EInvoiceMenu";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
@@ -176,12 +175,6 @@ const InvoicePage: React.FC = () => {
     []
   );
 
-  const handleSubmissionComplete = useCallback(() => {
-    setSelectedCount(0);
-    setIsAllSelected(false);
-    setSelectedInvoices([]);
-  }, []);
-
   const handleBulkDelete = async () => {
     setShowDeleteConfirmation(false);
 
@@ -216,7 +209,6 @@ const InvoicePage: React.FC = () => {
       });
       setInvoices(fetchedInvoices);
 
-      handleSubmissionComplete();
       toast.success("Selected invoices deleted successfully");
     } catch (error) {
       console.error("Error deleting invoices:", error);
@@ -307,10 +299,6 @@ const InvoicePage: React.FC = () => {
 
     setFilteredInvoices(filteredWithNames);
   }, [invoices, filters, searchTerm, customerNames]);
-
-  useEffect(() => {
-    handleSubmissionComplete();
-  }, [invoices, handleSubmissionComplete]);
 
   useEffect(() => {
     applyFilters();
@@ -635,11 +623,6 @@ const InvoicePage: React.FC = () => {
                 Print
               </Button>
               <div className="flex items-center gap-3">
-                <EInvoiceMenu
-                  selectedInvoices={selectedInvoices}
-                  onSubmissionComplete={handleSubmissionComplete}
-                  clearSelection={() => clearSelectionRef.current?.()}
-                />
                 <Button
                   onClick={handleCreateNewInvoice}
                   icon={IconPlus}
