@@ -214,7 +214,7 @@ export default function (pool, config) {
 
           if (isDuplicate) {
             validationErrors.push({
-              invoiceCodeNumber: invoiceId,
+              internalId: invoiceId,
               error: {
                 code: "DUPLICATE",
                 message: `Invoice number ${invoiceId} already exists in the system`,
@@ -274,7 +274,7 @@ export default function (pool, config) {
           // Handle validation errors as before
           const errorDetails = error.details || [];
           validationErrors.push({
-            invoiceCodeNumber: error.id || invoiceId,
+            internalId: error.id || invoiceId,
             error: {
               code: error.code || "2",
               message: "Validation Error",
@@ -295,8 +295,8 @@ export default function (pool, config) {
         }
       }
 
-      // If there are any validation errors, return them
-      if (validationErrors.length > 0) {
+      // If there are any validation errors, but we still have valid invoices, continue processing
+      if (validationErrors.length > 0 && transformedInvoices.length === 0) {
         return res.status(400).json({
           success: false,
           message: "Validation failed for submitted documents",
@@ -322,6 +322,15 @@ export default function (pool, config) {
         transformedInvoices
       );
 
+      // Add validation errors to the result if there are any
+      if (validationErrors.length > 0) {
+        submissionResult.rejectedDocuments = [
+          ...(submissionResult.rejectedDocuments || []),
+          ...validationErrors,
+        ];
+        submissionResult.overallStatus = "Partial";
+      }
+
       // Add accepted documents to database
       if (
         submissionResult.success &&
@@ -333,13 +342,38 @@ export default function (pool, config) {
       return res.json(submissionResult);
     } catch (error) {
       console.error("Submission error:", error);
+      // Check specifically for 422 error code (duplicate payload)
+      if (error.status === 422) {
+        return res.status(422).json({
+          success: false,
+          message: "Duplicate submission detected",
+          shouldStopAtValidation: true,
+          rejectedDocuments: [
+            {
+              internalId: "Failed",
+              error: {
+                code: "DUPLICATE_PAYLOAD",
+                message: "Duplicated Submission",
+                details: [
+                  {
+                    message: error.response.error,
+                  },
+                ],
+              },
+            },
+          ],
+          overallStatus: "Invalid",
+        });
+      }
+
+      // Original error handling
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to process batch submission",
         shouldStopAtValidation: true,
         rejectedDocuments: [
           {
-            invoiceCodeNumber:
+            internalId:
               error.id || (error.invoiceNo ? error.invoiceNo : "unknown"),
             error: {
               code: error.code || "Unknown",
