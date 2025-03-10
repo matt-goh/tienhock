@@ -92,10 +92,15 @@ function TableEditing<T extends Record<string, any>>({
     "orderDetails",
     "customerProducts",
     "invois",
+    "einvoice-submit",
     "consolidate",
   ].includes(tableKey || "");
 
-  const isSelectionEnabled = ["invois", "consolidate"].includes(tableKey || "");
+  const isSelectionEnabled = [
+    "invois",
+    "consolidate",
+    "einvoice-submit",
+  ].includes(tableKey || "");
 
   React.useImperativeHandle(ref, () => ({
     selection,

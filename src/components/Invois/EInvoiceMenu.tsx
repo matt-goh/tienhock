@@ -88,15 +88,8 @@ const InfoBox: React.FC = () => (
           Please select invoices to submit to MyInvois
         </p>
         <p className="text-sm text-amber-700">
-          1. Invoice date must be in the past 3 days.
-        </p>
-        <p className="text-sm text-amber-700">
-          2. TIN number must be assigned to the involved customer(s) in
-          catalogue.
-        </p>
-        <p className="text-sm text-amber-700">
-          3. It is recommended to submit in batches of up to 100 documents
-          instead of single document per submission.
+          1. TIN number and ID Number must be assigned to the involved
+          customer(s) in catalogue.
         </p>
       </div>
     </div>
@@ -114,7 +107,7 @@ const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
   onSubmissionComplete,
   clearSelection,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
     null
   );
