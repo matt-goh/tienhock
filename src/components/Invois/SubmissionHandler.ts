@@ -176,8 +176,8 @@ export class SubmissionHandler {
       response.rejectedDocuments.length > 0
     ) {
       response.rejectedDocuments.forEach((doc) => {
-        const errors = this.processValidationErrors(doc.error, doc.internalId);
-        this.updateDocumentStatus(doc.internalId, "REJECTED", {
+        const errors = this.processValidationErrors(doc.error, doc.invoiceCodeNumber);
+        this.updateDocumentStatus(doc.invoiceCodeNumber, "REJECTED", {
           errors,
         });
       });
@@ -198,8 +198,8 @@ export class SubmissionHandler {
 
     // Process rejected documents
     response.rejectedDocuments.forEach((doc) => {
-      const errors = this.processValidationErrors(doc.error, doc.internalId);
-      this.updateDocumentStatus(doc.internalId, "REJECTED", {
+      const errors = this.processValidationErrors(doc.error, doc.invoiceCodeNumber);
+      this.updateDocumentStatus(doc.invoiceCodeNumber, "REJECTED", {
         errors,
       });
     });

@@ -250,10 +250,10 @@ const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
 
       // Handle rejected documents
       response.rejectedDocuments?.forEach((doc: any) => {
-        if (doc.internalId) {
+        if (doc.invoiceCodeNumber) {
           // Make sure we have a valid ID
-          documents[doc.internalId] = {
-            invoiceNo: doc.internalId,
+          documents[doc.invoiceCodeNumber] = {
+            invoiceNo: doc.invoiceCodeNumber,
             currentStatus: "REJECTED",
             errors: [
               {
