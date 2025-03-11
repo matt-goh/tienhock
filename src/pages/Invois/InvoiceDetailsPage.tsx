@@ -24,7 +24,7 @@ import {
   deleteInvoice,
   createInvoice,
   checkDuplicateInvoiceNo,
-} from "../../utils/invoice/InvoisUtils";
+} from "../../utils/invoice/InvoiceUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
