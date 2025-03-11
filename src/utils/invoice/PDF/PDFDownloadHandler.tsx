@@ -3,7 +3,7 @@ import { pdf, Document } from "@react-pdf/renderer";
 import { InvoiceData } from "../../../types/types";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
 import Button from "../../../components/Button";
-import InvoisPDF from "./InvoisPDF";
+import InvoicePDF from "./InvoicePDF";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
 
@@ -50,7 +50,7 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // First render the PDF component
       const pdfComponent = (
         <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-          <InvoisPDF invoices={invoices} logoData={logoImage} />
+          <InvoicePDF invoices={invoices} logoData={logoImage} />
         </Document>
       );
 

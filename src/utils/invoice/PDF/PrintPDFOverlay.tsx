@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
-import InvoisPDF from "./InvoisPDF";
+import InvoicePDF from "./InvoicePDF";
 import { InvoiceData } from "../../../types/types";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
@@ -67,7 +67,7 @@ const PrintPDFOverlay = ({
         // First render the PDF to ensure it's properly initialized
         const pdfComponent = (
           <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-            <InvoisPDF invoices={invoices} />
+            <InvoicePDF invoices={invoices} />
           </Document>
         );
 
