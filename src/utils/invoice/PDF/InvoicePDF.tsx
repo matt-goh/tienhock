@@ -2,7 +2,7 @@ import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, ProductItem } from "../../../types/types";
 
-interface InvoisPDFProps {
+interface InvoicePDFProps {
   invoices: InvoiceData[];
   logoData?: string | null;
 }
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
+const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoices, logoData }) => {
   const getProcessedProducts = (products: ProductItem[]) => {
     // Keep track of all rows in their original order
     const orderedRows: ProductItem[] = [];
@@ -583,4 +583,4 @@ const InvoisPDF: React.FC<InvoisPDFProps> = ({ invoices, logoData }) => {
   );
 };
 
-export default InvoisPDF;
+export default InvoicePDF;

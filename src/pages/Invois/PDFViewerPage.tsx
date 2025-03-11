@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { InvoiceData } from "../../types/types";
-import InvoisPDF from "../../utils/invoice/PDF/InvoisPDF";
+import InvoicePDF from "../../utils/invoice/PDF/InvoicePDF";
 import { PDFViewer, Document } from "@react-pdf/renderer";
 import { generatePDFFilename } from "../../utils/invoice/PDF/generatePDFFilename";
 
@@ -50,7 +50,7 @@ const PDFViewerPage: React.FC = () => {
     <div className="h-screen w-screen">
       <PDFViewer style={{ width: "100%", height: "100%" }}>
         <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-          <InvoisPDF invoices={invoices} />
+          <InvoicePDF invoices={invoices} />
         </Document>
       </PDFViewer>
     </div>
