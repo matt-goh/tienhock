@@ -22,6 +22,7 @@ import BasicPage from "./Catalogue/BasicPage";
 import StaffPage from "./Catalogue/StaffPage";
 import JobPage from "./Catalogue/JobPage";
 import TaxPage from "./Catalogue/TaxPage";
+import SalesByProductsPage from "./Sales/SalesByProductsPage";
 
 export interface PopoverOption {
   name: string;
@@ -81,6 +82,11 @@ export const SidebarData: SidebarItem[] = [
         name: "e-Invoice",
         path: "/sales/einvoice",
         component: EInvoicePage,
+      },
+      {
+        name: "Sales by Products",
+        path: "/sales/products-dashboard",
+        component: SalesByProductsPage,
       },
     ],
   },

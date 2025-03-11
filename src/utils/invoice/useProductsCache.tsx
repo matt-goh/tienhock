@@ -3,7 +3,12 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 
 interface CachedProducts {
-  data: Array<{ id: string; description: string; price_per_unit: number }>;
+  data: Array<{
+    id: string;
+    description: string;
+    price_per_unit: number;
+    type: string;
+  }>;
   timestamp: number;
 }
 
@@ -44,7 +49,12 @@ if (typeof window !== "undefined") {
 
 export const useProductsCache = () => {
   const [products, setProducts] = useState<
-    Array<{ id: string; description: string; price_per_unit: number }>
+    Array<{
+      id: string;
+      description: string;
+      price_per_unit: number;
+      type: string;
+    }>
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
