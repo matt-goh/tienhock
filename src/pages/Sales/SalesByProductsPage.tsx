@@ -457,19 +457,18 @@ const SalesByProductsPage: React.FC = () => {
       <h1 className="text-2xl font-bold mb-6">Sales by Products</h1>
 
       {/* Product Mix Analysis Chart */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded-lg border shadow p-4 pb-0 mb-4">
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={yearlyTrendData}
-              margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
+              margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="month"
-                angle={-45}
-                textAnchor="end"
-                height={70}
+                textAnchor="middle"
+                height={80}
                 tickMargin={15}
               />
               <YAxis
@@ -484,7 +483,9 @@ const SalesByProductsPage: React.FC = () => {
                 formatter={(value: any) => formatCurrency(Number(value))}
                 itemSorter={(item) => -Number(item.value)}
               />
-              <Legend />
+              <Legend
+                wrapperStyle={{ bottom: 20 }}
+              />
               {Object.keys(categoryColors).map((type) => (
                 <Line
                   key={type}
@@ -500,10 +501,8 @@ const SalesByProductsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Since we're removing the filter section, let's remove the whole container */}
-
       {/* Summary section */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded-lg border shadow p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Monthly Summary</h2>
@@ -551,7 +550,7 @@ const SalesByProductsPage: React.FC = () => {
 
       {/* Dashboard content */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white rounded-lg border shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Category Performance</h2>
           {summary.pieData.length > 0 ? (
             <div className="h-64">
@@ -587,7 +586,7 @@ const SalesByProductsPage: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white rounded-lg border shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Top Selling Products</h2>
           {topProducts.length > 0 ? (
             <div className="h-64">
@@ -632,7 +631,7 @@ const SalesByProductsPage: React.FC = () => {
       </div>
 
       {/* Detailed product sales table */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white rounded-lg border shadow p-4">
         <h2 className="text-lg font-semibold mb-4">Product Sales Details</h2>
         {filteredAndSortedData.length > 0 ? (
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
