@@ -151,18 +151,18 @@ const styles = StyleSheet.create({
     width: "8%",
   },
   itemNameCol: {
-    width: "47%",
+    width: "44%",
   },
   qtyCol: {
     width: "5%",
     textAlign: "center",
   },
   priceCol: {
-    width: "10%",
+    width: "11%",
     textAlign: "right",
   },
   subtotalCol: {
-    width: "10%",
+    width: "11%",
     textAlign: "right",
   },
   taxCol: {
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   totalCol: {
-    width: "10%",
+    width: "11%",
     textAlign: "right",
   },
   headerText: {
@@ -211,9 +211,14 @@ const styles = StyleSheet.create({
 interface Props {
   data: EInvoicePDFData;
   qrCodeData: string;
+  isConsolidated?: boolean;
 }
 
-const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
+const EInvoicePDF: React.FC<Props> = ({
+  data,
+  qrCodeData,
+  isConsolidated = false,
+}) => {
   return (
     <Page size="A4" style={styles.page}>
       {/* Header Section */}
@@ -240,7 +245,9 @@ const EInvoicePDF: React.FC<Props> = ({ data, qrCodeData }) => {
       </View>
 
       {/* E-Invoice Title */}
-      <Text style={styles.title}>e-Invoice</Text>
+      <Text style={styles.title}>
+        {isConsolidated ? "Consolidated e-Invoice" : "e-Invoice"}
+      </Text>
 
       {/* Key Invoice Details */}
       <View style={styles.invoiceDetails}>
