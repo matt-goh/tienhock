@@ -38,7 +38,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     flexDirection: "column",
-    paddingTop: 30,
+    paddingTop: 15,
     paddingBottom: 15,
     paddingLeft: 40,
     paddingRight: 40,
@@ -46,15 +46,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     backgroundColor: colors.background,
   },
-  headerContainer: {
-    backgroundColor: colors.header.background,
-    borderRadius: 6,
-    padding: 15,
-    marginBottom: 15,
-  },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
+    marginBottom: 15,
     gap: 15,
   },
   companyName: {
@@ -477,24 +472,22 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoices, logoData }) => {
       {pages.map((pageInvoices, pageIndex) => (
         <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
           {pageIndex === 0 && (
-            <View style={styles.headerContainer}>
-              <View style={styles.header}>
-                {logoData ? (
-                  <Image src={logoData} style={styles.logo} />
-                ) : (
-                  <Image src="../tienhock.png" style={styles.logo} />
-                )}
-                <View style={styles.headerTextContainer}>
-                  <Text style={styles.companyName}>
-                    TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
-                  </Text>
-                  <Text style={styles.companyDetails}>
-                    Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah
-                  </Text>
-                  <Text style={styles.companyDetails}>
-                    Tel: (088)719715, 719799 Fax:(088)72645
-                  </Text>
-                </View>
+            <View style={styles.header}>
+              {logoData ? (
+                <Image src={logoData} style={styles.logo} />
+              ) : (
+                <Image src="../tienhock.png" style={styles.logo} />
+              )}
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.companyName}>
+                  TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
+                </Text>
+                <Text style={styles.companyDetails}>
+                  Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah
+                </Text>
+                <Text style={styles.companyDetails}>
+                  Tel: (088)719715, 719799 Fax:(088)72645
+                </Text>
               </View>
             </View>
           )}
