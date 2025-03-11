@@ -260,8 +260,8 @@ export default function (pool) {
     const { customerIds } = req.body;
 
     if (!Array.isArray(customerIds) || customerIds.length === 0) {
-      return res.status(400).json({
-        message: "Invalid input: customerIds must be a non-empty array",
+      return res.status(200).json({
+        message: "No customer IDs found",
       });
     }
 
