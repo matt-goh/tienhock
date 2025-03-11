@@ -36,29 +36,35 @@ const EInvoiceSubmitPage: React.FC = () => {
       startDate.setDate(startDate.getDate() - 2);
       startDate.setHours(0, 0, 0, 0);
 
-      const filters: InvoiceFilters = {
-        dateRange: { start: startDate, end: endDate },
-        salespersonId: null,
-        applySalespersonFilter: true,
-        customerId: null,
-        applyCustomerFilter: true,
-        paymentType: null,
-        applyPaymentTypeFilter: true,
-      };
+      // Use the new endpoint specifically for eligible invoices
+      const response = await api.get(`/api/einvoice/eligible-for-submission`, {
+        startDate: startDate.getTime().toString(),
+        endDate: endDate.getTime().toString(),
+      });
 
-      const fetchedInvoices = await getInvoices(filters);
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to fetch eligible invoices"
+        );
+      }
+
+      const fetchedInvoices = response.data;
 
       const uniqueCustomerIds = Array.from(
-        new Set(fetchedInvoices.map((inv) => inv.customerid))
+        new Set(
+          fetchedInvoices.map((inv: { customerid: any }) => inv.customerid)
+        )
       );
       const customerNamesMap = await api.post("/api/customers/names", {
         customerIds: uniqueCustomerIds,
       });
 
-      const extendedInvoices = fetchedInvoices.map((inv) => ({
-        ...inv,
-        customerName: customerNamesMap[inv.customerid] || inv.customerid,
-      }));
+      const extendedInvoices = fetchedInvoices.map(
+        (inv: { customerid: string | number }) => ({
+          ...inv,
+          customerName: customerNamesMap[inv.customerid] || inv.customerid,
+        })
+      );
       setInvoices(extendedInvoices);
     } catch (err) {
       console.error("Error fetching invoices:", err);

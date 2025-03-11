@@ -187,6 +187,54 @@ export default function (pool, config) {
     }
   });
 
+  router.get("/eligible-for-submission", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      let query = `
+        SELECT 
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+          i.amount, i.rounding, i.totalamountpayable
+        FROM invoices i
+        LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
+        WHERE 1=1
+        AND e.internal_id IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM einvoices e2, jsonb_array_elements_text(e2.consolidated_invoices::jsonb) AS invoice_id
+          WHERE e2.consolidated_invoices IS NOT NULL 
+          AND invoice_id = i.id::text
+        )
+      `;
+
+      const queryParams = [];
+      let paramCounter = 1;
+
+      if (startDate && endDate) {
+        queryParams.push(startDate, endDate);
+        query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
+          paramCounter + 1
+        } AS bigint)`;
+        paramCounter += 2;
+      }
+
+      query += ` ORDER BY i.createddate DESC`;
+
+      const result = await pool.query(query, queryParams);
+
+      res.json({
+        success: true,
+        data: result.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching eligible invoices:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch eligible invoices",
+        error: error.message,
+      });
+    }
+  });
+
   // Submit invoice to MyInvois
   router.post("/submit", async (req, res) => {
     try {
