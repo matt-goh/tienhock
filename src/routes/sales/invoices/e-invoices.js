@@ -191,6 +191,19 @@ export default function (pool, config) {
     try {
       const { startDate, endDate } = req.query;
 
+      // Default to last 3 days if dates aren't provided
+      if (!startDate || !endDate) {
+        const endDateTime = new Date();
+        endDateTime.setHours(23, 59, 59, 999);
+
+        const startDateTime = new Date();
+        startDateTime.setDate(startDateTime.getDate() - 2); // Last 3 days (including today)
+        startDateTime.setHours(0, 0, 0, 0);
+
+        endDate = endDateTime.getTime().toString();
+        startDate = startDateTime.getTime().toString();
+      }
+
       let query = `
         SELECT 
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 

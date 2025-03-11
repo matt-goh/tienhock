@@ -2,11 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../routes/utils/api";
 import { getInvoices } from "../../utils/invoice/InvoisUtils";
-import {
-  ColumnConfig,
-  ExtendedInvoiceData,
-  InvoiceFilters,
-} from "../../types/types";
+import { ColumnConfig, ExtendedInvoiceData } from "../../types/types";
 import TableEditing from "../../components/Table/TableEditing";
 import EInvoiceMenu from "../../components/Invois/EInvoiceMenu";
 import Button from "../../components/Button";
@@ -24,6 +20,9 @@ const EInvoiceSubmitPage: React.FC = () => {
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [customerNames, setCustomerNames] = useState<Record<string, string>>(
+    {}
+  );
   const clearSelectionRef = useRef<(() => void) | null>(null);
 
   const fetchInvoices = useCallback(async () => {
@@ -37,10 +36,11 @@ const EInvoiceSubmitPage: React.FC = () => {
       startDate.setHours(0, 0, 0, 0);
 
       // Use the new endpoint specifically for eligible invoices
-      const response = await api.get(`/api/einvoice/eligible-for-submission`, {
-        startDate: startDate.getTime().toString(),
-        endDate: endDate.getTime().toString(),
-      });
+      const response = await api.get(
+        `/api/einvoice/eligible-for-submission?startDate=${startDate
+          .getTime()
+          .toString()}&endDate=${endDate.getTime().toString()}`
+      );
 
       if (!response.success) {
         throw new Error(
@@ -48,24 +48,7 @@ const EInvoiceSubmitPage: React.FC = () => {
         );
       }
 
-      const fetchedInvoices = response.data;
-
-      const uniqueCustomerIds = Array.from(
-        new Set(
-          fetchedInvoices.map((inv: { customerid: any }) => inv.customerid)
-        )
-      );
-      const customerNamesMap = await api.post("/api/customers/names", {
-        customerIds: uniqueCustomerIds,
-      });
-
-      const extendedInvoices = fetchedInvoices.map(
-        (inv: { customerid: string | number }) => ({
-          ...inv,
-          customerName: customerNamesMap[inv.customerid] || inv.customerid,
-        })
-      );
-      setInvoices(extendedInvoices);
+      setInvoices(response.data);
     } catch (err) {
       console.error("Error fetching invoices:", err);
       setError("Failed to fetch invoices. Please try again.");
@@ -93,6 +76,74 @@ const EInvoiceSubmitPage: React.FC = () => {
     setSelectedInvoices([]);
     if (clearSelectionRef.current) clearSelectionRef.current();
   }, []);
+
+  useEffect(() => {
+    const fetchCustomerNames = async () => {
+      const uniqueCustomerIds = Array.from(
+        new Set(invoices.map((invoice) => invoice.customerid))
+      );
+
+      const missingCustomerIds = uniqueCustomerIds.filter(
+        (id) => !(id in customerNames)
+      );
+
+      if (missingCustomerIds.length === 0) return;
+
+      try {
+        // First check local cache
+        const CACHE_KEY = "customers_cache";
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        let customersFromCache: Record<string, string> = {};
+        let idsToFetch: string[] = [...missingCustomerIds];
+
+        if (cachedData) {
+          const { data } = JSON.parse(cachedData);
+
+          if (Array.isArray(data)) {
+            // Create map from cached data
+            customersFromCache = data.reduce((map, customer) => {
+              if (missingCustomerIds.includes(customer.id)) {
+                map[customer.id] = customer.name;
+                // Remove from idsToFetch since we got it from cache
+                idsToFetch = idsToFetch.filter((id) => id !== customer.id);
+              }
+              return map;
+            }, {} as Record<string, string>);
+          }
+        }
+
+        // If we still have IDs to fetch, make API call
+        let customersFromApi: Record<string, string> = {};
+        if (idsToFetch.length > 0) {
+          customersFromApi = await api.post("/api/customers/names", {
+            customerIds: idsToFetch,
+          });
+        }
+
+        // Combine results from cache and API
+        setCustomerNames((prev) => ({
+          ...prev,
+          ...customersFromCache,
+          ...customersFromApi,
+        }));
+      } catch (error) {
+        console.error("Error fetching customer names:", error);
+        const fallbackNames = missingCustomerIds.reduce<Record<string, string>>(
+          (map, id) => {
+            map[id] = id;
+            return map;
+          },
+          {}
+        );
+        setCustomerNames((prev) => ({
+          ...prev,
+          ...fallbackNames,
+        }));
+      }
+    };
+
+    fetchCustomerNames();
+  }, [invoices, customerNames]);
 
   useEffect(() => {
     handleSubmissionComplete();
@@ -141,7 +192,7 @@ const EInvoiceSubmitPage: React.FC = () => {
         row: { original: ExtendedInvoiceData };
       }) => (
         <div className="px-6 py-3">
-          {info.row.original.customerName || info.getValue()}
+          {customerNames[info.getValue()] || info.getValue()}
         </div>
       ),
     },
