@@ -7,7 +7,6 @@ import {
   IconFilter,
   IconSortAscending,
   IconSortDescending,
-  IconRefresh,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
@@ -22,6 +21,11 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
+  CartesianGrid,
+  AreaChart,
+  Area,
 } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
@@ -39,6 +43,11 @@ interface CategorySummary {
   color: string;
 }
 
+interface MonthlyTypeData {
+  month: string;
+  [key: string]: string | number; // For product types and their sales values
+}
+
 const SalesByProductsPage: React.FC = () => {
   // Month and year selection
   const [selectedMonth, setSelectedMonth] = useState<number>(() => {
@@ -51,10 +60,8 @@ const SalesByProductsPage: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [salesData, setSalesData] = useState<ProductSalesData[]>([]);
+  const [yearlyTrendData, setYearlyTrendData] = useState<MonthlyTypeData[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [productTypeFilter, setProductTypeFilter] = useState<string | null>(
-    null
-  );
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ProductSalesData;
     direction: "asc" | "desc";
@@ -68,7 +75,6 @@ const SalesByProductsPage: React.FC = () => {
     products,
     isLoading: isProductsLoading,
     error: productsError,
-    refreshProducts,
   } = useProductsCache();
 
   // Dynamic category colors based on product types
@@ -121,8 +127,12 @@ const SalesByProductsPage: React.FC = () => {
   }, []);
 
   // Handle month selection change
-  const handleMonthChange = (newMonth: string) => {
-    const monthIndex = parseInt(newMonth, 10);
+  const handleMonthChange = (value: string) => {
+    const monthIndex = monthOptions.findIndex(
+      (option) => option.name === value
+    );
+    if (monthIndex === -1) return;
+
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
@@ -190,6 +200,110 @@ const SalesByProductsPage: React.FC = () => {
     return Array.from(productMap.values());
   };
 
+  // Fetch yearly trend data for the product mix chart
+  const fetchYearlyTrendData = async () => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 1); // Last 12 months
+
+      const startTimestamp = startDate.getTime().toString();
+      const endTimestamp = endDate.getTime().toString();
+
+      const invoices = await api.get(
+        `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
+      );
+
+      if (!Array.isArray(invoices)) {
+        throw new Error("Invalid response format");
+      }
+
+      // Group sales by month and product type
+      const monthlyData = new Map<string, Record<string, number>>();
+      const allTypes = new Set<string>();
+
+      invoices.forEach((invoice) => {
+        const invoiceDate = new Date(Number(invoice.createddate));
+        const monthYear = `${invoiceDate.getFullYear()}-${String(
+          invoiceDate.getMonth() + 1
+        ).padStart(2, "0")}`;
+
+        if (!monthlyData.has(monthYear)) {
+          monthlyData.set(monthYear, {});
+        }
+
+        if (Array.isArray(invoice.products)) {
+          invoice.products.forEach(
+            (product: {
+              issubtotal: any;
+              istotal: any;
+              code: string;
+              quantity: any;
+              price: any;
+            }) => {
+              if (product.issubtotal || product.istotal) return;
+
+              const productType = getProductType(product.code);
+              allTypes.add(productType);
+
+              const quantity = Number(product.quantity) || 0;
+              const price = Number(product.price) || 0;
+              const total = quantity * price;
+
+              const monthData = monthlyData.get(monthYear)!;
+              monthData[productType] = (monthData[productType] || 0) + total;
+            }
+          );
+        }
+      });
+
+      // Convert to array format for chart
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const sortedMonths = Array.from(monthlyData.keys()).sort();
+
+      const chartData = sortedMonths.map((monthYear) => {
+        const [year, month] = monthYear.split("-");
+        const monthData = monthlyData.get(monthYear)!;
+
+        // Create data point with month label and all product types
+        const dataPoint: MonthlyTypeData = {
+          month: `${monthNames[parseInt(month) - 1]} ${year}`,
+        };
+
+        // Add values for each product type
+        Array.from(allTypes).forEach((type) => {
+          dataPoint[type] = monthData[type] || 0;
+        });
+
+        // Add total
+        dataPoint.total = Object.values(monthData).reduce(
+          (sum, value) => sum + value,
+          0
+        );
+
+        return dataPoint;
+      });
+
+      setYearlyTrendData(chartData);
+    } catch (error) {
+      console.error("Error fetching yearly trend data:", error);
+      // Don't show error toast for this - just log it
+    }
+  };
+
   // Fetch sales data for the selected month
   useEffect(() => {
     const fetchSalesData = async () => {
@@ -232,34 +346,18 @@ const SalesByProductsPage: React.FC = () => {
     }
   }, [selectedMonth, selectedYear, products]);
 
-  // Get available product types from sales data
-  const availableProductTypes = useMemo(() => {
-    const types = new Set<string>();
-    salesData.forEach((product) => {
-      if (product.type) types.add(product.type);
-    });
-    return Array.from(types).sort();
-  }, [salesData]);
+  // Fetch yearly trend data on initial load
+  useEffect(() => {
+    if (products.length > 0) {
+      fetchYearlyTrendData();
+    }
+  }, [products]);
 
-  // Generate product type filter options
-  const productTypeOptions = useMemo(() => {
-    const options = [{ id: "All Types", name: "All Types" }];
-
-    availableProductTypes.forEach((type) => {
-      options.push({ id: type, name: type });
-    });
-
-    return options;
-  }, [availableProductTypes]);
+  // No longer need product type filters
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
     let data = [...salesData];
-
-    // Apply product type filter
-    if (productTypeFilter) {
-      data = data.filter((product) => product.type === productTypeFilter);
-    }
 
     // Apply sorting
     data.sort((a, b) => {
@@ -273,17 +371,7 @@ const SalesByProductsPage: React.FC = () => {
     });
 
     return data;
-  }, [salesData, productTypeFilter, sortConfig]);
-
-  // Handle product refresh
-  const handleRefreshProducts = async () => {
-    try {
-      await refreshProducts();
-      toast.success("Product data refreshed successfully");
-    } catch (error) {
-      toast.error("Failed to refresh product data");
-    }
-  };
+  }, [salesData, sortConfig]);
 
   // Calculate summary statistics
   const summary = useMemo(() => {
@@ -368,49 +456,70 @@ const SalesByProductsPage: React.FC = () => {
     <div className="w-full p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Sales by Products</h1>
 
-      {/* Filter section */}
+      {/* Product Mix Analysis Chart */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-48">
-            <FormListbox
-              name="month"
-              label="Select Month"
-              value={monthOptions[selectedMonth].name}
-              onChange={handleMonthChange}
-              options={monthOptions}
-            />
-          </div>
-          <div className="text-sm text-default-500 font-medium">
-            Year: {selectedYear}
-          </div>
-          <div className="ml-auto flex items-center gap-4">
-            <FormListbox
-              name="productType"
-              label="Filter by Type"
-              value={productTypeFilter || "All Types"}
-              onChange={(value) =>
-                setProductTypeFilter(value === "All Types" ? null : value)
-              }
-              options={productTypeOptions}
-            />
-            <Button
-              onClick={handleRefreshProducts}
-              icon={IconRefresh}
-              iconSize={16}
-              iconStroke={2}
-              variant="outline"
-              size="sm"
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={yearlyTrendData}
+              margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
             >
-              Refresh Products
-            </Button>
-          </div>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                angle={-45}
+                textAnchor="end"
+                height={70}
+                tickMargin={15}
+              />
+              <YAxis
+                tickFormatter={(value) =>
+                  new Intl.NumberFormat("en", {
+                    notation: "compact",
+                    compactDisplay: "short",
+                  }).format(value)
+                }
+              />
+              <Tooltip
+                formatter={(value: any) => formatCurrency(Number(value))}
+                itemSorter={(item) => -Number(item.value)}
+              />
+              <Legend />
+              {Object.keys(categoryColors).map((type) => (
+                <Line
+                  key={type}
+                  type="monotone"
+                  dataKey={type}
+                  stroke={categoryColors[type]}
+                  strokeWidth={2}
+                  activeDot={{ r: 8 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Since we're removing the filter section, let's remove the whole container */}
 
       {/* Summary section */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Monthly Summary</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold">Monthly Summary</h2>
+            <div className="w-40">
+              <FormListbox
+                name="month"
+                label=""
+                value={monthOptions[selectedMonth]?.name || "January"}
+                onChange={handleMonthChange}
+                options={monthOptions}
+              />
+            </div>
+            <div className="text-sm text-default-500 font-medium">
+              Year: {selectedYear}
+            </div>
+          </div>
           <div className="text-lg font-bold text-default-700">
             Total Sales: {formatCurrency(summary.totalSales)}
           </div>
@@ -526,9 +635,11 @@ const SalesByProductsPage: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold mb-4">Product Sales Details</h2>
         {filteredAndSortedData.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            {" "}
+            {/* Added fixed height and vertical scroll */}
             <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
+              <thead className="bg-default-50 sticky top-0">
                 <tr>
                   <th
                     scope="col"
@@ -638,7 +749,7 @@ const SalesByProductsPage: React.FC = () => {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-default-50">
+              <tfoot className="bg-default-50 sticky bottom-0">
                 <tr>
                   <td
                     colSpan={4}

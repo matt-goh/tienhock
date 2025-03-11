@@ -104,9 +104,9 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
 
   const getBookmarkIconClasses = () => {
     if (isInBookmarksSection) {
-      return `transition-all duration-200 right-8 absolute cursor-pointer opacity-0 group-hover/option:opacity-100 hover:text-default-600`;
+      return `transition-all duration-200 right-[1.6rem] absolute cursor-pointer opacity-0 group-hover/option:opacity-100 hover:text-default-600`;
     }
-    return `transition-all duration-200 right-8 absolute cursor-pointer ${
+    return `transition-all duration-200 right-[1.6rem] absolute cursor-pointer ${
       isActive || isBookmarked
         ? "opacity-100 hover:text-default-600"
         : "opacity-0 group-hover/option:opacity-100 hover:text-default-600"
