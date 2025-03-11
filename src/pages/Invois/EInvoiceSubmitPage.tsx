@@ -1,7 +1,6 @@
 // src/pages/Invois/EInvoiceSubmitPage.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../routes/utils/api";
-import { getInvoices } from "../../utils/invoice/InvoisUtils";
 import { ColumnConfig, ExtendedInvoiceData } from "../../types/types";
 import TableEditing from "../../components/Table/TableEditing";
 import EInvoiceMenu from "../../components/Invois/EInvoiceMenu";
