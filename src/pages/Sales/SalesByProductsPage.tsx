@@ -4,11 +4,9 @@ import { api } from "../../routes/utils/api";
 import { FormListbox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
-  IconFilter,
   IconSortAscending,
   IconSortDescending,
 } from "@tabler/icons-react";
-import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -24,8 +22,6 @@ import {
   LineChart,
   Line,
   CartesianGrid,
-  AreaChart,
-  Area,
 } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
@@ -515,8 +511,8 @@ const SalesByProductsPage: React.FC = () => {
                 options={monthOptions}
               />
             </div>
-            <div className="text-sm text-default-500 font-medium">
-              Year: {selectedYear}
+            <div className="text-default-500 font-medium">
+              {selectedYear}
             </div>
           </div>
           <div className="text-lg font-bold text-default-700">
