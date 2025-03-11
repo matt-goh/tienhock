@@ -515,6 +515,7 @@ export default function (pool, config) {
         });
       }
 
+      // This part remains unchanged
       const startYear = parseInt(year);
       const startMonth = parseInt(month); // 0-11 (Jan-Dec)
       const endYear = startMonth === 11 ? startYear + 1 : startYear;
@@ -534,6 +535,7 @@ export default function (pool, config) {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
+      // REPLACE this query with the modified version:
       const query = `
         SELECT i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
                i.amount, i.rounding, i.totalamountpayable
@@ -541,6 +543,11 @@ export default function (pool, config) {
         LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
         WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
         AND e.internal_id IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM einvoices e2, jsonb_array_elements_text(e2.consolidated_invoices::jsonb) AS invoice_id
+          WHERE e2.consolidated_invoices IS NOT NULL 
+          AND invoice_id = i.id::text
+        )
         ORDER BY CAST(i.createddate AS bigint) ASC
       `;
 
