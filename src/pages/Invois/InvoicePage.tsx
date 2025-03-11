@@ -422,7 +422,7 @@ const InvoicePage: React.FC = () => {
       cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
         <button
           onClick={() => handleInvoiceClick(info.row.original)}
-          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer hover:font-semibold"
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
         >
           {info.row.original.paymenttype === "CASH" ? "C" : "I"}
           {info.getValue()}
@@ -434,10 +434,17 @@ const InvoicePage: React.FC = () => {
       header: "Date",
       type: "readonly",
       width: 150,
-      cell: (info: { getValue: () => any }) => {
+      cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => {
         const timestamp = info.getValue();
         const { date } = parseDatabaseTimestamp(timestamp);
-        return <div className="px-6 py-3">{formatDisplayDate(date)}</div>;
+        return (
+          <button
+            onClick={() => handleInvoiceClick(info.row.original)}
+            className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+          >
+            {formatDisplayDate(date)}
+          </button>
+        );
       },
     },
     {
@@ -445,6 +452,14 @@ const InvoicePage: React.FC = () => {
       header: "Salesman",
       type: "readonly",
       width: 150,
+      cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
+          {info.getValue()}
+        </button>
+      ),
     },
     {
       id: "customerid",
@@ -455,9 +470,12 @@ const InvoicePage: React.FC = () => {
         getValue: () => any;
         row: { original: ExtendedInvoiceData };
       }) => (
-        <div className="px-6 py-3">
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
           {info.row.original.customerName || info.getValue()}
-        </div>
+        </button>
       ),
     },
     {
@@ -465,10 +483,13 @@ const InvoicePage: React.FC = () => {
       header: "Amount",
       type: "amount",
       width: 150,
-      cell: (info: { getValue: () => any }) => (
-        <div className="px-6 py-3 text-right">
+      cell: (info: { getValue: () => any; row: { original: InvoiceData } }) => (
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
           {Number(info.getValue() || 0).toFixed(2)}
-        </div>
+        </button>
       ),
     },
   ];
