@@ -160,7 +160,7 @@ export default function (pool) {
   // Fetch all products (id and description only)
   router.get("/combobox", async (req, res) => {
     try {
-      const query = "SELECT id, description, price_per_unit FROM products";
+      const query = "SELECT id, description, price_per_unit, type FROM products";
       const result = await pool.query(query);
       res.json(result.rows);
     } catch (error) {
