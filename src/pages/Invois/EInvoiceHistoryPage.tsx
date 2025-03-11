@@ -11,6 +11,7 @@ import {
 import PaginationControls from "../../components/Invois/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import ConsolidatedInfoTooltip from "../../components/Invois/ConsolidatedInfoTooltip";
 import { LoginResponse } from "../../types/types";
 import toast from "react-hot-toast";
 
@@ -18,12 +19,12 @@ const STORAGE_KEY = "einvoisDateFilters";
 
 // Define column configuration as a single source of truth
 const COLUMN_CONFIG = [
-  { name: "Invoice No", width: "w-[8%]" },
+  { name: "Invoice No", width: "w-[10%]" },
   { name: "Type", width: "w-[8%]" },
   { name: "Customer", width: "w-[18%]" },
   { name: "Validated At", width: "w-[15%]" },
   { name: "Amount", width: "w-[7%]" },
-  { name: "Filler", width: "w-[4%]" },
+  { name: "Filler", width: "w-[2%]" },
   { name: "Submission ID", width: "w-[20%]" },
   { name: "Actions", width: "w-[20%]" },
 ];
@@ -40,6 +41,8 @@ interface EInvoice {
   total_payable_amount: number;
   total_excluding_tax: number;
   total_net_amount: number;
+  isConsolidated: boolean;
+  consolidated_invoices: number[] | string[];
 }
 
 interface PaginationState {
@@ -478,7 +481,7 @@ const EInvoiceHistoryPage: React.FC = () => {
         </div>
       )}
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-visible">
         <div className="relative">
           <div
             className={`bg-default-100 border-b ${
@@ -541,12 +544,20 @@ const EInvoiceHistoryPage: React.FC = () => {
                   filteredInvoices.map((einvoice) => (
                     <tr key={einvoice.uuid} className="border-b last:border-0">
                       <td className="px-4 py-3 text-default-700">
-                        {einvoice.internal_id}
-                        {!einvoice.long_id && (
-                          <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                            Pending
-                          </span>
-                        )}
+                        <div className="flex items-center">
+                          <span>{einvoice.internal_id}</span>
+                          {Array.isArray(einvoice.consolidated_invoices) &&
+                            einvoice.consolidated_invoices.length > 0 && (
+                              <ConsolidatedInfoTooltip
+                                invoices={einvoice.consolidated_invoices}
+                              />
+                            )}
+                          {!einvoice.long_id && (
+                            <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                              Pending
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-default-700">
                         {einvoice.type_name}
