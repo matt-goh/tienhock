@@ -147,11 +147,9 @@ const InvoicePage: React.FC = () => {
         let idsToFetch: string[] = [...missingCustomerIds];
 
         if (cachedData) {
-          const { data, timestamp } = JSON.parse(cachedData);
-          const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week
-          const isExpired = Date.now() - timestamp > CACHE_DURATION;
+          const { data } = JSON.parse(cachedData);
 
-          if (!isExpired && Array.isArray(data)) {
+          if (Array.isArray(data)) {
             // Create map from cached data
             customersFromCache = data.reduce((map, customer) => {
               if (missingCustomerIds.includes(customer.id)) {
