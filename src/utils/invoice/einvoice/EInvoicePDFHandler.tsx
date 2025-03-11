@@ -26,6 +26,10 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
     const toastId = toast.loading("Generating e-invoice PDF...");
 
     try {
+      // Check if this is a consolidated invoice
+      const isConsolidated =
+        einvoice.is_consolidated || einvoice.internal_id.startsWith("CON-");
+
       // Generate QR code first
       const qrDataUrl = await generateQRDataUrl(
         einvoice.uuid,
@@ -38,7 +42,11 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Create PDF
       const pdfComponent = (
         <Document title={`einvoice-${einvoice.internal_id}`}>
-          <EInvoicePDF data={pdfData} qrCodeData={qrDataUrl} />
+          <EInvoicePDF
+            data={pdfData}
+            qrCodeData={qrDataUrl}
+            isConsolidated={isConsolidated}
+          />
         </Document>
       );
 

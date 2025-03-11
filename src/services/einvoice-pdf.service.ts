@@ -45,6 +45,10 @@ export interface EInvoicePDFData {
 // Helper function to fetch invoice details
 const fetchInvoiceDetails = async (invoiceId: string) => {
   try {
+    // Check if this is a consolidated invoice
+    if (invoiceId.startsWith("CON-")) {
+      return fetchConsolidatedInvoiceDetails(invoiceId);
+    }
     // Get the invoice from the main invoices endpoint
     const response = await api.get(`/api/invoices?invoiceId=${invoiceId}`);
 
@@ -77,9 +81,78 @@ const fetchInvoiceDetails = async (invoiceId: string) => {
   }
 };
 
-// Helper function to fetch order details
-const fetchOrderDetails = async (invoiceId: string) => {
+// Helper function to fetch consolidated invoice details
+const fetchConsolidatedInvoiceDetails = async (invoiceId: string) => {
   try {
+    // Parse month and year from consolidated invoice ID (CON-YYYYMM)
+    const datePart = invoiceId.substring(4); // e.g., "202503"
+    const year = datePart.substring(0, 4);
+    const month = datePart.substring(4, 6);
+
+    const formattedDate = `01/${month}/${year}`;
+
+    return {
+      date: formattedDate,
+      time: "00:00",
+    };
+  } catch (error) {
+    console.error("Error parsing consolidated invoice details:", error);
+    return {
+      date: "N/A",
+      time: "N/A",
+    };
+  }
+};
+
+// Helper function to create consolidated order details
+const createConsolidatedOrderDetails = async (einvoiceData: any) => {
+  try {
+    // Extract date part from the invoice ID (e.g., "202503" from "CON-202503")
+    const datePart = einvoiceData.internal_id.substring(4);
+
+    // Format as "03/2025" instead of "202503"
+    const year = datePart.substring(0, 4);
+    const month = datePart.substring(4, 6);
+    const formattedDate = `${month}/${year}`;
+    return [
+      {
+        productname: `Consolidated Invoice for ${formattedDate}`,
+        description: `Consolidated Invoice for ${formattedDate}`,
+        qty: 1,
+        price: einvoiceData.total_excluding_tax.toString(),
+        total: einvoiceData.total_payable_amount.toString(),
+        tax: (
+          einvoiceData.total_payable_amount - einvoiceData.total_excluding_tax
+        ).toString(),
+      },
+    ];
+  } catch (error) {
+    console.error("Error creating consolidated order details:", error);
+    return [];
+  }
+};
+
+const createConsolidatedCustomerDetails = () => {
+  return {
+    name: "Consolidated Buyers",
+    tin_number: "EI00000000010",
+    id_number: "-",
+    phone_number: "-",
+    email: "-",
+    address: "-",
+    city: "-",
+    state: "",
+    id_type: "BRN",
+  };
+};
+
+// Helper function to fetch order details
+const fetchOrderDetails = async (invoiceId: string, einvoiceData?: any) => {
+  try {
+    // Check if this is a consolidated invoice
+    if (invoiceId.startsWith("CON-") && einvoiceData) {
+      return createConsolidatedOrderDetails(einvoiceData);
+    }
     const response = await api.get(`/api/invoices/details/${invoiceId}/items`);
     // Format the order details to ensure tax values are properly included
     return response.map((item: any) => ({
@@ -99,8 +172,15 @@ const fetchOrderDetails = async (invoiceId: string) => {
 };
 
 // Helper function to fetch customer details
-const fetchCustomerDetails = async (receiverId: string) => {
+const fetchCustomerDetails = async (
+  receiverId: string,
+  isConsolidated: boolean = false
+) => {
   try {
+    // For consolidated invoices, use default customer details
+    if (isConsolidated || receiverId === "EI00000000010") {
+      return createConsolidatedCustomerDetails();
+    }
     const response = await api.get(`/api/customers/by-tin/${receiverId}`);
     return response;
   } catch (error) {
@@ -148,11 +228,17 @@ export const formatCurrency = (amount: number): string => {
 export const preparePDFData = async (
   einvoiceData: any
 ): Promise<EInvoicePDFData> => {
+  const isConsolidated =
+    einvoiceData.is_consolidated || einvoiceData.internal_id.startsWith("CON-");
   // Fetch customer details
   const [customerDetails, invoiceDetails, orderDetails] = await Promise.all([
-    fetchCustomerDetails(einvoiceData.receiver_id),
+    fetchCustomerDetails(einvoiceData.receiver_id, isConsolidated),
     fetchInvoiceDetails(einvoiceData.internal_id),
-    fetchOrderDetails(einvoiceData.internal_id),
+    // Pass einvoiceData to fetchOrderDetails for consolidated invoices
+    fetchOrderDetails(
+      einvoiceData.internal_id,
+      isConsolidated ? einvoiceData : null
+    ),
   ]);
 
   // Calculate tax amount
@@ -177,7 +263,7 @@ export const preparePDFData = async (
       name: customerDetails.name,
       tin: customerDetails.tin_number || "",
       reg_no: customerDetails.id_number || "",
-      sst_no: customerDetails.sst_no || "N/A",
+      sst_no: customerDetails.sst_no || "-",
       address: customerDetails.address || "",
       city: customerDetails.city || "",
       state: customerDetails.state || "",
