@@ -85,7 +85,7 @@ export const SidebarData: SidebarItem[] = [
       },
       {
         name: "Sales by Products",
-        path: "/sales/products-dashboard",
+        path: "/sales/sales-by-products",
         component: SalesByProductsPage,
       },
     ],
