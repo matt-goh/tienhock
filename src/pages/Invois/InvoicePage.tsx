@@ -12,7 +12,7 @@ import {
   InvoiceData,
   InvoiceFilters,
 } from "../../types/types";
-import { deleteInvoice, getInvoices } from "../../utils/invoice/InvoisUtils";
+import { deleteInvoice, getInvoices } from "../../utils/invoice/InvoiceUtils";
 import {
   IconEye,
   IconPlus,
