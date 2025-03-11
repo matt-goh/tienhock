@@ -109,7 +109,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
   onChange,
   options,
 }) => (
-  <div className="space-y-2">
+  <div className={`${label === "" ? "" : "space-y-2"}`}>
     <label htmlFor={name} className="text-sm font-medium text-default-700">
       {label}
     </label>
