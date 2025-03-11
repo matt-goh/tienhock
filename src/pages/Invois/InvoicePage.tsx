@@ -140,13 +140,43 @@ const InvoicePage: React.FC = () => {
       if (missingCustomerIds.length === 0) return;
 
       try {
-        const customerNamesMap = await api.post("/api/customers/names", {
-          customerIds: missingCustomerIds,
-        });
+        // First check local cache
+        const CACHE_KEY = "customers_cache";
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        let customersFromCache: Record<string, string> = {};
+        let idsToFetch: string[] = [...missingCustomerIds];
 
+        if (cachedData) {
+          const { data, timestamp } = JSON.parse(cachedData);
+          const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week
+          const isExpired = Date.now() - timestamp > CACHE_DURATION;
+
+          if (!isExpired && Array.isArray(data)) {
+            // Create map from cached data
+            customersFromCache = data.reduce((map, customer) => {
+              if (missingCustomerIds.includes(customer.id)) {
+                map[customer.id] = customer.name;
+                // Remove from idsToFetch since we got it from cache
+                idsToFetch = idsToFetch.filter((id) => id !== customer.id);
+              }
+              return map;
+            }, {} as Record<string, string>);
+          }
+        }
+
+        // If we still have IDs to fetch, make API call
+        let customersFromApi: Record<string, string> = {};
+        if (idsToFetch.length > 0) {
+          customersFromApi = await api.post("/api/customers/names", {
+            customerIds: idsToFetch,
+          });
+        }
+
+        // Combine results from cache and API
         setCustomerNames((prev) => ({
           ...prev,
-          ...customerNamesMap,
+          ...customersFromCache,
+          ...customersFromApi,
         }));
       } catch (error) {
         console.error("Error fetching customer names:", error);
