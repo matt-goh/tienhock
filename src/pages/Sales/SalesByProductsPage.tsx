@@ -3,10 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
 import { FormListbox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import {
-  IconSortAscending,
-  IconSortDescending,
-} from "@tabler/icons-react";
+import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -479,9 +476,7 @@ const SalesByProductsPage: React.FC = () => {
                 formatter={(value: any) => formatCurrency(Number(value))}
                 itemSorter={(item) => -Number(item.value)}
               />
-              <Legend
-                wrapperStyle={{ bottom: 20 }}
-              />
+              <Legend wrapperStyle={{ bottom: 20 }} />
               {Object.keys(categoryColors).map((type) => (
                 <Line
                   key={type}
@@ -489,7 +484,8 @@ const SalesByProductsPage: React.FC = () => {
                   dataKey={type}
                   stroke={categoryColors[type]}
                   strokeWidth={2}
-                  activeDot={{ r: 8 }}
+                  dot={false}
+                  activeDot={{ r: 4 }}
                 />
               ))}
             </LineChart>
@@ -511,9 +507,7 @@ const SalesByProductsPage: React.FC = () => {
                 options={monthOptions}
               />
             </div>
-            <div className="text-default-500 font-medium">
-              {selectedYear}
-            </div>
+            <div className="text-default-500 font-medium">{selectedYear}</div>
           </div>
           <div className="text-lg font-bold text-default-700">
             Total Sales: {formatCurrency(summary.totalSales)}
