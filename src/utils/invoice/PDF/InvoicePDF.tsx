@@ -187,36 +187,28 @@ const styles = StyleSheet.create({
   summary: {
     paddingTop: 5,
   },
-  summaryTitle: {
-    fontSize: 10,
-    marginBottom: 6,
-    paddingLeft: 4,
-  },
   summaryHeaderRow: {
     flexDirection: "row",
-    marginBottom: 2,
-    paddingBottom: 2,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#666",
+    paddingBottom: 4,
   },
   summaryDataRow: {
     flexDirection: "row",
     marginBottom: 2,
   },
   summaryTypeCol: {
-    width: "16%",
+    width: "11%",
     paddingLeft: 4,
   },
   summaryCountCol: {
-    width: "8%",
+    width: "10%",
     textAlign: "center",
   },
   summaryAmountCol: {
-    width: "19%",
+    width: "15%",
     textAlign: "right",
   },
   summaryTotalCol: {
-    width: "19%",
+    width: "18%",
     textAlign: "right",
     paddingRight: 4,
   },
@@ -472,14 +464,19 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
         return sum + (item.product.tax || 0);
       }, 0);
 
+      // Get rounding explicitly
+      const rounding = Number(invoice.rounding) || 0;
+
       if (invoice.paymenttype === "CASH") {
         acc.cashSubtotal += subtotal;
         acc.cashTax += tax;
+        acc.cashRounding += rounding;
         acc.cashTotal += invoice.totalamountpayable;
         acc.cashCount++;
       } else {
         acc.invoiceSubtotal += subtotal;
         acc.invoiceTax += tax;
+        acc.invoiceRounding += rounding;
         acc.invoiceTotal += invoice.totalamountpayable;
         acc.invoiceCount++;
       }
@@ -488,10 +485,12 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
     {
       cashSubtotal: 0,
       cashTax: 0,
+      cashRounding: 0,
       cashTotal: 0,
       cashCount: 0,
       invoiceSubtotal: 0,
       invoiceTax: 0,
+      invoiceRounding: 0,
       invoiceTotal: 0,
       invoiceCount: 0,
     }
@@ -585,8 +584,6 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
 
           {pageIndex === pages.length - 1 && (
             <View style={styles.summary}>
-              <Text style={[styles.bold, styles.summaryTitle]}>Summary</Text>
-
               {/* Header Row */}
               <View style={styles.summaryHeaderRow}>
                 <Text style={[styles.summaryTypeCol, styles.bold]}>Type</Text>
@@ -601,6 +598,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
                 </Text>
                 <Text style={[styles.summaryAmountCol, styles.bold]}>
                   Total Incl. Tax
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  Rounding
                 </Text>
                 <Text style={[styles.summaryTotalCol, styles.bold]}>
                   Total Payable
@@ -620,6 +620,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
                   </Text>
                   <Text style={styles.summaryAmountCol}>
                     {(totals.cashSubtotal + totals.cashTax).toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {totals.cashRounding.toFixed(2)}
                   </Text>
                   <Text style={styles.summaryTotalCol}>
                     {totals.cashTotal.toFixed(2)}
@@ -642,6 +645,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
                   </Text>
                   <Text style={styles.summaryAmountCol}>
                     {(totals.invoiceSubtotal + totals.invoiceTax).toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {totals.invoiceRounding.toFixed(2)}
                   </Text>
                   <Text style={styles.summaryTotalCol}>
                     {totals.invoiceTotal.toFixed(2)}
@@ -668,6 +674,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
                     totals.invoiceSubtotal +
                     totals.invoiceTax
                   ).toFixed(2)}
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  {(totals.invoiceRounding + totals.cashRounding).toFixed(2)}
                 </Text>
                 <Text style={[styles.summaryTotalCol, styles.bold]}>
                   {(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
