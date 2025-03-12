@@ -42,6 +42,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
 
     // Calculate totals from all invoices
     let totalExcludingTax = 0;
+    let totalInclusiveTax = 0;
     let totalPayableAmount = 0;
     let totalRounding = 0;
     let totalProductTax = 0;
@@ -83,6 +84,8 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
       // If no product-level taxes found, calculate based on totals and account for rounding
       taxAmount = totalPayableAmount - totalExcludingTax - totalRounding;
     }
+
+    totalInclusiveTax = totalExcludingTax + taxAmount;
 
     // Format amounts to 2 decimal places
     totalExcludingTax = totalExcludingTax.toFixed(2);
@@ -218,10 +221,12 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="MYR">${totalExcludingTax}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="MYR">${totalExcludingTax}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="MYR">${totalPayableAmount}</cbc:TaxInclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="MYR">${totalInclusiveTax}</cbc:TaxInclusiveAmount>
     <cbc:AllowanceTotalAmount currencyID="MYR">0.00</cbc:AllowanceTotalAmount>
     <cbc:ChargeTotalAmount currencyID="MYR">0.00</cbc:ChargeTotalAmount>
-    <cbc:PayableRoundingAmount currencyID="MYR">0.00</cbc:PayableRoundingAmount>
+    <cbc:PayableRoundingAmount currencyID="MYR">${
+      totalRounding || "0.00"
+    }</cbc:PayableRoundingAmount>
     <cbc:PayableAmount currencyID="MYR">${totalPayableAmount}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>`;
 
