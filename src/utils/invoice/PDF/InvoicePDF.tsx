@@ -17,14 +17,8 @@ const SUMMARY_ROWS = 3;
 const colors = {
   background: "#ffffff",
   header: {
-    background: "#F3F4F6",
     companyName: "#1e293b",
     companyDetails: "#334155",
-  },
-  table: {
-    headerBackground: "#F3F4F6",
-    border: "#D1D5DB",
-    borderDark: "#D1D5DB",
   },
   text: {
     primary: "#111827",
@@ -83,6 +77,7 @@ const styles = StyleSheet.create({
   infoContainer: {
     paddingTop: 6,
     paddingBottom: 4,
+    paddingLeft: 8,
   },
   infoRow: {
     flexDirection: "row",
@@ -168,12 +163,12 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "#1F2937",
   },
-  summary: {
+  tableSummary: {
     alignItems: "flex-end",
     paddingRight: 8,
     marginTop: 5,
   },
-  summaryRow: {
+  tableSummaryRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
   },
@@ -189,27 +184,47 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
   },
-  grandTotal: {
-    marginTop: 4,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: "#666",
+  summary: {
+    paddingTop: 5,
   },
   summaryTitle: {
-    paddingBottom: 8,
+    fontSize: 10,
+    marginBottom: 6,
+    paddingLeft: 4,
   },
-  subtotalRow: {
+  summaryHeaderRow: {
     flexDirection: "row",
+    marginBottom: 2,
+    paddingBottom: 2,
     borderBottomWidth: 0.5,
     borderBottomColor: "#666",
-    paddingVertical: 4,
   },
-  subtotalText: {
-    padding: "6 8",
-    width: "45%",
-    borderRightWidth: 0.5,
-    borderRightColor: colors.table.border,
-    fontFamily: "Helvetica-Bold",
+  summaryDataRow: {
+    flexDirection: "row",
+    marginBottom: 2,
+  },
+  summaryTypeCol: {
+    width: "16%",
+    paddingLeft: 4,
+  },
+  summaryCountCol: {
+    width: "8%",
+    textAlign: "center",
+  },
+  summaryAmountCol: {
+    width: "19%",
+    textAlign: "right",
+  },
+  summaryTotalCol: {
+    width: "19%",
+    textAlign: "right",
+    paddingRight: 4,
+  },
+  grandTotalRow: {
+    marginTop: 2,
+    paddingTop: 2,
+    borderTopWidth: 0.5,
+    borderTopColor: "#666",
   },
 });
 
@@ -416,17 +431,19 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
                 {!product.issubtotal ? itemTax.toFixed(2) : ""}
               </Text>
               <Text style={[styles.totalCol, styles.cellText]}>
-                {product.issubtotal ? product.total : itemTotal.toFixed(2)}
+                {product.issubtotal
+                  ? Number(product.total).toFixed(2)
+                  : itemTotal.toFixed(2)}
               </Text>
             </View>
           );
         })}
 
         {/* Table Footer/Summary */}
-        <View style={styles.summary}>
-          <View style={styles.summaryRow}>
+        <View style={styles.tableSummary}>
+          <View style={styles.tableSummaryRow}>
             <Text style={[styles.summaryLabel, styles.headerText]}>
-              Total Amount (RM)
+              Total Amount (MYR)
             </Text>
             <Text style={[styles.summaryValue, styles.headerText]}>
               {total.toFixed(2)}
@@ -441,16 +458,43 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
 
   const totals = invoices.reduce(
     (acc, invoice) => {
-      if (invoice.paymenttype === "Cash") {
+      // Get the products and calculate tax separately
+      const { regularItems } = getProcessedProducts(invoice.products);
+
+      // Calculate tax and subtotal for this invoice
+      const subtotal = regularItems.reduce((sum, item) => {
+        const quantity = item.product.quantity || 0;
+        const price = item.product.price || 0;
+        return sum + quantity * price;
+      }, 0);
+
+      const tax = regularItems.reduce((sum, item) => {
+        return sum + (item.product.tax || 0);
+      }, 0);
+
+      if (invoice.paymenttype === "CASH") {
+        acc.cashSubtotal += subtotal;
+        acc.cashTax += tax;
         acc.cashTotal += invoice.totalamountpayable;
         acc.cashCount++;
       } else {
+        acc.invoiceSubtotal += subtotal;
+        acc.invoiceTax += tax;
         acc.invoiceTotal += invoice.totalamountpayable;
         acc.invoiceCount++;
       }
       return acc;
     },
-    { cashTotal: 0, invoiceTotal: 0, cashCount: 0, invoiceCount: 0 }
+    {
+      cashSubtotal: 0,
+      cashTax: 0,
+      cashTotal: 0,
+      cashCount: 0,
+      invoiceSubtotal: 0,
+      invoiceTax: 0,
+      invoiceTotal: 0,
+      invoiceCount: 0,
+    }
   );
 
   const renderInvoiceInfoRows = (invoice: InvoiceData) => {
@@ -542,18 +586,91 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
           {pageIndex === pages.length - 1 && (
             <View style={styles.summary}>
               <Text style={[styles.bold, styles.summaryTitle]}>Summary</Text>
-              <View style={styles.summaryRow}>
-                <Text>Cash Invoices ({totals.cashCount}):</Text>
-                <Text>RM {totals.cashTotal.toFixed(2)}</Text>
+
+              {/* Header Row */}
+              <View style={styles.summaryHeaderRow}>
+                <Text style={[styles.summaryTypeCol, styles.bold]}>Type</Text>
+                <Text style={[styles.summaryCountCol, styles.bold]}>
+                  Quantity
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  Total Excl. Tax
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  Tax Amount
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  Total Incl. Tax
+                </Text>
+                <Text style={[styles.summaryTotalCol, styles.bold]}>
+                  Total Payable
+                </Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text>Credit Invoices ({totals.invoiceCount}):</Text>
-                <Text>RM {totals.invoiceTotal.toFixed(2)}</Text>
-              </View>
-              <View style={[styles.summaryRow, styles.grandTotal]}>
-                <Text style={styles.bold}>Grand Total:</Text>
-                <Text style={styles.bold}>
-                  RM {(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
+
+              {/* Cash Row */}
+              {totals.cashCount > 0 && (
+                <View style={styles.summaryDataRow}>
+                  <Text style={styles.summaryTypeCol}>Cash</Text>
+                  <Text style={styles.summaryCountCol}>{totals.cashCount}</Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {totals.cashSubtotal.toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {totals.cashTax.toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {(totals.cashSubtotal + totals.cashTax).toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryTotalCol}>
+                    {totals.cashTotal.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Credit Row */}
+              {totals.invoiceCount > 0 && (
+                <View style={styles.summaryDataRow}>
+                  <Text style={styles.summaryTypeCol}>Credit</Text>
+                  <Text style={styles.summaryCountCol}>
+                    {totals.invoiceCount}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {totals.invoiceSubtotal.toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {totals.invoiceTax.toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryAmountCol}>
+                    {(totals.invoiceSubtotal + totals.invoiceTax).toFixed(2)}
+                  </Text>
+                  <Text style={styles.summaryTotalCol}>
+                    {totals.invoiceTotal.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Total Row */}
+              <View style={[styles.summaryDataRow, styles.grandTotalRow]}>
+                <Text style={[styles.summaryTypeCol, styles.bold]}>Total</Text>
+                <Text style={[styles.summaryCountCol, styles.bold]}>
+                  {totals.cashCount + totals.invoiceCount}
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  {(totals.cashSubtotal + totals.invoiceSubtotal).toFixed(2)}
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  {(totals.cashTax + totals.invoiceTax).toFixed(2)}
+                </Text>
+                <Text style={[styles.summaryAmountCol, styles.bold]}>
+                  {(
+                    totals.cashSubtotal +
+                    totals.cashTax +
+                    totals.invoiceSubtotal +
+                    totals.invoiceTax
+                  ).toFixed(2)}
+                </Text>
+                <Text style={[styles.summaryTotalCol, styles.bold]}>
+                  {(totals.cashTotal + totals.invoiceTotal).toFixed(2)}
                 </Text>
               </View>
             </View>
