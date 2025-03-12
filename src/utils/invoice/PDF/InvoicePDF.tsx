@@ -1,6 +1,7 @@
 import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, ProductItem } from "../../../types/types";
+import { COMPANY_INFO } from "../einvoice/companyInfo";
 
 interface InvoicePDFProps {
   invoices: InvoiceData[];
@@ -479,14 +480,12 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoices, logoData }) => {
                 <Image src="../tienhock.png" style={styles.logo} />
               )}
               <View style={styles.headerTextContainer}>
-                <Text style={styles.companyName}>
-                  TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
+                <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
+                <Text style={styles.companyDetails}>
+                  {COMPANY_INFO.address_pdf}
                 </Text>
                 <Text style={styles.companyDetails}>
-                  Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah
-                </Text>
-                <Text style={styles.companyDetails}>
-                  Tel: (088)719715, 719799 Fax:(088)72645
+                  Tel: {COMPANY_INFO.phone}
                 </Text>
               </View>
             </View>
