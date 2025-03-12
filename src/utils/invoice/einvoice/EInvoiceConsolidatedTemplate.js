@@ -43,18 +43,51 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
     // Calculate totals from all invoices
     let totalExcludingTax = 0;
     let totalPayableAmount = 0;
+    let totalRounding = 0;
+    let totalProductTax = 0;
 
     invoices.forEach((invoice) => {
-      totalExcludingTax += Number(invoice.amount) || 0;
+      // Calculate true tax-exclusive amount using product data if available
+      if (invoice.orderDetails && Array.isArray(invoice.orderDetails)) {
+        // Sum product price * quantity for true tax-exclusive amount
+        const invoiceSubtotal = invoice.orderDetails.reduce((sum, product) => {
+          if (!product.issubtotal) {
+            return (
+              sum +
+              (Number(product.price) || 0) * (Number(product.quantity) || 0)
+            );
+          }
+          return sum;
+        }, 0);
+        totalExcludingTax += invoiceSubtotal;
+
+        // Sum product taxes
+        invoice.orderDetails.forEach((product) => {
+          if (!product.issubtotal) {
+            totalProductTax += Number(product.tax) || 0;
+          }
+        });
+      } else {
+        // Fallback: Use amount directly if specified as tax-exclusive
+        // If it's tax-inclusive and we don't have product data, this will be inaccurate
+        totalExcludingTax += Number(invoice.amount) || 0;
+      }
+
       totalPayableAmount += Number(invoice.totalamountpayable) || 0;
+      totalRounding += Number(invoice.rounding) || 0;
     });
 
-    // Calculate tax amount
-    const taxAmount = totalPayableAmount - totalExcludingTax;
+    // Calculate tax amount - prefer product-level calculation but fall back if needed
+    let taxAmount = totalProductTax;
+    if (taxAmount === 0) {
+      // If no product-level taxes found, calculate based on totals and account for rounding
+      taxAmount = totalPayableAmount - totalExcludingTax - totalRounding;
+    }
 
     // Format amounts to 2 decimal places
     totalExcludingTax = totalExcludingTax.toFixed(2);
     totalPayableAmount = totalPayableAmount.toFixed(2);
+    totalRounding = totalRounding.toFixed(2);
     const formattedTaxAmount = taxAmount.toFixed(2);
 
     // Generate a unique ID for consolidated invoice based on month and year

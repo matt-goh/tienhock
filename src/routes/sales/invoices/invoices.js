@@ -86,32 +86,6 @@ const fetchCustomerData = async (pool, customerId) => {
   }
 };
 
-const formatDate = (date) => {
-  if (date instanceof Date) {
-    return `${date.getDate().toString().padStart(2, "0")}/${(
-      date.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}/${date.getFullYear()}`;
-  }
-  if (typeof date === "string") {
-    const [year, month, day] = date.split("T")[0].split("-");
-    return `${day}/${month}/${year}`;
-  }
-  return "Invalid Date";
-};
-
-const formatTime = (time) => {
-  if (typeof time === "string") {
-    let [hours, minutes] = time.split(":");
-    hours = parseInt(hours);
-    const period = hours >= 12 ? "pm" : "am";
-    hours = hours % 12 || 12;
-    return `${hours}:${minutes} ${period}`;
-  }
-  return "Invalid Time";
-};
-
 export default function (pool, config) {
   const router = Router();
 
@@ -830,43 +804,6 @@ export default function (pool, config) {
       console.error("Error fetching order details:", error);
       res.status(500).json({
         message: "Error fetching order details",
-        error: error.message,
-      });
-    }
-  });
-
-  // Get single invoice by ID
-  router.get("/details/:id/basic", async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      const invoiceQuery = `
-      SELECT 
-        date,
-        time
-      FROM 
-        invoices
-      WHERE 
-        id = $1
-    `;
-
-      const result = await pool.query(invoiceQuery, [id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
-
-      const invoice = result.rows[0];
-      const formattedInvoice = {
-        date: formatDate(invoice.date),
-        time: formatTime(invoice.time),
-      };
-
-      res.json(formattedInvoice);
-    } catch (error) {
-      console.error("Error fetching invoice:", error);
-      res.status(500).json({
-        message: "Error fetching invoice",
         error: error.message,
       });
     }

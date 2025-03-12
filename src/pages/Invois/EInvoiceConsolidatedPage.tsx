@@ -264,6 +264,9 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     // If selected month is ahead of current month, show previous year
     const newYear = month.id > currentMonth ? currentYear - 1 : currentYear;
     setSelectedYear(newYear);
+    setSelectedInvoices([]);
+    setSelectedCount(0);
+    setIsAllSelected(false);
   };
 
   // Fetch eligible invoices function
@@ -594,6 +597,7 @@ const EInvoiceConsolidatedPage: React.FC = () => {
                     color="sky"
                     variant="primary"
                     disabled={
+                      submissionState !== null ||
                       isConnecting ||
                       isSubmitting ||
                       selectedInvoices.length === 0
@@ -618,7 +622,14 @@ const EInvoiceConsolidatedPage: React.FC = () => {
           <SubmissionDisplay
             state={submissionState}
             onClose={() => {
+              // Reset submission state
               setSubmissionState(null);
+
+              // Clear selection state
+              setSelectedInvoices([]);
+              setSelectedCount(0);
+              setIsAllSelected(false);
+
               // Refresh the eligible invoices
               fetchEligibleInvoices();
             }}

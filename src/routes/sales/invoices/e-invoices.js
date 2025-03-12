@@ -771,21 +771,9 @@ export default function (pool, config) {
               "EI00000000010",
               "Consolidated Buyers",
               consolidatedData.dateTimeValidated || new Date().toISOString(),
-              invoiceData.reduce(
-                (sum, inv) => sum + Number(inv.totalamountpayable || 0),
-                0
-              ),
-              invoiceData.reduce(
-                (sum, inv) => sum + Number(inv.amount || 0),
-                0
-              ),
-              invoiceData.reduce(
-                (sum, inv) =>
-                  sum +
-                  (Number(inv.totalamountpayable || 0) -
-                    Number(inv.amount || 0)),
-                0
-              ),
+              consolidatedData.totalPayableAmount,
+              consolidatedData.totalExcludingTax,
+              consolidatedData.totalNetAmount,
               true,
               JSON.stringify(invoiceIds),
             ]
