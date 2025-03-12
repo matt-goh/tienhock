@@ -18,18 +18,6 @@ const formatTime = () => {
   return `${hours}:${minutes}:00Z`;
 };
 
-// XML escape function to prevent XML injection
-function escapeXml(unsafe) {
-  if (unsafe === undefined || unsafe === null) return "";
-  return unsafe
-    .toString()
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   try {
     if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
