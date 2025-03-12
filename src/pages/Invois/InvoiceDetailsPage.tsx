@@ -112,15 +112,6 @@ const InvoiceDetailsPage: React.FC = () => {
     return afterTax;
   };
 
-  const calculateOverallTotal = (products: ProductItem[]): number => {
-    return products.reduce((total, item) => {
-      if (item.issubtotal || item.istotal) {
-        return total;
-      }
-      return total + calculateTotal(item);
-    }, 0);
-  };
-
   const fetchCustomers = useCallback(
     async (search: string, page: number) => {
       setIsFetchingCustomers(true);
@@ -336,89 +327,137 @@ const InvoiceDetailsPage: React.FC = () => {
     fetchSalesmen();
   }, [fetchSalesmen]);
 
-  const addTotalRow = (
-    items: ProductItem[],
-    totalAmount: string
-  ): ProductItem[] => {
-    const existingTotalRow = items.find((item) => item.istotal);
-    if (existingTotalRow) {
-      return items.map((item) =>
-        item.istotal ? { ...item, total: totalAmount } : item
-      );
-    } else {
-      return [
-        ...items,
-        {
-          uid: crypto.randomUUID(),
-          code: "",
-          description: "Total:",
-          quantity: 0,
-          price: 0,
-          total: totalAmount,
-          freeProduct: 0,
-          returnProduct: 0,
-          tax: 0,
-          istotal: true,
-          issubtotal: false,
-        },
-      ];
-    }
-  };
-
   const orderDetailsWithTotal = useMemo(() => {
     if (!invoiceData || !Array.isArray(invoiceData.products)) {
       return [];
     }
 
+    // Get regular items (not total row)
     const regularItems = invoiceData.products.filter(
       (product) => !product.istotal
     );
-    const totalAmount = calculateOverallTotal(regularItems).toFixed(2);
-    return addTotalRow(regularItems, totalAmount);
-  }, [invoiceData, calculateOverallTotal, addTotalRow]);
 
-  const getAvailableProducts = useCallback(() => {
-    // If no products are available for new selection,
-    // return all products to start over
-    if (products.length === 0) return [];
+    // Get existing total row to preserve rounding
+    const existingTotalRow = invoiceData.products.find((item) => item.istotal);
 
-    const usedProducts = invoiceData?.products
-      .filter((item) => !item.issubtotal && !item.istotal)
-      .map((item) => item.code);
-
-    // Get unused products first
-    const unusedProducts = products.filter(
-      (p) => !usedProducts?.includes(p.id)
+    // Explicitly get the rounding value, ensuring it's a number
+    const rounding = parseFloat(
+      // Check total row first, then invoiceData, default to 0
+      String(
+        (existingTotalRow?.rounding !== undefined
+          ? String(existingTotalRow.rounding)
+          : String(invoiceData.rounding)) || "0"
+      )
     );
 
-    // If no unused products, return all products to start over
+    // Calculate subtotal (amount before tax and rounding)
+    const subtotalAmount = regularItems.reduce((total, item) => {
+      if (item.issubtotal) return total;
+      return total + (item.quantity || 0) * (item.price || 0);
+    }, 0);
+
+    // Calculate tax amount
+    const taxAmount = regularItems.reduce((total, item) => {
+      if (item.issubtotal) return total;
+      return total + (item.tax || 0);
+    }, 0);
+
+    // Calculate total amount including rounding
+    const totalAmountPayable = subtotalAmount + taxAmount + rounding;
+
+    // Create or update total row with explicit rounding property
+    const totalRow = {
+      uid: existingTotalRow?.uid || crypto.randomUUID(),
+      code: "TOTAL",
+      description: "Total:",
+      quantity: 0,
+      price: 0,
+      freeProduct: 0,
+      returnProduct: 0,
+      tax: 0,
+      total: totalAmountPayable.toFixed(2),
+      istotal: true,
+      issubtotal: false,
+      rounding: rounding, // Explicit rounding value
+      amount: subtotalAmount.toFixed(2),
+    };
+
+    return [...regularItems, totalRow];
+  }, [invoiceData]);
+
+  const getAvailableProducts = useCallback(() => {
+    // Check if product list is available
+    if (!products || products.length === 0) {
+      console.warn("No products data available");
+      return [];
+    }
+
+    // If no invoice data or products, return all products
+    if (!invoiceData?.products || invoiceData.products.length === 0) {
+      return products;
+    }
+
+    // Get currently used product codes (excluding subtotal and total rows)
+    const usedProductCodes = invoiceData.products
+      .filter((item) => !item.issubtotal && !item.istotal && item.code)
+      .map((item) => item.code);
+
+    // First try to find products that haven't been used yet
+    const unusedProducts = products.filter(
+      (p) => !usedProductCodes.includes(p.id)
+    );
+
+    // If we have unused products, return them, otherwise return all products
     return unusedProducts.length > 0 ? unusedProducts : products;
-  }, [products, invoiceData]);
+  }, [products, invoiceData?.products]);
 
-  const addNewRow = useCallback((): ProductItem => {
+  const addNewRow = useCallback(() => {
+    // Get available products
     const availableProducts = getAvailableProducts();
-    const randomProduct =
-      availableProducts[Math.floor(Math.random() * availableProducts.length)];
 
-    // Check if there's a custom price for this product
+    // Safeguard - if there are no products, return a placeholder
+    if (!availableProducts || availableProducts.length === 0) {
+      console.error("No products available for selection");
+      return {
+        uid: crypto.randomUUID(),
+        code: "",
+        description: "",
+        quantity: 1,
+        price: 0,
+        freeProduct: 0,
+        returnProduct: 0,
+        tax: 0,
+        total: "0",
+        issubtotal: false,
+        istotal: false,
+      };
+    }
+
+    // Select a random product
+    const randomIndex = Math.floor(Math.random() * availableProducts.length);
+    const randomProduct = availableProducts[randomIndex];
+
+    // Check for custom pricing
     const customProduct = customerProducts.find(
       (cp) => cp.product_id === randomProduct.id && cp.is_available
     );
 
+    // Determine price - prioritize custom pricing
     const price = customProduct
       ? Number(customProduct.custom_price)
       : Number(randomProduct.price_per_unit) || 0;
 
+    // Create and return the new product item
     return {
       uid: crypto.randomUUID(),
       code: randomProduct.id,
-      description: randomProduct.description,
-      quantity: 1,
+      description: randomProduct.description || "",
+      quantity: 1, // Default quantity 1
       price: price,
       freeProduct: 0,
       returnProduct: 0,
       tax: 0,
-      total: "0",
+      total: price.toFixed(2), // Initial total is just the price
       issubtotal: false,
       istotal: false,
     };
@@ -436,8 +475,17 @@ const InvoiceDetailsPage: React.FC = () => {
     (updatedItems: ProductItem[]) => {
       setTimeout(() => {
         setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
-          // Filter out total row from updated items
+          // Extract total row to get any rounding changes
+          const totalRow = updatedItems.find((item) => item.istotal);
           const filteredItems = updatedItems.filter((item) => !item.istotal);
+
+          // Get the updated rounding value (ensure it's a number with 2 decimal places max)
+          const roundingValue =
+            totalRow && totalRow.rounding !== undefined
+              ? Math.round(
+                  (parseFloat(totalRow.rounding.toString()) || 0) * 100
+                ) / 100
+              : prevData.rounding || 0;
 
           // Map items and handle new rows
           let updatedProducts = filteredItems.map((item) => {
@@ -508,10 +556,15 @@ const InvoiceDetailsPage: React.FC = () => {
             return sum + (item.tax || 0);
           }, 0);
 
-          const rounding = prevData.rounding || 0;
+          // Get rounding from existing total row or use current rounding value
+          const existingTotalRow = prevData.products.find((row) => row.istotal);
+          const rounding =
+            existingTotalRow?.rounding !== undefined
+              ? existingTotalRow.rounding
+              : prevData.rounding || 0;
 
           // Calculate total amount payable (tax inclusive + rounding)
-          const totalAmountPayable = subtotalAmount + taxAmount + rounding;
+          const totalAmountPayable = subtotalAmount + taxAmount + roundingValue;
 
           // Add the total row
           const productsWithTotal = [
@@ -528,6 +581,8 @@ const InvoiceDetailsPage: React.FC = () => {
               total: totalAmountPayable.toFixed(2),
               istotal: true,
               issubtotal: false,
+              rounding: roundingValue,
+              amount: subtotalAmount.toFixed(2),
             },
           ];
 
@@ -547,13 +602,13 @@ const InvoiceDetailsPage: React.FC = () => {
             ...prevData,
             products: productsWithTotal,
             amount: subtotalAmount, // Tax exclusive amount
-            rounding: rounding,
+            rounding: roundingValue,
             totalamountpayable: totalAmountPayable, // Tax inclusive amount
           };
         });
       }, 0);
     },
-    [addNewRow, getAvailableProducts]
+    [addNewRow, getAvailableProducts, customerProducts]
   );
 
   const handleAddSubtotal = () => {
@@ -810,49 +865,68 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const handleAddRegularItem = () => {
-    setInvoiceData((prevData: ExtendedInvoiceData): ExtendedInvoiceData => {
+    newRowAddedRef.current = true;
+    // Get a new random product item
+    const newItem = addNewRow();
+
+    setInvoiceData((prevData) => {
       if (!prevData) return prevData;
 
-      const newItem = addNewRow();
-      if (!newItem) return prevData;
-
-      // Remove total row if it exists
+      // Get current products without the total row
       const productsWithoutTotal = prevData.products.filter(
         (item) => !item.istotal
       );
 
-      // Add new item
-      const newProducts = [...productsWithoutTotal, newItem];
+      // Add the new item
+      const updatedProducts = [...productsWithoutTotal, newItem];
 
-      // Calculate the total for all regular items
-      const totalAmount = calculateOverallTotal(newProducts).toFixed(2);
+      // Get existing rounding value
+      const existingTotalRow = prevData.products.find((item) => item.istotal);
+      const rounding = parseFloat(
+        String(
+          (existingTotalRow?.rounding !== undefined
+            ? existingTotalRow.rounding
+            : prevData.rounding) || 0
+        )
+      );
 
-      // Add total row with the computed total
-      const finalProducts = [
-        ...newProducts,
-        {
-          uid: crypto.randomUUID(), // Add uid for consistency
-          code: "TOTAL",
-          description: "Total:",
-          quantity: 0,
-          price: 0,
-          freeProduct: 0,
-          returnProduct: 0,
-          tax: 0,
-          total: totalAmount,
-          istotal: true,
-          issubtotal: false,
-        },
-      ];
+      // Calculate new totals
+      const subtotal = updatedProducts.reduce((sum, item) => {
+        if (item.issubtotal) return sum;
+        return sum + (item.quantity || 0) * (item.price || 0);
+      }, 0);
 
-      // Update the invoice data with the new products and totalamountpayable
+      const taxAmount = updatedProducts.reduce((sum, item) => {
+        if (item.issubtotal) return sum;
+        return sum + (item.tax || 0);
+      }, 0);
+
+      const totalAmount = subtotal + taxAmount + rounding;
+
+      // Create new total row
+      const newTotalRow = {
+        uid: existingTotalRow?.uid || crypto.randomUUID(),
+        code: "TOTAL",
+        description: "Total:",
+        quantity: 0,
+        price: 0,
+        freeProduct: 0,
+        returnProduct: 0,
+        tax: 0,
+        total: totalAmount.toFixed(2),
+        istotal: true,
+        issubtotal: false,
+        rounding: rounding,
+        amount: subtotal.toFixed(2),
+      };
+
+      // Return updated invoice data with new product and totals
       return {
         ...prevData,
-        products: finalProducts,
-        amount: calculateOverallTotal(
-          newProducts.filter((item) => !item.issubtotal)
-        ), // Subtotal (tax-exclusive)
-        totalamountpayable: parseFloat(totalAmount), // Total (tax-inclusive)
+        products: [...updatedProducts, newTotalRow],
+        amount: subtotal,
+        rounding: rounding,
+        totalamountpayable: totalAmount,
       };
     });
   };

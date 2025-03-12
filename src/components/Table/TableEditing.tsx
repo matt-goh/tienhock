@@ -1241,30 +1241,122 @@ function TableEditing<T extends Record<string, any>>({
                           cell.column.id ===
                           columns.find((col) => col.type === "amount")?.id
                         ) {
-                          return (
-                            <td
-                              key={cell.id}
-                              colSpan={
-                                row.original.istotal
-                                  ? columns.length
-                                  : columns.length - 1
-                              }
-                              className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
-                            >
-                              {row.original.istotal ? "Total:" : "Subtotal:"}{" "}
-                              {cell.getValue() as ReactNode}
-                            </td>
-                          );
+                          if (row.original.istotal) {
+                            // Get the subtotal (before rounding)
+                            const subtotal = parseFloat(
+                              row.original.amount || 0
+                            );
+                            // Get current rounding value
+                            const currentRounding = parseFloat(
+                              row.original.rounding || 0
+                            );
+
+                            return (
+                              <td
+                                key={cell.id}
+                                colSpan={columns.length - 2}
+                                className="py-3 pr-6 font-semibold"
+                              >
+                                <div className="flex justify-end items-center">
+                                  <span className="text-sm text-default-400">
+                                    Rounding:
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={currentRounding.toFixed(2)}
+                                    onChange={(e) => {
+                                      // Parse the value and restrict to 2 decimal places
+                                      let value = e.target.value;
+                                      // If user enters more than 2 decimal places, truncate it
+                                      if (
+                                        value.includes(".") &&
+                                        value.split(".")[1].length > 2
+                                      ) {
+                                        value = parseFloat(value).toFixed(2);
+                                      }
+
+                                      const roundingValue =
+                                        parseFloat(value) || 0;
+
+                                      // Update the rounding value and recalculate total
+                                      setData((prevData) => {
+                                        const updatedData = prevData.map(
+                                          (dataRow) => {
+                                            if (dataRow.istotal) {
+                                              // Calculate new total = subtotal + rounding
+                                              const newTotal =
+                                                subtotal + roundingValue;
+
+                                              return {
+                                                ...dataRow,
+                                                rounding: roundingValue,
+                                                totalamountpayable: newTotal,
+                                                // Also update the cell value for display
+                                                [cell.column.id]:
+                                                  newTotal.toFixed(2),
+                                              };
+                                            }
+                                            return dataRow;
+                                          }
+                                        );
+
+                                        // Call the onChange prop to ensure parent component is updated
+                                        if (onChange) {
+                                          onChange(updatedData);
+                                        }
+
+                                        return updatedData;
+                                      });
+                                    }}
+                                    className="w-10 py-1 bg-transparent border-none text-center text-sm text-default-400"
+                                  />
+                                </div>
+                              </td>
+                            );
+                          } else {
+                            // For subtotal rows, keep behavior the same
+                            return (
+                              <td
+                                key={cell.id}
+                                colSpan={columns.length - 1}
+                                className="py-3 pr-6 text-right font-semibold"
+                              >
+                                Subtotal: {cell.getValue() as ReactNode}
+                              </td>
+                            );
+                          }
                         } else if (
                           cell.column.id === columns[columns.length - 1].id &&
                           !row.original.istotal
                         ) {
+                          // Keep the behavior for the last cell of subtotal rows
                           return (
                             <td
                               key={cell.id}
                               className="border-l border-default-300"
                             >
                               {renderCell(row, cell, cellIndex, isLastRow)}
+                            </td>
+                          );
+                        } else if (
+                          cell.column.id === columns[columns.length - 1].id &&
+                          row.original.istotal
+                        ) {
+                          // Explicitly calculate and display the total amount
+                          const subtotal = parseFloat(row.original.amount || 0);
+                          const roundingValue = parseFloat(
+                            row.original.rounding || 0
+                          );
+
+                          return (
+                            <td
+                              key={cell.id}
+                              className="py-3 pr-6 text-right font-semibold rounded-br-lg"
+                              colSpan={1}
+                            >
+                              Total: {row.original.total}
                             </td>
                           );
                         } else {
