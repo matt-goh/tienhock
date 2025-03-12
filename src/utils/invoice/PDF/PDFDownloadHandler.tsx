@@ -6,6 +6,7 @@ import Button from "../../../components/Button";
 import InvoicePDF from "./InvoicePDF";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
+import { api } from "../../../routes/utils/api";
 
 interface PDFDownloadHandlerProps {
   invoices: InvoiceData[];
@@ -17,28 +18,76 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
   disabled,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [logoImage, setLogoImage] = useState<string | null>(null);
+  const [customerNames, setCustomerNames] = useState<Record<string, string>>(
+    {}
+  );
 
   useEffect(() => {
-    const loadImage = async () => {
+    const fetchCustomerNames = async () => {
+      const uniqueCustomerIds = Array.from(
+        new Set(invoices.map((invoice) => invoice.customerid))
+      );
+
+      const missingCustomerIds = uniqueCustomerIds.filter(
+        (id) => !(id in customerNames)
+      );
+
+      if (missingCustomerIds.length === 0) return;
+
       try {
-        const response = await fetch("../tienhock.png");
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        // First check local cache
+        const CACHE_KEY = "customers_cache";
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        let customersFromCache: Record<string, string> = {};
+        let idsToFetch: string[] = [...missingCustomerIds];
+
+        if (cachedData) {
+          const { data } = JSON.parse(cachedData);
+          if (Array.isArray(data)) {
+            // Create map from cached data
+            customersFromCache = data.reduce((map, customer) => {
+              if (missingCustomerIds.includes(customer.id)) {
+                map[customer.id] = customer.name;
+                // Remove from idsToFetch since we got it from cache
+                idsToFetch = idsToFetch.filter((id) => id !== customer.id);
+              }
+              return map;
+            }, {} as Record<string, string>);
+          }
+        }
+
+        // If we still have IDs to fetch, make API call
+        let customersFromApi: Record<string, string> = {};
+        if (idsToFetch.length > 0) {
+          customersFromApi = await api.post("/api/customers/names", {
+            customerIds: idsToFetch,
+          });
+        }
+
+        // Combine results from cache and API
+        setCustomerNames((prev) => ({
+          ...prev,
+          ...customersFromCache,
+          ...customersFromApi,
+        }));
       } catch (error) {
-        console.warn("Error loading logo:", error);
-        return null;
+        console.error("Error fetching customer names:", error);
+        const fallbackNames = missingCustomerIds.reduce<Record<string, string>>(
+          (map, id) => {
+            map[id] = id;
+            return map;
+          },
+          {}
+        );
+        setCustomerNames((prev) => ({
+          ...prev,
+          ...fallbackNames,
+        }));
       }
     };
 
-    loadImage().then(setLogoImage);
-  }, []);
+    fetchCustomerNames();
+  }, [invoices, customerNames]);
 
   const handleDownload = async () => {
     if (isGenerating) return;
@@ -50,7 +99,10 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // First render the PDF component
       const pdfComponent = (
         <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-          <InvoicePDF invoices={invoices} logoData={logoImage} />
+          <InvoicePDF
+            invoices={invoices}
+            customerNames={customerNames}
+          />
         </Document>
       );
 

@@ -5,7 +5,7 @@ import { COMPANY_INFO } from "../einvoice/companyInfo";
 
 interface InvoicePDFProps {
   invoices: InvoiceData[];
-  logoData?: string | null;
+  customerNames?: Record<string, string>;
 }
 
 const ROWS_PER_PAGE = 28;
@@ -53,6 +53,17 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     gap: 15,
   },
+  headerTextContainer: {
+    flex: 1,
+  },
+  logo: {
+    width: 45,
+    height: 45,
+  },
+  bold: {
+    fontFamily: "Helvetica-Bold",
+    color: colors.text.bold,
+  },
   companyName: {
     fontSize: 14,
     fontFamily: "Helvetica-Bold",
@@ -68,6 +79,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderBottom: `1pt solid ${colors.borders.invoice}`,
     paddingBottom: 8,
+  },
+  infoContainer: {
+    marginBottom: 4,
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    paddingBottom: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.table.border,
+  },
+  infoRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  infoCell: {
+    marginRight: 10,
+    marginBottom: 2,
+    minWidth: 40,
+  },
+  infoLabel: {
+    fontSize: 7,
+    color: "#64748B",
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 1,
+  },
+  infoValue: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    color: "#1E293B",
+    letterSpacing: 0.2,
+    textOverflow: "ellipsis",
+    maxWidth: 200,
   },
   table: {
     width: "100%",
@@ -85,11 +130,6 @@ const styles = StyleSheet.create({
     minHeight: 20,
     alignItems: "center",
   },
-  invoiceInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
   tableHeader: {
     backgroundColor: colors.table.headerBackground,
     fontFamily: "Helvetica-Bold",
@@ -99,20 +139,6 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     padding: "6 8",
-  },
-  infoCell: {
-    padding: "3 8",
-  },
-  customerInfo: {
-    fontSize: 10,
-    color: colors.text.primary,
-    fontFamily: "Helvetica",
-  },
-  customerLabel: {
-    color: colors.text.secondary,
-    marginRight: 5,
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
   },
   descriptionCell: {
     width: "45%",
@@ -147,30 +173,6 @@ const styles = StyleSheet.create({
     width: "13%",
     textAlign: "right",
   },
-  infoLeftCell: {
-    width: "65%",
-  },
-  infoRightCell: {
-    width: "35%",
-    textAlign: "right",
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  infoLeftSection: {
-    width: "65%",
-  },
-  infoRightSection: {
-    width: "35%",
-    alignItems: "flex-end",
-  },
-  infoRightContainer: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-  },
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -195,17 +197,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.text.primary,
   },
-  bold: {
-    fontFamily: "Helvetica-Bold",
-    color: colors.text.bold,
-  },
-  logo: {
-    width: 45,
-    height: 45,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
   subtotalRow: {
     backgroundColor: colors.table.headerBackground,
     flexDirection: "row",
@@ -224,7 +215,10 @@ const styles = StyleSheet.create({
   },
 });
 
-const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoices, logoData }) => {
+const InvoicePDF: React.FC<InvoicePDFProps> = ({
+  invoices,
+  customerNames = {},
+}) => {
   const getProcessedProducts = (products: ProductItem[]) => {
     // Keep track of all rows in their original order
     const orderedRows: ProductItem[] = [];
@@ -427,46 +421,62 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoices, logoData }) => {
     { cashTotal: 0, invoiceTotal: 0, cashCount: 0, invoiceCount: 0 }
   );
 
-  const renderInvoiceInfoRows = (invoice: InvoiceData) => (
-    <>
-      <View style={styles.infoRow}>
-        <View style={styles.infoLeftSection}>
-          <Text style={styles.customerInfo}>
-            <Text style={styles.customerLabel}>Customer: </Text>
-            {invoice.customerid}
-          </Text>
-        </View>
-        <View style={styles.infoRightSection}>
-          <View style={styles.infoRightContainer}>
-            <Text style={[styles.customerInfo]}>
-              <Text style={styles.customerLabel}>Type: </Text>
-              {invoice.paymenttype}
-            </Text>
-            <Text style={styles.customerInfo}>
-              <Text style={styles.customerLabel}>Invoice No: </Text>
-              {invoice.id}
-            </Text>
+  const renderInvoiceInfoRows = (invoice: InvoiceData) => {
+    // Parse the timestamp to format date and time
+    const date = new Date(parseInt(invoice.createddate));
+
+    // Format time (HH:MM AM/PM)
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // Convert 0 to 12
+    const formattedTime = `${String(hours).padStart(
+      2,
+      "0"
+    )}:${minutes} ${ampm}`;
+
+    // Format date (DD/MM/YYYY)
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+
+    // Get customer name if available, otherwise use ID
+    const customerName =
+      customerNames[invoice.customerid] || invoice.customerid;
+
+    return (
+      <View style={styles.infoContainer}>
+        <View style={styles.infoRow}>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Invoice No</Text>
+            <Text style={styles.infoValue}>{invoice.id}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Salesman</Text>
+            <Text style={styles.infoValue}>{invoice.salespersonid}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Customer</Text>
+            <Text style={styles.infoValue}>{customerName}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Type</Text>
+            <Text style={styles.infoValue}>{invoice.paymenttype}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Time</Text>
+            <Text style={styles.infoValue}>{formattedTime}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Date</Text>
+            <Text style={styles.infoValue}>{formattedDate}</Text>
           </View>
         </View>
       </View>
-      <View style={[styles.infoRow, { marginBottom: 10 }]}>
-        <View style={styles.infoLeftSection}>
-          <Text style={styles.customerInfo}>
-            <Text style={styles.customerLabel}>Salesman: </Text>
-            {invoice.salespersonid}
-          </Text>
-        </View>
-        <View style={styles.infoRightSection}>
-          <View style={styles.infoRightContainer}>
-            <Text style={styles.customerInfo}>
-              <Text style={styles.customerLabel}>Date: </Text>
-              {invoice.createddate}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </>
-  );
+    );
+  };
 
   return (
     <>
@@ -474,11 +484,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoices, logoData }) => {
         <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
           {pageIndex === 0 && (
             <View style={styles.header}>
-              {logoData ? (
-                <Image src={logoData} style={styles.logo} />
-              ) : (
-                <Image src="../tienhock.png" style={styles.logo} />
-              )}
+              <Image src="../tienhock.png" style={styles.logo} />
               <View style={styles.headerTextContainer}>
                 <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
                 <Text style={styles.companyDetails}>
