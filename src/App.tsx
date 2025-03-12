@@ -129,7 +129,7 @@ const Layout: React.FC = () => {
             path="/login"
             element={
               isAuthenticated ? (
-                <Navigate to="/sales/products-dashboard" replace />
+                <Navigate to="/" replace />
               ) : (
                 <Login />
               )
@@ -139,7 +139,7 @@ const Layout: React.FC = () => {
             path="/"
             element={
               <ProtectedRoute>
-                <Navigate to="/sales/products-dashboard" replace />
+                <Navigate to="/" replace />
               </ProtectedRoute>
             }
           />

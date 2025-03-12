@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 15,
+    marginBottom: 6,
     gap: 15,
   },
   headerTextContainer: {
@@ -76,17 +76,13 @@ const styles = StyleSheet.create({
     lineHeight: 1,
   },
   invoice: {
-    marginBottom: 12,
+    marginBottom: 2,
     borderBottom: `1pt solid ${colors.borders.invoice}`,
-    paddingBottom: 8,
+    paddingBottom: 5,
   },
   infoContainer: {
-    marginBottom: 4,
-    paddingHorizontal: 6,
     paddingTop: 6,
     paddingBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.table.border,
   },
   infoRow: {
     flexDirection: "row",
@@ -114,97 +110,99 @@ const styles = StyleSheet.create({
     textOverflow: "ellipsis",
     maxWidth: 200,
   },
-  table: {
-    width: "100%",
-    marginBottom: 15,
-  },
-  tableContent: {
-    border: `1pt solid ${colors.table.border}`,
-    paddingBottom: 6,
+  tableHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#000",
+    borderTopWidth: 0.5,
+    borderTopColor: "#000",
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
-    borderBottomColor: colors.table.borderDark,
-    borderBottomStyle: "solid",
-    minHeight: 20,
-    alignItems: "center",
+    borderBottomColor: "#666",
+    paddingVertical: 4,
   },
-  tableHeader: {
-    backgroundColor: colors.table.headerBackground,
-    fontFamily: "Helvetica-Bold",
-    fontSize: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.table.border,
+  productCol: {
+    width: "36%",
+    paddingLeft: 8,
+    paddingRight: 4,
   },
-  tableCell: {
-    padding: "6 8",
+  focCol: {
+    width: "7%",
+    textAlign: "center",
   },
-  descriptionCell: {
-    width: "45%",
-    borderRightWidth: 0.5,
-    borderRightColor: colors.table.border,
+  rtnCol: {
+    width: "7%",
+    textAlign: "center",
   },
-  focCell: {
+  qtyCol: {
+    width: "7%",
+    textAlign: "center",
+  },
+  priceCol: {
     width: "10%",
     textAlign: "right",
-    borderRightWidth: 0.5,
-    borderRightColor: colors.table.border,
   },
-  returnCell: {
-    width: "10%",
-    textAlign: "right",
-    borderRightWidth: 0.5,
-    borderRightColor: colors.table.border,
-  },
-  qtyCell: {
-    width: "10%",
-    textAlign: "right",
-    borderRightWidth: 0.5,
-    borderRightColor: colors.table.border,
-  },
-  priceCell: {
+  subtotalCol: {
     width: "12%",
     textAlign: "right",
-    borderRightWidth: 0.5,
-    borderRightColor: colors.table.border,
   },
-  amountCell: {
-    width: "13%",
+  taxCol: {
+    width: "10%",
     textAlign: "right",
   },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    paddingTop: 6,
+  totalCol: {
+    width: "11%",
+    textAlign: "right",
     paddingRight: 8,
   },
+  headerText: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    color: "#374151",
+  },
+  cellText: {
+    fontSize: 9,
+    color: "#1F2937",
+  },
   summary: {
-    marginTop: -2,
+    alignItems: "flex-end",
+    paddingRight: 8,
+    marginTop: 5,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  summaryLabel: {
+    width: 120,
+    textAlign: "right",
+    fontSize: 9,
+    marginRight: 8,
+  },
+  summaryValue: {
+    width: 50,
+    textAlign: "right",
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+  },
+  grandTotal: {
+    marginTop: 4,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: "#666",
   },
   summaryTitle: {
     paddingBottom: 8,
   },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-    fontSize: 10,
-    color: colors.text.primary,
-  },
-  grandTotal: {
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.text.primary,
-  },
   subtotalRow: {
-    backgroundColor: colors.table.headerBackground,
     flexDirection: "row",
     borderBottomWidth: 0.5,
-    borderBottomColor: colors.table.borderDark,
-    borderBottomStyle: "solid",
-    minHeight: 20,
-    alignItems: "center",
+    borderBottomColor: "#666",
+    paddingVertical: 4,
   },
   subtotalText: {
     padding: "6 8",
@@ -286,24 +284,6 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
     };
   };
 
-  const calculateTotal = (product: ProductItem): number => {
-    if (product.istotal || product.issubtotal) {
-      return parseFloat(product.total || "0");
-    }
-
-    const quantity = product.quantity || 0;
-    const price = product.price || 0;
-    const tax = product.tax || 0;
-
-    // Calculate base total
-    const baseTotal = quantity * price;
-
-    // Apply tax
-    const final = baseTotal + tax;
-
-    return final;
-  };
-
   const calculateInvoiceRows = (invoice: InvoiceData) => {
     const { orderedRows } = getProcessedProducts(invoice.products);
     return TABLE_HEADER_ROWS + orderedRows.length + 1; // +1 for the total row
@@ -368,42 +348,94 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
     return pages;
   };
 
-  const renderTableRow = (
-    product: ProductItem,
-    foc: number = 0,
-    returned: number = 0,
-    index: number
-  ) => (
-    <View
-      key={`row-${index}`}
-      style={product.issubtotal ? styles.subtotalRow : styles.tableRow}
-    >
-      <Text
-        style={
-          product.issubtotal
-            ? styles.subtotalText
-            : [styles.tableCell, styles.descriptionCell]
-        }
-      >
-        {product.description}
-      </Text>
-      <Text style={[styles.tableCell, styles.focCell]}>
-        {!product.issubtotal ? foc || "" : ""}
-      </Text>
-      <Text style={[styles.tableCell, styles.returnCell]}>
-        {!product.issubtotal ? returned || "" : ""}
-      </Text>
-      <Text style={[styles.tableCell, styles.qtyCell]}>
-        {!product.issubtotal ? Math.round(product.quantity || 0) : ""}
-      </Text>
-      <Text style={[styles.tableCell, styles.priceCell]}>
-        {!product.issubtotal ? Number(product.price || 0).toFixed(2) : ""}
-      </Text>
-      <Text style={[styles.tableCell, styles.amountCell]}>
-        {calculateTotal(product).toFixed(2)}
-      </Text>
-    </View>
-  );
+  // Render the table
+  const renderTable = (invoice: InvoiceData) => {
+    const { regularItems, orderedRows } = getProcessedProducts(
+      invoice.products
+    );
+
+    // Calculate totals for footer
+    const subtotal = regularItems.reduce((sum, item) => {
+      const quantity = item.product.quantity || 0;
+      const price = item.product.price || 0;
+      return sum + quantity * price;
+    }, 0);
+
+    const tax = regularItems.reduce((sum, item) => {
+      return sum + (item.product.tax || 0);
+    }, 0);
+
+    const total = subtotal + tax;
+
+    return (
+      <View>
+        {/* Table Header */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.productCol, styles.headerText]}>Product</Text>
+          <Text style={[styles.focCol, styles.headerText]}>Foc</Text>
+          <Text style={[styles.rtnCol, styles.headerText]}>Rtn</Text>
+          <Text style={[styles.qtyCol, styles.headerText]}>Qty</Text>
+          <Text style={[styles.priceCol, styles.headerText]}>U. Price</Text>
+          <Text style={[styles.subtotalCol, styles.headerText]}>Subtotal</Text>
+          <Text style={[styles.taxCol, styles.headerText]}>Tax</Text>
+          <Text style={[styles.totalCol, styles.headerText]}>Total</Text>
+        </View>
+
+        {/* Table Rows */}
+        {orderedRows.map((product, index) => {
+          const item = regularItems.find(
+            (i) => i.product.code === product.code
+          );
+          const quantity = product.quantity || 0;
+          const price = product.price || 0;
+          const itemSubtotal = quantity * price;
+          const itemTax = product.tax || 0;
+          const itemTotal = itemSubtotal + itemTax;
+
+          return (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.productCol, styles.cellText]}>
+                {product.description}
+              </Text>
+              <Text style={[styles.focCol, styles.cellText]}>
+                {!product.issubtotal ? item?.foc || "0" : ""}
+              </Text>
+              <Text style={[styles.rtnCol, styles.cellText]}>
+                {!product.issubtotal ? item?.returned || "0" : ""}
+              </Text>
+              <Text style={[styles.qtyCol, styles.cellText]}>
+                {!product.issubtotal ? quantity : ""}
+              </Text>
+              <Text style={[styles.priceCol, styles.cellText]}>
+                {!product.issubtotal ? price.toFixed(2) : ""}
+              </Text>
+              <Text style={[styles.subtotalCol, styles.cellText]}>
+                {!product.issubtotal ? itemSubtotal.toFixed(2) : ""}
+              </Text>
+              <Text style={[styles.taxCol, styles.cellText]}>
+                {!product.issubtotal ? itemTax.toFixed(2) : ""}
+              </Text>
+              <Text style={[styles.totalCol, styles.cellText]}>
+                {product.issubtotal ? product.total : itemTotal.toFixed(2)}
+              </Text>
+            </View>
+          );
+        })}
+
+        {/* Table Footer/Summary */}
+        <View style={styles.summary}>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, styles.headerText]}>
+              Total Amount (RM)
+            </Text>
+            <Text style={[styles.summaryValue, styles.headerText]}>
+              {total.toFixed(2)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const pages = paginateInvoices(invoices);
 
@@ -497,64 +529,15 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
             </View>
           )}
 
-          {pageInvoices.map((invoice, invoiceIndex) => {
-            const { regularItems, orderedRows } = getProcessedProducts(
-              invoice.products
-            );
-
-            return (
-              <View
-                key={`invoice-${pageIndex}-${invoiceIndex}`}
-                style={styles.invoice}
-              >
-                <View style={styles.table}>
-                  {renderInvoiceInfoRows(invoice)}
-                  <View style={styles.tableContent}>
-                    <View style={[styles.tableRow, styles.tableHeader]}>
-                      <Text style={[styles.tableCell, styles.descriptionCell]}>
-                        Description
-                      </Text>
-                      <Text style={[styles.tableCell, styles.focCell]}>
-                        Foc
-                      </Text>
-                      <Text style={[styles.tableCell, styles.returnCell]}>
-                        Return
-                      </Text>
-                      <Text style={[styles.tableCell, styles.qtyCell]}>
-                        Qty
-                      </Text>
-                      <Text style={[styles.tableCell, styles.priceCell]}>
-                        Unit/Price
-                      </Text>
-                      <Text style={[styles.tableCell, styles.amountCell]}>
-                        Amount
-                      </Text>
-                    </View>
-
-                    {orderedRows.map((row, rowIndex) => {
-                      const item = regularItems.find(
-                        (item) => item.product.code === row.code
-                      );
-                      return renderTableRow(
-                        row,
-                        item?.foc || 0,
-                        item?.returned || 0,
-                        rowIndex
-                      );
-                    })}
-
-                    {/* Total row */}
-                    <View key={`total-${invoiceIndex}`} style={styles.totalRow}>
-                      <Text style={styles.bold}>
-                        Total Amount Payable: RM{" "}
-                        {invoice.totalamountpayable.toFixed(2)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          {pageInvoices.map((invoice, invoiceIndex) => (
+            <View
+              key={`invoice-${pageIndex}-${invoiceIndex}`}
+              style={styles.invoice}
+            >
+              {renderInvoiceInfoRows(invoice)}
+              {renderTable(invoice)}
+            </View>
+          ))}
 
           {pageIndex === pages.length - 1 && (
             <View style={styles.summary}>
