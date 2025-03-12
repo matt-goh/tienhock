@@ -215,11 +215,13 @@ const EInvoiceSubmitPage: React.FC = () => {
           Submit e-Invoices
         </h1>
         <div className="flex items-center gap-3">
-          <EInvoiceMenu
-            selectedInvoices={selectedInvoices}
-            onSubmissionComplete={handleSubmissionComplete}
-            clearSelection={() => clearSelectionRef.current?.()}
-          />
+          {invoices.length > 0 && (
+            <EInvoiceMenu
+              selectedInvoices={selectedInvoices}
+              onSubmissionComplete={handleSubmissionComplete}
+              clearSelection={() => clearSelectionRef.current?.()}
+            />
+          )}
           <Button
             onClick={fetchInvoices}
             disabled={isLoading}
