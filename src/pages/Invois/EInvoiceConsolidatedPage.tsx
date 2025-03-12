@@ -35,6 +35,12 @@ interface MonthOption {
   name: string;
 }
 
+interface Product {
+  issubtotal?: boolean;
+  istotal?: boolean;
+  tax: number;
+}
+
 interface EligibleInvoice {
   id: string;
   salespersonid: string;
@@ -44,6 +50,7 @@ interface EligibleInvoice {
   amount: number;
   rounding: number;
   totalamountpayable: number;
+  products?: Product[];
 }
 
 const EInvoiceConsolidatedPage: React.FC = () => {
@@ -155,18 +162,32 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     const calculateTotals = () => {
       let subtotal = 0;
       let total = 0;
+      let taxTotal = 0;
+      let roundingTotal = 0;
 
       selectedInvoices.forEach((invoice) => {
         subtotal += Number(invoice.amount) || 0;
         total += Number(invoice.totalamountpayable) || 0;
+        roundingTotal += Number(invoice.rounding) || 0;
+
+        // Sum up individual product taxes if available
+        if (invoice.products && Array.isArray(invoice.products)) {
+          invoice.products.forEach((product) => {
+            if (!product.issubtotal && !product.istotal) {
+              taxTotal += Number(product.tax) || 0;
+            }
+          });
+        }
       });
 
-      // Tax is the difference between total and subtotal
-      const tax = total - subtotal;
+      // If product-level tax calculation is zero, fall back to simple calculation
+      if (taxTotal === 0 && selectedInvoices.length > 0) {
+        taxTotal = total - subtotal - roundingTotal;
+      }
 
       setTotals({
         subtotal,
-        tax,
+        tax: taxTotal,
         total,
       });
     };

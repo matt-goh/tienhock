@@ -598,9 +598,30 @@ export default function (pool, config) {
 
       // REPLACE this query with the modified version:
       const query = `
-        SELECT i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-               i.amount, i.rounding, i.totalamountpayable
+        SELECT 
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+          i.amount, i.rounding, i.totalamountpayable,
+          COALESCE(
+            json_agg(
+              CASE WHEN od.id IS NOT NULL THEN 
+                json_build_object(
+                  'code', od.code,
+                  'quantity', od.quantity,
+                  'price', od.price,
+                  'freeProduct', od.freeproduct,
+                  'returnProduct', od.returnproduct,
+                  'description', od.description,
+                  'tax', od.tax,
+                  'total', od.total,
+                  'issubtotal', od.issubtotal
+                )
+              ELSE NULL END
+              ORDER BY od.id  -- Maintain order of products and subtotals
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
+          ) as products
         FROM invoices i
+        LEFT JOIN order_details od ON i.id = od.invoiceid
         LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
         WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
         AND e.internal_id IS NULL
@@ -609,14 +630,34 @@ export default function (pool, config) {
           WHERE e2.consolidated_invoices IS NOT NULL 
           AND invoice_id = i.id::text
         )
+        GROUP BY i.id
         ORDER BY CAST(i.createddate AS bigint) ASC
       `;
 
       const result = await pool.query(query, [startTimestamp, endTimestamp]);
 
+      // Transform results to ensure proper types for tax calculations
+      const transformedResults = result.rows.map((row) => ({
+        ...row,
+        products: (row.products || []).map((product) => ({
+          ...product,
+          uid: crypto.randomUUID(),
+          price: parseFloat(product.price) || 0,
+          quantity: parseInt(product.quantity) || 0,
+          freeProduct: parseInt(product.freeProduct) || 0,
+          returnProduct: parseInt(product.returnProduct) || 0,
+          tax: parseFloat(product.tax) || 0,
+          total: parseFloat(product.total) || 0,
+          issubtotal: Boolean(product.issubtotal),
+        })),
+        amount: parseFloat(row.amount) || 0,
+        rounding: parseFloat(row.rounding) || 0,
+        totalamountpayable: parseFloat(row.totalamountpayable) || 0,
+      }));
+
       res.json({
         success: true,
-        data: result.rows,
+        data: transformedResults,
       });
     } catch (error) {
       console.error("Error fetching invoices:", error);
