@@ -110,8 +110,13 @@ function escapeXml(unsafe) {
 }
 
 const calculateTaxAndTotals = (invoiceData) => {
-  // Get the provided values directly
-  const subtotal = formatAmount(invoiceData.amount || 0);
+  // Calculate tax-exclusive amount (subtotal) from product data
+  const subtotal = invoiceData.orderDetails.reduce((sum, detail) => {
+    if (!detail.issubtotal) {
+      return sum + (detail.qty || 0) * (Number(detail.price) || 0);
+    }
+    return sum;
+  }, 0);
 
   // Group tax items by tax category
   const taxGroups = {
@@ -122,9 +127,13 @@ const calculateTaxAndTotals = (invoiceData) => {
   };
 
   // Calculate tax by category
+  let totalProductTax = 0;
   invoiceData.orderDetails.forEach((detail) => {
+    if (detail.issubtotal) return;
+
     const taxAmount = parseFloat(detail.tax) || 0;
     const lineAmount = (detail.qty || 0) * (Number(detail.price) || 0);
+    totalProductTax += taxAmount;
 
     // Determine tax category based on tax amount
     let taxCategory = "06"; // Default to not applicable
@@ -147,19 +156,34 @@ const calculateTaxAndTotals = (invoiceData) => {
       taxAmount: formatAmount(group.amount),
     }));
 
-  // Calculate total tax
-  const totalTax = formatAmount(
-    Object.values(taxGroups).reduce((sum, group) => sum + group.amount, 0)
-  );
+  // Calculate total tax - prefer product-level calculation
+  let totalTax = formatAmount(totalProductTax);
 
-  // Use the totalamountpayable as the total
-  const total = formatAmount(invoiceData.totalamountpayable || 0);
+  // If no product-level taxes found, try to calculate from provided values
+  if (
+    totalProductTax === 0 &&
+    invoiceData.totalamountpayable &&
+    invoiceData.amount
+  ) {
+    totalTax = formatAmount(
+      Number(invoiceData.totalamountpayable) -
+        Number(invoiceData.amount) -
+        Number(invoiceData.rounding || 0)
+    );
+  }
+
+  // Get the rounding value
+  const rounding = formatAmount(invoiceData.rounding || 0);
+
+  // Calculate total (tax-inclusive amount + rounding)
+  const total = formatAmount(subtotal + totalTax + rounding);
 
   return {
-    subtotal,
+    subtotal: formatAmount(subtotal),
     tax: totalTax,
     total,
     taxSubtotals,
+    rounding,
   };
 };
 
@@ -527,27 +551,25 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
 
     // Add legal monetary total
     xml += `
-  <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="MYR">${totals.subtotal.toFixed(
-      2
-    )}</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="MYR">${totals.subtotal.toFixed(
-      2
-    )}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="MYR">${totals.total.toFixed(
-      2
-    )}</cbc:TaxInclusiveAmount>
-    <cbc:AllowanceTotalAmount currencyID="MYR">0.00</cbc:AllowanceTotalAmount>
-    <cbc:ChargeTotalAmount currencyID="MYR">${totals.subtotal.toFixed(
-      2
-    )}</cbc:ChargeTotalAmount>
-    <cbc:PayableRoundingAmount currencyID="MYR">${Number(
-      rawInvoiceData.rounding || 0
-    ).toFixed(2)}</cbc:PayableRoundingAmount>
-    <cbc:PayableAmount currencyID="MYR">${totals.total.toFixed(
-      2
-    )}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>`;
+<cac:LegalMonetaryTotal>
+  <cbc:LineExtensionAmount currencyID="MYR">${totals.subtotal.toFixed(
+    2
+  )}</cbc:LineExtensionAmount>
+  <cbc:TaxExclusiveAmount currencyID="MYR">${totals.subtotal.toFixed(
+    2
+  )}</cbc:TaxExclusiveAmount>
+  <cbc:TaxInclusiveAmount currencyID="MYR">${(
+    totals.subtotal + totals.tax
+  ).toFixed(2)}</cbc:TaxInclusiveAmount>
+  <cbc:AllowanceTotalAmount currencyID="MYR">0.00</cbc:AllowanceTotalAmount>
+  <cbc:ChargeTotalAmount currencyID="MYR">0.00</cbc:ChargeTotalAmount>
+  <cbc:PayableRoundingAmount currencyID="MYR">${totals.rounding.toFixed(
+    2
+  )}</cbc:PayableRoundingAmount>
+  <cbc:PayableAmount currencyID="MYR">${totals.total.toFixed(
+    2
+  )}</cbc:PayableAmount>
+</cac:LegalMonetaryTotal>`;
 
     // Add invoice lines
     xml += generateInvoiceLines(sanitizedOrderDetails);
