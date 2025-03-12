@@ -735,6 +735,7 @@ const InvoiceDetailsPage: React.FC = () => {
               tax: product.tax || 0,
               total: product.total,
               description: product.description,
+              issubtotal: product.issubtotal || false,
             }));
 
           const dataToSave: ExtendedInvoiceData = {
