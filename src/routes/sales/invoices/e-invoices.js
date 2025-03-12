@@ -37,18 +37,25 @@ async function fetchCustomerData(pool, customerId) {
 }
 
 // Helper function to insert accepted documents
-const insertAcceptedDocuments = async (pool, documents) => {
+const insertAcceptedDocuments = async (
+  pool,
+  documents,
+  originalInvoices = {}
+) => {
   const query = `
     INSERT INTO einvoices (
       uuid, submission_uid, long_id, internal_id, type_name, 
       receiver_id, receiver_name, datetime_validated,
-      total_payable_amount, total_excluding_tax, total_net_amount
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      total_payable_amount, total_excluding_tax, total_net_amount, total_rounding
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
   `;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     for (const doc of documents) {
+      // Get rounding from original invoice if available, otherwise default to 0
+      const rounding = originalInvoices[doc.internalId]?.rounding || 0;
+
       // Add a default datetime_validated if missing
       const datetime_validated =
         doc.dateTimeValidated || new Date().toISOString();
@@ -61,10 +68,11 @@ const insertAcceptedDocuments = async (pool, documents) => {
         doc.typeName,
         doc.receiverId,
         doc.receiverName,
-        datetime_validated, // Use our modified value
+        datetime_validated,
         doc.totalPayableAmount,
         doc.totalExcludingTax,
         doc.totalNetAmount,
+        rounding, // Use the rounding from original invoice data
       ]);
     }
     await client.query("COMMIT");
@@ -262,6 +270,7 @@ export default function (pool, config) {
 
       const transformedInvoices = [];
       const validationErrors = [];
+      const invoiceRoundings = {};
 
       // Check for duplicates first
       for (const invoiceId of invoiceIds) {
@@ -297,6 +306,9 @@ export default function (pool, config) {
           if (!invoiceData) {
             throw new Error(`Invoice with ID ${invoiceId} not found`);
           }
+
+          // Store the rounding value for this invoice
+          invoiceRoundings[invoiceId] = invoiceData.rounding || 0;
 
           const customerData = await fetchCustomerData(
             pool,
@@ -397,7 +409,11 @@ export default function (pool, config) {
         submissionResult.success &&
         submissionResult.acceptedDocuments?.length > 0
       ) {
-        await insertAcceptedDocuments(pool, submissionResult.acceptedDocuments);
+        await insertAcceptedDocuments(
+          pool,
+          submissionResult.acceptedDocuments,
+          invoiceRoundings
+        );
       }
 
       return res.json(submissionResult);
@@ -690,11 +706,13 @@ export default function (pool, config) {
 
       // Fetch all invoice data
       const invoiceData = [];
+      let totalRounding = 0;
       for (const invoiceId of invoiceIds) {
         try {
           const invoice = await getInvoices(pool, invoiceId);
           if (invoice) {
             invoiceData.push(invoice);
+            totalRounding += Number(invoice.rounding || 0);
           }
         } catch (error) {
           console.warn(`Failed to fetch invoice ${invoiceId}:`, error);
@@ -760,8 +778,8 @@ export default function (pool, config) {
               uuid, submission_uid, long_id, internal_id, type_name, 
               receiver_id, receiver_name, datetime_validated,
               total_payable_amount, total_excluding_tax, total_net_amount,
-              is_consolidated, consolidated_invoices
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              is_consolidated, consolidated_invoices, total_rounding
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
             [
               consolidatedData.uuid,
               submissionResponse.submissionUid,
@@ -776,6 +794,7 @@ export default function (pool, config) {
               consolidatedData.totalNetAmount,
               true,
               JSON.stringify(invoiceIds),
+              totalRounding,
             ]
           );
 

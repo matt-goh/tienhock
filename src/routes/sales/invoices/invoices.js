@@ -15,20 +15,26 @@ const myInvoisConfig = {
   MYINVOIS_CLIENT_SECRET,
 };
 
-async function insertAcceptedDocuments(pool, documents) {
+// Helper function to insert accepted documents
+const insertAcceptedDocuments = async (
+  pool,
+  documents,
+  originalInvoices = {}
+) => {
   const query = `
     INSERT INTO einvoices (
       uuid, submission_uid, long_id, internal_id, type_name, 
       receiver_id, receiver_name, datetime_validated,
-      total_payable_amount, total_excluding_tax, total_net_amount
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      total_payable_amount, total_excluding_tax, total_net_amount, total_rounding
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
   `;
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     for (const doc of documents) {
+      // Get rounding from original invoice if available, otherwise default to 0
+      const rounding = originalInvoices[doc.internalId]?.rounding || 0;
+
       // Add a default datetime_validated if missing
       const datetime_validated =
         doc.dateTimeValidated || new Date().toISOString();
@@ -41,13 +47,13 @@ async function insertAcceptedDocuments(pool, documents) {
         doc.typeName,
         doc.receiverId,
         doc.receiverName,
-        datetime_validated, // Use our modified value
+        datetime_validated,
         doc.totalPayableAmount,
         doc.totalExcludingTax,
         doc.totalNetAmount,
+        rounding, // Use the rounding from original invoice data
       ]);
     }
-
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -55,7 +61,7 @@ async function insertAcceptedDocuments(pool, documents) {
   } finally {
     client.release();
   }
-}
+};
 
 const fetchCustomerData = async (pool, customerId) => {
   try {
@@ -562,6 +568,12 @@ export default function (pool, config) {
       let einvoiceResults = null;
       if (savedInvoiceData.length > 0) {
         try {
+          // Create a map of invoice IDs to rounding values
+          const invoiceRoundings = {};
+          savedInvoiceData.forEach((invoice) => {
+            invoiceRoundings[invoice.id] = invoice.rounding || 0;
+          });
+
           einvoiceResults = await submitInvoicesToMyInvois(
             myInvoisConfig,
             savedInvoiceData,
@@ -576,7 +588,8 @@ export default function (pool, config) {
             try {
               await insertAcceptedDocuments(
                 pool,
-                einvoiceResults.acceptedDocuments
+                einvoiceResults.acceptedDocuments,
+                invoiceRoundings
               );
             } catch (storageError) {
               console.error("Error storing accepted documents:", storageError);
