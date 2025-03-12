@@ -738,62 +738,12 @@ function TableEditing<T extends Record<string, any>>({
         );
       }
 
-      // Early return for subtotal rows
-      if (row.original.issubtotal) {
-        // Only render content for the amount column and description column
-        const isAmountColumn = columnType === "amount";
-        const isDescriptionColumn = columnConfig.id === "productname";
-
-        if (isAmountColumn) {
-          return (
-            <div className="px-6 py-3 text-right font-semibold">
-              {`Subtotal: ${cell.getValue()}`}
-            </div>
-          );
-        }
-
-        if (isDescriptionColumn) {
-          return <div className="px-6 py-3">{cell.getValue() as string}</div>;
-        }
-
-        return null;
-      }
-
       // Custom cell renderer
       if (columnConfig.cell) {
         return columnConfig.cell({
           getValue: () => cell.getValue(),
           row: { original: { ...row.original, isSorting } },
         });
-      }
-
-      // Handle Total, Subtotal rows
-      if (row.original.istotal || row.original.issubtotal) {
-        if (
-          cell.column.id === columns.find((col) => col.type === "amount")?.id
-        ) {
-          return (
-            <td
-              colSpan={
-                row.original.istotal ? columns.length : columns.length - 1
-              }
-              className="py-3 pr-6 text-right font-semibold rounded-br-lg rounded-bl-lg"
-            >
-              {row.original.istotal ? "Total:" : "Subtotal:"}{" "}
-              {cell.getValue() as ReactNode}
-            </td>
-          );
-        } else if (
-          cell.column.id === columns[columns.length - 1].id &&
-          !row.original.istotal
-        ) {
-          return (
-            <td className="border-l border-default-300">
-              {renderCell(row, cell, cellIndex, isLastRow)}
-            </td>
-          );
-        }
-        return null;
       }
 
       if (
@@ -1287,13 +1237,6 @@ function TableEditing<T extends Record<string, any>>({
                       const isLastCell =
                         cellIndex === row.getVisibleCells().length - 1;
                       if (row.original.istotal || row.original.issubtotal) {
-                        const amountColumnId = columns.find(
-                          (col) => col.id === "amount"
-                        )?.id;
-                        const qtyColumnId = columns.find(
-                          (col) => col.id === "qty"
-                        )?.id;
-
                         if (
                           cell.column.id ===
                           columns.find((col) => col.type === "amount")?.id
