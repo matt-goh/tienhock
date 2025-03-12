@@ -43,7 +43,13 @@ export const generatePDFFilename = (invoices: InvoiceData[]): string => {
 };
 
 // Helper function to parse date strings in DD/MM/YYYY format
-const parseDateString = (dateStr: string): Date => {
-  const [day, month, year] = dateStr.split("/").map(Number);
+const parseDateString = (dateStr: string | number): Date => {
+  // Check if the date is an epoch timestamp (string or number)
+  if (/^\d+$/.test(String(dateStr))) {
+    return new Date(Number(dateStr));
+  }
+
+  // Fallback to previous behavior for DD/MM/YYYY format
+  const [day, month, year] = String(dateStr).split("/").map(Number);
   return new Date(year, month - 1, day);
 };
