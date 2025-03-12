@@ -177,8 +177,7 @@ export default function (pool, config) {
                   'description', od.description,
                   'tax', od.tax,
                   'total', od.total,
-                  'issubtotal', od.issubtotal,
-                  'istotal', false
+                  'issubtotal', od.issubtotal
                 )
               ELSE NULL END
               ORDER BY od.id  -- Maintain order of products and subtotals

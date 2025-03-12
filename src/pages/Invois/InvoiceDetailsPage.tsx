@@ -665,7 +665,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
           // Format products for saving - including all required fields
           const productsToSave = invoiceData.products
-            .filter((product) => !product.istotal && !product.issubtotal)
+            .filter((product) => !product.istotal)
             .map((product) => ({
               code: product.code,
               quantity: product.quantity || 0,
@@ -725,7 +725,7 @@ const InvoiceDetailsPage: React.FC = () => {
         // Handle existing invoice update
         try {
           const productsToSave = invoiceData.products
-            .filter((product) => !product.istotal && !product.issubtotal)
+            .filter((product) => !product.istotal)
             .map((product) => ({
               code: product.code,
               quantity: product.quantity || 0,
