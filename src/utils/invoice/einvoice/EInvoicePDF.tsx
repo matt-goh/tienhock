@@ -407,9 +407,20 @@ const EInvoicePDF: React.FC<Props> = ({
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Total Incl. Tax (MYR)</Text>
           <Text style={styles.summaryValue}>
-            {data.amounts.total?.toFixed(2) || "0.00"}
+            {((data.amounts.subtotal || 0) + (data.amounts.tax || 0)).toFixed(
+              2
+            )}
           </Text>
         </View>
+        {/* Add rounding row here - only show if rounding exists */}
+        {data.amounts.rounding > 0 && (
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Rounding (MYR)</Text>
+            <Text style={styles.summaryValue}>
+              {data.amounts.rounding?.toFixed(2) || "0.00"}
+            </Text>
+          </View>
+        )}
         <View style={[styles.summaryRow, styles.bold]}>
           <Text style={styles.summaryLabel}>Total Payable Amount (MYR)</Text>
           <Text style={styles.summaryValue}>

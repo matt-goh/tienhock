@@ -20,6 +20,7 @@ export interface EInvoicePDFData {
     type: string;
     datetime_validated: string;
     submission_id: string;
+    rounding: number;
     date: string;
     time: string;
   };
@@ -38,6 +39,7 @@ export interface EInvoicePDFData {
     subtotal: number;
     tax: number;
     total: number;
+    rounding: number;
   };
   orderDetails: OrderDetail[];
 }
@@ -70,11 +72,14 @@ const fetchInvoiceDetails = async (invoiceId: string) => {
     const minutes = String(createdDate.getMinutes()).padStart(2, "0");
     const time = `${hours}:${minutes}`;
 
-    return { date, time };
+    const rounding = Number(invoice.rounding || 0);
+
+    return { rounding, date, time };
   } catch (error) {
     console.error("Error fetching invoice details:", error);
     // Return fallback values instead of throwing
     return {
+      rounding: 0,
       date: "N/A",
       time: "N/A",
     };
@@ -94,12 +99,14 @@ const fetchConsolidatedInvoiceDetails = async (invoiceId: string) => {
     return {
       date: formattedDate,
       time: "00:00",
+      rounding: 0,
     };
   } catch (error) {
     console.error("Error parsing consolidated invoice details:", error);
     return {
       date: "N/A",
       time: "N/A",
+      rounding: 0,
     };
   }
 };
@@ -114,16 +121,30 @@ const createConsolidatedOrderDetails = async (einvoiceData: any) => {
     const year = datePart.substring(0, 4);
     const month = datePart.substring(4, 6);
     const formattedDate = `${month}/${year}`;
+
+    // Convert values to numbers to ensure accurate calculation
+    const totalExcludingTax = Number(einvoiceData.total_excluding_tax || 0);
+    const totalPayableAmount = Number(einvoiceData.total_payable_amount || 0);
+    const rounding = Number(einvoiceData.rounding || 0);
+
+    // Check if a specific tax amount is provided
+    let taxAmount;
+    if (einvoiceData.tax_amount !== undefined) {
+      // Use the provided tax amount if available
+      taxAmount = Number(einvoiceData.tax_amount);
+    } else {
+      // Calculate tax accounting for rounding
+      taxAmount = totalPayableAmount - totalExcludingTax - rounding;
+    }
+
     return [
       {
         productname: `Consolidated Invoice for ${formattedDate}`,
         description: `Consolidated Invoice for ${formattedDate}`,
         qty: 1,
-        price: einvoiceData.total_excluding_tax.toString(),
-        total: einvoiceData.total_payable_amount.toString(),
-        tax: (
-          einvoiceData.total_payable_amount - einvoiceData.total_excluding_tax
-        ).toString(),
+        price: totalExcludingTax.toString(),
+        total: totalPayableAmount.toString(),
+        tax: taxAmount.toString(),
       },
     ];
   } catch (error) {
@@ -241,10 +262,30 @@ export const preparePDFData = async (
     ),
   ]);
 
-  // Calculate tax amount
+  // Calculate tax amount accounting for rounding
   const subtotal = Number(einvoiceData.total_excluding_tax);
   const total = Number(einvoiceData.total_payable_amount);
-  const tax = total - subtotal;
+  const rounding = invoiceDetails.rounding || 0;
+  let tax = 0;
+
+  // First try to calculate tax from product details if available
+  if (orderDetails && orderDetails.length > 0) {
+    // Sum product-level taxes
+    tax = orderDetails.reduce(
+      (sum: number, item: { issubtotal: any; tax: any }) => {
+        if (!item.issubtotal) {
+          return sum + (Number(item.tax) || 0);
+        }
+        return sum;
+      },
+      0
+    );
+  }
+
+  // If product-level tax calculation is zero or unavailable, use total-based calculation
+  if (tax === 0) {
+    tax = total - subtotal - rounding;
+  }
 
   // Combine all data
   return {
@@ -256,6 +297,7 @@ export const preparePDFData = async (
       type: einvoiceData.type_name,
       datetime_validated: formatDate(einvoiceData.datetime_validated),
       submission_id: einvoiceData.submission_uid,
+      rounding,
       date: invoiceDetails.date,
       time: invoiceDetails.time,
     },
@@ -274,6 +316,7 @@ export const preparePDFData = async (
       subtotal,
       tax,
       total,
+      rounding,
     },
     orderDetails: orderDetails,
   };
