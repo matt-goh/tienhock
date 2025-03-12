@@ -127,7 +127,7 @@ export default function (pool, config) {
   // Get invoices with filters
   router.get("/", async (req, res) => {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, invoiceId } = req.query;
 
       let query = `
         SELECT 
@@ -166,7 +166,12 @@ export default function (pool, config) {
       const queryParams = [];
       let paramCounter = 1;
 
-      if (startDate && endDate) {
+      // Add invoiceId filter if provided
+      if (invoiceId) {
+        queryParams.push(invoiceId);
+        query += ` AND i.id = $${paramCounter}`;
+        paramCounter++;
+      } else if (startDate && endDate) {
         queryParams.push(startDate, endDate);
         query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
           paramCounter + 1
