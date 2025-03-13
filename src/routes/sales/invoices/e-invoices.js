@@ -53,8 +53,11 @@ const insertAcceptedDocuments = async (
   try {
     await client.query("BEGIN");
     for (const doc of documents) {
-      // Get rounding from original invoice if available, otherwise default to 0
-      const rounding = originalInvoices[doc.internalId]?.rounding || 0;
+      // Convert internalId to string to ensure consistent key lookup
+      const internalIdKey = String(doc.internalId);
+
+      // Get rounding from original invoice - ensure it's a number
+      const rounding = parseFloat(originalInvoices[internalIdKey] || 0);
 
       // Add a default datetime_validated if missing
       const datetime_validated =
@@ -72,7 +75,7 @@ const insertAcceptedDocuments = async (
         doc.totalPayableAmount,
         doc.totalExcludingTax,
         doc.totalNetAmount,
-        rounding, // Use the rounding from original invoice data
+        rounding, // Explicitly converted rounding value
       ]);
     }
     await client.query("COMMIT");

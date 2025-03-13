@@ -32,8 +32,16 @@ const insertAcceptedDocuments = async (
   try {
     await client.query("BEGIN");
     for (const doc of documents) {
-      // Get rounding from original invoice if available, otherwise default to 0
-      const rounding = originalInvoices[doc.internalId]?.rounding || 0;
+      // Convert internalId to string to ensure consistent key lookup
+      const internalIdKey = String(doc.internalId);
+
+      // Get rounding - ensure it's a number and try multiple ways to access it
+      let rounding = 0;
+      if (originalInvoices[internalIdKey] !== undefined) {
+        rounding = parseFloat(originalInvoices[internalIdKey]);
+      } else if (typeof originalInvoices[internalIdKey] === "object") {
+        rounding = parseFloat(originalInvoices[internalIdKey].rounding || 0);
+      }
 
       // Add a default datetime_validated if missing
       const datetime_validated =
@@ -51,7 +59,7 @@ const insertAcceptedDocuments = async (
         doc.totalPayableAmount,
         doc.totalExcludingTax,
         doc.totalNetAmount,
-        rounding, // Use the rounding from original invoice data
+        rounding, // Explicitly processed rounding value
       ]);
     }
     await client.query("COMMIT");
@@ -571,7 +579,10 @@ export default function (pool, config) {
           // Create a map of invoice IDs to rounding values
           const invoiceRoundings = {};
           savedInvoiceData.forEach((invoice) => {
-            invoiceRoundings[invoice.id] = invoice.rounding || 0;
+            // Ensure ID is a string and rounding is explicitly a number
+            const id = String(invoice.id);
+            const rounding = parseFloat(invoice.rounding || 0);
+            invoiceRoundings[id] = rounding;
           });
 
           einvoiceResults = await submitInvoicesToMyInvois(

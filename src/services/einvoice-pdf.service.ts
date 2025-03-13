@@ -3,7 +3,7 @@ import { api } from "../routes/utils/api";
 import { COMPANY_INFO } from "../utils/invoice/einvoice/companyInfo";
 
 interface OrderDetail {
-  productname: string;
+  description: string;
   qty: number;
   price: string;
   total: string;
@@ -170,7 +170,6 @@ const fetchOrderDetails = async (invoiceId: string, einvoiceData?: any) => {
     // Format the order details to ensure tax values are properly included
     return response.map((item: any) => ({
       ...item,
-      productname: item.description || "",
       tax: Number(item.tax || 0),
       qty: Number(item.qty || 0),
       price:

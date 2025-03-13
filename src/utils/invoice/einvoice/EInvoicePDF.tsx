@@ -371,7 +371,7 @@ const EInvoicePDF: React.FC<Props> = ({
           <View key={index} style={styles.tableRow}>
             <Text style={[styles.classCol, styles.cellText]}>022</Text>
             <Text style={[styles.itemNameCol, styles.cellText]}>
-              {item.productname}
+              {item.description}
             </Text>
             <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
             <Text style={[styles.priceCol, styles.cellText]}>
