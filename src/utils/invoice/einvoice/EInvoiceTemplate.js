@@ -159,19 +159,6 @@ const calculateTaxAndTotals = (invoiceData) => {
   // Calculate total tax - prefer product-level calculation
   let totalTax = formatAmount(totalProductTax);
 
-  // If no product-level taxes found, try to calculate from provided values
-  if (
-    totalProductTax === 0 &&
-    invoiceData.totalamountpayable &&
-    invoiceData.amount
-  ) {
-    totalTax = formatAmount(
-      Number(invoiceData.totalamountpayable) -
-        Number(invoiceData.amount) -
-        Number(invoiceData.rounding || 0)
-    );
-  }
-
   // Get the rounding value
   const rounding = formatAmount(invoiceData.rounding || 0);
 
@@ -376,6 +363,7 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
       orderDetails: sanitizedOrderDetails,
       totalamountpayable: Number(rawInvoiceData.totalamountpayable || 0),
       amount: Number(rawInvoiceData.amount || 0),
+      rounding: Number(rawInvoiceData.rounding || 0),
     });
 
     // Start XML document using optimized string concatenation
