@@ -413,11 +413,11 @@ const EInvoicePDF: React.FC<Props> = ({
           </Text>
         </View>
         {/* Add rounding row here - only show if rounding exists */}
-        {data.amounts.rounding > 0 && (
+        {data.invoice.rounding > 0 && (
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Rounding (MYR)</Text>
+            <Text style={styles.summaryLabel}>Total Rounding (MYR)</Text>
             <Text style={styles.summaryValue}>
-              {data.amounts.rounding?.toFixed(2) || "0.00"}
+              {data.invoice.rounding || "0.00"}
             </Text>
           </View>
         )}

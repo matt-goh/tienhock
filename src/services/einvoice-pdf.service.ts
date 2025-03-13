@@ -39,7 +39,6 @@ export interface EInvoicePDFData {
     subtotal: number;
     tax: number;
     total: number;
-    rounding: number;
   };
   orderDetails: OrderDetail[];
 }
@@ -72,9 +71,7 @@ const fetchInvoiceDetails = async (invoiceId: string) => {
     const minutes = String(createdDate.getMinutes()).padStart(2, "0");
     const time = `${hours}:${minutes}`;
 
-    const rounding = Number(invoice.rounding || 0);
-
-    return { rounding, date, time };
+    return { date, time };
   } catch (error) {
     console.error("Error fetching invoice details:", error);
     // Return fallback values instead of throwing
@@ -125,17 +122,12 @@ const createConsolidatedOrderDetails = async (einvoiceData: any) => {
     // Convert values to numbers to ensure accurate calculation
     const totalExcludingTax = Number(einvoiceData.total_excluding_tax || 0);
     const totalPayableAmount = Number(einvoiceData.total_payable_amount || 0);
-    const rounding = Number(einvoiceData.rounding || 0);
+    const rounding = Number(einvoiceData.total_rounding || 0);
 
     // Check if a specific tax amount is provided
     let taxAmount;
-    if (einvoiceData.tax_amount !== undefined) {
-      // Use the provided tax amount if available
-      taxAmount = Number(einvoiceData.tax_amount);
-    } else {
-      // Calculate tax accounting for rounding
-      taxAmount = totalPayableAmount - totalExcludingTax - rounding;
-    }
+    // Calculate tax accounting for rounding
+    taxAmount = totalPayableAmount - totalExcludingTax - rounding;
 
     return [
       {
@@ -265,7 +257,7 @@ export const preparePDFData = async (
   // Calculate tax amount accounting for rounding
   const subtotal = Number(einvoiceData.total_excluding_tax);
   const total = Number(einvoiceData.total_payable_amount);
-  const rounding = invoiceDetails.rounding || 0;
+  const rounding = einvoiceData.total_rounding || 0;
   let tax = 0;
 
   // First try to calculate tax from product details if available
@@ -297,7 +289,7 @@ export const preparePDFData = async (
       type: einvoiceData.type_name,
       datetime_validated: formatDate(einvoiceData.datetime_validated),
       submission_id: einvoiceData.submission_uid,
-      rounding,
+      rounding: rounding,
       date: invoiceDetails.date,
       time: invoiceDetails.time,
     },
@@ -316,7 +308,6 @@ export const preparePDFData = async (
       subtotal,
       tax,
       total,
-      rounding,
     },
     orderDetails: orderDetails,
   };
