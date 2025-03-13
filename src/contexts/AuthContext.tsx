@@ -29,18 +29,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Initialize session and check state
-      await sessionService.initialize();
-      const { staff, hasActiveProfile } = await sessionService.checkState();
-      
-      if (staff && hasActiveProfile) {
-        setUser(staff);
-      } else {
-        // Clear invalid session
-        await sessionService.logout();
+      try {
+        await sessionService.initialize();
+        const { staff, hasActiveProfile } = await sessionService.checkState();
+
+        if (staff && hasActiveProfile) {
+          setUser(staff);
+        } else {
+          // Clear invalid session
+          await sessionService.logout();
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        // Don't await here - just clear local session
+        sessionService
+          .logout()
+          .catch((e) => console.warn("Error during forced logout:", e));
       }
-    } catch (error) {
-      console.error("Auth initialization error:", error);
-      await sessionService.logout();
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
     };
 
-    window.addEventListener('sessionExpired', handleSessionExpired);
-    return () => window.removeEventListener('sessionExpired', handleSessionExpired);
+    window.addEventListener("sessionExpired", handleSessionExpired);
+    return () =>
+      window.removeEventListener("sessionExpired", handleSessionExpired);
   }, []);
 
   return (
