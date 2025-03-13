@@ -7,6 +7,8 @@ import {
   IconSearch,
   IconRotateClockwise,
   IconTrash,
+  IconChevronDown,
+  IconCheck,
 } from "@tabler/icons-react";
 import PaginationControls from "../../components/Invois/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
@@ -14,6 +16,12 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import ConsolidatedInfoTooltip from "../../components/Invois/ConsolidatedInfoTooltip";
 import { LoginResponse } from "../../types/types";
 import toast from "react-hot-toast";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
 
 const STORAGE_KEY = "einvoisDateFilters";
 
@@ -51,11 +59,35 @@ interface PaginationState {
   totalPages: number;
 }
 
+interface MonthOption {
+  id: number;
+  name: string;
+}
+
 const EInvoiceHistoryPage: React.FC = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  // Month options
+  const monthOptions: MonthOption[] = [
+    { id: 0, name: "January" },
+    { id: 1, name: "February" },
+    { id: 2, name: "March" },
+    { id: 3, name: "April" },
+    { id: 4, name: "May" },
+    { id: 5, name: "June" },
+    { id: 6, name: "July" },
+    { id: 7, name: "August" },
+    { id: 8, name: "September" },
+    { id: 9, name: "October" },
+    { id: 10, name: "November" },
+    { id: 11, name: "December" },
+  ];
 
   // Function to get initial dates from localStorage
   const getInitialDates = () => {
@@ -97,9 +129,9 @@ const EInvoiceHistoryPage: React.FC = () => {
     null
   );
   const [isConnecting, setIsConnecting] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState<{
-    [key: string]: boolean;
-  }>({});
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
+    monthOptions[currentMonth]
+  );
 
   // Apply search filter locally
   const applySearchFilter = (data: EInvoice[], term: string) => {
@@ -271,6 +303,30 @@ const EInvoiceHistoryPage: React.FC = () => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   };
 
+  const handleMonthChange = (month: MonthOption) => {
+    setSelectedMonth(month);
+
+    // If selected month is ahead of current month, use previous year
+    const year = month.id > currentMonth ? currentYear - 1 : currentYear;
+
+    // Create start date (1st of the selected month)
+    const startDate = new Date(year, month.id, 1);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Create end date (last day of the selected month)
+    const endDate = new Date(year, month.id + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Save to storage and update state
+    saveDatesToStorage(startDate, endDate);
+    setDateRange({
+      start: startDate,
+      end: endDate,
+    });
+    // Reset to first page when date changes
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
+
   const formatDateForInput = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -422,57 +478,113 @@ const EInvoiceHistoryPage: React.FC = () => {
         </h1>
       </div>
 
-      <div className="flex gap-4 mb-4">
-        <div className="flex-1">
-          <div
-            className={`flex items-center w-fit bg-white border ${
-              isDateRangeFocused ? "border-default-500" : "border-default-300"
-            } rounded-full px-4`}
-          >
-            <div className="flex items-center gap-3 flex-1">
-              <input
-                type="date"
-                value={formatDateForInput(dateRange.start)}
-                onChange={(e) => handleDateChange("start", e.target.value)}
-                onFocus={() => setIsDateRangeFocused(true)}
-                onBlur={() => setIsDateRangeFocused(false)}
-                className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
+      <div className="flex justify-between mb-4">
+        <div className="flex gap-4">
+          <div>
+            <div
+              className={`flex items-center w-fit bg-white border ${
+                isDateRangeFocused ? "border-default-500" : "border-default-300"
+              } rounded-full px-4`}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <input
+                  type="date"
+                  value={formatDateForInput(dateRange.start)}
+                  onChange={(e) => handleDateChange("start", e.target.value)}
+                  onFocus={() => setIsDateRangeFocused(true)}
+                  onBlur={() => setIsDateRangeFocused(false)}
+                  className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
+                />
+                <span className="text-default-400">to</span>
+                <input
+                  type="date"
+                  value={formatDateForInput(dateRange.end)}
+                  onChange={(e) => handleDateChange("end", e.target.value)}
+                  onFocus={() => setIsDateRangeFocused(true)}
+                  onBlur={() => setIsDateRangeFocused(false)}
+                  className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="w-40">
+            <Listbox value={selectedMonth} onChange={handleMonthChange}>
+              <div className="relative">
+                <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                  <span className="block truncate pl-2">
+                    {selectedMonth.name}
+                  </span>
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                    <IconChevronDown
+                      className="h-5 w-5 text-default-400"
+                      aria-hidden="true"
+                    />
+                  </span>
+                </ListboxButton>
+                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                  {monthOptions.map((month) => (
+                    <ListboxOption
+                      key={month.id}
+                      className={({ active }) =>
+                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                          active
+                            ? "bg-default-100 text-default-900"
+                            : "text-default-900"
+                        }`
+                      }
+                      value={month}
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : "font-normal"
+                            }`}
+                          >
+                            {month.name}
+                          </span>
+                          {selected && (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                              <IconCheck
+                                className="h-5 w-5"
+                                aria-hidden="true"
+                              />
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </ListboxOption>
+                  ))}
+                </ListboxOptions>
+              </div>
+            </Listbox>
+          </div>
+        </div>
+        <div className="flex gap-4">
+          <div className="w-[320px]">
+            <div className="relative">
+              <IconSearch
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
+                size={20}
               />
-              <span className="text-default-400">to</span>
               <input
-                type="date"
-                value={formatDateForInput(dateRange.end)}
-                onChange={(e) => handleDateChange("end", e.target.value)}
-                onFocus={() => setIsDateRangeFocused(true)}
-                onBlur={() => setIsDateRangeFocused(false)}
-                className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
+                type="text"
+                placeholder="Search e-invoices..."
+                className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
+          <Button
+            onClick={handleRefresh}
+            disabled={loading}
+            variant="outline"
+            icon={IconRefresh}
+          >
+            Refresh
+          </Button>
         </div>
-        <div className="w-[320px]">
-          <div className="relative">
-            <IconSearch
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Search e-invoices..."
-              className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={loading}
-          variant="outline"
-          icon={IconRefresh}
-        >
-          Refresh
-        </Button>
       </div>
 
       {error && (
