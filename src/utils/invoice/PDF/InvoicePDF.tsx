@@ -661,7 +661,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
               {/* Credit Row */}
               {totals.invoiceCount > 0 && (
                 <View style={styles.summaryDataRow}>
-                  <Text style={styles.summaryTypeCol}>Credit</Text>
+                  <Text style={styles.summaryTypeCol}>Invoice</Text>
                   <Text style={styles.summaryCountCol}>
                     {totals.invoiceCount}
                   </Text>
