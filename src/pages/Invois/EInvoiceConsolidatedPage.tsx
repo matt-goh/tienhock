@@ -107,6 +107,7 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     subtotal: 0,
     tax: 0,
     total: 0,
+    rounding: 0,
   });
 
   // Token validation function
@@ -180,15 +181,13 @@ const EInvoiceConsolidatedPage: React.FC = () => {
         }
       });
 
-      // If product-level tax calculation is zero, fall back to simple calculation
-      if (taxTotal === 0 && selectedInvoices.length > 0) {
-        taxTotal = total - subtotal - roundingTotal;
-      }
+      subtotal = subtotal - taxTotal;
 
       setTotals({
         subtotal,
         tax: taxTotal,
         total,
+        rounding: roundingTotal,
       });
     };
 
@@ -572,6 +571,16 @@ const EInvoiceConsolidatedPage: React.FC = () => {
                   <span className="text-xs text-default-500">Tax</span>
                   <span className="text-base font-semibold text-default-700">
                     {totals.tax.toLocaleString("en-MY", {
+                      style: "currency",
+                      currency: "MYR",
+                    })}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-end">
+                  <span className="text-xs text-default-500">Rounding</span>
+                  <span className="text-base font-semibold text-default-700">
+                    {totals.rounding.toLocaleString("en-MY", {
                       style: "currency",
                       currency: "MYR",
                     })}
