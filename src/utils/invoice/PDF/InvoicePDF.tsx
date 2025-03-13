@@ -11,7 +11,7 @@ interface InvoicePDFProps {
 const ROWS_PER_PAGE = 35;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
-const SUMMARY_ROWS = 3;
+const SUMMARY_ROWS = 1;
 
 // Color palette for easy customization
 const colors = {
@@ -171,6 +171,16 @@ const styles = StyleSheet.create({
   tableSummaryRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  roundingLabel: {
+    fontSize: 7,
+    marginRight: 2,
+    color: "#9CA3AF", // Light gray color
+  },
+  roundingValue: {
+    fontSize: 7,
+    color: "#9CA3AF", // Light gray color
   },
   summaryLabel: {
     width: 120,
@@ -380,7 +390,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
       return sum + (item.product.tax || 0);
     }, 0);
 
-    const total = subtotal + tax;
+    const total = subtotal + tax + invoice.rounding;
 
     return (
       <View>
@@ -442,6 +452,16 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
         {/* Table Footer/Summary */}
         <View style={styles.tableSummary}>
           <View style={styles.tableSummaryRow}>
+            {/* Rounding info inline - only display if rounding exists */}
+            {Number(invoice.rounding || 0) !== 0 && (
+              <>
+                <Text style={styles.roundingLabel}>Rounding</Text>
+                <Text style={styles.roundingValue}>
+                  {Number(invoice.rounding || 0).toFixed(2)}
+                </Text>
+              </>
+            )}
+            {/* Total amount */}
             <Text style={[styles.summaryLabel, styles.headerText]}>
               Total Amount (MYR)
             </Text>
