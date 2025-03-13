@@ -684,6 +684,7 @@ const InvoicePage: React.FC = () => {
                   selectedCount > 0 ? selectedInvoices : filteredInvoices
                 }
                 disabled={selectedCount === 0}
+                customerNames={customerNames}
               />
 
               <Button
