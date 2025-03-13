@@ -411,6 +411,28 @@ export default function (pool, config) {
             throw new Error(`Invoice ${transformedInvoice.id} already exists`);
           }
 
+          // Fetch product descriptions first if needed
+          let productDescriptions = {};
+          if (invoice.products && invoice.products.length > 0) {
+            // Get all product codes that need descriptions
+            const productCodes = invoice.products
+              .filter((p) => !p.description && p.code)
+              .map((p) => p.code);
+
+            if (productCodes.length > 0) {
+              // Fetch descriptions for all products at once
+              const descQuery =
+                "SELECT id, description FROM products WHERE id = ANY($1)";
+              const descResult = await client.query(descQuery, [productCodes]);
+
+              // Create a lookup map for product descriptions
+              productDescriptions = descResult.rows.reduce((map, row) => {
+                map[row.id] = row.description;
+                return map;
+              }, {});
+            }
+          }
+
           // Build insert query
           const columns = Object.keys(transformedInvoice);
           const placeholders = columns
@@ -441,7 +463,10 @@ export default function (pool, config) {
               const freeProduct = Number(product.freeProduct) || 0;
               const returnProduct = Number(product.returnProduct) || 0;
               const tax = Number(product.tax) || 0;
-              const description = product.description || "";
+
+              // Get description from our lookup map or use provided description or empty string
+              const description =
+                product.description || productDescriptions[product.code] || "";
 
               // Calculate total
               const total = (quantity * price + tax).toFixed(2);
@@ -527,50 +552,6 @@ export default function (pool, config) {
 
       // Otherwise commit successful transactions
       await client.query("COMMIT");
-
-      // Process any invoice data that might be missing product descriptions
-      for (const invoice of savedInvoiceData) {
-        const productCodesWithoutDescription = invoice.orderDetails
-          .filter((product) => !product.description)
-          .map((product) => product.code);
-
-        if (productCodesWithoutDescription.length > 0) {
-          try {
-            // Fetch only the missing product descriptions
-            const descriptionQuery = `
-            SELECT id, description 
-            FROM products 
-            WHERE id = ANY($1)
-          `;
-            const descriptionResult = await client.query(descriptionQuery, [
-              productCodesWithoutDescription,
-            ]);
-
-            // Create a lookup map of product code to description
-            const descriptionMap = {};
-            descriptionResult.rows.forEach((row) => {
-              descriptionMap[row.id] = row.description;
-            });
-
-            // Update the product descriptions in our data
-            invoice.orderDetails = invoice.orderDetails.map((product) => {
-              if (!product.description && descriptionMap[product.code]) {
-                return {
-                  ...product,
-                  description: descriptionMap[product.code],
-                };
-              }
-              return product;
-            });
-          } catch (err) {
-            console.error(
-              `Error fetching product descriptions for invoice ${invoice.id}:`,
-              err
-            );
-            // Continue with whatever descriptions we have
-          }
-        }
-      }
 
       // After successful database save, attempt MyInvois submission
       let einvoiceResults = null;
