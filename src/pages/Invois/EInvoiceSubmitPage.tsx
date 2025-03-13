@@ -66,7 +66,9 @@ const EInvoiceSubmitPage: React.FC = () => {
       allSelected: boolean,
       selectedRows: ExtendedInvoiceData[]
     ) => {
-      setSelectedInvoices(selectedRows);
+      setTimeout(() => {
+        setSelectedInvoices(selectedRows);
+      }, 0);
     },
     []
   );
