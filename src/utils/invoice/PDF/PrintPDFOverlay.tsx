@@ -100,6 +100,13 @@ const PrintPDFOverlay = ({
 
             // Trigger print dialog
             printFrame.contentWindow.print();
+
+            // Add a fallback timeout in case onafterprint doesn't fire
+            setTimeout(() => {
+              if (isPrinting) {
+                cleanup();
+              }
+            }, 5000); // 5 seconds should be enough time for most print dialogs
           }
         };
 
