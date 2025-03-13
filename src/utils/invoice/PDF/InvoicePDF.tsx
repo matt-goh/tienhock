@@ -177,10 +177,12 @@ const styles = StyleSheet.create({
     fontSize: 7,
     marginRight: 2,
     color: "#9CA3AF", // Light gray color
+    fontFamily: "Helvetica-Bold",
   },
   roundingValue: {
     fontSize: 7,
     color: "#9CA3AF", // Light gray color
+    fontFamily: "Helvetica-Bold",
   },
   summaryLabel: {
     width: 120,
