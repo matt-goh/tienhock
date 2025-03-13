@@ -8,8 +8,8 @@ interface InvoicePDFProps {
   customerNames?: Record<string, string>;
 }
 
-const ROWS_PER_PAGE = 28;
-const HEADER_ROWS = 3;
+const ROWS_PER_PAGE = 40;
+const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 3;
 const SUMMARY_ROWS = 3;
 
@@ -297,57 +297,65 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
   };
 
   const paginateInvoices = (invoices: InvoiceData[]) => {
+    // If no invoices, return empty array
+    if (!invoices || invoices.length === 0) {
+      return [];
+    }
+
     const pages: InvoiceData[][] = [];
     let currentPage: InvoiceData[] = [];
     let currentPageRows = HEADER_ROWS;
-    let remainingSpace = 0;
 
-    // Calculate total rows needed for summary
-    const summaryNeededRows = SUMMARY_ROWS;
+    // Calculate the max number of content rows available per page
+    const MAX_CONTENT_ROWS = ROWS_PER_PAGE - HEADER_ROWS;
 
+    // Process each invoice
     invoices.forEach((invoice, index) => {
       const invoiceRows = calculateInvoiceRows(invoice);
       const isLastInvoice = index === invoices.length - 1;
 
-      // Check if adding this invoice would exceed page limit
-      if (currentPageRows + invoiceRows > ROWS_PER_PAGE) {
-        // If this is the last invoice, check if we need a new page for summary
-        if (isLastInvoice) {
-          remainingSpace = ROWS_PER_PAGE - currentPageRows;
-          // If not enough space for both invoice and summary, start a new page
-          if (remainingSpace < invoiceRows + summaryNeededRows) {
-            pages.push(currentPage);
-            currentPage = [invoice];
-            currentPageRows = HEADER_ROWS + invoiceRows;
-          } else {
-            currentPage.push(invoice);
-            currentPageRows += invoiceRows;
-          }
-        } else {
-          // Not the last invoice, simply start a new page
+      // Check if adding this invoice to the current page would exceed the limit
+      const wouldExceedLimit = currentPageRows + invoiceRows > ROWS_PER_PAGE;
+
+      // If this is the last invoice, we need to consider space for the summary
+      const summaryRows = isLastInvoice ? SUMMARY_ROWS : 0;
+      const wouldExceedWithSummary =
+        currentPageRows + invoiceRows + summaryRows > ROWS_PER_PAGE;
+
+      // Determine if we need to start a new page
+      let startNewPage = false;
+
+      if (wouldExceedLimit) {
+        // Normal case: invoice doesn't fit on current page
+        startNewPage = true;
+      } else if (isLastInvoice && wouldExceedWithSummary) {
+        // Special case: invoice fits, but no room for summary
+        startNewPage = true;
+      }
+
+      if (startNewPage) {
+        // Only start a new page if we have invoices on the current page
+        if (currentPage.length > 0) {
           pages.push(currentPage);
-          currentPage = [invoice];
-          currentPageRows = HEADER_ROWS + invoiceRows;
+          currentPage = [];
+          currentPageRows = HEADER_ROWS;
         }
-      } else {
-        // Check if this is the last invoice and if we have enough space for summary
-        if (
-          isLastInvoice &&
-          currentPageRows + invoiceRows + summaryNeededRows > ROWS_PER_PAGE
-        ) {
-          // Not enough space for summary, push current page and start new one
-          pages.push(currentPage);
-          currentPage = [invoice];
-          currentPageRows = HEADER_ROWS + invoiceRows;
-        } else {
-          // Enough space, add to current page
-          currentPage.push(invoice);
-          currentPageRows += invoiceRows;
+
+        // Special handling for invoices that exceed a single page
+        if (invoiceRows > MAX_CONTENT_ROWS) {
+          console.warn(
+            `Invoice ${invoice.id} is too large for a single page (${invoiceRows} rows needed)`
+          );
+          // We still add it to its own page as best effort
         }
       }
+
+      // Add the invoice to the current page
+      currentPage.push(invoice);
+      currentPageRows += invoiceRows;
     });
 
-    // Push the last page if it has any invoices
+    // Add the last page if it has any invoices
     if (currentPage.length > 0) {
       pages.push(currentPage);
     }
