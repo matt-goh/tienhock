@@ -106,7 +106,7 @@ const PrintPDFOverlay = ({
               if (isPrinting) {
                 cleanup();
               }
-            }, 5000); // 5 seconds should be enough time for most print dialogs
+            }, 3000); // 3 seconds should be enough time for most print dialogs
           }
         };
 
