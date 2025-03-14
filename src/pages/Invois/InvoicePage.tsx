@@ -29,6 +29,7 @@ import toast from "react-hot-toast";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import DateRangePicker from "../../components/DateRangePicker";
 import {
   parseDatabaseTimestamp,
   formatDisplayDate,
@@ -112,7 +113,6 @@ const InvoicePage: React.FC = () => {
     applyPaymentTypeFilter: true,
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [customerNames, setCustomerNames] = useState<Record<string, string>>(
     {}
@@ -591,111 +591,6 @@ const InvoicePage: React.FC = () => {
     return Array.from(new Set(invoices.map((invoice) => invoice.customerid)));
   }, [invoices]);
 
-  const formatDateForInput = (date: Date | null): string => {
-    if (!date) return "";
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const getDateRangeInfo = (start: Date, end: Date) => {
-    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
-    const rangeDuration = end.getTime() - start.getTime();
-    return {
-      isWithinMonth: rangeDuration <= oneMonthMs,
-      isValidDirection: rangeDuration > 0,
-      rangeDuration,
-    };
-  };
-
-  const adjustDateRange = (
-    newDate: Date,
-    type: "start" | "end",
-    currentRange: { start: Date | null; end: Date | null }
-  ): { start: Date; end: Date } => {
-    const oneMonthMs = 32 * 24 * 60 * 60 * 1000;
-
-    if (!currentRange.start || !currentRange.end) {
-      // If we don't have both dates, set the other date one month apart
-      if (type === "start") {
-        return {
-          start: newDate,
-          end: new Date(newDate.getTime() + oneMonthMs),
-        };
-      } else {
-        return {
-          start: new Date(newDate.getTime() - oneMonthMs),
-          end: newDate,
-        };
-      }
-    }
-
-    // Check if the new range would exceed one month
-    const rangeInfo = getDateRangeInfo(
-      type === "start" ? newDate : currentRange.start,
-      type === "end" ? newDate : currentRange.end
-    );
-
-    if (!rangeInfo.isValidDirection) {
-      // If dates are in wrong order, adjust the other date to maintain order
-      return type === "start"
-        ? {
-            start: newDate,
-            end: new Date(newDate.getTime() + 24 * 60 * 60 * 1000),
-          } // one day later
-        : {
-            start: new Date(newDate.getTime() - 24 * 60 * 60 * 1000),
-            end: newDate,
-          }; // one day earlier
-    }
-
-    if (!rangeInfo.isWithinMonth) {
-      // If range exceeds one month, adjust the other date to maintain one month maximum
-      return type === "start"
-        ? { start: newDate, end: new Date(newDate.getTime() + oneMonthMs) }
-        : { start: new Date(newDate.getTime() - oneMonthMs), end: newDate };
-    }
-
-    // If range is valid (within a month), return new date with existing other date
-    return {
-      start: type === "start" ? newDate : currentRange.start,
-      end: type === "end" ? newDate : currentRange.end,
-    };
-  };
-
-  const handleDateChange = (type: "start" | "end", value: string) => {
-    if (!value) {
-      const newDateRange = {
-        ...filters.dateRange,
-        [type]: null,
-      };
-      handleFilterChange({
-        ...filters,
-        dateRange: newDateRange,
-      });
-      return;
-    }
-
-    const [year, month, day] = value.split("-").map(Number);
-    const newDate = new Date(year, month - 1, day);
-
-    // Set time based on start or end
-    if (type === "end") {
-      newDate.setHours(23, 59, 59, 999); // End of the day
-    } else {
-      newDate.setHours(0, 0, 0, 0); // Start of the day
-    }
-
-    // Get adjusted date range
-    const adjustedRange = adjustDateRange(newDate, type, filters.dateRange);
-
-    handleFilterChange({
-      ...filters,
-      dateRange: adjustedRange,
-    });
-  };
-
   if (isLoading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
@@ -784,37 +679,18 @@ const InvoicePage: React.FC = () => {
             <div className="flex gap-4">
               {/* Date Range */}
               <div className="flex-1">
-                <div
-                  className={`flex items-center bg-white border ${
-                    isDateRangeFocused
-                      ? "border-default-500"
-                      : "border-default-300"
-                  } rounded-full px-4`}
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <input
-                      type="date"
-                      value={formatDateForInput(
-                        filters.dateRange?.start ?? null
-                      )}
-                      onChange={(e) =>
-                        handleDateChange("start", e.target.value)
-                      }
-                      onFocus={() => setIsDateRangeFocused(true)}
-                      onBlur={() => setIsDateRangeFocused(false)}
-                      className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
-                    />
-                    <span className="text-default-400">to</span>
-                    <input
-                      type="date"
-                      value={formatDateForInput(filters.dateRange?.end ?? null)}
-                      onChange={(e) => handleDateChange("end", e.target.value)}
-                      onFocus={() => setIsDateRangeFocused(true)}
-                      onBlur={() => setIsDateRangeFocused(false)}
-                      className="flex-1 px-2 py-2 rounded-full bg-transparent outline-none"
-                    />
-                  </div>
-                </div>
+                <DateRangePicker
+                  dateRange={{
+                    start: filters.dateRange.start || today,
+                    end: filters.dateRange.end || tomorrow,
+                  }}
+                  onDateChange={(newDateRange) =>
+                    handleFilterChange({
+                      ...filters,
+                      dateRange: newDateRange,
+                    })
+                  }
+                />
               </div>
 
               {/* Month Selection */}

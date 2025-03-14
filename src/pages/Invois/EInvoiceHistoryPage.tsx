@@ -14,6 +14,7 @@ import PaginationControls from "../../components/Invois/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import ConsolidatedInfoTooltip from "../../components/Invois/ConsolidatedInfoTooltip";
+import DateRangePicker from "../../components/DateRangePicker";
 import { LoginResponse } from "../../types/types";
 import toast from "react-hot-toast";
 import {
@@ -481,30 +482,19 @@ const EInvoiceHistoryPage: React.FC = () => {
       <div className="flex justify-between mb-4">
         <div className="flex gap-4">
           <div>
-            <div
-              className={`flex items-center w-fit bg-white border ${
-                isDateRangeFocused ? "border-default-500" : "border-default-300"
-              } rounded-full px-4`}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <input
-                  type="date"
-                  value={formatDateForInput(dateRange.start)}
-                  onChange={(e) => handleDateChange("start", e.target.value)}
-                  onFocus={() => setIsDateRangeFocused(true)}
-                  onBlur={() => setIsDateRangeFocused(false)}
-                  className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
-                />
-                <span className="text-default-400">to</span>
-                <input
-                  type="date"
-                  value={formatDateForInput(dateRange.end)}
-                  onChange={(e) => handleDateChange("end", e.target.value)}
-                  onFocus={() => setIsDateRangeFocused(true)}
-                  onBlur={() => setIsDateRangeFocused(false)}
-                  className="w-44 px-2 py-2 rounded-full bg-transparent outline-none"
-                />
-              </div>
+            <div className="flex items-center gap-3 flex-1">
+              <DateRangePicker
+                dateRange={dateRange}
+                onDateChange={(newDateRange) => {
+                  // Save to storage
+                  saveDatesToStorage(newDateRange.start, newDateRange.end);
+                  setDateRange(newDateRange);
+                  // Reset to first page when date changes
+                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                }}
+                startInputWidth="w-44"
+                endInputWidth="w-44"
+              />
             </div>
           </div>
           <div className="w-40">
