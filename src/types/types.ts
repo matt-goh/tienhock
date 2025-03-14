@@ -427,6 +427,8 @@ export interface Customer extends CustomerList {
   state: string;
   id_type: string;
   originalId?: string;
+  credit_limit?: number;
+  credit_used?: number;
 }
 
 export interface Job {

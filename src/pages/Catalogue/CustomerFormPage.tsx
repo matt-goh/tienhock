@@ -53,6 +53,8 @@ const CustomerFormPage: React.FC = () => {
     state: "12",
     id_number: "",
     id_type: "",
+    credit_limit: 3000,
+    credit_used: 0,
   });
 
   // UI state
@@ -498,6 +500,13 @@ const CustomerFormPage: React.FC = () => {
     );
   };
 
+  const getProgressBarColor = (used: number, limit: number): string => {
+    const percentage = (used / limit) * 100;
+    if (percentage >= 90) return "bg-rose-500"; // Red for high usage
+    if (percentage >= 70) return "bg-amber-500"; // Yellow/amber for medium usage
+    return "bg-emerald-500"; // Green for low usage
+  };
+
   if (loading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
@@ -582,6 +591,126 @@ const CustomerFormPage: React.FC = () => {
 
               {/* Second tab - Customer Sales Details */}
               <div className="space-y-6">
+                {/* Credit Management Section */}
+                <div className="mt-6 p-4 border rounded-lg bg-white">
+                  <h3 className="text-lg font-medium text-default-900 mb-3">
+                    Credit Management
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Credit Limit Box */}
+                    <div className="border border-default-300 rounded-lg bg-white overflow-hidden h-[60px] flex flex-col">
+                      <div className="px-3 pt-2 text-xs text-default-500">
+                        Credit Limit (RM)
+                      </div>
+                      <div className="px-3 pb-2 flex-grow">
+                        <input
+                          type="text"
+                          name="credit_limit"
+                          value={formData.credit_limit?.toString() || "3000"}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (/^\d*\.?\d{0,2}$/.test(value) || value === "") {
+                              setFormData({
+                                ...formData,
+                                credit_limit:
+                                  value === "" ? 0 : parseFloat(value),
+                              });
+                            }
+                          }}
+                          placeholder="3000.00"
+                          className="w-full h-full bg-transparent border-0 p-0 font-medium text-default-800 focus:outline-none focus:ring-0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Used Credit Box */}
+                    <div className="border border-default-300 rounded-lg bg-default-50 h-[60px] flex flex-col">
+                      <div className="px-3 pt-2 text-xs text-default-500">
+                        Used
+                      </div>
+                      <div className="px-3 pb-2 flex-grow flex items-center">
+                        <span className="font-medium text-default-700">
+                          {formData.credit_used !== undefined
+                            ? `RM ${parseFloat(
+                                formData.credit_used.toString()
+                              ).toFixed(2)}`
+                            : "RM 0.00"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Available Credit Box */}
+                    <div className="border border-default-300 rounded-lg bg-default-50 h-[60px] flex flex-col">
+                      <div className="px-3 pt-2 text-xs text-default-500">
+                        Available
+                      </div>
+                      <div className="px-3 pb-2 flex-grow flex items-center">
+                        <span className="font-medium text-default-700">
+                          {formData.credit_limit === 0
+                            ? "Unlimited"
+                            : `RM ${Math.max(
+                                0,
+                                (formData.credit_limit || 0) -
+                                  (formData.credit_used || 0)
+                              ).toFixed(2)}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Credit Usage Visualization - Only show when credit limit is greater than 0 */}
+                  {(formData.credit_limit || 0) > 0 && (
+                    <div className="mt-4">
+                      <div className="flex justify-between text-xs text-default-600 mb-1">
+                        <span>Credit Usage</span>
+                        <span>
+                          {parseFloat(
+                            (formData.credit_used || 0).toString()
+                          ).toFixed(2)}{" "}
+                          /{" "}
+                          {parseFloat(
+                            (formData.credit_limit || 0).toString()
+                          ).toFixed(2)}{" "}
+                          RM (
+                          {Math.min(
+                            ((formData.credit_used || 0) /
+                              (formData.credit_limit || 1)) *
+                              100,
+                            100
+                          ).toFixed(1)}
+                          %)
+                        </span>
+                      </div>
+                      <div className="w-full bg-default-200 rounded-full h-2.5">
+                        <div
+                          className={`h-2.5 rounded-full ${getProgressBarColor(
+                            formData.credit_used || 0,
+                            formData.credit_limit || 3000
+                          )}`}
+                          style={{
+                            width: `${Math.min(
+                              ((formData.credit_used || 0) /
+                                (formData.credit_limit || 1)) *
+                                100,
+                              100
+                            )}%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show this message when credit limit is exactly 0 (unlimited) */}
+                  {formData.credit_limit === 0 && (
+                    <div className="mt-4 text-center py-2 bg-sky-100 text-sky-800 rounded-md">
+                      <span className="text-sm">
+                        Customer has unlimited credit
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <CustomerProductsTab
                   customerId={id || ""}
                   isNewCustomer={!isEditMode}
@@ -595,7 +724,7 @@ const CustomerFormPage: React.FC = () => {
             </Tab>
           </div>
 
-          <div className="mt-6 py-3 space-x-3 text-right">
+          <div className="mt-4 py-3 space-x-3 text-right">
             {isEditMode && (
               <Button
                 type="button"
