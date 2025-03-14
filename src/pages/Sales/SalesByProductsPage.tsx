@@ -446,55 +446,11 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full p-6 max-w-7xl mx-auto">
+    <div className="w-full p-6 max-w-7xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold mb-6">Sales by Products</h1>
 
-      {/* Product Mix Analysis Chart */}
-      <div className="bg-white rounded-lg border shadow p-4 pb-0 mb-4">
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={yearlyTrendData}
-              margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="month"
-                textAnchor="middle"
-                height={80}
-                tickMargin={15}
-              />
-              <YAxis
-                tickFormatter={(value: string | number | bigint) =>
-                  new Intl.NumberFormat("en", {
-                    notation: "compact",
-                    compactDisplay: "short",
-                  }).format(Number(value))
-                }
-              />
-              <Tooltip
-                formatter={(value: any) => formatCurrency(Number(value))}
-                itemSorter={(item) => (item.value ? -Number(item.value) : 0)}
-              />
-              <Legend wrapperStyle={{ bottom: 20 }} />
-              {Object.keys(categoryColors).map((type) => (
-                <Line
-                  key={type}
-                  type="monotone"
-                  dataKey={type}
-                  stroke={categoryColors[type]}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {/* Summary section */}
-      <div className="bg-white rounded-lg border shadow p-4 mb-6">
+      <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Monthly Summary</h2>
@@ -535,88 +491,6 @@ const SalesByProductsPage: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Dashboard content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg border shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Category Performance</h2>
-          {summary.pieData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={summary.pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100).toFixed(1)}%`
-                    }
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {summary.pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value) => formatCurrency(Number(value))}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
-              No data available
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-lg border shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Top Selling Products</h2>
-          {topProducts.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={topProducts}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <XAxis type="number" />
-                  <YAxis
-                    type="category"
-                    dataKey="id"
-                    width={80}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(Number(value))}
-                    labelFormatter={(label) => {
-                      const product = topProducts.find((p) => p.id === label);
-                      return product
-                        ? `${product.id}: ${product.description}`
-                        : label;
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="totalSales"
-                    name="Sales"
-                    fill="#4299e1"
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
-              No data available
-            </div>
-          )}
         </div>
       </div>
 
@@ -764,6 +638,132 @@ const SalesByProductsPage: React.FC = () => {
             sales data exists.
           </div>
         )}
+      </div>
+
+      {/* Dashboard content */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg border shadow p-4">
+          <h2 className="text-lg font-semibold mb-4">Category Performance</h2>
+          {summary.pieData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={summary.pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) =>
+                      `${name}: ${(percent * 100).toFixed(1)}%`
+                    }
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {summary.pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value) => formatCurrency(Number(value))}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
+              No data available
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg border shadow p-4">
+          <h2 className="text-lg font-semibold mb-4">Top Selling Products</h2>
+          {topProducts.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={topProducts}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <XAxis type="number" />
+                  <YAxis
+                    type="category"
+                    dataKey="id"
+                    width={80}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip
+                    formatter={(value) => formatCurrency(Number(value))}
+                    labelFormatter={(label) => {
+                      const product = topProducts.find((p) => p.id === label);
+                      return product
+                        ? `${product.id}: ${product.description}`
+                        : label;
+                    }}
+                  />
+                  <Legend />
+                  <Bar
+                    dataKey="totalSales"
+                    name="Sales"
+                    fill="#4299e1"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
+              No data available
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Product Mix Analysis Chart */}
+      <div className="bg-white rounded-lg border shadow p-4 pb-0">
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={yearlyTrendData}
+              margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                textAnchor="middle"
+                height={80}
+                tickMargin={15}
+              />
+              <YAxis
+                tickFormatter={(value: string | number | bigint) =>
+                  new Intl.NumberFormat("en", {
+                    notation: "compact",
+                    compactDisplay: "short",
+                  }).format(Number(value))
+                }
+              />
+              <Tooltip
+                formatter={(value: any) => formatCurrency(Number(value))}
+                itemSorter={(item) => (item.value ? -Number(item.value) : 0)}
+              />
+              <Legend wrapperStyle={{ bottom: 20 }} />
+              {Object.keys(categoryColors).map((type) => (
+                <Line
+                  key={type}
+                  type="monotone"
+                  dataKey={type}
+                  stroke={categoryColors[type]}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
