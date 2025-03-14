@@ -177,10 +177,12 @@ const styles = StyleSheet.create({
     fontSize: 7,
     marginRight: 2,
     color: "#9CA3AF", // Light gray color
+    fontFamily: "Helvetica-Bold",
   },
   roundingValue: {
     fontSize: 7,
     color: "#9CA3AF", // Light gray color
+    fontFamily: "Helvetica-Bold",
   },
   summaryLabel: {
     width: 120,
@@ -661,7 +663,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
               {/* Credit Row */}
               {totals.invoiceCount > 0 && (
                 <View style={styles.summaryDataRow}>
-                  <Text style={styles.summaryTypeCol}>Credit</Text>
+                  <Text style={styles.summaryTypeCol}>Invoice</Text>
                   <Text style={styles.summaryCountCol}>
                     {totals.invoiceCount}
                   </Text>
