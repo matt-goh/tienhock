@@ -11,16 +11,20 @@ import {
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import {
+  useJobCategoriesCache,
+  refreshJobCategoriesCache,
+} from "../../utils/catalogue/useJobCategoriesCache";
 
 const JobCategoryPage: React.FC = () => {
-  const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
+  // Replace direct state with cached data
+  const { jobCategories, isLoading, error } = useJobCategoriesCache();
   const [editedJobCategories, setEditedJobCategories] = useState<JobCategory[]>(
     []
   );
   const [sections, setSections] = useState<string[]>(["All Section"]);
   const [selectedSection, setSelectedSection] = useState<string>("All Section");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
   const jobCategoryColumns: ColumnConfig[] = useMemo(() => {
@@ -80,23 +84,9 @@ const JobCategoryPage: React.FC = () => {
     }
   }, []);
 
-  const fetchJobCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await api.get("/api/job-categories");
-      setJobCategories(data);
-    } catch (error) {
-      console.error("Error fetching job categories:", error);
-      toast.error("Failed to fetch job categories. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchJobCategories();
     fetchSections();
-  }, [fetchJobCategories, fetchSections]);
+  }, [fetchSections]);
 
   useEffect(() => {
     if (isEditing) {
@@ -120,11 +110,8 @@ const JobCategoryPage: React.FC = () => {
       try {
         await api.delete("/api/job-categories", categoryIdsToDelete);
 
-        setJobCategories((prevCategories) =>
-          prevCategories.filter(
-            (category) => !categoryIdsToDelete.includes(category.id)
-          )
-        );
+        // Refresh the cache after successful deletion
+        await refreshJobCategoriesCache();
 
         toast.success("Selected job categories deleted successfully");
         setIsEditing(false);
@@ -188,31 +175,12 @@ const JobCategoryPage: React.FC = () => {
         id: category.originalId || category.id,
       }));
 
-      const result = await api.post("/api/job-categories/batch", {
+      await api.post("/api/job-categories/batch", {
         jobCategories: jobCategoriesToUpdate,
       });
 
-      // Update local state with the changes
-      setJobCategories((prevCategories) => {
-        const updatedCategories = [...prevCategories];
-        result.jobCategories.forEach((updatedCategory: JobCategory) => {
-          const index = updatedCategories.findIndex(
-            (cat) => cat.id === updatedCategory.id
-          );
-          if (index !== -1) {
-            updatedCategories[index] = {
-              ...updatedCategory,
-              originalId: updatedCategory.id,
-            };
-          } else {
-            updatedCategories.push({
-              ...updatedCategory,
-              originalId: updatedCategory.id,
-            });
-          }
-        });
-        return updatedCategories;
-      });
+      // After successfully saving, refresh the job categories cache
+      await refreshJobCategoriesCache();
 
       setIsEditing(false);
       toast.success("Changes saved successfully");
@@ -313,12 +281,16 @@ const JobCategoryPage: React.FC = () => {
     </>
   );
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
+  }
+
+  if (error) {
+    return <div>Error: {error.message}</div>;
   }
 
   return (
