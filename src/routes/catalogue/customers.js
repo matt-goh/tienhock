@@ -180,22 +180,6 @@ export default function (pool) {
     }
   });
 
-  router.get("/get-customers", async (req, res) => {
-    try {
-      const query = `
-        SELECT
-          id, name, id_number, tin_number, salesman, email, phone_number, address, city
-        FROM customers
-      `;
-
-      const result = await pool.query(query);
-      res.json(result.rows);
-    } catch (error) {
-      console.error("Error fetching customers:", error);
-      res.status(500).json({ error: "Failed to fetch customers" });
-    }
-  });
-
   router.get("/by-tin/:tin", async (req, res) => {
     const { tin } = req.params;
 
