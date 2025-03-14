@@ -124,6 +124,8 @@ export default function (pool) {
       state,
       id_number,
       id_type,
+      credit_limit,
+      credit_used,
     } = req.body;
 
     // Transform empty strings to null for numeric fields
@@ -140,6 +142,8 @@ export default function (pool) {
       state || null,
       id_number || null,
       id_type || null,
+      credit_limit || 3000,
+      credit_used || 0,
     ];
 
     try {
@@ -156,9 +160,11 @@ export default function (pool) {
           city,
           state,
           id_number,
-          id_type
+          id_type,
+          credit_limit,
+          credit_used
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *
       `;
 
@@ -310,6 +316,8 @@ export default function (pool) {
       id_number,
       id_type,
       newId,
+      credit_limit,
+      credit_used,
     } = req.body;
 
     // Are we trying to change the ID?
@@ -336,9 +344,9 @@ export default function (pool) {
           const insertQuery = `
             INSERT INTO customers (
               id, name, closeness, salesman, tin_number, phone_number, email, 
-              address, city, state, id_number, id_type
+              address, city, state, id_number, id_type, credit_limit, credit_used
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
             ) RETURNING *
           `;
 
@@ -355,6 +363,8 @@ export default function (pool) {
             state || null,
             id_number || null,
             id_type || null,
+            credit_limit || 3000,
+            credit_used || 0,
           ];
 
           const insertResult = await client.query(insertQuery, insertValues);
@@ -391,13 +401,15 @@ export default function (pool) {
               city = $8,
               state = $9,
               id_number = $10,
-              id_type = $11
-            WHERE id = $12
+              id_type = $11,
+              credit_limit = $12,
+              credit_used = $13
+            WHERE id = $14
             RETURNING *
           `;
 
           const values = [
-            name, // This is where the error was occurring
+            name,
             closeness,
             salesman,
             tin_number || null,
@@ -408,6 +420,8 @@ export default function (pool) {
             state || null,
             id_number || null,
             id_type || null,
+            credit_limit || 0, // Default to 0 if not provided
+            credit_used || 0,
             id,
           ];
 
