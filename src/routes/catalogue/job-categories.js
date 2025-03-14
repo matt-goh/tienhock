@@ -71,30 +71,31 @@ export default function(pool) {
   });
 
   // Delete job categories (batch delete)
-  router.delete('/', async (req, res) => {
-    const { jobCategoryIds } = req.body;
+router.delete('/', async (req, res) => {
+  // Check for IDs in both possible payload formats
+  const jobCategoryIds = req.body.jobCategoryIds || req.body["job-categories"];
 
-    if (!Array.isArray(jobCategoryIds) || jobCategoryIds.length === 0) {
-      return res.status(400).json({ message: 'Invalid job category IDs provided' });
-    }
+  if (!Array.isArray(jobCategoryIds) || jobCategoryIds.length === 0) {
+    return res.status(400).json({ message: 'Invalid job category IDs provided' });
+  }
 
-    try {
-      const query = 'DELETE FROM job_categories WHERE id = ANY($1) RETURNING id';
-      const result = await pool.query(query, [jobCategoryIds]);
+  try {
+    const query = 'DELETE FROM job_categories WHERE id = ANY($1) RETURNING id';
+    const result = await pool.query(query, [jobCategoryIds]);
 
-      const deletedIds = result.rows.map(row => row.id);
-      res.status(200).json({ 
-        message: 'Job categories deleted successfully', 
-        deletedJobCategoryIds: deletedIds 
-      });
-    } catch (error) {
-      console.error('Error deleting job categories:', error);
-      res.status(500).json({ 
-        message: 'Error deleting job categories', 
-        error: error.message 
-      });
-    }
-  });
+    const deletedIds = result.rows.map(row => row.id);
+    res.status(200).json({ 
+      message: 'Job categories deleted successfully', 
+      deletedJobCategoryIds: deletedIds 
+    });
+  } catch (error) {
+    console.error('Error deleting job categories:', error);
+    res.status(500).json({ 
+      message: 'Error deleting job categories', 
+      error: error.message 
+    });
+  }
+});
 
   // Batch update/insert job categories
   router.post('/batch', async (req, res) => {
