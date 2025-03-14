@@ -599,7 +599,7 @@ const CustomerFormPage: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Credit Limit Box */}
-                    <div className="border border-default-300 rounded-lg bg-white overflow-hidden h-[60px] flex flex-col">
+                    <div className="border border-default-300 rounded-lg bg-white overflow-hidden h-[60px] flex flex-col focus-within:outline-none focus-within:border-default-500 transition-colors">
                       <div className="px-3 pt-2 text-xs text-default-500">
                         Credit Limit (RM)
                       </div>
