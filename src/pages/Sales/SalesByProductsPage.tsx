@@ -465,16 +465,16 @@ const SalesByProductsPage: React.FC = () => {
                 tickMargin={15}
               />
               <YAxis
-                tickFormatter={(value) =>
+                tickFormatter={(value: string | number | bigint) =>
                   new Intl.NumberFormat("en", {
                     notation: "compact",
                     compactDisplay: "short",
-                  }).format(value)
+                  }).format(Number(value))
                 }
               />
               <Tooltip
                 formatter={(value: any) => formatCurrency(Number(value))}
-                itemSorter={(item) => -Number(item.value)}
+                itemSorter={(item) => (item.value ? -Number(item.value) : 0)}
               />
               <Legend wrapperStyle={{ bottom: 20 }} />
               {Object.keys(categoryColors).map((type) => (

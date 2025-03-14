@@ -34,8 +34,21 @@ import {
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
 import { api } from "../../routes/utils/api";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
+import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 
 const STORAGE_KEY = "invoisDateFilters";
+
+// Define month options type and array
+interface MonthOption {
+  id: number;
+  name: string;
+}
 
 const InvoicePage: React.FC = () => {
   const today = new Date();
@@ -58,6 +71,26 @@ const InvoicePage: React.FC = () => {
       end: tomorrow,
     };
   };
+
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  // Month options
+  const monthOptions: MonthOption[] = [
+    { id: 0, name: "January" },
+    { id: 1, name: "February" },
+    { id: 2, name: "March" },
+    { id: 3, name: "April" },
+    { id: 4, name: "May" },
+    { id: 5, name: "June" },
+    { id: 6, name: "July" },
+    { id: 7, name: "August" },
+    { id: 8, name: "September" },
+    { id: 9, name: "October" },
+    { id: 10, name: "November" },
+    { id: 11, name: "December" },
+  ];
 
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<
@@ -83,6 +116,9 @@ const InvoicePage: React.FC = () => {
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [customerNames, setCustomerNames] = useState<Record<string, string>>(
     {}
+  );
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
+    monthOptions[currentMonth]
   );
   const clearSelectionRef = useRef<(() => void) | null>(null);
   const location = useLocation();
@@ -245,7 +281,30 @@ const InvoicePage: React.FC = () => {
     }
   };
 
-  // In InvoicePage.tsx
+  const handleMonthChange = (month: MonthOption) => {
+    setSelectedMonth(month);
+
+    // If selected month is ahead of current month, use previous year
+    const year = month.id > currentMonth ? currentYear - 1 : currentYear;
+
+    // Create start date (1st of the selected month)
+    const startDate = new Date(year, month.id, 1);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Create end date (last day of the selected month)
+    const endDate = new Date(year, month.id + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Update filters with the new date range
+    handleFilterChange({
+      ...filters,
+      dateRange: {
+        start: startDate,
+        end: endDate,
+      },
+    });
+  };
+
   const applyFilters = useCallback(() => {
     let filtered = [...invoices];
 
@@ -684,6 +743,7 @@ const InvoicePage: React.FC = () => {
                   selectedCount > 0 ? selectedInvoices : filteredInvoices
                 }
                 disabled={selectedCount === 0}
+                customerNames={customerNames}
               />
 
               <Button
@@ -755,6 +815,60 @@ const InvoicePage: React.FC = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Month Selection */}
+              <div className="w-40">
+                <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                  <div className="relative">
+                    <ListboxButton className="w-full h-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                      <span className="block truncate pl-2">
+                        {selectedMonth.name}
+                      </span>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <IconChevronDown
+                          className="h-5 w-5 text-default-400"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </ListboxButton>
+                    <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                      {monthOptions.map((month) => (
+                        <ListboxOption
+                          key={month.id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                          value={month}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {month.name}
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </div>
+                </Listbox>
               </div>
 
               {/* Search Bar */}

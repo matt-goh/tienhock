@@ -58,19 +58,43 @@ class SessionService {
     return error;
   }
 
+  // In src/services/SessionService.ts
+
   async initialize(): Promise<void> {
     try {
       const storedSession = this.getStoredSession();
 
-      await api.post("/api/sessions/register", {
+      const response = await api.post("/api/sessions/register", {
         sessionId: this.currentSessionId,
         staffId: storedSession?.staffId || null,
       });
+
+      if (response.requireReconnect) {
+        // Server is indicating we need to start fresh
+        this.clearSession();
+        throw this.createSessionError(
+          "Server requires reconnection",
+          "INITIALIZATION_ERROR"
+        );
+      }
 
       if (!this.getStoredSessionId()) {
         localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
       }
     } catch (error) {
+      // If there's a connection error, don't throw - allow the app to function
+      // in a degraded state and attempt reconnection later
+      if (
+        error instanceof Error &&
+        (error.message.includes("Network Error") ||
+          error.message.includes("Failed to fetch"))
+      ) {
+        console.warn(
+          "Network error during session initialization, will retry later"
+        );
+        return;
+      }
+
       throw this.createSessionError(
         "Failed to initialize session",
         "INITIALIZATION_ERROR",
@@ -97,14 +121,35 @@ class SessionService {
       const response = await api.get(
         `/api/sessions/state/${this.currentSessionId}`
       );
+
+      // Handle maintenance mode from server
+      if (response.maintenance) {
+        console.log("Server is in maintenance mode");
+        return {
+          staff: null,
+          hasActiveProfile: false,
+        };
+      }
+
       if (response.staff) {
         this.updateStoredSession(response.staff.id, response.staff);
       }
+
       return {
         staff: response.staff || null,
         hasActiveProfile: response.hasActiveProfile,
       };
-    } catch (error) {
+    } catch (error: any) {
+      // Check for specific error codes that indicate session issues
+      if (
+        error.response?.data?.code === "SESSION_NOT_FOUND" ||
+        error.response?.data?.requireLogin
+      ) {
+        console.log("Session no longer valid, triggering logout");
+        // Fire session expired event
+        window.dispatchEvent(new Event("sessionExpired"));
+      }
+
       console.error("Session state check failed:", error);
       return {
         staff: null,
@@ -183,6 +228,8 @@ class SessionService {
   async logout(): Promise<void> {
     try {
       await this.endSession();
+    } catch (error) {
+      console.warn("Error during logout:", error);
     } finally {
       this.clearSession();
       // Generate new session ID for anonymous tracking
@@ -199,11 +246,15 @@ class SessionService {
         clearInterval(this.stateCheckInterval);
       }
     } catch (error) {
-      throw this.createSessionError(
-        "Failed to end session",
-        "NETWORK_ERROR",
-        error as Error
+      console.warn(
+        "Failed to end session on server, clearing local session anyway:",
+        error
       );
+      // Don't throw error here - just clear local session
+      this.clearSession();
+      if (this.stateCheckInterval) {
+        clearInterval(this.stateCheckInterval);
+      }
     }
   }
 
