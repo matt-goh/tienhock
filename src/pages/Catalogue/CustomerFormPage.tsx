@@ -12,7 +12,7 @@ import {
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
+import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
 import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
