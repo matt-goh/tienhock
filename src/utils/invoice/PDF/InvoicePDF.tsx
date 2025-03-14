@@ -8,7 +8,7 @@ interface InvoicePDFProps {
   customerNames?: Record<string, string>;
 }
 
-const ROWS_PER_PAGE = 35;
+const ROWS_PER_PAGE = 34;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
 const SUMMARY_ROWS = 1;
@@ -35,10 +35,10 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     paddingTop: 15,
     paddingBottom: 15,
-    paddingLeft: 40,
-    paddingRight: 40,
+    paddingLeft: 30,
+    paddingRight: 30,
     fontFamily: "Helvetica",
-    fontSize: 9,
+    fontSize: 10,
     backgroundColor: colors.background,
   },
   header: {
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     minWidth: 40,
   },
   infoLabel: {
-    fontSize: 7,
+    fontSize: 8,
     color: "#64748B",
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
@@ -98,7 +98,6 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   infoValue: {
-    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: "#1E293B",
     letterSpacing: 0.2,
@@ -155,12 +154,10 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   headerText: {
-    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: "#374151",
   },
   cellText: {
-    fontSize: 9,
     color: "#1F2937",
   },
   tableSummary: {
@@ -174,26 +171,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   roundingLabel: {
-    fontSize: 7,
+    fontSize: 8,
     marginRight: 2,
     color: "#9CA3AF", // Light gray color
     fontFamily: "Helvetica-Bold",
   },
   roundingValue: {
-    fontSize: 7,
+    fontSize: 8,
     color: "#9CA3AF", // Light gray color
     fontFamily: "Helvetica-Bold",
   },
   summaryLabel: {
     width: 120,
     textAlign: "right",
-    fontSize: 9,
     marginRight: 8,
   },
   summaryValue: {
     width: 50,
     textAlign: "right",
-    fontSize: 9,
     fontFamily: "Helvetica-Bold",
   },
   summary: {
