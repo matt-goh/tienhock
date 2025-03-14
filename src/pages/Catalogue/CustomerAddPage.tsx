@@ -7,7 +7,7 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
-import { validateCustomerIdentity } from "../../routes/sales/invoices/customerValidation";
+import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
 import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
@@ -161,6 +161,44 @@ const CustomerAddPage: React.FC = () => {
     // Validate form
     if (!validateForm()) {
       return;
+    }
+
+    // Check if any of the validation fields has input
+    const hasIdType = formData.id_type && formData.id_type !== "Select";
+    const hasIdNumber = Boolean(formData.id_number);
+    const hasTinNumber = Boolean(formData.tin_number);
+
+    // If any field has input, all fields are required
+    if (hasIdType || hasIdNumber || hasTinNumber) {
+      setIsSaving(true);
+      if (!hasIdType) {
+        toast.error(
+          "ID Type is required when providing identification details"
+        );
+        setIsSaving(false);
+        return;
+      }
+      if (!hasIdNumber) {
+        toast.error(
+          "ID Number is required when providing identification details"
+        );
+        setIsSaving(false);
+        return;
+      }
+      if (!hasTinNumber) {
+        toast.error(
+          "TIN Number is required when providing identification details"
+        );
+        setIsSaving(false);
+        return;
+      }
+
+      // Validate customer identity
+      const validationResult = await validateCustomerIdentity(formData);
+      if (!validationResult.isValid) {
+        setIsSaving(false);
+        return;
+      }
     }
 
     setIsSaving(true);

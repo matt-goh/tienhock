@@ -1,7 +1,7 @@
 // src/utils/customerValidation.ts
 import toast from "react-hot-toast";
-import { Customer } from "../../../types/types";
-import { api } from "../../utils/api";
+import { Customer } from "../../types/types";
+import { api } from "../utils/api";
 
 interface ValidationResponse {
   isValid: boolean;
