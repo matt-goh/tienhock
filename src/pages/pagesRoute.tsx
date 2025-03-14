@@ -1,7 +1,7 @@
 import {
-  IconPackage,
   IconBookmark,
   IconListDetails,
+  IconReportAnalytics,
 } from "@tabler/icons-react";
 import { Icon } from "@tabler/icons-react";
 import React from "react";
@@ -54,7 +54,7 @@ export const SidebarData: SidebarItem[] = [
   },
   {
     name: "Sales",
-    icon: IconPackage,
+    icon: IconReportAnalytics,
     subItems: [
       {
         name: "Invoice",
