@@ -327,8 +327,8 @@ const CustomerAddPage: React.FC = () => {
           }}
         >
           <div className="pl-6 pt-5">
-            <Tab labels={["Details", "Products"]}>
-              {/* First tab - Customer Details */}
+            <Tab labels={["Info", "Sales"]}>
+              {/* First tab - Customer Info */}
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderInput("id", "ID", "text", "TIENHOCK")}
@@ -375,7 +375,7 @@ const CustomerAddPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Second tab - Customer Products */}
+              {/* Second tab - Customer Sales Details */}
               <div className="space-y-6">
                 <CustomerProductsTab
                   customerId=""

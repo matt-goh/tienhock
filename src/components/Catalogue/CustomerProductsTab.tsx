@@ -256,26 +256,30 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   return (
     <div className="">
       {customerProducts.length > 0 && (
-        <div className="flex justify-end items-center mb-6">
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleAddProduct}
-              icon={IconPlus}
-              iconSize={16}
-              iconStroke={2}
-              variant="outline"
-              type="button"
-            >
-              Add Product
-            </Button>
-          </div>
+        <div className="flex w-full items-center justify-between mt-5 mb-4">
+          <h1 className="text-xl h-full font-semibold text-default-900 items-center">
+            Custom Price
+          </h1>
+          <Button
+            onClick={handleAddProduct}
+            icon={IconPlus}
+            iconSize={16}
+            iconStroke={2}
+            variant="outline"
+            type="button"
+          >
+            Add Product
+          </Button>
         </div>
       )}
 
       {customerProducts.length === 0 ? (
         <div className="flex flex-col items-center py-8">
+          <h1 className="text-xl font-semibold text-default-900 mb-2">
+            Custom Price
+          </h1>
           <div className="text-center mb-4 text-default-500">
-            No custom products added for this customer yet.
+            No custom price added for this customer yet.
           </div>
           <Button
             onClick={handleAddProduct}
