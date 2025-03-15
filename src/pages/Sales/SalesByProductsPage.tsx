@@ -571,11 +571,11 @@ const SalesByProductsPage: React.FC = () => {
           {topProductSummary.map((product) => (
             <div
               key={product.id}
-              className="bg-default-50 rounded-lg p-3 border-l-4 overflow-hidden"
+              className="bg-default-100/75 rounded-lg p-3 border-l-4 overflow-hidden"
               style={{ borderColor: categoryColors[product.type] || "#a0aec0" }}
             >
               <div
-                className="text-sm text-default-500 font-medium truncate"
+                className="text-base text-default-500 font-medium truncate"
                 title={product.description}
               >
                 {product.description || product.id}
@@ -583,7 +583,7 @@ const SalesByProductsPage: React.FC = () => {
               <div className="text-lg font-bold mt-1">
                 {formatCurrency(product.totalSales)}
               </div>
-              <div className="text-xs text-default-400 mt-1">
+              <div className="text-sm text-default-500 font-medium mt-1">
                 {product.quantity.toLocaleString()} units
               </div>
             </div>
@@ -610,11 +610,11 @@ const SalesByProductsPage: React.FC = () => {
                 {" "}
                 {/* Added fixed height and vertical scroll */}
                 <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-50 sticky top-0">
+                  <thead className="bg-default-100 sticky top-0">
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
@@ -629,7 +629,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("description")}
                       >
                         <div className="flex items-center">
@@ -644,7 +644,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("type")}
                       >
                         <div className="flex items-center">
@@ -659,7 +659,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("foc")}
                       >
                         <div className="flex items-center justify-end">
@@ -674,7 +674,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("returns")}
                       >
                         <div className="flex items-center justify-end">
@@ -689,7 +689,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("quantity")}
                       >
                         <div className="flex items-center justify-end">
@@ -704,7 +704,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("totalSales")}
                       >
                         <div className="flex items-center justify-end">
@@ -721,14 +721,14 @@ const SalesByProductsPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-default-200">
                     {filteredAndSortedData.map((product) => (
-                      <tr key={product.id} className="hover:bg-default-50">
+                      <tr key={product.id} className="hover:bg-default-100/75">
                         <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900">
                           {product.id}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-default-700">
                           {product.description}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-default-700">
                           <span
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                             style={{
@@ -741,30 +741,30 @@ const SalesByProductsPage: React.FC = () => {
                             {product.type}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
                           {product.foc.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
                           {product.returns.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
                           {product.quantity.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right font-medium">
                           {formatCurrency(product.totalSales)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-default-50 sticky bottom-0">
+                  <tfoot className="bg-default-100 sticky bottom-0">
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-6 py-3 text-right text-sm font-medium"
+                        className="px-6 py-3 text-right text-base font-medium"
                       >
                         Total:
                       </td>
-                      <td className="px-6 py-3 text-right text-sm font-bold">
+                      <td className="px-6 py-3 text-right text-base font-bold">
                         {formatCurrency(
                           filteredAndSortedData.reduce(
                             (sum, product) => sum + product.totalSales,
