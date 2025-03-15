@@ -33,6 +33,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import Button from "../../components/Button";
 
 interface ProductSalesData {
   id: string;
@@ -116,6 +117,8 @@ const SalesByProductsPage: React.FC = () => {
   const [salesData, setSalesData] = useState<ProductSalesData[]>([]);
   const [yearlyTrendData, setYearlyTrendData] = useState<MonthlyTypeData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [yearlyDataLoaded, setYearlyDataLoaded] = useState(false);
+  const [isLoadingYearlyData, setIsLoadingYearlyData] = useState(false);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ProductSalesData;
     direction: "asc" | "desc";
@@ -339,9 +342,12 @@ const SalesByProductsPage: React.FC = () => {
       });
 
       setYearlyTrendData(chartData);
+      setYearlyDataLoaded(true);
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
-      // Don't show error toast for this - just log it
+      toast.error("Failed to load yearly trend data");
+    } finally {
+      setIsLoadingYearlyData(false);
     }
   };
 
@@ -381,15 +387,6 @@ const SalesByProductsPage: React.FC = () => {
       fetchSalesData();
     }
   }, [dateRange, products]); // Changed from [selectedMonth, selectedYear, products]
-
-  // Fetch yearly trend data on initial load
-  useEffect(() => {
-    if (products.length > 0) {
-      fetchYearlyTrendData();
-    }
-  }, [products]);
-
-  // No longer need product type filters
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -864,8 +861,36 @@ const SalesByProductsPage: React.FC = () => {
           </div>
 
           {/* Product Mix Analysis Chart */}
-          <div className="bg-white rounded-lg border shadow p-4 pb-0">
-            <div className="h-80">
+          <div className="bg-white rounded-lg border shadow p-4 pb-0 relative">
+            <h2 className="text-lg font-semibold mb-4">
+              Product Mix Analysis (Last 12 Months)
+            </h2>
+
+            <div className="h-80 relative">
+              {!yearlyDataLoaded && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                  {isLoadingYearlyData ? (
+                    <div className="flex flex-col items-center">
+                      <LoadingSpinner />
+                      <p className="mt-2 text-default-600">
+                        Loading yearly data (this may take a moment)...
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-center px-4">
+                      <Button
+                        onClick={fetchYearlyTrendData}
+                        className="mb-12"
+                        variant="filled"
+                        color="sky"
+                      >
+                        Generate Yearly Trend Chart
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={yearlyTrendData}
