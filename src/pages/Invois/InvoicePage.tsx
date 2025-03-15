@@ -552,7 +552,7 @@ const InvoicePage: React.FC = () => {
       id: "customerid",
       header: "Customer",
       type: "readonly",
-      width: 500,
+      width: 450,
       cell: (info: {
         getValue: () => any;
         row: { original: ExtendedInvoiceData };
