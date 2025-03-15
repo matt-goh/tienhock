@@ -40,6 +40,8 @@ interface ProductSalesData {
   type: string; // The actual product type (MEE, BH, JP)
   quantity: number;
   totalSales: number;
+  foc: number;
+  returns: number;
 }
 
 interface CategorySummary {
@@ -208,11 +210,15 @@ const SalesByProductsPage: React.FC = () => {
           const quantity = Number(product.quantity) || 0;
           const price = Number(product.price) || 0;
           const total = quantity * price;
+          const foc = Number(product.freeProduct) || 0; // Get FOC quantity
+          const returns = Number(product.returnProduct) || 0; // Get Returns quantity
 
           if (productMap.has(productId)) {
             const existingProduct = productMap.get(productId)!;
             existingProduct.quantity += quantity;
             existingProduct.totalSales += total;
+            existingProduct.foc += foc; // Add FOC
+            existingProduct.returns += returns; // Add Returns
           } else {
             // Get product type from cache
             const type = getProductType(productId);
@@ -224,6 +230,8 @@ const SalesByProductsPage: React.FC = () => {
               type,
               quantity,
               totalSales: total,
+              foc, // Initialize FOC
+              returns, // Initialize Returns
             });
           }
         });
@@ -479,7 +487,7 @@ const SalesByProductsPage: React.FC = () => {
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold">Monthly Summary</h2>
+            <h2 className="text-lg font-semibold">Summary</h2>
 
             {/* Date Range Picker */}
             <DateRangePicker
@@ -597,7 +605,7 @@ const SalesByProductsPage: React.FC = () => {
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
@@ -612,7 +620,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("description")}
                       >
                         <div className="flex items-center">
@@ -627,12 +635,42 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("type")}
                       >
                         <div className="flex items-center">
                           Type
                           {sortConfig.key === "type" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("foc")}
+                      >
+                        <div className="flex items-center justify-end">
+                          FOC
+                          {sortConfig.key === "foc" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("returns")}
+                      >
+                        <div className="flex items-center justify-end">
+                          Returns
+                          {sortConfig.key === "returns" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
                             ) : (
@@ -675,7 +713,7 @@ const SalesByProductsPage: React.FC = () => {
                   <tbody className="bg-white divide-y divide-default-200">
                     {filteredAndSortedData.map((product) => (
                       <tr key={product.id} className="hover:bg-default-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900">
                           {product.id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
@@ -695,6 +733,12 @@ const SalesByProductsPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                          {product.foc.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                          {product.returns.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
                           {product.quantity.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
@@ -706,7 +750,7 @@ const SalesByProductsPage: React.FC = () => {
                   <tfoot className="bg-default-50 sticky bottom-0">
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={6}
                         className="px-6 py-3 text-right text-sm font-medium"
                       >
                         Total:
