@@ -3,7 +3,19 @@ import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
 import { FormListbox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
+import {
+  IconSortAscending,
+  IconSortDescending,
+  IconChevronDown,
+  IconCheck,
+} from "@tabler/icons-react";
+import DateRangePicker from "../../components/DateRangePicker";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -36,20 +48,67 @@ interface CategorySummary {
   color: string;
 }
 
+interface MonthOption {
+  id: number;
+  name: string;
+}
+
 interface MonthlyTypeData {
   month: string;
   [key: string]: string | number; // For product types and their sales values
 }
 
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+const tomorrow = new Date(today);
+tomorrow.setDate(tomorrow.getDate() + 1);
+const currentDate = new Date();
+const currentMonth = currentDate.getMonth();
+const currentYear = currentDate.getFullYear();
+
 const SalesByProductsPage: React.FC = () => {
+  // Month options
+  const monthOptions = useMemo(() => {
+    return [
+      { id: 0, name: "January" },
+      { id: 1, name: "February" },
+      { id: 2, name: "March" },
+      { id: 3, name: "April" },
+      { id: 4, name: "May" },
+      { id: 5, name: "June" },
+      { id: 6, name: "July" },
+      { id: 7, name: "August" },
+      { id: 8, name: "September" },
+      { id: 9, name: "October" },
+      { id: 10, name: "November" },
+      { id: 11, name: "December" },
+    ];
+  }, []);
+
   // Month and year selection
-  const [selectedMonth, setSelectedMonth] = useState<number>(() => {
-    const currentDate = new Date();
-    return currentDate.getMonth();
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(() => {
+    return monthOptions[currentMonth];
   });
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     const currentDate = new Date();
     return currentDate.getFullYear();
+  });
+  const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    // Create start date (1st of the selected month)
+    const startDate = new Date(currentYear, currentMonth, 1);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Create end date (last day of the selected month)
+    const endDate = new Date(currentYear, currentMonth + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    return { start: startDate, end: endDate };
   });
   const [isLoading, setIsLoading] = useState(false);
   const [salesData, setSalesData] = useState<ProductSalesData[]>([]);
@@ -101,43 +160,24 @@ const SalesByProductsPage: React.FC = () => {
     return result;
   }, [salesData]);
 
-  // Generate month options
-  const monthOptions = useMemo(() => {
-    return [
-      { id: "0", name: "January" },
-      { id: "1", name: "February" },
-      { id: "2", name: "March" },
-      { id: "3", name: "April" },
-      { id: "4", name: "May" },
-      { id: "5", name: "June" },
-      { id: "6", name: "July" },
-      { id: "7", name: "August" },
-      { id: "8", name: "September" },
-      { id: "9", name: "October" },
-      { id: "10", name: "November" },
-      { id: "11", name: "December" },
-    ];
-  }, []);
-
   // Handle month selection change
-  const handleMonthChange = (value: string) => {
-    const monthIndex = monthOptions.findIndex(
-      (option) => option.name === value
-    );
-    if (monthIndex === -1) return;
+  const handleMonthChange = (month: MonthOption) => {
+    setSelectedMonth(month);
 
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+    // If selected month is ahead of current month, use previous year
+    const year = month.id > currentMonth ? currentYear - 1 : currentYear;
+    setSelectedYear(year);
 
-    // If selected month is ahead of current month, show previous year
-    if (monthIndex > currentMonth) {
-      setSelectedYear(currentYear - 1);
-    } else {
-      setSelectedYear(currentYear);
-    }
+    // Create start date (1st of the selected month)
+    const startDate = new Date(year, month.id, 1);
+    startDate.setHours(0, 0, 0, 0);
 
-    setSelectedMonth(monthIndex);
+    // Create end date (last day of the selected month)
+    const endDate = new Date(year, month.id + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Update date range
+    setDateRange({ start: startDate, end: endDate });
   };
 
   // Get product type from product ID using cache
@@ -297,23 +337,18 @@ const SalesByProductsPage: React.FC = () => {
     }
   };
 
-  // Fetch sales data for the selected month
+  // Fetch sales data for the selected date range
   useEffect(() => {
     const fetchSalesData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Calculate date range for the selected month
-        const startDate = new Date(selectedYear, selectedMonth, 1);
-        const endDate = new Date(selectedYear, selectedMonth + 1, 0);
-        endDate.setHours(23, 59, 59, 999);
-
         // Format dates as timestamps for the API
-        const startTimestamp = startDate.getTime().toString();
-        const endTimestamp = endDate.getTime().toString();
+        const startTimestamp = dateRange.start.getTime().toString();
+        const endTimestamp = dateRange.end.getTime().toString();
 
-        // Fetch invoices for the selected month
+        // Fetch invoices for the selected date range
         const invoices = await api.get(
           `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
         );
@@ -337,7 +372,7 @@ const SalesByProductsPage: React.FC = () => {
     if (products.length > 0) {
       fetchSalesData();
     }
-  }, [selectedMonth, selectedYear, products]);
+  }, [dateRange, products]); // Changed from [selectedMonth, selectedYear, products]
 
   // Fetch yearly trend data on initial load
   useEffect(() => {
@@ -423,15 +458,6 @@ const SalesByProductsPage: React.FC = () => {
     });
   };
 
-  // Show loading when either products or sales data is loading
-  if (isProductsLoading || isLoading) {
-    return (
-      <div className="w-full h-64 flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
   // Show error from either source
   if (productsError || error) {
     return (
@@ -454,15 +480,69 @@ const SalesByProductsPage: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Monthly Summary</h2>
+
+            {/* Date Range Picker */}
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateChange={(newDateRange) => {
+                setDateRange(newDateRange);
+              }}
+            />
+
+            {/* Month Selection */}
             <div className="w-40">
-              <FormListbox
-                name="month"
-                label=""
-                value={monthOptions[selectedMonth]?.name || "January"}
-                onChange={handleMonthChange}
-                options={monthOptions}
-              />
+              <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                <div className="relative">
+                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                    <span className="block truncate pl-2">
+                      {selectedMonth.name}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                      <IconChevronDown
+                        className="h-5 w-5 text-default-400"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </ListboxButton>
+                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                    {monthOptions.map((month) => (
+                      <ListboxOption
+                        key={month.id}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                            active
+                              ? "bg-default-100 text-default-900"
+                              : "text-default-900"
+                          }`
+                        }
+                        value={month}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              {month.name}
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                    ))}
+                  </ListboxOptions>
+                </div>
+              </Listbox>
             </div>
+
             <div className="text-default-500 font-medium">{selectedYear}</div>
           </div>
           <div className="text-lg font-bold text-default-700">
@@ -493,278 +573,299 @@ const SalesByProductsPage: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {/* Detailed product sales table */}
-      <div className="bg-white rounded-lg border shadow p-4">
-        <h2 className="text-lg font-semibold mb-4">Product Sales Details</h2>
-        {filteredAndSortedData.length > 0 ? (
-          <div className="overflow-x-auto max-h-96 overflow-y-auto">
-            {" "}
-            {/* Added fixed height and vertical scroll */}
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50 sticky top-0">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("id")}
-                  >
-                    <div className="flex items-center">
-                      Product ID
-                      {sortConfig.key === "id" &&
-                        (sortConfig.direction === "asc" ? (
-                          <IconSortAscending size={16} className="ml-1" />
-                        ) : (
-                          <IconSortDescending size={16} className="ml-1" />
-                        ))}
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("description")}
-                  >
-                    <div className="flex items-center">
-                      Description
-                      {sortConfig.key === "description" &&
-                        (sortConfig.direction === "asc" ? (
-                          <IconSortAscending size={16} className="ml-1" />
-                        ) : (
-                          <IconSortDescending size={16} className="ml-1" />
-                        ))}
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("type")}
-                  >
-                    <div className="flex items-center">
-                      Type
-                      {sortConfig.key === "type" &&
-                        (sortConfig.direction === "asc" ? (
-                          <IconSortAscending size={16} className="ml-1" />
-                        ) : (
-                          <IconSortDescending size={16} className="ml-1" />
-                        ))}
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("quantity")}
-                  >
-                    <div className="flex items-center justify-end">
-                      Quantity
-                      {sortConfig.key === "quantity" &&
-                        (sortConfig.direction === "asc" ? (
-                          <IconSortAscending size={16} className="ml-1" />
-                        ) : (
-                          <IconSortDescending size={16} className="ml-1" />
-                        ))}
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("totalSales")}
-                  >
-                    <div className="flex items-center justify-end">
-                      Total Sales
-                      {sortConfig.key === "totalSales" &&
-                        (sortConfig.direction === "asc" ? (
-                          <IconSortAscending size={16} className="ml-1" />
-                        ) : (
-                          <IconSortDescending size={16} className="ml-1" />
-                        ))}
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-default-200">
-                {filteredAndSortedData.map((product) => (
-                  <tr key={product.id} className="hover:bg-default-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
-                      {product.id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                      {product.description}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                      <span
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                        style={{
-                          backgroundColor: `${
-                            categoryColors[product.type] || "#a0aec0"
-                          }20`,
-                          color: categoryColors[product.type] || "#a0aec0",
-                        }}
+      {isLoading ? (
+        <div className="w-full h-64 flex items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      ) : error ? (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+          {error}
+        </div>
+      ) : (
+        <>
+          {/* Detailed product sales table */}
+          <div className="bg-white rounded-lg border shadow p-4">
+            <h2 className="text-lg font-semibold mb-4">
+              Product Sales Details
+            </h2>
+            {filteredAndSortedData.length > 0 ? (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                {" "}
+                {/* Added fixed height and vertical scroll */}
+                <table className="min-w-full divide-y divide-default-200">
+                  <thead className="bg-default-50 sticky top-0">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("id")}
                       >
-                        {product.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
-                      {product.quantity.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                      {formatCurrency(product.totalSales)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-default-50 sticky bottom-0">
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-3 text-right text-sm font-medium"
-                  >
-                    Total:
-                  </td>
-                  <td className="px-6 py-3 text-right text-sm font-bold">
-                    {formatCurrency(
-                      filteredAndSortedData.reduce(
-                        (sum, product) => sum + product.totalSales,
-                        0
-                      )
-                    )}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        ) : (
-          <div className="border border-dashed border-default-300 rounded p-4 text-center text-default-500">
-            No data to display. Please select a different month or check if
-            sales data exists.
-          </div>
-        )}
-      </div>
-
-      {/* Dashboard content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg border shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Category Performance</h2>
-          {summary.pieData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={summary.pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100).toFixed(1)}%`
-                    }
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {summary.pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                        <div className="flex items-center">
+                          Product ID
+                          {sortConfig.key === "id" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("description")}
+                      >
+                        <div className="flex items-center">
+                          Description
+                          {sortConfig.key === "description" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("type")}
+                      >
+                        <div className="flex items-center">
+                          Type
+                          {sortConfig.key === "type" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("quantity")}
+                      >
+                        <div className="flex items-center justify-end">
+                          Quantity
+                          {sortConfig.key === "quantity" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("totalSales")}
+                      >
+                        <div className="flex items-center justify-end">
+                          Total Sales
+                          {sortConfig.key === "totalSales" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-default-200">
+                    {filteredAndSortedData.map((product) => (
+                      <tr key={product.id} className="hover:bg-default-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                          {product.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                          {product.description}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                          <span
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: `${
+                                categoryColors[product.type] || "#a0aec0"
+                              }20`,
+                              color: categoryColors[product.type] || "#a0aec0",
+                            }}
+                          >
+                            {product.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                          {product.quantity.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                          {formatCurrency(product.totalSales)}
+                        </td>
+                      </tr>
                     ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value) => formatCurrency(Number(value))}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
-              No data available
-            </div>
-          )}
-        </div>
+                  </tbody>
+                  <tfoot className="bg-default-50 sticky bottom-0">
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-6 py-3 text-right text-sm font-medium"
+                      >
+                        Total:
+                      </td>
+                      <td className="px-6 py-3 text-right text-sm font-bold">
+                        {formatCurrency(
+                          filteredAndSortedData.reduce(
+                            (sum, product) => sum + product.totalSales,
+                            0
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="border border-dashed border-default-300 rounded p-4 text-center text-default-500">
+                No data to display. Please select a different month or check if
+                sales data exists.
+              </div>
+            )}
+          </div>
 
-        <div className="bg-white rounded-lg border shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Top Selling Products</h2>
-          {topProducts.length > 0 ? (
-            <div className="h-64">
+          {/* Dashboard content */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg border shadow p-4">
+              <h2 className="text-lg font-semibold mb-4">
+                Category Performance
+              </h2>
+              {summary.pieData.length > 0 ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={summary.pieData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) =>
+                          `${name}: ${(percent * 100).toFixed(1)}%`
+                        }
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {summary.pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => formatCurrency(Number(value))}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
+                  No data available
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg border shadow p-4">
+              <h2 className="text-lg font-semibold mb-4">
+                Top Selling Products
+              </h2>
+              {topProducts.length > 0 ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={topProducts}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <XAxis type="number" />
+                      <YAxis
+                        type="category"
+                        dataKey="id"
+                        width={80}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip
+                        formatter={(value) => formatCurrency(Number(value))}
+                        labelFormatter={(label) => {
+                          const product = topProducts.find(
+                            (p) => p.id === label
+                          );
+                          return product
+                            ? `${product.id}: ${product.description}`
+                            : label;
+                        }}
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey="totalSales"
+                        name="Sales"
+                        fill="#4299e1"
+                        radius={[0, 4, 4, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
+                  No data available
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Product Mix Analysis Chart */}
+          <div className="bg-white rounded-lg border shadow p-4 pb-0">
+            <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={topProducts}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                <LineChart
+                  data={yearlyTrendData}
+                  margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
                 >
-                  <XAxis type="number" />
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="month"
+                    textAnchor="middle"
+                    height={80}
+                    tickMargin={15}
+                  />
                   <YAxis
-                    type="category"
-                    dataKey="id"
-                    width={80}
-                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value: string | number | bigint) =>
+                      new Intl.NumberFormat("en", {
+                        notation: "compact",
+                        compactDisplay: "short",
+                      }).format(Number(value))
+                    }
                   />
                   <Tooltip
-                    formatter={(value) => formatCurrency(Number(value))}
-                    labelFormatter={(label) => {
-                      const product = topProducts.find((p) => p.id === label);
-                      return product
-                        ? `${product.id}: ${product.description}`
-                        : label;
-                    }}
+                    formatter={(value: any) => formatCurrency(Number(value))}
+                    itemSorter={(item) =>
+                      item.value ? -Number(item.value) : 0
+                    }
                   />
-                  <Legend />
-                  <Bar
-                    dataKey="totalSales"
-                    name="Sales"
-                    fill="#4299e1"
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
+                  <Legend wrapperStyle={{ bottom: 20 }} />
+                  {Object.keys(categoryColors).map((type) => (
+                    <Line
+                      key={type}
+                      type="monotone"
+                      dataKey={type}
+                      stroke={categoryColors[type]}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  ))}
+                </LineChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center border border-dashed border-default-300 rounded">
-              No data available
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Product Mix Analysis Chart */}
-      <div className="bg-white rounded-lg border shadow p-4 pb-0">
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={yearlyTrendData}
-              margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="month"
-                textAnchor="middle"
-                height={80}
-                tickMargin={15}
-              />
-              <YAxis
-                tickFormatter={(value: string | number | bigint) =>
-                  new Intl.NumberFormat("en", {
-                    notation: "compact",
-                    compactDisplay: "short",
-                  }).format(Number(value))
-                }
-              />
-              <Tooltip
-                formatter={(value: any) => formatCurrency(Number(value))}
-                itemSorter={(item) => (item.value ? -Number(item.value) : 0)}
-              />
-              <Legend wrapperStyle={{ bottom: 20 }} />
-              {Object.keys(categoryColors).map((type) => (
-                <Line
-                  key={type}
-                  type="monotone"
-                  dataKey={type}
-                  stroke={categoryColors[type]}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

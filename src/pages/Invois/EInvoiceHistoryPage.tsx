@@ -481,21 +481,19 @@ const EInvoiceHistoryPage: React.FC = () => {
 
       <div className="flex justify-between mb-4">
         <div className="flex gap-4">
-          <div>
-            <div className="flex items-center gap-3 flex-1">
-              <DateRangePicker
-                dateRange={dateRange}
-                onDateChange={(newDateRange) => {
-                  // Save to storage
-                  saveDatesToStorage(newDateRange.start, newDateRange.end);
-                  setDateRange(newDateRange);
-                  // Reset to first page when date changes
-                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                }}
-                startInputWidth="w-44"
-                endInputWidth="w-44"
-              />
-            </div>
+          <div className="flex items-center gap-3 flex-1">
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateChange={(newDateRange) => {
+                // Save to storage
+                saveDatesToStorage(newDateRange.start, newDateRange.end);
+                setDateRange(newDateRange);
+                // Reset to first page when date changes
+                setPagination((prev) => ({ ...prev, currentPage: 1 }));
+              }}
+              startInputWidth="w-44"
+              endInputWidth="w-44"
+            />
           </div>
           <div className="w-40">
             <Listbox value={selectedMonth} onChange={handleMonthChange}>
