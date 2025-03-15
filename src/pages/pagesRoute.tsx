@@ -7,6 +7,8 @@ import { Icon } from "@tabler/icons-react";
 import React from "react";
 
 // Import components here
+import SalesByProductsPage from "./Sales/SalesByProductsPage";
+import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
 import InvoiceDetailsPage from "./Invois/InvoiceDetailsPage";
 import CustomerFormPage from "./Catalogue/CustomerFormPage";
 import CustomerAddPage from "./Catalogue/CustomerAddPage";
@@ -22,7 +24,6 @@ import BasicPage from "./Catalogue/BasicPage";
 import StaffPage from "./Catalogue/StaffPage";
 import JobPage from "./Catalogue/JobPage";
 import TaxPage from "./Catalogue/TaxPage";
-import SalesByProductsPage from "./Sales/SalesByProductsPage";
 
 export interface PopoverOption {
   name: string;
@@ -87,6 +88,11 @@ export const SidebarData: SidebarItem[] = [
         name: "Sales by Products",
         path: "/sales/sales-by-products",
         component: SalesByProductsPage,
+      },
+      {
+        name: "Sales by Salesman",
+        path: "/sales/sales-by-salesman",
+        component: SalesBySalesmanPage,
       },
     ],
   },
