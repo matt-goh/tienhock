@@ -433,7 +433,7 @@ const SalesBySalesmanPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full p-6 max-w-7xl mx-auto space-y-6">
+    <div className="w-full p-6 max-w-[88rem] mx-auto space-y-6">
       <h1 className="text-2xl font-bold mb-6">Sales by Salesman</h1>
 
       {/* Summary section */}
