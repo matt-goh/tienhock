@@ -1020,7 +1020,7 @@ const SalesByProductsPage: React.FC = () => {
           </div>
 
           {/* Product Mix Analysis Chart */}
-          <div className="bg-white rounded-lg border shadow p-4 pb-0">
+          <div className="bg-white rounded-lg border shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
               <Button
