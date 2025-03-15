@@ -604,7 +604,7 @@ const EInvoiceConsolidatedPage: React.FC = () => {
                     onClick={handleSubmitConsolidated}
                     icon={IconFileInvoice}
                     color="sky"
-                    variant="primary"
+                    variant="filled"
                     disabled={
                       submissionState !== null ||
                       isConnecting ||
