@@ -511,7 +511,7 @@ const SalesBySalesmanPage: React.FC = () => {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-sky-500">
+          <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-sky-500">
             <div className="text-sm text-default-500 font-medium">
               Total Sales
             </div>
@@ -519,7 +519,7 @@ const SalesBySalesmanPage: React.FC = () => {
               {formatCurrency(summary.totalSales)}
             </div>
           </div>
-          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-green-500">
+          <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-green-500">
             <div className="text-sm text-default-500 font-medium">
               Total Bills
             </div>
@@ -527,7 +527,7 @@ const SalesBySalesmanPage: React.FC = () => {
               {summary.totalBills.toLocaleString()}
             </div>
           </div>
-          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-amber-500">
+          <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-amber-500">
             <div className="text-sm text-default-500 font-medium">
               Total Invoices
             </div>
@@ -535,7 +535,7 @@ const SalesBySalesmanPage: React.FC = () => {
               {summary.totalInvoices.toLocaleString()}
             </div>
           </div>
-          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-indigo-500">
+          <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-indigo-500">
             <div className="text-sm text-default-500 font-medium">
               Total Cash Bills
             </div>
@@ -543,7 +543,7 @@ const SalesBySalesmanPage: React.FC = () => {
               {summary.totalCashBills.toLocaleString()}
             </div>
           </div>
-          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-teal-500">
+          <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-teal-500">
             <div className="text-sm text-default-500 font-medium">
               Average Sale per Bill
             </div>
@@ -568,11 +568,11 @@ const SalesBySalesmanPage: React.FC = () => {
             {filteredAndSortedData.length > 0 ? (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-50 sticky top-0">
+                  <thead className="bg-default-100 sticky top-0">
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
@@ -587,7 +587,7 @@ const SalesBySalesmanPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("cashCount")}
                       >
                         <div className="flex items-center justify-end">
@@ -602,7 +602,7 @@ const SalesBySalesmanPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("invoiceCount")}
                       >
                         <div className="flex items-center justify-end">
@@ -617,7 +617,7 @@ const SalesBySalesmanPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("totalQuantity")}
                       >
                         <div className="flex items-center justify-end">
@@ -632,7 +632,7 @@ const SalesBySalesmanPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("totalSales")}
                       >
                         <div className="flex items-center justify-end">
@@ -649,34 +649,34 @@ const SalesBySalesmanPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-default-200">
                     {filteredAndSortedData.map((salesman) => (
-                      <tr key={salesman.id} className="hover:bg-default-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                      <tr key={salesman.id} className="hover:bg-default-100/75">
+                        <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900">
                           {salesman.id}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
                           {(salesman.cashCount || 0).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
                           {(salesman.invoiceCount || 0).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
                           {salesman.totalQuantity.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right font-medium">
                           {formatCurrency(salesman.totalSales)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-default-50 sticky bottom-0">
+                  <tfoot className="bg-default-100 sticky bottom-0">
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-6 py-3 text-right text-sm font-medium"
+                        className="px-6 py-3 text-right text-base font-medium"
                       >
                         Total:
                       </td>
-                      <td className="px-6 py-3 text-right text-sm font-bold">
+                      <td className="px-6 py-3 text-right text-base font-bold">
                         {formatCurrency(summary.totalSales)}
                       </td>
                     </tr>
