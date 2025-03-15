@@ -244,6 +244,16 @@ const SalesByProductsPage: React.FC = () => {
     return Array.from(productMap.values());
   };
 
+  // Get top products for summary cards
+  const topProductSummary = useMemo(() => {
+    // Sort by sales amount in descending order
+    const sortedProducts = [...salesData].sort(
+      (a, b) => b.totalSales - a.totalSales
+    );
+    // Take top 12 (or fewer if there aren't 12 products)
+    return sortedProducts.slice(0, 12);
+  }, [salesData]);
+
   // Fetch yearly trend data for the product mix chart
   const fetchYearlyTrendData = async () => {
     setIsGeneratingChart(true);
@@ -555,25 +565,26 @@ const SalesByProductsPage: React.FC = () => {
             Total Sales: {formatCurrency(summary.totalSales)}
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.keys(summary.categorySummary).map((category) => (
+        {/* Product cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Get top 6 products by sales instead of 12 */}
+          {topProductSummary.map((product) => (
             <div
-              key={category}
-              className="bg-default-50 rounded-lg p-4 border-l-4"
-              style={{ borderColor: categoryColors[category] || "#a0aec0" }}
+              key={product.id}
+              className="bg-default-50 rounded-lg p-3 border-l-4 overflow-hidden"
+              style={{ borderColor: categoryColors[product.type] || "#a0aec0" }}
             >
-              <div className="text-sm text-default-500 font-medium">
-                {category}
+              <div
+                className="text-sm text-default-500 font-medium truncate"
+                title={product.description}
+              >
+                {product.description || product.id}
               </div>
-              <div className="text-xl font-bold mt-1">
-                {formatCurrency(summary.categorySummary[category])}
+              <div className="text-lg font-bold mt-1">
+                {formatCurrency(product.totalSales)}
               </div>
-              <div className="text-sm text-default-500 mt-1">
-                {(
-                  (summary.categorySummary[category] / summary.totalSales) *
-                  100
-                ).toFixed(1)}
-                % of total
+              <div className="text-xs text-default-400 mt-1">
+                {product.quantity.toLocaleString()} units
               </div>
             </div>
           ))}
