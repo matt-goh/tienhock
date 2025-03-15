@@ -36,7 +36,9 @@ interface SalesmanData {
   name?: string;
   totalSales: number;
   totalQuantity: number;
-  salesCount: number; // Number of invoices
+  salesCount: number; // Total number of bills (invoices + cash bills)
+  invoiceCount: number; // Number of invoices
+  cashCount: number; // Number of cash bills
 }
 
 interface MonthOption {
@@ -157,17 +159,29 @@ const SalesBySalesmanPage: React.FC = () => {
         });
       }
 
+      const isCashBill = invoice.paymenttype === "CASH";
+
       if (salesmanMap.has(salesmanId)) {
         const existingSalesman = salesmanMap.get(salesmanId)!;
         existingSalesman.totalSales += invoiceTotal;
         existingSalesman.totalQuantity += totalQuantity;
         existingSalesman.salesCount += 1;
+
+        // Increment the appropriate counter based on invoice type
+        if (isCashBill) {
+          existingSalesman.cashCount = (existingSalesman.cashCount || 0) + 1;
+        } else {
+          existingSalesman.invoiceCount =
+            (existingSalesman.invoiceCount || 0) + 1;
+        }
       } else {
         salesmanMap.set(salesmanId, {
           id: salesmanId,
           totalSales: invoiceTotal,
           totalQuantity: totalQuantity,
           salesCount: 1,
+          cashCount: isCashBill ? 1 : 0,
+          invoiceCount: isCashBill ? 0 : 1,
         });
       }
     });
@@ -331,17 +345,23 @@ const SalesBySalesmanPage: React.FC = () => {
   // Calculate summary statistics
   const summary = useMemo(() => {
     let totalSales = 0;
+    let totalBills = 0;
     let totalInvoices = 0;
+    let totalCashBills = 0;
 
     salesmanData.forEach((salesman) => {
       totalSales += salesman.totalSales;
-      totalInvoices += salesman.salesCount;
+      totalBills += salesman.salesCount;
+      totalInvoices += salesman.invoiceCount || 0;
+      totalCashBills += salesman.cashCount || 0;
     });
 
     return {
       totalSales,
+      totalBills,
       totalInvoices,
-      averageSalePerInvoice: totalInvoices > 0 ? totalSales / totalInvoices : 0,
+      totalCashBills,
+      averageSalePerBill: totalBills > 0 ? totalSales / totalBills : 0,
     };
   }, [salesmanData]);
 
@@ -490,7 +510,7 @@ const SalesBySalesmanPage: React.FC = () => {
             Total Sales: {formatCurrency(summary.totalSales)}
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-default-50 rounded-lg p-4 border-l-4 border-sky-500">
             <div className="text-sm text-default-500 font-medium">
               Total Sales
@@ -501,18 +521,34 @@ const SalesBySalesmanPage: React.FC = () => {
           </div>
           <div className="bg-default-50 rounded-lg p-4 border-l-4 border-green-500">
             <div className="text-sm text-default-500 font-medium">
+              Total Bills
+            </div>
+            <div className="text-xl font-bold mt-1">
+              {summary.totalBills.toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-amber-500">
+            <div className="text-sm text-default-500 font-medium">
               Total Invoices
             </div>
             <div className="text-xl font-bold mt-1">
               {summary.totalInvoices.toLocaleString()}
             </div>
           </div>
-          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-yellow-500">
+          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-indigo-500">
             <div className="text-sm text-default-500 font-medium">
-              Average Sale per Invoice
+              Total Cash Bills
             </div>
             <div className="text-xl font-bold mt-1">
-              {formatCurrency(summary.averageSalePerInvoice)}
+              {summary.totalCashBills.toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-default-50 rounded-lg p-4 border-l-4 border-teal-500">
+            <div className="text-sm text-default-500 font-medium">
+              Average Sale per Bill
+            </div>
+            <div className="text-xl font-bold mt-1">
+              {formatCurrency(summary.averageSalePerBill)}
             </div>
           </div>
         </div>
@@ -552,11 +588,26 @@ const SalesBySalesmanPage: React.FC = () => {
                       <th
                         scope="col"
                         className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
-                        onClick={() => handleSort("salesCount")}
+                        onClick={() => handleSort("cashCount")}
+                      >
+                        <div className="flex items-center justify-end">
+                          Cash Bills
+                          {sortConfig.key === "cashCount" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-sm font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => handleSort("invoiceCount")}
                       >
                         <div className="flex items-center justify-end">
                           Invoices
-                          {sortConfig.key === "salesCount" &&
+                          {sortConfig.key === "invoiceCount" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
                             ) : (
@@ -603,7 +654,10 @@ const SalesBySalesmanPage: React.FC = () => {
                           {salesman.id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
-                          {salesman.salesCount.toLocaleString()}
+                          {(salesman.cashCount || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
+                          {(salesman.invoiceCount || 0).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-default-700">
                           {salesman.totalQuantity.toLocaleString()}
@@ -617,7 +671,7 @@ const SalesBySalesmanPage: React.FC = () => {
                   <tfoot className="bg-default-50 sticky bottom-0">
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-6 py-3 text-right text-sm font-medium"
                       >
                         Total:
@@ -679,10 +733,10 @@ const SalesBySalesmanPage: React.FC = () => {
               )}
             </div>
 
-            {/* Average Sale per Invoice */}
+            {/* Average Sale per Bill */}
             <div className="bg-white rounded-lg border shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                Average Sale per Invoice
+                Average Sale per Bill
               </h2>
               {salesmanData.length > 0 ? (
                 <div className="h-64">
@@ -792,7 +846,7 @@ const SalesBySalesmanPage: React.FC = () => {
               </div>
             ) : (
               <div className="h-80 flex items-center justify-center border border-dashed border-default-300 rounded text-default-500">
-                Generate to view sales trends for the past 12 months
+                Generate to view salesmen's sales trends for the past 12 months
               </div>
             )}
           </div>
