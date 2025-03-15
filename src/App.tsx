@@ -31,7 +31,7 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 768);
     };
 
     window.addEventListener("resize", handleResize);
@@ -83,7 +83,7 @@ const Layout: React.FC = () => {
               larger screen.
             </p>
             <p className="text-sm text-default-400">
-              Minimum recommended width: 1024px
+              Minimum recommended width: 768px
             </p>
           </div>
         </div>
