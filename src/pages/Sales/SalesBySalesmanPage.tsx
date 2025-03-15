@@ -731,11 +731,14 @@ const SalesBySalesmanPage: React.FC = () => {
               <h2 className="text-lg font-semibold">Sales Trends Over Time</h2>
               <Button
                 onClick={fetchYearlyTrendData}
-                color="sky"
-                variant="filled"
                 disabled={isGeneratingChart || salesTrendData.length > 0}
+                color="sky"
               >
-                {isGeneratingChart ? "Generating..." : "Generate Chart"}
+                {isGeneratingChart
+                  ? "Generating..."
+                  : salesTrendData.length > 0
+                  ? "Generated"
+                  : "Generate Chart"}
               </Button>
             </div>
             {isGeneratingChart ? (

@@ -101,7 +101,7 @@ const SalesByProductsPage: React.FC = () => {
     const currentDate = new Date();
     return currentDate.getFullYear();
   });
-  const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
+  const [isGeneratingChart, setIsGeneratingChart] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     // Create start date (1st of the selected month)
     const startDate = new Date(currentYear, currentMonth, 1);
@@ -246,6 +246,7 @@ const SalesByProductsPage: React.FC = () => {
 
   // Fetch yearly trend data for the product mix chart
   const fetchYearlyTrendData = async () => {
+    setIsGeneratingChart(true);
     try {
       const endDate = new Date();
       const startDate = new Date();
@@ -342,12 +343,12 @@ const SalesByProductsPage: React.FC = () => {
       });
 
       setYearlyTrendData(chartData);
-      setYearlyDataLoaded(true);
+      toast.success("Product trend data generated successfully");
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
-      toast.error("Failed to load yearly trend data");
+      toast.error("Failed to generate product trend data");
     } finally {
-      setIsLoadingYearlyData(false);
+      setIsGeneratingChart(false);
     }
   };
 
@@ -861,77 +862,73 @@ const SalesByProductsPage: React.FC = () => {
           </div>
 
           {/* Product Mix Analysis Chart */}
-          <div className="bg-white rounded-lg border shadow p-4 pb-0 relative">
-            <h2 className="text-lg font-semibold mb-4">
-              Product Mix Analysis (Last 12 Months)
-            </h2>
-
-            <div className="h-80 relative">
-              {!yearlyDataLoaded && (
-                <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-                  {isLoadingYearlyData ? (
-                    <div className="flex flex-col items-center">
-                      <LoadingSpinner />
-                      <p className="mt-2 text-default-600">
-                        Loading yearly data (this may take a moment)...
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center text-center px-4">
-                      <Button
-                        onClick={fetchYearlyTrendData}
-                        className="mb-12"
-                        variant="filled"
-                        color="sky"
-                      >
-                        Generate Yearly Trend Chart
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={yearlyTrendData}
-                  margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="month"
-                    textAnchor="middle"
-                    height={80}
-                    tickMargin={15}
-                  />
-                  <YAxis
-                    tickFormatter={(value: string | number | bigint) =>
-                      new Intl.NumberFormat("en", {
-                        notation: "compact",
-                        compactDisplay: "short",
-                      }).format(Number(value))
-                    }
-                  />
-                  <Tooltip
-                    formatter={(value: any) => formatCurrency(Number(value))}
-                    itemSorter={(item) =>
-                      item.value ? -Number(item.value) : 0
-                    }
-                  />
-                  <Legend wrapperStyle={{ bottom: 20 }} />
-                  {Object.keys(categoryColors).map((type) => (
-                    <Line
-                      key={type}
-                      type="monotone"
-                      dataKey={type}
-                      stroke={categoryColors[type]}
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+          <div className="bg-white rounded-lg border shadow p-4 pb-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
+              <Button
+                onClick={fetchYearlyTrendData}
+                disabled={isGeneratingChart || yearlyTrendData.length > 0}
+                color="sky"
+              >
+                {isGeneratingChart
+                  ? "Generating..."
+                  : yearlyTrendData.length > 0
+                  ? "Generated"
+                  : "Generate Chart"}
+              </Button>
             </div>
+            {isGeneratingChart ? (
+              <div className="w-full h-80 flex items-center justify-center">
+                <LoadingSpinner />
+              </div>
+            ) : yearlyTrendData.length > 0 ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={yearlyTrendData}
+                    margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="month"
+                      textAnchor="middle"
+                      height={80}
+                      tickMargin={15}
+                    />
+                    <YAxis
+                      tickFormatter={(value: string | number | bigint) =>
+                        new Intl.NumberFormat("en", {
+                          notation: "compact",
+                          compactDisplay: "short",
+                        }).format(Number(value))
+                      }
+                    />
+                    <Tooltip
+                      formatter={(value: any) => formatCurrency(Number(value))}
+                      itemSorter={(item) =>
+                        item.value ? -Number(item.value) : 0
+                      }
+                    />
+                    <Legend wrapperStyle={{ bottom: 20 }} />
+                    {Object.keys(categoryColors).map((type) => (
+                      <Line
+                        key={type}
+                        type="monotone"
+                        dataKey={type}
+                        stroke={categoryColors[type]}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-80 flex items-center justify-center border border-dashed border-default-300 rounded text-default-500">
+                Generate Chart view product mix trends for the past 12 months
+              </div>
+            )}
           </div>
         </>
       )}
