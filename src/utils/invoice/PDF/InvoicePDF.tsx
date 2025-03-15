@@ -8,7 +8,7 @@ interface InvoicePDFProps {
   customerNames?: Record<string, string>;
 }
 
-const ROWS_PER_PAGE = 34;
+const ROWS_PER_PAGE = 33;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
 const SUMMARY_ROWS = 1;
