@@ -141,7 +141,7 @@ export default function (pool, config) {
   // Get invoices with filters
   router.get("/", async (req, res) => {
     try {
-      const { startDate, endDate, invoiceId } = req.query;
+      const { startDate, endDate, invoiceId, salesman } = req.query;
 
       let query = `
         SELECT 
@@ -191,6 +191,11 @@ export default function (pool, config) {
           paramCounter + 1
         } AS bigint)`;
         paramCounter += 2;
+      } else if (salesman) {
+        const salesmanList = req.query.salesman.split(",");
+        queryParams.push(salesmanList);
+        query += ` AND i.salespersonid = ANY($${paramCounter})`;
+        paramCounter++;
       }
 
       query += ` GROUP BY i.id ORDER BY i.createddate DESC`;

@@ -29,6 +29,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import Button from "../../components/Button";
+import { FormCombobox } from "../../components/FormComponents";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 
 // Define interfaces
 interface SalesmanData {
@@ -112,6 +114,32 @@ const SalesBySalesmanPage: React.FC = () => {
     key: "totalSales",
     direction: "desc",
   });
+  const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
+  const { salesmen: salesmenData, isLoading: salesmenLoading } =
+    useSalesmanCache();
+  const [selectedChartSalesmen, setSelectedChartSalesmen] = useState<string[]>(
+    []
+  );
+  const [salesmanQuery, setSalesmanQuery] = useState("");
+  const [maxChartSalesmen] = useState(5); // Limit to prevent chart legend overcrowding
+
+  useEffect(() => {
+    if (salesmenData.length > 0) {
+      const salesmenIds = salesmenData.map((employee) => employee.id);
+      setSalesmen(["All Salesmen", ...salesmenIds]);
+    }
+  }, [salesmenData]);
+
+  useEffect(() => {
+    if (salesmen.length > 0) {
+      // Filter out "All Salesmen" and apply maximum limit
+      const allSalesmenIds = salesmen
+        .filter((id) => id !== "All Salesmen")
+        .slice(0, maxChartSalesmen);
+
+      setSelectedChartSalesmen(allSalesmenIds);
+    }
+  }, [salesmen, maxChartSalesmen]);
 
   // Handle month selection change
   const handleMonthChange = (month: MonthOption) => {
@@ -200,8 +228,10 @@ const SalesBySalesmanPage: React.FC = () => {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
+      // Add the salesmen parameter to filter invoices
+      const salesmenParam = selectedChartSalesmen.join(",");
       const invoices = await api.get(
-        `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
+        `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}&salesman=${salesmenParam}`
       );
 
       if (!Array.isArray(invoices)) {
@@ -210,9 +240,12 @@ const SalesBySalesmanPage: React.FC = () => {
 
       // Group sales by month and salesman
       const monthlyData = new Map<string, Record<string, number>>();
-      const allSalesmen = new Set<string>();
+      const allSalesmen = new Set<string>(selectedChartSalesmen); // Only include selected salesmen
 
       invoices.forEach((invoice) => {
+        // Skip if not a selected salesman
+        if (!selectedChartSalesmen.includes(invoice.salespersonid)) return;
+
         const invoiceDate = new Date(Number(invoice.createddate));
         const monthYear = `${invoiceDate.getFullYear()}-${String(
           invoiceDate.getMonth() + 1
@@ -225,18 +258,23 @@ const SalesBySalesmanPage: React.FC = () => {
         const salesmanId = invoice.salespersonid;
         if (!salesmanId) return;
 
-        allSalesmen.add(salesmanId);
-
         // Calculate total for the invoice (product quantity * price)
         let invoiceTotal = 0;
         if (Array.isArray(invoice.products)) {
-          invoice.products.forEach((product: any) => {
-            // Skip subtotal or total rows
-            if (product.issubtotal || product.istotal) return;
-            const quantity = Number(product.quantity) || 0;
-            const price = Number(product.price) || 0;
-            invoiceTotal += quantity * price;
-          });
+          invoice.products.forEach(
+            (product: {
+              issubtotal: any;
+              istotal: any;
+              quantity: any;
+              price: any;
+            }) => {
+              // Skip subtotal or total rows
+              if (product.issubtotal || product.istotal) return;
+              const quantity = Number(product.quantity) || 0;
+              const price = Number(product.price) || 0;
+              invoiceTotal += quantity * price;
+            }
+          );
         }
 
         const monthData = monthlyData.get(monthYear)!;
@@ -321,6 +359,13 @@ const SalesBySalesmanPage: React.FC = () => {
     fetchSalesData();
   }, [dateRange]);
 
+  useEffect(() => {
+    // Clear chart data if it exists when selection changes
+    if (salesTrendData.length > 0) {
+      setSalesTrendData([]);
+    }
+  }, [selectedChartSalesmen]);
+
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
     let data = [...salesmanData];
@@ -393,8 +438,12 @@ const SalesBySalesmanPage: React.FC = () => {
   };
 
   // Generate random colors for charts
+  const generateRandomColor = () => {
+    return `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+  };
+
   const generateSalesmanColors = () => {
-    const colorMap: Record<string, string> = {};
+    const colorMap: { [key: string]: string } = {};
 
     // Base colors for first few salesmen
     const baseColors = [
@@ -405,15 +454,12 @@ const SalesBySalesmanPage: React.FC = () => {
       "#f56565", // Red
     ];
 
-    salesmanData.forEach((salesman, index) => {
+    // Assign colors to the selected salesmen first
+    selectedChartSalesmen.forEach((salesmanId, index) => {
       if (index < baseColors.length) {
-        colorMap[salesman.id] = baseColors[index];
+        colorMap[salesmanId] = baseColors[index];
       } else {
-        // Generate a random color for additional salesmen
-        const randomColor = `#${Math.floor(Math.random() * 16777215).toString(
-          16
-        )}`;
-        colorMap[salesman.id] = randomColor;
+        colorMap[salesmanId] = generateRandomColor();
       }
     });
 
@@ -782,18 +828,50 @@ const SalesBySalesmanPage: React.FC = () => {
           {/* Sales Trend Chart */}
           <div className="bg-white rounded-lg border shadow p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Sales Trends Over Time</h2>
-              <Button
-                onClick={fetchYearlyTrendData}
-                disabled={isGeneratingChart || salesTrendData.length > 0}
-                color="sky"
-              >
-                {isGeneratingChart
-                  ? "Generating..."
-                  : salesTrendData.length > 0
-                  ? "Generated"
-                  : "Generate Chart"}
-              </Button>
+              <h2 className="text-lg font-semibold">
+                Salesmen's Sales Trends Over Time
+              </h2>
+              <div className="flex items-center gap-3">
+                <FormCombobox
+                  name="chartSalesmen"
+                  label=""
+                  value={selectedChartSalesmen}
+                  onChange={(values) => {
+                    // Limit selection to prevent chart overcrowding
+                    if (values && values.length <= maxChartSalesmen) {
+                      setSelectedChartSalesmen(values);
+                    } else if (values && values.length > maxChartSalesmen) {
+                      toast.error(
+                        `Maximum ${maxChartSalesmen} salesmen can be selected for the chart`
+                      );
+                      // Keep the first max number of selections
+                      setSelectedChartSalesmen(
+                        values.slice(0, maxChartSalesmen)
+                      );
+                    }
+                  }}
+                  options={salesmen
+                    .filter((id) => id !== "All Salesmen")
+                    .map((id) => ({ id, name: id }))}
+                  query={salesmanQuery}
+                  setQuery={setSalesmanQuery}
+                />
+                <Button
+                  onClick={fetchYearlyTrendData}
+                  disabled={
+                    isGeneratingChart ||
+                    salesTrendData.length > 0 ||
+                    selectedChartSalesmen.length === 0
+                  }
+                  color="sky"
+                >
+                  {isGeneratingChart
+                    ? "Generating..."
+                    : salesTrendData.length > 0
+                    ? "Generated"
+                    : "Generate Chart"}
+                </Button>
+              </div>
             </div>
             {isGeneratingChart ? (
               <div className="w-full h-80 flex items-center justify-center">
@@ -829,13 +907,15 @@ const SalesBySalesmanPage: React.FC = () => {
                     />
                     <Legend wrapperStyle={{ bottom: 20 }} />
                     {/* Only show lines for salesmen who have data */}
-                    {salesmanData.map((salesman) => (
+                    {selectedChartSalesmen.map((salesmanId) => (
                       <Line
-                        key={salesman.id}
+                        key={salesmanId}
                         type="monotone"
-                        dataKey={salesman.id}
-                        name={salesman.id}
-                        stroke={salesmanColors[salesman.id]}
+                        dataKey={salesmanId}
+                        name={salesmanId}
+                        stroke={
+                          salesmanColors[salesmanId] || generateRandomColor()
+                        }
                         strokeWidth={2}
                         dot={false}
                         activeDot={{ r: 4 }}
@@ -846,7 +926,7 @@ const SalesBySalesmanPage: React.FC = () => {
               </div>
             ) : (
               <div className="h-80 flex items-center justify-center border border-dashed border-default-300 rounded text-default-500">
-                Generate to view salesmen's sales trends for the past 12 months
+                Generate to view sales trends for the past 12 months
               </div>
             )}
           </div>

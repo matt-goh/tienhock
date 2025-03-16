@@ -18,8 +18,6 @@ import {
 } from "@headlessui/react";
 import toast from "react-hot-toast";
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   Tooltip,
