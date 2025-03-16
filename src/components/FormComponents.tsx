@@ -44,7 +44,7 @@ export const FormInput: React.FC<InputProps> = ({
   type = "text",
   placeholder = "",
 }) => (
-  <div className="space-y-2">
+  <div className={`${label === "" ? "" : "space-y-2"}`}>
     <label htmlFor={name} className="text-sm font-medium text-default-700">
       {label}
     </label>
@@ -72,7 +72,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   showStatus = false,
   isVerified = false,
 }) => (
-  <div className="space-y-2">
+  <div className={`${label === "" ? "" : "space-y-2"}`}>
     <div className="flex items-center gap-2">
       <label htmlFor={name} className="text-sm font-medium text-default-700">
         {label}
@@ -187,7 +187,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   query,
   setQuery,
 }) => (
-  <div className="space-y-2">
+  <div className={`${label === "" ? "" : "space-y-2"}`}>
     <label htmlFor={name} className="text-sm font-medium text-default-700">
       {label}
     </label>
