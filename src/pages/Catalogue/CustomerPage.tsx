@@ -25,6 +25,7 @@ import {
   refreshCustomersCache,
   useCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -40,21 +41,15 @@ const CustomerPage: React.FC = () => {
   const [customerToDelete, setCustomerToDelete] = useState<CustomerList | null>(
     null
   );
-
-  const fetchSalesmen = useCallback(async () => {
-    try {
-      const data: Employee[] = await api.get("/api/staffs?salesmenOnly=true");
-      const salesmenIds = data.map((employee) => employee.id);
-      setSalesmen(["All Salesmen", ...salesmenIds]);
-    } catch (error) {
-      console.error("Error fetching salesmen:", error);
-      toast.error("Failed to fetch salesmen list");
-    }
-  }, []);
+  const { salesmen: salesmenData, isLoading: salesmenLoading } =
+    useSalesmanCache();
 
   useEffect(() => {
-    fetchSalesmen();
-  }, [fetchSalesmen]);
+    if (salesmenData.length > 0) {
+      const salesmenIds = salesmenData.map((employee) => employee.id);
+      setSalesmen(["All Salesmen", ...salesmenIds]);
+    }
+  }, [salesmenData]);
 
   const handleDeleteClick = (customer: CustomerList) => {
     setCustomerToDelete(customer);

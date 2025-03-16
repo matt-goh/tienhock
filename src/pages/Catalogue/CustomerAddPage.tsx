@@ -9,6 +9,7 @@ import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
 import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
 
@@ -22,6 +23,8 @@ const CustomerAddPage: React.FC = () => {
   const [temporaryProducts, setTemporaryProducts] = useState<CustomProduct[]>(
     []
   );
+  const { salesmen: salesmenData, isLoading: salesmenLoading } =
+    useSalesmanCache();
 
   // Helper function for ID number placeholder
   const getIdNumberPlaceholder = (idType: string) => {
@@ -98,22 +101,14 @@ const CustomerAddPage: React.FC = () => {
   }, [formData]);
 
   useEffect(() => {
-    fetchSalesmen();
-  }, []);
-
-  const fetchSalesmen = useCallback(async () => {
-    try {
-      const data: Employee[] = await api.get("/api/staffs?salesmenOnly=true");
-      const salesmenOptions = data.map((employee) => ({
+    if (salesmenData.length > 0) {
+      const salesmenOptions = salesmenData.map((employee) => ({
         id: employee.id,
         name: employee.name || employee.id,
       }));
       setSalesmen(salesmenOptions);
-    } catch (error) {
-      console.error("Error fetching salesmen:", error);
-      toast.error("Failed to fetch salesmen list");
     }
-  }, []);
+  }, [salesmenData]);
 
   const handleBackClick = () => {
     if (isFormChanged) {

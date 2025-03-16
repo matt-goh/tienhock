@@ -14,6 +14,7 @@ import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
 import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
 
@@ -69,6 +70,8 @@ const CustomerFormPage: React.FC = () => {
   const [originalProductIds, setOriginalProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const { salesmen: salesmenData, isLoading: salesmenLoading } =
+    useSalesmanCache();
 
   // Options
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
@@ -118,8 +121,17 @@ const CustomerFormPage: React.FC = () => {
     if (isEditMode) {
       fetchCustomerDetails();
     }
-    fetchSalesmen();
   }, []);
+
+  useEffect(() => {
+    if (salesmenData.length > 0) {
+      const salesmenOptions = salesmenData.map((employee) => ({
+        id: employee.id,
+        name: employee.name || employee.id,
+      }));
+      setSalesmen(salesmenOptions);
+    }
+  }, [salesmenData]);
 
   useEffect(() => {
     // Only mark as changed if we have products
@@ -154,20 +166,6 @@ const CustomerFormPage: React.FC = () => {
       setLoading(false);
     }
   };
-
-  const fetchSalesmen = useCallback(async () => {
-    try {
-      const data: Employee[] = await api.get("/api/staffs?salesmenOnly=true");
-      const salesmenOptions = data.map((employee) => ({
-        id: employee.id,
-        name: employee.name || employee.id,
-      }));
-      setSalesmen(salesmenOptions);
-    } catch (error) {
-      console.error("Error fetching salesmen:", error);
-      toast.error("Failed to fetch salesmen list");
-    }
-  }, []);
 
   // Event handlers
   const handleBackClick = () => {
