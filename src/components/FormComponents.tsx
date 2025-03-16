@@ -193,7 +193,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
     </label>
     <Combobox multiple value={value} onChange={onChange}>
       {({ open }) => (
-        <div className="relative mt-1">
+        <div className="relative">
           <ComboboxInput
             className={clsx(
               "w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",

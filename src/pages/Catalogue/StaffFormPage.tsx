@@ -358,7 +358,7 @@ const StaffFormPage: React.FC = () => {
                   {renderInput("address", "Address")}
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
                   {renderCombobox(
@@ -371,7 +371,7 @@ const StaffFormPage: React.FC = () => {
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderInput("icNo", "IC Number")}
                   {renderInput("bankAccountNumber", "Bank Account Number")}
@@ -381,7 +381,7 @@ const StaffFormPage: React.FC = () => {
                   {renderListbox("document", "Document", documentOptions)}
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderListbox(
                     "paymentType",
