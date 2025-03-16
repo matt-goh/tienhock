@@ -37,6 +37,7 @@ import TableEditableCell from "../../components/Table/TableEditableCell";
 import { debounce } from "lodash";
 import { CustomerCombobox } from "../../components/Invois/CustomerCombobox";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 
 const InvoiceDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -81,6 +82,8 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { products } = useProductsCache();
+  const { salesmen: salesmenData, isLoading: salesmenLoading } =
+    useSalesmanCache();
 
   useEffect(() => {
     if (location.state?.previousPath) {
@@ -93,6 +96,13 @@ const InvoiceDetailsPage: React.FC = () => {
       JSON.stringify(invoiceData) !== JSON.stringify(initialInvoiceData);
     setIsFormChanged(hasChanged);
   }, [invoiceData, initialInvoiceData]);
+
+  useEffect(() => {
+    if (salesmenData.length > 0) {
+      const salesmenIds = salesmenData.map((employee) => employee.id);
+      setSalesmen(["All Salesmen", ...salesmenIds]);
+    }
+  }, [salesmenData]);
 
   const calculateTotal = (item: ProductItem): number => {
     if (!item) return 0;
@@ -311,21 +321,6 @@ const InvoiceDetailsPage: React.FC = () => {
       }
     }
   }, [products, customerProducts]);
-
-  const fetchSalesmen = useCallback(async () => {
-    try {
-      const data: Employee[] = await api.get("/api/staffs?salesmenOnly=true");
-      const salesmenIds = data.map((employee) => employee.id);
-      setSalesmen(["All Salesmen", ...salesmenIds]);
-    } catch (error) {
-      console.error("Error fetching salesmen:", error);
-      toast.error("Failed to fetch salesmen. Please try again.");
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSalesmen();
-  }, [fetchSalesmen]);
 
   const orderDetailsWithTotal = useMemo(() => {
     if (!invoiceData || !Array.isArray(invoiceData.products)) {
