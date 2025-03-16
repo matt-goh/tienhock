@@ -33,6 +33,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import Button from "../../components/Button";
 
 interface ProductSalesData {
@@ -127,13 +128,13 @@ const SalesByProductsPage: React.FC = () => {
     key: "totalSales",
     direction: "desc",
   });
-
-  // Get products from cache
   const {
     products,
     isLoading: isProductsLoading,
     error: productsError,
   } = useProductsCache();
+  const { salesmen: salesmenData, isLoading: salesmenLoading } =
+    useSalesmanCache();
 
   // Dynamic category colors based on product types
   const categoryColors = useMemo(() => {
@@ -185,6 +186,13 @@ const SalesByProductsPage: React.FC = () => {
     // Update date range
     setDateRange({ start: startDate, end: endDate });
   };
+
+  useEffect(() => {
+    if (salesmenData.length > 0) {
+      const salesmenIds = salesmenData.map((employee) => employee.id);
+      setSalesmen(["All Salesmen", ...salesmenIds]);
+    }
+  }, [salesmenData]);
 
   // Get product type from product ID using cache
   const getProductType = (productId: string): string => {
@@ -388,17 +396,6 @@ const SalesByProductsPage: React.FC = () => {
         );
 
         if (Array.isArray(invoices)) {
-          // Extract unique salesperson IDs
-          const uniqueSalesmen = new Set<string>();
-          invoices.forEach((invoice) => {
-            if (invoice.salespersonid) {
-              uniqueSalesmen.add(invoice.salespersonid);
-            }
-          });
-
-          // Update salesmen state
-          setSalesmen(["All Salesmen", ...Array.from(uniqueSalesmen)]);
-
           const processedData = processInvoiceData(invoices);
           setSalesData(processedData);
         } else {
