@@ -1,7 +1,7 @@
 // src/pages/Sales/SalesByProductsPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
-import { FormListbox } from "../../components/FormComponents";
+import { FormCombobox, FormListbox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   IconSortAscending,
@@ -133,6 +133,11 @@ const SalesByProductsPage: React.FC = () => {
   } = useProductsCache();
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
+  const [selectedChartProducts, setSelectedChartProducts] = useState<string[]>(
+    []
+  );
+  const [productQuery, setProductQuery] = useState("");
+  const [maxChartProducts] = useState(5); // Limit to prevent chart legend overcrowding
 
   // Dynamic category colors based on product types
   const categoryColors = useMemo(() => {
@@ -185,12 +190,62 @@ const SalesByProductsPage: React.FC = () => {
     setDateRange({ start: startDate, end: endDate });
   };
 
+  const productOptions = useMemo(() => {
+    const options = [
+      { id: "MEE", name: "All Mee Products" },
+      { id: "BH", name: "All Bihun Products" },
+    ];
+
+    // Add individual products from cache
+    products.forEach((product) => {
+      options.push({
+        id: product.id,
+        name: product.description || product.id,
+      });
+    });
+
+    return options;
+  }, [products]);
+
+  // Clear chart data when product selection changes
+  useEffect(() => {
+    if (yearlyTrendData.length > 0) {
+      setYearlyTrendData([]);
+    }
+  }, [selectedChartProducts]);
+
   useEffect(() => {
     if (salesmenData.length > 0) {
       const salesmenIds = salesmenData.map((employee) => employee.id);
       setSalesmen(["All Salesmen", ...salesmenIds]);
     }
   }, [salesmenData]);
+
+  // Initialize selected products when product options are available
+  useEffect(() => {
+    if (productOptions.length > 0) {
+      // Take the first few products up to the maximum limit
+      // Start with categories (MEE, BH) if available
+      const categoryOptions = productOptions
+        .filter((option) => ["MEE", "BH"].includes(option.id))
+        .map((option) => option.id);
+
+      // Take up to the limit
+      const initialSelection = categoryOptions.slice(0, maxChartProducts);
+
+      // If we still have room, add some individual products
+      if (initialSelection.length < maxChartProducts) {
+        const individualProducts = productOptions
+          .filter((option) => !["MEE", "BH"].includes(option.id))
+          .slice(0, maxChartProducts - initialSelection.length)
+          .map((option) => option.id);
+
+        initialSelection.push(...individualProducts);
+      }
+
+      setSelectedChartProducts(initialSelection);
+    }
+  }, [productOptions, maxChartProducts]);
 
   // Get product type from product ID using cache
   const getProductType = (productId: string): string => {
@@ -202,6 +257,51 @@ const SalesByProductsPage: React.FC = () => {
   const getProductDescription = (productId: string): string => {
     const product = products.find((p) => p.id === productId);
     return product?.description || productId;
+  };
+
+  const getProductColor = (key: string): string => {
+    // If it's a category, use its color
+    if (categoryColors[key]) {
+      return categoryColors[key];
+    }
+
+    // For individual products, derive color from their product type
+    const productType = getProductType(key);
+    const baseColor = categoryColors[productType] || "#a0aec0";
+
+    // Create a consistent variation based on product ID
+    const hash = key
+      .split("")
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const shade = -40 + (hash % 60); // Generate a shade between -40% (darker) and +20% (lighter)
+
+    return adjustColorBrightness(baseColor, shade);
+  };
+
+  // Helper function to adjust color brightness with limits
+  const adjustColorBrightness = (hex: string, percent: number): string => {
+    // Limit the brightness adjustment to ensure colors aren't too light
+    percent = Math.min(20, Math.max(-40, percent)); // Limit between -40% (darker) and +20% (slightly lighter)
+
+    // Convert hex to RGB
+    let r = parseInt(hex.slice(1, 3), 16);
+    let g = parseInt(hex.slice(3, 5), 16);
+    let b = parseInt(hex.slice(5, 7), 16);
+
+    // Adjust brightness
+    r = Math.floor((r * (100 + percent)) / 100);
+    g = Math.floor((g * (100 + percent)) / 100);
+    b = Math.floor((b * (100 + percent)) / 100);
+
+    // Ensure values are in valid range
+    r = Math.min(255, Math.max(0, r));
+    g = Math.min(255, Math.max(0, g));
+    b = Math.min(255, Math.max(0, b));
+
+    // Convert back to hex
+    return `#${r.toString(16).padStart(2, "0")}${g
+      .toString(16)
+      .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   };
 
   // Process invoice data to get product sales
@@ -280,17 +380,29 @@ const SalesByProductsPage: React.FC = () => {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      const invoices = await api.get(
-        `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
-      );
+      // Add product filter parameter
+      let url = `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`;
+      if (selectedChartProducts.length > 0) {
+        url += `&products=${selectedChartProducts.join(",")}`;
+      }
+
+      const invoices = await api.get(url);
 
       if (!Array.isArray(invoices)) {
         throw new Error("Invalid response format");
       }
 
-      // Group sales by month and product type
+      // Check if we received any invoices
+      if (invoices.length === 0) {
+        toast.error("No data found for the selected products in the past year");
+        setYearlyTrendData([]);
+        setIsGeneratingChart(false);
+        return;
+      }
+
+      // Group sales by month and product/type
       const monthlyData = new Map<string, Record<string, number>>();
-      const allTypes = new Set<string>();
+      const allProductsOrTypes = new Set<string>();
 
       invoices.forEach((invoice) => {
         const invoiceDate = new Date(Number(invoice.createddate));
@@ -307,21 +419,33 @@ const SalesByProductsPage: React.FC = () => {
             (product: {
               issubtotal: any;
               istotal: any;
-              code: string;
+              code: any;
               quantity: any;
               price: any;
             }) => {
               if (product.issubtotal || product.istotal) return;
 
-              const productType = getProductType(product.code);
-              allTypes.add(productType);
+              const productId = product.code;
+              const productType = getProductType(productId);
 
+              // Calculate the total for this product
               const quantity = Number(product.quantity) || 0;
               const price = Number(product.price) || 0;
               const total = quantity * price;
 
-              const monthData = monthlyData.get(monthYear)!;
-              monthData[productType] = (monthData[productType] || 0) + total;
+              // Track sales for the individual product if it's selected
+              if (selectedChartProducts.includes(productId)) {
+                allProductsOrTypes.add(productId);
+                const monthData = monthlyData.get(monthYear)!;
+                monthData[productId] = (monthData[productId] || 0) + total;
+              }
+
+              // Also track sales for the product type if it's selected
+              if (selectedChartProducts.includes(productType)) {
+                allProductsOrTypes.add(productType);
+                const monthData = monthlyData.get(monthYear)!;
+                monthData[productType] = (monthData[productType] || 0) + total;
+              }
             }
           );
         }
@@ -348,27 +472,27 @@ const SalesByProductsPage: React.FC = () => {
         const [year, month] = monthYear.split("-");
         const monthData = monthlyData.get(monthYear)!;
 
-        // Create data point with month label and all product types
+        // Create data point with month label and selected products/types
         const dataPoint: MonthlyTypeData = {
           month: `${monthNames[parseInt(month) - 1]} ${year}`,
         };
 
-        // Add values for each product type
-        Array.from(allTypes).forEach((type) => {
-          dataPoint[type] = monthData[type] || 0;
+        // Add values for each selected product/type
+        Array.from(allProductsOrTypes).forEach((key) => {
+          dataPoint[key] = monthData[key] || 0;
         });
-
-        // Add total
-        dataPoint.total = Object.values(monthData).reduce(
-          (sum, value) => sum + value,
-          0
-        );
 
         return dataPoint;
       });
 
-      setYearlyTrendData(chartData);
-      toast.success("Product trend data generated successfully");
+      // Check if we have any data points after processing
+      if (chartData.length === 0 || allProductsOrTypes.size === 0) {
+        toast.error("No sales data found for the selected products");
+        setYearlyTrendData([]);
+      } else {
+        setYearlyTrendData(chartData);
+        toast.success("Product trend data generated successfully");
+      }
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
       toast.error("Failed to generate product trend data");
@@ -604,6 +728,9 @@ const SalesByProductsPage: React.FC = () => {
       })
     );
 
+    const bhTotal = bhProducts.reduce((sum, p) => sum + p.totalSales, 0);
+    const meeTotal = meeProducts.reduce((sum, p) => sum + p.totalSales, 0);
+
     return {
       categorySummary,
       totalSales,
@@ -613,6 +740,8 @@ const SalesByProductsPage: React.FC = () => {
         meeProducts,
         categoryColors["MEE"] || "#48bb78"
       ),
+      bhTotal,
+      meeTotal,
     };
   }, [salesData, categoryColors]);
 
@@ -1001,41 +1130,53 @@ const SalesByProductsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* BH Products Doughnut Chart */}
             <div className="bg-white rounded-lg border shadow p-4">
-              <h2 className="text-lg font-semibold">
+              <h2 className="text-lg font-semibold mb-4">
                 Bihun Products Distribution
               </h2>
               {summary.bhPieData && summary.bhPieData.length > 0 ? (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={summary.bhPieData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) =>
-                          percent > 0.05
-                            ? `${name.substring(0, 12)}${
-                                name.length > 12 ? "..." : ""
-                              }: ${(percent * 100).toFixed(1)}%`
-                            : ""
-                        }
-                        outerRadius={100}
-                        innerRadius={50}
-                        fill="#8884d8"
-                        dataKey="value"
-                        paddingAngle={2}
-                      >
-                        {summary.bhPieData.map((entry) => (
-                          <Cell key={entry.id} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value) => formatCurrency(Number(value))}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+                <>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={summary.bhPieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) =>
+                            percent > 0.05
+                              ? `${name.substring(0, 12)}${
+                                  name.length > 12 ? "..." : ""
+                                }: ${(percent * 100).toFixed(1)}%`
+                              : ""
+                          }
+                          outerRadius={100}
+                          innerRadius={50}
+                          fill="#8884d8"
+                          dataKey="value"
+                          paddingAngle={2}
+                        >
+                          {summary.bhPieData.map((entry) => (
+                            <Cell key={entry.id} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => formatCurrency(Number(value))}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div
+                    className="text-center mt-2 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: `${categoryColors["BH"]}15`,
+                      color: categoryColors["BH"] || "#4299e1",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Total: {formatCurrency(summary.bhTotal)}
+                  </div>
+                </>
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
                   No Bihun products data available
@@ -1049,37 +1190,49 @@ const SalesByProductsPage: React.FC = () => {
                 Mee Products Distribution
               </h2>
               {summary.meePieData && summary.meePieData.length > 0 ? (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={summary.meePieData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) =>
-                          percent > 0.05
-                            ? `${name.substring(0, 12)}${
-                                name.length > 12 ? "..." : ""
-                              }: ${(percent * 100).toFixed(1)}%`
-                            : ""
-                        }
-                        outerRadius={100}
-                        innerRadius={50}
-                        fill="#8884d8"
-                        dataKey="value"
-                        paddingAngle={2}
-                      >
-                        {summary.meePieData.map((entry) => (
-                          <Cell key={entry.id} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value) => formatCurrency(Number(value))}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+                <>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={summary.meePieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) =>
+                            percent > 0.05
+                              ? `${name.substring(0, 12)}${
+                                  name.length > 12 ? "..." : ""
+                                }: ${(percent * 100).toFixed(1)}%`
+                              : ""
+                          }
+                          outerRadius={100}
+                          innerRadius={50}
+                          fill="#8884d8"
+                          dataKey="value"
+                          paddingAngle={2}
+                        >
+                          {summary.meePieData.map((entry) => (
+                            <Cell key={entry.id} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => formatCurrency(Number(value))}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div
+                    className="text-center mt-2 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: `${categoryColors["MEE"]}15`,
+                      color: categoryColors["MEE"] || "#48bb78",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Total: {formatCurrency(summary.meeTotal)}
+                  </div>
+                </>
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
                   No Mee products data available
@@ -1092,17 +1245,53 @@ const SalesByProductsPage: React.FC = () => {
           <div className="bg-white rounded-lg border shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
-              <Button
-                onClick={fetchYearlyTrendData}
-                disabled={isGeneratingChart || yearlyTrendData.length > 0}
-                color="sky"
-              >
-                {isGeneratingChart
-                  ? "Generating..."
-                  : yearlyTrendData.length > 0
-                  ? "Generated"
-                  : "Generate Chart"}
-              </Button>
+              <div className="flex items-center gap-3">
+                <div className="w-96">
+                  <FormCombobox
+                    name="chartProducts"
+                    label=""
+                    value={selectedChartProducts}
+                    onChange={(values) => {
+                      // Handle null case
+                      if (!values) {
+                        setSelectedChartProducts([]);
+                        return;
+                      }
+
+                      // Limit selection to prevent chart overcrowding
+                      if (values.length <= maxChartProducts) {
+                        setSelectedChartProducts(values);
+                      } else {
+                        toast.error(
+                          `Maximum ${maxChartProducts} products can be selected for the chart`
+                        );
+                        // Keep the first max number of selections
+                        setSelectedChartProducts(
+                          values.slice(0, maxChartProducts)
+                        );
+                      }
+                    }}
+                    options={productOptions}
+                    query={productQuery}
+                    setQuery={setProductQuery}
+                  />
+                </div>
+                <Button
+                  onClick={fetchYearlyTrendData}
+                  disabled={
+                    isGeneratingChart ||
+                    yearlyTrendData.length > 0 ||
+                    selectedChartProducts.length === 0
+                  }
+                  color="sky"
+                >
+                  {isGeneratingChart
+                    ? "Generating..."
+                    : yearlyTrendData.length > 0
+                    ? "Generated"
+                    : "Generate Chart"}
+                </Button>
+              </div>
             </div>
             {isGeneratingChart ? (
               <div className="w-full h-80 flex items-center justify-center">
@@ -1137,23 +1326,40 @@ const SalesByProductsPage: React.FC = () => {
                       }
                     />
                     <Legend wrapperStyle={{ bottom: 20 }} />
-                    {Object.keys(categoryColors).map((type) => (
-                      <Line
-                        key={type}
-                        type="monotone"
-                        dataKey={type}
-                        stroke={categoryColors[type]}
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                      />
-                    ))}
+                    {yearlyTrendData.length > 0 &&
+                      Object.keys(yearlyTrendData[0])
+                        .filter((key) => key !== "month")
+                        .map((key) => {
+                          // Get display name for the line
+                          const displayName =
+                            key === "MEE"
+                              ? "All Mee Products"
+                              : key === "BH"
+                              ? "All Bihun Products"
+                              : products.find((p) => p.id === key)
+                                  ?.description || key;
+
+                          return (
+                            <Line
+                              key={key}
+                              type="monotone"
+                              dataKey={key}
+                              name={displayName}
+                              stroke={getProductColor(key)}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{ r: 4 }}
+                            />
+                          );
+                        })}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-80 flex items-center justify-center border border-dashed border-default-300 rounded text-default-500">
-                Generate Chart view product mix trends for the past 12 months
+              <div className="h-80 flex flex-col items-center justify-center border border-dashed border-default-300 rounded text-default-500">
+                {selectedChartProducts.length === 0
+                  ? "Generate Chart to view product mix trends for the past 12 months"
+                  : "No data available for selected products. Try selecting different products or a different time period."}
               </div>
             )}
           </div>

@@ -141,7 +141,7 @@ export default function (pool, config) {
   // Get invoices with filters
   router.get("/", async (req, res) => {
     try {
-      const { startDate, endDate, invoiceId, salesman } = req.query;
+      const { startDate, endDate, invoiceId, salesman, products } = req.query;
 
       let query = `
         SELECT 
@@ -180,21 +180,37 @@ export default function (pool, config) {
       const queryParams = [];
       let paramCounter = 1;
 
-      // Add invoiceId filter if provided
+      // Filter by invoiceId
       if (invoiceId) {
         queryParams.push(invoiceId);
         query += ` AND i.id = $${paramCounter}`;
         paramCounter++;
-      } else if (startDate && endDate) {
+      }
+      // Filter by date range
+      if (startDate && endDate) {
         queryParams.push(startDate, endDate);
         query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
           paramCounter + 1
         } AS bigint)`;
         paramCounter += 2;
-      } else if (salesman) {
+      }
+      // Filter by salesman
+      if (salesman) {
         const salesmanList = req.query.salesman.split(",");
         queryParams.push(salesmanList);
         query += ` AND i.salespersonid = ANY($${paramCounter})`;
+        paramCounter++;
+      }
+      // Filter by products
+      if (products) {
+        const productList = req.query.products.split(",");
+        queryParams.push(productList);
+        query += ` AND EXISTS (
+          SELECT 1 FROM order_details od
+          LEFT JOIN products p ON od.code = p.id
+          WHERE od.invoiceid = i.id 
+          AND (od.code = ANY($${paramCounter}) OR p.type = ANY($${paramCounter}))
+        )`;
         paramCounter++;
       }
 
