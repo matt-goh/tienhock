@@ -423,6 +423,10 @@ export default function (pool, config) {
 
   // Submit invoices (single or batch)
   router.post("/submit-invoices", async (req, res) => {
+    // Extract fields query parameter to determine response format
+    const fieldsParam = req.query.fields;
+    const isMinimal = fieldsParam === "minimal";
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -661,7 +665,101 @@ export default function (pool, config) {
         }
       }
 
-      // Return response with results and any errors
+      // Prepare response based on fields parameter
+      if (isMinimal) {
+        // Create merged invoice results with combined status
+        const invoices = [];
+
+        // Create a lookup map for einvoice results
+        const acceptedDocMap = {};
+        const rejectedDocMap = {};
+
+        if (einvoiceResults) {
+          // Map accepted documents by internalId
+          if (
+            einvoiceResults.acceptedDocuments &&
+            einvoiceResults.acceptedDocuments.length > 0
+          ) {
+            einvoiceResults.acceptedDocuments.forEach((doc) => {
+              acceptedDocMap[doc.internalId] = doc;
+            });
+          }
+
+          // Map rejected documents by internalId
+          if (
+            einvoiceResults.rejectedDocuments &&
+            einvoiceResults.rejectedDocuments.length > 0
+          ) {
+            einvoiceResults.rejectedDocuments.forEach((doc) => {
+              rejectedDocMap[doc.internalId || doc.invoiceCodeNumber] = doc;
+            });
+          }
+        }
+
+        // Process results and merge with einvoice data
+        for (const result of results) {
+          const invoiceId = result.billNumber;
+          const invoiceData = {
+            id: invoiceId,
+            systemStatus: result.status,
+          };
+
+          // If invoice was accepted in MyInvois
+          if (acceptedDocMap[invoiceId]) {
+            const doc = acceptedDocMap[invoiceId];
+
+            // If longId is missing, mark status as Pending instead of Valid
+            if (!doc.longId) {
+              invoiceData.einvoiceStatus = "Pending";
+            } else {
+              invoiceData.einvoiceStatus = doc.status || "Valid";
+            }
+
+            invoiceData.uuid = doc.uuid;
+            invoiceData.longId = doc.longId || "";
+            invoiceData.dateTimeValidated = doc.dateTimeValidated || null;
+          }
+          // If invoice was rejected in MyInvois
+          else if (rejectedDocMap[invoiceId]) {
+            const doc = rejectedDocMap[invoiceId];
+            invoiceData.einvoiceStatus = "Invalid";
+            invoiceData.error = {
+              code: doc.error?.code || "ERROR",
+              message: doc.error?.message || "Unknown error",
+            };
+          }
+          // If invoice wasn't processed by MyInvois at all
+          else if (einvoiceResults) {
+            invoiceData.einvoiceStatus = "Not Processed";
+          }
+
+          invoices.push(invoiceData);
+        }
+
+        // Add any errors from system processing
+        if (errors && errors.length > 0) {
+          for (const error of errors) {
+            invoices.push({
+              id: error.billNumber,
+              systemStatus: "error",
+              einvoiceStatus: "Not Processed",
+              error: {
+                message: error.message,
+              },
+            });
+          }
+        }
+
+        return res.status(207).json({
+          message: "Invoice processing completed",
+          invoices: invoices,
+          overallStatus: einvoiceResults
+            ? einvoiceResults.overallStatus
+            : "SystemOnly",
+        });
+      }
+
+      // Return full response for ERP system (default)
       res.status(207).json({
         message: "Invoice processing completed",
         results,
