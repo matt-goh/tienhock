@@ -261,6 +261,10 @@ export default function (pool, config) {
 
   // Submit invoice to MyInvois
   router.post("/submit", async (req, res) => {
+    // Extract fields query parameter
+    const fieldsParam = req.query.fields;
+    const isMinimal = fieldsParam === "minimal";
+
     try {
       const { invoiceIds } = req.body;
 
@@ -419,6 +423,61 @@ export default function (pool, config) {
         );
       }
 
+      // If minimal response is requested, transform the result
+      if (isMinimal) {
+        const invoices = [];
+
+        // Process accepted documents
+        if (
+          submissionResult.acceptedDocuments &&
+          submissionResult.acceptedDocuments.length > 0
+        ) {
+          for (const doc of submissionResult.acceptedDocuments) {
+            const invoiceData = {
+              id: doc.internalId,
+              systemStatus: "success",
+              uuid: doc.uuid,
+              longId: doc.longId || "",
+              dateTimeValidated: doc.dateTimeValidated || null,
+            };
+
+            // If longId is missing, mark status as Pending
+            if (!doc.longId) {
+              invoiceData.einvoiceStatus = "Pending";
+            } else {
+              invoiceData.einvoiceStatus = doc.status || "Valid";
+            }
+
+            invoices.push(invoiceData);
+          }
+        }
+
+        // Process rejected documents
+        if (
+          submissionResult.rejectedDocuments &&
+          submissionResult.rejectedDocuments.length > 0
+        ) {
+          for (const doc of submissionResult.rejectedDocuments) {
+            invoices.push({
+              id: doc.internalId || doc.invoiceCodeNumber,
+              systemStatus: "success", // It's in the system but failed e-invoice
+              einvoiceStatus: "Invalid",
+              error: {
+                code: doc.error?.code || "ERROR",
+                message: doc.error?.message || "Unknown error",
+              },
+            });
+          }
+        }
+
+        return res.json({
+          message: "Invoice processing completed",
+          invoices: invoices,
+          overallStatus: submissionResult.overallStatus || "Unknown",
+        });
+      }
+
+      // Return full response
       return res.json(submissionResult);
     } catch (error) {
       console.error("Submission error:", error);
