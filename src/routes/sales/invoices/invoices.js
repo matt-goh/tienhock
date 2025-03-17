@@ -711,6 +711,43 @@ export default function (pool, config) {
         throw new Error(`Invoice with ID ${lookupId} not found`);
       }
 
+      // First, get the original invoice to check payment type, customer and amount
+      const originalInvoiceQuery =
+        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
+      const originalInvoiceResult = await client.query(originalInvoiceQuery, [
+        lookupId,
+      ]);
+      const originalInvoice = originalInvoiceResult.rows[0];
+
+      // Normalize payment types to ensure consistent comparison
+      const originalType = (originalInvoice.paymenttype || "")
+        .trim()
+        .toUpperCase();
+      const newType = (invoice.paymenttype || "INVOICE").trim().toUpperCase();
+      const originalAmount = parseFloat(
+        originalInvoice.totalamountpayable || 0
+      );
+      const newAmount = parseFloat(invoice.totalamountpayable || 0);
+      const originalCustomerId = originalInvoice.customerid;
+      const newCustomerId = invoice.customerid;
+
+      // Handle credit adjustments based on payment type changes
+      if (originalType === "INVOICE") {
+        // Original was INVOICE - need to remove original credit
+        await updateCustomerCredit(client, originalCustomerId, -originalAmount);
+      }
+
+      if (newType === "INVOICE") {
+        // New is INVOICE - need to add new credit
+        await updateCustomerCredit(client, newCustomerId, newAmount);
+      }
+
+      // The update logic specifically handles:
+      // - INVOICE → CASH: Original credit removed, no new credit added
+      // - CASH → INVOICE: No original credit to remove, new credit added
+      // - INVOICE → INVOICE (same customer): Original credit removed, new credit added
+      // - INVOICE → INVOICE (different customer): Original credit removed from original customer, new credit added to new customer
+
       // First, delete existing products
       await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
         lookupId,
@@ -810,32 +847,6 @@ export default function (pool, config) {
         }
       }
 
-      // First, get the original invoice to check payment type and amount
-      const originalInvoiceQuery =
-        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
-      const originalInvoiceResult = await client.query(originalInvoiceQuery, [
-        lookupId,
-      ]);
-      const originalInvoice = originalInvoiceResult.rows[0];
-
-      // Handle credit adjustments for INVOICE payment types
-      if (originalInvoice.paymenttype === "INVOICE") {
-        // Decrease credit for the original customer
-        await updateCustomerCredit(
-          client,
-          originalInvoice.customerid,
-          -parseFloat(originalInvoice.totalamountpayable || 0)
-        );
-      }
-
-      // If updated invoice is INVOICE type, increase credit for the (possibly new) customer
-      if (invoice.paymenttype === "INVOICE") {
-        await updateCustomerCredit(
-          client,
-          invoice.customerid,
-          invoice.totalamountpayable || 0
-        );
-      }
       await client.query("COMMIT");
       res.json({
         message: "Invoice updated successfully",
@@ -924,6 +935,24 @@ export default function (pool, config) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
+      // First check if the invoice is of type INVOICE
+      const invoiceTypeQuery =
+        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
+      const invoiceTypeResult = await client.query(invoiceTypeQuery, [id]);
+
+      if (invoiceTypeResult.rows.length > 0) {
+        const invoiceDetails = invoiceTypeResult.rows[0];
+
+        // If it's an INVOICE type, reduce the customer's credit used
+        if (invoiceDetails.paymenttype === "INVOICE") {
+          await updateCustomerCredit(
+            client,
+            invoiceDetails.customerid,
+            -parseFloat(invoiceDetails.totalamountpayable || 0)
+          );
+        }
+      }
+
       // Check if there's also an e-invoice for this invoice
       const eInvoiceQuery = "SELECT uuid FROM einvoices WHERE internal_id = $1";
       const eInvoiceResult = await pool.query(eInvoiceQuery, [id]);
@@ -950,24 +979,6 @@ export default function (pool, config) {
         } catch (cancelError) {
           console.error("Error cancelling e-invoice in MyInvois:", cancelError);
           // We continue with invoice deletion even if e-invoice cancellation fails
-        }
-      }
-
-      // First check if the invoice is of type INVOICE
-      const invoiceTypeQuery =
-        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
-      const invoiceTypeResult = await client.query(invoiceTypeQuery, [id]);
-
-      if (invoiceTypeResult.rows.length > 0) {
-        const invoiceDetails = invoiceTypeResult.rows[0];
-
-        // If it's an INVOICE type, reduce the customer's credit used
-        if (invoiceDetails.paymenttype === "INVOICE") {
-          await updateCustomerCredit(
-            client,
-            invoiceDetails.customerid,
-            -parseFloat(invoiceDetails.totalamountpayable || 0)
-          );
         }
       }
 
