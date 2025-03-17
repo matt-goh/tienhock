@@ -100,6 +100,30 @@ const fetchCustomerData = async (pool, customerId) => {
   }
 };
 
+// Helper function to update customer credit
+const updateCustomerCredit = async (client, customerId, amount) => {
+  try {
+    // Update the customer's credit_used by adding the specified amount (can be negative for reductions)
+    const updateQuery = `
+      UPDATE customers 
+      SET credit_used = GREATEST(0, COALESCE(credit_used, 0) + $1)
+      WHERE id = $2
+      RETURNING credit_used, credit_limit
+    `;
+    const result = await client.query(updateQuery, [amount, customerId]);
+
+    if (result.rows.length === 0) {
+      console.warn(`Customer ${customerId} not found when updating credit`);
+      return null;
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error(`Error updating credit for customer ${customerId}:`, error);
+    throw error;
+  }
+};
+
 export default function (pool, config) {
   const router = Router();
 
@@ -364,6 +388,15 @@ export default function (pool, config) {
         }
       }
 
+      // Only update credit for INVOICE type
+      if (invoice.paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          invoice.customerid,
+          invoice.totalamountpayable || 0
+        );
+      }
+
       await client.query("COMMIT");
 
       // Return the complete invoice with all products
@@ -540,6 +573,15 @@ export default function (pool, config) {
             status: "success",
             message: "Invoice created successfully",
           });
+
+          // After inserting the invoice and products, update credit used
+          if (transformedInvoice.paymenttype === "INVOICE") {
+            await updateCustomerCredit(
+              client,
+              transformedInvoice.customerid,
+              transformedInvoice.totalamountpayable || 0
+            );
+          }
 
           // Store the data needed for MyInvois submission
           savedInvoiceData.push({
@@ -768,6 +810,32 @@ export default function (pool, config) {
         }
       }
 
+      // First, get the original invoice to check payment type and amount
+      const originalInvoiceQuery =
+        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
+      const originalInvoiceResult = await client.query(originalInvoiceQuery, [
+        lookupId,
+      ]);
+      const originalInvoice = originalInvoiceResult.rows[0];
+
+      // Handle credit adjustments for INVOICE payment types
+      if (originalInvoice.paymenttype === "INVOICE") {
+        // Decrease credit for the original customer
+        await updateCustomerCredit(
+          client,
+          originalInvoice.customerid,
+          -parseFloat(originalInvoice.totalamountpayable || 0)
+        );
+      }
+
+      // If updated invoice is INVOICE type, increase credit for the (possibly new) customer
+      if (invoice.paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          invoice.customerid,
+          invoice.totalamountpayable || 0
+        );
+      }
       await client.query("COMMIT");
       res.json({
         message: "Invoice updated successfully",
@@ -882,6 +950,24 @@ export default function (pool, config) {
         } catch (cancelError) {
           console.error("Error cancelling e-invoice in MyInvois:", cancelError);
           // We continue with invoice deletion even if e-invoice cancellation fails
+        }
+      }
+
+      // First check if the invoice is of type INVOICE
+      const invoiceTypeQuery =
+        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
+      const invoiceTypeResult = await client.query(invoiceTypeQuery, [id]);
+
+      if (invoiceTypeResult.rows.length > 0) {
+        const invoiceDetails = invoiceTypeResult.rows[0];
+
+        // If it's an INVOICE type, reduce the customer's credit used
+        if (invoiceDetails.paymenttype === "INVOICE") {
+          await updateCustomerCredit(
+            client,
+            invoiceDetails.customerid,
+            -parseFloat(invoiceDetails.totalamountpayable || 0)
+          );
         }
       }
 
