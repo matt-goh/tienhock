@@ -192,8 +192,8 @@ const SalesByProductsPage: React.FC = () => {
 
   const productOptions = useMemo(() => {
     const options = [
-      { id: "MEE", name: "All Mee Products" },
-      { id: "BH", name: "All Bihun Products" },
+      { id: "MEE", name: "Mee Products" },
+      { id: "BH", name: "Bihun Products" },
     ];
 
     // Add individual products from cache
