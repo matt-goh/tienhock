@@ -43,7 +43,17 @@ app.use(async (req, res, next) => {
   next();
 });
 
-app.use(cors({origin: false}));
+// conditional CORS configuration based on environment
+const corsConfig = process.env.NODE_ENV === 'production'
+? { origin: false } // In production, Nginx handles CORS
+: {                 // In development, Express handles CORS
+    origin: ['http://localhost:3000'],
+    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'api-key'],
+    credentials: true
+  };
+
+app.use(cors(corsConfig));
 app.use(json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'build')));
 
