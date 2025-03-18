@@ -701,7 +701,7 @@ export default function (pool, config) {
           const invoiceId = result.billNumber;
           const invoiceData = {
             id: invoiceId,
-            systemStatus: result.status === "success" ? 0 : 1,
+            systemStatus: result.status === "success" ? 0 : 100, // 0=success, 100=error
           };
 
           // If invoice was accepted in MyInvois
@@ -710,9 +710,9 @@ export default function (pool, config) {
 
             // If longId is missing, mark status as Pending instead of Valid
             if (!doc.longId) {
-              invoiceData.einvoiceStatus = 2;
+              invoiceData.einvoiceStatus = 10; // Pending = 10 (success variant)
             } else {
-              invoiceData.einvoiceStatus = 0;
+              invoiceData.einvoiceStatus = 0; // Valid = 0 (complete success)
             }
 
             invoiceData.uuid = doc.uuid;
@@ -722,7 +722,7 @@ export default function (pool, config) {
           // If invoice was rejected in MyInvois
           else if (rejectedDocMap[invoiceId]) {
             const doc = rejectedDocMap[invoiceId];
-            invoiceData.einvoiceStatus = 1;
+            invoiceData.einvoiceStatus = 100; // Invalid = 100 (error)
             invoiceData.error = {
               code: doc.error?.code || "ERROR",
               message: doc.error?.message || "Unknown error",
@@ -730,7 +730,7 @@ export default function (pool, config) {
           }
           // If invoice wasn't processed by MyInvois at all
           else if (einvoiceResults) {
-            invoiceData.einvoiceStatus = 3;
+            invoiceData.einvoiceStatus = 20; // Not Processed = 20 (partial success)
           }
 
           invoices.push(invoiceData);
@@ -741,8 +741,8 @@ export default function (pool, config) {
           for (const error of errors) {
             invoices.push({
               id: error.billNumber,
-              systemStatus: 1,
-              einvoiceStatus: 3,
+              systemStatus: 100, // Error = 100
+              einvoiceStatus: 20, // Not Processed = 20
               error: {
                 message: error.message,
               },
