@@ -9,7 +9,7 @@ const getDefaultApiBaseUrl = () => {
   const env = process.env.NODE_ENV || 'development';
   return env === 'development' 
     ? 'http://localhost:5000' 
-    : 'https://tienhock.com';
+    : 'https://api.tienhock.com';
 };
 
 export const {
