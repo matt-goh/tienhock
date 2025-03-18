@@ -21,14 +21,6 @@ const port = 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configure CORS
-const corsOptions = {
-  origin: ['https://tienhock.com'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'api-key'],
-  credentials: true
-};
-
 // Create enhanced PostgreSQL pool
 export const pool = createDatabasePool({
   user: process.env.DB_USER,
@@ -51,7 +43,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-app.use(cors(corsOptions));
+app.use(cors({origin: false}));
 app.use(json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'build')));
 
