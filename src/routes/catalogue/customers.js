@@ -29,6 +29,36 @@ export default function (pool) {
     }
   });
 
+  // Get customers with credit data
+  router.get("/get-customers", async (req, res) => {
+    try {
+      const query = `
+      SELECT 
+        id,
+        name,
+        id_number,
+        tin_number,
+        salesman,
+        email,
+        phone_number,
+        address,
+        city,
+        credit_used,
+        credit_limit
+      FROM customers 
+      ORDER BY name
+    `;
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({
+        message: "Error fetching customers",
+        error: error.message,
+      });
+    }
+  });
+
   // Get customers for combobox
   router.get("/combobox", async (req, res) => {
     const { salesman = "", search = "", page = 1, limit = 20 } = req.query;
