@@ -435,7 +435,7 @@ export default function (pool, config) {
           for (const doc of submissionResult.acceptedDocuments) {
             const invoiceData = {
               id: doc.internalId,
-              systemStatus: "success",
+              systemStatus: 0,
               uuid: doc.uuid,
               longId: doc.longId || "",
               dateTimeValidated: doc.dateTimeValidated || null,
@@ -443,9 +443,9 @@ export default function (pool, config) {
 
             // If longId is missing, mark status as Pending
             if (!doc.longId) {
-              invoiceData.einvoiceStatus = "Pending";
+              invoiceData.einvoiceStatus = 2;
             } else {
-              invoiceData.einvoiceStatus = doc.status || "Valid";
+              invoiceData.einvoiceStatus = 0;
             }
 
             invoices.push(invoiceData);
@@ -460,8 +460,8 @@ export default function (pool, config) {
           for (const doc of submissionResult.rejectedDocuments) {
             invoices.push({
               id: doc.internalId || doc.invoiceCodeNumber,
-              systemStatus: "success", // It's in the system but failed e-invoice
-              einvoiceStatus: "Invalid",
+              systemStatus: 0, // it's in the system but failed einvoice submission
+              einvoiceStatus: 1,
               error: {
                 code: doc.error?.code || "ERROR",
                 message: doc.error?.message || "Unknown error",

@@ -701,7 +701,7 @@ export default function (pool, config) {
           const invoiceId = result.billNumber;
           const invoiceData = {
             id: invoiceId,
-            systemStatus: result.status,
+            systemStatus: result.status === "success" ? 0 : 1,
           };
 
           // If invoice was accepted in MyInvois
@@ -710,9 +710,9 @@ export default function (pool, config) {
 
             // If longId is missing, mark status as Pending instead of Valid
             if (!doc.longId) {
-              invoiceData.einvoiceStatus = "Pending";
+              invoiceData.einvoiceStatus = 2;
             } else {
-              invoiceData.einvoiceStatus = doc.status || "Valid";
+              invoiceData.einvoiceStatus = 0;
             }
 
             invoiceData.uuid = doc.uuid;
@@ -722,7 +722,7 @@ export default function (pool, config) {
           // If invoice was rejected in MyInvois
           else if (rejectedDocMap[invoiceId]) {
             const doc = rejectedDocMap[invoiceId];
-            invoiceData.einvoiceStatus = "Invalid";
+            invoiceData.einvoiceStatus = 1;
             invoiceData.error = {
               code: doc.error?.code || "ERROR",
               message: doc.error?.message || "Unknown error",
@@ -730,7 +730,7 @@ export default function (pool, config) {
           }
           // If invoice wasn't processed by MyInvois at all
           else if (einvoiceResults) {
-            invoiceData.einvoiceStatus = "Not Processed";
+            invoiceData.einvoiceStatus = 3;
           }
 
           invoices.push(invoiceData);
@@ -741,8 +741,8 @@ export default function (pool, config) {
           for (const error of errors) {
             invoices.push({
               id: error.billNumber,
-              systemStatus: "error",
-              einvoiceStatus: "Not Processed",
+              systemStatus: 1,
+              einvoiceStatus: 3,
               error: {
                 message: error.message,
               },
