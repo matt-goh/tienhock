@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 
 // Configure CORS
 const corsOptions = {
-  origin: true,
+  origin: ['https://tienhock.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'api-key'],
   credentials: true
