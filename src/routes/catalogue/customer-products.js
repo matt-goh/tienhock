@@ -33,8 +33,14 @@ export default function (pool) {
 
       const result = await pool.query(query, queryParams);
 
+      // Convert custom_price to a number
+      const customerProductsWithNumberValues = result.rows.map((cp) => ({
+        ...cp,
+        custom_price: cp.custom_price !== null ? Number(cp.custom_price) : null,
+      }));
+
       // Return just the data array
-      res.json(result.rows);
+      res.json(customerProductsWithNumberValues);
     } catch (error) {
       console.error("Error fetching customer products:", error);
       res.status(500).json({

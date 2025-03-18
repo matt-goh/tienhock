@@ -9,7 +9,16 @@ export default function (pool) {
     try {
       const query = "SELECT * FROM products";
       const result = await pool.query(query);
-      res.json(result.rows);
+
+      // Convert money-related fields to numbers
+      const productsWithNumberValues = result.rows.map((product) => ({
+        ...product,
+        price_per_unit:
+          product.price_per_unit !== null
+            ? Number(product.price_per_unit)
+            : null,
+      }));
+      res.json(productsWithNumberValues);
     } catch (error) {
       console.error("Error fetching products:", error);
       res
@@ -160,7 +169,8 @@ export default function (pool) {
   // Fetch all products (id and description only)
   router.get("/combobox", async (req, res) => {
     try {
-      const query = "SELECT id, description, price_per_unit, type FROM products";
+      const query =
+        "SELECT id, description, price_per_unit, type FROM products";
       const result = await pool.query(query);
       res.json(result.rows);
     } catch (error) {
