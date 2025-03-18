@@ -442,9 +442,9 @@ export default function (pool, config) {
 
             // If longId is missing, mark status as Pending
             if (!doc.longId) {
-              invoiceData.einvoiceStatus = 2;
+              invoiceData.einvoiceStatus = 10; // Pending = 10 (success variant)
             } else {
-              invoiceData.einvoiceStatus = 0;
+              invoiceData.einvoiceStatus = 0; // Valid = 0 (complete success)
             }
 
             invoices.push(invoiceData);
@@ -459,7 +459,7 @@ export default function (pool, config) {
           for (const doc of submissionResult.rejectedDocuments) {
             invoices.push({
               id: doc.internalId || doc.invoiceCodeNumber,
-              einvoiceStatus: 1,
+              einvoiceStatus: 100, // Invalid = 100 (error)
               error: {
                 code: doc.error?.code || "ERROR",
                 message: doc.error?.message || "Unknown error",
