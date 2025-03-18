@@ -435,7 +435,6 @@ export default function (pool, config) {
           for (const doc of submissionResult.acceptedDocuments) {
             const invoiceData = {
               id: doc.internalId,
-              systemStatus: 0,
               uuid: doc.uuid,
               longId: doc.longId || "",
               dateTimeValidated: doc.dateTimeValidated || null,
@@ -460,7 +459,6 @@ export default function (pool, config) {
           for (const doc of submissionResult.rejectedDocuments) {
             invoices.push({
               id: doc.internalId || doc.invoiceCodeNumber,
-              systemStatus: 0, // it's in the system but failed einvoice submission
               einvoiceStatus: 1,
               error: {
                 code: doc.error?.code || "ERROR",
