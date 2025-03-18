@@ -49,7 +49,17 @@ export default function (pool) {
       ORDER BY name
     `;
       const result = await pool.query(query);
-      res.json(result.rows);
+
+      // Convert money-related fields to numbers
+      const customersWithNumberValues = result.rows.map((customer) => ({
+        ...customer,
+        credit_used:
+          customer.credit_used !== null ? Number(customer.credit_used) : null,
+        credit_limit:
+          customer.credit_limit !== null ? Number(customer.credit_limit) : null,
+      }));
+
+      res.json(customersWithNumberValues);
     } catch (error) {
       console.error("Error fetching customers:", error);
       res.status(500).json({
