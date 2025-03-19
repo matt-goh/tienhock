@@ -50,7 +50,7 @@ const ProductPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.get("/api/products");
+      const data = await api.get("/api/products?all");
       setProducts(
         data.map((product: Product) => ({ ...product, originalId: product.id }))
       );

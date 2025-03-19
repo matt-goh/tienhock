@@ -23,7 +23,7 @@ export const refreshProductsCache = async () => {
     localStorage.removeItem(CACHE_KEY);
 
     // Fetch new data
-    const data = await api.get("/api/products/combobox");
+    const data = await api.get("/api/products");
 
     // Store in cache
     const cacheData = {
@@ -80,7 +80,7 @@ export const useProductsCache = () => {
       }
 
       // If cache is missing, expired, or force refresh is requested, fetch fresh data
-      const data = await api.get("/api/products/combobox");
+      const data = await api.get("/api/products");
 
       // Update cache
       const cacheData: CachedProducts = {
