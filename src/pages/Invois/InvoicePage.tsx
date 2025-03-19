@@ -606,7 +606,7 @@ const InvoicePage: React.FC = () => {
   return (
     <div className="flex flex-col">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-white px-6 pt-4">
+      <div className="sticky top-0 z-20 bg-white px-6">
         <div className="flex flex-col space-y-4">
           {/* Title and Actions Row */}
           <div className={`flex items-center justify-between pl-[45px]`}>
