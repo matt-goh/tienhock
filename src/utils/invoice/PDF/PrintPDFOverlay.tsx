@@ -16,6 +16,7 @@ const PrintPDFOverlay = ({
 }) => {
   const [isPrinting, setIsPrinting] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
+  const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(true);
   const hasPrintedRef = useRef(false);
   const resourcesRef = useRef<{
     printFrame: HTMLIFrameElement | null;
@@ -30,30 +31,33 @@ const PrintPDFOverlay = ({
     {}
   );
 
-  const cleanup = () => {
-    if (resourcesRef.current.pdfUrl) {
-      URL.revokeObjectURL(resourcesRef.current.pdfUrl);
+  const cleanup = (fullCleanup = false) => {
+    if (fullCleanup) {
+      if (resourcesRef.current.pdfUrl) {
+        URL.revokeObjectURL(resourcesRef.current.pdfUrl);
+      }
+      if (
+        resourcesRef.current.printFrame &&
+        resourcesRef.current.printFrame.parentNode
+      ) {
+        document.body.removeChild(resourcesRef.current.printFrame);
+      }
+      if (
+        resourcesRef.current.container &&
+        resourcesRef.current.container.parentNode
+      ) {
+        document.body.removeChild(resourcesRef.current.container);
+      }
+      resourcesRef.current = {
+        printFrame: null,
+        container: null,
+        pdfUrl: null,
+      };
+      setIsPrinting(false);
+      onComplete();
     }
-    if (
-      resourcesRef.current.printFrame &&
-      resourcesRef.current.printFrame.parentNode
-    ) {
-      document.body.removeChild(resourcesRef.current.printFrame);
-    }
-    if (
-      resourcesRef.current.container &&
-      resourcesRef.current.container.parentNode
-    ) {
-      document.body.removeChild(resourcesRef.current.container);
-    }
-    resourcesRef.current = {
-      printFrame: null,
-      container: null,
-      pdfUrl: null,
-    };
-    setIsPrinting(false);
     setIsGenerating(false);
-    onComplete();
+    setIsLoadingDialogVisible(false);
   };
 
   useEffect(() => {
@@ -87,9 +91,19 @@ const PrintPDFOverlay = ({
           if (!hasPrintedRef.current && printFrame?.contentWindow) {
             hasPrintedRef.current = true;
             printFrame.contentWindow.print();
-            setTimeout(() => {
-              cleanup();
-            }, 1000); // Increased to 1000ms
+            cleanup(); // Hide loading dialog only
+
+            const onFocus = () => {
+              window.removeEventListener("focus", onFocus);
+              clearTimeout(fallbackTimeout);
+              cleanup(true); // Full cleanup
+            };
+            window.addEventListener("focus", onFocus);
+
+            const fallbackTimeout = setTimeout(() => {
+              window.removeEventListener("focus", onFocus);
+              cleanup(true); // Full cleanup after 60 seconds
+            }, 60000);
           }
         };
 
@@ -97,7 +111,7 @@ const PrintPDFOverlay = ({
       } catch (error) {
         console.error("Error generating PDF:", error);
         toast.error("Error preparing document for print. Please try again.");
-        cleanup();
+        cleanup(true);
       }
     };
 
@@ -105,10 +119,18 @@ const PrintPDFOverlay = ({
       generateAndPrint();
     }
 
-    return cleanup;
+    return () => {
+      if (
+        resourcesRef.current.printFrame ||
+        resourcesRef.current.container ||
+        resourcesRef.current.pdfUrl
+      ) {
+        cleanup(true);
+      }
+    };
   }, [invoices, isPrinting, onComplete]);
 
-  // Customer names fetching logic remains unchanged
+  // Customer names fetching logic (unchanged)
   useEffect(() => {
     const fetchCustomerNames = async () => {
       const uniqueCustomerIds = Array.from(
@@ -166,7 +188,7 @@ const PrintPDFOverlay = ({
     fetchCustomerNames();
   }, [invoices, customerNames]);
 
-  return isPrinting ? (
+  return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
@@ -180,9 +202,9 @@ const PrintPDFOverlay = ({
           <p className="text-sm text-default-500">Please wait a moment</p>
           <button
             onClick={() => {
-              cleanup();
+              cleanup(true);
             }}
-            className="mt-2 text-sm text-sky-600 text-center hover:underline"
+            className="mt-2 text-sm text-center text-sky-600 hover:underline"
           >
             Close
           </button>
@@ -191,5 +213,4 @@ const PrintPDFOverlay = ({
     </div>
   ) : null;
 };
-
 export default PrintPDFOverlay;
