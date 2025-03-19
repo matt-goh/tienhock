@@ -30,33 +30,33 @@ const PrintPDFOverlay = ({
     {}
   );
 
-  useEffect(() => {
-    const cleanup = () => {
-      if (resourcesRef.current.pdfUrl) {
-        URL.revokeObjectURL(resourcesRef.current.pdfUrl);
-      }
-      if (
-        resourcesRef.current.printFrame &&
-        resourcesRef.current.printFrame.parentNode
-      ) {
-        document.body.removeChild(resourcesRef.current.printFrame);
-      }
-      if (
-        resourcesRef.current.container &&
-        resourcesRef.current.container.parentNode
-      ) {
-        document.body.removeChild(resourcesRef.current.container);
-      }
-      resourcesRef.current = {
-        printFrame: null,
-        container: null,
-        pdfUrl: null,
-      };
-      setIsPrinting(false);
-      setIsGenerating(false);
-      onComplete();
+  const cleanup = () => {
+    if (resourcesRef.current.pdfUrl) {
+      URL.revokeObjectURL(resourcesRef.current.pdfUrl);
+    }
+    if (
+      resourcesRef.current.printFrame &&
+      resourcesRef.current.printFrame.parentNode
+    ) {
+      document.body.removeChild(resourcesRef.current.printFrame);
+    }
+    if (
+      resourcesRef.current.container &&
+      resourcesRef.current.container.parentNode
+    ) {
+      document.body.removeChild(resourcesRef.current.container);
+    }
+    resourcesRef.current = {
+      printFrame: null,
+      container: null,
+      pdfUrl: null,
     };
+    setIsPrinting(false);
+    setIsGenerating(false);
+    onComplete();
+  };
 
+  useEffect(() => {
     const generateAndPrint = async () => {
       if (hasPrintedRef.current) return;
 
@@ -89,7 +89,7 @@ const PrintPDFOverlay = ({
             printFrame.contentWindow.print();
             setTimeout(() => {
               cleanup();
-            }, 100);
+            }, 1000); // Increased to 1000ms
           }
         };
 
@@ -178,6 +178,14 @@ const PrintPDFOverlay = ({
               : "Opening print dialog..."}
           </p>
           <p className="text-sm text-default-500">Please wait a moment</p>
+          <button
+            onClick={() => {
+              cleanup();
+            }}
+            className="mt-2 text-sm text-sky-600 text-center hover:underline"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
