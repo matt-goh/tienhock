@@ -8,10 +8,10 @@ interface InvoicePDFProps {
   customerNames?: Record<string, string>;
 }
 
-const ROWS_PER_PAGE = 33;
+const ROWS_PER_PAGE = 32;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
-const SUMMARY_ROWS = 1;
+const SUMMARY_ROWS = 2;
 
 // Color palette for easy customization
 const colors = {
@@ -581,7 +581,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
   return (
     <>
       {pages.map((pageInvoices, pageIndex) => (
-        <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
+        <Page key={`page-${pageIndex}`} size="LETTER" style={styles.page}>
           {pageIndex === 0 && (
             <View style={styles.header}>
               <Image src="../tienhock.png" style={styles.logo} />
