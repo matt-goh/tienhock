@@ -5,9 +5,6 @@ import authRouter from "./auth/auth.js";
 import sessionsRouter from "./auth/sessions.js";
 import { authMiddleware } from "../middleware/auth.js";
 
-// Middleware
-import { schemaMiddleware } from "../middleware/schema-middleware.js";
-
 // Admin routes
 import backupRouter from "./admin/backup.js";
 
@@ -60,7 +57,6 @@ const checkRestoreState = (req, res, next) => {
 };
 
 export default function setupRoutes(app, pool) {
-  app.use(schemaMiddleware(pool));
   // MyInvois API Configuration
   const myInvoisConfig = {
     MYINVOIS_API_BASE_URL,
@@ -68,19 +64,10 @@ export default function setupRoutes(app, pool) {
     MYINVOIS_CLIENT_SECRET,
   };
 
-  app.use((req, res, next) => {
-    // Skip auth for specific paths
-    if (req.path.startsWith("/api/backup/") || req.method === "OPTIONS") {
-      return next();
-    }
-
-    next();
-  });
-
   // Auth routes
   app.use("/api/auth", authRouter(pool));
 
-  // Protected routes
+  // Add auth middleware to protect other routes
   app.use("/api", authMiddleware(pool));
   app.use("/api", checkRestoreState);
   app.use("/api/sessions", sessionsRouter(pool));
@@ -92,16 +79,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/bookmarks", sidebarRouter(pool));
 
   // Sales routes
-  app.use(
-    "/api/invoices",
-    (req, res, next) => {
-      // For any routes handled by setupRoutes, make sure we pass the schema
-      // down to route handlers that need it
-      req.originalUrl = req.originalUrl || req.url;
-      next();
-    },
-    invoiceRouter(pool, myInvoisConfig)
-  );
+  app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
 
   // Catalogue - Main routes

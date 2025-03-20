@@ -303,24 +303,7 @@ export const JellyPollySidebarData: SidebarItem[] = [
       {
         name: "Invoice",
         path: "/sales/invoice",
-        component: InvoicePage,
-        subItems: [
-          {
-            name: "Invoice Details",
-            path: "/sales/invoice/:id",
-            component: InvoiceDetailsPage,
-          },
-          {
-            name: "Invoice PDF Viewer",
-            path: "/pdf-viewer",
-            component: PDFViewerPage,
-          },
-          {
-            name: "Create New Invoice Page",
-            path: "/sales/invoice/create",
-            component: InvoiceDetailsPage,
-          },
-        ],
+        component: () => <div>Green Target Orders</div>, // Placeholder component
       },
     ],
   },
