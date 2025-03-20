@@ -35,13 +35,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
   const getCompanyLogo = (companyId: string) => {
     switch (companyId) {
       case "greentarget":
-        return (
-          <img
-            src="/greentarget.ico"
-            width={24}
-            height={24}
-          />
-        );
+        return <img src="/greentarget.ico" width={24} height={24} />;
       case "tienhock":
       case "jellypolly":
       default:
@@ -90,7 +84,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
           {companies.map((company) => (
             <button
               key={company.id}
-              className={`w-full text-left rounded-md flex items-center gap-2 px-3 py-2.5 font-medium transition-colors duration-200 hover:bg-default-200/90 active:bg-default-300/90 hover:text-default-800 ${
+              className={`w-full text-center rounded-md flex items-center gap-2 px-3 py-2.5 font-medium transition-colors duration-200 hover:bg-default-200/90 active:bg-default-300/90 hover:text-default-800 ${
                 company.id === activeCompany.id
                   ? "bg-default-100 text-default-800"
                   : "text-default-700"
