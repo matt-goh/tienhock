@@ -25,7 +25,6 @@ interface CompanyContextType {
   setActiveCompany: (company: Company) => void;
   companies: Company[];
   getCompanyFromPath: (path: string) => Company;
-  getRoutePath: (path: string) => string;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -77,11 +76,6 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
     localStorage.setItem("activeCompany", company.id);
   };
 
-  const getRoutePath = (path: string) => {
-    if (!activeCompany.routePrefix) return path;
-    return `/${activeCompany.routePrefix}${path}`;
-  };
-
   return (
     <CompanyContext.Provider
       value={{
@@ -89,7 +83,6 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
         setActiveCompany,
         companies: COMPANIES,
         getCompanyFromPath,
-        getRoutePath,
       }}
     >
       {children}

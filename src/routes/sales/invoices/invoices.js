@@ -240,9 +240,7 @@ export default function (pool, config) {
 
       query += ` GROUP BY i.id ORDER BY i.createddate DESC`;
 
-      const result = await pool.query(query, queryParams, {
-        companySchema: req.companySchema,
-      });
+      const result = await pool.query(query, queryParams);
 
       // Transform results and ensure numeric values
       const transformedResults = result.rows.map((row) => ({
@@ -279,12 +277,8 @@ export default function (pool, config) {
     const client = await pool.connect();
 
     try {
-      // Set schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO ${req.companySchema}, public`);
-      }
-
       await client.query("BEGIN");
+
       const invoice = req.body;
 
       // Validate required fields
@@ -423,10 +417,6 @@ export default function (pool, config) {
         error: error.message,
       });
     } finally {
-      // Reset schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO public`);
-      }
       client.release();
     }
   });
@@ -439,11 +429,6 @@ export default function (pool, config) {
 
     const client = await pool.connect();
     try {
-      // Set schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO ${req.companySchema}, public`);
-      }
-
       await client.query("BEGIN");
 
       // Convert input to array if single invoice
@@ -788,10 +773,6 @@ export default function (pool, config) {
         error: error.message,
       });
     } finally {
-      // Reset schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO public`);
-      }
       client.release();
     }
   });
@@ -801,12 +782,8 @@ export default function (pool, config) {
     const client = await pool.connect();
 
     try {
-      // Set schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO ${req.companySchema}, public`);
-      }
-
       await client.query("BEGIN");
+
       const invoice = req.body;
 
       // Check which ID to use for finding the invoice
@@ -981,10 +958,6 @@ export default function (pool, config) {
         error: error.message,
       });
     } finally {
-      // Reset schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO public`);
-      }
       client.release();
     }
   });
@@ -1000,9 +973,7 @@ export default function (pool, config) {
     try {
       // Query both id and invoiceno columns
       const query = "SELECT COUNT(*) FROM invoices WHERE id = $1";
-      const result = await pool.query(query, [invoiceNo], {
-        companySchema: req.companySchema,
-      });
+      const result = await pool.query(query, [invoiceNo]);
       const count = parseInt(result.rows[0].count);
 
       return res.json({ isDuplicate: count > 0 });
@@ -1035,9 +1006,7 @@ export default function (pool, config) {
         id
     `;
 
-      const result = await pool.query(orderDetailsQuery, [id], {
-        companySchema: req.companySchema,
-      });
+      const result = await pool.query(orderDetailsQuery, [id]);
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching order details:", error);
@@ -1054,11 +1023,6 @@ export default function (pool, config) {
     const client = await pool.connect();
 
     try {
-      // Set schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO ${req.companySchema}, public`);
-      }
-
       await client.query("BEGIN");
 
       // Check if invoice exists
@@ -1140,10 +1104,6 @@ export default function (pool, config) {
         error: error.message,
       });
     } finally {
-      // Reset schema if needed
-      if (req.companySchema) {
-        await client.query(`SET search_path TO public`);
-      }
       client.release();
     }
   });

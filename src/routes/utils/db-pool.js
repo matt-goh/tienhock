@@ -18,31 +18,11 @@ class DatabasePool {
     });
   }
 
-  async query(text, params, options = {}) {
-    const client = await this.pool.connect();
-    try {
-      // If a company schema is specified, set the search path to include both schemas
-      if (options.companySchema) {
-        await client.query(
-          `SET search_path TO ${options.companySchema}, public`
-        );
-      }
-
-      // Execute the query
-      const result = await client.query(text, params);
-
-      // Reset search path if needed
-      if (options.companySchema) {
-        await client.query("SET search_path TO public");
-      }
-
-      return result;
-    } finally {
-      client.release();
-    }
+  async query(...args) {
+    return this.pool.query(...args);
   }
 
-  async connect() {
+  connect() {
     return this.pool.connect();
   }
 
