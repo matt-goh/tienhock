@@ -1,10 +1,7 @@
 import {
   IconBookmark,
   IconBox,
-  IconDashboard,
-  IconFileAnalytics,
   IconListDetails,
-  IconPackage,
   IconReportAnalytics,
 } from "@tabler/icons-react";
 import { Icon } from "@tabler/icons-react";

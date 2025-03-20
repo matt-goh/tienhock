@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useRef,
 } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -40,6 +41,7 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
     return COMPANIES.find((c) => c.id === savedCompanyId) || COMPANIES[0];
   });
 
+  const initialCompanySet = useRef(false);
   const location = useLocation();
 
   // Helper function to get company from path
@@ -57,6 +59,12 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
 
   // Update company based on URL when navigating directly
   useEffect(() => {
+    // Skip the first time this effect runs to prevent override during initial load
+    if (!initialCompanySet.current) {
+      initialCompanySet.current = true;
+      return;
+    }
+
     const companyFromPath = getCompanyFromPath(location.pathname);
     if (companyFromPath.id !== activeCompany.id) {
       setActiveCompanyState(companyFromPath);
