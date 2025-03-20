@@ -29,7 +29,6 @@ import {
 import TableEditableCell from "../../components/Table/TableEditableCell";
 import { debounce } from "lodash";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
-import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import {
   updateInvoice,
@@ -80,9 +79,15 @@ const InvoiceDetailsPageJP: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const { products } = useProductsCache();
-  const { salesmen: salesmenData, isLoading: salesmenLoading } =
-    useSalesmanCache();
+  const [products, setProducts] = useState<
+    Array<{
+      id: string;
+      description: string;
+      price_per_unit: number;
+      type: string;
+    }>
+  >([]);
+  const { salesmen: salesmenData } = useSalesmanCache();
 
   useEffect(() => {
     if (location.state?.previousPath) {
@@ -95,6 +100,20 @@ const InvoiceDetailsPageJP: React.FC = () => {
       JSON.stringify(invoiceData) !== JSON.stringify(initialInvoiceData);
     setIsFormChanged(hasChanged);
   }, [invoiceData, initialInvoiceData]);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const data = await api.get("/api/products?JP");
+        setProducts(data);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        toast.error("Failed to load products");
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   useEffect(() => {
     if (salesmenData.length > 0) {
