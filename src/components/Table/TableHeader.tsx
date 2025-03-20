@@ -18,6 +18,8 @@ interface TableHeaderProps {
   columnWidths: { [k: string]: number };
   onColumnResize: (columnId: string, width: number) => void;
   disableSelection?: boolean;
+  onHeaderRowMouseEnter?: () => void;
+  onHeaderRowMouseLeave?: () => void;
 }
 
 function TableHeader({
@@ -31,6 +33,8 @@ function TableHeader({
   columnWidths,
   onColumnResize,
   disableSelection, // New prop
+  onHeaderRowMouseEnter,
+  onHeaderRowMouseLeave,
 }: TableHeaderProps) {
   const getHeaderClass = (columnId: string, columnType: ColumnType) => {
     let baseClass = "";
@@ -53,7 +57,11 @@ function TableHeader({
   };
 
   return (
-    <tr className="bg-default-100">
+    <tr
+      className="bg-default-100"
+      onMouseEnter={onHeaderRowMouseEnter}
+      onMouseLeave={onHeaderRowMouseLeave}
+    >
       {headerGroup.headers.map((header: any, index: number) => (
         <th
           key={header.id}

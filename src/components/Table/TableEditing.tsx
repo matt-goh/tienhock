@@ -169,6 +169,14 @@ function TableEditing<T extends Record<string, any>>({
     [pagination, isSelectionEnabled, data, onSelectionChange]
   );
 
+  const handleHeaderRowMouseEnter = useCallback(() => {
+    setSelection((prev) => ({ ...prev, isHeaderHovered: true }));
+  }, []);
+
+  const handleHeaderRowMouseLeave = useCallback(() => {
+    setSelection((prev) => ({ ...prev, isHeaderHovered: false }));
+  }, []);
+
   const handleClearAllSelections = useCallback(() => {
     if (!isSelectionEnabled) return;
 
@@ -1190,6 +1198,8 @@ function TableEditing<T extends Record<string, any>>({
                   isSortableColumn={isSortableColumn}
                   columnWidths={columnWidths}
                   onColumnResize={handleColumnResize}
+                  onHeaderRowMouseEnter={handleHeaderRowMouseEnter}
+                  onHeaderRowMouseLeave={handleHeaderRowMouseLeave}
                 />
               ))}
             </thead>
