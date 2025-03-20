@@ -12,7 +12,6 @@ import {
   ColumnConfig,
   Customer,
   CustomProduct,
-  Employee,
   ExtendedInvoiceData,
   InvoiceData,
   ProductItem,
@@ -35,7 +34,7 @@ import {
 } from "../../utils/invoice/dateUtils";
 import TableEditableCell from "../../components/Table/TableEditableCell";
 import { debounce } from "lodash";
-import { CustomerCombobox } from "../../components/Invois/CustomerCombobox";
+import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 

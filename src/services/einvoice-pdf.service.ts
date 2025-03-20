@@ -1,6 +1,6 @@
 // src/services/einvoice-pdf.service.ts
 import { api } from "../routes/utils/api";
-import { COMPANY_INFO } from "../utils/invoice/einvoice/companyInfo";
+import { TIENHOCK_INFO } from "../utils/invoice/einvoice/companyInfo";
 
 interface OrderDetail {
   description: string;
@@ -12,7 +12,7 @@ interface OrderDetail {
 
 // Types
 export interface EInvoicePDFData {
-  company: typeof COMPANY_INFO;
+  company: typeof TIENHOCK_INFO;
   invoice: {
     number: string;
     uuid: string;
@@ -280,7 +280,7 @@ export const preparePDFData = async (
 
   // Combine all data
   return {
-    company: COMPANY_INFO,
+    company: TIENHOCK_INFO,
     invoice: {
       number: einvoiceData.internal_id,
       uuid: einvoiceData.uuid,

@@ -1,4 +1,4 @@
-// src/pages/Invois/EInvoicePage.tsx
+// src/pages/Invoice/EInvoicePage.tsx
 import React from "react";
 import Tab from "../../components/Tab";
 import EInvoiceConsolidatedPage from "./EInvoiceConsolidatedPage";

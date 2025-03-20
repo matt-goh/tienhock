@@ -1,29 +1,33 @@
 import {
   IconBookmark,
+  IconBox,
   IconListDetails,
   IconReportAnalytics,
 } from "@tabler/icons-react";
 import { Icon } from "@tabler/icons-react";
+import { Company } from "../contexts/CompanyContext";
 import React from "react";
 
 // Import components here
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
-import InvoiceDetailsPage from "./Invois/InvoiceDetailsPage";
+import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 import CustomerFormPage from "./Catalogue/CustomerFormPage";
 import CustomerAddPage from "./Catalogue/CustomerAddPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import StaffFormPage from "./Catalogue/StaffFormPage";
 import CustomerPage from "./Catalogue/CustomerPage";
 import StaffAddPage from "./Catalogue/StaffAddPage";
-import PDFViewerPage from "./Invois/PDFViewerPage";
+import PDFViewerPage from "./Invoice/PDFViewerPage";
 import ProductPage from "./Catalogue/ProductPage";
-import EInvoicePage from "./Invois/EInvoicePage";
-import InvoicePage from "./Invois/InvoicePage";
+import EInvoicePage from "./Invoice/EInvoicePage";
+import InvoicePage from "./Invoice/InvoicePage";
 import BasicPage from "./Catalogue/BasicPage";
 import StaffPage from "./Catalogue/StaffPage";
 import JobPage from "./Catalogue/JobPage";
 import TaxPage from "./Catalogue/TaxPage";
+import InvoicePageJP from "./Invoice/InvoicePageJP";
+import InvoiceDetailsPageJP from "./Invoice/InvoiceDetailsPageJP";
 
 export interface PopoverOption {
   name: string;
@@ -38,6 +42,7 @@ export interface SidebarItem {
   subItems?: SidebarItem[];
   popoverOptions?: PopoverOption[];
   defaultOpen?: boolean;
+  companyId?: string;
 }
 
 export interface RouteItem {
@@ -46,7 +51,61 @@ export interface RouteItem {
   component: React.ComponentType<any>;
 }
 
-export const SidebarData: SidebarItem[] = [
+// This function will generate routes with the correct prefix for a specific company
+export const getCompanyRoutes = (company: Company): SidebarItem[] => {
+  // Get company-specific sidebar data
+  const companySidebarData = getCompanySidebarData(company.id);
+
+  // If Tien Hock (no prefix), return routes as is
+  if (!company.routePrefix) {
+    return companySidebarData;
+  }
+
+  // For other companies, add the prefix to all routes
+  return companySidebarData.map((item) => {
+    const newItem = { ...item, companyId: company.id };
+
+    // Add prefix to the path if it exists
+    if (item.path) {
+      newItem.path = `/${company.routePrefix}${item.path}`;
+    }
+
+    // Process sub-items recursively
+    if (item.subItems && item.subItems.length > 0) {
+      newItem.subItems = item.subItems.map((subItem) => {
+        const newSubItem = { ...subItem, companyId: company.id };
+        if (subItem.path) {
+          newSubItem.path = `/${company.routePrefix}${subItem.path}`;
+        }
+
+        // Process deeper sub-items if they exist
+        if (subItem.subItems && subItem.subItems.length > 0) {
+          newSubItem.subItems = subItem.subItems.map((deepSubItem) => {
+            const newDeepSubItem = { ...deepSubItem, companyId: company.id };
+            if (deepSubItem.path) {
+              newDeepSubItem.path = `/${company.routePrefix}${deepSubItem.path}`;
+            }
+            return newDeepSubItem;
+          });
+        }
+
+        return newSubItem;
+      });
+    }
+
+    // Process popover options
+    if (item.popoverOptions && item.popoverOptions.length > 0) {
+      newItem.popoverOptions = item.popoverOptions.map((option) => ({
+        ...option,
+        path: `/${company.routePrefix}${option.path}`,
+      }));
+    }
+
+    return newItem;
+  });
+};
+
+export const TienHockSidebarData: SidebarItem[] = [
   {
     name: "Bookmarks",
     icon: IconBookmark,
@@ -224,6 +283,65 @@ export const SidebarData: SidebarItem[] = [
   },
 ];
 
+export const GreenTargetSidebarData: SidebarItem[] = [
+  {
+    name: "Sales",
+    icon: IconReportAnalytics,
+    subItems: [
+      {
+        name: "Orders",
+        path: "/sales/orders",
+        component: () => <div>Green Target Orders</div>, // Placeholder component
+      },
+    ],
+  },
+];
+
+export const JellyPollySidebarData: SidebarItem[] = [
+  {
+    name: "Sales",
+    icon: IconReportAnalytics,
+    subItems: [
+      {
+        name: "Invoice",
+        path: "/sales/invoice",
+        component: InvoicePageJP,
+        subItems: [
+          {
+            name: "Invoice Details",
+            path: "/sales/invoice/:id",
+            component: InvoiceDetailsPageJP,
+          },
+          {
+            name: "Create New Invoice Page",
+            path: "/sales/invoice/create",
+            component: InvoiceDetailsPageJP,
+          },
+          {
+            name: "Invoice PDF Viewer",
+            path: "/pdf-viewer",
+            component: PDFViewerPage,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+// Function to get the appropriate SidebarData based on company ID
+export const getCompanySidebarData = (companyId: string): SidebarItem[] => {
+  switch (companyId) {
+    case "tienhock":
+      return TienHockSidebarData;
+    case "greentarget":
+      return GreenTargetSidebarData;
+    case "jellypolly":
+      return JellyPollySidebarData;
+    default:
+      return TienHockSidebarData; // Default to Tien Hock
+  }
+};
+
 export const flattenRoutes = (items: SidebarItem[]): RouteItem[] => {
   return items.reduce((acc: RouteItem[], item) => {
     if (item.path && item.component) {
@@ -251,4 +369,29 @@ export const flattenRoutes = (items: SidebarItem[]): RouteItem[] => {
   }, []);
 };
 
-export const routes = flattenRoutes(SidebarData);
+// Generate flattened routes for all companies for routing
+export const getAllRoutes = (): RouteItem[] => {
+  const tienhockRoutes = flattenRoutes(TienHockSidebarData);
+
+  // Generate prefixed routes for other companies
+  const greentargetRoutes = flattenRoutes(
+    getCompanyRoutes({
+      id: "greentarget",
+      name: "Green Target",
+      routePrefix: "greentarget",
+    })
+  );
+
+  const jellypollyRoutes = flattenRoutes(
+    getCompanyRoutes({
+      id: "jellypolly",
+      name: "Jelly Polly",
+      routePrefix: "jellypolly",
+    })
+  );
+
+  // Combine all routes
+  return [...tienhockRoutes, ...greentargetRoutes, ...jellypollyRoutes];
+};
+
+export const routes = getAllRoutes();

@@ -80,7 +80,7 @@ function TableEditing<T extends Record<string, any>>({
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
-  // Selection related states (only used when tableKey is "invois" or "consolidate")
+  // Selection related states (only used when tableKey is "invoice" or "consolidate")
   const [selection, setSelection] = useState<TableSelection>({
     selectedRows: new Set(),
     hoveredRowIndex: null,
@@ -89,15 +89,18 @@ function TableEditing<T extends Record<string, any>>({
 
   // Constants
   const isSortingDisabled = [
+    "invoice",
+    "invoiceJP",
     "orderDetails",
+    "orderDetailsJP",
     "customerProducts",
-    "invois",
     "einvoice-submit",
     "consolidate",
   ].includes(tableKey || "");
 
   const isSelectionEnabled = [
-    "invois",
+    "invoice",
+    "invoiceJP",
     "consolidate",
     "einvoice-submit",
   ].includes(tableKey || "");
@@ -168,6 +171,14 @@ function TableEditing<T extends Record<string, any>>({
     },
     [pagination, isSelectionEnabled, data, onSelectionChange]
   );
+
+  const handleHeaderRowMouseEnter = useCallback(() => {
+    setSelection((prev) => ({ ...prev, isHeaderHovered: true }));
+  }, []);
+
+  const handleHeaderRowMouseLeave = useCallback(() => {
+    setSelection((prev) => ({ ...prev, isHeaderHovered: false }));
+  }, []);
 
   const handleClearAllSelections = useCallback(() => {
     if (!isSelectionEnabled) return;
@@ -1190,6 +1201,8 @@ function TableEditing<T extends Record<string, any>>({
                   isSortableColumn={isSortableColumn}
                   columnWidths={columnWidths}
                   onColumnResize={handleColumnResize}
+                  onHeaderRowMouseEnter={handleHeaderRowMouseEnter}
+                  onHeaderRowMouseLeave={handleHeaderRowMouseLeave}
                 />
               ))}
             </thead>
@@ -1201,7 +1214,7 @@ function TableEditing<T extends Record<string, any>>({
                   <tr
                     key={row.id}
                     className={`border-t ${
-                      tableKey === "invois" ? "group" : ""
+                      tableKey === "invoice" ? "group" : ""
                     } ${
                       isLastRow
                         ? "border-b-0 rounded-b-lg"

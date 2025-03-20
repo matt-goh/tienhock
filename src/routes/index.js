@@ -34,6 +34,9 @@ import agamaRouter from "./catalogue/entities/agama.js";
 import invoiceRouter from "./sales/invoices/invoices.js";
 import eInvoiceRouter from "./sales/invoices/e-invoices.js";
 
+// Jellypolly routes
+import jellypollyInvoiceRouter from "./sales/invoices/invoicesJP.js";
+
 import {
   MYINVOIS_API_BASE_URL,
   MYINVOIS_CLIENT_ID,
@@ -81,6 +84,12 @@ export default function setupRoutes(app, pool) {
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
+
+  // Jellypolly routes
+  app.use(
+    "/jellypolly/api/invoices",
+    jellypollyInvoiceRouter(pool, myInvoisConfig)
+  );
 
   // Catalogue - Main routes
   app.use("/api/staffs", staffRouter(pool));

@@ -22,6 +22,11 @@ export default {
       amber: colors.amber,
       emerald: colors.emerald,
     },
+    extend: {
+      fontFamily: {
+        segoe: ['"Segoe UI"', "sans-serif"],
+      },
+    },
   },
   variants: {
     extend: {},

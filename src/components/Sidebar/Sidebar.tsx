@@ -7,9 +7,10 @@ import React, {
   useCallback,
 } from "react";
 import {
-  PopoverOption,
-  SidebarData as OriginalSidebarData,
+  getCompanySidebarData,
   SidebarItem,
+  PopoverOption,
+  getCompanyRoutes,
 } from "../../pages/pagesRoute";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
@@ -21,6 +22,8 @@ import { IconArrowBarToLeft, IconArrowBarToRight } from "@tabler/icons-react";
 import UserMenu from "../UserMenu";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../routes/utils/api";
+import CompanySwitcher from "../CompanySwitcher";
+import { useCompany } from "../../contexts/CompanyContext";
 
 interface SidebarProps {
   isPinned: boolean;
@@ -69,8 +72,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const { user, isLoading } = useAuth();
+  const { activeCompany } = useCompany();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const findSidebarItem = useCallback(
     (
@@ -98,18 +101,35 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   useEffect(() => {
-    const updatedSidebarData = [...OriginalSidebarData];
+    const updatedSidebarData = [...SidebarData];
     if (!user || isLoading) {
       updatedSidebarData.splice(0, 1);
     }
     setSidebarData(updatedSidebarData);
   }, [user, isLoading]);
 
+  // Effect to set company-specific sidebar data
+  useEffect(() => {
+    // Get routes for the active company
+    const companySidebarData = getCompanyRoutes(activeCompany);
+
+    // Only show bookmarks for Tien Hock
+    if ((!user || isLoading) && activeCompany.id === "tienhock") {
+      // Remove bookmarks if user not logged in and it's Tien Hock
+      const filteredData = [...companySidebarData];
+      filteredData.splice(0, 1);
+      setSidebarData(filteredData);
+    } else {
+      // Otherwise use the company-specific sidebar data
+      setSidebarData(companySidebarData);
+    }
+  }, [user, isLoading, activeCompany]);
+
   // On mount, set initial open items
   useEffect(() => {
-    const defaultOpenItems = OriginalSidebarData.filter(
-      (item) => item.defaultOpen
-    ).map((item) => item.name);
+    const defaultOpenItems = SidebarData.filter((item) => item.defaultOpen).map(
+      (item) => item.name
+    );
     setOpenItems(defaultOpenItems);
   }, []);
 
@@ -240,10 +260,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const isVisible = isPinned || isHovered;
-
-  const handleTitleClick = () => {
-    navigate("/");
-  };
 
   const handleToggle = (item: string) => {
     setOpenItems((prevItems) =>
@@ -513,26 +529,27 @@ const Sidebar: React.FC<SidebarProps> = ({
       onMouseLeave={handleSidebarMouseLeave}
     >
       {/* Header */}
-      <div className="flex-none h-[72px] flex justify-between items-center py-4 bg-default-100/75 z-10 relative">
+      <div className="flex-none h-fit mt-3 flex justify-between items-center bg-default-100/75 z-10 relative">
         {/* Header bottom shadow */}
         <div className="pointer-events-none absolute inset-x-0 -bottom-6 h-6 z-[1] bg-gradient-to-b from-default-100 via-default-100/25 to-transparent"></div>
 
-        <h2
-          className="text-xl font-bold text-center ml-8 cursor-pointer"
-          onClick={handleTitleClick}
-        >
-          Tien Hock
-        </h2>
-        <button
-          onClick={() => setIsPinned(!isPinned)}
-          className="flex items-center justify-center p-2 mr-3.5 h-[34px] w-[34px] rounded-lg hover:bg-default-200 active:bg-default-300"
-        >
-          {isPinned ? (
-            <IconArrowBarToLeft stroke={2} />
-          ) : (
-            <IconArrowBarToRight stroke={2} />
-          )}
-        </button>
+        {/* Updated CompanySwitcher placement with logo */}
+        <div className="flex-1 flex pl-3">
+          <CompanySwitcher onNavigate={() => setLastClickedSource("regular")} />
+        </div>
+
+        <div className="flex justify-end pr-3">
+          <button
+            onClick={() => setIsPinned(!isPinned)}
+            className="flex items-center justify-center p-2 h-[34px] w-[34px] rounded-lg hover:bg-default-200/90 active:bg-default-300/90 transition-colors duration-200"
+          >
+            {isPinned ? (
+              <IconArrowBarToLeft stroke={1.75} size={20} />
+            ) : (
+              <IconArrowBarToRight stroke={1.75} size={20} />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main content */}

@@ -1,5 +1,5 @@
 // EInvoiceTemplate.js
-import { COMPANY_INFO } from "./companyInfo.js";
+import { TIENHOCK_INFO } from "./companyInfo.js";
 
 // Helper function to format phone number
 function formatPhoneNumber(phone) {
@@ -418,29 +418,29 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
   <cac:AccountingSupplierParty>
     <cbc:AdditionalAccountID schemeAgencyName="CertEX"></cbc:AdditionalAccountID>
     <cac:Party>
-      <cbc:IndustryClassificationCode name="${COMPANY_INFO.msic_description}">${
-      COMPANY_INFO.msic_code
-    }</cbc:IndustryClassificationCode>
+      <cbc:IndustryClassificationCode name="${
+        TIENHOCK_INFO.msic_description
+      }">${TIENHOCK_INFO.msic_code}</cbc:IndustryClassificationCode>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="TIN">${COMPANY_INFO.tin}</cbc:ID>
+        <cbc:ID schemeID="TIN">${TIENHOCK_INFO.tin}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="BRN">${COMPANY_INFO.reg_no}</cbc:ID>
+        <cbc:ID schemeID="BRN">${TIENHOCK_INFO.reg_no}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="SST">${COMPANY_INFO.sst_id_xml || "-"}</cbc:ID>
+        <cbc:ID schemeID="SST">${TIENHOCK_INFO.sst_id_xml || "-"}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
         <cbc:ID schemeID="TTX">-</cbc:ID>
       </cac:PartyIdentification>
       <cac:PostalAddress>
-        <cbc:CityName>${COMPANY_INFO.city_xml}</cbc:CityName>
-        <cbc:PostalZone>${COMPANY_INFO.postcode}</cbc:PostalZone>
+        <cbc:CityName>${TIENHOCK_INFO.city_xml}</cbc:CityName>
+        <cbc:PostalZone>${TIENHOCK_INFO.postcode}</cbc:PostalZone>
         <cbc:CountrySubentityCode>${
-          COMPANY_INFO.country_code
+          TIENHOCK_INFO.country_code
         }</cbc:CountrySubentityCode>
           <cac:AddressLine>
-            <cbc:Line>${COMPANY_INFO.address_xml}</cbc:Line>
+            <cbc:Line>${TIENHOCK_INFO.address_xml}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
           <cbc:Line></cbc:Line>
@@ -453,11 +453,11 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>${COMPANY_INFO.name}</cbc:RegistrationName>
+        <cbc:RegistrationName>${TIENHOCK_INFO.name}</cbc:RegistrationName>
       </cac:PartyLegalEntity>
       <cac:Contact>
-        <cbc:Telephone>${COMPANY_INFO.phone}</cbc:Telephone>
-        <cbc:ElectronicMail>${COMPANY_INFO.email}</cbc:ElectronicMail>
+        <cbc:Telephone>${TIENHOCK_INFO.phone}</cbc:Telephone>
+        <cbc:ElectronicMail>${TIENHOCK_INFO.email}</cbc:ElectronicMail>
       </cac:Contact>
     </cac:Party>
   </cac:AccountingSupplierParty>`;
