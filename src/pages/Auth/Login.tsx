@@ -53,24 +53,27 @@ const Login: React.FC = () => {
 
       // Check for saved company preference
       const savedCompanyId = localStorage.getItem("activeCompany");
+      let targetPath = "/";
 
       if (savedCompanyId) {
         const company = COMPANIES.find((c) => c.id === savedCompanyId);
         if (company) {
-          // Set the active company in context BEFORE navigation
+          // Set the active company in context
           setActiveCompany(company);
 
-          // Then navigate to the company home route
-          const homePath = company.routePrefix
-            ? `/${company.routePrefix}`
-            : "/";
-          navigate(homePath);
+          // Determine navigation path based on company
+          targetPath = company.routePrefix ? `/${company.routePrefix}` : "/";
+
+          // Add a slight delay to ensure the company state is updated before navigation
+          setTimeout(() => {
+            navigate(targetPath);
+          }, 50);
           return;
         }
       }
 
       // Default behavior if no saved company or saved company not found
-      navigate("/");
+      navigate(targetPath);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Login failed");
 
