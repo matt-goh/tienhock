@@ -32,6 +32,23 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
     };
   }, []);
 
+  const getCompanyLogo = (companyId: string) => {
+    switch (companyId) {
+      case "greentarget":
+        return (
+          <img
+            src="/greentarget.ico"
+            width={24}
+            height={24}
+          />
+        );
+      case "tienhock":
+      case "jellypolly":
+      default:
+        return <TienHockLogo width={24} height={24} />;
+    }
+  };
+
   const handleCompanyChange = (company: Company) => {
     setActiveCompany(company);
     setIsOpen(false);
@@ -80,7 +97,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
               }`}
               onClick={() => handleCompanyChange(company)}
             >
-              <TienHockLogo width={24} height={24} />
+              {getCompanyLogo(company.id)}
               {company.name}
             </button>
           ))}
