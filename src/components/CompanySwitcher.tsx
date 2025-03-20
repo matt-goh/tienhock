@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompany, Company } from "../contexts/CompanyContext";
 import { Transition } from "@headlessui/react";
+import TienHockLogo from "../utils/TienHockLogo";
 
 interface CompanySwitcherProps {
   onNavigate?: () => void;
@@ -72,13 +73,14 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
           {companies.map((company) => (
             <button
               key={company.id}
-              className={`w-full text-left rounded-md px-4 py-2.5 font-medium transition-colors duration-200 hover:bg-default-200/90 active:bg-default-300/90 hover:text-default-800 ${
+              className={`w-full text-left rounded-md flex items-center gap-2 px-3 py-2.5 font-medium transition-colors duration-200 hover:bg-default-200/90 active:bg-default-300/90 hover:text-default-800 ${
                 company.id === activeCompany.id
                   ? "bg-default-100 text-default-800"
                   : "text-default-700"
               }`}
               onClick={() => handleCompanyChange(company)}
             >
+              <TienHockLogo width={24} height={24} />
               {company.name}
             </button>
           ))}
