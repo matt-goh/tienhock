@@ -297,13 +297,13 @@ export const GreenTargetSidebarData: SidebarItem[] = [
 
 export const JellyPollySidebarData: SidebarItem[] = [
   {
-    name: "Inventory",
-    icon: IconBox, // Import this icon
+    name: "Sales",
+    icon: IconReportAnalytics,
     subItems: [
       {
-        name: "Stock",
-        path: "/inventory/stock",
-        component: () => <div>Jelly Polly Stock</div>, // Placeholder component
+        name: "Invoice",
+        path: "/sales/invoice",
+        component: () => <div>Green Target Orders</div>, // Placeholder component
       },
     ],
   },

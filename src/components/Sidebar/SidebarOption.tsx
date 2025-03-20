@@ -6,6 +6,7 @@ import {
 } from "@tabler/icons-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useCompany } from "../../contexts/CompanyContext";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 
@@ -35,6 +36,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
   onNavigate,
 }) => {
   const { user, isLoading } = useAuth();
+  const { activeCompany } = useCompany();
   const navigate = useNavigate();
 
   const handleBookmarkClick = async (e: {
@@ -113,7 +115,7 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
     }`;
   };
 
-  const shouldShowBookmark = user && path;
+  const shouldShowBookmark = user && path && activeCompany.id === "tienhock";
 
   const content = (
     <>

@@ -74,7 +74,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { user, isLoading } = useAuth();
   const { activeCompany } = useCompany();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const findSidebarItem = useCallback(
     (
