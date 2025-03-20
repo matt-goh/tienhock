@@ -10,10 +10,10 @@ import {
   IconChevronDown,
   IconCheck,
 } from "@tabler/icons-react";
-import PaginationControls from "../../components/Invois/Paginationcontrols";
+import PaginationControls from "../../components/Invoice/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import ConsolidatedInfoTooltip from "../../components/Invois/ConsolidatedInfoTooltip";
+import ConsolidatedInfoTooltip from "../../components/Invoice/ConsolidatedInfoTooltip";
 import DateRangePicker from "../../components/DateRangePicker";
 import { LoginResponse } from "../../types/types";
 import toast from "react-hot-toast";

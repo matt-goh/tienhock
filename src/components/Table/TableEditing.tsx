@@ -80,7 +80,7 @@ function TableEditing<T extends Record<string, any>>({
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
     Object.fromEntries(columns.map((col) => [col.id, col.width || 200]))
   );
-  // Selection related states (only used when tableKey is "invois" or "consolidate")
+  // Selection related states (only used when tableKey is "invoice" or "consolidate")
   const [selection, setSelection] = useState<TableSelection>({
     selectedRows: new Set(),
     hoveredRowIndex: null,
@@ -91,13 +91,13 @@ function TableEditing<T extends Record<string, any>>({
   const isSortingDisabled = [
     "orderDetails",
     "customerProducts",
-    "invois",
+    "invoice",
     "einvoice-submit",
     "consolidate",
   ].includes(tableKey || "");
 
   const isSelectionEnabled = [
-    "invois",
+    "invoice",
     "consolidate",
     "einvoice-submit",
   ].includes(tableKey || "");
@@ -1211,7 +1211,7 @@ function TableEditing<T extends Record<string, any>>({
                   <tr
                     key={row.id}
                     className={`border-t ${
-                      tableKey === "invois" ? "group" : ""
+                      tableKey === "invoice" ? "group" : ""
                     } ${
                       isLastRow
                         ? "border-b-0 rounded-b-lg"
