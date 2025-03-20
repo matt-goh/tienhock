@@ -203,6 +203,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const fetchBookmarks = async () => {
+      // Skip for non-TienHock companies
+      if (activeCompany.id !== "tienhock") {
+        setBookmarks([]);
+        setBookmarkedItems(new Set());
+        return;
+      }
+
       if (user?.id) {
         try {
           const data = await api.get(`/api/bookmarks/${user.id}`);
@@ -385,6 +392,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const renderSidebarItems = (items: SidebarItem[]) => {
     return items.map((item) => {
+      // Skip Bookmarks section for non-TienHock companies
+      if (item.name === "Bookmarks" && activeCompany.id !== "tienhock") {
+        return null;
+      }
+      
       if (item.name === "Bookmarks") {
         return (
           <SidebarButton

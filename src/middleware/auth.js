@@ -19,6 +19,9 @@ export const authMiddleware = (pool) => async (req, res, next) => {
   const sessionId = req.headers["x-session-id"];
   const apiKey = req.headers["api-key"];
 
+  // Get company from request
+  const companySchema = req.companySchema || null;
+
   if (!sessionId && !apiKey) {
     return res
       .status(401)
@@ -97,6 +100,7 @@ export const authMiddleware = (pool) => async (req, res, next) => {
       const session = sessionResult.rows[0];
       req.session = {
         ...session,
+        companySchema,
         staff: session.staff_id
           ? {
               id: session.staff_id,

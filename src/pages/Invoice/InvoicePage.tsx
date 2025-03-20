@@ -35,6 +35,7 @@ import {
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
 import { api } from "../../routes/utils/api";
+import { useCompany } from "../../contexts/CompanyContext";
 import {
   Listbox,
   ListboxButton,
@@ -123,6 +124,7 @@ const InvoicePage: React.FC = () => {
   const clearSelectionRef = useRef<(() => void) | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const { getRoutePath, activeCompany } = useCompany();
 
   useEffect(() => {
     const handleInvoicesUpdated = () => {
@@ -436,16 +438,28 @@ const InvoicePage: React.FC = () => {
   };
 
   const handleCreateNewInvoice = () => {
-    navigate("/sales/invoice/details", {
+    // Build path with company prefix if needed
+    const basePath = "/sales/invoice/details";
+    const path = activeCompany.routePrefix
+      ? `/${activeCompany.routePrefix}${basePath}`
+      : basePath;
+
+    navigate(path, {
       state: {
         isNewInvoice: true,
         previousPath: location.pathname,
       },
     });
   };
-
+  
   const handleInvoiceClick = (invoiceData: InvoiceData) => {
-    navigate(`/sales/invoice/details`, {
+    // Build path with company prefix if needed
+    const basePath = "/sales/invoice/details";
+    const path = activeCompany.routePrefix
+      ? `/${activeCompany.routePrefix}${basePath}`
+      : basePath;
+
+    navigate(path, {
       state: {
         invoiceData,
         isNewInvoice: false,
