@@ -1,33 +1,164 @@
 // src/routes/sales/invoices/invoicesJP.js
 import { Router } from "express";
+import {
+  MYINVOIS_API_BASE_URL,
+  MYINVOIS_CLIENT_ID,
+  MYINVOIS_CLIENT_SECRET,
+} from "../../../configs/config.js";
+import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
+import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 
-export default function (pool, config) {
-  const router = Router();
+// Define the MyInvois configuration object
+const myInvoisConfig = {
+  MYINVOIS_API_BASE_URL,
+  MYINVOIS_CLIENT_ID,
+  MYINVOIS_CLIENT_SECRET,
+};
 
-  // Customer data cache
-  const customerCache = new Map();
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Helper function to insert accepted documents
+const insertAcceptedDocuments = async (
+  pool,
+  documents,
+  originalInvoices = {}
+) => {
+  const query = `
+    INSERT INTO jellypolly.einvoices (
+      uuid, submission_uid, long_id, internal_id, type_name, 
+      receiver_id, receiver_name, datetime_validated,
+      total_payable_amount, total_excluding_tax, total_net_amount, total_rounding
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  `;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const doc of documents) {
+      // Convert internalId to string to ensure consistent key lookup
+      const internalIdKey = String(doc.internalId);
 
-  // Helper function to update customer credit
-  const updateCustomerCredit = async (client, customerId, amount) => {
-    try {
-      // Update the customer's credit_used by adding the specified amount
-      const updateQuery = `
+      // Get rounding - ensure it's a number and try multiple ways to access it
+      let rounding = 0;
+      if (originalInvoices[internalIdKey] !== undefined) {
+        rounding = parseFloat(originalInvoices[internalIdKey]);
+      } else if (typeof originalInvoices[internalIdKey] === "object") {
+        rounding = parseFloat(originalInvoices[internalIdKey].rounding || 0);
+      }
+
+      // Add a default datetime_validated if missing
+      const datetime_validated =
+        doc.dateTimeValidated || new Date().toISOString();
+
+      await client.query(query, [
+        doc.uuid,
+        doc.submissionUid,
+        doc.longId,
+        doc.internalId,
+        doc.typeName,
+        doc.receiverId,
+        doc.receiverName,
+        datetime_validated,
+        doc.totalPayableAmount,
+        doc.totalExcludingTax,
+        doc.totalNetAmount,
+        rounding, // Explicitly processed rounding value
+      ]);
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+// Helper function to fetch customer data (you'll need to implement this)
+const fetchCustomerData = async (customerId) => {
+  try {
+    const query = `
+              SELECT 
+                city,
+                state,
+                address,
+                name,
+                tin_number,
+                id_number,
+                id_type,
+                phone_number,
+                email
+              FROM customers 
+              WHERE id = $1
+            `;
+    const result = await pool.query(query, [customerId]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error fetching customer data:", error);
+    throw error;
+  }
+};
+
+// Helper function to update customer credit
+const updateCustomerCredit = async (client, customerId, amount) => {
+  try {
+    // Update the customer's credit_used by adding the specified amount
+    const updateQuery = `
         UPDATE customers 
         SET credit_used = GREATEST(0, COALESCE(credit_used, 0) + $1)
         WHERE id = $2
         RETURNING credit_used, credit_limit
       `;
-      const result = await client.query(updateQuery, [amount, customerId]);
+    const result = await client.query(updateQuery, [amount, customerId]);
 
-      if (result.rows.length === 0) {
-        console.warn(`Customer ${customerId} not found when updating credit`);
-        return null;
+    if (result.rows.length === 0) {
+      console.warn(`Customer ${customerId} not found when updating credit`);
+      return null;
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error(`Error updating credit for customer ${customerId}:`, error);
+    throw error;
+  }
+};
+
+export default function (pool, config) {
+  const router = Router();
+
+  const apiClient = EInvoiceApiClientFactory.getInstance(myInvoisConfig);
+
+  // Customer data cache
+  const customerCache = new Map();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Enhanced customer data function with caching
+  const fetchCustomerDataWithCache = async (customerId) => {
+    // Check cache first
+    const cacheKey = `customer_${customerId}`;
+    const cachedData = customerCache.get(cacheKey);
+
+    if (cachedData && cachedData.timestamp > Date.now() - CACHE_TTL) {
+      return cachedData.data;
+    }
+
+    // Not in cache or expired, fetch from database
+    try {
+      const data = await fetchCustomerData(pool, customerId);
+
+      // Store in cache if found
+      if (data) {
+        customerCache.set(cacheKey, {
+          data,
+          timestamp: Date.now(),
+        });
       }
 
-      return result.rows[0];
+      return data;
     } catch (error) {
-      console.error(`Error updating credit for customer ${customerId}:`, error);
+      console.error("Error fetching customer data:", error);
       throw error;
     }
   };
@@ -291,6 +422,364 @@ export default function (pool, config) {
     }
   });
 
+  // Submit invoices (single or batch)
+  router.post("/submit-invoices", async (req, res) => {
+    // Extract fields query parameter to determine response format
+    const fieldsParam = req.query.fields;
+    const isMinimal = fieldsParam === "minimal";
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Convert input to array if single invoice
+      const invoices = Array.isArray(req.body) ? req.body : [req.body];
+
+      const results = [];
+      const errors = [];
+      const savedInvoiceData = [];
+
+      // Process each invoice for database save
+      for (const invoice of invoices) {
+        try {
+          // Transform data to match database columns
+          const transformedInvoice = {
+            id: String(invoice.billNumber),
+            salespersonid: invoice.salespersonId,
+            customerid: invoice.customerId,
+            createddate: invoice.createdDate || Date.now().toString(),
+            paymenttype: invoice.paymentType,
+            amount: Number(invoice.amount) || 0,
+            rounding: Number(invoice.rounding) || 0,
+            totalamountpayable: Number(invoice.totalAmountPayable) || 0,
+          };
+
+          // Validate required fields
+          if (!transformedInvoice.id || !transformedInvoice.customerid) {
+            throw new Error(
+              `Invoice ${transformedInvoice.id}: Missing required fields`
+            );
+          }
+
+          // Check for duplicate invoice
+          const checkQuery = "SELECT id FROM jellypolly.invoices WHERE id = $1";
+          const checkResult = await client.query(checkQuery, [
+            transformedInvoice.id,
+          ]);
+          if (checkResult.rows.length > 0) {
+            throw new Error(`Invoice ${transformedInvoice.id} already exists`);
+          }
+
+          // Fetch product descriptions first if needed
+          let productDescriptions = {};
+          if (invoice.products && invoice.products.length > 0) {
+            // Get all product codes that need descriptions
+            const productCodes = invoice.products
+              .filter((p) => !p.description && p.code)
+              .map((p) => p.code);
+
+            if (productCodes.length > 0) {
+              // Fetch descriptions for all products at once
+              const descQuery =
+                "SELECT id, description FROM jellypolly.products WHERE id = ANY($1)";
+              const descResult = await client.query(descQuery, [productCodes]);
+
+              // Create a lookup map for product descriptions
+              productDescriptions = descResult.rows.reduce((map, row) => {
+                map[row.id] = row.description;
+                return map;
+              }, {});
+            }
+          }
+
+          // Build insert query
+          const columns = Object.keys(transformedInvoice);
+          const placeholders = columns
+            .map((_, idx) => `$${idx + 1}`)
+            .join(", ");
+          const values = columns.map((col) => transformedInvoice[col]);
+
+          const insertInvoiceQuery = `
+          INSERT INTO jellypolly.invoices (${columns.join(", ")})
+          VALUES (${placeholders})
+          RETURNING *
+        `;
+
+          const invoiceResult = await client.query(insertInvoiceQuery, values);
+          const savedInvoice = invoiceResult.rows[0];
+
+          // Prepare order details for both database and MyInvois
+          const orderDetails = [];
+
+          // Process products to save in database and track for MyInvois
+          if (invoice.products && invoice.products.length > 0) {
+            for (const product of invoice.products) {
+              // Skip products with zero quantity and price
+              if (product.quantity === 0 && product.price === 0) continue;
+
+              const quantity = Number(product.quantity) || 0;
+              const price = Number(product.price) || 0;
+              const freeProduct = Number(product.freeProduct) || 0;
+              const returnProduct = Number(product.returnProduct) || 0;
+              const tax = Number(product.tax) || 0;
+
+              // Get description from our lookup map or use provided description or empty string
+              const description =
+                product.description || productDescriptions[product.code] || "";
+
+              // Calculate total
+              const total = (quantity * price + tax).toFixed(2);
+
+              const productData = {
+                invoiceid: transformedInvoice.id,
+                code: product.code,
+                price: price,
+                quantity: quantity,
+                freeproduct: freeProduct,
+                returnproduct: returnProduct,
+                description: description,
+                tax: tax,
+                total: total,
+                issubtotal: false,
+              };
+
+              // Store product data for MyInvois
+              orderDetails.push({
+                code: product.code,
+                price: price,
+                quantity: quantity,
+                freeProduct: freeProduct,
+                returnProduct: returnProduct,
+                tax: tax,
+                total: total.toString(),
+                description: description, // Capture this for MyInvois
+              });
+
+              // Build insert query for product
+              const productColumns = Object.keys(productData);
+              const productPlaceholders = productColumns
+                .map((_, idx) => `$${idx + 1}`)
+                .join(", ");
+              const productValues = productColumns.map(
+                (col) => productData[col]
+              );
+
+              const insertProductQuery = `
+              INSERT INTO jellypolly.order_details (${productColumns.join(
+                ", "
+              )})
+              VALUES (${productPlaceholders})
+            `;
+
+              await client.query(insertProductQuery, productValues);
+            }
+          }
+
+          results.push({
+            billNumber: transformedInvoice.id,
+            status: "success",
+            message: "Invoice created successfully",
+          });
+
+          // After inserting the invoice and products, update credit used
+          if (transformedInvoice.paymenttype === "INVOICE") {
+            await updateCustomerCredit(
+              client,
+              transformedInvoice.customerid,
+              transformedInvoice.totalamountpayable || 0
+            );
+          }
+
+          // Store the data needed for MyInvois submission
+          savedInvoiceData.push({
+            id: savedInvoice.id,
+            salespersonid: savedInvoice.salespersonid,
+            customerid: savedInvoice.customerid,
+            createddate: savedInvoice.createddate,
+            paymenttype: savedInvoice.paymenttype,
+            amount: Number(savedInvoice.amount) || 0,
+            rounding: Number(savedInvoice.rounding) || 0,
+            totalamountpayable: Number(savedInvoice.totalamountpayable) || 0,
+            orderDetails: orderDetails,
+          });
+        } catch (error) {
+          errors.push({
+            billNumber: invoice.billNumber,
+            status: "error",
+            message: error.message,
+          });
+        }
+      }
+
+      // If all invoices failed, rollback and return error
+      if (errors.length === invoices.length) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "All invoices failed to process",
+          errors,
+        });
+      }
+
+      // Otherwise commit successful transactions
+      await client.query("COMMIT");
+
+      // After successful database save, attempt MyInvois submission
+      let einvoiceResults = null;
+      if (savedInvoiceData.length > 0) {
+        try {
+          // Create a map of invoice IDs to rounding values
+          const invoiceRoundings = {};
+          savedInvoiceData.forEach((invoice) => {
+            // Ensure ID is a string and rounding is explicitly a number
+            const id = String(invoice.id);
+            const rounding = parseFloat(invoice.rounding || 0);
+            invoiceRoundings[id] = rounding;
+          });
+
+          einvoiceResults = await submitInvoicesToMyInvois(
+            config,
+            savedInvoiceData,
+            fetchCustomerDataWithCache
+          );
+
+          // Add this block to store accepted documents in the einvoices table
+          if (
+            einvoiceResults.success &&
+            einvoiceResults.acceptedDocuments?.length > 0
+          ) {
+            try {
+              await insertAcceptedDocuments(
+                pool,
+                einvoiceResults.acceptedDocuments,
+                invoiceRoundings
+              );
+            } catch (storageError) {
+              console.error("Error storing accepted documents:", storageError);
+              // Don't fail the whole operation if storing documents fails
+            }
+          }
+        } catch (einvoiceError) {
+          console.error("Error during submission to MyInvois:", einvoiceError);
+          einvoiceResults = {
+            success: false,
+            message: "Failed to submit to MyInvois API",
+            error: einvoiceError.message || "Unknown error",
+          };
+        }
+      }
+
+      // Prepare response based on fields parameter
+      if (isMinimal) {
+        // Create merged invoice results with combined status
+        const invoices = [];
+
+        // Create a lookup map for einvoice results
+        const acceptedDocMap = {};
+        const rejectedDocMap = {};
+
+        if (einvoiceResults) {
+          // Map accepted documents by internalId
+          if (
+            einvoiceResults.acceptedDocuments &&
+            einvoiceResults.acceptedDocuments.length > 0
+          ) {
+            einvoiceResults.acceptedDocuments.forEach((doc) => {
+              acceptedDocMap[doc.internalId] = doc;
+            });
+          }
+
+          // Map rejected documents by internalId
+          if (
+            einvoiceResults.rejectedDocuments &&
+            einvoiceResults.rejectedDocuments.length > 0
+          ) {
+            einvoiceResults.rejectedDocuments.forEach((doc) => {
+              rejectedDocMap[doc.internalId || doc.invoiceCodeNumber] = doc;
+            });
+          }
+        }
+
+        // Process results and merge with einvoice data
+        for (const result of results) {
+          const invoiceId = result.billNumber;
+          const invoiceData = {
+            id: invoiceId,
+            systemStatus: result.status === "success" ? 0 : 100, // 0=success, 100=error
+          };
+
+          // If invoice was accepted in MyInvois
+          if (acceptedDocMap[invoiceId]) {
+            const doc = acceptedDocMap[invoiceId];
+
+            // If longId is missing, mark status as Pending instead of Valid
+            if (!doc.longId) {
+              invoiceData.einvoiceStatus = 10; // Pending = 10 (success variant)
+            } else {
+              invoiceData.einvoiceStatus = 0; // Valid = 0 (complete success)
+            }
+
+            invoiceData.uuid = doc.uuid;
+            invoiceData.longId = doc.longId || "";
+            invoiceData.dateTimeValidated = doc.dateTimeValidated || null;
+          }
+          // If invoice was rejected in MyInvois
+          else if (rejectedDocMap[invoiceId]) {
+            const doc = rejectedDocMap[invoiceId];
+            invoiceData.einvoiceStatus = 100; // Invalid = 100 (error)
+            invoiceData.error = {
+              code: doc.error?.code || "ERROR",
+              message: doc.error?.message || "Unknown error",
+            };
+          }
+          // If invoice wasn't processed by MyInvois at all
+          else if (einvoiceResults) {
+            invoiceData.einvoiceStatus = 20; // Not Processed = 20 (partial success)
+          }
+
+          invoices.push(invoiceData);
+        }
+
+        // Add any errors from system processing
+        if (errors && errors.length > 0) {
+          for (const error of errors) {
+            invoices.push({
+              id: error.billNumber,
+              systemStatus: 100, // Error = 100
+              einvoiceStatus: 20, // Not Processed = 20
+              error: {
+                message: error.message,
+              },
+            });
+          }
+        }
+
+        return res.status(207).json({
+          message: "Invoice processing completed",
+          invoices: invoices,
+          overallStatus: einvoiceResults
+            ? einvoiceResults.overallStatus
+            : "SystemOnly",
+        });
+      }
+
+      // Return full response for ERP system (default)
+      res.status(207).json({
+        message: "Invoice processing completed",
+        results,
+        errors: errors.length > 0 ? errors : undefined,
+        einvoice: einvoiceResults,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      res.status(500).json({
+        message: "Error processing invoices",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // Update existing invoice
   router.post("/update", async (req, res) => {
     const client = await pool.connect();
@@ -526,7 +1015,7 @@ export default function (pool, config) {
     }
   });
 
-  // Delete invoice from database
+  // Delete invoice from database and check myInvois for e-invoice cancellation
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
@@ -560,6 +1049,39 @@ export default function (pool, config) {
         }
       }
 
+      // Check if there's also an e-invoice for this invoice
+      const eInvoiceQuery =
+        "SELECT uuid FROM jellypolly.einvoices WHERE internal_id = $1";
+      const eInvoiceResult = await pool.query(eInvoiceQuery, [id]);
+
+      if (eInvoiceResult.rows.length > 0 && config) {
+        const uuid = eInvoiceResult.rows[0].uuid;
+        const apiClient = EInvoiceApiClientFactory.getInstance(config);
+
+        // Try to cancel the e-invoice in MyInvois
+        try {
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${uuid}/state`,
+            {
+              status: "cancelled",
+              reason: "Invoice deleted",
+            }
+          );
+
+          // Delete the e-invoice from local database
+          await pool.query("DELETE FROM jellypolly.einvoices WHERE uuid = $1", [
+            uuid,
+          ]);
+          console.log(
+            `Cancelled and deleted e-invoice with UUID ${uuid} for invoice ID ${id}`
+          );
+        } catch (cancelError) {
+          console.error("Error cancelling e-invoice in MyInvois:", cancelError);
+          // We continue with invoice deletion even if e-invoice cancellation fails
+        }
+      }
+
       // Delete order details first
       await client.query(
         "DELETE FROM jellypolly.order_details WHERE invoiceid = $1",
@@ -574,14 +1096,14 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
       res.status(200).json({
-        message: "Jellypolly invoice deleted successfully",
+        message: "Invoice deleted successfully",
         deletedInvoice: result.rows[0],
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error deleting Jellypolly invoice:", error);
+      console.error("Error deleting invoice:", error);
       res.status(500).json({
-        message: "Error deleting Jellypolly invoice",
+        message: "Error deleting invoice",
         error: error.message,
       });
     } finally {
