@@ -12,6 +12,7 @@ import {
 } from "./src/configs/config.js";
 import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
+import { schemaMiddleware } from "./src/middleware/schema-middleware.js";
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use(async (req, res, next) => {
   }
   next();
 });
+app.use(schemaMiddleware(pool));
 
 // conditional CORS configuration based on environment
 const corsConfig =
@@ -65,12 +67,43 @@ const corsConfig =
 
 app.use(cors(corsConfig));
 app.use(json({ limit: "50mb" }));
-app.use(express.static(path.join(__dirname, "build")));
 
-// Setup all routes
+// IMPORTANT: Serve static files but with API route precedence
+app.use(
+  express.static(path.join(__dirname, "build"), {
+    index: false, // Don't serve index.html for directory requests
+  })
+);
+
+// Setup company-prefixed API routes
+// 1. TienHock routes (no prefix)
 setupRoutes(app, pool);
 
-// Handle react routing
+// 2. Handle company-prefixed routes
+// This is critical - we need explicit handling for each company
+app.use(
+  "/jellypolly/api",
+  (req, res, next) => {
+    // Store company schema info on request
+    req.companySchema = "jellypolly";
+    // Rewrite URL to remove company prefix for route matching
+    req.url = req.url.replace(/^\/jellypolly\/api/, "");
+    next();
+  },
+  setupRoutes
+);
+
+app.use(
+  "/greentarget/api",
+  (req, res, next) => {
+    req.companySchema = "greentarget";
+    req.url = req.url.replace(/^\/greentarget\/api/, "");
+    next();
+  },
+  setupRoutes
+);
+
+// AFTER API routes, catch-all for React routing
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
