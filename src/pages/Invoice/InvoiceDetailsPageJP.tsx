@@ -18,12 +18,6 @@ import {
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import toast from "react-hot-toast";
-import {
-  updateInvoice,
-  deleteInvoice,
-  createInvoice,
-  checkDuplicateInvoiceNo,
-} from "../../utils/invoice/InvoiceUtils";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
@@ -37,11 +31,17 @@ import { debounce } from "lodash";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import {
+  updateInvoice,
+  deleteInvoice,
+  createInvoice,
+  checkDuplicateInvoiceNo,
+} from "../../utils/invoice/InvoiceUtilsJP";
 
-const InvoiceDetailsPage: React.FC = () => {
+const InvoiceDetailsPageJP: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [previousPath, setPreviousPath] = useState("/sales/invoice");
+  const [previousPath, setPreviousPath] = useState("/jellypolly/sales/invoice");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData>(() => {
     if (location.state?.isNewInvoice) {
@@ -1290,7 +1290,7 @@ const InvoiceDetailsPage: React.FC = () => {
             initialData={orderDetailsWithTotal}
             columns={productColumns}
             onChange={handleChange}
-            tableKey="orderDetails"
+            tableKey="orderDetailsJP"
           />
         </>
       )}
@@ -1316,4 +1316,4 @@ const InvoiceDetailsPage: React.FC = () => {
   );
 };
 
-export default InvoiceDetailsPage;
+export default InvoiceDetailsPageJP;
