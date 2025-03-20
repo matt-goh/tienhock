@@ -27,6 +27,7 @@ import StaffPage from "./Catalogue/StaffPage";
 import JobPage from "./Catalogue/JobPage";
 import TaxPage from "./Catalogue/TaxPage";
 import InvoicePageJP from "./Invoice/InvoicePageJP";
+import InvoiceDetailsPageJP from "./Invoice/InvoiceDetailsPageJP";
 
 export interface PopoverOption {
   name: string;
@@ -305,6 +306,23 @@ export const JellyPollySidebarData: SidebarItem[] = [
         name: "Invoice",
         path: "/sales/invoice",
         component: InvoicePageJP,
+        subItems: [
+          {
+            name: "Invoice Details",
+            path: "/sales/invoice/:id",
+            component: InvoiceDetailsPageJP,
+          },
+          {
+            name: "Create New Invoice Page",
+            path: "/sales/invoice/create",
+            component: InvoiceDetailsPageJP,
+          },
+          {
+            name: "Invoice PDF Viewer",
+            path: "/pdf-viewer",
+            component: PDFViewerPage,
+          },
+        ],
       },
     ],
   },

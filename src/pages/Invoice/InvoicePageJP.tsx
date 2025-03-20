@@ -51,7 +51,7 @@ interface MonthOption {
   name: string;
 }
 
-const InvoicePage: React.FC = () => {
+const InvoicePageJP: React.FC = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -796,7 +796,7 @@ const InvoicePage: React.FC = () => {
               onClearSelection={(fn) => {
                 clearSelectionRef.current = fn;
               }}
-              tableKey="invoice"
+              tableKey="invoiceJP"
             />
           ) : (
             <div className="py-16">
@@ -830,4 +830,4 @@ const InvoicePage: React.FC = () => {
   );
 };
 
-export default InvoicePage;
+export default InvoicePageJP;

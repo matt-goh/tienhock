@@ -89,15 +89,18 @@ function TableEditing<T extends Record<string, any>>({
 
   // Constants
   const isSortingDisabled = [
-    "orderDetails",
-    "customerProducts",
     "invoice",
+    "invoiceJP",
+    "orderDetails",
+    "orderDetailsJP",
+    "customerProducts",
     "einvoice-submit",
     "consolidate",
   ].includes(tableKey || "");
 
   const isSelectionEnabled = [
     "invoice",
+    "invoiceJP",
     "consolidate",
     "einvoice-submit",
   ].includes(tableKey || "");
