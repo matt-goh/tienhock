@@ -1,4 +1,4 @@
-// src/pages/Invois/EInvoiceConsolidatedPage.tsx
+// src/pages/Invoice/EInvoiceConsolidatedPage.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../routes/utils/api";
 import {
@@ -27,7 +27,7 @@ import {
 } from "../../utils/invoice/dateUtils";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
-import { SubmissionDisplay } from "../../components/Invois/SubmissionDisplay";
+import { SubmissionDisplay } from "../../components/Invoice/SubmissionDisplay";
 import { StatusIndicator } from "../../components/StatusIndicator";
 
 interface MonthOption {

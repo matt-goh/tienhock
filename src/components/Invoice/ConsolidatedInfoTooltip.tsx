@@ -1,4 +1,4 @@
-// src/components/Invois/ConsolidatedInfoTooltip.tsx
+// src/components/Invoice/ConsolidatedInfoTooltip.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { IconInfoCircle } from "@tabler/icons-react";

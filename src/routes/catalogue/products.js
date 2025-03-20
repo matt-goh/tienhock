@@ -4,10 +4,27 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get all products
+  // Get products based on params
   router.get("/", async (req, res) => {
     try {
-      const query = "SELECT * FROM products";
+      // Check if we should return all products or filter by type
+      const showAll = req.query.all !== undefined;
+      const showJP = req.query.JP !== undefined;
+
+      let query;
+      if (showAll) {
+        // Return all products with all columns /api/products?all
+        query = "SELECT * FROM products";
+      } else if (showJP) {
+        // Return only JP type products (excluding tax) /api/products?JP
+        query =
+          "SELECT id, description, price_per_unit, type FROM products WHERE type = 'JP'";
+      } else {
+        // Default: Return only BH and MEE type products (excluding tax)
+        query =
+          "SELECT id, description, price_per_unit, type FROM products WHERE type IN ('BH', 'MEE')";
+      }
+
       const result = await pool.query(query);
 
       // Convert money-related fields to numbers
@@ -163,21 +180,6 @@ export default function (pool) {
       res
         .status(500)
         .json({ message: "Error processing products", error: error.message });
-    }
-  });
-
-  // Fetch all products (id and description only)
-  router.get("/combobox", async (req, res) => {
-    try {
-      const query =
-        "SELECT id, description, price_per_unit, type FROM products";
-      const result = await pool.query(query);
-      res.json(result.rows);
-    } catch (error) {
-      console.error("Error fetching products for combobox:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching products", error: error.message });
     }
   });
 

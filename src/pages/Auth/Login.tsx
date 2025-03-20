@@ -5,6 +5,7 @@ import { IconArrowRight, IconLock, IconId } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
+import { useCompany, COMPANIES } from "../../contexts/CompanyContext";
 import TienHockLogo from "../../utils/TienHockLogo";
 
 const Login: React.FC = () => {
@@ -14,6 +15,7 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { setActiveCompany } = useCompany();
 
   const validateIcNo = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
@@ -48,7 +50,30 @@ const Login: React.FC = () => {
 
     try {
       await login(ic_no, password);
-      navigate("/");
+
+      // Check for saved company preference
+      const savedCompanyId = localStorage.getItem("activeCompany");
+      let targetPath = "/";
+
+      if (savedCompanyId) {
+        const company = COMPANIES.find((c) => c.id === savedCompanyId);
+        if (company) {
+          // Set the active company in context
+          setActiveCompany(company);
+
+          // Determine navigation path based on company
+          targetPath = company.routePrefix ? `/${company.routePrefix}` : "/";
+
+          // Add a slight delay to ensure the company state is updated before navigation
+          setTimeout(() => {
+            navigate(targetPath);
+          }, 50);
+          return;
+        }
+      }
+
+      // Default behavior if no saved company or saved company not found
+      navigate(targetPath);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Login failed");
 

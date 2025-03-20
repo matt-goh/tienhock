@@ -778,7 +778,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full p-6 max-w-[88rem] mx-auto space-y-6">
+    <div className="w-full p-6 pt-0 max-w-[88rem] mx-auto space-y-6">
       <h1 className="text-2xl font-bold mb-6">Sales by Products</h1>
 
       {/* Summary section */}
@@ -903,7 +903,7 @@ const SalesByProductsPage: React.FC = () => {
               </Listbox>
             </div>
           </div>
-          <div className="text-lg font-bold text-default-700">
+          <div className="text-lg text-right font-bold text-default-700">
             Total Sales: {formatCurrency(summary.totalSales)}
           </div>
         </div>

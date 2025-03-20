@@ -5,11 +5,18 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Toaster } from "react-hot-toast";
 import { routes } from "./pages/pagesRoute";
 import { IconDeviceDesktop } from "@tabler/icons-react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
 import Login from "./pages/Auth/Login";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Sidebar from "./components/Sidebar/Sidebar";
@@ -18,6 +25,7 @@ import LoadingSpinner from "./components/LoadingSpinner";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const { activeCompany, getCompanyFromPath } = useCompany();
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
     return pinnedState ? JSON.parse(pinnedState) : true;
@@ -28,6 +36,19 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isVisible = isPinned || isHovered;
+
+  // Get routes based on current company
+  const companyRoutes = useMemo(() => {
+    // Import both functions from pagesRoute.tsx
+    const {
+      SidebarData,
+      getCompanyRoutes,
+      flattenRoutes,
+    } = require("./pages/pagesRoute");
+
+    const routesForCompany = getCompanyRoutes(activeCompany, SidebarData);
+    return flattenRoutes(routesForCompany);
+  }, [activeCompany]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -120,21 +141,18 @@ const Layout: React.FC = () => {
       <main
         className={`
     flex justify-center w-full transition-all duration-300 ease-in-out
-    ${!isPDFRoute && location.pathname !== "/login" ? "my-[68px]" : ""} 
+    ${!isPDFRoute && location.pathname !== "/login" ? "mt-[84px]" : ""} 
     ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
   `}
       >
         <Routes>
+          {/* Login route */}
           <Route
             path="/login"
-            element={
-              isAuthenticated ? (
-                <Navigate to="/" replace />
-              ) : (
-                <Login />
-              )
-            }
+            element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
           />
+
+          {/* Home route */}
           <Route
             path="/"
             element={
@@ -143,6 +161,27 @@ const Layout: React.FC = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Company-specific home routes */}
+          <Route
+            path="/greentarget"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/greentarget" replace />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/jellypolly"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/jellypolly" replace />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* All routes from all companies */}
           {routes.map((route) => (
             <Route
               key={route.path}
@@ -169,18 +208,20 @@ const App: React.FC = () => {
           v7_relativeSplatPath: true,
         }}
       >
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              padding: "12px",
-              fontSize: "0.875rem",
-              lineHeight: "1.25rem",
-              fontWeight: 500,
-            },
-          }}
-        />
-        <Layout />
+        <CompanyProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                padding: "12px",
+                fontSize: "0.875rem",
+                lineHeight: "1.25rem",
+                fontWeight: 500,
+              },
+            }}
+          />
+          <Layout />
+        </CompanyProvider>
       </BrowserRouter>
     </AuthProvider>
   );

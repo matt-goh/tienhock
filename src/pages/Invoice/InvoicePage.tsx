@@ -21,8 +21,8 @@ import {
   IconRefresh,
 } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import InvoiceFilterMenu from "../../components/Invois/InvoiceFilterMenu";
-import FilterSummary from "../../components/Invois/FilterSummary";
+import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
+import FilterSummary from "../../components/Invoice/FilterSummary";
 import TableEditing from "../../components/Table/TableEditing";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
@@ -606,7 +606,7 @@ const InvoicePage: React.FC = () => {
   return (
     <div className="flex flex-col">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-white px-6 pt-4">
+      <div className="sticky top-0 z-20 bg-white px-6">
         <div className="flex flex-col space-y-4">
           {/* Title and Actions Row */}
           <div className={`flex items-center justify-between pl-[45px]`}>
@@ -796,7 +796,7 @@ const InvoicePage: React.FC = () => {
               onClearSelection={(fn) => {
                 clearSelectionRef.current = fn;
               }}
-              tableKey="invois"
+              tableKey="invoice"
             />
           ) : (
             <div className="py-16">

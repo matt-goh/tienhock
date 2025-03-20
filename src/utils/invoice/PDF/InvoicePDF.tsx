@@ -1,7 +1,7 @@
 import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, ProductItem } from "../../../types/types";
-import { COMPANY_INFO } from "../einvoice/companyInfo";
+import { TIENHOCK_INFO } from "../einvoice/companyInfo";
 
 interface InvoicePDFProps {
   invoices: InvoiceData[];
@@ -586,12 +586,12 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
             <View style={styles.header}>
               <Image src="../tienhock.png" style={styles.logo} />
               <View style={styles.headerTextContainer}>
-                <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
+                <Text style={styles.companyName}>{TIENHOCK_INFO.name}</Text>
                 <Text style={styles.companyDetails}>
-                  {COMPANY_INFO.address_pdf}
+                  {TIENHOCK_INFO.address_pdf}
                 </Text>
                 <Text style={styles.companyDetails}>
-                  Tel: {COMPANY_INFO.phone}
+                  Tel: {TIENHOCK_INFO.phone}
                 </Text>
               </View>
             </View>
