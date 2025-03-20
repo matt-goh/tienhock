@@ -1056,7 +1056,6 @@ export default function (pool, config) {
 
       if (eInvoiceResult.rows.length > 0 && config) {
         const uuid = eInvoiceResult.rows[0].uuid;
-        const apiClient = EInvoiceApiClientFactory.getInstance(config);
 
         // Try to cancel the e-invoice in MyInvois
         try {
