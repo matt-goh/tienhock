@@ -34,6 +34,14 @@ import agamaRouter from "./catalogue/entities/agama.js";
 import invoiceRouter from "./sales/invoices/invoices.js";
 import eInvoiceRouter from "./sales/invoices/e-invoices.js";
 
+// Green Target routes
+import greenTargetCustomerRouter from "./greentarget/customers.js";
+import greenTargetLocationRouter from "./greentarget/locations.js";
+import greenTargetDumpsterRouter from "./greentarget/dumpsters.js";
+import greenTargetRentalRouter from "./greentarget/rentals.js";
+import greenTargetInvoiceRouter from "./greentarget/invoices.js";
+import greenTargetPaymentRouter from "./greentarget/payments.js";
+
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./sales/invoices/invoicesJP.js";
 
@@ -84,6 +92,14 @@ export default function setupRoutes(app, pool) {
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
+
+  // Green Target routes
+  app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));
+  app.use("/greentarget/api/locations", greenTargetLocationRouter(pool));
+  app.use("/greentarget/api/dumpsters", greenTargetDumpsterRouter(pool));
+  app.use("/greentarget/api/rentals", greenTargetRentalRouter(pool));
+  app.use("/greentarget/api/invoices", greenTargetInvoiceRouter(pool));
+  app.use("/greentarget/api/payments", greenTargetPaymentRouter(pool));
 
   // Jellypolly routes
   app.use(
