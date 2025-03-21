@@ -11,8 +11,8 @@ import {
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
-import { api } from "../../../routes/utils/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 
 // Define the Customer interface based on your backend data structure
 interface Customer {
@@ -126,7 +126,7 @@ const CustomerListPage = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const data = await api.get("/greentarget/api/customers");
+      const data = await greenTargetApi.getCustomers();
       setCustomers(data);
       setError(null);
     } catch (err) {
@@ -145,9 +145,7 @@ const CustomerListPage = () => {
   const handleConfirmDelete = async () => {
     if (customerToDelete) {
       try {
-        await api.delete(
-          `/greentarget/api/customers/${customerToDelete.customer_id}`
-        );
+        await greenTargetApi.deleteCustomer(customerToDelete.customer_id);
         toast.success("Customer deactivated successfully");
 
         // Update the customer status locally instead of removing from the list
