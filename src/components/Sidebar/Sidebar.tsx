@@ -7,14 +7,12 @@ import React, {
   useCallback,
 } from "react";
 import {
-  getCompanySidebarData,
   SidebarItem,
   PopoverOption,
   getCompanyRoutes,
 } from "../../pages/pagesRoute";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
-import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
 import "../../index.css";
@@ -439,6 +437,29 @@ const Sidebar: React.FC<SidebarProps> = ({
         );
       }
 
+      // Check if the top-level item has both a path and component
+      if (item.path && item.component) {
+        // Render as a clickable button
+        return (
+          <SidebarButton
+            key={item.name}
+            name={item.name}
+            icon={renderIcon(item.icon)}
+            onClick={() => handleToggle(item.name)}
+            isOpen={openItems.includes(item.name)}
+            path={item.path} // Add the path
+            onNavigate={() => setLastClickedSource("regular")} // Add navigation callback
+          >
+            {openItems.includes(item.name) && item.subItems && (
+              <ul className="mt-1.5 space-y-1.5">
+                {item.subItems.map(renderSidebarOption)}
+              </ul>
+            )}
+          </SidebarButton>
+        );
+      }
+
+      // For traditional dropdown categories (no path/component)
       if (item.subItems) {
         return (
           <SidebarButton
@@ -450,9 +471,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             {openItems.includes(item.name) && (
               <ul className="mt-1.5 space-y-1.5">
-                {item.name === "Payroll"
-                  ? renderPayrollItems(item.subItems)
-                  : renderSubItems(item.subItems)}
+                {renderSubItems(item.subItems)}
               </ul>
             )}
           </SidebarButton>
@@ -461,25 +480,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         return renderSidebarOption(item);
       }
     });
-  };
-
-  const renderPayrollItems = (items: SidebarItem[]) => {
-    return items.map((item) => (
-      <SidebarSubButton
-        key={item.name}
-        name={item.name}
-        icon={renderIcon(item.icon)}
-        isOpen={openPayrollOptions.includes(item.name.toLowerCase())}
-        onToggle={() => handlePayrollToggle(item.name.toLowerCase())}
-      >
-        {openPayrollOptions.includes(item.name.toLowerCase()) &&
-          item.subItems && (
-            <ul className="mt-1.5 space-y-1">
-              {item.subItems.map(renderSidebarOption)}
-            </ul>
-          )}
-      </SidebarSubButton>
-    ));
   };
 
   const renderSubItems = (items: SidebarItem[]) => {
