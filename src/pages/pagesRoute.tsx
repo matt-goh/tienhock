@@ -3,6 +3,7 @@ import {
   IconBox,
   IconListDetails,
   IconReportAnalytics,
+  IconUsers,
 } from "@tabler/icons-react";
 import { Icon } from "@tabler/icons-react";
 import { Company } from "../contexts/CompanyContext";
@@ -28,6 +29,8 @@ import JobPage from "./Catalogue/JobPage";
 import TaxPage from "./Catalogue/TaxPage";
 import InvoicePageJP from "./Invoice/InvoicePageJP";
 import InvoiceDetailsPageJP from "./Invoice/InvoiceDetailsPageJP";
+import GreenTargetCustomerListPage from "./GreenTarget/Customers/CustomerListPage";
+import GreenTargetCustomerFormPage from "./GreenTarget/Customers/CustomerFormPage";
 
 export interface PopoverOption {
   name: string;
@@ -285,13 +288,20 @@ export const TienHockSidebarData: SidebarItem[] = [
 
 export const GreenTargetSidebarData: SidebarItem[] = [
   {
-    name: "Sales",
-    icon: IconReportAnalytics,
+    name: "Customers",
+    icon: IconUsers,
+    path: "/customers",
+    component: GreenTargetCustomerListPage,
     subItems: [
       {
-        name: "Orders",
-        path: "/sales/orders",
-        component: () => <div>Green Target Orders</div>, // Placeholder component
+        name: "Add Customer",
+        path: "/customers/new",
+        component: GreenTargetCustomerFormPage,
+      },
+      {
+        name: "Edit Customer",
+        path: "/customers/:id",
+        component: GreenTargetCustomerFormPage,
       },
     ],
   },
