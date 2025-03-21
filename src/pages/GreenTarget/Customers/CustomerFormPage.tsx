@@ -34,13 +34,13 @@ const CustomerFormPage: React.FC = () => {
     phone_number: "",
     status: "active",
   });
-  
+
   const [initialFormData, setInitialFormData] = useState<Customer>({
     name: "",
     phone_number: "",
     status: "active",
   });
-  
+
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
   const [newLocation, setNewLocation] = useState("");
   const [isFormChanged, setIsFormChanged] = useState(false);
@@ -56,7 +56,12 @@ const CustomerFormPage: React.FC = () => {
   }, [id, isEditMode]);
 
   useEffect(() => {
-    const hasChanged = JSON.stringify({...formData, locations}) !== JSON.stringify({...initialFormData, locations: initialFormData.locations || []});
+    const hasChanged =
+      JSON.stringify({ ...formData, locations }) !==
+      JSON.stringify({
+        ...initialFormData,
+        locations: initialFormData.locations || [],
+      });
     setIsFormChanged(hasChanged);
   }, [formData, locations, initialFormData]);
 
@@ -64,7 +69,7 @@ const CustomerFormPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await api.get(`/greentarget/api/customers/${customerId}`);
-      
+
       setFormData({
         customer_id: data.customer_id,
         name: data.name,
@@ -72,9 +77,9 @@ const CustomerFormPage: React.FC = () => {
         status: data.status || "active",
         last_activity_date: data.last_activity_date,
       });
-      
+
       setLocations(data.locations || []);
-      
+
       setInitialFormData({
         customer_id: data.customer_id,
         name: data.name,
@@ -83,7 +88,7 @@ const CustomerFormPage: React.FC = () => {
         last_activity_date: data.last_activity_date,
         locations: data.locations || [],
       });
-      
+
       setError(null);
     } catch (err) {
       setError("Failed to fetch customer details. Please try again later.");
@@ -150,11 +155,14 @@ const CustomerFormPage: React.FC = () => {
 
       if (isEditMode && formData.customer_id) {
         // Update existing customer
-        customerResponse = await api.put(`/greentarget/api/customers/${formData.customer_id}`, {
-          name: formData.name,
-          phone_number: formData.phone_number,
-          status: formData.status,
-        });
+        customerResponse = await api.put(
+          `/greentarget/api/customers/${formData.customer_id}`,
+          {
+            name: formData.name,
+            phone_number: formData.phone_number,
+            status: formData.status,
+          }
+        );
       } else {
         // Create new customer
         customerResponse = await api.post("/greentarget/api/customers", {
@@ -171,9 +179,12 @@ const CustomerFormPage: React.FC = () => {
         for (const location of locations) {
           if (location.location_id) {
             // Update existing location
-            await api.put(`/greentarget/api/locations/${location.location_id}`, {
-              address: location.address,
-            });
+            await api.put(
+              `/greentarget/api/locations/${location.location_id}`,
+              {
+                address: location.address,
+              }
+            );
           } else {
             // Add new location
             await api.post("/greentarget/api/locations", {
@@ -188,7 +199,9 @@ const CustomerFormPage: React.FC = () => {
         // For simplicity, not implementing this now
       }
 
-      toast.success(`Customer ${isEditMode ? "updated" : "created"} successfully!`);
+      toast.success(
+        `Customer ${isEditMode ? "updated" : "created"} successfully!`
+      );
       navigate("/greentarget/customers");
     } catch (error) {
       if (error instanceof Error) {
@@ -201,7 +214,11 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
-  const renderInput = (name: keyof Customer, label: string, type: string = "text") => (
+  const renderInput = (
+    name: keyof Customer,
+    label: string,
+    type: string = "text"
+  ) => (
     <FormInput
       name={name}
       label={label}
@@ -243,11 +260,13 @@ const CustomerFormPage: React.FC = () => {
               {renderInput("name", "Customer Name")}
               {renderInput("phone_number", "Phone Number", "tel")}
             </div>
-            
+
             {isEditMode && (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-default-700">Status</label>
+                  <label className="text-sm font-medium text-default-700">
+                    Status
+                  </label>
                   <div className="flex space-x-4">
                     <label className="inline-flex items-center">
                       <input
@@ -273,22 +292,26 @@ const CustomerFormPage: React.FC = () => {
                     </label>
                   </div>
                 </div>
-                
+
                 {formData.last_activity_date && (
                   <div>
-                    <label className="block text-sm font-medium text-default-700">Last Activity</label>
+                    <label className="block text-sm font-medium text-default-700">
+                      Last Activity
+                    </label>
                     <div className="mt-1 py-2">
-                      {new Date(formData.last_activity_date).toLocaleDateString()}
+                      {new Date(
+                        formData.last_activity_date
+                      ).toLocaleDateString()}
                     </div>
                   </div>
                 )}
               </div>
             )}
-            
+
             {/* Locations Section */}
             <div className="border-t pt-6 mt-6">
               <h2 className="text-lg font-medium mb-4">Customer Locations</h2>
-              
+
               <div className="mb-4">
                 <div className="flex space-x-2">
                   <input
@@ -307,11 +330,14 @@ const CustomerFormPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              
+
               {locations.length > 0 ? (
                 <div className="space-y-2">
                   {locations.map((location, index) => (
-                    <div key={index} className="flex justify-between items-center bg-default-50 p-3 rounded-md">
+                    <div
+                      key={index}
+                      className="flex justify-between items-center bg-default-50 p-3 rounded-md"
+                    >
                       <span>{location.address}</span>
                       <button
                         type="button"
@@ -324,11 +350,14 @@ const CustomerFormPage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-default-500 italic">No locations added yet. Add at least one location for this customer.</p>
+                <p className="text-default-500 italic">
+                  No locations added yet. Add at least one location for this
+                  customer.
+                </p>
               )}
             </div>
           </div>
-          
+
           <div className="mt-8 py-3 text-right">
             <Button
               type="submit"
@@ -341,7 +370,7 @@ const CustomerFormPage: React.FC = () => {
           </div>
         </form>
       </div>
-      
+
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
