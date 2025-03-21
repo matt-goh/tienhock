@@ -89,7 +89,8 @@ const InfoBox: React.FC = () => (
         </p>
         <p className="text-sm text-amber-700">
           1. TIN number and ID Number must be assigned to the involved
-          customer(s) in catalogue.
+          customer(s) in catalogue. <br />
+          2. Only Invoices within the last 2 days can be submitted.
         </p>
       </div>
     </div>
