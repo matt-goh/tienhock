@@ -7,16 +7,23 @@ export default function (pool) {
   // Get all customers
   router.get("/", async (req, res) => {
     try {
+      const { salesmenOnly } = req.query;
+
+      // Modified query to include active rental information through a subquery
       const query = `
         SELECT 
-          customer_id, 
-          name, 
-          phone_number, 
-          last_activity_date, 
-          status
-        FROM greentarget.customers 
-        ORDER BY name
+          c.customer_id, 
+          c.name, 
+          c.phone_number, 
+          c.last_activity_date,
+          EXISTS (
+            SELECT 1 FROM greentarget.rentals r 
+            WHERE r.customer_id = c.customer_id AND r.date_picked IS NULL
+          ) as has_active_rental
+        FROM greentarget.customers c
+        ORDER BY c.name
       `;
+
       const result = await pool.query(query);
       res.json(result.rows);
     } catch (error) {
@@ -121,30 +128,68 @@ export default function (pool) {
   // Delete a customer (soft delete by setting status to inactive)
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
+    const client = await pool.connect();
 
     try {
-      const query = `
-        UPDATE greentarget.customers
-        SET status = 'inactive'
-        WHERE customer_id = $1
-        RETURNING *
-      `;
-      const result = await pool.query(query, [id]);
+      await client.query("BEGIN");
+
+      // First check if customer has active rentals
+      const activeRentalsCheck = await client.query(
+        "SELECT COUNT(*) FROM greentarget.rentals WHERE customer_id = $1 AND date_picked IS NULL",
+        [id]
+      );
+
+      if (parseInt(activeRentalsCheck.rows[0].count) > 0) {
+        return res.status(400).json({
+          message: "Cannot delete customer: they have active rentals",
+        });
+      }
+
+      // Then check if customer has any past rental history
+      const historyCheck = await client.query(
+        "SELECT COUNT(*) FROM greentarget.rentals WHERE customer_id = $1",
+        [id]
+      );
+
+      // Delete locations associated with this customer
+      await client.query(
+        "DELETE FROM greentarget.locations WHERE customer_id = $1",
+        [id]
+      );
+
+      // Delete the customer
+      const query =
+        "DELETE FROM greentarget.customers WHERE customer_id = $1 RETURNING *";
+      const result = await client.query(query, [id]);
 
       if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Customer not found" });
       }
 
+      await client.query("COMMIT");
       res.json({
-        message: "Customer deactivated successfully",
+        message: "Customer deleted successfully",
         customer: result.rows[0],
       });
     } catch (error) {
-      console.error("Error deactivating Green Target customer:", error);
+      await client.query("ROLLBACK");
+      console.error("Error deleting customer:", error);
+
+      // Check for foreign key constraint violation
+      if (error.code === "23503") {
+        return res.status(400).json({
+          message:
+            "Cannot delete customer: they have related records in other tables",
+        });
+      }
+
       res.status(500).json({
-        message: "Error deactivating customer",
+        message: "Error deleting customer",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 

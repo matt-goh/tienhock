@@ -121,7 +121,6 @@ const EInvoiceHistoryPage: React.FC = () => {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState(getInitialDates());
-  const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [einvoiceToDelete, setEinvoiceToDelete] = useState<EInvoice | null>(
     null

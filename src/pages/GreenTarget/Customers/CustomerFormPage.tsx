@@ -8,6 +8,12 @@ import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import {
+  IconCalendarEvent,
+  IconMap,
+  IconMapPin,
+  IconTrash,
+} from "@tabler/icons-react";
 
 interface CustomerLocation {
   location_id?: number;
@@ -259,46 +265,74 @@ const CustomerFormPage: React.FC = () => {
             </div>
 
             {isEditMode && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mt-6">
+                <div className="space-y-3">
                   <label className="text-sm font-medium text-default-700">
                     Status
                   </label>
-                  <div className="flex space-x-4">
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="active"
-                        checked={formData.status === "active"}
-                        onChange={handleInputChange}
-                        className="mr-2"
-                      />
-                      Active
-                    </label>
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="inactive"
-                        checked={formData.status === "inactive"}
-                        onChange={handleInputChange}
-                        className="mr-2"
-                      />
-                      Inactive
-                    </label>
+                  <div className="flex p-1 bg-default-100 rounded-lg w-fit">
+                    <button
+                      type="button"
+                      className={`px-4 py-2 rounded-lg transition-colors duration-200 ${
+                        formData.status === "active"
+                          ? "bg-white text-green-600 font-medium shadow-sm"
+                          : "text-default-600 hover:text-default-800"
+                      }`}
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, status: "active" }))
+                      }
+                    >
+                      <span className="flex items-center">
+                        {formData.status === "active" && (
+                          <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
+                        )}
+                        Active
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-4 py-2 rounded-lg transition-colors duration-200 ${
+                        formData.status === "inactive"
+                          ? "bg-white text-rose-600 font-medium shadow-sm"
+                          : "text-default-600 hover:text-default-800"
+                      }`}
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, status: "inactive" }))
+                      }
+                    >
+                      <span className="flex items-center">
+                        {formData.status === "inactive" && (
+                          <span className="h-2 w-2 bg-rose-500 rounded-full mr-2"></span>
+                        )}
+                        Inactive
+                      </span>
+                    </button>
                   </div>
                 </div>
 
                 {formData.last_activity_date && (
-                  <div>
+                  <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700">
                       Last Activity
                     </label>
-                    <div className="mt-1 py-2">
-                      {new Date(
-                        formData.last_activity_date
-                      ).toLocaleDateString()}
+                    <div className="flex items-center bg-default-50 px-4 py-2 rounded-lg border border-default-200">
+                      <span className="flex h-8 w-8 items-center justify-center bg-blue-100 text-blue-600 rounded-full mr-3">
+                        <IconCalendarEvent size={16} stroke={2} />
+                      </span>
+                      <div>
+                        <div className="font-medium">
+                          {new Date(
+                            formData.last_activity_date
+                          ).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </div>
+                        <div className="text-xs text-default-500">
+                          Last recorded activity
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -309,48 +343,67 @@ const CustomerFormPage: React.FC = () => {
             <div className="border-t pt-6 mt-6">
               <h2 className="text-lg font-medium mb-4">Customer Locations</h2>
 
-              <div className="mb-4">
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newLocation}
-                    onChange={(e) => setNewLocation(e.target.value)}
-                    placeholder="Enter location address"
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                  />
+              <div className="mb-6">
+                <div className="flex space-x-2 border border-default-300 rounded-lg p-2 bg-white">
+                  <div className="flex-grow relative">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-default-400">
+                      <IconMapPin size={18} />
+                    </span>
+                    <input
+                      type="text"
+                      value={newLocation}
+                      onChange={(e) => setNewLocation(e.target.value)}
+                      placeholder="Enter location address"
+                      className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none focus:ring-0"
+                    />
+                  </div>
                   <Button
                     type="button"
                     onClick={handleAddLocation}
-                    variant="outline"
+                    variant="default"
+                    color="sky"
                   >
-                    Add
+                    Add Location
                   </Button>
                 </div>
               </div>
 
               {locations.length > 0 ? (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {locations.map((location, index) => (
                     <div
                       key={index}
-                      className="flex justify-between items-center bg-default-50 p-3 rounded-md"
+                      className="flex justify-between items-center bg-white border border-default-200 p-4 rounded-lg hover:shadow-sm transition-shadow duration-200"
                     >
-                      <span>{location.address}</span>
+                      <div className="flex items-center">
+                        <span className="flex h-8 w-8 items-center justify-center bg-sky-100 text-sky-600 rounded-full mr-3">
+                          <IconMapPin size={16} />
+                        </span>
+                        <span className="font-medium">{location.address}</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveLocation(index)}
-                        className="text-rose-500 hover:text-rose-600"
+                        className="p-1.5 rounded-full text-default-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Remove location"
                       >
-                        Remove
+                        <IconTrash size={18} />
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-default-500 italic">
-                  No locations added yet. Add at least one location for this
-                  customer.
-                </p>
+                <div className="border-2 border-dashed border-default-200 rounded-lg p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-default-100">
+                    <IconMap size={24} className="text-default-600" />
+                  </div>
+                  <h3 className="mt-3 text-sm font-medium text-default-900">
+                    No locations
+                  </h3>
+                  <p className="mt-1 text-sm text-default-500">
+                    Add at least one location for this customer.
+                  </p>
+                </div>
               )}
             </div>
           </div>

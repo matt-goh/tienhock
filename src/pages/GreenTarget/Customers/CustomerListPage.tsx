@@ -7,6 +7,9 @@ import {
   IconChevronRight,
   IconPlus,
   IconTrash,
+  IconCheck,
+  IconSquare,
+  IconSquareCheckFilled,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -21,88 +24,8 @@ interface Customer {
   phone_number: string;
   last_activity_date: string;
   status: string;
+  has_active_rental: boolean;
 }
-
-const CustomerCard = ({
-  customer,
-  onDeleteClick,
-}: {
-  customer: Customer;
-  onDeleteClick: (customer: Customer) => void;
-}) => {
-  const navigate = useNavigate();
-  const [isCardHovered, setIsCardHovered] = useState(false);
-  const [isTrashHovered, setIsTrashHovered] = useState(false);
-
-  const handleClick = () => {
-    navigate(`/greentarget/customers/${customer.customer_id}`);
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onDeleteClick(customer);
-  };
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-
-  return (
-    <div
-      className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered
-          ? "bg-default-100 active:bg-default-200"
-          : ""
-      }`}
-      onClick={handleClick}
-      onMouseEnter={() => setIsCardHovered(true)}
-      onMouseLeave={() => setIsCardHovered(false)}
-    >
-      <div className="mb-2">
-        <h3 className="font-semibold">{customer.name}</h3>
-        <div className="text-sm text-default-500">
-          ID: {customer.customer_id}
-        </div>
-      </div>
-      <p className="text-sm">Phone: {customer.phone_number || "N/A"}</p>
-      <p className="text-sm">
-        Last Activity: {formatDate(customer.last_activity_date)}
-      </p>
-      <p className="text-sm">
-        Status:{" "}
-        <span
-          className={
-            customer.status === "active" ? "text-green-600" : "text-red-600"
-          }
-        >
-          {customer.status}
-        </span>
-      </p>
-      <div className="absolute inset-y-0 top-2 right-2">
-        <div className="relative w-8 h-8">
-          {isCardHovered && (
-            <button
-              onClick={handleDeleteClick}
-              onMouseEnter={() => setIsTrashHovered(true)}
-              onMouseLeave={() => setIsTrashHovered(false)}
-              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-default-100 active:bg-default-200 focus:outline-none"
-            >
-              <IconTrash
-                className="text-default-700 active:text-default-800"
-                stroke={1.5}
-                size={18}
-              />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const CustomerListPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -110,14 +33,14 @@ const CustomerListPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
-  const [showInactive, setShowInactive] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showInactive, setShowInactive] = useState(true);
   const navigate = useNavigate();
 
-  const ITEMS_PER_PAGE = 12;
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     fetchCustomers();
@@ -137,41 +60,49 @@ const CustomerListPage = () => {
     }
   };
 
-  const handleDeleteClick = (customer: Customer) => {
-    setCustomerToDelete(customer);
-    setIsDeleteDialogOpen(true);
-  };
-
   const handleConfirmDelete = async () => {
     if (customerToDelete) {
       try {
+        // Actually delete the customer from the database
         await greenTargetApi.deleteCustomer(customerToDelete.customer_id);
-        toast.success("Customer deactivated successfully");
 
-        // Update the customer status locally instead of removing from the list
+        // Remove from the local state immediately
         setCustomers(
-          customers.map((c) =>
-            c.customer_id === customerToDelete.customer_id
-              ? { ...c, status: "inactive" }
-              : c
+          customers.filter(
+            (c) => c.customer_id !== customerToDelete.customer_id
           )
         );
 
-        setIsDeleteDialogOpen(false);
+        toast.success("Customer deleted successfully");
+        setShowDeleteDialog(false);
         setCustomerToDelete(null);
       } catch (err) {
-        console.error("Error deactivating customer:", err);
-        toast.error("Failed to deactivate customer. Please try again.");
+        console.error("Error deleting customer:", err);
+        toast.error("Failed to delete customer. Please try again.");
       }
     }
   };
 
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
-      const matchesSearch = customer.name
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesStatus = showInactive ? true : customer.status === "active";
+      // Search in both name and phone number
+      const matchesSearch =
+        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (customer.phone_number &&
+          customer.phone_number
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()));
+
+      // Using has_active_rental for filtering active/inactive status
+      const matchesStatus = showInactive ? true : customer.has_active_rental;
+
       return matchesSearch && matchesStatus;
     });
   }, [customers, searchTerm, showInactive]);
@@ -297,12 +228,34 @@ const CustomerListPage = () => {
   }
 
   return (
-    <div className="relative w-full mx-20">
+    <div className="relative w-full mx-20 mb-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl text-default-700 font-bold">
           Customers ({filteredCustomers.length})
         </h1>
         <div className="flex space-x-3">
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => setShowInactive(!showInactive)}
+              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200 flex items-center"
+            >
+              {showInactive ? (
+                <IconSquareCheckFilled
+                  className="text-blue-600"
+                  width={20}
+                  height={20}
+                />
+              ) : (
+                <IconSquare
+                  className="text-default-400"
+                  width={20}
+                  height={20}
+                />
+              )}
+              <span className="ml-2 font-medium">Show Inactive</span>
+            </button>
+          </div>
           <div className="relative">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
@@ -315,16 +268,6 @@ const CustomerListPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-          </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="showInactive"
-              checked={showInactive}
-              onChange={() => setShowInactive(!showInactive)}
-              className="mr-2"
-            />
-            <label htmlFor="showInactive">Show Inactive</label>
           </div>
           <Button
             onClick={() => navigate("/greentarget/customers/new")}
@@ -341,14 +284,85 @@ const CustomerListPage = () => {
           <p className="text-default-500">No customers found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {paginatedCustomers.map((customer) => (
-            <CustomerCard
-              key={customer.customer_id}
-              customer={customer}
-              onDeleteClick={handleDeleteClick}
-            />
-          ))}
+        <div className="bg-white border border-default-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-default-200">
+              <thead className="bg-default-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Customer Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Phone Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Last Activity
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-default-200">
+                {paginatedCustomers.map((customer) => (
+                  <tr
+                    key={customer.customer_id}
+                    onClick={() =>
+                      navigate(`/greentarget/customers/${customer.customer_id}`)
+                    }
+                    className="hover:bg-default-50 cursor-pointer"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-default-900">
+                        {customer.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                      {customer.customer_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                      {customer.phone_number || "N/A"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                      {formatDate(customer.last_activity_date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          customer.has_active_rental
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {customer.has_active_rental ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteDialog(true);
+                          setCustomerToDelete(customer);
+                        }}
+                        variant="outline"
+                        color="rose"
+                        size="sm"
+                        icon={IconTrash}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -373,12 +387,13 @@ const CustomerListPage = () => {
       )}
 
       <ConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Deactivate Customer"
-        message={`Are you sure you want to deactivate ${customerToDelete?.name}? This will mark them as inactive but preserve their data.`}
-        confirmButtonText="Deactivate"
+        title="Delete Customer"
+        message={`Are you sure you want to remove ${customerToDelete?.name} from the system? This action cannot be undone.`}
+        confirmButtonText="Delete"
+        variant="danger"
       />
     </div>
   );
