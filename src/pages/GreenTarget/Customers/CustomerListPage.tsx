@@ -7,7 +7,6 @@ import {
   IconChevronRight,
   IconPlus,
   IconTrash,
-  IconCheck,
   IconSquare,
   IconSquareCheckFilled,
 } from "@tabler/icons-react";
@@ -17,13 +16,11 @@ import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 
-// Define the Customer interface based on your backend data structure
 interface Customer {
   customer_id: number;
   name: string;
   phone_number: string;
   last_activity_date: string;
-  status: string;
   has_active_rental: boolean;
 }
 

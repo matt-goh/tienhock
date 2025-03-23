@@ -7,8 +7,6 @@ export default function (pool) {
   // Get all customers
   router.get("/", async (req, res) => {
     try {
-      const { salesmenOnly } = req.query;
-
       // Modified query to include active rental information through a subquery
       const query = `
         SELECT 
@@ -70,7 +68,11 @@ export default function (pool) {
     try {
       const query = `
         SELECT c.*,
-          (SELECT json_agg(l.*) FROM greentarget.locations l WHERE l.customer_id = c.customer_id) as locations
+          (SELECT json_agg(l.*) FROM greentarget.locations l WHERE l.customer_id = c.customer_id) as locations,
+        EXISTS (
+          SELECT 1 FROM greentarget.rentals r 
+          WHERE r.customer_id = c.customer_id AND r.date_picked IS NULL
+        ) as has_active_rental
         FROM greentarget.customers c
         WHERE c.customer_id = $1
       `;
@@ -93,7 +95,7 @@ export default function (pool) {
   // Update a customer
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { name, phone_number, status } = req.body;
+    const { name, phone_number } = req.body;
 
     try {
       const query = `
@@ -101,12 +103,11 @@ export default function (pool) {
         SET 
           name = $1, 
           phone_number = $2,
-          status = $3,
           last_activity_date = CURRENT_DATE
-        WHERE customer_id = $4
+        WHERE customer_id = $3
         RETURNING *
       `;
-      const result = await pool.query(query, [name, phone_number, status, id]);
+      const result = await pool.query(query, [name, phone_number, id]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Customer not found" });
@@ -144,12 +145,6 @@ export default function (pool) {
           message: "Cannot delete customer: they have active rentals",
         });
       }
-
-      // Then check if customer has any past rental history
-      const historyCheck = await client.query(
-        "SELECT COUNT(*) FROM greentarget.rentals WHERE customer_id = $1",
-        [id]
-      );
 
       // Delete locations associated with this customer
       await client.query(

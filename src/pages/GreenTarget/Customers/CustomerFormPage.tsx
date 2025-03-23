@@ -8,12 +8,7 @@ import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import {
-  IconCalendarEvent,
-  IconMap,
-  IconMapPin,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconMap, IconMapPin, IconTrash } from "@tabler/icons-react";
 
 interface CustomerLocation {
   location_id?: number;
@@ -25,9 +20,9 @@ interface Customer {
   customer_id?: number;
   name: string;
   phone_number: string;
-  status: string;
   last_activity_date?: string;
   locations?: CustomerLocation[];
+  has_active_rental?: boolean;
 }
 
 const CustomerFormPage: React.FC = () => {
@@ -38,13 +33,11 @@ const CustomerFormPage: React.FC = () => {
   const [formData, setFormData] = useState<Customer>({
     name: "",
     phone_number: "",
-    status: "active",
   });
 
   const [initialFormData, setInitialFormData] = useState<Customer>({
     name: "",
     phone_number: "",
-    status: "active",
   });
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
@@ -54,6 +47,7 @@ const CustomerFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const [isLocationInputFocused, setIsLocationInputFocused] = useState(false);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -80,7 +74,6 @@ const CustomerFormPage: React.FC = () => {
         customer_id: data.customer_id,
         name: data.name,
         phone_number: data.phone_number || "",
-        status: data.status || "active",
         last_activity_date: data.last_activity_date,
       });
 
@@ -90,7 +83,6 @@ const CustomerFormPage: React.FC = () => {
         customer_id: data.customer_id,
         name: data.name,
         phone_number: data.phone_number || "",
-        status: data.status || "active",
         last_activity_date: data.last_activity_date,
         locations: data.locations || [],
       });
@@ -166,7 +158,6 @@ const CustomerFormPage: React.FC = () => {
           {
             name: formData.name,
             phone_number: formData.phone_number,
-            status: formData.status,
           }
         );
       } else {
@@ -247,15 +238,53 @@ const CustomerFormPage: React.FC = () => {
     <div className="container mx-auto px-4">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
-        <div className="pl-6">
-          <h1 className="text-xl font-semibold text-default-900">
-            {isEditMode ? "Edit Customer" : "Add New Customer"}
-          </h1>
-          <p className="mt-1 text-sm text-default-500">
-            {isEditMode
-              ? 'Edit customer information here. Click "Save" when you\'re done.'
-              : 'Enter new customer information here. Click "Save" when you\'re done.'}
-          </p>
+        <div className="justify-between flex px-6">
+          <div>
+            <h1 className="text-xl font-semibold text-default-900">
+              {isEditMode ? "Edit Customer" : "Add New Customer"}
+            </h1>
+            <p className="mt-1 text-sm text-default-500">
+              {isEditMode
+                ? 'Edit customer information here. Click "Save" when you\'re done.'
+                : 'Enter new customer information here. Click "Save" when you\'re done.'}
+            </p>
+          </div>
+          {isEditMode && (
+            <div className="space-y-2 text-right">
+              <div className="flex items-center space-x-2">
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    formData.has_active_rental
+                      ? "bg-green-100 text-green-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {formData.has_active_rental ? "Active" : "Inactive"}
+                </span>
+                <label className="text-sm font-medium text-default-700">
+                  Last Activity
+                </label>
+              </div>
+              <div>
+                {formData.last_activity_date ? (
+                  <span className="text-default-500">
+                    {new Date(formData.last_activity_date).toLocaleDateString(
+                      undefined,
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      }
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-default-500 italic">
+                    No activity recorded
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
@@ -264,97 +293,30 @@ const CustomerFormPage: React.FC = () => {
               {renderInput("phone_number", "Phone Number", "tel")}
             </div>
 
-            {isEditMode && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mt-6">
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-default-700">
-                    Status
-                  </label>
-                  <div className="flex p-1 bg-default-100 rounded-lg w-fit">
-                    <button
-                      type="button"
-                      className={`px-4 py-2 rounded-lg transition-colors duration-200 ${
-                        formData.status === "active"
-                          ? "bg-white text-green-600 font-medium shadow-sm"
-                          : "text-default-600 hover:text-default-800"
-                      }`}
-                      onClick={() =>
-                        setFormData((prev) => ({ ...prev, status: "active" }))
-                      }
-                    >
-                      <span className="flex items-center">
-                        {formData.status === "active" && (
-                          <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-                        )}
-                        Active
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-4 py-2 rounded-lg transition-colors duration-200 ${
-                        formData.status === "inactive"
-                          ? "bg-white text-rose-600 font-medium shadow-sm"
-                          : "text-default-600 hover:text-default-800"
-                      }`}
-                      onClick={() =>
-                        setFormData((prev) => ({ ...prev, status: "inactive" }))
-                      }
-                    >
-                      <span className="flex items-center">
-                        {formData.status === "inactive" && (
-                          <span className="h-2 w-2 bg-rose-500 rounded-full mr-2"></span>
-                        )}
-                        Inactive
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {formData.last_activity_date && (
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-default-700">
-                      Last Activity
-                    </label>
-                    <div className="flex items-center bg-default-50 px-4 py-2 rounded-lg border border-default-200">
-                      <span className="flex h-8 w-8 items-center justify-center bg-blue-100 text-blue-600 rounded-full mr-3">
-                        <IconCalendarEvent size={16} stroke={2} />
-                      </span>
-                      <div>
-                        <div className="font-medium">
-                          {new Date(
-                            formData.last_activity_date
-                          ).toLocaleDateString(undefined, {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
-                        </div>
-                        <div className="text-xs text-default-500">
-                          Last recorded activity
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Locations Section */}
             <div className="border-t pt-6 mt-6">
               <h2 className="text-lg font-medium mb-4">Customer Locations</h2>
 
               <div className="mb-6">
-                <div className="flex space-x-2 border border-default-300 rounded-lg p-2 bg-white">
+                <div
+                  className={`flex space-x-2 border rounded-lg p-1.5 ${
+                    isLocationInputFocused
+                      ? "border-default-500"
+                      : "border-default-300"
+                  }`}
+                >
                   <div className="flex-grow relative">
-                    <span className="absolute inset-y-0 left-3 flex items-center text-default-400">
+                    <span className="absolute inset-y-0 left-2 flex items-center text-default-400">
                       <IconMapPin size={18} />
                     </span>
                     <input
                       type="text"
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
+                      onFocus={() => setIsLocationInputFocused(true)}
+                      onBlur={() => setIsLocationInputFocused(false)}
                       placeholder="Enter location address"
-                      className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none focus:ring-0"
+                      className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none"
                     />
                   </div>
                   <Button
@@ -362,6 +324,7 @@ const CustomerFormPage: React.FC = () => {
                     onClick={handleAddLocation}
                     variant="default"
                     color="sky"
+                    size="sm"
                   >
                     Add Location
                   </Button>
