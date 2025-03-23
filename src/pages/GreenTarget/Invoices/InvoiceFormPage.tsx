@@ -1,13 +1,13 @@
 // src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
-import { FormInput } from "../../../components/FormComponents";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { api } from "../../../routes/utils/api";
 
 interface Customer {
   customer_id: number;
@@ -70,6 +70,8 @@ const InvoiceFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
+  const rentalData = location.state;
 
   // Check if form data has changed from initial state
   useEffect(() => {
@@ -106,9 +108,35 @@ const InvoiceFormPage: React.FC = () => {
     }));
   }, [formData.amount_before_tax]);
 
+  useEffect(() => {
+    if (rentalData && !isEditMode) {
+      // Pre-populate form with rental data
+      setFormData((prev) => ({
+        ...prev,
+        customer_id: rentalData.customer_id,
+        rental_id: rentalData.rental_id,
+        // Set a default amount - could be calculated based on rental duration
+        amount_before_tax: 500, // Default amount, adjust as needed
+      }));
+
+      // Set the selected rental
+      if (rentalData.rental_id) {
+        const rental = {
+          rental_id: rentalData.rental_id,
+          customer_id: rentalData.customer_id,
+          tong_no: rentalData.tong_no,
+          date_placed: rentalData.date_placed,
+          date_picked: rentalData.date_picked,
+          location_address: rentalData.location_address,
+        };
+        setSelectedRental(rental);
+      }
+    }
+  }, [rentalData, isEditMode]);
+
   const fetchCustomers = async () => {
     try {
-      const data = await api.get("/greentarget/api/customers");
+      const data = await greenTargetApi.getCustomers();
       // Filter to only active customers
       const activeCustomers = data.filter((c: any) => c.status === "active");
       setCustomers(activeCustomers);
@@ -156,7 +184,7 @@ const InvoiceFormPage: React.FC = () => {
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
       setLoading(true);
-      const data = await api.get(`/greentarget/api/invoices/${invoiceId}`);
+      const data = await greenTargetApi.getInvoice(invoiceId);
 
       if (!data.invoice) {
         throw new Error("Invalid invoice data returned from API");
@@ -347,14 +375,14 @@ const InvoiceFormPage: React.FC = () => {
       if (isEditMode && formData.invoice_id) {
         // Update existing invoice - not typically allowed for accounting records
         // but we'll include the code for completeness
-        response = await api.put(
-          `/greentarget/api/invoices/${formData.invoice_id}`,
+        response = await greenTargetApi.updateInvoice(
+          formData.invoice_id,
           invoiceData
         );
         toast.success("Invoice updated successfully");
       } else {
         // Create new invoice
-        response = await api.post("/greentarget/api/invoices", invoiceData);
+        response = await greenTargetApi.createInvoice(invoiceData);
         toast.success("Invoice created successfully");
       }
 

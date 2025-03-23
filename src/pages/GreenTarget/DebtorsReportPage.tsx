@@ -7,12 +7,11 @@ import {
   IconFilter,
   IconAlertCircle,
   IconPhone,
-  IconMail,
   IconFileInvoice,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
-import { api } from "../../routes/utils/api";
+import { greenTargetApi } from "../../routes/greentarget/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface Debtor {
@@ -44,7 +43,7 @@ const DebtorsReportPage: React.FC = () => {
   const fetchDebtors = async () => {
     try {
       setLoading(true);
-      const data = await api.get("/greentarget/api/payments/debtors");
+      const data = await greenTargetApi.getDebtorsReport();
       setDebtors(data);
       setError(null);
     } catch (err) {

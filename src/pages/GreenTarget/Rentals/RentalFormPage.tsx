@@ -5,10 +5,10 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
-import { FormInput } from "../../../components/FormComponents";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { IconCalendar, IconTruck } from "@tabler/icons-react";
+import { IconCalendar } from "@tabler/icons-react";
+import { api } from "../../../routes/utils/api";
 
 interface Customer {
   customer_id: number;
@@ -139,10 +139,7 @@ const RentalFormPage: React.FC = () => {
       setLoading(true);
 
       // Get rental data
-      const rentalsData = await api.get(
-        `/greentarget/api/rentals?rental_id=${rentalId}`
-      );
-      const rental = rentalsData.find((r: Rental) => r.rental_id === rentalId);
+      const rental = await greenTargetApi.getRental(rentalId);
 
       if (!rental) {
         throw new Error("Rental not found");
@@ -188,8 +185,8 @@ const RentalFormPage: React.FC = () => {
 
   const fetchCustomerLocations = async (customerId: number) => {
     try {
-      const locationsData = await api.get(
-        `/greentarget/api/locations?customer_id=${customerId}`
+      const locationsData = await greenTargetApi.getLocationsByCustomer(
+        customerId
       );
       setCustomerLocations(locationsData);
     } catch (err) {
@@ -275,7 +272,7 @@ const RentalFormPage: React.FC = () => {
     try {
       if (isEditMode && formData.rental_id) {
         // Update existing rental (usually just adding pickup date)
-        await api.put(`/greentarget/api/rentals/${formData.rental_id}`, {
+        await greenTargetApi.updateRental(formData.rental_id, {
           date_picked: formData.date_picked,
           remarks: formData.remarks,
         });
@@ -283,7 +280,7 @@ const RentalFormPage: React.FC = () => {
         toast.success("Rental updated successfully!");
       } else {
         // Create new rental
-        await api.post("/greentarget/api/rentals", {
+        await greenTargetApi.createRental({
           customer_id: formData.customer_id,
           location_id: formData.location_id,
           tong_no: formData.tong_no,

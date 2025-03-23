@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { IconPrinter, IconDownload } from "@tabler/icons-react";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 interface DeliveryOrderData {
@@ -38,9 +38,7 @@ const DeliveryOrderPage: React.FC = () => {
   const fetchDeliveryOrderData = async (rentalId: string) => {
     try {
       setLoading(true);
-      const data = await api.get(
-        `/greentarget/api/rentals/${rentalId}/delivery-order`
-      );
+      const data = await greenTargetApi.generateDeliveryOrder(rentalId);
 
       if (data && data.deliveryOrderData) {
         setDeliveryOrderData(data.deliveryOrderData);

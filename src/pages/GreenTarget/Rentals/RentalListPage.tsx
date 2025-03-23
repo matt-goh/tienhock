@@ -9,9 +9,8 @@ import {
   IconFileInvoice,
   IconReceipt,
 } from "@tabler/icons-react";
-import { toast } from "react-hot-toast";
 import Button from "../../../components/Button";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 // Define the Rental interface
@@ -170,7 +169,7 @@ const RentalListPage = () => {
   const fetchRentals = async () => {
     try {
       setLoading(true);
-      const data = await api.get("/greentarget/api/rentals");
+      const data = await greenTargetApi.getRentals();
       setRentals(data);
       setError(null);
     } catch (err) {
@@ -182,12 +181,23 @@ const RentalListPage = () => {
   };
 
   const handleGenerateDeliveryOrder = (rental: Rental) => {
-    navigate(`/greentarget/rentals/${rental.rental_id}/delivery-order`);
+    navigate(`/greentarget/rentals/${rental.rental_id}/delivery-order`, {
+      state: { rentalData: rental }, // Pass rental data to avoid extra API call
+    });
   };
 
   const handleCreateInvoice = (rental: Rental) => {
     // Redirect to invoice creation page with rental ID
-    navigate(`/greentarget/invoices/new?rental_id=${rental.rental_id}`);
+    navigate(`/greentarget/invoices/new`, {
+      state: {
+        rental_id: rental.rental_id,
+        customer_id: rental.customer_id,
+        customer_name: rental.customer_name,
+        tong_no: rental.tong_no,
+        date_placed: rental.date_placed,
+        date_picked: rental.date_picked,
+      },
+    });
   };
 
   const filteredRentals = useMemo(() => {

@@ -5,8 +5,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
-import { FormInput } from "../../../components/FormComponents";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 interface Dumpster {
@@ -50,7 +49,7 @@ const DumpsterFormPage: React.FC = () => {
   const fetchDumpsterDetails = async (dumpsterId: string) => {
     try {
       setLoading(true);
-      const dumpsters = await api.get("/greentarget/api/dumpsters");
+      const dumpsters = await greenTargetApi.getDumpsters();
       const dumpster = dumpsters.find(
         (d: Dumpster) => d.tong_no === dumpsterId
       );
@@ -119,13 +118,13 @@ const DumpsterFormPage: React.FC = () => {
     try {
       if (isEditMode) {
         // Update existing dumpster
-        await api.put(`/greentarget/api/dumpsters/${encodeURIComponent(id!)}`, {
+        await greenTargetApi.updateDumpster(id!, {
           status: formData.status,
         });
         toast.success("Dumpster updated successfully!");
       } else {
         // Create new dumpster
-        await api.post("/greentarget/api/dumpsters", {
+        await greenTargetApi.createDumpster({
           tong_no: formData.tong_no,
           status: formData.status,
         });

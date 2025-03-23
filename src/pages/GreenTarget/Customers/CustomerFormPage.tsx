@@ -6,7 +6,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 interface CustomerLocation {
@@ -68,7 +68,7 @@ const CustomerFormPage: React.FC = () => {
   const fetchCustomerDetails = async (customerId: number) => {
     try {
       setLoading(true);
-      const data = await api.get(`/greentarget/api/customers/${customerId}`);
+      const data = await greenTargetApi.getCustomer(customerId);
 
       setFormData({
         customer_id: data.customer_id,
@@ -155,8 +155,8 @@ const CustomerFormPage: React.FC = () => {
 
       if (isEditMode && formData.customer_id) {
         // Update existing customer
-        customerResponse = await api.put(
-          `/greentarget/api/customers/${formData.customer_id}`,
+        customerResponse = await greenTargetApi.updateCustomer(
+          formData.customer_id,
           {
             name: formData.name,
             phone_number: formData.phone_number,
@@ -165,7 +165,7 @@ const CustomerFormPage: React.FC = () => {
         );
       } else {
         // Create new customer
-        customerResponse = await api.post("/greentarget/api/customers", {
+        customerResponse = await greenTargetApi.createCustomer({
           name: formData.name,
           phone_number: formData.phone_number,
         });
@@ -179,15 +179,12 @@ const CustomerFormPage: React.FC = () => {
         for (const location of locations) {
           if (location.location_id) {
             // Update existing location
-            await api.put(
-              `/greentarget/api/locations/${location.location_id}`,
-              {
-                address: location.address,
-              }
-            );
+            await greenTargetApi.updateLocation(location.location_id, {
+              address: location.address,
+            });
           } else {
             // Add new location
-            await api.post("/greentarget/api/locations", {
+            await greenTargetApi.createLocation({
               customer_id: customerId,
               address: location.address,
             });

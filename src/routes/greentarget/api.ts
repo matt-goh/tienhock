@@ -54,6 +54,6 @@ export const greenTargetApi = {
     api.put(`/greentarget/api/locations/${id}`, data),
   deleteLocation: (id: any) => api.delete(`/greentarget/api/locations/${id}`),
 
-  // Report endpoints
-  getDebtorsReport: () => api.get("/greentarget/api/reports/debtors"),
+  // Debtors endpoints
+  getDebtorsReport: () => api.get("/greentarget/api/payments/debtors"),
 };

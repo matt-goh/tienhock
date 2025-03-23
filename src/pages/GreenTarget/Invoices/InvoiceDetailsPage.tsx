@@ -5,12 +5,11 @@ import {
   IconFileInvoice,
   IconCash,
   IconPrinter,
-  IconEdit,
   IconChevronLeft,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 interface Payment {
@@ -81,7 +80,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
       setLoading(true);
-      const data = await api.get(`/greentarget/api/invoices/${invoiceId}`);
+      const data = await greenTargetApi.getInvoice(invoiceId);
 
       if (!data.invoice) {
         throw new Error("Invoice not found");
@@ -163,7 +162,7 @@ const InvoiceDetailsPage: React.FC = () => {
         ...paymentFormData,
       };
 
-      const response = await api.post("/greentarget/api/payments", paymentData);
+      const response = await greenTargetApi.createPayment(paymentData);
 
       toast.success("Payment processed successfully");
 
@@ -506,6 +505,18 @@ const InvoiceDetailsPage: React.FC = () => {
                   <td className="py-2 text-sm font-medium text-default-900">
                     {invoice.customer_name}
                   </td>
+                  {invoice.customer_id && (
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/greentarget/customers/${invoice.customer_id}`
+                        )
+                      }
+                      className="text-sky-600 hover:text-sky-800 text-sm ml-2"
+                    >
+                      View Customer
+                    </button>
+                  )}
                 </tr>
               </tbody>
             </table>
