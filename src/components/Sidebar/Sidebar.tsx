@@ -43,10 +43,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [SidebarData, setSidebarData] = useState<SidebarItem[]>([]);
   const [openItems, setOpenItems] = useState<string[]>([]);
-  const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
-    "production",
-    "pinjam",
-  ]);
   const [hoveredRegularOption, setHoveredRegularOption] = useState<
     string | null
   >(null);
@@ -264,14 +260,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       prevItems.includes(item)
         ? prevItems.filter((i) => i !== item)
         : [...prevItems, item]
-    );
-  };
-
-  const handlePayrollToggle = (option: string) => {
-    setOpenPayrollOptions((prevOptions) =>
-      prevOptions.includes(option)
-        ? prevOptions.filter((i) => i !== option)
-        : [...prevOptions, option]
     );
   };
 
@@ -539,16 +527,26 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="flex justify-end pr-3">
-          <button
-            onClick={() => setIsPinned(!isPinned)}
-            className="flex items-center justify-center p-2 h-[34px] w-[34px] rounded-lg hover:bg-default-200/90 active:bg-default-300/90 transition-colors duration-200"
-          >
-            {isPinned ? (
-              <IconArrowBarToLeft stroke={1.75} size={20} />
-            ) : (
-              <IconArrowBarToRight stroke={1.75} size={20} />
-            )}
-          </button>
+          <div className="flex justify-end pr-3">
+            <button
+              onClick={() => setIsPinned(!isPinned)}
+              className="flex items-center justify-center p-2 h-[34px] w-[34px] rounded-lg hover:bg-default-200/90 active:bg-default-300/90 transition-all duration-300 ease-in-out hover:scale-105 active:scale-95"
+            >
+              {isPinned ? (
+                <IconArrowBarToLeft
+                  stroke={1.75}
+                  size={20}
+                  className="transition-opacity duration-200"
+                />
+              ) : (
+                <IconArrowBarToRight
+                  stroke={1.75}
+                  size={20}
+                  className="transition-opacity duration-200"
+                />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
