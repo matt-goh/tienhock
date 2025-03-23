@@ -4,56 +4,56 @@ import { api } from "../utils/api";
 
 export const greenTargetApi = {
   // Customer endpoints
-  getCustomers: () => api.get("/greentarget/customers"),
-  getCustomer: (id: any) => api.get(`/greentarget/customers/${id}`),
-  createCustomer: (data: any) => api.post("/greentarget/customers", data),
+  getCustomers: () => api.get("/greentarget/api/customers"),
+  getCustomer: (id: any) => api.get(`/greentarget/api/customers/${id}`),
+  createCustomer: (data: any) => api.post("/greentarget/api/customers", data),
   updateCustomer: (id: any, data: any) =>
-    api.put(`/greentarget/customers/${id}`, data),
-  deleteCustomer: (id: any) => api.delete(`/greentarget/customers/${id}`),
+    api.put(`/greentarget/api/customers/${id}`, data),
+  deleteCustomer: (id: any) => api.delete(`/greentarget/api/customers/${id}`),
 
   // Dumpster endpoints
-  getDumpsters: () => api.get("/greentarget/dumpsters"),
-  getDumpster: (id: any) => api.get(`/greentarget/dumpsters/${id}`),
-  createDumpster: (data: any) => api.post("/greentarget/dumpsters", data),
+  getDumpsters: () => api.get("/greentarget/api/dumpsters"),
+  getDumpster: (id: any) => api.get(`/greentarget/api/dumpsters/${id}`),
+  createDumpster: (data: any) => api.post("/greentarget/api/dumpsters", data),
   updateDumpster: (id: any, data: any) =>
-    api.put(`/greentarget/dumpsters/${id}`, data),
-  deleteDumpster: (id: any) => api.delete(`/greentarget/dumpsters/${id}`),
+    api.put(`/greentarget/api/dumpsters/${id}`, data),
+  deleteDumpster: (id: any) => api.delete(`/greentarget/api/dumpsters/${id}`),
 
   // Rental endpoints
-  getRentals: () => api.get("/greentarget/rentals"),
-  getRental: (id: any) => api.get(`/greentarget/rentals/${id}`),
-  createRental: (data: any) => api.post("/greentarget/rentals", data),
+  getRentals: () => api.get("/greentarget/api/rentals"),
+  getRental: (id: any) => api.get(`/greentarget/api/rentals/${id}`),
+  createRental: (data: any) => api.post("/greentarget/api/rentals", data),
   updateRental: (id: any, data: any) =>
-    api.put(`/greentarget/rentals/${id}`, data),
-  deleteRental: (id: any) => api.delete(`/greentarget/rentals/${id}`),
+    api.put(`/greentarget/api/rentals/${id}`, data),
+  deleteRental: (id: any) => api.delete(`/greentarget/api/rentals/${id}`),
   generateDeliveryOrder: (rentalId: any) =>
-    api.get(`/greentarget/rentals/${rentalId}/do`),
+    api.get(`/greentarget/api/rentals/${rentalId}/do`),
 
   // Invoice endpoints
-  getInvoices: () => api.get("/greentarget/invoices"),
-  getInvoice: (id: any) => api.get(`/greentarget/invoices/${id}`),
-  createInvoice: (data: any) => api.post("/greentarget/invoices", data),
+  getInvoices: () => api.get("/greentarget/api/invoices"),
+  getInvoice: (id: any) => api.get(`/greentarget/api/invoices/${id}`),
+  createInvoice: (data: any) => api.post("/greentarget/api/invoices", data),
   updateInvoice: (id: any, data: any) =>
-    api.put(`/greentarget/invoices/${id}`, data),
-  deleteInvoice: (id: any) => api.delete(`/greentarget/invoices/${id}`),
+    api.put(`/greentarget/api/invoices/${id}`, data),
+  deleteInvoice: (id: any) => api.delete(`/greentarget/api/invoices/${id}`),
 
   // Payment endpoints
-  getPayments: () => api.get("/greentarget/payments"),
+  getPayments: () => api.get("/greentarget/api/payments"),
   getPaymentsByInvoice: (invoiceId: any) =>
-    api.get(`/greentarget/invoices/${invoiceId}/payments`),
-  createPayment: (data: any) => api.post("/greentarget/payments", data),
+    api.get(`/greentarget/api/invoices/${invoiceId}/payments`),
+  createPayment: (data: any) => api.post("/greentarget/api/payments", data),
   updatePayment: (id: any, data: any) =>
-    api.put(`/greentarget/payments/${id}`, data),
-  deletePayment: (id: any) => api.delete(`/greentarget/payments/${id}`),
+    api.put(`/greentarget/api/payments/${id}`, data),
+  deletePayment: (id: any) => api.delete(`/greentarget/api/payments/${id}`),
 
   // Location endpoints
   getLocationsByCustomer: (customerId: any) =>
-    api.get(`/greentarget/customers/${customerId}/locations`),
-  createLocation: (data: any) => api.post("/greentarget/locations", data),
+    api.get(`/greentarget/api/customers/${customerId}/locations`),
+  createLocation: (data: any) => api.post("/greentarget/api/locations", data),
   updateLocation: (id: any, data: any) =>
-    api.put(`/greentarget/locations/${id}`, data),
-  deleteLocation: (id: any) => api.delete(`/greentarget/locations/${id}`),
+    api.put(`/greentarget/api/locations/${id}`, data),
+  deleteLocation: (id: any) => api.delete(`/greentarget/api/locations/${id}`),
 
   // Report endpoints
-  getDebtorsReport: () => api.get("/greentarget/reports/debtors"),
+  getDebtorsReport: () => api.get("/greentarget/api/reports/debtors"),
 };
