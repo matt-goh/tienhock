@@ -13,8 +13,9 @@ import {
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { api } from "../../../routes/utils/api";
 
 interface Invoice {
   invoice_id: number;

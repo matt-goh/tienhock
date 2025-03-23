@@ -11,7 +11,7 @@ import {
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
-import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 // Define the Dumpster interface
@@ -122,7 +122,7 @@ const DumpsterListPage = () => {
   const fetchDumpsters = async () => {
     try {
       setLoading(true);
-      const data = await api.get("/greentarget/api/dumpsters");
+      const data = await greenTargetApi.getDumpsters();
       setDumpsters(data);
       setError(null);
     } catch (err) {
@@ -141,11 +141,7 @@ const DumpsterListPage = () => {
   const handleConfirmDelete = async () => {
     if (dumpsterToDelete) {
       try {
-        await api.delete(
-          `/greentarget/api/dumpsters/${encodeURIComponent(
-            dumpsterToDelete.tong_no
-          )}`
-        );
+        await greenTargetApi.deleteDumpster(dumpsterToDelete.tong_no);
 
         setDumpsters(
           dumpsters.filter((d) => d.tong_no !== dumpsterToDelete.tong_no)
