@@ -65,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     new Set()
   );
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const { user, isLoading } = useAuth();
   const { activeCompany } = useCompany();
   const location = useLocation();
@@ -353,6 +354,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (!isPinned) {
       setIsHovered(true);
     }
+    setIsSidebarHovered(true);
   };
 
   const handleSidebarMouseLeave = () => {
@@ -361,6 +363,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         setIsHovered(false);
       }, 300);
     }
+    setIsSidebarHovered(false);
   };
 
   const renderIcon = (IconComponent?: SidebarItem["icon"]) => {
@@ -536,7 +539,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <IconArrowBarToLeft
                   stroke={1.75}
                   size={20}
-                  className="transition-opacity duration-200"
+                  className={`transition-opacity duration-200 ${
+                    isSidebarHovered ? "opacity-100" : "opacity-0"
+                  }`}
                 />
               ) : (
                 <IconArrowBarToRight

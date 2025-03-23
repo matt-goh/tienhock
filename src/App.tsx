@@ -10,13 +10,12 @@ import React, {
   useState,
   useRef,
   useCallback,
-  useMemo,
 } from "react";
 import { Toaster } from "react-hot-toast";
 import { routes } from "./pages/pagesRoute";
 import { IconDeviceDesktop } from "@tabler/icons-react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
+import { CompanyProvider } from "./contexts/CompanyContext";
 import Login from "./pages/Auth/Login";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Sidebar from "./components/Sidebar/Sidebar";
@@ -25,7 +24,6 @@ import LoadingSpinner from "./components/LoadingSpinner";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  const { activeCompany, getCompanyFromPath } = useCompany();
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
     return pinnedState ? JSON.parse(pinnedState) : true;
@@ -36,19 +34,6 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isVisible = isPinned || isHovered;
-
-  // Get routes based on current company
-  const companyRoutes = useMemo(() => {
-    // Import both functions from pagesRoute.tsx
-    const {
-      SidebarData,
-      getCompanyRoutes,
-      flattenRoutes,
-    } = require("./pages/pagesRoute");
-
-    const routesForCompany = getCompanyRoutes(activeCompany, SidebarData);
-    return flattenRoutes(routesForCompany);
-  }, [activeCompany]);
 
   useEffect(() => {
     const handleResize = () => {
