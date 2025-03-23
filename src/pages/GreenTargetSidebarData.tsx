@@ -75,9 +75,9 @@ export const GreenTargetSidebarData: SidebarItem[] = [
     ],
   },
   {
-    name: "Reports",
+    name: "Debtors",
     icon: IconReportAnalytics,
-    path: "/debtors", // Make reports go directly to debtors for now
+    path: "/debtors",
     component: GreenTargetDebtorsReportPage,
   },
   {
