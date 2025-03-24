@@ -7,8 +7,14 @@ import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { IconCalendar } from "@tabler/icons-react";
+import { IconCalendar, IconChevronDown, IconCheck } from "@tabler/icons-react";
 import { api } from "../../../routes/utils/api";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
 
 interface Customer {
   customer_id: number;
@@ -97,7 +103,7 @@ const RentalFormPage: React.FC = () => {
       try {
         const [customersData, dumpstersData] = await Promise.all([
           api.get("/greentarget/api/customers"),
-          api.get("/greentarget/api/dumpsters?status=available"),
+          api.get("/greentarget/api/dumpsters?status=Available"),
         ]);
 
         setCustomers(customersData);
@@ -347,24 +353,70 @@ const RentalFormPage: React.FC = () => {
                   >
                     Customer
                   </label>
-                  <select
-                    id="customer_id"
-                    name="customer_id"
+                  <Listbox
                     value={formData.customer_id}
-                    onChange={handleInputChange}
+                    onChange={(value) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        customer_id: value,
+                        location_id: null,
+                      }));
+                    }}
                     disabled={isEditMode}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
                   >
-                    <option value="">Select Customer</option>
-                    {customers.map((customer) => (
-                      <option
-                        key={customer.customer_id}
-                        value={customer.customer_id}
-                      >
-                        {customer.name}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="relative">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
+                        <span className="block truncate">
+                          {formData.customer_id
+                            ? customers.find(
+                                (c) => c.customer_id === formData.customer_id
+                              )?.name || "Select Customer"
+                            : "Select Customer"}
+                        </span>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <IconChevronDown
+                            className="h-5 w-5 text-default-400"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                        {customers.map((customer) => (
+                          <ListboxOption
+                            key={customer.customer_id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                active
+                                  ? "bg-default-100 text-default-900"
+                                  : "text-default-900"
+                              }`
+                            }
+                            value={customer.customer_id}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {customer.name}
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </div>
+                  </Listbox>
                 </div>
 
                 <div className="space-y-2">
@@ -374,24 +426,99 @@ const RentalFormPage: React.FC = () => {
                   >
                     Location (Optional)
                   </label>
-                  <select
-                    id="location_id"
-                    name="location_id"
+                  <Listbox
                     value={formData.location_id || ""}
-                    onChange={handleInputChange}
+                    onChange={(value) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        location_id: value === "" ? null : Number(value),
+                      }));
+                    }}
                     disabled={isEditMode || !formData.customer_id}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
                   >
-                    <option value="">No Specific Location</option>
-                    {customerLocations.map((location) => (
-                      <option
-                        key={location.location_id}
-                        value={location.location_id}
-                      >
-                        {location.address}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="relative">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
+                        <span className="block truncate">
+                          {formData.location_id
+                            ? customerLocations.find(
+                                (l) => l.location_id === formData.location_id
+                              )?.address || "No Specific Location"
+                            : "No Specific Location"}
+                        </span>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <IconChevronDown
+                            className="h-5 w-5 text-default-400"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                        <ListboxOption
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                          value=""
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                No Specific Location
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                        {customerLocations.map((location) => (
+                          <ListboxOption
+                            key={location.location_id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                active
+                                  ? "bg-default-100 text-default-900"
+                                  : "text-default-900"
+                              }`
+                            }
+                            value={location.location_id}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {location.address}
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </div>
+                  </Listbox>
                 </div>
               </div>
             </div>
@@ -408,21 +535,95 @@ const RentalFormPage: React.FC = () => {
                   >
                     Dumpster
                   </label>
-                  <select
-                    id="tong_no"
-                    name="tong_no"
+                  <Listbox
                     value={formData.tong_no}
-                    onChange={handleInputChange}
+                    onChange={(value) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        tong_no: value,
+                      }));
+                    }}
                     disabled={isEditMode}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
                   >
-                    <option value="">Select Dumpster</option>
-                    {availableDumpsters.map((dumpster) => (
-                      <option key={dumpster.tong_no} value={dumpster.tong_no}>
-                        {dumpster.tong_no}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="relative">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
+                        <span className="block truncate">
+                          {formData.tong_no || "Select Dumpster"}
+                        </span>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <IconChevronDown
+                            className="h-5 w-5 text-default-400"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                        <ListboxOption
+                          value=""
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                Select Dumpster
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                        {availableDumpsters.map((dumpster) => (
+                          <ListboxOption
+                            key={dumpster.tong_no}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                active
+                                  ? "bg-default-100 text-default-900"
+                                  : "text-default-900"
+                              }`
+                            }
+                            value={dumpster.tong_no}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {dumpster.tong_no}
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </div>
+                  </Listbox>
                 </div>
 
                 <div className="space-y-2">
@@ -432,21 +633,95 @@ const RentalFormPage: React.FC = () => {
                   >
                     Driver
                   </label>
-                  <select
-                    id="driver"
-                    name="driver"
+                  <Listbox
                     value={formData.driver}
-                    onChange={handleInputChange}
+                    onChange={(value) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        driver: value,
+                      }));
+                    }}
                     disabled={isEditMode}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
                   >
-                    <option value="">Select Driver</option>
-                    {drivers.map((driver) => (
-                      <option key={driver} value={driver}>
-                        {driver}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="relative">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
+                        <span className="block truncate">
+                          {formData.driver || "Select Driver"}
+                        </span>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <IconChevronDown
+                            className="h-5 w-5 text-default-400"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                        <ListboxOption
+                          value=""
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                Select Driver
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                        {drivers.map((driver) => (
+                          <ListboxOption
+                            key={driver}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                active
+                                  ? "bg-default-100 text-default-900"
+                                  : "text-default-900"
+                              }`
+                            }
+                            value={driver}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {driver}
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </div>
+                  </Listbox>
                 </div>
               </div>
             </div>

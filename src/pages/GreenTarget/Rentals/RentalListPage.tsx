@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Rentals/RentalListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -8,6 +8,8 @@ import {
   IconPlus,
   IconFileInvoice,
   IconReceipt,
+  IconSquareCheckFilled,
+  IconSquare,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
@@ -157,7 +159,7 @@ const RentalListPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeOnly, setActiveOnly] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(true);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -349,6 +351,28 @@ const RentalListPage = () => {
           Rentals ({filteredRentals.length})
         </h1>
         <div className="flex space-x-3">
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => setActiveOnly(!activeOnly)}
+              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200 flex items-center"
+            >
+              {activeOnly ? (
+                <IconSquareCheckFilled
+                  className="text-blue-600"
+                  width={20}
+                  height={20}
+                />
+              ) : (
+                <IconSquare
+                  className="text-default-400"
+                  width={20}
+                  height={20}
+                />
+              )}
+              <span className="ml-2 font-medium">Active Rentals Only</span>
+            </button>
+          </div>
           <div className="relative">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
@@ -361,16 +385,6 @@ const RentalListPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-          </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="activeOnly"
-              checked={activeOnly}
-              onChange={() => setActiveOnly(!activeOnly)}
-              className="mr-2"
-            />
-            <label htmlFor="activeOnly">Active Rentals Only</label>
           </div>
           <Button
             onClick={() => navigate("/greentarget/rentals/new")}
