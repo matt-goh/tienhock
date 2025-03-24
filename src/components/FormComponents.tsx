@@ -45,7 +45,7 @@ export const FormInput: React.FC<InputProps> = ({
   placeholder = "",
 }) => (
   <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label htmlFor={name} className="text-sm font-medium text-default-700">
+    <label htmlFor={name} className="text-sm font-medium text-default-700 mt-0.5">
       {label}
     </label>
     <input
@@ -74,7 +74,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
 }) => (
   <div className={`${label === "" ? "" : "space-y-2"}`}>
     <div className="flex items-center gap-2">
-      <label htmlFor={name} className="text-sm font-medium text-default-700">
+      <label htmlFor={name} className="text-sm font-medium text-default-700 mt-1">
         {label}
       </label>
       {showStatus && isVerified && (
