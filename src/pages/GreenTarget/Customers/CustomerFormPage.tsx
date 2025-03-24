@@ -8,6 +8,7 @@ import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
 import { IconMap, IconMapPin, IconTrash, IconPhone } from "@tabler/icons-react";
 
 interface CustomerLocation {
@@ -56,6 +57,9 @@ const CustomerFormPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLocationInputFocused, setIsLocationInputFocused] = useState(false);
   const [isPhoneInputFocused, setIsPhoneInputFocused] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] =
+    useState<CustomerLocation | null>(null);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -410,7 +414,11 @@ const CustomerFormPage: React.FC = () => {
                   {locations.map((location, index) => (
                     <div
                       key={index}
-                      className="flex justify-between items-center bg-white border border-default-200 p-4 rounded-lg hover:shadow-sm transition-shadow duration-200"
+                      className="flex justify-between items-center bg-white border border-default-200 p-4 rounded-lg hover:shadow-sm transition-all duration-200 hover:bg-default-100/75 active:bg-default-200/75"
+                      onClick={() => {
+                        setSelectedLocation(location);
+                        setIsLocationModalOpen(true);
+                      }}
                     >
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
@@ -432,7 +440,10 @@ const CustomerFormPage: React.FC = () => {
                             )}
                           <button
                             type="button"
-                            onClick={() => handleRemoveLocation(index)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveLocation(index);
+                            }}
                             className="p-1.5 rounded-full text-default-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             title="Remove location"
                           >
@@ -472,6 +483,68 @@ const CustomerFormPage: React.FC = () => {
         </form>
       </div>
 
+      <LocationFormModal
+        isOpen={isLocationModalOpen}
+        onClose={() => {
+          setIsLocationModalOpen(false);
+          setSelectedLocation(null);
+        }}
+        onSubmit={async (locationData) => {
+          if (selectedLocation) {
+            try {
+              // First update location in the backend
+              if (selectedLocation.location_id) {
+                // Update existing location in backend
+                await greenTargetApi.updateLocation(
+                  selectedLocation.location_id,
+                  {
+                    address: locationData.address,
+                    phone_number: locationData.phone_number,
+                  }
+                );
+
+                // Then update in local state using location_id for reliable comparison
+                const updatedLocations = locations.map((loc) =>
+                  loc.location_id === selectedLocation.location_id
+                    ? {
+                        ...loc,
+                        address: locationData.address,
+                        phone_number: locationData.phone_number,
+                      }
+                    : loc
+                );
+                setLocations(updatedLocations);
+
+                toast.success("Location updated successfully");
+              } else {
+                // This is a new location that hasn't been saved to backend yet
+                // Just update it in local state using array index
+                const locationIndex = locations.findIndex(
+                  (loc) => loc === selectedLocation
+                );
+                if (locationIndex !== -1) {
+                  const updatedLocations = [...locations];
+                  updatedLocations[locationIndex] = {
+                    ...updatedLocations[locationIndex],
+                    address: locationData.address,
+                    phone_number: locationData.phone_number,
+                  };
+                  setLocations(updatedLocations);
+                }
+              }
+            } catch (error) {
+              console.error("Error updating location:", error);
+              toast.error("Failed to update location");
+            }
+          }
+
+          setIsLocationModalOpen(false);
+          setSelectedLocation(null);
+        }}
+        initialData={selectedLocation || undefined}
+        customerPhoneNumber={formData.phone_number}
+        customerId={formData.customer_id}
+      />
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
