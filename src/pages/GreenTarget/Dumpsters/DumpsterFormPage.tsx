@@ -7,10 +7,17 @@ import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
+import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 
 interface Dumpster {
   tong_no: string;
-  status: "available" | "rented" | "maintenance";
+  status: "Available" | "Rented" | "Maintenance";
 }
 
 const DumpsterFormPage: React.FC = () => {
@@ -20,12 +27,12 @@ const DumpsterFormPage: React.FC = () => {
 
   const [formData, setFormData] = useState<Dumpster>({
     tong_no: "",
-    status: "available",
+    status: "Available",
   });
 
   const [initialFormData, setInitialFormData] = useState<Dumpster>({
     tong_no: "",
-    status: "available",
+    status: "Available",
   });
 
   const [isFormChanged, setIsFormChanged] = useState(false);
@@ -39,6 +46,10 @@ const DumpsterFormPage: React.FC = () => {
       fetchDumpsterDetails(id);
     }
   }, [id, isEditMode]);
+
+  useEffect(() => {
+    console.log(formData);
+  }, [formData]);
 
   useEffect(() => {
     const hasChanged =
@@ -75,21 +86,6 @@ const DumpsterFormPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
-
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      status: e.target.value as "available" | "rented" | "maintenance",
-    }));
   };
 
   const handleBackClick = () => {
@@ -183,37 +179,144 @@ const DumpsterFormPage: React.FC = () => {
                   id="tong_no"
                   name="tong_no"
                   value={formData.tong_no}
-                  onChange={handleInputChange}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      tong_no: e.target.value,
+                    }))
+                  }
                   disabled={isEditMode}
                   className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="w-full">
                 <label
                   htmlFor="status"
                   className="text-sm font-medium text-default-700"
                 >
                   Status
                 </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleStatusChange}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                >
-                  <option value="available">Available</option>
-                  <option value="rented" disabled={!isEditMode}>
-                    Rented
-                  </option>
-                  <option value="maintenance">Maintenance</option>
-                </select>
-                {!isEditMode && (
-                  <p className="text-xs text-default-500 mt-1">
-                    Note: New dumpsters cannot be created with 'Rented' status.
-                  </p>
-                )}
+                <div className="mt-2">
+                  <Listbox
+                    value={formData.status}
+                    onChange={(newStatus) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        status: newStatus,
+                      }))
+                    }
+                    disabled={isEditMode && formData.status === "Rented"}
+                  >
+                    <div className="relative">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
+                        <span className="block truncate">
+                          {formData.status.charAt(0).toUpperCase() +
+                            formData.status.slice(1)}
+                        </span>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <IconChevronDown
+                            className="h-5 w-5 text-default-400"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                        <ListboxOption
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                          value="Available"
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                Available
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                        <ListboxOption
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                          value="Rented"
+                          disabled
+                        >
+                          {({ selected, disabled }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                } ${disabled ? "opacity-50" : ""}`}
+                              >
+                                Rented
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                        <ListboxOption
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-default-900"
+                            }`
+                          }
+                          value="Maintenance"
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                Maintenance
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </div>
+                  </Listbox>
+                </div>
               </div>
             </div>
           </div>
