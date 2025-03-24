@@ -102,6 +102,8 @@ const RentalFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const [isPlacementDateFocused, setIsPlacementDateFocused] = useState(false);
+  const [isPickupDateFocused, setIsPickupDateFocused] = useState(false);
 
   // Load reference data
   useEffect(() => {
@@ -891,19 +893,23 @@ const RentalFormPage: React.FC = () => {
                   >
                     Placement Date
                   </label>
-                  <div className="relative">
+                  <div
+                    className={`flex relative w-full border rounded-lg ${
+                      isPlacementDateFocused
+                        ? "border-default-500"
+                        : "border-default-300"
+                    }`}
+                  >
                     <input
                       type="date"
                       id="date_placed"
                       name="date_placed"
                       value={formatDateForInput(formData.date_placed)}
                       onChange={handleDateChange}
+                      onFocus={() => setIsPlacementDateFocused(true)}
+                      onBlur={() => setIsPlacementDateFocused(false)}
                       disabled={isEditMode}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
-                    />
-                    <IconCalendar
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-default-400"
-                      size={20}
+                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none disabled:bg-default-50"
                     />
                   </div>
                 </div>
@@ -916,18 +922,22 @@ const RentalFormPage: React.FC = () => {
                     Pickup Date{" "}
                     {!isEditMode && "(Leave empty for active rentals)"}
                   </label>
-                  <div className="relative">
+                  <div
+                    className={`flex relative w-full border rounded-lg ${
+                      isPickupDateFocused
+                        ? "border-default-500"
+                        : "border-default-300"
+                    }`}
+                  >
                     <input
                       type="date"
                       id="date_picked"
                       name="date_picked"
                       value={formatDateForInput(formData.date_picked)}
                       onChange={handleDateChange}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                    />
-                    <IconCalendar
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-default-400"
-                      size={20}
+                      onFocus={() => setIsPickupDateFocused(true)}
+                      onBlur={() => setIsPickupDateFocused(false)}
+                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none"
                     />
                   </div>
                 </div>
