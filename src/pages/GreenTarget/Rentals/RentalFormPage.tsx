@@ -81,11 +81,7 @@ const RentalFormPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [availableDumpsters, setAvailableDumpsters] = useState<Dumpster[]>([]);
-  const [drivers, setDrivers] = useState<string[]>([
-    "Driver 1",
-    "Driver 2",
-    "Driver 3",
-  ]); // Could fetch from API if needed
+  const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
 
   // UI state
   const [initialFormData, setInitialFormData] = useState<Rental>({
@@ -109,13 +105,31 @@ const RentalFormPage: React.FC = () => {
   useEffect(() => {
     const loadReferenceData = async () => {
       try {
-        const [customersData, dumpstersData] = await Promise.all([
+        const [customersData, dumpstersData, driversData] = await Promise.all([
           api.get("/greentarget/api/customers"),
           api.get("/greentarget/api/dumpsters?status=Available"),
+          api.get("/api/staffs/get-drivers"), // Add this new endpoint call
         ]);
 
         setCustomers(customersData);
         setAvailableDumpsters(dumpstersData);
+        setDrivers(driversData); // Set the drivers
+
+        // Auto-select the first dumpster if available and we're not in edit mode
+        if (!isEditMode && dumpstersData && dumpstersData.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            tong_no: dumpstersData[0].tong_no,
+          }));
+        }
+
+        // Auto-select the first driver if available and we're not in edit mode
+        if (!isEditMode && driversData && driversData.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            driver: driversData[0].name,
+          }));
+        }
       } catch (err) {
         console.error("Error loading reference data:", err);
         toast.error("Failed to load necessary data");
@@ -123,7 +137,7 @@ const RentalFormPage: React.FC = () => {
     };
 
     loadReferenceData();
-  }, []);
+  }, [isEditMode]);
 
   // Load rental data in edit mode
   useEffect(() => {
@@ -206,9 +220,27 @@ const RentalFormPage: React.FC = () => {
         `/greentarget/api/locations?customer_id=${customerId}`
       );
       setCustomerLocations(locationsData);
+
+      // Auto-select the first location if available, otherwise set to null
+      if (locationsData && locationsData.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          location_id: locationsData[0].location_id,
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          location_id: null,
+        }));
+      }
     } catch (err) {
       console.error("Error fetching customer locations:", err);
       setCustomerLocations([]);
+      // Set to null on error
+      setFormData((prev) => ({
+        ...prev,
+        location_id: null,
+      }));
     }
   };
 
@@ -370,7 +402,6 @@ const RentalFormPage: React.FC = () => {
                       setFormData((prev) => ({
                         ...prev,
                         customer_id: value,
-                        location_id: null,
                       }));
                     }}
                     disabled={isEditMode}
@@ -452,6 +483,27 @@ const RentalFormPage: React.FC = () => {
                             )}
                           </ListboxOption>
                         ))}
+                        {/* Add new location option */}
+                        {formData.customer_id && (
+                          <ListboxOption
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
+                                active
+                                  ? "bg-default-100 text-sky-600"
+                                  : "text-sky-600"
+                              }`
+                            }
+                            value="add_new"
+                            disabled={true}
+                          >
+                            {({ selected }) => (
+                              <span className="flex items-center font-medium">
+                                <IconPlus size={16} className="mr-1" />
+                                Add new customer
+                              </span>
+                            )}
+                          </ListboxOption>
+                        )}
                       </ListboxOptions>
                     </div>
                   </Listbox>
@@ -782,7 +834,7 @@ const RentalFormPage: React.FC = () => {
                         </ListboxOption>
                         {drivers.map((driver) => (
                           <ListboxOption
-                            key={driver}
+                            key={driver.id}
                             className={({ active }) =>
                               `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                                 active
@@ -790,7 +842,7 @@ const RentalFormPage: React.FC = () => {
                                   : "text-default-900"
                               }`
                             }
-                            value={driver}
+                            value={driver.name}
                           >
                             {({ selected }) => (
                               <>
@@ -799,7 +851,7 @@ const RentalFormPage: React.FC = () => {
                                     selected ? "font-medium" : "font-normal"
                                   }`}
                                 >
-                                  {driver}
+                                  {driver.name}
                                 </span>
                                 {selected && (
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">

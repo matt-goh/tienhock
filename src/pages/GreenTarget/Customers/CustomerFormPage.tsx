@@ -452,7 +452,7 @@ const CustomerFormPage: React.FC = () => {
                     No locations
                   </h3>
                   <p className="mt-1 text-sm text-default-500">
-                    Add at least one location for this customer.
+                    Add location for this customer.
                   </p>
                 </div>
               )}
