@@ -159,7 +159,7 @@ const RentalFormPage: React.FC = () => {
 
   // Load locations when customer changes
   useEffect(() => {
-    if (formData.customer_id) {
+    if (formData.customer_id && !isEditMode) {
       fetchCustomerLocations(formData.customer_id);
     } else {
       setCustomerLocations([]);
@@ -390,9 +390,9 @@ const RentalFormPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6 pb-0">
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* Customer & Location Section */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h2 className="text-lg font-medium">Customer Information</h2>
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -679,7 +679,7 @@ const RentalFormPage: React.FC = () => {
             </div>
 
             {/* Dumpster & Driver Section */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h2 className="text-lg font-medium">Rental Details</h2>
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -882,7 +882,7 @@ const RentalFormPage: React.FC = () => {
             </div>
 
             {/* Dates Section */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h2 className="text-lg font-medium">Dates</h2>
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -964,7 +964,7 @@ const RentalFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 py-3 text-right">
+          <div className="mt-6 py-3 text-right">
             <Button
               type="submit"
               variant="boldOutline"
