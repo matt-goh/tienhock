@@ -50,10 +50,6 @@ const DumpsterFormPage: React.FC = () => {
   }, [id, isEditMode]);
 
   useEffect(() => {
-    console.log(formData);
-  }, [formData]);
-
-  useEffect(() => {
     const hasChanged =
       JSON.stringify(formData) !== JSON.stringify(initialFormData);
     setIsFormChanged(hasChanged);

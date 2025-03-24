@@ -21,6 +21,7 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
+import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
 
 interface Customer {
   customer_id: number;
@@ -79,7 +80,8 @@ const RentalFormPage: React.FC = () => {
 
   // Reference data
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+  const [isNewLocationModalOpen, setIsNewLocationModalOpen] = useState(false);
   const [availableDumpsters, setAvailableDumpsters] = useState<Dumpster[]>([]);
   const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
 
@@ -219,13 +221,16 @@ const RentalFormPage: React.FC = () => {
       const locationsData = await api.get(
         `/greentarget/api/locations?customer_id=${customerId}`
       );
-      setCustomerLocations(locationsData);
+
+      // Ensure we always have an array
+      const locationsArray = Array.isArray(locationsData) ? locationsData : [];
+      setCustomerLocations(locationsArray);
 
       // Auto-select the first location if available, otherwise set to null
-      if (locationsData && locationsData.length > 0) {
+      if (locationsArray.length > 0) {
         setFormData((prev) => ({
           ...prev,
-          location_id: locationsData[0].location_id,
+          location_id: locationsArray[0].location_id,
         }));
       } else {
         setFormData((prev) => ({
@@ -382,7 +387,7 @@ const RentalFormPage: React.FC = () => {
               : "Create a new dumpster rental record."}
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="p-6 pb-0">
           <div className="space-y-8">
             {/* Customer & Location Section */}
             <div className="space-y-6">
@@ -483,27 +488,25 @@ const RentalFormPage: React.FC = () => {
                             )}
                           </ListboxOption>
                         ))}
-                        {/* Add new location option */}
-                        {formData.customer_id ? (
-                          <ListboxOption
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
-                                active
-                                  ? "bg-default-100 text-sky-600"
-                                  : "text-sky-600"
-                              }`
-                            }
-                            value="add_new"
-                            disabled={true}
-                          >
-                            {({ selected }) => (
-                              <span className="flex items-center font-medium">
-                                <IconPlus size={16} className="mr-1" />
-                                Add new customer
-                              </span>
-                            )}
-                          </ListboxOption>
-                        ) : null}
+                        {/* Add new customer option */}
+                        <ListboxOption
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
+                              active
+                                ? "bg-default-100 text-sky-600"
+                                : "text-sky-600"
+                            }`
+                          }
+                          value="add_new"
+                          onClick={() => setIsNewCustomerModalOpen(true)}
+                        >
+                          {({ selected }) => (
+                            <span className="flex items-center font-medium">
+                              <IconPlus size={16} className="mr-1" />
+                              Add new customer
+                            </span>
+                          )}
+                        </ListboxOption>
                       </ListboxOptions>
                     </div>
                   </Listbox>
@@ -652,7 +655,11 @@ const RentalFormPage: React.FC = () => {
                               }`
                             }
                             value="add_new"
-                            disabled={true}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setIsNewLocationModalOpen(true);
+                            }}
                           >
                             {({ selected }) => (
                               <span className="flex items-center font-medium">
@@ -969,7 +976,95 @@ const RentalFormPage: React.FC = () => {
           </div>
         </form>
       </div>
+      {/* New Customer with Location Modal */}
+      <LocationFormModal
+        isOpen={isNewCustomerModalOpen}
+        onClose={() => setIsNewCustomerModalOpen(false)}
+        isCreatingCustomer={true}
+        onSubmit={async (data) => {
+          try {
+            // Create the new customer
+            if (data.customer_name) {
+              const customerResponse = await greenTargetApi.createCustomer({
+                name: data.customer_name,
+                phone_number: data.phone_number,
+              });
 
+              if (customerResponse && customerResponse.customer) {
+                const newCustomerId = customerResponse.customer.customer_id;
+
+                // Create the location for the new customer
+                if (data.address) {
+                  await greenTargetApi.createLocation({
+                    customer_id: newCustomerId,
+                    address: data.address,
+                    phone_number: data.phone_number,
+                  });
+                }
+
+                // Fetch updated customers list
+                const customersData = await api.get(
+                  "/greentarget/api/customers"
+                );
+                setCustomers(customersData);
+
+                // Select the new customer
+                setFormData((prev) => ({
+                  ...prev,
+                  customer_id: newCustomerId,
+                }));
+
+                toast.success("Customer and location created successfully");
+              }
+            }
+          } catch (error) {
+            console.error("Error creating customer and location:", error);
+            toast.error("Failed to create customer and location");
+          }
+
+          setIsNewCustomerModalOpen(false);
+        }}
+      />
+      {/* New Location for Existing Customer Modal */}
+      <LocationFormModal
+        isOpen={isNewLocationModalOpen}
+        onClose={() => setIsNewLocationModalOpen(false)}
+        customerId={formData.customer_id}
+        customerPhoneNumber={
+          customers.find((c) => c.customer_id === formData.customer_id)
+            ?.phone_number || ""
+        }
+        onSubmit={async (data) => {
+          try {
+            // Create new location for selected customer
+            if (data.address && formData.customer_id) {
+              const locationResponse = await greenTargetApi.createLocation({
+                customer_id: formData.customer_id,
+                address: data.address,
+                phone_number: data.phone_number,
+              });
+
+              // Refresh customer locations
+              await fetchCustomerLocations(formData.customer_id);
+
+              // Select the new location
+              if (locationResponse && locationResponse.location) {
+                setFormData((prev) => ({
+                  ...prev,
+                  location_id: locationResponse.location.location_id,
+                }));
+              }
+
+              toast.success("Location added successfully");
+            }
+          } catch (error) {
+            console.error("Error creating location:", error);
+            toast.error("Failed to create location");
+          }
+
+          setIsNewLocationModalOpen(false);
+        }}
+      />
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
