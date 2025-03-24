@@ -38,6 +38,8 @@ const DumpsterFormPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +58,19 @@ const DumpsterFormPage: React.FC = () => {
       JSON.stringify(formData) !== JSON.stringify(initialFormData);
     setIsFormChanged(hasChanged);
   }, [formData, initialFormData]);
+
+  // Add a debounce effect to avoid too many API calls while typing
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (formData.tong_no) {
+        checkDuplicateTongNo(formData.tong_no);
+      }
+    }, 500); // 500ms debounce
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [formData.tong_no]);
 
   const fetchDumpsterDetails = async (dumpsterId: string) => {
     try {
@@ -101,11 +116,34 @@ const DumpsterFormPage: React.FC = () => {
     navigate("/greentarget/dumpsters");
   };
 
+  const checkDuplicateTongNo = async (value: string) => {
+    if (!value.trim() || isEditMode) return;
+
+    setIsCheckingDuplicate(true);
+    try {
+      const dumpsters = await greenTargetApi.getDumpsters();
+      const duplicate = dumpsters.some(
+        (d: Dumpster) => d.tong_no === value.trim()
+      );
+      setIsDuplicate(duplicate);
+    } catch (err) {
+      console.error("Error checking for duplicate dumpster:", err);
+      // Don't set duplicate flag on error - better to allow submission than block incorrectly
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.tong_no) {
       toast.error("Dumpster number is required");
+      return;
+    }
+
+    if (isDuplicate) {
+      toast.error("A dumpster with this number already exists");
       return;
     }
 
@@ -174,20 +212,36 @@ const DumpsterFormPage: React.FC = () => {
                 >
                   Dumpster Number
                 </label>
-                <input
-                  type="text"
-                  id="tong_no"
-                  name="tong_no"
-                  value={formData.tong_no}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      tong_no: e.target.value,
-                    }))
-                  }
-                  disabled={isEditMode}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 disabled:bg-default-50"
-                />
+                <div>
+                  <input
+                    type="text"
+                    id="tong_no"
+                    name="tong_no"
+                    value={formData.tong_no}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        tong_no: e.target.value,
+                      }))
+                    }
+                    disabled={isEditMode}
+                    className={`w-full px-3 py-2 border ${
+                      isDuplicate
+                        ? "border-rose-300 focus:border-rose-500"
+                        : "border-default-300 focus:border-default-500"
+                    } rounded-lg focus:outline-none disabled:bg-default-50`}
+                  />
+                  {isDuplicate && (
+                    <p className="mt-1 text-sm text-rose-600">
+                      A dumpster with this number already exists
+                    </p>
+                  )}
+                  {isCheckingDuplicate && (
+                    <p className="mt-1 text-sm text-default-500">
+                      Checking availability...
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="w-full">
@@ -321,12 +375,14 @@ const DumpsterFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 py-3 text-right">
+          <div className="mt-6 py-3 text-right">
             <Button
               type="submit"
               variant="boldOutline"
               size="lg"
-              disabled={isSaving || !isFormChanged}
+              disabled={
+                isSaving || !isFormChanged || isDuplicate || isCheckingDuplicate
+              }
             >
               {isSaving ? "Saving..." : "Save"}
             </Button>
