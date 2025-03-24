@@ -87,6 +87,7 @@ const CustomerFormPage: React.FC = () => {
         name: data.name,
         phone_number: data.phone_number || "",
         last_activity_date: data.last_activity_date,
+        has_active_rental: data.has_active_rental,
       });
 
       setLocations(data.locations || []);
@@ -97,6 +98,7 @@ const CustomerFormPage: React.FC = () => {
         phone_number: data.phone_number || "",
         last_activity_date: data.last_activity_date,
         locations: data.locations || [],
+        has_active_rental: data.has_active_rental,
       });
 
       setError(null);
