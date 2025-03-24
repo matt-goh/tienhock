@@ -28,86 +28,6 @@ interface Dumpster {
   status: "Available" | "Rented" | "Maintenance";
 }
 
-const DumpsterCard = ({
-  dumpster,
-  onDeleteClick,
-}: {
-  dumpster: Dumpster;
-  onDeleteClick: (dumpster: Dumpster) => void;
-}) => {
-  const navigate = useNavigate();
-  const [isCardHovered, setIsCardHovered] = useState(false);
-  const [isTrashHovered, setIsTrashHovered] = useState(false);
-
-  const handleClick = () => {
-    navigate(`/greentarget/dumpsters/${encodeURIComponent(dumpster.tong_no)}`);
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onDeleteClick(dumpster);
-  };
-
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Available":
-        return "bg-green-100 text-green-800";
-      case "Rented":
-        return "bg-blue-100 text-blue-800";
-      case "Maintenance":
-        return "bg-amber-100 text-amber-800";
-      default:
-        return "bg-default-100 text-default-800";
-    }
-  };
-
-  return (
-    <div
-      className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered
-          ? "bg-default-100 active:bg-default-200"
-          : ""
-      }`}
-      onClick={handleClick}
-      onMouseEnter={() => setIsCardHovered(true)}
-      onMouseLeave={() => setIsCardHovered(false)}
-    >
-      <div className="mb-2">
-        <h3 className="font-semibold">Tong {dumpster.tong_no}</h3>
-      </div>
-      <div className="mt-2">
-        <span
-          className={`inline-block px-2.5 py-0.5 rounded text-xs font-medium ${getStatusColor(
-            dumpster.status
-          )}`}
-        >
-          {dumpster.status}
-        </span>
-      </div>
-      <div className="absolute inset-y-0 top-2 right-2">
-        <div className="relative w-8 h-8">
-          {isCardHovered && dumpster.status !== "Rented" && (
-            <button
-              onClick={handleDeleteClick}
-              onMouseEnter={() => setIsTrashHovered(true)}
-              onMouseLeave={() => setIsTrashHovered(false)}
-              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-default-100 active:bg-default-200 focus:outline-none"
-            >
-              <IconTrash
-                className="text-default-700 active:text-default-800"
-                stroke={1.5}
-                size={18}
-              />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const DumpsterListPage = () => {
   const [dumpsters, setDumpsters] = useState<Dumpster[]>([]);
   const [loading, setLoading] = useState(true);
@@ -406,17 +326,74 @@ const DumpsterListPage = () => {
           <p className="text-default-500">No dumpsters found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {paginatedDumpsters.map((dumpster) => (
-            <DumpsterCard
-              key={dumpster.tong_no}
-              dumpster={dumpster}
-              onDeleteClick={handleDeleteClick}
-            />
-          ))}
+        <div className="bg-white border border-default-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-default-200">
+              <thead className="bg-default-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Tong Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-default-200">
+                {paginatedDumpsters.map((dumpster) => (
+                  <tr
+                    key={dumpster.tong_no}
+                    className="hover:bg-default-50 cursor-pointer"
+                    onClick={() =>
+                      navigate(
+                        `/greentarget/dumpsters/${encodeURIComponent(
+                          dumpster.tong_no
+                        )}`
+                      )
+                    }
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-default-900">
+                      {dumpster.tong_no}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded text-xs font-medium ${
+                          dumpster.status === "Available"
+                            ? "bg-green-100 text-green-800"
+                            : dumpster.status === "Rented"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {dumpster.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {dumpster.status !== "Rented" && (
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(dumpster);
+                          }}
+                          variant="outline"
+                          color="rose"
+                          size="sm"
+                          icon={IconTrash}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
-
       {filteredDumpsters.length > 0 && (
         <div className="mt-6 flex justify-between items-center text-default-700">
           <button
@@ -436,7 +413,6 @@ const DumpsterListPage = () => {
           </button>
         </div>
       )}
-
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
