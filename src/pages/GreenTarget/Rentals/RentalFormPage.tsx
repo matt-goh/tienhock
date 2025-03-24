@@ -7,7 +7,13 @@ import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { IconCalendar, IconChevronDown, IconCheck } from "@tabler/icons-react";
+import {
+  IconCalendar,
+  IconChevronDown,
+  IconCheck,
+  IconPlus,
+  IconPhone,
+} from "@tabler/icons-react";
 import { api } from "../../../routes/utils/api";
 import {
   Listbox,
@@ -19,12 +25,14 @@ import {
 interface Customer {
   customer_id: number;
   name: string;
+  phone_number?: string;
 }
 
 interface Location {
   location_id: number;
   customer_id: number;
   address: string;
+  phone_number?: string;
 }
 
 interface Dumpster {
@@ -137,6 +145,8 @@ const RentalFormPage: React.FC = () => {
       fetchCustomerLocations(formData.customer_id);
     } else {
       setCustomerLocations([]);
+      // Reset location_id when customer changes
+      setFormData((prev) => ({ ...prev, location_id: null }));
     }
   }, [formData.customer_id]);
 
@@ -191,8 +201,9 @@ const RentalFormPage: React.FC = () => {
 
   const fetchCustomerLocations = async (customerId: number) => {
     try {
-      const locationsData = await greenTargetApi.getLocationsByCustomer(
-        customerId
+      // Using the correct API endpoint with query parameter
+      const locationsData = await api.get(
+        `/greentarget/api/locations?customer_id=${customerId}`
       );
       setCustomerLocations(locationsData);
     } catch (err) {
@@ -366,13 +377,32 @@ const RentalFormPage: React.FC = () => {
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
-                        <span className="block truncate">
-                          {formData.customer_id
-                            ? customers.find(
-                                (c) => c.customer_id === formData.customer_id
-                              )?.name || "Select Customer"
-                            : "Select Customer"}
-                        </span>
+                        {formData.customer_id ? (
+                          // Selected customer with potential phone number
+                          (() => {
+                            const selectedCustomer = customers.find(
+                              (c) => c.customer_id === formData.customer_id
+                            );
+                            return (
+                              <div className="flex flex-col">
+                                <span className="block truncate font-medium">
+                                  {selectedCustomer?.name || "Select Customer"}
+                                </span>
+                                {selectedCustomer?.phone_number ? (
+                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                    <IconPhone size={12} className="mr-1" />
+                                    {selectedCustomer.phone_number}
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          // No customer selected - no extra spacing
+                          <span className="block truncate">
+                            Select Customer
+                          </span>
+                        )}
                         <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                           <IconChevronDown
                             className="h-5 w-5 text-default-400"
@@ -395,13 +425,21 @@ const RentalFormPage: React.FC = () => {
                           >
                             {({ selected }) => (
                               <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {customer.name}
-                                </span>
+                                <div className="flex flex-col">
+                                  <span
+                                    className={`block truncate ${
+                                      selected ? "font-medium" : "font-normal"
+                                    }`}
+                                  >
+                                    {customer.name}
+                                  </span>
+                                  {customer.phone_number && (
+                                    <span className="text-xs text-default-500 mt-0.5 flex items-center">
+                                      <IconPhone size={12} className="mr-1" />
+                                      {customer.phone_number}
+                                    </span>
+                                  )}
+                                </div>
                                 {selected && (
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                                     <IconCheck
@@ -429,6 +467,12 @@ const RentalFormPage: React.FC = () => {
                   <Listbox
                     value={formData.location_id || ""}
                     onChange={(value) => {
+                      if (value === "add_new") {
+                        // This will be functionless for now as requested
+                        console.log("Add new location requested");
+                        return;
+                      }
+
                       setFormData((prev) => ({
                         ...prev,
                         location_id: value === "" ? null : Number(value),
@@ -438,13 +482,33 @@ const RentalFormPage: React.FC = () => {
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
-                        <span className="block truncate">
-                          {formData.location_id
-                            ? customerLocations.find(
-                                (l) => l.location_id === formData.location_id
-                              )?.address || "No Specific Location"
-                            : "No Specific Location"}
-                        </span>
+                        {formData.location_id ? (
+                          // Selected location with potential phone number
+                          (() => {
+                            const selectedLocation = customerLocations.find(
+                              (l) => l.location_id === formData.location_id
+                            );
+                            return (
+                              <div className="flex flex-col">
+                                <span className="block truncate font-medium">
+                                  {selectedLocation?.address ||
+                                    "No Specific Location"}
+                                </span>
+                                {selectedLocation?.phone_number && (
+                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                    <IconPhone size={12} className="mr-1" />
+                                    {selectedLocation.phone_number}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          // No location selected
+                          <span className="block truncate">
+                            No Specific Location
+                          </span>
+                        )}
                         <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                           <IconChevronDown
                             className="h-5 w-5 text-default-400"
@@ -497,13 +561,21 @@ const RentalFormPage: React.FC = () => {
                           >
                             {({ selected }) => (
                               <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {location.address}
-                                </span>
+                                <div className="flex flex-col">
+                                  <span
+                                    className={`block truncate ${
+                                      selected ? "font-medium" : "font-normal"
+                                    }`}
+                                  >
+                                    {location.address}
+                                  </span>
+                                  {location.phone_number && (
+                                    <div className="flex text-xs text-default-500 mt-0.5">
+                                      <IconPhone size={16} className="mr-1.5" />
+                                      {location.phone_number}
+                                    </div>
+                                  )}
+                                </div>
                                 {selected && (
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
                                     <IconCheck
@@ -516,6 +588,28 @@ const RentalFormPage: React.FC = () => {
                             )}
                           </ListboxOption>
                         ))}
+
+                        {/* Add new location option */}
+                        {formData.customer_id && (
+                          <ListboxOption
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
+                                active
+                                  ? "bg-default-100 text-sky-600"
+                                  : "text-sky-600"
+                              }`
+                            }
+                            value="add_new"
+                            disabled={true}
+                          >
+                            {({ selected }) => (
+                              <span className="flex items-center font-medium">
+                                <IconPlus size={16} className="mr-1" />
+                                Add new location for selected customer
+                              </span>
+                            )}
+                          </ListboxOption>
+                        )}
                       </ListboxOptions>
                     </div>
                   </Listbox>
