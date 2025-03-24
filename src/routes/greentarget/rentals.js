@@ -80,23 +80,9 @@ export default function (pool) {
         throw new Error("Missing required fields: customer_id, tong_no, driver, date_placed");
       }
 
-      // Check if dumpster exists and is available
-      const dumpsterQuery = `
-        SELECT * FROM greentarget.dumpsters WHERE tong_no = $1
-      `;
-      const dumpsterResult = await client.query(dumpsterQuery, [tong_no]);
-      
-      if (dumpsterResult.rows.length === 0) {
-        throw new Error(`Dumpster with ID ${tong_no} not found`);
-      }
-      
-      if (dumpsterResult.rows[0].status !== 'available') {
-        throw new Error(`Dumpster ${tong_no} is not available (current status: ${dumpsterResult.rows[0].status})`);
-      }
-
       // Update dumpster status to 'rented'
       await client.query(
-        `UPDATE greentarget.dumpsters SET status = 'rented' WHERE tong_no = $1`,
+        `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
         [tong_no]
       );
 
@@ -172,7 +158,7 @@ export default function (pool) {
       // If setting date_picked and it wasn't set before, update dumpster status
       if (date_picked && !currentRental.date_picked) {
         await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'available' WHERE tong_no = $1`,
+          `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
           [currentRental.tong_no]
         );
       }
