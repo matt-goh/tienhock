@@ -7,7 +7,15 @@ import {
   IconChevronRight,
   IconPlus,
   IconTrash,
+  IconChevronDown,
+  IconCheck,
 } from "@tabler/icons-react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
@@ -17,7 +25,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 // Define the Dumpster interface
 interface Dumpster {
   tong_no: string;
-  status: "available" | "rented" | "maintenance";
+  status: "Available" | "Rented" | "Maintenance";
 }
 
 const DumpsterCard = ({
@@ -44,11 +52,11 @@ const DumpsterCard = ({
   // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "available":
+      case "Available":
         return "bg-green-100 text-green-800";
-      case "rented":
+      case "Rented":
         return "bg-blue-100 text-blue-800";
-      case "maintenance":
+      case "Maintenance":
         return "bg-amber-100 text-amber-800";
       default:
         return "bg-default-100 text-default-800";
@@ -67,7 +75,7 @@ const DumpsterCard = ({
       onMouseLeave={() => setIsCardHovered(false)}
     >
       <div className="mb-2">
-        <h3 className="font-semibold">Dumpster {dumpster.tong_no}</h3>
+        <h3 className="font-semibold">Tong {dumpster.tong_no}</h3>
       </div>
       <div className="mt-2">
         <span
@@ -80,7 +88,7 @@ const DumpsterCard = ({
       </div>
       <div className="absolute inset-y-0 top-2 right-2">
         <div className="relative w-8 h-8">
-          {isCardHovered && dumpster.status !== "rented" && (
+          {isCardHovered && dumpster.status !== "Rented" && (
             <button
               onClick={handleDeleteClick}
               onMouseEnter={() => setIsTrashHovered(true)}
@@ -110,7 +118,7 @@ const DumpsterListPage = () => {
   const [dumpsterToDelete, setDumpsterToDelete] = useState<Dumpster | null>(
     null
   );
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -168,7 +176,7 @@ const DumpsterListPage = () => {
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
       const matchesStatus =
-        statusFilter === "all" || dumpster.status === statusFilter;
+        statusFilter === "All" || dumpster.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [dumpsters, searchTerm, statusFilter]);
@@ -250,16 +258,139 @@ const DumpsterListPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border focus:border-default-500 rounded-full"
-          >
-            <option value="all">All Statuses</option>
-            <option value="available">Available</option>
-            <option value="rented">Rented</option>
-            <option value="maintenance">Maintenance</option>
-          </select>
+          <div className="w-48">
+            <Listbox value={statusFilter} onChange={setStatusFilter}>
+              <div className="relative">
+                <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                  <span className="pl-2 block truncate">
+                    {statusFilter === "All"
+                      ? "All Statuses"
+                      : statusFilter === "Available"
+                      ? "Available"
+                      : statusFilter === "Rented"
+                      ? "Rented"
+                      : "Maintenance"}
+                  </span>
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                    <IconChevronDown
+                      className="h-5 w-5 text-default-400"
+                      aria-hidden="true"
+                    />
+                  </span>
+                </ListboxButton>
+                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                  <ListboxOption
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                        active
+                          ? "bg-default-100 text-default-900"
+                          : "text-default-900"
+                      }`
+                    }
+                    value="All"
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          All Statuses
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                            <IconCheck className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ListboxOption>
+                  <ListboxOption
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                        active
+                          ? "bg-default-100 text-default-900"
+                          : "text-default-900"
+                      }`
+                    }
+                    value="Available"
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          Available
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                            <IconCheck className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ListboxOption>
+                  <ListboxOption
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                        active
+                          ? "bg-default-100 text-default-900"
+                          : "text-default-900"
+                      }`
+                    }
+                    value="Rented"
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          Rented
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                            <IconCheck className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ListboxOption>
+                  <ListboxOption
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                        active
+                          ? "bg-default-100 text-default-900"
+                          : "text-default-900"
+                      }`
+                    }
+                    value="Maintenance"
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          Maintenance
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                            <IconCheck className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ListboxOption>
+                </ListboxOptions>
+              </div>
+            </Listbox>
+          </div>
           <Button
             onClick={() => navigate("/greentarget/dumpsters/new")}
             icon={IconPlus}
