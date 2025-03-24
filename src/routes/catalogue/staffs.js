@@ -166,6 +166,24 @@ export default function (pool) {
     }
   });
 
+  router.get("/get-drivers", async (req, res) => {
+    try {
+      const query = `
+        SELECT
+          id, name
+        FROM staffs
+        WHERE (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+        AND job::jsonb ? 'DRIVER'
+      `;
+
+      const result = await pool.query(query);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching drivers:", error);
+      res.status(500).json({ error: "Failed to fetch drivers" });
+    }
+  });
+
   // Get single staff member
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
