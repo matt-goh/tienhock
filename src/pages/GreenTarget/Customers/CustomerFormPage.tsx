@@ -8,12 +8,13 @@ import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { IconMap, IconMapPin, IconTrash } from "@tabler/icons-react";
+import { IconMap, IconMapPin, IconTrash, IconPhone } from "@tabler/icons-react";
 
 interface CustomerLocation {
   location_id?: number;
   customer_id: number;
   address: string;
+  phone_number?: string;
 }
 
 interface Customer {
@@ -41,13 +42,20 @@ const CustomerFormPage: React.FC = () => {
   });
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
-  const [newLocation, setNewLocation] = useState("");
+  const [newLocation, setNewLocation] = useState<{
+    address: string;
+    phone_number: string;
+  }>({
+    address: "",
+    phone_number: "",
+  });
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [isLocationInputFocused, setIsLocationInputFocused] = useState(false);
+  const [isPhoneInputFocused, setIsPhoneInputFocused] = useState(false);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -104,6 +112,16 @@ const CustomerFormPage: React.FC = () => {
     }));
   };
 
+  const handleLocationInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const { name, value } = e.target;
+    setNewLocation((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleBackClick = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
@@ -118,18 +136,20 @@ const CustomerFormPage: React.FC = () => {
   };
 
   const handleAddLocation = () => {
-    if (!newLocation.trim()) {
+    if (!newLocation.address.trim()) {
       toast.error("Please enter a location address");
       return;
     }
 
     const newLocationObj: CustomerLocation = {
-      customer_id: formData.customer_id || 0, // Will be set properly on save
-      address: newLocation.trim(),
+      customer_id: formData.customer_id || 0,
+      address: newLocation.address.trim(),
+      // Use custom phone number if provided, otherwise use customer's phone number
+      phone_number: newLocation.phone_number.trim() || formData.phone_number,
     };
 
     setLocations([...locations, newLocationObj]);
-    setNewLocation("");
+    setNewLocation({ address: "", phone_number: "" });
   };
 
   const handleRemoveLocation = (index: number) => {
@@ -170,27 +190,46 @@ const CustomerFormPage: React.FC = () => {
 
       const customerId = customerResponse.customer.customer_id;
 
-      // Handle locations
+      // Get original location IDs from initialFormData
+      const originalLocationIds = initialFormData.locations
+        ? initialFormData.locations
+            .filter((loc) => loc.location_id)
+            .map((loc) => loc.location_id)
+        : [];
+
+      // Get current location IDs that have an ID (existing locations)
+      const currentLocationIds = locations
+        .filter((loc) => loc.location_id)
+        .map((loc) => loc.location_id);
+
+      // Find IDs that are in original but not in current (these need to be deleted)
+      const locationsToDelete = originalLocationIds.filter(
+        (id) => !currentLocationIds.includes(id)
+      );
+
+      // Delete removed locations
+      for (const locationId of locationsToDelete) {
+        await greenTargetApi.deleteLocation(locationId);
+      }
+
+      // Handle locations (update existing, add new)
       if (locations.length > 0) {
-        // For existing locations, we need to check if they need to be updated or added
         for (const location of locations) {
           if (location.location_id) {
             // Update existing location
             await greenTargetApi.updateLocation(location.location_id, {
               address: location.address,
+              phone_number: location.phone_number,
             });
           } else {
             // Add new location
             await greenTargetApi.createLocation({
               customer_id: customerId,
               address: location.address,
+              phone_number: location.phone_number,
             });
           }
         }
-
-        // For locations that were removed, we would need to delete them
-        // This is complex to track, so we'd need a more sophisticated approach
-        // For simplicity, not implementing this now
       }
 
       toast.success(
@@ -298,37 +337,72 @@ const CustomerFormPage: React.FC = () => {
               <h2 className="text-lg font-medium mb-4">Customer Locations</h2>
 
               <div className="mb-6">
-                <div
-                  className={`flex space-x-2 border rounded-lg p-1.5 ${
-                    isLocationInputFocused
-                      ? "border-default-500"
-                      : "border-default-300"
-                  }`}
-                >
-                  <div className="flex-grow relative">
-                    <span className="absolute inset-y-0 left-2 flex items-center text-default-400">
-                      <IconMapPin size={18} />
-                    </span>
-                    <input
-                      type="text"
-                      value={newLocation}
-                      onChange={(e) => setNewLocation(e.target.value)}
-                      onFocus={() => setIsLocationInputFocused(true)}
-                      onBlur={() => setIsLocationInputFocused(false)}
-                      placeholder="Enter location address"
-                      className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleAddLocation}
-                    variant="default"
-                    color="sky"
-                    size="sm"
+                <div className="flex flex-row space-x-2 w-full">
+                  {/* Location input - 70% width */}
+                  <div
+                    className={`flex flex-grow w-[70%] border rounded-lg p-1.5 ${
+                      isLocationInputFocused
+                        ? "border-default-500"
+                        : "border-default-300"
+                    }`}
                   >
-                    Add Location
-                  </Button>
+                    <div className="flex relative w-[85%]">
+                      <span className="absolute inset-y-0 left-2 flex items-center text-default-400">
+                        <IconMapPin size={18} />
+                      </span>
+                      <input
+                        type="text"
+                        name="address"
+                        value={newLocation.address}
+                        onChange={handleLocationInputChange}
+                        onFocus={() => setIsLocationInputFocused(true)}
+                        onBlur={() => setIsLocationInputFocused(false)}
+                        placeholder="Enter location address"
+                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleAddLocation}
+                      variant="default"
+                      color="sky"
+                      size="sm"
+                      className="w-[15%]"
+                    >
+                      Add Location
+                    </Button>
+                  </div>
+
+                  {/* Phone input - 30% width */}
+                  <div
+                    className={`flex w-[30%] border rounded-lg p-1.5 ${
+                      isPhoneInputFocused
+                        ? "border-default-500"
+                        : "border-default-300"
+                    }`}
+                  >
+                    <div className="flex relative w-full">
+                      <span className="absolute inset-y-0 left-2 flex items-center text-default-400">
+                        <IconPhone size={18} />
+                      </span>
+                      <input
+                        type="tel"
+                        name="phone_number"
+                        value={newLocation.phone_number}
+                        onChange={handleLocationInputChange}
+                        onFocus={() => setIsPhoneInputFocused(true)}
+                        onBlur={() => setIsPhoneInputFocused(false)}
+                        placeholder={`Optional phone number (default: ${
+                          formData.phone_number || "none"
+                        })`}
+                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Add Location Button - Below the inputs */}
+                <div className="mt-2 flex justify-end"></div>
               </div>
 
               {locations.length > 0 ? (
@@ -338,20 +412,34 @@ const CustomerFormPage: React.FC = () => {
                       key={index}
                       className="flex justify-between items-center bg-white border border-default-200 p-4 rounded-lg hover:shadow-sm transition-shadow duration-200"
                     >
-                      <div className="flex items-center">
-                        <span className="flex h-8 w-8 items-center justify-center bg-sky-100 text-sky-600 rounded-full mr-3">
-                          <IconMapPin size={16} />
-                        </span>
-                        <span className="font-medium">{location.address}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <span className="flex h-8 w-8 items-center justify-center bg-sky-100 text-sky-600 rounded-full mr-3">
+                              <IconMapPin size={16} />
+                            </span>
+                            <span className="font-medium">
+                              {location.address}
+                            </span>
+                          </div>
+                          {/* Only show phone if it's different from the customer's default */}
+                          {location.phone_number &&
+                            location.phone_number !== formData.phone_number && (
+                              <div className="flex items-center px-2 text-default-600 text-sm">
+                                <IconPhone size={14} className="mr-1" />
+                                {location.phone_number}
+                              </div>
+                            )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLocation(index)}
+                            className="p-1.5 rounded-full text-default-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Remove location"
+                          >
+                            <IconTrash size={18} />
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveLocation(index)}
-                        className="p-1.5 rounded-full text-default-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Remove location"
-                      >
-                        <IconTrash size={18} />
-                      </button>
                     </div>
                   ))}
                 </div>
