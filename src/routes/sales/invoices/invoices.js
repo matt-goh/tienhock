@@ -611,10 +611,30 @@ export default function (pool, config) {
       // If all invoices failed, rollback and return error
       if (errors.length === invoices.length) {
         await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "All invoices failed to process",
-          errors,
-        });
+
+        if (isMinimal) {
+          // Transform error format for minimal response
+          const invoicesResponse = errors.map((error) => ({
+            id: error.billNumber,
+            systemStatus: 100, // Error
+            einvoiceStatus: 20, // Not processed
+            error: {
+              message: error.message,
+            },
+          }));
+
+          return res.status(400).json({
+            message: "All invoices failed to process",
+            invoices: invoicesResponse,
+            overallStatus: "Invalid",
+          });
+        } else {
+          // Standard error format
+          return res.status(400).json({
+            message: "All invoices failed to process",
+            errors,
+          });
+        }
       }
 
       // Otherwise commit successful transactions
@@ -750,7 +770,7 @@ export default function (pool, config) {
           }
         }
 
-        return res.status(207).json({
+        return res.status(200).json({
           message: "Invoice processing completed",
           invoices: invoices,
           overallStatus: einvoiceResults
@@ -760,7 +780,7 @@ export default function (pool, config) {
       }
 
       // Return full response for ERP system (default)
-      res.status(207).json({
+      res.status(200).json({
         message: "Invoice processing completed",
         results,
         errors: errors.length > 0 ? errors : undefined,
