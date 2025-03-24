@@ -484,7 +484,7 @@ const RentalFormPage: React.FC = () => {
                           </ListboxOption>
                         ))}
                         {/* Add new location option */}
-                        {formData.customer_id && (
+                        {formData.customer_id ? (
                           <ListboxOption
                             className={({ active }) =>
                               `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
@@ -503,7 +503,7 @@ const RentalFormPage: React.FC = () => {
                               </span>
                             )}
                           </ListboxOption>
-                        )}
+                        ) : null}
                       </ListboxOptions>
                     </div>
                   </Listbox>
