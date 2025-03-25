@@ -14,6 +14,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { api } from "../../../routes/utils/api";
 
 interface Dumpster {
   tong_no: string;
@@ -34,7 +35,7 @@ const DumpsterFormPage: React.FC = () => {
     tong_no: "",
     status: "Available",
   });
-
+  const [rentals, setRentals] = useState<any[]>([]);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -46,6 +47,7 @@ const DumpsterFormPage: React.FC = () => {
   useEffect(() => {
     if (isEditMode && id) {
       fetchDumpsterDetails(id);
+      fetchDumpsterRentals(id);
     }
   }, [id, isEditMode]);
 
@@ -96,6 +98,18 @@ const DumpsterFormPage: React.FC = () => {
       console.error("Error fetching dumpster details:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDumpsterRentals = async (dumpsterId: string) => {
+    try {
+      const response = await api.get(
+        `/greentarget/api/rentals?tong_no=${encodeURIComponent(dumpsterId)}`
+      );
+      setRentals(response || []);
+    } catch (err) {
+      console.error("Error fetching dumpster rentals:", err);
+      setRentals([]);
     }
   };
 
@@ -370,6 +384,101 @@ const DumpsterFormPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {isEditMode && (
+            <div className="mt-8 pt-4 border-t">
+              <h2 className="text-lg font-medium mb-4">Rental Schedule</h2>
+              {rentals.length === 0 ? (
+                <p className="text-default-500">
+                  No rentals scheduled for this dumpster.
+                </p>
+              ) : (
+                <div className="overflow-hidden border border-default-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-default-200">
+                    <thead className="bg-default-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          Customer
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          Placement Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          Pickup Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-default-200">
+                      {rentals.map((rental) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const pickupDate = rental.date_picked
+                          ? new Date(rental.date_picked)
+                          : null;
+                        const placementDate = new Date(rental.date_placed);
+
+                        // A rental is currently active if:
+                        // 1. It has a placement date in the past or today, AND
+                        // 2. Either it has no pickup date, or the pickup date is in the future
+                        const isCurrent =
+                          placementDate <= today &&
+                          (!pickupDate || pickupDate > today);
+
+                        // A rental is scheduled if the placement date is in the future
+                        const isScheduled = placementDate > today;
+
+                        // A rental is completed if it has a pickup date in the past
+                        const isCompleted = pickupDate && pickupDate <= today;
+
+                        return (
+                          <tr
+                            key={rental.rental_id}
+                            className="hover:bg-default-50"
+                          >
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
+                              {rental.customer_name}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                              {new Date(
+                                rental.date_placed
+                              ).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                              {rental.date_picked
+                                ? new Date(
+                                    rental.date_picked
+                                  ).toLocaleDateString()
+                                : "Not set"}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                  isCurrent
+                                    ? "bg-green-100 text-green-800"
+                                    : isScheduled
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-blue-100 text-blue-800"
+                                }`}
+                              >
+                                {isCurrent
+                                  ? "Ongoing"
+                                  : isScheduled
+                                  ? "Scheduled"
+                                  : "Completed"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-6 py-3 text-right">
             <Button

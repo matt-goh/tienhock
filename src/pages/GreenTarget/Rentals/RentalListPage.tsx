@@ -10,10 +10,13 @@ import {
   IconReceipt,
   IconSquareCheckFilled,
   IconSquare,
+  IconTrash,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import toast from "react-hot-toast";
 
 // Define the Rental interface
 interface Rental {
@@ -34,10 +37,12 @@ const RentalCard = ({
   rental,
   onGenerateDeliveryOrder,
   onCreateInvoice,
+  onDeleteRental,
 }: {
   rental: Rental;
   onGenerateDeliveryOrder: (rental: Rental) => void;
   onCreateInvoice: (rental: Rental) => void;
+  onDeleteRental: (rental: Rental) => void;
 }) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
@@ -65,16 +70,31 @@ const RentalCard = ({
     const differenceInTime = endDate.getTime() - startDate.getTime();
     const differenceInDays = Math.ceil(differenceInTime / (1000 * 3600 * 24));
 
-    return `${differenceInDays} day${differenceInDays !== 1 ? "s" : ""}`;
+    // Return different text for rentals with and without pickup dates
+    if (!rental.date_picked) {
+      return `-`;
+    } else {
+      return `${differenceInDays} day${differenceInDays !== 1 ? "s" : ""}`;
+    }
   };
 
-  const isActive = !rental.date_picked;
+  const isActive = () => {
+    if (!rental.date_picked) return true;
+
+    // If pickup date exists but is in the future, still consider active
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to beginning of today
+    const pickupDate = new Date(rental.date_picked);
+    return pickupDate > today;
+  };
+
+  const activeStatus = isActive();
 
   return (
     <div
       className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
         isCardHovered ? "bg-default-100 active:bg-default-200" : ""
-      } ${isActive ? "border-green-400" : ""}`}
+      } ${activeStatus ? "border-green-400" : ""}`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -83,12 +103,12 @@ const RentalCard = ({
         <h3 className="font-semibold">Rental #{rental.rental_id}</h3>
         <span
           className={`text-xs rounded-full px-2 py-0.5 ${
-            isActive
+            activeStatus
               ? "bg-green-100 text-green-800"
               : "bg-default-100 text-default-800"
           }`}
         >
-          {isActive ? "Active" : "Completed"}
+          {activeStatus ? "Ongoing" : "Completed"}
         </span>
       </div>
 
@@ -110,11 +130,11 @@ const RentalCard = ({
 
       <div className="space-y-1 text-sm">
         <p>
-          <span className="font-medium">Placed:</span>{" "}
+          <span className="font-medium">Place:</span>{" "}
           {formatDate(rental.date_placed)}
         </p>
         <p>
-          <span className="font-medium">Picked up:</span>{" "}
+          <span className="font-medium">Pick up:</span>{" "}
           {formatDate(rental.date_picked)}
         </p>
         <p>
@@ -147,6 +167,16 @@ const RentalCard = ({
               <IconFileInvoice size={18} stroke={1.5} />
             </button>
           )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteRental(rental);
+            }}
+            className="p-1.5 hover:bg-rose-100 active:bg-rose-200 text-rose-600 hover:text-rose-700 rounded-full"
+            title="Delete Rental"
+          >
+            <IconTrash size={18} stroke={1.5} />
+          </button>
         </div>
       )}
     </div>
@@ -160,6 +190,9 @@ const RentalListPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeOnly, setActiveOnly] = useState(true);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -202,7 +235,41 @@ const RentalListPage = () => {
     });
   };
 
+  const handleDeleteRental = (rental: Rental) => {
+    setRentalToDelete(rental);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteRental = async () => {
+    if (!rentalToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await greenTargetApi.deleteRental(rentalToDelete.rental_id);
+      toast.success("Rental deleted successfully");
+
+      // Remove deleted rental from state
+      setRentals(
+        rentals.filter((r) => r.rental_id !== rentalToDelete.rental_id)
+      );
+    } catch (error: any) {
+      if (error.message && error.message.includes("associated invoices")) {
+        toast.error("Cannot delete rental: it has associated invoices");
+      } else {
+        toast.error("Failed to delete rental");
+        console.error("Error deleting rental:", error);
+      }
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+      setRentalToDelete(null);
+    }
+  };
+
   const filteredRentals = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return rentals.filter((rental) => {
       // Filter by search term (customer name, location, driver or dumpster number)
       const matchesSearch =
@@ -214,8 +281,11 @@ const RentalListPage = () => {
         rental.driver.toLowerCase().includes(searchTerm.toLowerCase()) ||
         rental.tong_no.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Filter by active status if needed
-      const matchesStatus = activeOnly ? !rental.date_picked : true;
+      // Filter by active status - consider rentals with future pickup dates as active
+      const isRentalActive =
+        !rental.date_picked || new Date(rental.date_picked) > today;
+
+      const matchesStatus = activeOnly ? isRentalActive : true;
 
       return matchesSearch && matchesStatus;
     });
@@ -408,6 +478,7 @@ const RentalListPage = () => {
               rental={rental}
               onGenerateDeliveryOrder={handleGenerateDeliveryOrder}
               onCreateInvoice={handleCreateInvoice}
+              onDeleteRental={handleDeleteRental}
             />
           ))}
         </div>
@@ -432,6 +503,17 @@ const RentalListPage = () => {
           </button>
         </div>
       )}
+      <ConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={confirmDeleteRental}
+        title="Delete Rental"
+        message={`Are you sure you want to delete the rental for ${
+          rentalToDelete?.customer_name || "this customer"
+        }? This action cannot be undone.`}
+        confirmButtonText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

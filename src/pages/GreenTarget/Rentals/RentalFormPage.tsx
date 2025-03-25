@@ -1,6 +1,6 @@
 // src/pages/GreenTarget/Rentals/RentalFormPage.tsx
-import React, { useState, useEffect } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
@@ -8,11 +8,14 @@ import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
-  IconCalendar,
+  IconCircleCheck,
+  IconCircleDashed,
+  IconCircleX,
   IconChevronDown,
   IconCheck,
   IconPlus,
   IconPhone,
+  IconTrash,
 } from "@tabler/icons-react";
 import { api } from "../../../routes/utils/api";
 import {
@@ -39,6 +42,15 @@ interface Location {
 interface Dumpster {
   tong_no: string;
   status: string;
+  available_until?: string;
+  available_after?: string;
+  reason?: string;
+  customer?: string;
+  rental_id?: number;
+  next_rental?: {
+    date: string;
+    customer: string;
+  };
 }
 
 interface Rental {
@@ -81,7 +93,7 @@ const RentalFormPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [isNewLocationModalOpen, setIsNewLocationModalOpen] = useState(false);
-  const [availableDumpsters, setAvailableDumpsters] = useState<Dumpster[]>([]);
+  const [isValidSelection, setIsValidSelection] = useState(false);
   const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
 
   // UI state
@@ -103,28 +115,26 @@ const RentalFormPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isPlacementDateFocused, setIsPlacementDateFocused] = useState(false);
   const [isPickupDateFocused, setIsPickupDateFocused] = useState(false);
+  const [dumpsterAvailability, setDumpsterAvailability] = useState<{
+    date: string;
+    available: Dumpster[];
+    upcoming: Dumpster[];
+    unavailable: Dumpster[];
+  } | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load reference data
   useEffect(() => {
     const loadReferenceData = async () => {
       try {
-        const [customersData, dumpstersData, driversData] = await Promise.all([
+        const [customersData, driversData] = await Promise.all([
           api.get("/greentarget/api/customers"),
-          api.get("/greentarget/api/dumpsters?status=Available"),
-          api.get("/api/staffs/get-drivers"), // Add this new endpoint call
+          api.get("/api/staffs/get-drivers"),
         ]);
 
         setCustomers(customersData);
-        setAvailableDumpsters(dumpstersData);
-        setDrivers(driversData); // Set the drivers
-
-        // Auto-select the first dumpster if available and we're not in edit mode
-        if (!isEditMode && dumpstersData && dumpstersData.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            tong_no: dumpstersData[0].tong_no,
-          }));
-        }
+        setDrivers(driversData);
 
         // Auto-select the first driver if available and we're not in edit mode
         if (!isEditMode && driversData && driversData.length > 0) {
@@ -141,6 +151,33 @@ const RentalFormPage: React.FC = () => {
 
     loadReferenceData();
   }, [isEditMode]);
+
+  useEffect(() => {
+    const fetchDumpsterAvailability = async () => {
+      if (!formData.date_placed) return;
+
+      try {
+        const data = await api.get(
+          `/greentarget/api/dumpsters/availability?date=${formData.date_placed}`
+        );
+        setDumpsterAvailability(data);
+
+        // If we're creating a new rental and there are available dumpsters,
+        // auto-select the first available one
+        if (!isEditMode && !formData.tong_no && data.available.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            tong_no: data.available[0].tong_no,
+          }));
+        }
+      } catch (err) {
+        console.error("Error fetching dumpster availability:", err);
+        toast.error("Failed to load dumpster availability");
+      }
+    };
+
+    fetchDumpsterAvailability();
+  }, [formData.date_placed, isEditMode]);
 
   // Load rental data in edit mode
   useEffect(() => {
@@ -216,6 +253,27 @@ const RentalFormPage: React.FC = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!formData.rental_id) return;
+
+    setIsDeleting(true);
+    try {
+      await greenTargetApi.deleteRental(formData.rental_id);
+      toast.success("Rental deleted successfully");
+      navigate("/greentarget/rentals");
+    } catch (error: any) {
+      if (error.message && error.message.includes("associated invoices")) {
+        toast.error("Cannot delete rental: it has associated invoices");
+      } else {
+        toast.error("Failed to delete rental");
+        console.error("Error deleting rental:", error);
+      }
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   const fetchCustomerLocations = async (customerId: number) => {
     try {
       // Using the correct API endpoint with query parameter
@@ -283,24 +341,84 @@ const RentalFormPage: React.FC = () => {
     navigate("/greentarget/rentals");
   };
 
+  const checkDumpsterAvailability = useCallback(() => {
+    if (!formData.date_placed || !formData.tong_no || !dumpsterAvailability) {
+      setIsValidSelection(false);
+      return;
+    }
+
+    // If we're in edit mode with the original dumpster, it's always valid
+    if (isEditMode && formData.tong_no === initialFormData.tong_no) {
+      setIsValidSelection(true);
+      return;
+    }
+
+    // Direct availability
+    const isAvailable = dumpsterAvailability.available.some(
+      (d) => d.tong_no === formData.tong_no
+    );
+
+    // For upcoming dumpsters, check if it's a same-day transition
+    // (placement date equals availability date)
+    const isTransition = dumpsterAvailability.upcoming.some(
+      (d) =>
+        d.tong_no === formData.tong_no &&
+        d.available_after === formData.date_placed
+    );
+
+    // A dumpster is valid if it's available now OR it's a valid same-day transition
+    if (isAvailable || isTransition) {
+      setIsValidSelection(true);
+    } else {
+      const upcomingDumpster = dumpsterAvailability.upcoming.find(
+        (d) => d.tong_no === formData.tong_no
+      );
+
+      // If it's upcoming but not yet available on the selected date
+      if (
+        upcomingDumpster?.available_after &&
+        formData.date_placed > upcomingDumpster.available_after
+      ) {
+        setIsValidSelection(true);
+      } else {
+        setIsValidSelection(false);
+      }
+    }
+  }, [
+    formData.date_placed,
+    formData.tong_no,
+    dumpsterAvailability,
+    isEditMode,
+    initialFormData.tong_no,
+  ]);
+
+  useEffect(() => {
+    checkDumpsterAvailability();
+  }, [
+    formData.date_placed,
+    formData.tong_no,
+    dumpsterAvailability,
+    checkDumpsterAvailability,
+  ]);
+
   const validateForm = (): boolean => {
+    if (!formData.date_placed) {
+      toast.error("Please select a placement date");
+      return false;
+    }
+
     if (!formData.customer_id) {
       toast.error("Please select a customer");
       return false;
     }
 
-    if (!isEditMode && !formData.tong_no) {
+    if (!formData.tong_no) {
       toast.error("Please select a dumpster");
       return false;
     }
 
     if (!formData.driver) {
       toast.error("Please select a driver");
-      return false;
-    }
-
-    if (!formData.date_placed) {
-      toast.error("Please set the placement date");
       return false;
     }
 
@@ -312,6 +430,12 @@ const RentalFormPage: React.FC = () => {
         toast.error("Pickup date cannot be earlier than placement date");
         return false;
       }
+    }
+
+    // Add a check for dumpster availability
+    if (!isValidSelection && !isEditMode) {
+      toast.error("The selected dumpster is not available for the chosen date");
+      return false;
     }
 
     return true;
@@ -354,7 +478,13 @@ const RentalFormPage: React.FC = () => {
       navigate("/greentarget/rentals");
     } catch (error: any) {
       if (error.message && error.message.includes("not available")) {
-        toast.error("The selected dumpster is no longer available");
+        toast.error(
+          "The selected dumpster is not available for the chosen period"
+        );
+      } else if (error.message && error.message.includes("overlaps")) {
+        toast.error("The rental period overlaps with an existing rental");
+      } else if (error.message && error.message.includes("after pickup date")) {
+        toast.error("Placement date cannot be after pickup date");
       } else {
         toast.error("An unexpected error occurred.");
         console.error("Error saving rental:", error);
@@ -377,7 +507,7 @@ const RentalFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4">
+    <div className="container mx-auto px-4 -mt-6">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
@@ -386,9 +516,7 @@ const RentalFormPage: React.FC = () => {
           </h1>
           <p className="mt-1 text-sm text-default-500">
             {isEditMode
-              ? `${
-                  formData.date_picked ? "View" : "Update"
-                } rental details here.`
+              ? `Update rental details here.`
               : "Create a new dumpster rental record."}
           </p>
         </div>
@@ -681,18 +809,97 @@ const RentalFormPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Dates Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">Rental Dates</h2>
+              <p className="text-sm text-default-500">
+                Select a date to see available dumpsters
+              </p>
+
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="date_placed"
+                    className="text-sm font-medium text-default-700"
+                  >
+                    Placement Date <span className="text-rose-500">*</span>
+                  </label>
+                  <div
+                    className={`flex relative w-full border rounded-lg ${
+                      isPlacementDateFocused
+                        ? "border-default-500"
+                        : "border-default-300"
+                    }`}
+                  >
+                    <input
+                      type="date"
+                      id="date_placed"
+                      name="date_placed"
+                      value={formatDateForInput(formData.date_placed)}
+                      onChange={handleDateChange}
+                      onFocus={() => setIsPlacementDateFocused(true)}
+                      onBlur={() => setIsPlacementDateFocused(false)}
+                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none disabled:bg-default-50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="date_picked"
+                    className="text-sm font-medium text-default-700"
+                  >
+                    Pickup Date{" "}
+                    {!isEditMode && "(Leave empty for ongoing rentals)"}
+                  </label>
+                  <div
+                    className={`flex relative w-full border rounded-lg ${
+                      isPickupDateFocused
+                        ? "border-default-500"
+                        : "border-default-300"
+                    }`}
+                  >
+                    <input
+                      type="date"
+                      id="date_picked"
+                      name="date_picked"
+                      value={formatDateForInput(formData.date_picked)}
+                      onChange={handleDateChange}
+                      onFocus={() => setIsPickupDateFocused(true)}
+                      onBlur={() => setIsPickupDateFocused(false)}
+                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Dumpster & Driver Section */}
             <div className="space-y-4">
               <h2 className="text-lg font-medium">Rental Details</h2>
 
+              {/* Availability summary */}
+              {dumpsterAvailability && (
+                <div className="text-sm mb-2">
+                  <span className="font-medium">
+                    {dumpsterAvailability.available.length} dumpsters available
+                  </span>
+                  {dumpsterAvailability.upcoming.length > 0 && (
+                    <span className="ml-2 text-default-500">
+                      • {dumpsterAvailability.upcoming.length} upcoming
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label
                     htmlFor="tong_no"
                     className="text-sm font-medium text-default-700"
                   >
-                    Dumpster
+                    Dumpster <span className="text-rose-500">*</span>
                   </label>
+
                   <Listbox
                     value={formData.tong_no}
                     onChange={(value) => {
@@ -701,11 +908,14 @@ const RentalFormPage: React.FC = () => {
                         tong_no: value,
                       }));
                     }}
+                    disabled={!formData.date_placed}
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
                         <span className="block truncate">
-                          {formData.tong_no || "Select Dumpster"}
+                          {formData.tong_no
+                            ? formData.tong_no
+                            : "Select Dumpster"}
                         </span>
                         <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                           <IconChevronDown
@@ -715,69 +925,208 @@ const RentalFormPage: React.FC = () => {
                         </span>
                       </ListboxButton>
                       <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                        <ListboxOption
-                          value=""
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                              active
-                                ? "bg-default-100 text-default-900"
-                                : "text-default-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                Select Dumpster
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                  />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                        {availableDumpsters.map((dumpster) => (
-                          <ListboxOption
-                            key={dumpster.tong_no}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                active
-                                  ? "bg-default-100 text-default-900"
-                                  : "text-default-900"
-                              }`
-                            }
-                            value={dumpster.tong_no}
-                          >
-                            {({ selected }) => (
+                        {!dumpsterAvailability ? (
+                          <div className="px-3 py-2 text-default-500">
+                            Please select a placement date first
+                          </div>
+                        ) : dumpsterAvailability.available.length === 0 &&
+                          dumpsterAvailability.upcoming.length === 0 &&
+                          dumpsterAvailability.unavailable.length === 0 ? (
+                          <div className="px-3 py-2 text-default-500">
+                            No dumpsters found
+                          </div>
+                        ) : (
+                          <>
+                            {/* Available dumpsters */}
+                            {dumpsterAvailability.available.length > 0 && (
                               <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {dumpster.tong_no}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                    <IconCheck
-                                      className="h-5 w-5"
-                                      aria-hidden="true"
-                                    />
-                                  </span>
+                                <div className="px-3 py-1.5 text-xs font-semibold text-default-500 bg-default-50">
+                                  Available Dumpsters{" "}
+                                  {dumpsterAvailability.available.some(
+                                    (d) => d.available_until
+                                  )
+                                    ? "(Some have upcoming rentals)"
+                                    : ""}
+                                </div>
+                                {dumpsterAvailability.available.map(
+                                  (dumpster) => (
+                                    <ListboxOption
+                                      key={dumpster.tong_no}
+                                      className={({ active }) =>
+                                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                          active
+                                            ? "bg-default-100 text-default-900"
+                                            : "text-default-900"
+                                        }`
+                                      }
+                                      value={dumpster.tong_no}
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <div className="flex flex-col">
+                                            <div className="flex items-center">
+                                              <IconCircleCheck
+                                                size={16}
+                                                className="mr-2 text-green-500"
+                                              />
+                                              <span
+                                                className={`block truncate ${
+                                                  selected
+                                                    ? "font-medium"
+                                                    : "font-normal"
+                                                }`}
+                                              >
+                                                {dumpster.tong_no}
+                                              </span>
+                                            </div>
+                                            {dumpster.available_until && (
+                                              <span className="text-xs text-green-600 ml-6">
+                                                Available until{" "}
+                                                {new Date(
+                                                  dumpster.available_until
+                                                ).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                              <IconCheck
+                                                className="h-5 w-5"
+                                                aria-hidden="true"
+                                              />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </ListboxOption>
+                                  )
                                 )}
                               </>
                             )}
-                          </ListboxOption>
-                        ))}
+
+                            {/* Upcoming dumpsters */}
+                            {dumpsterAvailability.upcoming.length > 0 && (
+                              <>
+                                <div className="px-3 py-1.5 text-xs font-semibold text-default-500 bg-default-50 mt-1">
+                                  Future Availability
+                                </div>
+                                {dumpsterAvailability.upcoming.map(
+                                  (dumpster) => (
+                                    <ListboxOption
+                                      key={dumpster.tong_no}
+                                      className={({ active }) =>
+                                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                          active
+                                            ? "bg-default-100 text-default-900"
+                                            : "text-default-900"
+                                        }`
+                                      }
+                                      value={dumpster.tong_no}
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <div className="flex flex-col">
+                                            <div className="flex items-center">
+                                              <IconCircleDashed
+                                                size={16}
+                                                className="mr-2 text-amber-500"
+                                              />
+                                              <span
+                                                className={`block truncate ${
+                                                  selected
+                                                    ? "font-medium"
+                                                    : "font-normal"
+                                                }`}
+                                              >
+                                                {dumpster.tong_no}
+                                              </span>
+                                            </div>
+                                            {dumpster.available_after && (
+                                              <span className="text-xs text-amber-600 ml-6">
+                                                Available after{" "}
+                                                {new Date(
+                                                  dumpster.available_after
+                                                ).toLocaleDateString()}
+                                                {dumpster.customer &&
+                                                  ` (Currently with ${dumpster.customer})`}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                              <IconCheck
+                                                className="h-5 w-5"
+                                                aria-hidden="true"
+                                              />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </ListboxOption>
+                                  )
+                                )}
+                              </>
+                            )}
+
+                            {/* Unavailable dumpsters */}
+                            {dumpsterAvailability.unavailable.length > 0 && (
+                              <>
+                                <div className="px-3 py-1.5 text-xs font-semibold text-default-500 bg-default-50 mt-1">
+                                  Unavailable Dumpsters
+                                </div>
+                                {dumpsterAvailability.unavailable.map(
+                                  (dumpster) => (
+                                    <ListboxOption
+                                      key={dumpster.tong_no}
+                                      className={({ active }) =>
+                                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                                          active
+                                            ? "bg-default-100 text-default-900"
+                                            : "text-default-900"
+                                        }`
+                                      }
+                                      value={dumpster.tong_no}
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <div className="flex flex-col">
+                                            <div className="flex items-center">
+                                              <IconCircleX
+                                                size={16}
+                                                className="mr-2 text-rose-500"
+                                              />
+                                              <span
+                                                className={`block truncate ${
+                                                  selected
+                                                    ? "font-medium"
+                                                    : "font-normal"
+                                                }`}
+                                              >
+                                                {dumpster.tong_no}
+                                              </span>
+                                            </div>
+                                            <span className="text-xs text-rose-600 ml-6">
+                                              {dumpster.reason ||
+                                                "Currently unavailable"}
+                                            </span>
+                                          </div>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                              <IconCheck
+                                                className="h-5 w-5"
+                                                aria-hidden="true"
+                                              />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </ListboxOption>
+                                  )
+                                )}
+                              </>
+                            )}
+                          </>
+                        )}
                       </ListboxOptions>
                     </div>
                   </Listbox>
@@ -788,7 +1137,7 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="driver"
                     className="text-sm font-medium text-default-700"
                   >
-                    Driver
+                    Driver <span className="text-rose-500">*</span>
                   </label>
                   <Listbox
                     value={formData.driver}
@@ -882,68 +1231,6 @@ const RentalFormPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Dates Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium">Dates</h2>
-
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="date_placed"
-                    className="text-sm font-medium text-default-700"
-                  >
-                    Placement Date
-                  </label>
-                  <div
-                    className={`flex relative w-full border rounded-lg ${
-                      isPlacementDateFocused
-                        ? "border-default-500"
-                        : "border-default-300"
-                    }`}
-                  >
-                    <input
-                      type="date"
-                      id="date_placed"
-                      name="date_placed"
-                      value={formatDateForInput(formData.date_placed)}
-                      onChange={handleDateChange}
-                      onFocus={() => setIsPlacementDateFocused(true)}
-                      onBlur={() => setIsPlacementDateFocused(false)}
-                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none disabled:bg-default-50"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="date_picked"
-                    className="text-sm font-medium text-default-700"
-                  >
-                    Pickup Date{" "}
-                    {!isEditMode && "(Leave empty for active rentals)"}
-                  </label>
-                  <div
-                    className={`flex relative w-full border rounded-lg ${
-                      isPickupDateFocused
-                        ? "border-default-500"
-                        : "border-default-300"
-                    }`}
-                  >
-                    <input
-                      type="date"
-                      id="date_picked"
-                      name="date_picked"
-                      value={formatDateForInput(formData.date_picked)}
-                      onChange={handleDateChange}
-                      onFocus={() => setIsPickupDateFocused(true)}
-                      onBlur={() => setIsPickupDateFocused(false)}
-                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Remarks Section */}
             <div className="space-y-2">
               <label
@@ -964,19 +1251,88 @@ const RentalFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-6 py-3 text-right">
-            <Button
-              type="submit"
-              variant="boldOutline"
-              size="lg"
-              disabled={
-                isSaving ||
-                (!isEditMode && !isFormChanged) ||
-                (isEditMode && formData.date_picked !== null && !isFormChanged)
-              }
-            >
-              {isSaving ? "Saving..." : isEditMode ? "Update" : "Create Rental"}
-            </Button>
+          {!isValidSelection &&
+            formData.tong_no &&
+            formData.date_placed &&
+            !isEditMode && (
+              <div className="mt-2 text-sm text-rose-600 flex items-center">
+                <IconCircleX size={16} className="mr-1.5 flex-shrink-0" />
+                <span>
+                  The selected dumpster is not available for the chosen date.
+                  {(() => {
+                    const upcomingDumpster =
+                      dumpsterAvailability?.upcoming.find(
+                        (d) => d.tong_no === formData.tong_no
+                      );
+                    const unavailableDumpster =
+                      dumpsterAvailability?.unavailable.find(
+                        (d) => d.tong_no === formData.tong_no
+                      );
+
+                    if (upcomingDumpster?.available_after) {
+                      return ` It will be available after ${new Date(
+                        upcomingDumpster.available_after
+                      ).toLocaleDateString()}${
+                        upcomingDumpster.customer
+                          ? ` (currently with ${upcomingDumpster.customer})`
+                          : ""
+                      }.`;
+                    } else if (unavailableDumpster?.reason) {
+                      return ` ${unavailableDumpster.reason}${
+                        unavailableDumpster.customer
+                          ? ` (with ${unavailableDumpster.customer})`
+                          : ""
+                      }.`;
+                    }
+                    return "";
+                  })()}
+                  {/* Specific note about same-day transitions */}
+                  {dumpsterAvailability?.upcoming.some(
+                    (d) =>
+                      d.tong_no === formData.tong_no &&
+                      d.available_after &&
+                      new Date(d.available_after) >
+                        new Date(formData.date_placed)
+                  )}
+                </span>
+              </div>
+            )}
+
+          <div className="mt-6 py-3 flex space-x-2 justify-end">
+            {isEditMode && (
+              <Button
+                type="button"
+                variant="outline"
+                color="rose"
+                size="lg"
+                icon={IconTrash}
+                onClick={() => setIsDeleteDialogOpen(true)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete Rental"}
+              </Button>
+            )}
+            <div className={isEditMode ? "" : "ml-auto"}>
+              <Button
+                type="submit"
+                variant="boldOutline"
+                size="lg"
+                disabled={
+                  isSaving ||
+                  (!isEditMode && !isFormChanged) ||
+                  (isEditMode &&
+                    formData.date_picked !== null &&
+                    !isFormChanged) ||
+                  (!isValidSelection && !isEditMode)
+                }
+              >
+                {isSaving
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Update"
+                  : "Create Rental"}
+              </Button>
+            </div>
           </div>
         </form>
       </div>
@@ -1068,6 +1424,15 @@ const RentalFormPage: React.FC = () => {
 
           setIsNewLocationModalOpen(false);
         }}
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDelete}
+        title="Delete Rental"
+        message="Are you sure you want to delete this rental? This action cannot be undone."
+        confirmButtonText="Delete"
+        variant="danger"
       />
       <ConfirmationDialog
         isOpen={showBackConfirmation}

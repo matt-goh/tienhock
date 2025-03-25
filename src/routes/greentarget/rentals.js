@@ -4,8 +4,62 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  const updateExpiredRentals = async (pool) => {
+    const client = await pool.connect();
+    try {
+      const today = new Date().toISOString().split("T")[0];
+
+      // Get all rentals with pickup dates that have passed
+      const expiredRentalsQuery = `
+        SELECT r.rental_id, r.tong_no
+        FROM greentarget.rentals r
+        WHERE r.date_picked < $1
+      `;
+
+      const expiredRentalsResult = await client.query(expiredRentalsQuery, [
+        today,
+      ]);
+
+      // For each dumpster, check if there are any active rentals
+      const processedDumpsters = new Set();
+
+      for (const rental of expiredRentalsResult.rows) {
+        if (!processedDumpsters.has(rental.tong_no)) {
+          processedDumpsters.add(rental.tong_no);
+
+          // Check if this dumpster has any active rentals
+          const activeRentalsQuery = `
+            SELECT COUNT(*) 
+            FROM greentarget.rentals 
+            WHERE tong_no = $1 
+            AND (date_picked IS NULL OR date_picked >= $2)
+            AND date_placed <= $2
+          `;
+
+          const activeRentalsResult = await client.query(activeRentalsQuery, [
+            rental.tong_no,
+            today,
+          ]);
+
+          // If no active rentals, set dumpster status to Available
+          if (parseInt(activeRentalsResult.rows[0].count) === 0) {
+            await client.query(
+              `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
+              [rental.tong_no]
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error updating expired rentals:", error);
+    } finally {
+      client.release();
+    }
+  };
+
   // Get all rentals (with optional filters)
   router.get("/", async (req, res) => {
+    await updateExpiredRentals(pool);
     const { customer_id, location_id, tong_no, active_only } = req.query;
 
     try {
@@ -63,7 +117,6 @@ export default function (pool) {
   router.post("/", async (req, res) => {
     const { customer_id, location_id, tong_no, driver, date_placed, remarks } =
       req.body;
-
     const client = await pool.connect();
 
     try {
@@ -76,11 +129,34 @@ export default function (pool) {
         );
       }
 
-      // Update dumpster status to 'rented'
-      await client.query(
-        `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-        [tong_no]
-      );
+      const currentDate = new Date().toISOString().split("T")[0];
+
+      // Check for overlapping rentals
+      const overlapQuery = `
+        SELECT COUNT(*) 
+        FROM greentarget.rentals 
+        WHERE tong_no = $1 AND (
+          (date_picked IS NULL OR $2 < date_picked) AND
+          (date_placed <= $2)
+        )
+      `;
+      const overlapResult = await client.query(overlapQuery, [
+        tong_no,
+        date_placed,
+      ]);
+      if (parseInt(overlapResult.rows[0].count) > 0) {
+        throw new Error(
+          "The selected dumpster is not available for the chosen period"
+        );
+      }
+
+      // Update dumpster status to 'rented' only if the rental starts today or earlier
+      if (date_placed <= currentDate) {
+        await client.query(
+          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
+          [tong_no]
+        );
+      }
 
       // Update customer last_activity_date
       await client.query(
@@ -134,7 +210,6 @@ export default function (pool) {
     const { rental_id } = req.params;
     const { location_id, tong_no, driver, date_placed, date_picked, remarks } =
       req.body;
-
     const client = await pool.connect();
 
     try {
@@ -142,8 +217,8 @@ export default function (pool) {
 
       // Get current rental information
       const currentRentalQuery = `
-      SELECT * FROM greentarget.rentals WHERE rental_id = $1
-    `;
+        SELECT * FROM greentarget.rentals WHERE rental_id = $1
+      `;
       const currentRentalResult = await client.query(currentRentalQuery, [
         rental_id,
       ]);
@@ -153,64 +228,133 @@ export default function (pool) {
       }
 
       const currentRental = currentRentalResult.rows[0];
+      const currentDate = new Date().toISOString().split("T")[0];
+
+      // Validate dates if provided
+      if (date_placed && date_picked && date_placed > date_picked) {
+        throw new Error("Placement date cannot be after pickup date");
+      }
+
+      const newTongNo = tong_no || currentRental.tong_no;
+      const newDatePlaced = date_placed || currentRental.date_placed;
+      const newDatePicked =
+        date_picked !== undefined ? date_picked : currentRental.date_picked;
 
       // Handle dumpster changes if tong_no is being updated
       if (tong_no && tong_no !== currentRental.tong_no) {
-        // Check if the new dumpster is available
+        // Check if the new dumpster is available for the period
+        const overlapQuery = `
+          SELECT COUNT(*) 
+          FROM greentarget.rentals 
+          WHERE tong_no = $1 AND rental_id != $2 AND (
+            (date_picked IS NULL OR $3 < date_picked) AND
+            (date_placed <= $3)
+          )
+        `;
+        const overlapResult = await client.query(overlapQuery, [
+          tong_no,
+          rental_id,
+          newDatePlaced,
+        ]);
+
+        if (parseInt(overlapResult.rows[0].count) > 0) {
+          throw new Error(
+            `Dumpster ${tong_no} is not available for the chosen period`
+          );
+        }
+
+        // Check if the new dumpster exists
         const dumpsterQuery = `
-        SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
-      `;
+          SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
+        `;
         const dumpsterResult = await client.query(dumpsterQuery, [tong_no]);
 
         if (dumpsterResult.rows.length === 0) {
           throw new Error(`Dumpster ${tong_no} not found`);
         }
 
-        if (dumpsterResult.rows[0].status !== "Available") {
-          throw new Error(`Dumpster ${tong_no} is not available for rental`);
+        // Update the old dumpster to Available if no other active rentals
+        const oldRentalsQuery = `
+          SELECT COUNT(*) FROM greentarget.rentals 
+          WHERE tong_no = $1 AND rental_id != $2 
+          AND date_picked IS NULL AND date_placed <= $3
+        `;
+        const oldRentalsResult = await client.query(oldRentalsQuery, [
+          currentRental.tong_no,
+          rental_id,
+          currentDate,
+        ]);
+
+        if (parseInt(oldRentalsResult.rows[0].count) === 0) {
+          await client.query(
+            `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
+            [currentRental.tong_no]
+          );
         }
 
-        // Update the old dumpster to Available
-        await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
-          [currentRental.tong_no]
-        );
+        // Update the new dumpster to Rented if the rental is active now
+        if (newDatePlaced <= currentDate && !newDatePicked) {
+          await client.query(
+            `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
+            [tong_no]
+          );
+        }
+      } else {
+        // If setting date_picked and it wasn't set before, check if we should update dumpster status
+        if (date_picked && !currentRental.date_picked) {
+          // Only update to Available if there are no other active rentals for this dumpster
+          // and the pickup date is not in the future
+          const today = new Date().toISOString().split("T")[0];
 
-        // Update the new dumpster to Rented
-        await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-          [tong_no]
-        );
-      }
+          // Only mark as Available if the pickup date is today or in the past
+          if (date_picked <= today) {
+            const activeRentalsQuery = `
+              SELECT COUNT(*) FROM greentarget.rentals 
+              WHERE tong_no = $1 AND rental_id != $2 
+              AND (date_picked IS NULL OR date_picked > $3)
+              AND date_placed <= $4
+            `;
+            const activeRentalsResult = await client.query(activeRentalsQuery, [
+              currentRental.tong_no,
+              rental_id,
+              today,
+              today,
+            ]);
 
-      // If setting date_picked and it wasn't set before, update dumpster status
-      if (date_picked && !currentRental.date_picked) {
-        await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
-          [currentRental.tong_no]
-        );
-      }
-      // If removing a date_picked that was previously set, update dumpster status back to Rented
-      else if (currentRental.date_picked && !date_picked) {
-        await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-          [currentRental.tong_no]
-        );
+            if (parseInt(activeRentalsResult.rows[0].count) === 0) {
+              await client.query(
+                `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
+                [currentRental.tong_no]
+              );
+            }
+          }
+        }
+        // If removing a date_picked that was previously set, update dumpster status back to Rented
+        else if (
+          currentRental.date_picked &&
+          date_picked === null &&
+          newDatePlaced <= currentDate
+        ) {
+          await client.query(
+            `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
+            [currentRental.tong_no]
+          );
+        }
       }
 
       // Update the rental with all editable fields
       const updateRentalQuery = `
-      UPDATE greentarget.rentals
-      SET 
-        location_id = COALESCE($1, location_id),
-        tong_no = COALESCE($2, tong_no),
-        driver = COALESCE($3, driver),
-        date_placed = COALESCE($4, date_placed),
-        date_picked = $5,
-        remarks = $6
-      WHERE rental_id = $7
-      RETURNING *
-    `;
+        UPDATE greentarget.rentals
+        SET 
+          location_id = COALESCE($1, location_id),
+          tong_no = COALESCE($2, tong_no),
+          driver = COALESCE($3, driver),
+          date_placed = COALESCE($4, date_placed),
+          date_picked = $5,
+          remarks = $6
+        WHERE rental_id = $7
+        RETURNING *
+      `;
 
       const updateRentalResult = await client.query(updateRentalQuery, [
         location_id || null,
@@ -320,6 +464,80 @@ export default function (pool) {
         message: "Error fetching rental",
         error: error.message,
       });
+    }
+  });
+
+  // Delete a rental
+  router.delete("/:rental_id", async (req, res) => {
+    const { rental_id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Get rental details before deletion
+      const rentalQuery =
+        "SELECT * FROM greentarget.rentals WHERE rental_id = $1";
+      const rentalResult = await client.query(rentalQuery, [rental_id]);
+
+      if (rentalResult.rows.length === 0) {
+        return res.status(404).json({ message: "Rental not found" });
+      }
+
+      const rental = rentalResult.rows[0];
+
+      // Check if rental is associated with an invoice
+      const invoiceQuery =
+        "SELECT COUNT(*) FROM greentarget.invoices WHERE rental_id = $1";
+      const invoiceResult = await client.query(invoiceQuery, [rental_id]);
+
+      if (parseInt(invoiceResult.rows[0].count) > 0) {
+        throw new Error("Cannot delete rental: it has associated invoices");
+      }
+
+      // Delete the rental
+      const deleteQuery =
+        "DELETE FROM greentarget.rentals WHERE rental_id = $1 RETURNING *";
+      const deleteResult = await client.query(deleteQuery, [rental_id]);
+
+      // Check if there are any other active rentals for this dumpster
+      const currentDate = new Date().toISOString().split("T")[0];
+      const activeRentalsQuery = `
+      SELECT COUNT(*) FROM greentarget.rentals 
+      WHERE tong_no = $1 
+      AND rental_id != $2
+      AND date_placed <= $3
+      AND (date_picked IS NULL OR date_picked >= $3)
+    `;
+      const activeRentalsResult = await client.query(activeRentalsQuery, [
+        rental.tong_no,
+        rental_id,
+        currentDate,
+      ]);
+
+      // If no other active rentals, update dumpster status to Available
+      if (parseInt(activeRentalsResult.rows[0].count) === 0) {
+        await client.query(
+          `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
+          [rental.tong_no]
+        );
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Rental deleted successfully",
+        rental: deleteResult.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error deleting Green Target rental:", error);
+      res.status(500).json({
+        message: error.message || "Error deleting rental",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 
