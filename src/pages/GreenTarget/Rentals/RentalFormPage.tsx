@@ -343,10 +343,6 @@ const RentalFormPage: React.FC = () => {
     }));
   };
 
-  useEffect(() => {
-    console.log(formData);
-  }, [formData]);
-
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
