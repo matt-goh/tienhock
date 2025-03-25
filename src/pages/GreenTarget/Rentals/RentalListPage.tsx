@@ -55,7 +55,12 @@ const RentalCard = ({
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not set";
     const date = new Date(dateString);
-    return date.toLocaleDateString();
+    // Use DD/MM/YYYY format
+    return `${date.getDate().toString().padStart(2, "0")}/${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}/${date.getFullYear()}`;
   };
 
   // Calculate rental duration in days
