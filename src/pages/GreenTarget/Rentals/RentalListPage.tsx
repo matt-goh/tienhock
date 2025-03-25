@@ -175,6 +175,19 @@ const RentalCard = ({
           </div>
         </div>
 
+        {/* Remarks section - only show if there are remarks */}
+        {rental.remarks && (
+          <div className="mb-4 bg-default-50/50 border border-default-100 rounded p-2">
+            <p className="text-xs text-default-500 mb-0.5">Remarks</p>
+            <p
+              className="text-xs text-default-700 truncate"
+              title={rental.remarks}
+            >
+              {rental.remarks}
+            </p>
+          </div>
+        )}
+
         {/* Dates section */}
         <div className="flex justify-end space-x-4 mb-4">
           <div>
