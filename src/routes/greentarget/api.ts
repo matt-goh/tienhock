@@ -25,7 +25,8 @@ export const greenTargetApi = {
   createRental: (data: any) => api.post("/greentarget/api/rentals", data),
   updateRental: (id: any, data: any) =>
     api.put(`/greentarget/api/rentals/${id}`, data),
-  deleteRental: (id: any) => api.delete(`/greentarget/api/rentals/${id}`),
+  deleteRental: (rentalId: number) =>
+    api.delete(`/greentarget/api/rentals/${rentalId}`),
   generateDeliveryOrder: (rentalId: any) =>
     api.get(`/greentarget/api/rentals/${rentalId}/do`),
 
