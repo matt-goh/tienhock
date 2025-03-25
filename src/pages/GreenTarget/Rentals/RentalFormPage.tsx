@@ -343,6 +343,10 @@ const RentalFormPage: React.FC = () => {
     }));
   };
 
+  useEffect(() => {
+    console.log(formData);
+  }, [formData]);
+
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
@@ -699,7 +703,7 @@ const RentalFormPage: React.FC = () => {
                                 : "text-sky-600"
                             }`
                           }
-                          value="add_new"
+                          value={0}
                           onClick={() => setIsNewCustomerModalOpen(true)}
                         >
                           {({ selected }) => (
@@ -719,23 +723,19 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="location_id"
                     className="text-sm font-medium text-default-700"
                   >
-                    Location (Optional)
+                    Location
                   </label>
                   <Listbox
                     value={formData.location_id || ""}
                     onChange={(value) => {
-                      if (value === "add_new") {
-                        // This will be functionless for now as requested
-                        console.log("Add new location requested");
-                        return;
-                      }
-
                       setFormData((prev) => ({
                         ...prev,
                         location_id: value === "" ? null : Number(value),
                       }));
                     }}
-                    disabled={!formData.customer_id}
+                    disabled={
+                      !formData.customer_id || formData.customer_id === 0
+                    }
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
@@ -856,7 +856,7 @@ const RentalFormPage: React.FC = () => {
                                   : "text-sky-600"
                               }`
                             }
-                            value="add_new"
+                            value={0}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
