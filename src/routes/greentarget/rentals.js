@@ -130,53 +130,68 @@ export default function (pool) {
       }
 
       const currentDate = new Date().toISOString().split("T")[0];
+      const date_picked = req.body.date_picked || null;
 
-      // Check for overlapping rentals
+      // FIXED: Properly cast dates and use DATE type for the far future date
       const overlapQuery = `
-        SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
-        FROM greentarget.rentals r
-        JOIN greentarget.customers c ON r.customer_id = c.customer_id
-        WHERE r.tong_no = $1 AND (
-          (r.date_picked IS NULL AND r.date_placed <= $2) OR
-          (r.date_picked IS NOT NULL AND r.date_placed <= $2 AND r.date_picked > $2) OR
-          -- Check for any rental starting on this exact date
-          (r.date_placed = $2)
-        )
-      `;
+      SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
+      FROM greentarget.rentals r
+      JOIN greentarget.customers c ON r.customer_id = c.customer_id
+      WHERE r.tong_no = $1 
+      AND (
+        ($2::date < COALESCE(r.date_picked, '9999-12-31'::date)) 
+        AND 
+        (r.date_placed < COALESCE($3::date, '9999-12-31'::date))
+      )
+    `;
 
       const overlapResult = await client.query(overlapQuery, [
         tong_no,
         date_placed,
+        date_picked,
       ]);
 
-      // If we have any conflicts
       if (overlapResult.rows.length > 0) {
-        // Check if it's only a same-day transition (placement date equals another rental's pickup date)
-        // AND there's no rental already scheduled to start on this date
+        // Special handling for transition day (moving out one customer, moving in another)
         const sameDay = overlapResult.rows.some(
           (rental) => rental.date_picked && rental.date_picked === date_placed
         );
 
-        const alreadyBookedForToday = overlapResult.rows.some(
-          (rental) => rental.date_placed === date_placed
-        );
+        // Only allow if this is a transition day and there's only one conflict
+        if (!(sameDay && overlapResult.rows.length === 1)) {
+          const conflict = overlapResult.rows[0];
+          throw new Error(
+            `The selected dumpster is not available for the chosen period. ` +
+              `Dumpster ${tong_no} is rented by ${conflict.customer_name} ` +
+              `from ${conflict.date_placed} to ${
+                conflict.date_picked || "ongoing"
+              }`
+          );
+        }
+      }
 
-        // Only allow if it's a transition day and no booking exists for this date
-        if (!sameDay || alreadyBookedForToday) {
-          const conflictRental = overlapResult.rows[0];
-          let errorMsg =
-            "The selected dumpster is not available for the chosen period. ";
+      // Check for future rentals when creating an indefinite rental
+      if (!date_picked) {
+        const futureRentalsQuery = `
+        SELECT r.rental_id, r.date_placed, c.name as customer_name 
+        FROM greentarget.rentals r
+        JOIN greentarget.customers c ON r.customer_id = c.customer_id
+        WHERE r.tong_no = $1 AND r.date_placed > $2::date
+        ORDER BY r.date_placed
+        LIMIT 1
+      `;
 
-          if (alreadyBookedForToday) {
-            errorMsg +=
-              "There is already a rental scheduled to start on this date.";
-          } else if (conflictRental.date_picked) {
-            errorMsg += `Rented until ${conflictRental.date_picked} by ${conflictRental.customer_name}`;
-          } else {
-            errorMsg += `Indefinitely rented by ${conflictRental.customer_name}`;
-          }
+        const futureRentalsResult = await client.query(futureRentalsQuery, [
+          tong_no,
+          date_placed,
+        ]);
 
-          throw new Error(errorMsg);
+        if (futureRentalsResult.rows.length > 0) {
+          const future = futureRentalsResult.rows[0];
+          throw new Error(
+            `Cannot create ongoing rental: dumpster is already booked starting ${future.date_placed} ` +
+              `for ${future.customer_name}`
+          );
         }
       }
 
@@ -196,17 +211,18 @@ export default function (pool) {
 
       // Create the rental
       const rentalQuery = `
-        INSERT INTO greentarget.rentals (
-          customer_id, 
-          location_id, 
-          tong_no, 
-          driver, 
-          date_placed, 
-          remarks
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-      `;
+      INSERT INTO greentarget.rentals (
+        customer_id, 
+        location_id, 
+        tong_no, 
+        driver, 
+        date_placed, 
+        date_picked,
+        remarks
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `;
 
       const rentalResult = await client.query(rentalQuery, [
         customer_id,
@@ -214,6 +230,7 @@ export default function (pool) {
         tong_no,
         driver,
         date_placed,
+        date_picked,
         remarks || null,
       ]);
 
@@ -247,8 +264,8 @@ export default function (pool) {
 
       // Get current rental information
       const currentRentalQuery = `
-        SELECT * FROM greentarget.rentals WHERE rental_id = $1
-      `;
+      SELECT * FROM greentarget.rentals WHERE rental_id = $1
+    `;
       const currentRentalResult = await client.query(currentRentalQuery, [
         rental_id,
       ]);
@@ -270,17 +287,54 @@ export default function (pool) {
       const newDatePicked =
         date_picked !== undefined ? date_picked : currentRental.date_picked;
 
+      // NEW CODE: Check for overlaps when updating dates on the SAME dumpster
+      if (
+        (date_placed && date_placed !== currentRental.date_placed) ||
+        (date_picked !== undefined && date_picked !== currentRental.date_picked)
+      ) {
+        // Check for overlaps with other rentals for the same dumpster
+        const overlapQuery = `
+          SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
+          FROM greentarget.rentals r
+          JOIN greentarget.customers c ON r.customer_id = c.customer_id
+          WHERE r.tong_no = $1 
+          AND r.rental_id != $2
+          AND (
+            ($3::date < COALESCE(r.date_picked, '9999-12-31'::date)) 
+            AND 
+            (r.date_placed < COALESCE($4::date, '9999-12-31'::date))
+          )
+        `;
+
+        const overlapResult = await client.query(overlapQuery, [
+          currentRental.tong_no,
+          rental_id,
+          newDatePlaced,
+          newDatePicked,
+        ]);
+
+        if (overlapResult.rows.length > 0) {
+          const conflict = overlapResult.rows[0];
+          throw new Error(
+            `The updated dates overlap with an existing rental for ${conflict.customer_name} ` +
+              `(${conflict.date_placed} to ${
+                conflict.date_picked || "ongoing"
+              })`
+          );
+        }
+      }
+
       // Handle dumpster changes if tong_no is being updated
       if (tong_no && tong_no !== currentRental.tong_no) {
         // Check if the new dumpster is available for the period
         const overlapQuery = `
-          SELECT COUNT(*) 
-          FROM greentarget.rentals 
-          WHERE tong_no = $1 AND rental_id != $2 AND (
-            (date_picked IS NULL OR $3 < date_picked) AND
-            (date_placed <= $3)
-          )
-        `;
+        SELECT COUNT(*) 
+        FROM greentarget.rentals 
+        WHERE tong_no = $1 AND rental_id != $2 AND (
+          (date_picked IS NULL OR $3 < date_picked) AND
+          (date_placed <= $3)
+        )
+      `;
         const overlapResult = await client.query(overlapQuery, [
           tong_no,
           rental_id,
@@ -295,8 +349,8 @@ export default function (pool) {
 
         // Check if the new dumpster exists
         const dumpsterQuery = `
-          SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
-        `;
+        SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
+      `;
         const dumpsterResult = await client.query(dumpsterQuery, [tong_no]);
 
         if (dumpsterResult.rows.length === 0) {
@@ -305,10 +359,10 @@ export default function (pool) {
 
         // Update the old dumpster to Available if no other active rentals
         const oldRentalsQuery = `
-          SELECT COUNT(*) FROM greentarget.rentals 
-          WHERE tong_no = $1 AND rental_id != $2 
-          AND date_picked IS NULL AND date_placed <= $3
-        `;
+        SELECT COUNT(*) FROM greentarget.rentals 
+        WHERE tong_no = $1 AND rental_id != $2 
+        AND date_picked IS NULL AND date_placed <= $3
+      `;
         const oldRentalsResult = await client.query(oldRentalsQuery, [
           currentRental.tong_no,
           rental_id,
@@ -339,11 +393,11 @@ export default function (pool) {
           // Only mark as Available if the pickup date is today or in the past
           if (date_picked <= today) {
             const activeRentalsQuery = `
-              SELECT COUNT(*) FROM greentarget.rentals 
-              WHERE tong_no = $1 AND rental_id != $2 
-              AND (date_picked IS NULL OR date_picked > $3)
-              AND date_placed <= $4
-            `;
+            SELECT COUNT(*) FROM greentarget.rentals 
+            WHERE tong_no = $1 AND rental_id != $2 
+            AND (date_picked IS NULL OR date_picked > $3)
+            AND date_placed <= $4
+          `;
             const activeRentalsResult = await client.query(activeRentalsQuery, [
               currentRental.tong_no,
               rental_id,
@@ -374,17 +428,17 @@ export default function (pool) {
 
       // Update the rental with all editable fields
       const updateRentalQuery = `
-        UPDATE greentarget.rentals
-        SET 
-          location_id = COALESCE($1, location_id),
-          tong_no = COALESCE($2, tong_no),
-          driver = COALESCE($3, driver),
-          date_placed = COALESCE($4, date_placed),
-          date_picked = $5,
-          remarks = $6
-        WHERE rental_id = $7
-        RETURNING *
-      `;
+      UPDATE greentarget.rentals
+      SET 
+        location_id = COALESCE($1, location_id),
+        tong_no = COALESCE($2, tong_no),
+        driver = COALESCE($3, driver),
+        date_placed = COALESCE($4, date_placed),
+        date_picked = $5,
+        remarks = $6
+      WHERE rental_id = $7
+      RETURNING *
+    `;
 
       const updateRentalResult = await client.query(updateRentalQuery, [
         location_id || null,

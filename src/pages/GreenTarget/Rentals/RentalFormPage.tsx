@@ -380,42 +380,69 @@ const RentalFormPage: React.FC = () => {
       return;
     }
 
-    // If we're in edit mode with the original dumpster, it's always valid
-    if (isEditMode && formData.tong_no === initialFormData.tong_no) {
+    // If we're in edit mode with the original dumpster and dates, it's valid
+    if (
+      isEditMode &&
+      formData.tong_no === initialFormData.tong_no &&
+      formData.date_placed === initialFormData.date_placed &&
+      formData.date_picked === initialFormData.date_picked
+    ) {
       setIsValidSelection(true);
       return;
     }
 
-    // 1. Check if it's directly available (including transition day dumpsters)
+    // Check if it's directly available
     const availableDumpster = dumpsterAvailability.available.find(
       (d) => d.tong_no === formData.tong_no
     );
 
-    // 2. Check if it's a transition day
+    // Check if it's a transition day
     const isTransitionDay = dumpsterAvailability.available.some(
       (d) => d.tong_no === formData.tong_no && d.is_transition_day === true
     );
 
-    // 3. Check upcoming availability with exact match on date
-    const upcomingDumpster = dumpsterAvailability.upcoming.find(
-      (d) => d.tong_no === formData.tong_no
-    );
+    // Check for future conflicts if this is an ongoing rental
+    if (
+      !formData.date_picked &&
+      availableDumpster &&
+      availableDumpster.next_rental
+    ) {
+      // There's a future booking, so we can't create an indefinite rental
+      setIsValidSelection(false);
+      return;
+    }
 
-    const isAvailableOnTransition =
-      upcomingDumpster &&
-      upcomingDumpster.available_after === formData.date_placed;
+    // If we have a pickup date, check if the full rental period is available
+    if (formData.date_picked && availableDumpster) {
+      // Check if there's any upcoming rental during our period
+      const pickupDate = new Date(formData.date_picked);
+      const hasConflict = dumpsterAvailability.upcoming.some(
+        (available_after) => {
+          if (!availableDumpster.next_rental) return false;
 
-    if (availableDumpster || isTransitionDay || isAvailableOnTransition) {
+          const nextRentalDate = new Date(availableDumpster.next_rental.date);
+          return nextRentalDate <= pickupDate;
+        }
+      );
+
+      if (hasConflict) {
+        setIsValidSelection(false);
+        return;
+      }
+    }
+
+    if (availableDumpster || isTransitionDay) {
       setIsValidSelection(true);
     } else {
       setIsValidSelection(false);
     }
   }, [
     formData.date_placed,
+    formData.date_picked,
     formData.tong_no,
     dumpsterAvailability,
     isEditMode,
-    initialFormData.tong_no,
+    initialFormData,
   ]);
 
   useEffect(() => {
@@ -1333,7 +1360,7 @@ const RentalFormPage: React.FC = () => {
 
                     if (upcomingDumpster?.available_after) {
                       // Include information about future unavailability
-                      const message = `It will be available after ${formatDumpsterDate(
+                      const message = ` It will be available after ${formatDumpsterDate(
                         upcomingDumpster.available_after
                       )}${
                         upcomingDumpster.customer
