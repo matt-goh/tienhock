@@ -74,7 +74,7 @@ interface Rental {
 const formatDateForInput = (dateString: string | null): string => {
   if (!dateString) return "";
   const date = new Date(dateString);
-  return date.toISOString().split("T")[0];
+  return date.toISOString().split("T")[0]; // Keep YYYY-MM-DD for input fields
 };
 
 const RentalFormPage: React.FC = () => {
@@ -340,6 +340,16 @@ const RentalFormPage: React.FC = () => {
     }
   };
 
+  const formatDumpsterDate = (dateString: string | undefined): string => {
+    if (!dateString) return "unknown";
+    const date = new Date(dateString);
+    return `${date.getDate().toString().padStart(2, "0")}/${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}/${date.getFullYear()}`;
+  };
+
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
     navigate("/greentarget/rentals");
@@ -357,32 +367,28 @@ const RentalFormPage: React.FC = () => {
       return;
     }
 
-    // 1. Direct availability - dumpster is directly available on the selected date
+    // 1. Check if it's directly available (including transition day dumpsters)
     const availableDumpster = dumpsterAvailability.available.find(
       (d) => d.tong_no === formData.tong_no
     );
 
-    // 2. Upcoming availability - dumpster will be available after a certain date
+    // 2. Check if it's a transition day
+    const isTransitionDay = dumpsterAvailability.available.some(
+      (d) => d.tong_no === formData.tong_no && d.is_transition_day === true
+    );
+
+    // 3. Check upcoming availability with exact match on date
     const upcomingDumpster = dumpsterAvailability.upcoming.find(
       (d) => d.tong_no === formData.tong_no
     );
 
-    // 3. Unavailable - dumpster is not available on the selected date
-    const unavailableDumpster = dumpsterAvailability.unavailable.find(
-      (d) => d.tong_no === formData.tong_no
-    );
-
-    if (availableDumpster) {
-      // Dumpster is available on the selected date
-      setIsValidSelection(true);
-    } else if (
+    const isAvailableOnTransition =
       upcomingDumpster &&
-      upcomingDumpster.available_after === formData.date_placed
-    ) {
-      // This is a transition date - the dumpster becomes available on this exact date
+      upcomingDumpster.available_after === formData.date_placed;
+
+    if (availableDumpster || isTransitionDay || isAvailableOnTransition) {
       setIsValidSelection(true);
     } else {
-      // Not available on the selected date
       setIsValidSelection(false);
     }
   }, [
@@ -995,9 +1001,9 @@ const RentalFormPage: React.FC = () => {
                                             {dumpster.available_until && (
                                               <span className="text-xs text-amber-600 ml-6">
                                                 Available until{" "}
-                                                {new Date(
+                                                {formatDumpsterDate(
                                                   dumpster.available_until
-                                                ).toLocaleDateString()}
+                                                )}
                                                 {dumpster.next_rental &&
                                                   ` (Next: ${dumpster.next_rental.customer})`}
                                               </span>
@@ -1059,9 +1065,9 @@ const RentalFormPage: React.FC = () => {
                                             {dumpster.available_after && (
                                               <span className="text-xs text-amber-600 ml-6">
                                                 Available after{" "}
-                                                {new Date(
+                                                {formatDumpsterDate(
                                                   dumpster.available_after
-                                                ).toLocaleDateString()}
+                                                )}
                                                 {dumpster.customer &&
                                                   ` (Currently with ${dumpster.customer})`}
                                               </span>
@@ -1070,9 +1076,9 @@ const RentalFormPage: React.FC = () => {
                                               dumpster.next_rental && (
                                                 <span className="text-xs text-rose-600 ml-6">
                                                   Then unavailable from{" "}
-                                                  {new Date(
+                                                  {formatDumpsterDate(
                                                     dumpster.next_rental.date
-                                                  ).toLocaleDateString()}
+                                                  )}
                                                   {` (Reserved by ${dumpster.next_rental.customer})`}
                                                 </span>
                                               )}
@@ -1295,13 +1301,25 @@ const RentalFormPage: React.FC = () => {
                       );
 
                     if (upcomingDumpster?.available_after) {
-                      return ` It will be available after ${new Date(
+                      // Include information about future unavailability
+                      const message = `It will be available after ${formatDumpsterDate(
                         upcomingDumpster.available_after
-                      ).toLocaleDateString()}${
+                      )}${
                         upcomingDumpster.customer
                           ? ` (currently with ${upcomingDumpster.customer})`
                           : ""
                       }.`;
+
+                      if (
+                        upcomingDumpster.has_future_rental &&
+                        upcomingDumpster.next_rental
+                      ) {
+                        return `${message} Note: It will be reserved again starting ${formatDumpsterDate(
+                          upcomingDumpster.next_rental.date
+                        )}.`;
+                      }
+
+                      return message;
                     } else if (unavailableDumpster?.reason) {
                       return ` ${unavailableDumpster.reason}${
                         unavailableDumpster.customer
@@ -1311,14 +1329,6 @@ const RentalFormPage: React.FC = () => {
                     }
                     return "";
                   })()}
-                  {/* Specific note about same-day transitions */}
-                  {dumpsterAvailability?.upcoming.some(
-                    (d) =>
-                      d.tong_no === formData.tong_no &&
-                      d.available_after &&
-                      new Date(d.available_after) >
-                        new Date(formData.date_placed)
-                  )}
                 </span>
               </div>
             )}
