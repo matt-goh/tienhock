@@ -1,6 +1,5 @@
 // src/components/GreenTarget/LocationFormModal.tsx
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, Transition } from "@headlessui/react";
 import { IconMapPin, IconPhone } from "@tabler/icons-react";
 import Button from "../Button";
 
@@ -130,7 +129,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
       <div className="flex min-h-screen items-center justify-center p-4 text-center">
         <div
           ref={modalRef}
-          className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all"
+          className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all"
         >
           <h3 className="text-lg font-medium leading-6 text-default-900">
             {modalTitle}
