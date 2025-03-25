@@ -392,7 +392,7 @@ const RentalFormPage: React.FC = () => {
       return;
     }
 
-    // If we're in edit mode with the original dumpster and dates, it's valid
+    // Edit mode with unchanged values is always valid
     if (
       isEditMode &&
       formData.tong_no === initialFormData.tong_no &&
@@ -403,51 +403,47 @@ const RentalFormPage: React.FC = () => {
       return;
     }
 
-    // Check if it's directly available
+    // Find dumpster in available list
     const availableDumpster = dumpsterAvailability.available.find(
       (d) => d.tong_no === formData.tong_no
     );
 
-    // Check if it's a transition day
-    const isTransitionDay = dumpsterAvailability.available.some(
-      (d) => d.tong_no === formData.tong_no && d.is_transition_day === true
-    );
-
-    // Check for future conflicts if this is an ongoing rental
-    if (
-      !formData.date_picked &&
-      availableDumpster &&
-      availableDumpster.next_rental
-    ) {
-      // There's a future booking, so we can't create an indefinite rental
+    // If not in available list, it's not valid
+    if (!availableDumpster) {
       setIsValidSelection(false);
       return;
     }
 
-    // If we have a pickup date, check if the full rental period is available
-    if (formData.date_picked && availableDumpster) {
-      // Check if there's any upcoming rental during our period
-      const pickupDate = new Date(formData.date_picked);
-      const hasConflict = dumpsterAvailability.upcoming.some(
-        (available_after) => {
-          if (!availableDumpster.next_rental) return false;
+    // For ongoing rentals (no pickup date)
+    if (!formData.date_picked) {
+      // Check if there are any future bookings
+      if (availableDumpster.next_rental) {
+        setIsValidSelection(false);
+        return;
+      }
 
-          const nextRentalDate = new Date(availableDumpster.next_rental.date);
-          return nextRentalDate <= pickupDate;
-        }
-      );
+      setIsValidSelection(true);
+      return;
+    }
 
-      if (hasConflict) {
+    // For rentals with pickup date, check the entire period
+    const pickupDate = new Date(formData.date_picked);
+    pickupDate.setHours(0, 0, 0, 0);
+
+    // If the dumpster has a known next booking
+    if (availableDumpster.next_rental) {
+      const nextRentalDate = new Date(availableDumpster.next_rental.date);
+      nextRentalDate.setHours(0, 0, 0, 0);
+
+      // If our pickup date is after or equal to the next rental date, we have a conflict
+      if (nextRentalDate <= pickupDate) {
         setIsValidSelection(false);
         return;
       }
     }
 
-    if (availableDumpster || isTransitionDay) {
-      setIsValidSelection(true);
-    } else {
-      setIsValidSelection(false);
-    }
+    // If we got here, the dumpster is available for the requested period
+    setIsValidSelection(true);
   }, [
     formData.date_placed,
     formData.date_picked,
@@ -487,9 +483,12 @@ const RentalFormPage: React.FC = () => {
       return false;
     }
 
-    if (isEditMode && formData.date_picked) {
+    // Enhanced validation for date ranges
+    if (formData.date_picked) {
       const placedDate = new Date(formData.date_placed);
+      placedDate.setHours(0, 0, 0, 0);
       const pickedDate = new Date(formData.date_picked);
+      pickedDate.setHours(0, 0, 0, 0);
 
       if (pickedDate < placedDate) {
         toast.error("Pickup date cannot be earlier than placement date");
@@ -497,9 +496,11 @@ const RentalFormPage: React.FC = () => {
       }
     }
 
-    // Add a check for dumpster availability
-    if (!isValidSelection && !isEditMode) {
-      toast.error("The selected dumpster is not available for the chosen date");
+    // More restrictive front-end validation
+    if (!isValidSelection) {
+      toast.error(
+        "The selected dumpster is not available for the chosen rental period"
+      );
       return false;
     }
 
@@ -514,9 +515,9 @@ const RentalFormPage: React.FC = () => {
     setIsSaving(true);
 
     try {
+      let response;
       if (isEditMode && formData.rental_id) {
-        // Update existing rental (usually just adding pickup date)
-        await greenTargetApi.updateRental(formData.rental_id, {
+        response = await greenTargetApi.updateRental(formData.rental_id, {
           location_id: formData.location_id,
           tong_no: formData.tong_no,
           driver: formData.driver,
@@ -524,35 +525,44 @@ const RentalFormPage: React.FC = () => {
           date_picked: formData.date_picked,
           remarks: formData.remarks,
         });
-
-        toast.success("Rental updated successfully!");
       } else {
-        // Create new rental
-        await greenTargetApi.createRental({
+        response = await greenTargetApi.createRental({
           customer_id: formData.customer_id,
           location_id: formData.location_id,
           tong_no: formData.tong_no,
           driver: formData.driver,
           date_placed: formData.date_placed,
+          date_picked: formData.date_picked,
           remarks: formData.remarks,
         });
-
-        toast.success("Rental created successfully!");
       }
 
+      // Only show success and navigate if we got here (no error thrown)
+      toast.success(
+        isEditMode
+          ? "Rental updated successfully!"
+          : "Rental created successfully!"
+      );
       navigate("/greentarget/rentals");
     } catch (error: any) {
-      if (error.message && error.message.includes("not available")) {
+      console.error("Error saving rental:", error);
+
+      // Improved error detection - check for any availability/overlap messages
+      if (
+        error.message &&
+        (error.message.includes("not available") ||
+          error.message.includes("overlaps") ||
+          error.message.includes("period") ||
+          error.message.includes("is rented by"))
+      ) {
         toast.error(
-          "The selected dumpster is not available for the chosen period"
+          error.message ||
+            "The selected dumpster is not available for the chosen period"
         );
-      } else if (error.message && error.message.includes("overlaps")) {
-        toast.error("The rental period overlaps with an existing rental");
       } else if (error.message && error.message.includes("after pickup date")) {
         toast.error("Placement date cannot be after pickup date");
       } else {
-        toast.error("An unexpected error occurred.");
-        console.error("Error saving rental:", error);
+        toast.error("An unexpected error occurred. Please try again.");
       }
     } finally {
       setIsSaving(false);
