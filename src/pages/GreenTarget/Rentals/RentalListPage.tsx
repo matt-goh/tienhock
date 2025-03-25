@@ -12,6 +12,7 @@ import {
   IconSquare,
   IconTrash,
   IconMapPin,
+  IconTruck,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
@@ -39,11 +40,13 @@ const RentalCard = ({
   onGenerateDeliveryOrder,
   onCreateInvoice,
   onDeleteRental,
+  onPickupRental,
 }: {
   rental: Rental;
   onGenerateDeliveryOrder: (rental: Rental) => void;
   onCreateInvoice: (rental: Rental) => void;
   onDeleteRental: (rental: Rental) => void;
+  onPickupRental: (rental: Rental) => void;
 }) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
@@ -201,12 +204,12 @@ const RentalCard = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onGenerateDeliveryOrder(rental);
+              onDeleteRental(rental);
             }}
-            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
-            title="Generate Delivery Order"
+            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+            title="Delete Rental"
           >
-            <IconReceipt size={18} stroke={1.5} />
+            <IconTrash size={18} stroke={1.5} />
           </button>
 
           {!isActive() && (
@@ -221,16 +224,31 @@ const RentalCard = ({
               <IconFileInvoice size={18} stroke={1.5} />
             </button>
           )}
+
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onDeleteRental(rental);
+              onGenerateDeliveryOrder(rental);
             }}
-            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
-            title="Delete Rental"
+            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
+            title="Generate Delivery Order"
           >
-            <IconTrash size={18} stroke={1.5} />
+            <IconReceipt size={18} stroke={1.5} />
           </button>
+
+          {/* Add new Pickup button only for active rentals */}
+          {isActive() && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPickupRental(rental);
+              }}
+              className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors"
+              title="Mark as Picked Up"
+            >
+              <IconTruck size={18} stroke={1.5} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -246,7 +264,9 @@ const RentalListPage = () => {
   const [activeOnly, setActiveOnly] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
+  const [rentalToPickup, setRentalToPickup] = useState<Rental | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -297,7 +317,6 @@ const RentalListPage = () => {
   const confirmDeleteRental = async () => {
     if (!rentalToDelete) return;
 
-    setIsDeleting(true);
     try {
       await greenTargetApi.deleteRental(rentalToDelete.rental_id);
       toast.success("Rental deleted successfully");
@@ -314,9 +333,46 @@ const RentalListPage = () => {
         console.error("Error deleting rental:", error);
       }
     } finally {
-      setIsDeleting(false);
       setIsDeleteDialogOpen(false);
       setRentalToDelete(null);
+    }
+  };
+
+  const handlePickupRental = (rental: Rental) => {
+    setRentalToPickup(rental);
+    setIsPickupDialogOpen(true);
+  };
+
+  const confirmPickupRental = async () => {
+    if (!rentalToPickup) return;
+
+    setIsUpdating(true);
+    try {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split("T")[0];
+
+      // Update the rental with today as pickup date
+      await greenTargetApi.updateRental(rentalToPickup.rental_id, {
+        date_picked: today,
+      });
+
+      toast.success("Rental marked as picked up");
+
+      // Update the rental in the local state to reflect changes
+      setRentals(
+        rentals.map((r) =>
+          r.rental_id === rentalToPickup.rental_id
+            ? { ...r, date_picked: today }
+            : r
+        )
+      );
+    } catch (error) {
+      console.error("Error updating rental:", error);
+      toast.error("Failed to mark rental as picked up");
+    } finally {
+      setIsUpdating(false);
+      setIsPickupDialogOpen(false);
+      setRentalToPickup(null);
     }
   };
 
@@ -533,6 +589,7 @@ const RentalListPage = () => {
               onGenerateDeliveryOrder={handleGenerateDeliveryOrder}
               onCreateInvoice={handleCreateInvoice}
               onDeleteRental={handleDeleteRental}
+              onPickupRental={handlePickupRental}
             />
           ))}
         </div>
@@ -567,6 +624,17 @@ const RentalListPage = () => {
         }? This action cannot be undone.`}
         confirmButtonText="Delete"
         variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={isPickupDialogOpen}
+        onClose={() => setIsPickupDialogOpen(false)}
+        onConfirm={confirmPickupRental}
+        title="Mark Rental as Picked Up"
+        message={`Are you sure you want to mark this rental for ${
+          rentalToPickup?.customer_name || "this customer"
+        } as picked up today? This will set today's date as the pickup date.`}
+        confirmButtonText="Confirm Pickup"
+        variant="default"
       />
     </div>
   );

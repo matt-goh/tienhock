@@ -403,6 +403,17 @@ const RentalFormPage: React.FC = () => {
       return;
     }
 
+    // If we're only adding or changing a pickup date for an existing rental,
+    // consider it valid because the dumpster is already assigned to this rental
+    if (
+      isEditMode &&
+      formData.tong_no === initialFormData.tong_no &&
+      formData.date_placed === initialFormData.date_placed
+    ) {
+      setIsValidSelection(true);
+      return;
+    }
+
     // Find dumpster in available list
     const availableDumpster = dumpsterAvailability.available.find(
       (d) => d.tong_no === formData.tong_no
