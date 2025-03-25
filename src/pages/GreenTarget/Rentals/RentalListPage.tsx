@@ -359,11 +359,23 @@ const RentalListPage = () => {
   const confirmPickupRental = async () => {
     if (!rentalToPickup) return;
 
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split("T")[0];
+
+    // Get placement date from the rental
+    const placementDate = new Date(rentalToPickup.date_placed);
+    const todayDate = new Date(today);
+
+    // Validate: ensure today is not before the placement date
+    if (todayDate < placementDate) {
+      toast.error("Pickup date cannot be earlier than placement date");
+      setIsPickupDialogOpen(false);
+      setRentalToPickup(null);
+      return;
+    }
+
     setIsUpdating(true);
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
-
       // Update the rental with today as pickup date
       await greenTargetApi.updateRental(rentalToPickup.rental_id, {
         date_picked: today,
