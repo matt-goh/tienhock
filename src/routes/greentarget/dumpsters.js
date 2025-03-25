@@ -189,7 +189,7 @@ export default function (pool) {
               ...dumpster,
               rental_id: currentRental.rental_id,
               customer: currentRental.customer_name,
-              reason: "Has an ongoing rental with no end date",
+              reason: "Has an ongoing rental with no pickup date",
             });
           } else {
             // Rental with end date - will be available after that date
