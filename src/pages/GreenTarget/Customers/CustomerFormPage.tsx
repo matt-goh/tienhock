@@ -314,7 +314,7 @@ const CustomerFormPage: React.FC = () => {
                 {formData.last_activity_date ? (
                   <span className="text-default-500">
                     {new Date(formData.last_activity_date).toLocaleDateString(
-                      undefined,
+                      "en-GB",
                       {
                         year: "numeric",
                         month: "long",

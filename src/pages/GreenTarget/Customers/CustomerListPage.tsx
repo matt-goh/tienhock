@@ -81,10 +81,15 @@ const CustomerListPage = () => {
   };
 
   // Format date for display
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Not set";
     const date = new Date(dateString);
-    return date.toLocaleDateString();
+    // Format as DD/MM/YYYY
+    return `${date.getDate().toString().padStart(2, "0")}/${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}/${date.getFullYear()}`;
   };
 
   const filteredCustomers = useMemo(() => {
