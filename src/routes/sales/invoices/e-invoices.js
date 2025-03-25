@@ -261,12 +261,10 @@ export default function (pool, config) {
 
   // Submit invoice to MyInvois
   router.post("/submit", async (req, res) => {
-    // Extract fields query parameter
-    const fieldsParam = req.query.fields;
-    const isMinimal = fieldsParam === "minimal";
-
     try {
       const { invoiceIds } = req.body;
+      const fieldsParam = req.query.fields;
+      const isMinimal = fieldsParam === "minimal";
 
       if (!invoiceIds?.length) {
         return res.status(400).json({
@@ -377,7 +375,8 @@ export default function (pool, config) {
 
       // If there are any validation errors, but we still have valid invoices, continue processing
       if (validationErrors.length > 0 && transformedInvoices.length === 0) {
-        return res.status(400).json({
+        return res.status(422).json({
+          // 422 Unprocessable Entity
           success: false,
           message: "Validation failed for submitted documents",
           shouldStopAtValidation: true,
@@ -421,6 +420,19 @@ export default function (pool, config) {
           submissionResult.acceptedDocuments,
           invoiceRoundings
         );
+      }
+
+      // Determine appropriate status code
+      let statusCode = 201; // Default to Created for complete success
+
+      if (submissionResult.overallStatus === "Partial") {
+        statusCode = 202; // Accepted for partial success
+      } else if (
+        submissionResult.overallStatus === "Invalid" ||
+        (submissionResult.rejectedDocuments?.length > 0 &&
+          submissionResult.acceptedDocuments?.length === 0)
+      ) {
+        statusCode = 422; // Unprocessable Entity for validation failures
       }
 
       // If minimal response is requested, transform the result
@@ -468,7 +480,7 @@ export default function (pool, config) {
           }
         }
 
-        return res.json({
+        return res.status(statusCode).json({
           message: "Invoice processing completed",
           invoices: invoices,
           overallStatus: submissionResult.overallStatus || "Unknown",
@@ -476,7 +488,7 @@ export default function (pool, config) {
       }
 
       // Return full response
-      return res.json(submissionResult);
+      return res.status(statusCode).json(submissionResult);
     } catch (error) {
       console.error("Submission error:", error);
       // Check specifically for 422 error code (duplicate payload)
@@ -573,7 +585,8 @@ export default function (pool, config) {
         }
       }
 
-      return res.json({
+      return res.status(200).json({
+        // OK for successful status check
         success: true,
         data: filteredResponse,
       });
@@ -937,7 +950,7 @@ export default function (pool, config) {
       const deleteQuery = "DELETE FROM einvoices WHERE uuid = $1 RETURNING *";
       const result = await pool.query(deleteQuery, [uuid]);
 
-      res.json({
+      res.status(200).json({
         message: "E-invoice cancelled and deleted successfully",
         einvoice: result.rows[0],
       });

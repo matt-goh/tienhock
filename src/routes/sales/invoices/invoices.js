@@ -437,6 +437,7 @@ export default function (pool, config) {
       const results = [];
       const errors = [];
       const savedInvoiceData = [];
+      const duplicateErrors = [];
 
       // Process each invoice for database save
       for (const invoice of invoices) {
@@ -465,8 +466,13 @@ export default function (pool, config) {
           const checkResult = await client.query(checkQuery, [
             transformedInvoice.id,
           ]);
+
           if (checkResult.rows.length > 0) {
-            throw new Error(`Invoice ${transformedInvoice.id} already exists`);
+            const error = new Error(
+              `Invoice ${transformedInvoice.id} already exists`
+            );
+            error.code = "DUPLICATE";
+            throw error;
           }
 
           // Fetch product descriptions first if needed
@@ -600,36 +606,72 @@ export default function (pool, config) {
             orderDetails: orderDetails,
           });
         } catch (error) {
-          errors.push({
-            billNumber: invoice.billNumber,
-            status: "error",
-            message: error.message,
+          // Track duplicate errors separately
+          if (error.code === "DUPLICATE") {
+            duplicateErrors.push({
+              billNumber: invoice.billNumber,
+              status: "error",
+              message: error.message,
+            });
+          } else {
+            errors.push({
+              billNumber: invoice.billNumber,
+              status: "error",
+              message: error.message,
+            });
+          }
+        }
+      }
+
+      // If all invoices failed due to duplicates
+      if (duplicateErrors.length === invoices.length) {
+        await client.query("ROLLBACK");
+
+        if (isMinimal) {
+          const invoicesResponse = duplicateErrors.map((error) => ({
+            id: error.billNumber,
+            systemStatus: 100,
+            einvoiceStatus: 20,
+            error: {
+              code: "DUPLICATE",
+              message: error.message,
+            },
+          }));
+
+          return res.status(409).json({
+            message: "All invoices already exist",
+            invoices: invoicesResponse,
+            overallStatus: "Invalid",
+          });
+        } else {
+          return res.status(409).json({
+            message: "All invoices already exist",
+            errors: duplicateErrors,
           });
         }
       }
 
-      // If all invoices failed, rollback and return error
+      // If all invoices failed due to validation errors
       if (errors.length === invoices.length) {
         await client.query("ROLLBACK");
 
         if (isMinimal) {
-          // Transform error format for minimal response
           const invoicesResponse = errors.map((error) => ({
             id: error.billNumber,
-            systemStatus: 100, // Error
-            einvoiceStatus: 20, // Not processed
+            systemStatus: 100,
+            einvoiceStatus: 20,
             error: {
               message: error.message,
             },
           }));
 
           return res.status(400).json({
+            // Bad Request for validation errors
             message: "All invoices failed to process",
             invoices: invoicesResponse,
             overallStatus: "Invalid",
           });
         } else {
-          // Standard error format
           return res.status(400).json({
             message: "All invoices failed to process",
             errors,
@@ -682,6 +724,21 @@ export default function (pool, config) {
             message: "Failed to submit to MyInvois API",
             error: einvoiceError.message || "Unknown error",
           };
+        }
+      }
+
+      // Determine the appropriate status code based on e-invoice results
+      let statusCode = 201; // Default to Created for complete success
+
+      if (einvoiceResults) {
+        if (einvoiceResults.overallStatus === "Partial") {
+          statusCode = 202; // Accepted for partial success
+        } else if (
+          einvoiceResults.rejectedDocuments &&
+          einvoiceResults.rejectedDocuments.length > 0 &&
+          einvoiceResults.acceptedDocuments.length === 0
+        ) {
+          statusCode = 422; // Unprocessable Entity for e-invoice validation failures
         }
       }
 
@@ -770,7 +827,7 @@ export default function (pool, config) {
           }
         }
 
-        return res.status(200).json({
+        return res.status(statusCode).json({
           message: "Invoice processing completed",
           invoices: invoices,
           overallStatus: einvoiceResults
@@ -780,7 +837,7 @@ export default function (pool, config) {
       }
 
       // Return full response for ERP system (default)
-      res.status(200).json({
+      res.status(statusCode).json({
         message: "Invoice processing completed",
         results,
         errors: errors.length > 0 ? errors : undefined,

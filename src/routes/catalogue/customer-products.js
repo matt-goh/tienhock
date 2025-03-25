@@ -55,6 +55,20 @@ export default function (pool) {
     try {
       const { customerId } = req.params;
 
+      // First check if customer exists
+      const customerCheck = await pool.query(
+        "SELECT COUNT(*) FROM customers WHERE id = $1",
+        [customerId]
+      );
+
+      if (parseInt(customerCheck.rows[0].count) === 0) {
+        return res.status(404).json({
+          // Not Found instead of continuing with empty results
+          message: "Customer not found",
+          customerId,
+        });
+      }
+
       const query = `
         SELECT 
           cp.id,
@@ -69,7 +83,7 @@ export default function (pool) {
       `;
 
       const result = await pool.query(query, [customerId]);
-      res.json(result.rows);
+      res.status(200).json(result.rows); // Explicitly use 200 OK
     } catch (error) {
       console.error("Error fetching custom products:", error);
       res.status(500).json({
