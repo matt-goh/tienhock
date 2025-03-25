@@ -32,111 +32,39 @@ export default function (pool) {
 
   // Create a new dumpster
   router.post("/", async (req, res) => {
-    const { customer_id, location_id, tong_no, driver, date_placed, remarks } =
-      req.body;
-    const client = await pool.connect();
+    const { tong_no, status = "available" } = req.body;
+
+    if (!tong_no) {
+      return res
+        .status(400)
+        .json({ message: "Dumpster number (tong_no) is required" });
+    }
 
     try {
-      await client.query("BEGIN");
-
-      // Check if required fields are provided
-      if (!customer_id || !tong_no || !driver || !date_placed) {
-        throw new Error(
-          "Missing required fields: customer_id, tong_no, driver, date_placed"
-        );
-      }
-
-      const currentDate = new Date().toISOString().split("T")[0];
-
-      // Modified overlap check to allow same-day transitions
-      // This checks for conflicts but allows a new rental to start on the same day
-      // another rental ends
-      const overlapQuery = `
-        SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
-        FROM greentarget.rentals r
-        JOIN greentarget.customers c ON r.customer_id = c.customer_id
-        WHERE r.tong_no = $1 AND (
-          (r.date_picked IS NULL AND r.date_placed <= $2) OR
-          (r.date_picked IS NOT NULL AND r.date_placed <= $2 AND r.date_picked > $2)
-        )
-      `;
-
-      const overlapResult = await client.query(overlapQuery, [
-        tong_no,
-        date_placed,
-      ]);
-
-      // If we have any conflicts that are NOT same-day transitions
-      if (overlapResult.rows.length > 0) {
-        // Check if it's a same-day transition (placement date equals another rental's pickup date)
-        const sameDay = overlapResult.rows.some(
-          (rental) => rental.date_picked && rental.date_picked === date_placed
-        );
-
-        // If it's not a same-day transition, it's a real conflict
-        if (!sameDay) {
-          const conflictRental = overlapResult.rows[0];
-          throw new Error(
-            `The selected dumpster is not available for the chosen period. ` +
-              (conflictRental.date_picked
-                ? `Rented until ${conflictRental.date_picked} by ${conflictRental.customer_name}`
-                : `Indefinitely rented by ${conflictRental.customer_name}`)
-          );
-        }
-      }
-
-      // Update dumpster status to 'rented' only if the rental starts today or earlier
-      if (date_placed <= currentDate) {
-        await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-          [tong_no]
-        );
-      }
-
-      // Update customer last_activity_date
-      await client.query(
-        `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
-        [customer_id]
-      );
-
-      // Create the rental
-      const rentalQuery = `
-        INSERT INTO greentarget.rentals (
-          customer_id, 
-          location_id, 
-          tong_no, 
-          driver, 
-          date_placed, 
-          remarks
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
+      const query = `
+        INSERT INTO greentarget.dumpsters (tong_no, status)
+        VALUES ($1, $2)
         RETURNING *
       `;
-
-      const rentalResult = await client.query(rentalQuery, [
-        customer_id,
-        location_id || null,
-        tong_no,
-        driver,
-        date_placed,
-        remarks || null,
-      ]);
-
-      await client.query("COMMIT");
+      const result = await pool.query(query, [tong_no, status]);
 
       res.status(201).json({
-        message: "Rental created successfully",
-        rental: rentalResult.rows[0],
+        message: "Dumpster created successfully",
+        dumpster: result.rows[0],
       });
     } catch (error) {
-      await client.query("ROLLBACK");
-      console.error("Error creating Green Target rental:", error);
+      if (error.code === "23505") {
+        // unique violation
+        return res
+          .status(400)
+          .json({ message: "A dumpster with this number already exists" });
+      }
+
+      console.error("Error creating Green Target dumpster:", error);
       res.status(500).json({
-        message: "Error creating rental",
+        message: "Error creating dumpster",
         error: error.message,
       });
-    } finally {
-      client.release();
     }
   });
 
