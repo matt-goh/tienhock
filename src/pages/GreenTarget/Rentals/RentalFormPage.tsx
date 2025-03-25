@@ -975,13 +975,7 @@ const RentalFormPage: React.FC = () => {
                 (isEditMode && formData.date_picked !== null && !isFormChanged)
               }
             >
-              {isSaving
-                ? "Saving..."
-                : isEditMode
-                ? formData.date_picked
-                  ? "Update"
-                  : "Mark as Picked Up"
-                : "Create Rental"}
+              {isSaving ? "Saving..." : isEditMode ? "Update" : "Create Rental"}
             </Button>
           </div>
         </form>
