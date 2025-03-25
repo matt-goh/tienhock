@@ -129,10 +129,11 @@ export default function (pool) {
     }
   });
 
-  // Update rental (primarily for pickup)
+  // Update rental
   router.put("/:rental_id", async (req, res) => {
     const { rental_id } = req.params;
-    const { date_picked, remarks } = req.body;
+    const { location_id, tong_no, driver, date_placed, date_picked, remarks } =
+      req.body;
 
     const client = await pool.connect();
 
@@ -141,8 +142,8 @@ export default function (pool) {
 
       // Get current rental information
       const currentRentalQuery = `
-        SELECT * FROM greentarget.rentals WHERE rental_id = $1
-      `;
+      SELECT * FROM greentarget.rentals WHERE rental_id = $1
+    `;
       const currentRentalResult = await client.query(currentRentalQuery, [
         rental_id,
       ]);
@@ -153,6 +154,35 @@ export default function (pool) {
 
       const currentRental = currentRentalResult.rows[0];
 
+      // Handle dumpster changes if tong_no is being updated
+      if (tong_no && tong_no !== currentRental.tong_no) {
+        // Check if the new dumpster is available
+        const dumpsterQuery = `
+        SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
+      `;
+        const dumpsterResult = await client.query(dumpsterQuery, [tong_no]);
+
+        if (dumpsterResult.rows.length === 0) {
+          throw new Error(`Dumpster ${tong_no} not found`);
+        }
+
+        if (dumpsterResult.rows[0].status !== "Available") {
+          throw new Error(`Dumpster ${tong_no} is not available for rental`);
+        }
+
+        // Update the old dumpster to Available
+        await client.query(
+          `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
+          [currentRental.tong_no]
+        );
+
+        // Update the new dumpster to Rented
+        await client.query(
+          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
+          [tong_no]
+        );
+      }
+
       // If setting date_picked and it wasn't set before, update dumpster status
       if (date_picked && !currentRental.date_picked) {
         await client.query(
@@ -160,20 +190,35 @@ export default function (pool) {
           [currentRental.tong_no]
         );
       }
+      // If removing a date_picked that was previously set, update dumpster status back to Rented
+      else if (currentRental.date_picked && !date_picked) {
+        await client.query(
+          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
+          [currentRental.tong_no]
+        );
+      }
 
-      // Update the rental
+      // Update the rental with all editable fields
       const updateRentalQuery = `
-        UPDATE greentarget.rentals
-        SET 
-          date_picked = COALESCE($1, date_picked),
-          remarks = COALESCE($2, remarks)
-        WHERE rental_id = $3
-        RETURNING *
-      `;
+      UPDATE greentarget.rentals
+      SET 
+        location_id = COALESCE($1, location_id),
+        tong_no = COALESCE($2, tong_no),
+        driver = COALESCE($3, driver),
+        date_placed = COALESCE($4, date_placed),
+        date_picked = $5,
+        remarks = $6
+      WHERE rental_id = $7
+      RETURNING *
+    `;
 
       const updateRentalResult = await client.query(updateRentalQuery, [
-        date_picked || null,
-        remarks || currentRental.remarks,
+        location_id || null,
+        tong_no || currentRental.tong_no,
+        driver || currentRental.driver,
+        date_placed || currentRental.date_placed,
+        date_picked, // Allow setting to null
+        remarks, // Allow setting to null
         rental_id,
       ]);
 

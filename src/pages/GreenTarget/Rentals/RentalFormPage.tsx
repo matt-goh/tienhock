@@ -63,14 +63,13 @@ const formatDateForInput = (dateString: string | null): string => {
 
 const RentalFormPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
 
   // Form data state
   const [formData, setFormData] = useState<Rental>({
     customer_id: 0,
-    location_id: null,
+    location_id: 0,
     tong_no: "",
     driver: "",
     date_placed: new Date().toISOString().split("T")[0],
@@ -329,6 +328,10 @@ const RentalFormPage: React.FC = () => {
       if (isEditMode && formData.rental_id) {
         // Update existing rental (usually just adding pickup date)
         await greenTargetApi.updateRental(formData.rental_id, {
+          location_id: formData.location_id,
+          tong_no: formData.tong_no,
+          driver: formData.driver,
+          date_placed: formData.date_placed,
           date_picked: formData.date_picked,
           remarks: formData.remarks,
         });
@@ -535,7 +538,7 @@ const RentalFormPage: React.FC = () => {
                         location_id: value === "" ? null : Number(value),
                       }));
                     }}
-                    disabled={isEditMode || !formData.customer_id}
+                    disabled={!formData.customer_id}
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
@@ -698,7 +701,6 @@ const RentalFormPage: React.FC = () => {
                         tong_no: value,
                       }));
                     }}
-                    disabled={isEditMode}
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
@@ -796,7 +798,6 @@ const RentalFormPage: React.FC = () => {
                         driver: value,
                       }));
                     }}
-                    disabled={isEditMode}
                   >
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
@@ -908,7 +909,6 @@ const RentalFormPage: React.FC = () => {
                       onChange={handleDateChange}
                       onFocus={() => setIsPlacementDateFocused(true)}
                       onBlur={() => setIsPlacementDateFocused(false)}
-                      disabled={isEditMode}
                       className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none disabled:bg-default-50"
                     />
                   </div>
