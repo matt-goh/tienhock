@@ -582,7 +582,7 @@ const RentalFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 -mt-6">
+    <div className="container mx-auto px-4 -mt-8">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
