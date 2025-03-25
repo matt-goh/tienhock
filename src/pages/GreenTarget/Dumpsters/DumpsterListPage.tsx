@@ -1,15 +1,20 @@
 // src/pages/GreenTarget/Dumpsters/DumpsterListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
+  IconCalendar,
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
-  IconTrash,
-  IconChevronDown,
   IconCheck,
+  IconChevronDown,
+  IconMapPin,
+  IconUser,
+  IconTruck,
+  IconCalendarTime,
 } from "@tabler/icons-react";
+import { createPortal } from "react-dom";
 import {
   Listbox,
   ListboxButton,
@@ -21,63 +26,79 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import DumpsterAvailabilityCalendar from "../../../components/GreenTarget/DumpsterAvailabilityCalander";
 
-// Define the Dumpster interface
 interface Dumpster {
   tong_no: string;
   status: "Available" | "Rented" | "Maintenance";
 }
 
-const DumpsterListPage = () => {
+interface Rental {
+  rental_id: number;
+  customer_id: number;
+  customer_name: string;
+  tong_no: string;
+  date_placed: string;
+  date_picked: string | null;
+  driver: string;
+  location_address?: string | null;
+}
+
+interface DumpsterStatus {
+  type: "available" | "rented" | "maintenance";
+  rental?: Rental;
+}
+
+interface TooltipPosition {
+  top: number;
+  left: number;
+}
+
+const DumpsterListPage: React.FC = () => {
+  const navigate = useNavigate();
   const [dumpsters, setDumpsters] = useState<Dumpster[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [startDate, setStartDate] = useState<Date>(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [dumpsterToDelete, setDumpsterToDelete] = useState<Dumpster | null>(
     null
   );
-  const [statusFilter, setStatusFilter] = useState<string>("All");
-  const navigate = useNavigate();
 
-  const ITEMS_PER_PAGE = 12;
+  const ITEMS_PER_PAGE = 15;
 
+  // Fetch dumpsters and rentals on component mount
   useEffect(() => {
-    fetchDumpsters();
+    fetchData();
   }, []);
 
-  const fetchDumpsters = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await greenTargetApi.getDumpsters();
-      setDumpsters(data);
-      setError(null);
+      const [dumpstersData, rentalsData] = await Promise.all([
+        greenTargetApi.getDumpsters(),
+        greenTargetApi.getRentals(),
+      ]);
+      setDumpsters(dumpstersData);
+      setRentals(rentalsData);
     } catch (err) {
-      setError("Failed to fetch dumpsters. Please try again later.");
-      console.error("Error fetching dumpsters:", err);
+      console.error("Error fetching data:", err);
+      toast.error("Failed to load dumpster data");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeleteClick = (dumpster: Dumpster) => {
-    setDumpsterToDelete(dumpster);
-    setIsDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
     if (dumpsterToDelete) {
       try {
         await greenTargetApi.deleteDumpster(dumpsterToDelete.tong_no);
-
         setDumpsters(
           dumpsters.filter((d) => d.tong_no !== dumpsterToDelete.tong_no)
         );
         toast.success("Dumpster deleted successfully");
-        setIsDeleteDialogOpen(false);
-        setDumpsterToDelete(null);
       } catch (err: any) {
         console.error("Error deleting dumpster:", err);
         if (err.message && err.message.includes("being used")) {
@@ -85,66 +106,183 @@ const DumpsterListPage = () => {
             "Cannot delete dumpster: it is being used in one or more rentals"
           );
         } else {
-          toast.error("Failed to delete dumpster. Please try again.");
+          toast.error("Failed to delete dumpster");
         }
+      } finally {
+        setIsDeleteDialogOpen(false);
+        setDumpsterToDelete(null);
       }
     }
   };
 
-  const filteredDumpsters = useMemo(() => {
-    return dumpsters.filter((dumpster) => {
-      const matchesSearch = dumpster.tong_no
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "All" || dumpster.status === statusFilter;
-      return matchesSearch && matchesStatus;
+  // Generate a date range
+  const getDateRange = (startDate: Date, days: number) => {
+    const dates = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const dateRange = getDateRange(startDate, 14); // Show 14 days
+
+  // Check if a date falls within a rental period
+  const isDateInRental = (date: Date, rental: Rental) => {
+    const rentalStart = new Date(rental.date_placed);
+    rentalStart.setHours(0, 0, 0, 0);
+
+    const rentalEnd = rental.date_picked ? new Date(rental.date_picked) : null;
+    if (rentalEnd) rentalEnd.setHours(23, 59, 59, 999);
+
+    const checkDate = new Date(date);
+    checkDate.setHours(12, 0, 0, 0);
+
+    if (!rentalEnd) {
+      // If no pickup date, assume it's still rented
+      return checkDate >= rentalStart;
+    }
+
+    return checkDate >= rentalStart && checkDate <= rentalEnd;
+  };
+
+  // Get dumpster status for a specific date
+  const getDumpsterStatus = (
+    dumpster: Dumpster,
+    date: Date
+  ): DumpsterStatus => {
+    if (dumpster.status === "Maintenance") {
+      return { type: "maintenance" };
+    }
+
+    const rental = rentals.find(
+      (r) => r.tong_no === dumpster.tong_no && isDateInRental(date, r)
+    );
+
+    if (rental) {
+      return { type: "rented", rental };
+    }
+
+    return { type: "available" };
+  };
+
+  // Get background color based on status
+  const getStatusColor = (status: DumpsterStatus) => {
+    switch (status.type) {
+      case "available":
+        return "bg-green-500";
+      case "rented":
+        return "bg-rose-500";
+      case "maintenance":
+        return "bg-amber-400";
+      default:
+        return "bg-default-200";
+    }
+  };
+
+  // Format date for display
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
     });
-  }, [dumpsters, searchTerm, statusFilter]);
+  };
+
+  const formatDetailDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "/");
+  };
+
+  // Navigate to previous/next period
+  const navigatePeriod = (direction: "prev" | "next") => {
+    const newDate = new Date(startDate);
+    if (direction === "prev") {
+      newDate.setDate(newDate.getDate() - 14);
+    } else {
+      newDate.setDate(newDate.getDate() + 14);
+    }
+    setStartDate(newDate);
+  };
+
+  // Filter dumpsters based on search and status
+  const filteredDumpsters = dumpsters.filter((dumpster) => {
+    const matchesSearch = dumpster.tong_no
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "All" || dumpster.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Paginate the filtered dumpsters
+  const paginatedDumpsters = filteredDumpsters.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const totalPages = Math.ceil(filteredDumpsters.length / ITEMS_PER_PAGE);
-
-  const paginatedDumpsters = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredDumpsters.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredDumpsters, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  const renderPaginationButtons = () => {
-    // Similar to the pagination in CustomerListPage
-    const buttons = [];
-    const maxVisiblePages = 5;
+  // Handle dumpster cell click - navigate to dumpster detail form
+  const handleDumpsterCellClick = (dumpster: Dumpster) => {
+    navigate(`/greentarget/dumpsters/${encodeURIComponent(dumpster.tong_no)}`);
+  };
 
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        buttons.push(
-          <button
-            key={i}
-            onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
-              i === currentPage
-                ? "border border-default-200 font-semibold"
-                : "font-medium"
-            }`}
-          >
-            {i}
-          </button>
-        );
-      }
-    } else {
-      // Complex pagination logic (first, ellipsis, around current, ellipsis, last)
-      // This is the same as in CustomerListPage
-      // ...
+  // Now we'll use a tooltip instead of a modal for status details
+  const [tooltipData, setTooltipData] = useState<{
+    dumpster: Dumpster;
+    date: Date;
+    status: DumpsterStatus;
+    position: { top: number; left: number };
+  } | null>(null);
+
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleStatusHover = (
+    e: React.MouseEvent,
+    dumpster: Dumpster,
+    date: Date,
+    status: DumpsterStatus
+  ) => {
+    e.stopPropagation(); // Prevent cell click navigation
+
+    // Get position for the tooltip
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const position = {
+      top: rect.top - 10,
+      left: rect.left + rect.width / 2,
+    };
+
+    // Clear any existing timeout
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
     }
 
-    return buttons;
+    // Set tooltip data with a small delay
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setTooltipData({ dumpster, date, status, position });
+    }, 100);
+  };
+
+  const handleTooltipLeave = () => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+
+    // Hide tooltip with a slight delay
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setTooltipData(null);
+    }, 200);
   };
 
   if (loading) {
@@ -155,13 +293,8 @@ const DumpsterListPage = () => {
     );
   }
 
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
-
   return (
     <div className="relative w-full mx-20">
-      <DumpsterAvailabilityCalendar />
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl text-default-700 font-bold">
           Dumpsters ({filteredDumpsters.length})
@@ -323,80 +456,302 @@ const DumpsterListPage = () => {
         </div>
       </div>
 
-      {filteredDumpsters.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-default-500">No dumpsters found.</p>
-        </div>
-      ) : (
-        <div className="bg-white border border-default-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                    Tong Number
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-default-200">
-                {paginatedDumpsters.map((dumpster) => (
-                  <tr
-                    key={dumpster.tong_no}
-                    className="hover:bg-default-50 cursor-pointer"
-                    onClick={() =>
-                      navigate(
-                        `/greentarget/dumpsters/${encodeURIComponent(
-                          dumpster.tong_no
-                        )}`
-                      )
-                    }
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-default-900">
-                      {dumpster.tong_no}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded text-xs font-medium ${
-                          dumpster.status === "Available"
-                            ? "bg-green-100 text-green-800"
-                            : dumpster.status === "Rented"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}
-                      >
-                        {dumpster.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {dumpster.status !== "Rented" && (
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClick(dumpster);
-                          }}
-                          variant="outline"
-                          color="rose"
-                          size="sm"
-                          icon={IconTrash}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Availability Calendar */}
+      <div className="bg-white rounded-lg border border-default-200 overflow-hidden shadow-sm mb-6">
+        <div className="border-b border-default-200 px-4 py-3 flex justify-between items-center bg-default-50">
+          <div className="flex items-center">
+            <IconCalendar size={18} className="text-default-500 mr-2" />
+            <h3 className="font-medium text-default-900">
+              Dumpster Availability Timeline
+            </h3>
+          </div>
+
+          {/* Navigation buttons */}
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3 bg-white border border-default-200 px-3 py-1 rounded-full shadow-sm">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+              <span className="text-sm text-default-600">Available</span>
+
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+              <span className="text-sm text-default-600">Rented</span>
+
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+              <span className="text-sm text-default-600">Maintenance</span>
+            </div>
+
+            <div className="flex items-center">
+              <div className="text-sm font-medium text-default-700 mr-2">
+                {startDate.toLocaleDateString("en-US", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+              <div className="flex space-x-1">
+                <button
+                  onClick={() => navigatePeriod("prev")}
+                  className="p-1.5 rounded-full hover:bg-default-100"
+                  title="Previous two weeks"
+                >
+                  <IconChevronLeft size={16} className="text-default-700" />
+                </button>
+                <button
+                  onClick={() => navigatePeriod("next")}
+                  className="p-1.5 rounded-full hover:bg-default-100"
+                  title="Next two weeks"
+                >
+                  <IconChevronRight size={16} className="text-default-700" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      )}
-      {filteredDumpsters.length > 0 && (
+
+        {filteredDumpsters.length === 0 ? (
+          <div className="p-8 text-center text-default-500">
+            No dumpsters match your search criteria.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div
+              className="min-w-max grid"
+              style={{
+                gridTemplateColumns: `minmax(120px, auto) repeat(${dateRange.length}, minmax(38px, 1fr))`,
+              }}
+            >
+              {/* Header Row: Dates */}
+              <div className="bg-default-50 py-2 px-2 sticky left-0 z-10 text-sm font-medium text-default-600 border-b border-r border-default-200">
+                Dumpster
+              </div>
+              {dateRange.map((date, index) => {
+                // Highlight today
+                const isToday =
+                  new Date().toDateString() === date.toDateString();
+                return (
+                  <div
+                    key={index}
+                    className={`bg-default-50 py-2 px-1 text-center text-sm font-medium border-b border-default-200 ${
+                      index < dateRange.length - 1 ? "border-r" : ""
+                    } ${
+                      isToday ? "text-sky-700 bg-sky-50" : "text-default-600"
+                    }`}
+                  >
+                    {formatDate(date)}
+                    {isToday && (
+                      <div className="h-0.5 w-10 bg-sky-500 mx-auto mt-1 rounded-full"></div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Dumpster Rows */}
+              {paginatedDumpsters.map((dumpster, dumpsterIndex) => (
+                <React.Fragment key={dumpster.tong_no}>
+                  <div
+                    className={`py-3 px-3 sticky left-0 z-10 bg-white font-medium ${
+                      dumpster.status === "Available"
+                        ? "text-green-700"
+                        : dumpster.status === "Maintenance"
+                        ? "text-amber-700"
+                        : "text-default-700"
+                    } border-r border-default-200 ${
+                      dumpsterIndex < paginatedDumpsters.length - 1
+                        ? "border-b"
+                        : ""
+                    } hover:bg-default-50 cursor-pointer transition-colors`}
+                    onClick={() => handleDumpsterCellClick(dumpster)}
+                  >
+                    <div className="flex items-center">
+                      <div
+                        className={`w-2 h-2 rounded-full mr-2 ${
+                          dumpster.status === "Available"
+                            ? "bg-green-500"
+                            : dumpster.status === "Maintenance"
+                            ? "bg-amber-400"
+                            : dumpster.status === "Rented"
+                            ? "bg-rose-500"
+                            : "bg-default-300"
+                        }`}
+                      ></div>
+                      {dumpster.tong_no}
+                    </div>
+                  </div>
+                  {dateRange.map((date, dateIndex) => {
+                    const status = getDumpsterStatus(dumpster, date);
+                    // Highlight today's column
+                    const isToday =
+                      new Date().toDateString() === date.toDateString();
+
+                    return (
+                      <div
+                        key={dateIndex}
+                        className={`py-3 px-1 ${
+                          dumpsterIndex < paginatedDumpsters.length - 1
+                            ? "border-b"
+                            : ""
+                        } ${
+                          dateIndex < dateRange.length - 1 ? "border-r" : ""
+                        } border-default-200 flex justify-center items-center hover:bg-default-50 cursor-pointer transition-colors ${
+                          isToday ? "bg-sky-50/30" : ""
+                        }`}
+                        onClick={() => handleDumpsterCellClick(dumpster)}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-full ${getStatusColor(
+                            status
+                          )} cursor-help hover:ring-2 hover:ring-offset-1 hover:ring-default-300 transition-all`}
+                          onMouseEnter={(e) =>
+                            handleStatusHover(e, dumpster, date, status)
+                          }
+                          onMouseLeave={handleTooltipLeave}
+                        ></div>
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Status Tooltip */}
+        {tooltipData &&
+          createPortal(
+            <div
+              className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-3 transform -translate-x-1/2 -translate-y-full"
+              style={{
+                top: `${tooltipData.position.top}px`,
+                left: `${tooltipData.position.left}px`,
+                maxWidth: "320px",
+              }}
+              onMouseEnter={() => {
+                if (tooltipTimeoutRef.current) {
+                  clearTimeout(tooltipTimeoutRef.current);
+                }
+              }}
+              onMouseLeave={handleTooltipLeave}
+            >
+              <div className="space-y-2">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className={`w-3 h-3 rounded-full ${getStatusColor(
+                          tooltipData.status
+                        )}`}
+                      ></div>
+                      <span
+                        className={`text-sm font-medium ${
+                          tooltipData.status.type === "available"
+                            ? "text-green-700"
+                            : tooltipData.status.type === "rented"
+                            ? "text-rose-700"
+                            : "text-amber-700"
+                        }`}
+                      >
+                        {tooltipData.status.type === "available"
+                          ? "Available"
+                          : tooltipData.status.type === "rented"
+                          ? "Rented"
+                          : "Under Maintenance"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-default-500">
+                      {formatDetailDate(
+                        tooltipData.date.toISOString().split("T")[0]
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="font-medium text-default-800">
+                  Dumpster: {tooltipData.dumpster.tong_no}
+                </div>
+
+                {tooltipData.status.type === "rented" &&
+                  tooltipData.status.rental && (
+                    <div className="space-y-1.5 text-sm border-t border-default-100 pt-2 mt-1">
+                      <div className="flex items-start gap-2">
+                        <IconUser
+                          size={14}
+                          className="mt-0.5 text-default-400 shrink-0"
+                        />
+                        <span className="text-default-700">
+                          {tooltipData.status.rental.customer_name}
+                        </span>
+                      </div>
+
+                      {tooltipData.status.rental.location_address && (
+                        <div className="flex items-start gap-2">
+                          <IconMapPin
+                            size={16}
+                            className="mt-0.5 text-default-400 shrink-0"
+                          />
+                          <span className="text-default-600 text-sm">
+                            {tooltipData.status.rental.location_address}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-2">
+                        <IconCalendarTime
+                          size={16}
+                          className="mt-0.5 text-default-400 shrink-0"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-default-600 text-sm">
+                            Placed:{" "}
+                            {formatDetailDate(
+                              tooltipData.status.rental.date_placed
+                            )}
+                          </span>
+                          {tooltipData.status.rental.date_picked ? (
+                            <span className="text-default-600 text-sm">
+                              Pickup:{" "}
+                              {formatDetailDate(
+                                tooltipData.status.rental.date_picked
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-green-600 text-sm">
+                              Ongoing rental
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <IconTruck
+                          size={16}
+                          className="mt-0.5 text-default-400 shrink-0"
+                        />
+                        <span className="text-default-600 text-sm">
+                          Driver: {tooltipData.status.rental.driver}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-end pt-1.5">
+                        <button
+                          className="text-sm text-sky-600 hover:text-sky-800 font-medium"
+                          onClick={() => {
+                            navigate(
+                              `/greentarget/rentals/${tooltipData.status.rental?.rental_id}`
+                            );
+                            setTooltipData(null);
+                          }}
+                        >
+                          View rental details →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            </div>,
+            document.body
+          )}
+      </div>
+
+      {/* Pagination Controls */}
+      {filteredDumpsters.length > ITEMS_PER_PAGE && (
         <div className="mt-6 flex justify-between items-center text-default-700">
           <button
             className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
@@ -405,7 +760,35 @@ const DumpsterListPage = () => {
           >
             <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
           </button>
-          <div className="flex space-x-2">{renderPaginationButtons()}</div>
+          <div className="flex space-x-2">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              // Logic to determine which page numbers to show
+              let pageNum = i + 1;
+              if (totalPages > 5) {
+                if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+              }
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+                    pageNum === currentPage
+                      ? "border border-default-200 font-semibold"
+                      : "font-medium"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
           <button
             className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
             onClick={() => handlePageChange(currentPage + 1)}
@@ -415,6 +798,8 @@ const DumpsterListPage = () => {
           </button>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
