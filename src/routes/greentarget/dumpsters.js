@@ -155,39 +155,24 @@ export default function (pool) {
       const dumpstersResult = await pool.query(dumpstersQuery);
       const allDumpsters = dumpstersResult.rows;
 
-      // Query for dumpsters that have ongoing rentals (no pickup date)
-      // These are unavailable indefinitely
-      const ongoingQuery = `
-        SELECT r.tong_no
-        FROM greentarget.rentals r
-        WHERE r.date_placed <= $1 
-        AND r.date_picked IS NULL
-      `;
-      const ongoingResult = await pool.query(ongoingQuery, [date]);
-      const ongoingDumpsters = new Set(
-        ongoingResult.rows.map((row) => row.tong_no)
-      );
-
-      // Query for rentals that overlap with the specified date but have pickup dates
-      const rentalQuery = `
+      // Get ALL rentals, not just the ones overlapping with the selected date
+      // This allows us to build a complete availability timeline
+      const rentalsQuery = `
         SELECT r.*, c.name as customer_name
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
-        WHERE 
-          r.date_placed <= $1 
-          AND r.date_picked IS NOT NULL
-          AND r.date_picked >= $1
+        ORDER BY r.date_placed
       `;
-      const rentalResult = await pool.query(rentalQuery, [date]);
+      const rentalsResult = await pool.query(rentalsQuery);
+      const allRentals = rentalsResult.rows;
 
-      // Create a map of rented dumpsters with their next available date
-      const rentedDumpsters = new Map();
-      rentalResult.rows.forEach((rental) => {
-        rentedDumpsters.set(rental.tong_no, {
-          rental_id: rental.rental_id,
-          customer_name: rental.customer_name,
-          available_after: rental.date_picked,
-        });
+      // Group rentals by dumpster
+      const rentalsByDumpster = {};
+      allRentals.forEach((rental) => {
+        if (!rentalsByDumpster[rental.tong_no]) {
+          rentalsByDumpster[rental.tong_no] = [];
+        }
+        rentalsByDumpster[rental.tong_no].push(rental);
       });
 
       // Categorize dumpsters
@@ -196,32 +181,117 @@ export default function (pool) {
       const unavailable = [];
 
       allDumpsters.forEach((dumpster) => {
+        const tong_no = dumpster.tong_no;
+        const dumpsterRentals = rentalsByDumpster[tong_no] || [];
+
         // If dumpster is under maintenance, it's unavailable
         if (dumpster.status === "Maintenance") {
           unavailable.push({
             ...dumpster,
             reason: "Under maintenance",
           });
+          return;
         }
-        // If dumpster has an ongoing rental (no pickup date), it's unavailable indefinitely
-        else if (ongoingDumpsters.has(dumpster.tong_no)) {
-          unavailable.push({
+
+        // Check all rentals for this dumpster to build a timeline
+        const currentDate = new Date(date);
+        currentDate.setHours(0, 0, 0, 0);
+
+        // Find the rental that overlaps with the selected date, if any
+        const currentRental = dumpsterRentals.find((rental) => {
+          const startDate = new Date(rental.date_placed);
+          const endDate = rental.date_picked
+            ? new Date(rental.date_picked)
+            : null;
+
+          return (
+            startDate <= currentDate && (!endDate || endDate >= currentDate)
+          );
+        });
+
+        // Find the next rental after the selected date, if any
+        const nextRental = dumpsterRentals.find((rental) => {
+          const startDate = new Date(rental.date_placed);
+          return startDate > currentDate;
+        });
+
+        // Is today a transition day? (Current rental ends today and there's no overlap)
+        const isSameDayTransition = dumpsterRentals.some((rental) => {
+          if (!rental.date_picked) return false;
+          const pickupDate = new Date(rental.date_picked);
+          pickupDate.setHours(0, 0, 0, 0);
+          return pickupDate.getTime() === currentDate.getTime();
+        });
+
+        if (currentRental) {
+          // If there's a rental for the selected date
+          if (!currentRental.date_picked) {
+            // Ongoing rental with no end date - completely unavailable
+            unavailable.push({
+              ...dumpster,
+              rental_id: currentRental.rental_id,
+              customer: currentRental.customer_name,
+              reason: "Has an ongoing rental with no end date",
+            });
+          } else {
+            // Rental with end date - will be available after that date
+            const nextAvailableDate = new Date(currentRental.date_picked);
+
+            // Check for future rentals
+            const futureRental = dumpsterRentals.find((rental) => {
+              const startDate = new Date(rental.date_placed);
+              return startDate > nextAvailableDate;
+            });
+
+            upcoming.push({
+              ...dumpster,
+              rental_id: currentRental.rental_id,
+              customer: currentRental.customer_name,
+              available_after: currentRental.date_picked,
+              has_future_rental: !!futureRental,
+              next_rental: futureRental
+                ? {
+                    date: futureRental.date_placed,
+                    customer: futureRental.customer_name,
+                    rental_id: futureRental.rental_id,
+                  }
+                : null,
+            });
+          }
+        } else if (isSameDayTransition) {
+          // Add to available with special flag
+          available.push({
             ...dumpster,
-            reason: "Has an ongoing rental with no end date",
+            is_transition_day: true,
+            // Find the rental that ends today
+            transition_from: dumpsterRentals.find((rental) => {
+              if (!rental.date_picked) return false;
+              const pickupDate = new Date(rental.date_picked);
+              pickupDate.setHours(0, 0, 0, 0);
+              return pickupDate.getTime() === currentDate.getTime();
+            }),
+            // Find the next rental if it exists
+            next_rental: nextRental
+              ? {
+                  date: nextRental.date_placed,
+                  customer: nextRental.customer_name,
+                  rental_id: nextRental.rental_id,
+                }
+              : null,
           });
-        }
-        // If dumpster is rented but has a future pickup date, it will be upcoming
-        else if (rentedDumpsters.has(dumpster.tong_no)) {
-          const rentalInfo = rentedDumpsters.get(dumpster.tong_no);
-          upcoming.push({
+        } else if (nextRental) {
+          // No current rental, but has future rentals
+          available.push({
             ...dumpster,
-            rental_id: rentalInfo.rental_id,
-            customer_name: rentalInfo.customer_name,
-            available_after: rentalInfo.available_after,
+            available_until: nextRental.date_placed,
+            next_rental: {
+              date: nextRental.date_placed,
+              customer: nextRental.customer_name,
+              rental_id: nextRental.rental_id,
+            },
           });
-        }
-        // Otherwise, it's available
-        else {
+        } else {
+          // Completely available with no future rentals
           available.push(dumpster);
         }
       });
