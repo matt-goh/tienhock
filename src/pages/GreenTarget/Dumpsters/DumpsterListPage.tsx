@@ -21,6 +21,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import DumpsterAvailabilityCalendar from "../../../components/GreenTarget/DumpsterAvailabilityCalander";
 
 // Define the Dumpster interface
 interface Dumpster {
@@ -160,6 +161,7 @@ const DumpsterListPage = () => {
 
   return (
     <div className="relative w-full mx-20">
+      <DumpsterAvailabilityCalendar />
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl text-default-700 font-bold">
           Dumpsters ({filteredDumpsters.length})
