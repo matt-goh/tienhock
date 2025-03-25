@@ -133,21 +133,51 @@ export default function (pool) {
 
       // Check for overlapping rentals
       const overlapQuery = `
-        SELECT COUNT(*) 
-        FROM greentarget.rentals 
-        WHERE tong_no = $1 AND (
-          (date_picked IS NULL OR $2 < date_picked) AND
-          (date_placed <= $2)
+        SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
+        FROM greentarget.rentals r
+        JOIN greentarget.customers c ON r.customer_id = c.customer_id
+        WHERE r.tong_no = $1 AND (
+          (r.date_picked IS NULL AND r.date_placed <= $2) OR
+          (r.date_picked IS NOT NULL AND r.date_placed <= $2 AND r.date_picked > $2) OR
+          -- Check for any rental starting on this exact date
+          (r.date_placed = $2)
         )
       `;
+
       const overlapResult = await client.query(overlapQuery, [
         tong_no,
         date_placed,
       ]);
-      if (parseInt(overlapResult.rows[0].count) > 0) {
-        throw new Error(
-          "The selected dumpster is not available for the chosen period"
+
+      // If we have any conflicts
+      if (overlapResult.rows.length > 0) {
+        // Check if it's only a same-day transition (placement date equals another rental's pickup date)
+        // AND there's no rental already scheduled to start on this date
+        const sameDay = overlapResult.rows.some(
+          (rental) => rental.date_picked && rental.date_picked === date_placed
         );
+
+        const alreadyBookedForToday = overlapResult.rows.some(
+          (rental) => rental.date_placed === date_placed
+        );
+
+        // Only allow if it's a transition day and no booking exists for this date
+        if (!sameDay || alreadyBookedForToday) {
+          const conflictRental = overlapResult.rows[0];
+          let errorMsg =
+            "The selected dumpster is not available for the chosen period. ";
+
+          if (alreadyBookedForToday) {
+            errorMsg +=
+              "There is already a rental scheduled to start on this date.";
+          } else if (conflictRental.date_picked) {
+            errorMsg += `Rented until ${conflictRental.date_picked} by ${conflictRental.customer_name}`;
+          } else {
+            errorMsg += `Indefinitely rented by ${conflictRental.customer_name}`;
+          }
+
+          throw new Error(errorMsg);
+        }
       }
 
       // Update dumpster status to 'rented' only if the rental starts today or earlier

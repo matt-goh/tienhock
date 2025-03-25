@@ -257,6 +257,25 @@ const RentalFormPage: React.FC = () => {
     }
   };
 
+  // Calculate days between two dates (correctly)
+  const calculateDaysBetween = (
+    startDateStr: string,
+    endDateStr: string
+  ): number => {
+    // Create date objects and ensure they're set to midnight (start of day)
+    const startDate = new Date(startDateStr);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(endDateStr);
+    endDate.setHours(0, 0, 0, 0);
+
+    // Calculate the difference in milliseconds and convert to days
+    const differenceMs = endDate.getTime() - startDate.getTime();
+    const days = Math.round(differenceMs / (1000 * 60 * 60 * 24));
+
+    return days;
+  };
+
   const handleDelete = async () => {
     if (!formData.rental_id) return;
 
@@ -564,12 +583,6 @@ const RentalFormPage: React.FC = () => {
                                 <span className="block truncate font-medium">
                                   {selectedCustomer?.name || "Select Customer"}
                                 </span>
-                                {selectedCustomer?.phone_number ? (
-                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
-                                    <IconPhone size={12} className="mr-1" />
-                                    {selectedCustomer.phone_number}
-                                  </span>
-                                ) : null}
                               </div>
                             );
                           })()
@@ -819,9 +832,6 @@ const RentalFormPage: React.FC = () => {
             {/* Dates Section */}
             <div className="space-y-4">
               <h2 className="text-lg font-medium">Rental Dates</h2>
-              <p className="text-sm text-default-500">
-                Select a date to see available dumpsters
-              </p>
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -1000,10 +1010,31 @@ const RentalFormPage: React.FC = () => {
 
                                             {dumpster.available_until && (
                                               <span className="text-xs text-amber-600 ml-6">
-                                                Available until{" "}
-                                                {formatDumpsterDate(
-                                                  dumpster.available_until
-                                                )}
+                                                {(() => {
+                                                  const today =
+                                                    formData.date_placed; // Use the selected date, not the actual today
+                                                  const endDate =
+                                                    dumpster.available_until;
+                                                  const daysAvailable =
+                                                    calculateDaysBetween(
+                                                      today,
+                                                      endDate
+                                                    );
+
+                                                  if (daysAvailable <= 0) {
+                                                    return `Available until ${formatDumpsterDate(
+                                                      dumpster.available_until
+                                                    )}`;
+                                                  }
+
+                                                  return `Available for ${daysAvailable} day${
+                                                    daysAvailable !== 1
+                                                      ? "s"
+                                                      : ""
+                                                  } until ${formatDumpsterDate(
+                                                    dumpster.available_until
+                                                  )}`;
+                                                })()}
                                                 {dumpster.next_rental &&
                                                   ` (Next: ${dumpster.next_rental.customer})`}
                                               </span>
