@@ -345,6 +345,18 @@ const RentalFormPage: React.FC = () => {
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
+    // For pickup date, validate it's not before placement date
+    if (name === "date_picked" && value) {
+      const placedDate = new Date(formData.date_placed);
+      const pickedDate = new Date(value);
+
+      if (pickedDate < placedDate) {
+        toast.error("Pickup date cannot be earlier than placement date");
+        return; // Don't update state with invalid date
+      }
+    }
+
     setFormData((prevData) => ({
       ...prevData,
       [name]: value || null,
