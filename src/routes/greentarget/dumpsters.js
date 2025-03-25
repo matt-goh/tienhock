@@ -223,7 +223,37 @@ export default function (pool) {
           return pickupDate.getTime() === currentDate.getTime();
         });
 
-        if (currentRental) {
+        // Check if there's already a rental scheduled to start on this date
+        const alreadyBookedForToday = dumpsterRentals.some((rental) => {
+          const startDate = new Date(rental.date_placed);
+          startDate.setHours(0, 0, 0, 0);
+          return startDate.getTime() === currentDate.getTime();
+        });
+
+        if (isSameDayTransition && !alreadyBookedForToday) {
+          // Add to available with special flag only if not already booked for this day
+          available.push({
+            ...dumpster,
+            is_transition_day: true,
+            // Add available_until information
+            available_until: nextRental ? nextRental.date_placed : null,
+            // Find the rental that ends today
+            transition_from: dumpsterRentals.find((rental) => {
+              if (!rental.date_picked) return false;
+              const pickupDate = new Date(rental.date_picked);
+              pickupDate.setHours(0, 0, 0, 0);
+              return pickupDate.getTime() === currentDate.getTime();
+            }),
+            // Find the next rental if it exists
+            next_rental: nextRental
+              ? {
+                  date: nextRental.date_placed,
+                  customer: nextRental.customer_name,
+                  rental_id: nextRental.rental_id,
+                }
+              : null,
+          });
+        } else if (currentRental) {
           // If there's a rental for the selected date
           if (!currentRental.date_picked) {
             // Ongoing rental with no end date - completely unavailable
