@@ -11,6 +11,7 @@ import {
   IconSquareCheckFilled,
   IconSquare,
   IconTrash,
+  IconMapPin,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
@@ -77,7 +78,9 @@ const RentalCard = ({
 
     // Return different text for rentals with and without pickup dates
     if (!rental.date_picked) {
-      return `-`;
+      return `${differenceInDays} day${
+        differenceInDays !== 1 ? "s" : ""
+      } (ongoing)`;
     } else {
       return `${differenceInDays} day${differenceInDays !== 1 ? "s" : ""}`;
     }
@@ -97,76 +100,122 @@ const RentalCard = ({
 
   return (
     <div
-      className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered ? "bg-default-100 active:bg-default-200" : ""
-      } ${activeStatus ? "border-green-400" : ""}`}
+      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer ${
+        isCardHovered ? "shadow-md" : "shadow-sm"
+      } ${activeStatus ? "border-green-400" : "border-default-200"}`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
     >
-      <div className="mb-3 flex justify-between">
-        <h3 className="font-semibold">Rental #{rental.rental_id}</h3>
-        <span
-          className={`text-xs rounded-full px-2 py-0.5 ${
-            activeStatus
-              ? "bg-green-100 text-green-800"
-              : "bg-default-100 text-default-800"
+      {/* Status banner */}
+      <div
+        className={`w-full py-1.5 px-4 text-sm font-medium text-white ${
+          activeStatus ? "bg-green-500" : "bg-default-500"
+        }`}
+      >
+        <div className="flex justify-between items-center">
+          <span>Rental #{rental.rental_id}</span>
+          <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
+            {activeStatus ? "Ongoing" : "Completed"}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {/* Customer section */}
+        <div className="mb-3 border-b pb-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-semibold text-default-900">
+                {rental.customer_name}
+              </h3>
+              {rental.location_address && (
+                <p className="text-sm text-default-600 mt-0.5">
+                  <IconMapPin
+                    size={14}
+                    className="inline mr-1 mt-0.5 align-top"
+                  />
+                  {rental.location_address}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Details grid */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-default-50 p-2 rounded">
+            <p className="text-xs text-default-500 mb-1">Dumpster</p>
+            <p className="font-medium">{rental.tong_no}</p>
+          </div>
+          <div className="bg-default-50 p-2 rounded">
+            <p className="text-xs text-default-500 mb-1">Driver</p>
+            <p className="font-medium">{rental.driver}</p>
+          </div>
+          <div className="bg-default-50 p-2 rounded">
+            <p className="text-xs text-default-500 mb-1">Duration</p>
+            <p className="font-medium">{calculateDuration()}</p>
+          </div>
+          <div
+            className={`p-2 rounded ${
+              activeStatus ? "bg-green-50" : "bg-default-50"
+            }`}
+          >
+            <p className="text-xs text-default-500 mb-1">Status</p>
+            <p
+              className={`font-medium ${
+                activeStatus ? "text-green-700" : "text-default-700"
+              }`}
+            >
+              {activeStatus ? "Active" : "Completed"}
+            </p>
+          </div>
+        </div>
+
+        {/* Dates section */}
+        <div className="flex justify-end space-x-4 mb-4">
+          <div>
+            <p className="text-xs text-default-500">Placement Date</p>
+            <p className="font-medium text-default-900">
+              {formatDate(rental.date_placed)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-default-500">Pickup Date</p>
+            <p
+              className={`font-medium ${
+                !rental.date_picked ? "text-amber-600" : "text-default-900"
+              }`}
+            >
+              {formatDate(rental.date_picked)}
+            </p>
+          </div>
+        </div>
+
+        {/* Action buttons - semi-visible always, fully visible on hover */}
+        <div
+          className={`flex justify-end space-x-2 mt-2 transition-opacity duration-200 ${
+            isCardHovered ? "opacity-100" : "opacity-70"
           }`}
         >
-          {activeStatus ? "Ongoing" : "Completed"}
-        </span>
-      </div>
-
-      <div className="space-y-1 text-sm mb-3">
-        <p>
-          <span className="font-medium">Customer:</span> {rental.customer_name}
-        </p>
-        <p>
-          <span className="font-medium">Location:</span>{" "}
-          {rental.location_address || "No specific location"}
-        </p>
-        <p>
-          <span className="font-medium">Dumpster:</span> {rental.tong_no}
-        </p>
-        <p>
-          <span className="font-medium">Driver:</span> {rental.driver}
-        </p>
-      </div>
-
-      <div className="space-y-1 text-sm">
-        <p>
-          <span className="font-medium">Place:</span>{" "}
-          {formatDate(rental.date_placed)}
-        </p>
-        <p>
-          <span className="font-medium">Pick up:</span>{" "}
-          {formatDate(rental.date_picked)}
-        </p>
-        <p>
-          <span className="font-medium">Duration:</span> {calculateDuration()}
-        </p>
-      </div>
-
-      {isCardHovered && (
-        <div className="absolute bottom-3 right-3 flex space-x-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onGenerateDeliveryOrder(rental);
             }}
-            className="p-1.5 bg-default-100 hover:bg-default-200 rounded-full"
+            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
             title="Generate Delivery Order"
           >
             <IconReceipt size={18} stroke={1.5} />
           </button>
 
-          {!isActive && (
+          {!isActive() && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onCreateInvoice(rental);
               }}
-              className="p-1.5 bg-default-100 hover:bg-default-200 rounded-full"
+              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
               title="Create Invoice"
             >
               <IconFileInvoice size={18} stroke={1.5} />
@@ -177,13 +226,13 @@ const RentalCard = ({
               e.stopPropagation();
               onDeleteRental(rental);
             }}
-            className="p-1.5 hover:bg-rose-100 active:bg-rose-200 text-rose-600 hover:text-rose-700 rounded-full"
+            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
             title="Delete Rental"
           >
             <IconTrash size={18} stroke={1.5} />
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };
