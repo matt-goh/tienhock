@@ -436,7 +436,7 @@ const RentalFormPage: React.FC = () => {
       nextRentalDate.setHours(0, 0, 0, 0);
 
       // If our pickup date is after or equal to the next rental date, we have a conflict
-      if (nextRentalDate <= pickupDate) {
+      if (nextRentalDate < pickupDate) {
         setIsValidSelection(false);
         return;
       }
