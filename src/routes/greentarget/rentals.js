@@ -66,7 +66,9 @@ export default function (pool) {
       let query = `
         SELECT r.*, 
                c.name as customer_name, 
+               c.phone_number as customer_phone_number,
                l.address as location_address,
+               l.phone_number as location_phone_number,
                d.status as dumpster_status,
                (SELECT json_build_object(
                   'invoice_id', i.invoice_id,
