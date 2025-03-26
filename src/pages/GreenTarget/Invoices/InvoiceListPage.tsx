@@ -288,17 +288,39 @@ const InvoiceListPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (invoiceToDelete) {
       try {
-        await greenTargetApi.deleteInvoice(invoiceToDelete.invoice_id);
-
-        // Remove deleted invoice from state
-        setInvoices(
-          invoices.filter((i) => i.invoice_id !== invoiceToDelete.invoice_id)
+        // Get the response from the API call
+        const response = await greenTargetApi.deleteInvoice(
+          invoiceToDelete.invoice_id
         );
 
-        toast.success("Invoice deleted successfully");
+        // Check if the response contains an error message
+        if (
+          response.error ||
+          (response.message && response.message.includes("Cannot delete"))
+        ) {
+          // Show error toast with the server's message
+          toast.error(
+            response.message || "Cannot delete invoice: unknown error occurred"
+          );
+        } else {
+          // Only show success and update state if there's no error
+          toast.success("Invoice deleted successfully");
+
+          // Remove deleted invoice from state
+          setInvoices(
+            invoices.filter((i) => i.invoice_id !== invoiceToDelete.invoice_id)
+          );
+        }
       } catch (error: any) {
-        console.error("Error deleting invoice:", error);
-        toast.error(error.message || "Failed to delete invoice");
+        // This will catch network errors or other exceptions
+        if (error.message && error.message.includes("associated payments")) {
+          toast.error(
+            "Cannot delete invoice: it has associated payments. Delete the payments first."
+          );
+        } else {
+          toast.error("Failed to delete invoice");
+          console.error("Error deleting invoice:", error);
+        }
       } finally {
         setIsDeleteDialogOpen(false);
         setInvoiceToDelete(null);
