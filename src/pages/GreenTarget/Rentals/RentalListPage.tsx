@@ -13,6 +13,7 @@ import {
   IconTrash,
   IconMapPin,
   IconTruck,
+  IconPhone,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
@@ -24,11 +25,13 @@ import toast from "react-hot-toast";
 interface Rental {
   rental_id: number;
   customer_id: number;
-  customer_name: string; // Joined from customers table
+  customer_name: string;
+  customer_phone_number: string | null;
   location_id: number | null;
-  location_address: string | null; // Joined from locations table
+  location_address: string | null;
+  location_phone_number: string | null;
   tong_no: string;
-  dumpster_status: string; // Joined from dumpsters table
+  dumpster_status: string;
   driver: string;
   date_placed: string;
   date_picked: string | null;
@@ -135,11 +138,27 @@ const RentalCard = ({
       <div className="p-4">
         {/* Customer section */}
         <div className="mb-3 border-b pb-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="font-semibold text-default-900">
-                {rental.customer_name}
-              </h3>
+          <div className="flex justify-between items-start w-full">
+            <div className="w-full">
+              <div className="flex items-centerw-full">
+                <h3 className="font-semibold text-default-900">
+                  {rental.customer_name}
+                </h3>
+                {(rental.customer_phone_number ||
+                  rental.location_phone_number) && (
+                  <p className="text-sm text-default-600 mt-[3px] ml-2">
+                    <IconPhone
+                      size={14}
+                      className="inline mr-1 mt-0.5 align-top"
+                    />
+                    {rental.customer_phone_number &&
+                    rental.location_phone_number
+                      ? `${rental.customer_phone_number}, ${rental.location_phone_number}`
+                      : rental.customer_phone_number ||
+                        rental.location_phone_number}
+                  </p>
+                )}
+              </div>
               {rental.location_address && (
                 <p className="text-sm text-default-600 mt-0.5">
                   <IconMapPin
