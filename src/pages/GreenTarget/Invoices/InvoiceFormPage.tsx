@@ -743,7 +743,7 @@ const InvoiceFormPage: React.FC = () => {
                   >
                     <div className="flex justify-between items-center">
                       <h3 className="font-medium">
-                        Rental #{selectedRental.rental_id} Details
+                        Rental Details
                       </h3>
                       <span
                         className={`text-sm font-medium px-2 py-0.5 rounded-full ${
