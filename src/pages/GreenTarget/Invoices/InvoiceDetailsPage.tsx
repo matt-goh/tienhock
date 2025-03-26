@@ -1,6 +1,6 @@
 // src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   IconFileInvoice,
   IconCash,
@@ -67,7 +67,8 @@ const InvoiceDetailsPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const location = useLocation();
+  const state = (location.state as { showPaymentForm?: boolean }) || {};
   // Payment form state
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentFormData, setPaymentFormData] = useState<PaymentFormData>({
@@ -84,6 +85,12 @@ const InvoiceDetailsPage: React.FC = () => {
       fetchInvoiceDetails(parseInt(id));
     }
   }, [id]);
+
+  useEffect(() => {
+    if (state?.showPaymentForm) {
+      setShowPaymentForm(true);
+    }
+  }, [state]);
 
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
@@ -545,7 +552,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 htmlFor="internal_reference"
                 className="block text-sm font-medium text-default-700"
               >
-                Internal Reference (RV Number)
+                Reference Number
               </label>
               <input
                 type="text"

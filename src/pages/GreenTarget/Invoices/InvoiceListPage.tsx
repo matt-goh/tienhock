@@ -11,12 +11,16 @@ import {
   IconFilter,
   IconSquareCheckFilled,
   IconSquare,
+  IconPrinter,
+  IconCash,
+  IconFileDownload,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 
 interface Invoice {
   invoice_id: number;
@@ -45,7 +49,6 @@ const InvoiceCard = ({
 }) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const [isTrashHovered, setIsTrashHovered] = useState(false);
 
   const handleClick = () => {
     navigate(`/greentarget/invoices/${invoice.invoice_id}`);
@@ -61,7 +64,11 @@ const InvoiceCard = ({
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString();
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
   // Format currency
@@ -72,63 +79,133 @@ const InvoiceCard = ({
     }).format(amount);
   };
 
+  const isPaid = invoice.current_balance <= 0;
+
   return (
     <div
-      className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered
-          ? "bg-default-100 active:bg-default-200"
-          : ""
-      }`}
+      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer ${
+        isCardHovered ? "shadow-md" : "shadow-sm"
+      } ${isPaid ? "border-green-400" : "border-amber-400"}`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
     >
-      <div className="mb-2 flex justify-between items-start">
-        <div>
-          <h3 className="font-semibold">{invoice.invoice_number}</h3>
-          <div className="text-sm text-default-500">
-            {invoice.type === "regular" ? "Regular Invoice" : "Statement"}
-          </div>
-        </div>
-        <div
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            invoice.current_balance > 0
-              ? "bg-amber-100 text-amber-800"
-              : "bg-green-100 text-green-800"
-          }`}
-        >
-          {invoice.current_balance > 0 ? "Outstanding" : "Paid"}
+      {/* Status banner */}
+      <div
+        className={`w-full py-1.5 px-4 text-sm font-medium text-white ${
+          isPaid ? "bg-green-500" : "bg-amber-500"
+        }`}
+      >
+        <div className="flex justify-between items-center">
+          <span>{invoice.invoice_number}</span>
+          <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
+            {isPaid ? "Paid" : "Outstanding"}
+          </span>
         </div>
       </div>
-      <p className="text-sm">Customer: {invoice.customer_name}</p>
-      <p className="text-sm">Date: {formatDate(invoice.date_issued)}</p>
-      <p className="text-sm">Amount: {formatCurrency(invoice.total_amount)}</p>
-      <p className="text-sm">
-        Balance:{" "}
-        <span
-          className={
-            invoice.current_balance > 0 ? "text-amber-600 font-medium" : ""
-          }
-        >
-          {formatCurrency(invoice.current_balance)}
-        </span>
-      </p>
-      <div className="absolute inset-y-0 top-2 right-2">
-        <div className="relative w-8 h-8">
-          {isCardHovered && (
-            <button
-              onClick={handleDeleteClick}
-              onMouseEnter={() => setIsTrashHovered(true)}
-              onMouseLeave={() => setIsTrashHovered(false)}
-              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-default-100 active:bg-default-200 focus:outline-none"
+
+      <div className="p-4">
+        {/* Customer section */}
+        <div className="mb-3 border-b pb-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-semibold text-default-900">
+                {invoice.customer_name}
+              </h3>
+              <p className="text-sm text-default-600 mt-0.5">
+                {invoice.type === "regular" ? "Regular Invoice" : "Statement"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Details grid */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 mb-1">Date Issued</p>
+            <p className="font-medium">{formatDate(invoice.date_issued)}</p>
+          </div>
+          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 mb-1">Total</p>
+            <p className="font-medium">
+              {formatCurrency(invoice.total_amount)}
+            </p>
+          </div>
+          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 mb-1">Paid</p>
+            <p className="font-medium text-green-600">
+              {formatCurrency(invoice.amount_paid)}
+            </p>
+          </div>
+          <div
+            className={`p-2 border rounded-md ${
+              isPaid
+                ? "bg-green-50 border-green-100"
+                : "bg-amber-50 border-amber-100"
+            }`}
+          >
+            <p className="text-xs text-default-500 mb-1">Balance</p>
+            <p
+              className={`font-medium ${
+                isPaid ? "text-green-700" : "text-amber-700"
+              }`}
             >
-              <IconTrash
-                className="text-default-700 active:text-default-800"
-                stroke={1.5}
-                size={18}
-              />
+              {formatCurrency(invoice.current_balance)}
+            </p>
+          </div>
+        </div>
+
+        {/* Action buttons - semi-visible always, fully visible on hover */}
+        <div
+          className={`flex justify-end space-x-2 mt-2 transition-opacity duration-200 ${
+            isCardHovered ? "opacity-100" : "opacity-70"
+          }`}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/greentarget/invoices/${invoice.invoice_id}`);
+            }}
+            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
+            title="View Details"
+          >
+            <IconFileDownload size={18} stroke={1.5} />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/greentarget/invoices/${invoice.invoice_id}`);
+            }}
+            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+            title="Print Invoice"
+          >
+            <IconPrinter size={18} stroke={1.5} />
+          </button>
+
+          {!isPaid && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // Navigate to invoice details with state to show payment form
+                navigate(`/greentarget/invoices/${invoice.invoice_id}`, {
+                  state: { showPaymentForm: true },
+                });
+              }}
+              className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-full transition-colors"
+              title="Record Payment"
+            >
+              <IconCash size={18} stroke={1.5} />
             </button>
           )}
+
+          <button
+            onClick={handleDeleteClick}
+            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+            title="Delete Invoice"
+          >
+            <IconTrash size={18} stroke={1.5} />
+          </button>
         </div>
       </div>
     </div>
@@ -211,16 +288,20 @@ const InvoiceListPage: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (invoiceToDelete) {
       try {
-        // We would typically delete the invoice here, but in this case
-        // we might not want to implement actual deletion for invoices
-        // as they should be preserved for accounting purposes
-        // This is just a placeholder for the delete functionality
-        toast.error("Invoice deletion is disabled for accounting integrity");
+        await greenTargetApi.deleteInvoice(invoiceToDelete.invoice_id);
+
+        // Remove deleted invoice from state
+        setInvoices(
+          invoices.filter((i) => i.invoice_id !== invoiceToDelete.invoice_id)
+        );
+
+        toast.success("Invoice deleted successfully");
+      } catch (error: any) {
+        console.error("Error deleting invoice:", error);
+        toast.error(error.message || "Failed to delete invoice");
+      } finally {
         setIsDeleteDialogOpen(false);
         setInvoiceToDelete(null);
-      } catch (err) {
-        console.error("Error deleting invoice:", err);
-        toast.error("Failed to delete invoice. Please try again.");
       }
     }
   };
@@ -511,7 +592,7 @@ const InvoiceListPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {paginatedInvoices.map((invoice) => (
             <InvoiceCard
               key={invoice.invoice_id}
