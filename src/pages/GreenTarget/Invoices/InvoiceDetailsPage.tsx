@@ -803,7 +803,13 @@ const InvoiceDetailsPage: React.FC = () => {
         {invoice.type === "regular" && invoice.rental_id && (
           <div className="px-6 py-4 border-t border-default-200">
             <h2 className="text-lg font-medium mb-3">Rental Details</h2>
-            <div className="rounded-lg border border-default-200 overflow-hidden">
+            <div
+              className="rounded-lg border border-default-200 overflow-hidden cursor-pointer"
+              onClick={() =>
+                navigate(`/greentarget/rentals/${invoice.rental_id}`)
+              }
+              title="View Rental"
+            >
               {/* Status Banner */}
               <div
                 className={`px-4 py-2 ${

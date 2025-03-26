@@ -119,12 +119,19 @@ const InvoiceCard = ({
             </div>
             {/* Add rental ID and driver info in the right side */}
             {invoice.rental_id && (
-              <div className="text-right">
-                <h3 className="font-medium text-default-700">
+              <div className="text-right truncate">
+                <h3
+                  className="font-medium text-default-700 cursor-pointer hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/greentarget/rentals/${invoice.rental_id}`);
+                  }}
+                  title="View Rental"
+                >
                   Rental #{invoice.rental_id}
                 </h3>
                 {invoice.driver && (
-                  <p className="text-sm text-default-600 mt-0.5 truncate">
+                  <p className="text-sm text-default-600 mt-0.5">
                     Driver: {invoice.driver}
                   </p>
                 )}
