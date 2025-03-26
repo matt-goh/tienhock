@@ -36,6 +36,7 @@ interface Invoice {
   customer_id: number;
   customer_name: string;
   rental_id?: number;
+  location_address?: string;
   tong_no?: string;
   date_placed?: string;
   date_picked?: string;
@@ -93,13 +94,30 @@ const InvoiceDetailsPage: React.FC = () => {
         throw new Error("Invoice not found");
       }
 
-      setInvoice(data.invoice);
+      const invoice = data.invoice;
+
+      // If this is a regular invoice with a rental_id, get the rental details to access location
+      let locationAddress = null;
+      if (invoice.type === "regular" && invoice.rental_id) {
+        try {
+          const rentalData = await greenTargetApi.getRental(invoice.rental_id);
+          locationAddress = rentalData.location_address || null;
+        } catch (error) {
+          console.error("Error fetching rental location:", error);
+        }
+      }
+
+      setInvoice({
+        ...invoice,
+        location_address: locationAddress,
+      });
+
       setPayments(data.payments || []);
 
       // Pre-fill amount in payment form
       setPaymentFormData((prev) => ({
         ...prev,
-        amount_paid: data.invoice.current_balance,
+        amount_paid: invoice.current_balance,
       }));
 
       setError(null);
@@ -731,24 +749,30 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-default-50 p-4 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-sm text-default-500">Dumpster</p>
+                  <p className="text-default-500">Dumpster</p>
                   <p className="font-medium">{invoice.tong_no || "N/A"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Placement Date</p>
+                  <p className="text-default-500">Driver</p>
+                  <p className="font-medium">{invoice.driver || "N/A"}</p>
+                </div>
+                <div className="md:col-span-3">
+                  <p className="text-default-500">Location</p>
+                  <p className="font-medium">
+                    {invoice.location_address || "No specific location"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-default-500">Placement Date</p>
                   <p className="font-medium">
                     {formatDate(invoice.date_placed || "")}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Pickup Date</p>
+                  <p className="text-default-500">Pickup Date</p>
                   <p className="font-medium">
                     {formatDate(invoice.date_picked || "")}
                   </p>
-                </div>
-                <div>
-                  <p className="text-sm text-default-500">Driver</p>
-                  <p className="font-medium">{invoice.driver || "N/A"}</p>
                 </div>
               </div>
             </div>
