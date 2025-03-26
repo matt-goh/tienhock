@@ -8,6 +8,13 @@ import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
+import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 
 interface Customer {
   customer_id: number;
@@ -38,7 +45,7 @@ interface Invoice {
   statement_period_end?: string | null;
 }
 
-const TAX_RATE = 0.06; // 6% SST for example
+const TAX_RATE = 0;
 
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -115,8 +122,7 @@ const InvoiceFormPage: React.FC = () => {
         ...prev,
         customer_id: rentalData.customer_id,
         rental_id: rentalData.rental_id,
-        // Set a default amount - could be calculated based on rental duration
-        amount_before_tax: 500, // Default amount, adjust as needed
+        amount_before_tax: 200, // Default amount, adjust as needed
       }));
 
       // Set the selected rental
@@ -437,29 +443,55 @@ const InvoiceFormPage: React.FC = () => {
               Invoice Type
             </label>
             <div className="flex space-x-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="type"
-                  value="regular"
-                  checked={formData.type === "regular"}
-                  onChange={handleInputChange}
-                  className="mr-2"
-                  disabled={isEditMode} // Can't change type if editing
-                />
-                Regular Invoice
+              <label className="inline-flex items-center cursor-pointer">
+                <div className="relative flex items-center">
+                  <input
+                    type="radio"
+                    name="type"
+                    value="regular"
+                    checked={formData.type === "regular"}
+                    onChange={handleInputChange}
+                    className="sr-only" // Hide the actual radio input
+                    disabled={isEditMode}
+                  />
+                  <div
+                    className={`w-4 h-4 rounded-full border ${
+                      formData.type === "regular"
+                        ? "border-sky-500 bg-white"
+                        : "border-default-300 bg-white"
+                    } flex items-center justify-center`}
+                  >
+                    {formData.type === "regular" && (
+                      <div className="w-2 h-2 rounded-full bg-sky-500"></div>
+                    )}
+                  </div>
+                </div>
+                <span className="ml-2">Regular Invoice</span>
               </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="type"
-                  value="statement"
-                  checked={formData.type === "statement"}
-                  onChange={handleInputChange}
-                  className="mr-2"
-                  disabled={isEditMode} // Can't change type if editing
-                />
-                Statement
+              <label className="inline-flex items-center cursor-pointer">
+                <div className="relative flex items-center">
+                  <input
+                    type="radio"
+                    name="type"
+                    value="statement"
+                    checked={formData.type === "statement"}
+                    onChange={handleInputChange}
+                    className="sr-only" // Hide the actual radio input
+                    disabled={isEditMode}
+                  />
+                  <div
+                    className={`w-4 h-4 rounded-full border ${
+                      formData.type === "statement"
+                        ? "border-sky-500 bg-white"
+                        : "border-default-300 bg-white"
+                    } flex items-center justify-center`}
+                  >
+                    {formData.type === "statement" && (
+                      <div className="w-2 h-2 rounded-full bg-sky-500"></div>
+                    )}
+                  </div>
+                </div>
+                <span className="ml-2">Statement</span>
               </label>
             </div>
           </div>
@@ -473,24 +505,85 @@ const InvoiceFormPage: React.FC = () => {
               >
                 Customer
               </label>
-              <select
-                id="customer_id"
-                name="customer_id"
+              <Listbox
                 value={formData.customer_id || ""}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                disabled={isEditMode} // Can't change customer if editing
+                onChange={(value) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    customer_id: value === "" ? 0 : Number(value),
+                  }));
+                }}
+                disabled={isEditMode}
               >
-                <option value="">Select Customer</option>
-                {customers.map((customer) => (
-                  <option
-                    key={customer.customer_id}
-                    value={customer.customer_id}
-                  >
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
+                <div className="relative">
+                  <ListboxButton className="w-full px-3 py-2 border border-default-300 rounded-lg text-left focus:outline-none focus:border-default-500 disabled:bg-default-50 focus:ring-0">
+                    <span className="block truncate">
+                      {customers.find(
+                        (customer) =>
+                          customer.customer_id === formData.customer_id
+                      )?.name || "Select Customer"}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                      <IconChevronDown size={20} className="text-default-500" />
+                    </span>
+                  </ListboxButton>
+                  <ListboxOptions className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
+                    <ListboxOption
+                      value=""
+                      className={({ active }) =>
+                        `relative cursor-pointer select-none py-2 px-4 ${
+                          active ? "bg-default-100" : "text-default-900"
+                        }`
+                      }
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : "font-normal"
+                            }`}
+                          >
+                            Select Customer
+                          </span>
+                          {selected && (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                              <IconCheck size={20} />
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </ListboxOption>
+                    {customers.map((customer) => (
+                      <ListboxOption
+                        key={customer.customer_id}
+                        value={customer.customer_id}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-4 ${
+                            active ? "bg-default-100" : "text-default-900"
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              {customer.name}
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck size={20} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                    ))}
+                  </ListboxOptions>
+                </div>
+              </Listbox>
             </div>
 
             {/* Invoice Date */}
@@ -522,25 +615,109 @@ const InvoiceFormPage: React.FC = () => {
                 >
                   Select Rental
                 </label>
-                <select
-                  id="rental_id"
-                  name="rental_id"
+                <Listbox
                   value={formData.rental_id || ""}
-                  onChange={handleRentalChange}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                  disabled={isEditMode || !formData.customer_id} // Can't change rental if editing or no customer selected
+                  onChange={(value) => {
+                    const rentalId = value === "" ? null : Number(value);
+                    const selectedRental = availableRentals.find(
+                      (r) => r.rental_id === rentalId
+                    );
+                    setSelectedRental(selectedRental || null);
+                    setFormData((prev) => ({
+                      ...prev,
+                      rental_id: rentalId,
+                    }));
+                  }}
+                  disabled={isEditMode || !formData.customer_id}
                 >
-                  <option value="">Select Rental</option>
-                  {availableRentals.map((rental) => (
-                    <option key={rental.rental_id} value={rental.rental_id}>
-                      Dumpster {rental.tong_no} -{" "}
-                      {rental.location_address || "No location"} - Picked up:{" "}
-                      {rental.date_picked
-                        ? new Date(rental.date_picked).toLocaleDateString()
-                        : "Not picked up"}
-                    </option>
-                  ))}
-                </select>
+                  <div className="relative">
+                    <ListboxButton className="w-full px-3 py-2 border border-default-300 rounded-lg text-left focus:outline-none focus:border-default-500 disabled:bg-default-50 focus:ring-0">
+                      <span className="block truncate">
+                        {selectedRental
+                          ? `Dumpster ${selectedRental.tong_no}${
+                              selectedRental.location_address
+                                ? ` - ${selectedRental.location_address}`
+                                : ""
+                            } - Pick up: ${
+                              selectedRental.date_picked
+                                ? new Date(
+                                    selectedRental.date_picked
+                                  ).toLocaleDateString()
+                                : "Not picked up"
+                            }`
+                          : "Select Rental"}
+                      </span>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <IconChevronDown
+                          size={20}
+                          className="text-default-500"
+                        />
+                      </span>
+                    </ListboxButton>
+                    <ListboxOptions className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
+                      <ListboxOption
+                        value=""
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-4 ${
+                            active ? "bg-default-100" : "text-default-900"
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              Select Rental
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck size={20} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                      {availableRentals.map((rental) => (
+                        <ListboxOption
+                          key={rental.rental_id}
+                          value={rental.rental_id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 px-4 ${
+                              active ? "bg-default-100" : "text-default-900"
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                Dumpster {rental.tong_no} -{" "}
+                                {rental.location_address || "No location"} -
+                                Picked up:{" "}
+                                {rental.date_picked
+                                  ? new Date(
+                                      rental.date_picked
+                                    ).toLocaleDateString()
+                                  : "Not picked up"}
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck size={20} />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </div>
+                </Listbox>
               </div>
 
               {selectedRental && (
@@ -552,11 +729,11 @@ const InvoiceFormPage: React.FC = () => {
                     {selectedRental.location_address || "No specific location"}
                   </p>
                   <p className="text-sm">
-                    Date Placed:{" "}
+                    Placement Date:{" "}
                     {new Date(selectedRental.date_placed).toLocaleDateString()}
                   </p>
                   <p className="text-sm">
-                    Date Picked:{" "}
+                    Pickup Date:{" "}
                     {selectedRental.date_picked
                       ? new Date(
                           selectedRental.date_picked
@@ -637,7 +814,7 @@ const InvoiceFormPage: React.FC = () => {
                   htmlFor="tax_amount"
                   className="block text-sm font-medium text-default-700"
                 >
-                  Tax Amount (6% SST)
+                  Tax Amount
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-3 flex items-center text-default-500">

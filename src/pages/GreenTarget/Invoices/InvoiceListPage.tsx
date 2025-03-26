@@ -9,11 +9,12 @@ import {
   IconTrash,
   IconFileInvoice,
   IconFilter,
+  IconSquareCheckFilled,
+  IconSquare,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
-import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 
@@ -386,7 +387,7 @@ const InvoiceListPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search by invoice # or customer"
+              placeholder="Search"
               className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -459,21 +460,32 @@ const InvoiceListPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-end">
-              <label className="inline-flex items-center">
-                <input
-                  type="checkbox"
-                  checked={filters.outstandingOnly}
-                  onChange={(e) =>
-                    setFilters({
-                      ...filters,
-                      outstandingOnly: e.target.checked,
-                    })
-                  }
-                  className="mr-2"
-                />
-                <span>Outstanding Only</span>
-              </label>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({
+                    ...filters,
+                    outstandingOnly: !filters.outstandingOnly,
+                  })
+                }
+                className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200 flex items-center"
+              >
+                {filters.outstandingOnly ? (
+                  <IconSquareCheckFilled
+                    className="text-blue-600"
+                    width={20}
+                    height={20}
+                  />
+                ) : (
+                  <IconSquare
+                    className="text-default-400"
+                    width={20}
+                    height={20}
+                  />
+                )}
+                <span className="ml-2 font-medium">Outstanding Only</span>
+              </button>
             </div>
           </div>
 

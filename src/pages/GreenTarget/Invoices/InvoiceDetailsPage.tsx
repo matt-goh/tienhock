@@ -11,6 +11,13 @@ import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
+import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 
 interface Payment {
   payment_id: number;
@@ -331,18 +338,139 @@ const InvoiceDetailsPage: React.FC = () => {
                 >
                   Payment Method
                 </label>
-                <select
-                  id="payment_method"
-                  name="payment_method"
+                <Listbox
                   value={paymentFormData.payment_method}
-                  onChange={handlePaymentFormChange}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                  onChange={(value) => {
+                    setPaymentFormData((prev) => ({
+                      ...prev,
+                      payment_method: value,
+                    }));
+                  }}
                 >
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="online">Online Payment</option>
-                </select>
+                  <div className="relative">
+                    <ListboxButton className="w-full px-3 py-2 border border-default-300 rounded-lg text-left focus:outline-none focus:border-default-500 focus:ring-0">
+                      <span className="block truncate">
+                        {paymentFormData.payment_method === "cash"
+                          ? "Cash"
+                          : paymentFormData.payment_method === "cheque"
+                          ? "Cheque"
+                          : paymentFormData.payment_method === "bank_transfer"
+                          ? "Bank Transfer"
+                          : paymentFormData.payment_method === "online"
+                          ? "Online Payment"
+                          : "Select Payment Method"}
+                      </span>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                        <IconChevronDown
+                          size={20}
+                          className="text-default-500"
+                        />
+                      </span>
+                    </ListboxButton>
+                    <ListboxOptions className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
+                      <ListboxOption
+                        value="cash"
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-4 ${
+                            active ? "bg-default-100" : ""
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              Cash
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck size={20} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="cheque"
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-4 ${
+                            active ? "bg-default-100" : ""
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              Cheque
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck size={20} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="bank_transfer"
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-4 ${
+                            active ? "bg-default-100" : ""
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              Bank Transfer
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck size={20} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="online"
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-4 ${
+                            active ? "bg-default-100" : ""
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              Online Payment
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck size={20} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </div>
+                </Listbox>
               </div>
 
               {paymentFormData.payment_method === "cheque" && (
