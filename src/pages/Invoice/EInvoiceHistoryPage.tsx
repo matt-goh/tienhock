@@ -288,21 +288,6 @@ const EInvoiceHistoryPage: React.FC = () => {
     };
   };
 
-  const handleDateChange = (type: "start" | "end", value: string) => {
-    if (!value) return;
-    const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) return;
-    const newDate = new Date(year, month - 1, day);
-    if (isNaN(newDate.getTime())) return;
-    const adjustedRange = adjustDateRange(newDate, type, dateRange);
-
-    // Save to storage and update state
-    saveDatesToStorage(adjustedRange.start, adjustedRange.end);
-    setDateRange(adjustedRange);
-    // Reset to first page when date changes
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  };
-
   const handleMonthChange = (month: MonthOption) => {
     setSelectedMonth(month);
 
@@ -325,13 +310,6 @@ const EInvoiceHistoryPage: React.FC = () => {
     });
     // Reset to first page when date changes
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  };
-
-  const formatDateForInput = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
   };
 
   const formatDate = (dateString: string) => {

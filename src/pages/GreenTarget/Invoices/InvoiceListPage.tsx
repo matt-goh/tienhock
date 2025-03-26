@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/Invoices/InvoiceListPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import DateRangePicker from "../../../components/DateRangePicker";
 import {
   IconSearch,
   IconChevronLeft,
@@ -8,13 +9,18 @@ import {
   IconPlus,
   IconTrash,
   IconFileInvoice,
-  IconFilter,
-  IconSquareCheckFilled,
-  IconSquare,
   IconPrinter,
   IconCash,
   IconFileDownload,
+  IconChevronDown,
+  IconCheck,
 } from "@tabler/icons-react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import Button from "../../../components/Button";
@@ -40,6 +46,8 @@ interface Invoice {
   statement_period_start?: string;
   statement_period_end?: string;
 }
+
+const STORAGE_KEY = "greentarget_invoice_filters";
 
 const InvoiceCard = ({
   invoice,
@@ -240,6 +248,47 @@ const InvoiceCard = ({
 };
 
 const InvoiceListPage: React.FC = () => {
+  // Function to get initial dates from localStorage
+  const getInitialDates = () => {
+    const savedFilters = localStorage.getItem(STORAGE_KEY);
+    if (savedFilters) {
+      const { start, end } = JSON.parse(savedFilters);
+      return {
+        start: start
+          ? new Date(start)
+          : new Date(new Date().setMonth(new Date().getMonth() - 1)),
+        end: end ? new Date(end) : new Date(),
+      };
+    }
+    return {
+      start: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+      end: new Date(),
+    };
+  }; // Month options setup
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  // Month options
+  const monthOptions = [
+    { id: 0, name: "January" },
+    { id: 1, name: "February" },
+    { id: 2, name: "March" },
+    { id: 3, name: "April" },
+    { id: 4, name: "May" },
+    { id: 5, name: "June" },
+    { id: 6, name: "July" },
+    { id: 7, name: "August" },
+    { id: 8, name: "September" },
+    { id: 9, name: "October" },
+    { id: 10, name: "November" },
+    { id: 11, name: "December" },
+  ];
+
+  const [selectedMonth, setSelectedMonth] = useState(
+    monthOptions[currentMonth]
+  );
+  const [dateRange, setDateRange] = useState(getInitialDates());
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -247,13 +296,6 @@ const InvoiceListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
-  const [filters, setFilters] = useState({
-    outstandingOnly: false,
-    type: "all", // all, regular, statement
-    startDate: "",
-    endDate: "",
-  });
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -262,6 +304,53 @@ const InvoiceListPage: React.FC = () => {
     fetchInvoices();
   }, []);
 
+  // Effect to fetch invoices when filters change
+  useEffect(() => {
+    fetchInvoices();
+  }, [dateRange]);
+
+  // Function to save dates to localStorage
+  const saveDatesToStorage = (startDate: Date, endDate: Date) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      })
+    );
+  };
+
+  // Handle month selection
+  const handleMonthChange = (month: { id: number; name: string }) => {
+    setSelectedMonth(month);
+
+    // Get the current year
+    const year = currentYear;
+
+    // If the selected month is after the current month, it must be from last year
+    const selectedYear = month.id > currentMonth ? year - 1 : year;
+
+    // Create start date (1st of the selected month)
+    const startDate = new Date(selectedYear, month.id, 1);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Create end date (last day of the selected month)
+    const endDate = new Date(selectedYear, month.id + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Save to storage and update state
+    saveDatesToStorage(startDate, endDate);
+
+    // Update state and then fetch
+    setDateRange({
+      start: startDate,
+      end: endDate,
+    });
+
+    // Reset to first page when date changes
+    setCurrentPage(1);
+  };
+
   const fetchInvoices = async () => {
     try {
       setLoading(true);
@@ -269,28 +358,18 @@ const InvoiceListPage: React.FC = () => {
       let queryParams = "";
 
       // Build query string if we have any active filters
-      if (
-        filters.outstandingOnly ||
-        filters.type !== "all" ||
-        filters.startDate ||
-        filters.endDate
-      ) {
+      if (dateRange.start || dateRange.end) {
         const params = new URLSearchParams();
 
-        if (filters.outstandingOnly) {
-          params.append("outstanding_only", "true");
+        if (dateRange.start) {
+          params.append(
+            "start_date",
+            dateRange.start.toISOString().split("T")[0]
+          );
         }
 
-        if (filters.type !== "all") {
-          params.append("type", filters.type);
-        }
-
-        if (filters.startDate) {
-          params.append("start_date", filters.startDate);
-        }
-
-        if (filters.endDate) {
-          params.append("end_date", filters.endDate);
+        if (dateRange.end) {
+          params.append("end_date", dateRange.end.toISOString().split("T")[0]);
         }
 
         queryParams = `?${params.toString()}`;
@@ -353,22 +432,6 @@ const InvoiceListPage: React.FC = () => {
         setInvoiceToDelete(null);
       }
     }
-  };
-
-  const handleApplyFilters = () => {
-    setCurrentPage(1);
-    fetchInvoices();
-    setIsFilterOpen(false);
-  };
-
-  const handleResetFilters = () => {
-    setFilters({
-      outstandingOnly: false,
-      type: "all",
-      startDate: "",
-      endDate: "",
-    });
-    // Don't fetch immediately, wait for the user to apply
   };
 
   const filteredInvoices = useMemo(() => {
@@ -506,11 +569,84 @@ const InvoiceListPage: React.FC = () => {
   return (
     <div className="relative w-full mx-20">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-default-700 font-bold">
+        <h1
+          className="text-2xl text-default-700 font-bold truncate max-w-xs"
+          title={`Invoices (${filteredInvoices.length})`}
+        >
           Invoices ({filteredInvoices.length})
         </h1>
-        <div className="flex space-x-3">
-          <div className="relative">
+        <div className="flex space-x-3 items-center">
+          {/* DateRangePicker - hidden on small screens */}
+          <div className="hidden lg:flex items-center gap-3 flex-1">
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateChange={(newDateRange) => {
+                // Save to storage
+                saveDatesToStorage(newDateRange.start, newDateRange.end);
+                setDateRange(newDateRange);
+                // Reset to first page when date changes
+                setCurrentPage(1);
+              }}
+              className="max-w-md"
+            />
+          </div>
+
+          {/* Month selection - hidden on small screens */}
+          <div className="hidden lg:block w-40">
+            <Listbox value={selectedMonth} onChange={handleMonthChange}>
+              <div className="relative">
+                <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                  <span className="block truncate pl-2">
+                    {selectedMonth.name}
+                  </span>
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                    <IconChevronDown
+                      className="h-5 w-5 text-default-400"
+                      aria-hidden="true"
+                    />
+                  </span>
+                </ListboxButton>
+                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                  {monthOptions.map((month) => (
+                    <ListboxOption
+                      key={month.id}
+                      className={({ active }) =>
+                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                          active
+                            ? "bg-default-100 text-default-900"
+                            : "text-default-900"
+                        }`
+                      }
+                      value={month}
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : "font-normal"
+                            }`}
+                          >
+                            {month.name}
+                          </span>
+                          {selected && (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                              <IconCheck
+                                className="h-5 w-5"
+                                aria-hidden="true"
+                              />
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </ListboxOption>
+                  ))}
+                </ListboxOptions>
+              </div>
+            </Listbox>
+          </div>
+
+          {/* Search box - hidden on small screens */}
+          <div className="hidden lg:block relative">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
               size={22}
@@ -524,14 +660,7 @@ const InvoiceListPage: React.FC = () => {
             />
           </div>
 
-          <Button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            icon={IconFilter}
-            variant="outline"
-          >
-            Filters
-          </Button>
-
+          {/* Create Invoice Button */}
           <Button
             onClick={() => navigate("/greentarget/invoices/new")}
             icon={IconPlus}
@@ -541,92 +670,6 @@ const InvoiceListPage: React.FC = () => {
           </Button>
         </div>
       </div>
-
-      {/* Filter Panel */}
-      {isFilterOpen && (
-        <div className="bg-white border border-default-200 rounded-lg p-4 mb-6 shadow-sm">
-          <h2 className="text-lg font-medium mb-4">Filter Invoices</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Invoice Type
-              </label>
-              <select
-                value={filters.type}
-                onChange={(e) =>
-                  setFilters({ ...filters, type: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-              >
-                <option value="all">All Types</option>
-                <option value="regular">Regular Invoices</option>
-                <option value="statement">Statements</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, startDate: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, endDate: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setFilters({
-                    ...filters,
-                    outstandingOnly: !filters.outstandingOnly,
-                  })
-                }
-                className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200 flex items-center"
-              >
-                {filters.outstandingOnly ? (
-                  <IconSquareCheckFilled
-                    className="text-blue-600"
-                    width={20}
-                    height={20}
-                  />
-                ) : (
-                  <IconSquare
-                    className="text-default-400"
-                    width={20}
-                    height={20}
-                  />
-                )}
-                <span className="ml-2 font-medium">Outstanding Only</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 flex justify-end space-x-3">
-            <Button onClick={handleResetFilters} variant="outline">
-              Reset
-            </Button>
-            <Button onClick={handleApplyFilters}>Apply Filters</Button>
-          </div>
-        </div>
-      )}
 
       {filteredInvoices.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200">
