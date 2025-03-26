@@ -510,7 +510,9 @@ const InvoiceFormPage: React.FC = () => {
                   setFormData((prev) => ({
                     ...prev,
                     customer_id: value === "" ? 0 : Number(value),
+                    rental_id: null,
                   }));
+                  setSelectedRental(null);
                 }}
                 disabled={isEditMode}
               >
