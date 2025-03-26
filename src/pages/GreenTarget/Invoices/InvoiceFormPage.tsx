@@ -29,6 +29,11 @@ interface Rental {
   date_picked: string | null;
   location_address?: string;
   customer_name?: string;
+  invoice_info?: {
+    invoice_id: number;
+    invoice_number: string;
+    has_payments: boolean;
+  } | null;
 }
 
 interface Invoice {
@@ -154,7 +159,6 @@ const InvoiceFormPage: React.FC = () => {
 
   const fetchAvailableRentals = async (customerId: number) => {
     try {
-      // Get completed rentals (with pickup date) for this customer
       const params = new URLSearchParams({
         customer_id: customerId.toString(),
       });
@@ -163,7 +167,12 @@ const InvoiceFormPage: React.FC = () => {
         `/greentarget/api/rentals?${params.toString()}`
       );
 
-      setAvailableRentals(data);
+      // Filter out rentals that already have invoices
+      const availableRentalsData = data.filter(
+        (rental: Rental) => !rental.invoice_info && rental.date_picked
+      );
+
+      setAvailableRentals(availableRentalsData);
 
       // If editing and we have a rental_id, select that rental
       if (isEditMode && formData.rental_id) {
@@ -318,6 +327,18 @@ const InvoiceFormPage: React.FC = () => {
 
     if (formData.type === "regular" && !formData.rental_id) {
       toast.error("Please select a rental for this invoice");
+      return false;
+    }
+
+    // Check if the selected rental already has an invoice
+    if (
+      formData.type === "regular" &&
+      selectedRental &&
+      selectedRental.invoice_info
+    ) {
+      toast.error(
+        "This rental already has an invoice. Please select a different rental."
+      );
       return false;
     }
 

@@ -67,7 +67,12 @@ export default function (pool) {
         SELECT r.*, 
                c.name as customer_name, 
                l.address as location_address,
-               d.status as dumpster_status
+               d.status as dumpster_status,
+               (SELECT json_build_object(
+                  'invoice_id', i.invoice_id,
+                  'invoice_number', i.invoice_number,
+                  'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id)
+                ) FROM greentarget.invoices i WHERE i.rental_id = r.rental_id LIMIT 1) as invoice_info
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
@@ -527,7 +532,13 @@ export default function (pool) {
         SELECT r.*, 
                c.name as customer_name, 
                l.address as location_address,
-               d.status as dumpster_status
+               d.status as dumpster_status,
+               (SELECT json_build_object(
+                  'invoice_id', i.invoice_id,
+                  'invoice_number', i.invoice_number,
+                  'amount', i.total_amount,
+                  'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id)
+                ) FROM greentarget.invoices i WHERE i.rental_id = r.rental_id LIMIT 1) as invoice_info
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
