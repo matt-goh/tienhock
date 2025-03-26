@@ -586,61 +586,62 @@ const InvoiceDetailsPage: React.FC = () => {
             <table className="min-w-full">
               <tbody>
                 <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500 align-top">
+                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
                     Invoice Number:
                   </td>
-                  <td className="py-2 text-sm font-medium text-default-900">
+                  <td className="py-2 font-medium text-default-900">
                     {invoice.invoice_number}
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500 align-top">
+                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
                     Type:
                   </td>
-                  <td className="py-2 text-sm font-medium text-default-900">
+                  <td className="py-2 font-medium text-default-900">
                     {invoice.type === "regular"
                       ? "Regular Invoice"
                       : "Statement"}
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500 align-top">
+                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
                     Date Issued:
                   </td>
-                  <td className="py-2 text-sm font-medium text-default-900">
+                  <td className="py-2 font-medium text-default-900">
                     {formatDate(invoice.date_issued)}
                   </td>
                 </tr>
                 {invoice.type === "statement" && (
                   <tr>
-                    <td className="py-2 pr-4 text-sm text-default-500 align-top">
+                    <td className="py-2 pr-4 text-default-500 font-medium align-top">
                       Statement Period:
                     </td>
-                    <td className="py-2 text-sm font-medium text-default-900">
+                    <td className="py-2 font-medium text-default-900">
                       {formatDate(invoice.statement_period_start || "")} to{" "}
                       {formatDate(invoice.statement_period_end || "")}
                     </td>
                   </tr>
                 )}
                 <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500 align-top">
+                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
                     Customer:
                   </td>
-                  <td className="py-2 text-sm font-medium text-default-900">
-                    {invoice.customer_name}
+                  <td className="py-2 font-medium text-default-900">
+                    {invoice.customer_id ? (
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/greentarget/customers/${invoice.customer_id}`
+                          )
+                        }
+                        className="text-default-900 hover:text-sky-600 font-medium hover:underline focus:outline-none"
+                      >
+                        {invoice.customer_name}
+                      </button>
+                    ) : (
+                      invoice.customer_name
+                    )}
                   </td>
-                  {invoice.customer_id && (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/greentarget/customers/${invoice.customer_id}`
-                        )
-                      }
-                      className="text-sky-600 hover:text-sky-800 text-sm ml-2"
-                    >
-                      View Customer
-                    </button>
-                  )}
                 </tr>
               </tbody>
             </table>
@@ -650,46 +651,66 @@ const InvoiceDetailsPage: React.FC = () => {
             <h2 className="text-lg font-medium mb-3">Amount Breakdown</h2>
             <table className="min-w-full">
               <tbody>
+                {/* Only show subtotal and tax if tax amount is non-zero */}
+                {parseFloat(invoice.tax_amount.toString()) > 0 && (
+                  <>
+                    <tr>
+                      <td className="py-2 pr-4 text-default-500">Subtotal:</td>
+                      <td className="py-2 font-medium text-right">
+                        {formatCurrency(
+                          parseFloat(invoice.amount_before_tax.toString())
+                        )}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 text-default-500">Tax:</td>
+                      <td className="py-2 font-medium text-right">
+                        {formatCurrency(
+                          parseFloat(invoice.tax_amount.toString())
+                        )}
+                      </td>
+                    </tr>
+                    <tr className="border-t">
+                      <td className="py-2 pr-4 font-medium text-default-900">
+                        Total:
+                      </td>
+                      <td className="py-2 font-bold text-right">
+                        {formatCurrency(
+                          parseFloat(invoice.total_amount.toString())
+                        )}
+                      </td>
+                    </tr>
+                  </>
+                )}
+
+                {/* If no tax, just show the total directly */}
+                {parseFloat(invoice.tax_amount.toString()) === 0 && (
+                  <tr>
+                    <td className="py-2 pr-4 font-medium text-default-900">
+                      Total:
+                    </td>
+                    <td className="py-2 font-bold text-right">
+                      {formatCurrency(
+                        parseFloat(invoice.total_amount.toString())
+                      )}
+                    </td>
+                  </tr>
+                )}
+
                 <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500">
-                    Subtotal:
-                  </td>
-                  <td className="py-2 text-sm font-medium text-right">
-                    {formatCurrency(
-                      parseFloat(invoice.amount_before_tax.toString())
-                    )}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500">Tax:</td>
-                  <td className="py-2 text-sm font-medium text-right">
-                    {formatCurrency(parseFloat(invoice.tax_amount.toString()))}
-                  </td>
-                </tr>
-                <tr className="border-t">
-                  <td className="py-2 pr-4 text-base font-medium text-default-900">
-                    Total:
-                  </td>
-                  <td className="py-2 text-base font-bold text-right">
-                    {formatCurrency(
-                      parseFloat(invoice.total_amount.toString())
-                    )}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500">
+                  <td className="py-2 pr-4 text-default-500 font-medium">
                     Amount Paid:
                   </td>
-                  <td className="py-2 text-sm font-medium text-right text-green-600">
+                  <td className="py-2 font-medium text-right text-green-600">
                     {formatCurrency(parseFloat(invoice.amount_paid.toString()))}
                   </td>
                 </tr>
                 <tr className="border-t">
-                  <td className="py-2 pr-4 text-sm font-medium text-default-900">
+                  <td className="py-2 pr-4 font-medium text-default-900">
                     Balance Due:
                   </td>
                   <td
-                    className={`py-2 text-sm font-bold text-right ${
+                    className={`py-2 font-bold text-right ${
                       invoice.current_balance > 0
                         ? "text-amber-600"
                         : "text-green-600"
