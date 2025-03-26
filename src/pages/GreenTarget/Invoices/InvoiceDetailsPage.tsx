@@ -208,9 +208,37 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
+      // Fetch all payments to find the highest reference number for this year
+      const allPayments = await greenTargetApi.getPayments();
+
+      // Get current year (last 2 digits)
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+
+      // Find the highest number for the current year
+      let highestNumber = 0;
+      const regex = new RegExp(`^RV/${currentYear}/(\\d+)$`);
+
+      allPayments.forEach((payment: { internal_reference: string }) => {
+        if (payment.internal_reference) {
+          const match = payment.internal_reference.match(regex);
+          if (match) {
+            const num = parseInt(match[1]);
+            if (num > highestNumber) {
+              highestNumber = num;
+            }
+          }
+        }
+      });
+
+      // Increment for the new payment
+      const nextNumber = highestNumber + 1;
+      const paddedNumber = nextNumber.toString().padStart(2, "0");
+      const referenceNumber = `RV/${currentYear}/${paddedNumber}`;
+
       const paymentData = {
         invoice_id: invoice.invoice_id,
         ...paymentFormData,
+        internal_reference: referenceNumber, // Set the auto-generated reference number
       };
 
       const response = await greenTargetApi.createPayment(paymentData);
@@ -349,7 +377,7 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="bg-default-50 p-6 rounded-lg mb-6 border border-default-200">
           <h2 className="text-lg font-medium mb-4">Record Payment</h2>
           <form onSubmit={handleSubmitPayment}>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <label
                   htmlFor="payment_date"
@@ -571,24 +599,6 @@ const InvoiceDetailsPage: React.FC = () => {
                   />
                 </div>
               )}
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="internal_reference"
-                  className="block text-sm font-medium text-default-700"
-                >
-                  Reference Number
-                </label>
-                <input
-                  type="text"
-                  id="internal_reference"
-                  name="internal_reference"
-                  value={paymentFormData.internal_reference}
-                  onChange={handlePaymentFormChange}
-                  placeholder="e.g., RV25/01/00"
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                />
-              </div>
             </div>
 
             <div className="mt-6 flex justify-end">

@@ -55,7 +55,7 @@ const InvoiceFormPage: React.FC = () => {
   const [formData, setFormData] = useState<Invoice>({
     type: "regular",
     customer_id: 0,
-    amount_before_tax: 0,
+    amount_before_tax: 200,
     tax_amount: 0,
     date_issued: new Date().toISOString().split("T")[0],
   });
@@ -63,7 +63,7 @@ const InvoiceFormPage: React.FC = () => {
   const [initialFormData, setInitialFormData] = useState<Invoice>({
     type: "regular",
     customer_id: 0,
-    amount_before_tax: 0,
+    amount_before_tax: 200,
     tax_amount: 0,
     date_issued: new Date().toISOString().split("T")[0],
   });
@@ -409,7 +409,7 @@ const InvoiceFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4">
+    <div className="container mx-auto -mt-8 px-4">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
