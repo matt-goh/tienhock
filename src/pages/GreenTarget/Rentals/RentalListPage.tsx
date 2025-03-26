@@ -385,6 +385,7 @@ const RentalListPage = () => {
         rental_id: rental.rental_id,
         customer_id: rental.customer_id,
         customer_name: rental.customer_name,
+        driver: rental.driver,
         location_address: rental.location_address,
         tong_no: rental.tong_no,
         date_placed: rental.date_placed,

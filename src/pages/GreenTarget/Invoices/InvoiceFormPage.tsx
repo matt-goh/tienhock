@@ -28,6 +28,7 @@ interface Rental {
   date_placed: string;
   date_picked: string | null;
   location_address?: string;
+  driver: string;
   customer_name?: string;
   invoice_info?: {
     invoice_id: number;
@@ -137,6 +138,7 @@ const InvoiceFormPage: React.FC = () => {
           rental_id: rentalData.rental_id,
           customer_id: rentalData.customer_id,
           tong_no: rentalData.tong_no,
+          driver: rentalData.driver,
           date_placed: rentalData.date_placed,
           date_picked: rentalData.date_picked,
           location_address: rentalData.location_address,
@@ -643,16 +645,16 @@ const InvoiceFormPage: React.FC = () => {
                     <ListboxButton className="w-full px-3 py-2 border border-default-300 rounded-lg text-left focus:outline-none focus:border-default-500 disabled:bg-default-50 focus:ring-0">
                       <span className="block truncate">
                         {selectedRental
-                          ? `Dumpster ${selectedRental.tong_no}${
+                          ? `Rental #${selectedRental.rental_id} - Dumpster ${
+                              selectedRental.tong_no
+                            } - Driver: ${
+                              selectedRental.driver
+                            } - Placed: ${new Date(
+                              selectedRental.date_placed
+                            ).toLocaleDateString()}${
                               selectedRental.location_address
                                 ? ` - ${selectedRental.location_address}`
                                 : ""
-                            } - Pick up: ${
-                              selectedRental.date_picked
-                                ? new Date(
-                                    selectedRental.date_picked
-                                  ).toLocaleDateString()
-                                : "Not picked up"
                             }`
                           : "Select Rental"}
                       </span>
@@ -706,14 +708,14 @@ const InvoiceFormPage: React.FC = () => {
                                   selected ? "font-medium" : "font-normal"
                                 }`}
                               >
-                                Dumpster {rental.tong_no} -{" "}
-                                {rental.location_address || "No location"} -
-                                Picked up:{" "}
-                                {rental.date_picked
-                                  ? new Date(
-                                      rental.date_picked
-                                    ).toLocaleDateString()
-                                  : "Not picked up"}
+                                Rental #{rental.rental_id} - Dumpster{" "}
+                                {rental.tong_no} - Driver: {rental.driver} -
+                                Placed:{" "}
+                                {new Date(
+                                  rental.date_placed
+                                ).toLocaleDateString()}
+                                {rental.location_address &&
+                                  ` - ${rental.location_address}`}
                               </span>
                               {selected && (
                                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
@@ -740,7 +742,9 @@ const InvoiceFormPage: React.FC = () => {
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <h3 className="font-medium">Rental Details</h3>
+                      <h3 className="font-medium">
+                        Rental #{selectedRental.rental_id} Details
+                      </h3>
                       <span
                         className={`text-sm font-medium px-2 py-0.5 rounded-full ${
                           isRentalActive(selectedRental.date_picked)
@@ -757,31 +761,8 @@ const InvoiceFormPage: React.FC = () => {
 
                   {/* Rental Information */}
                   <div className="p-4">
-                    {/* Dumpster & Location Info */}
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                        <div className="text-xs text-default-500 mb-1">
-                          Dumpster
-                        </div>
-                        <div className="font-medium">
-                          {selectedRental.tong_no}
-                        </div>
-                      </div>
-                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                        <div className="text-xs text-default-500 mb-1">
-                          Location
-                        </div>
-                        <div className="font-medium flex items-start">
-                          <span>
-                            {selectedRental.location_address ||
-                              "No specific location"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Rental Dates */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-default-50 p-3 rounded-lg border border-default-100">
                         <div className="text-xs text-default-500 mb-1">
                           Placement Date
@@ -812,6 +793,37 @@ const InvoiceFormPage: React.FC = () => {
                                 selectedRental.date_picked
                               ).toLocaleDateString()
                             : "Not picked up yet"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dumpster, Driver & Location Info */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Driver
+                        </div>
+                        <div className="font-medium">
+                          {selectedRental.driver}
+                        </div>
+                      </div>
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Dumpster
+                        </div>
+                        <div className="font-medium">
+                          {selectedRental.tong_no}
+                        </div>
+                      </div>
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Location
+                        </div>
+                        <div className="font-medium flex items-start">
+                          <span>
+                            {selectedRental.location_address ||
+                              "No specific location"}
+                          </span>
                         </div>
                       </div>
                     </div>
