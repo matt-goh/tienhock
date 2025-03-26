@@ -79,7 +79,8 @@ export const greenTargetApi = {
   createPayment: (data: any) => api.post("/greentarget/api/payments", data),
   updatePayment: (id: any, data: any) =>
     api.put(`/greentarget/api/payments/${id}`, data),
-  deletePayment: (id: any) => api.delete(`/greentarget/api/payments/${id}`),
+  deletePayment: (paymentId: number) =>
+    api.delete(`/greentarget/api/payments/${paymentId}`),
 
   // Location endpoints
   getLocationsByCustomer: (customerId: any) =>

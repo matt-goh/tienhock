@@ -18,6 +18,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 
 interface Payment {
   payment_id: number;
@@ -79,6 +80,10 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: "",
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] =
+    useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -229,6 +234,27 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const handleDeletePayment = async () => {
+    if (!paymentToDelete || !invoice) return;
+
+    setIsDeletingPayment(true);
+    try {
+      await greenTargetApi.deletePayment(paymentToDelete.payment_id);
+
+      toast.success("Payment deleted successfully");
+
+      // Refresh the invoice details to update balances
+      fetchInvoiceDetails(invoice.invoice_id);
+    } catch (error) {
+      console.error("Error deleting payment:", error);
+      toast.error("Failed to delete payment");
+    } finally {
+      setIsDeletingPayment(false);
+      setIsDeletePaymentDialogOpen(false);
+      setPaymentToDelete(null);
+    }
+  };
+
   const handlePrintInvoice = () => {
     // Placeholder for print functionality
     toast.success("Invoice printing functionality would go here");
@@ -323,7 +349,7 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="bg-default-50 p-6 rounded-lg mb-6 border border-default-200">
           <h2 className="text-lg font-medium mb-4">Record Payment</h2>
           <form onSubmit={handleSubmitPayment}>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
               <div className="space-y-2">
                 <label
                   htmlFor="payment_date"
@@ -545,24 +571,24 @@ const InvoiceDetailsPage: React.FC = () => {
                   />
                 </div>
               )}
-            </div>
 
-            <div className="mt-4 space-y-2">
-              <label
-                htmlFor="internal_reference"
-                className="block text-sm font-medium text-default-700"
-              >
-                Reference Number
-              </label>
-              <input
-                type="text"
-                id="internal_reference"
-                name="internal_reference"
-                value={paymentFormData.internal_reference}
-                onChange={handlePaymentFormChange}
-                placeholder="e.g., RV25/01/73"
-                className="w-full sm:w-1/2 px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-              />
+              <div className="space-y-2">
+                <label
+                  htmlFor="internal_reference"
+                  className="block text-sm font-medium text-default-700"
+                >
+                  Reference Number
+                </label>
+                <input
+                  type="text"
+                  id="internal_reference"
+                  name="internal_reference"
+                  value={paymentFormData.internal_reference}
+                  onChange={handlePaymentFormChange}
+                  placeholder="e.g., RV25/01/00"
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                />
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end">
@@ -882,6 +908,10 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                       Internal Ref
                     </th>
+                    {/* Add the new Actions column header */}
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-default-200">
@@ -909,6 +939,20 @@ const InvoiceDetailsPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
                         {payment.internal_reference || "-"}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <Button
+                          variant="outline"
+                          color="rose"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPaymentToDelete(payment);
+                            setIsDeletePaymentDialogOpen(true);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -917,6 +961,19 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         )}
       </div>
+      <ConfirmationDialog
+        isOpen={isDeletePaymentDialogOpen}
+        onClose={() => setIsDeletePaymentDialogOpen(false)}
+        onConfirm={handleDeletePayment}
+        title="Delete Payment"
+        message={`Are you sure you want to delete this payment of ${
+          paymentToDelete
+            ? formatCurrency(parseFloat(paymentToDelete.amount_paid.toString()))
+            : ""
+        }? This will affect the invoice balance.`}
+        confirmButtonText={isDeletingPayment ? "Deleting..." : "Delete"}
+        variant="danger"
+      />
     </div>
   );
 };
