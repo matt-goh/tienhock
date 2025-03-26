@@ -109,11 +109,14 @@ const InvoiceCard = ({
         {/* Customer section */}
         <div className="mb-3 border-b pb-3">
           <div className="flex justify-between items-start">
-            <div>
-              <h3 className="font-semibold text-default-900">
+            <div className="max-w-[65%]">
+              <h3
+                className="font-semibold text-default-900 truncate"
+                title={invoice.customer_name}
+              >
                 {invoice.customer_name}
               </h3>
-              <p className="text-sm text-default-600 mt-0.5">
+              <p className="text-sm text-default-600 mt-0.5 truncate">
                 {invoice.type === "regular" ? "Regular Invoice" : "Statement"}
               </p>
             </div>
@@ -121,7 +124,7 @@ const InvoiceCard = ({
             {invoice.rental_id && (
               <div className="text-right truncate">
                 <h3
-                  className="font-medium text-default-700 cursor-pointer hover:underline"
+                  className="font-medium text-default-700 cursor-pointer hover:underline truncate"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(`/greentarget/rentals/${invoice.rental_id}`);
@@ -131,7 +134,10 @@ const InvoiceCard = ({
                   Rental #{invoice.rental_id}
                 </h3>
                 {invoice.driver && (
-                  <p className="text-sm text-default-600 mt-0.5">
+                  <p
+                    className="text-sm text-default-600 mt-0.5 truncate"
+                    title={invoice.driver}
+                  >
                     Driver: {invoice.driver}
                   </p>
                 )}
