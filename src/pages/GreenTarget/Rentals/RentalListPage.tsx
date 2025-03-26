@@ -214,41 +214,6 @@ const RentalCard = ({
             isCardHovered ? "opacity-100" : "opacity-70"
           }`}
         >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteRental(rental);
-            }}
-            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
-            title="Delete Rental"
-          >
-            <IconTrash size={18} stroke={1.5} />
-          </button>
-
-          {!isActive() && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateInvoice(rental);
-              }}
-              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
-              title="Create Invoice"
-            >
-              <IconFileInvoice size={18} stroke={1.5} />
-            </button>
-          )}
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onGenerateDeliveryOrder(rental);
-            }}
-            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
-            title="Generate Delivery Order"
-          >
-            <IconReceipt size={18} stroke={1.5} />
-          </button>
-
           {/* Add new Pickup button only for active rentals */}
           {isActive() && (
             <button
@@ -262,6 +227,39 @@ const RentalCard = ({
               <IconTruck size={18} stroke={1.5} />
             </button>
           )}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateInvoice(rental);
+            }}
+            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+            title="Create Invoice"
+          >
+            <IconFileInvoice size={18} stroke={1.5} />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onGenerateDeliveryOrder(rental);
+            }}
+            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
+            title="Generate Delivery Order"
+          >
+            <IconReceipt size={18} stroke={1.5} />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteRental(rental);
+            }}
+            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+            title="Delete Rental"
+          >
+            <IconTrash size={18} stroke={1.5} />
+          </button>
         </div>
       </div>
     </div>
