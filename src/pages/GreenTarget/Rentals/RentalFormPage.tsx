@@ -758,12 +758,6 @@ const RentalFormPage: React.FC = () => {
                                   {selectedLocation?.address ||
                                     "No Specific Location"}
                                 </span>
-                                {selectedLocation?.phone_number && (
-                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
-                                    <IconPhone size={12} className="mr-1" />
-                                    {selectedLocation.phone_number}
-                                  </span>
-                                )}
                               </div>
                             );
                           })()
