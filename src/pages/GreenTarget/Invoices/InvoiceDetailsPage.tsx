@@ -129,6 +129,20 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const isRentalActive = (datePickedStr: string | null | undefined) => {
+    if (!datePickedStr) return true;
+
+    // Convert dates to YYYY-MM-DD format for reliable comparison
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    // Get just the date part
+    const pickupDateStr = datePickedStr.split("T")[0];
+
+    // If pickup date is today or in the past, consider it completed
+    return pickupDateStr > todayStr;
+  };
+
   const handlePaymentFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -746,33 +760,85 @@ const InvoiceDetailsPage: React.FC = () => {
         {invoice.type === "regular" && invoice.rental_id && (
           <div className="px-6 py-4 border-t border-default-200">
             <h2 className="text-lg font-medium mb-3">Rental Details</h2>
-            <div className="bg-default-50 p-4 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-default-500">Dumpster</p>
-                  <p className="font-medium">{invoice.tong_no || "N/A"}</p>
+            <div className="rounded-lg border border-default-200 overflow-hidden">
+              {/* Status Banner */}
+              <div
+                className={`px-4 py-2 ${
+                  isRentalActive(invoice.date_picked)
+                    ? "bg-green-500 text-white"
+                    : "bg-default-100 text-default-700"
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <h3 className="font-medium">Rental #{invoice.rental_id}</h3>
+                  <span
+                    className={`text-sm font-medium px-2 py-0.5 rounded-full ${
+                      isRentalActive(invoice.date_picked)
+                        ? "bg-green-400/30 text-white"
+                        : "bg-default-200 text-default-600"
+                    }`}
+                  >
+                    {isRentalActive(invoice.date_picked)
+                      ? "Ongoing"
+                      : "Completed"}
+                  </span>
                 </div>
-                <div>
-                  <p className="text-default-500">Driver</p>
-                  <p className="font-medium">{invoice.driver || "N/A"}</p>
+              </div>
+
+              {/* Rental Information */}
+              <div className="p-4">
+                {/* Rental Dates */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                    <div className="text-xs text-default-500 mb-1">
+                      Placement Date
+                    </div>
+                    <div className="font-medium">
+                      {formatDate(invoice.date_placed || "")}
+                    </div>
+                  </div>
+                  <div
+                    className={`p-3 rounded-lg ${
+                      invoice.date_picked
+                        ? "bg-default-50 border border-default-100"
+                        : "bg-green-50 border border-green-100"
+                    }`}
+                  >
+                    <div className="text-xs text-default-500 mb-1">
+                      Pickup Date
+                    </div>
+                    <div
+                      className={`font-medium ${
+                        !invoice.date_picked ? "text-green-600" : ""
+                      }`}
+                    >
+                      {invoice.date_picked
+                        ? formatDate(invoice.date_picked)
+                        : "Not picked up yet"}
+                    </div>
+                  </div>
                 </div>
-                <div className="md:col-span-3">
-                  <p className="text-default-500">Location</p>
-                  <p className="font-medium">
+                {/* Dumpster, Driver & Location Info */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                    <div className="text-xs text-default-500 mb-1">
+                      Dumpster
+                    </div>
+                    <div className="font-medium">
+                      {invoice.tong_no || "N/A"}
+                    </div>
+                  </div>
+                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                    <div className="text-xs text-default-500 mb-1">Driver</div>
+                    <div className="font-medium">{invoice.driver || "N/A"}</div>
+                  </div>
+                </div>
+
+                <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                  <div className="text-xs text-default-500 mb-1">Location</div>
+                  <div className="font-medium">
                     {invoice.location_address || "No specific location"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-default-500">Placement Date</p>
-                  <p className="font-medium">
-                    {formatDate(invoice.date_placed || "")}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-default-500">Pickup Date</p>
-                  <p className="font-medium">
-                    {formatDate(invoice.date_picked || "")}
-                  </p>
+                  </div>
                 </div>
               </div>
             </div>
