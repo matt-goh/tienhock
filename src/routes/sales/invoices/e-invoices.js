@@ -576,9 +576,7 @@ export default function (pool, config) {
             [documentDetails.longId, documentDetails.dateTimeValidated, uuid]
           );
 
-          console.log(
-            `Updated einvoice record for UUID ${uuid}: ${dbResult.rowCount} rows affected`
-          );
+          console.log(`Updated einvoice record for UUID ${uuid}`);
         } catch (dbError) {
           console.error("Error updating einvoice record:", dbError);
           // Continue with the response even if DB update fails
