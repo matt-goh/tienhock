@@ -224,13 +224,13 @@ const InvoiceDetailsPage: React.FC = () => {
 
   if (error || !invoice) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-8 py-8">
         <div className="bg-rose-50 text-rose-700 p-4 rounded-lg">
           <p>{error || "Invoice not found"}</p>
           <Button
             onClick={() => navigate("/greentarget/invoices")}
             icon={IconChevronLeft}
-            className="mt-4"
+            className="mt-4 font-medium"
           >
             Back to Invoices
           </Button>
@@ -240,13 +240,13 @@ const InvoiceDetailsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-8 pb-8 -mt-8">
       {/* Header with actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
         <div>
           <button
             onClick={() => navigate("/greentarget/invoices")}
-            className="mb-4 flex items-center text-default-600 hover:text-default-900"
+            className="mb-4 flex items-center font-medium text-default-600 hover:text-default-900"
           >
             <IconChevronLeft size={18} className="mr-1" />
             Back to Invoices
@@ -255,10 +255,6 @@ const InvoiceDetailsPage: React.FC = () => {
             <IconFileInvoice size={28} className="mr-2 text-default-600" />
             Invoice {invoice.invoice_number}
           </h1>
-          <div className="text-default-500 text-sm mt-1">
-            {invoice.type === "regular" ? "Regular Invoice" : "Statement"} •
-            Issued on {formatDate(invoice.date_issued)}
-          </div>
         </div>
 
         <div className="flex space-x-3 mt-4 md:mt-0">
@@ -665,9 +661,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 text-sm text-default-500">
-                    Tax (6% SST):
-                  </td>
+                  <td className="py-2 pr-4 text-sm text-default-500">Tax:</td>
                   <td className="py-2 text-sm font-medium text-right">
                     {formatCurrency(parseFloat(invoice.tax_amount.toString()))}
                   </td>
@@ -746,7 +740,7 @@ const InvoiceDetailsPage: React.FC = () => {
         <h2 className="text-xl font-medium mb-4">Payment History</h2>
 
         {payments.length === 0 ? (
-          <div className="bg-white border border-default-200 rounded-lg p-6 text-center">
+          <div className="bg-white border border-dashed border-default-200 rounded-lg p-6 text-center">
             <p className="text-default-500">No payments recorded yet.</p>
           </div>
         ) : (
