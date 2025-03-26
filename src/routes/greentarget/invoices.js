@@ -269,5 +269,57 @@ export default function (pool) {
     }
   });
 
+  // Delete an invoice
+  router.delete("/:invoice_id", async (req, res) => {
+    const { invoice_id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // First check if there are any payments for this invoice
+      const paymentsCheck = await client.query(
+        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1",
+        [invoice_id]
+      );
+
+      if (parseInt(paymentsCheck.rows[0].count) > 0) {
+        throw new Error(
+          "Cannot delete invoice: it has associated payments. Delete the payments first."
+        );
+      }
+
+      // Get invoice details before deletion
+      const invoiceQuery =
+        "SELECT * FROM greentarget.invoices WHERE invoice_id = $1";
+      const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
+
+      if (invoiceResult.rows.length === 0) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Delete the invoice
+      const deleteQuery =
+        "DELETE FROM greentarget.invoices WHERE invoice_id = $1 RETURNING *";
+      const deleteResult = await client.query(deleteQuery, [invoice_id]);
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Invoice deleted successfully",
+        invoice: deleteResult.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error deleting Green Target invoice:", error);
+      res.status(500).json({
+        message: error.message || "Error deleting invoice",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }

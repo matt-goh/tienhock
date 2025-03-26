@@ -333,14 +333,31 @@ const RentalListPage = () => {
     if (!rentalToDelete) return;
 
     try {
-      await greenTargetApi.deleteRental(rentalToDelete.rental_id);
-      toast.success("Rental deleted successfully");
-
-      // Remove deleted rental from state
-      setRentals(
-        rentals.filter((r) => r.rental_id !== rentalToDelete.rental_id)
+      // Get the response from the API call
+      const response = await greenTargetApi.deleteRental(
+        rentalToDelete.rental_id
       );
+
+      // Check if the response contains an error message
+      if (
+        response.error ||
+        (response.message && response.message.includes("Cannot delete"))
+      ) {
+        // Show error toast with the server's message
+        toast.error(
+          response.message || "Cannot delete rental: unknown error occurred"
+        );
+      } else {
+        // Only show success and update state if there's no error
+        toast.success("Rental deleted successfully");
+
+        // Remove deleted rental from state
+        setRentals(
+          rentals.filter((r) => r.rental_id !== rentalToDelete.rental_id)
+        );
+      }
     } catch (error: any) {
+      // This will catch network errors or other exceptions
       if (error.message && error.message.includes("associated invoices")) {
         toast.error("Cannot delete rental: it has associated invoices");
       } else {
