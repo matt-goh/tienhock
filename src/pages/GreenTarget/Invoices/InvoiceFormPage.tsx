@@ -14,7 +14,7 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconMapPin } from "@tabler/icons-react";
 
 interface Customer {
   customer_id: number;
@@ -122,6 +122,7 @@ const InvoiceFormPage: React.FC = () => {
         ...prev,
         customer_id: rentalData.customer_id,
         rental_id: rentalData.rental_id,
+        location_address: rentalData.location_address,
         amount_before_tax: 200, // Default amount, adjust as needed
       }));
 
@@ -156,24 +157,17 @@ const InvoiceFormPage: React.FC = () => {
       // Get completed rentals (with pickup date) for this customer
       const params = new URLSearchParams({
         customer_id: customerId.toString(),
-        // We only want rentals with pickup date set
-        // and without an invoice yet
       });
 
       const data = await api.get(
         `/greentarget/api/rentals?${params.toString()}`
       );
 
-      // Filter to rentals that have a pickup date but no invoice
-      const completedRentals = data.filter(
-        (rental: Rental) => rental.date_picked !== null
-      );
-
-      setAvailableRentals(completedRentals);
+      setAvailableRentals(data);
 
       // If editing and we have a rental_id, select that rental
       if (isEditMode && formData.rental_id) {
-        const selected = completedRentals.find(
+        const selected = data.find(
           (r: Rental) => r.rental_id === formData.rental_id
         );
         if (selected) {
@@ -286,27 +280,6 @@ const InvoiceFormPage: React.FC = () => {
         rental_id: null,
       }));
       setSelectedRental(null);
-    }
-  };
-
-  const handleRentalChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const rentalId = parseInt(e.target.value);
-
-    // Find the selected rental object
-    const rental = availableRentals.find((r) => r.rental_id === rentalId);
-
-    if (rental) {
-      setSelectedRental(rental);
-      setFormData((prev) => ({
-        ...prev,
-        rental_id: rental.rental_id,
-      }));
-    } else {
-      setSelectedRental(null);
-      setFormData((prev) => ({
-        ...prev,
-        rental_id: null,
-      }));
     }
   };
 
@@ -722,25 +695,90 @@ const InvoiceFormPage: React.FC = () => {
               </div>
 
               {selectedRental && (
-                <div className="mt-3 p-3 bg-default-50 rounded-lg">
-                  <h3 className="font-medium mb-2">Rental Details</h3>
-                  <p className="text-sm">Dumpster: {selectedRental.tong_no}</p>
-                  <p className="text-sm">
-                    Location:{" "}
-                    {selectedRental.location_address || "No specific location"}
-                  </p>
-                  <p className="text-sm">
-                    Placement Date:{" "}
-                    {new Date(selectedRental.date_placed).toLocaleDateString()}
-                  </p>
-                  <p className="text-sm">
-                    Pickup Date:{" "}
-                    {selectedRental.date_picked
-                      ? new Date(
+                <div className="mt-3 rounded-lg border border-default-200 overflow-hidden">
+                  {/* Status Banner */}
+                  <div
+                    className={`px-4 py-2 ${
+                      !selectedRental.date_picked
+                        ? "bg-green-500 text-white"
+                        : "bg-default-100 text-default-700"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium">Rental Details</h3>
+                      <span
+                        className={`text-sm px-2 py-0.5 rounded-full ${
+                          !selectedRental.date_picked
+                            ? "bg-green-400/30 text-white"
+                            : "bg-default-200 text-default-600"
+                        }`}
+                      >
+                        {!selectedRental.date_picked ? "Ongoing" : "Completed"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Rental Information */}
+                  <div className="p-4">
+                    {/* Dumpster & Location Info */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Dumpster
+                        </div>
+                        <div className="font-medium">
+                          {selectedRental.tong_no}
+                        </div>
+                      </div>
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Location
+                        </div>
+                        <div className="font-medium flex items-start">
+                          <span>
+                            {selectedRental.location_address ||
+                              "No specific location"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rental Dates */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Placement Date
+                        </div>
+                        <div className="font-medium">
+                          {new Date(
+                            selectedRental.date_placed
+                          ).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div
+                        className={`p-3 rounded-lg ${
                           selectedRental.date_picked
-                        ).toLocaleDateString()
-                      : "Not picked up yet"}
-                  </p>
+                            ? "bg-default-50 border border-default-100"
+                            : "bg-green-50 border border-green-100"
+                        }`}
+                      >
+                        <div className="text-xs text-default-500 mb-1">
+                          Pickup Date
+                        </div>
+                        <div
+                          className={`font-medium ${
+                            !selectedRental.date_picked ? "text-green-600" : ""
+                          }`}
+                        >
+                          {selectedRental.date_picked
+                            ? new Date(
+                                selectedRental.date_picked
+                              ).toLocaleDateString()
+                            : "Not picked up yet"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -791,7 +829,7 @@ const InvoiceFormPage: React.FC = () => {
                   htmlFor="amount_before_tax"
                   className="block text-sm font-medium text-default-700"
                 >
-                  Amount (Before Tax)
+                  Amount
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-3 flex items-center text-default-500">
