@@ -147,20 +147,20 @@ const RentalCard = ({
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-default-50 p-2 rounded">
+          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
             <p className="text-xs text-default-500 mb-1">Dumpster</p>
             <p className="font-medium">{rental.tong_no}</p>
           </div>
-          <div className="bg-default-50 p-2 rounded">
+          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
             <p className="text-xs text-default-500 mb-1">Driver</p>
             <p className="font-medium">{rental.driver}</p>
           </div>
-          <div className="bg-default-50 p-2 rounded">
+          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
             <p className="text-xs text-default-500 mb-1">Duration</p>
             <p className="font-medium">{calculateDuration()}</p>
           </div>
           <div
-            className={`p-2 rounded ${
+            className={`p-2 border border-default-100 rounded-md ${
               activeStatus ? "bg-green-50" : "bg-default-50"
             }`}
           >
@@ -177,7 +177,7 @@ const RentalCard = ({
 
         {/* Remarks section - only show if there are remarks */}
         {rental.remarks && (
-          <div className="mb-4 bg-default-50/50 border border-default-100 rounded p-2">
+          <div className="mb-4 bg-default-50/50 border border-default-100 rounded-md p-2">
             <p className="text-xs text-default-500 mb-0.5">Remarks</p>
             <p
               className="text-xs text-default-700 truncate"
