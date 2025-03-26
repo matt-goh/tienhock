@@ -629,15 +629,19 @@ const InvoiceListPage: React.FC = () => {
       )}
 
       {filteredInvoices.length === 0 ? (
-        <div className="text-center py-8">
+        <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200">
           <IconFileInvoice
-            size={48}
-            className="mx-auto mb-4 text-default-300"
+            size={64}
+            className="text-default-300 mb-5"
+            stroke={1.2}
           />
-          <p className="text-lg text-default-500">No invoices found.</p>
-          <p className="text-default-400">
-            {searchTerm ? "Try a different search term or " : ""}
-            Create a new invoice to get started.
+          <h3 className="text-xl font-semibold text-default-700 mb-2">
+            No invoices found
+          </h3>
+          <p className="text-default-500 text-center max-w-md mb-6">
+            {searchTerm
+              ? "Your search didn't match any invoices. Try adjusting your search terms or filters."
+              : "You haven't created any invoices yet."}
           </p>
         </div>
       ) : (
