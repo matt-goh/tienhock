@@ -14,7 +14,7 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck, IconMapPin } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 
 interface Customer {
   customer_id: number;
