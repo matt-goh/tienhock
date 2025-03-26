@@ -17,14 +17,16 @@ export default function (pool) {
 
     try {
       let query = `
-        SELECT i.*, 
-               c.name as customer_name,
-               COALESCE(SUM(p.amount_paid), 0) as amount_paid
-        FROM greentarget.invoices i
-        JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
-        WHERE 1=1
-      `;
+      SELECT i.*, 
+             c.name as customer_name,
+             r.driver, 
+             COALESCE(SUM(p.amount_paid), 0) as amount_paid
+      FROM greentarget.invoices i
+      JOIN greentarget.customers c ON i.customer_id = c.customer_id
+      LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+      LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
+      WHERE 1=1
+    `;
 
       const queryParams = [];
       let paramCounter = 1;
@@ -59,7 +61,7 @@ export default function (pool) {
         paramCounter++;
       }
 
-      query += ` GROUP BY i.invoice_id, c.name`;
+      query += ` GROUP BY i.invoice_id, c.name, r.driver`;
 
       if (outstanding_only === "true") {
         query += ` HAVING i.total_amount > COALESCE(SUM(p.amount_paid), 0)`;

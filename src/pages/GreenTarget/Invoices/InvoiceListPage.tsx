@@ -29,6 +29,7 @@ interface Invoice {
   customer_id: number;
   customer_name: string;
   rental_id?: number;
+  driver?: string;
   amount_before_tax: number;
   tax_amount: number;
   total_amount: number;
@@ -116,6 +117,19 @@ const InvoiceCard = ({
                 {invoice.type === "regular" ? "Regular Invoice" : "Statement"}
               </p>
             </div>
+            {/* Add rental ID and driver info in the right side */}
+            {invoice.rental_id && (
+              <div className="text-right">
+                <h3 className="font-medium text-default-700">
+                  Rental #{invoice.rental_id}
+                </h3>
+                {invoice.driver && (
+                  <p className="text-sm text-default-600 mt-0.5 truncate">
+                    Driver: {invoice.driver}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
