@@ -235,6 +235,20 @@ const InvoiceFormPage: React.FC = () => {
     }
   };
 
+  const isRentalActive = (datePickedStr: string | null) => {
+    if (!datePickedStr) return true;
+
+    // Convert dates to YYYY-MM-DD format for reliable comparison
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    // Get just the date part
+    const pickupDateStr = datePickedStr.split("T")[0];
+
+    // If pickup date is today or in the past, consider it completed
+    return pickupDateStr > todayStr;
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -699,7 +713,7 @@ const InvoiceFormPage: React.FC = () => {
                   {/* Status Banner */}
                   <div
                     className={`px-4 py-2 ${
-                      !selectedRental.date_picked
+                      isRentalActive(selectedRental.date_picked)
                         ? "bg-green-500 text-white"
                         : "bg-default-100 text-default-700"
                     }`}
@@ -707,13 +721,15 @@ const InvoiceFormPage: React.FC = () => {
                     <div className="flex justify-between items-center">
                       <h3 className="font-medium">Rental Details</h3>
                       <span
-                        className={`text-sm px-2 py-0.5 rounded-full ${
-                          !selectedRental.date_picked
+                        className={`text-sm font-medium px-2 py-0.5 rounded-full ${
+                          isRentalActive(selectedRental.date_picked)
                             ? "bg-green-400/30 text-white"
                             : "bg-default-200 text-default-600"
                         }`}
                       >
-                        {!selectedRental.date_picked ? "Ongoing" : "Completed"}
+                        {isRentalActive(selectedRental.date_picked)
+                          ? "Ongoing"
+                          : "Completed"}
                       </span>
                     </div>
                   </div>
