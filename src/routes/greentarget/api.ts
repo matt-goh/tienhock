@@ -1,15 +1,49 @@
 // Create this file: src/utils/greenTarget/api.ts
-
 import { api } from "../utils/api";
+import {
+  getCachedData,
+  setCachedData,
+  invalidateCache,
+  CACHE_KEYS,
+  CACHE_EXPIRY,
+} from "../../utils/greenTarget/cacheUtils";
 
 export const greenTargetApi = {
   // Customer endpoints
-  getCustomers: () => api.get("/greentarget/api/customers"),
+  getCustomers: async () => {
+    // Try to get from cache first
+    const cachedCustomers = getCachedData<any[]>(CACHE_KEYS.CUSTOMERS);
+    if (cachedCustomers) {
+      return cachedCustomers;
+    }
+
+    // If not in cache or expired, fetch from API
+    const data = await api.get("/greentarget/api/customers");
+
+    // Store in cache
+    setCachedData(CACHE_KEYS.CUSTOMERS, data, CACHE_EXPIRY.CUSTOMERS);
+
+    return data;
+  },
   getCustomer: (id: any) => api.get(`/greentarget/api/customers/${id}`),
-  createCustomer: (data: any) => api.post("/greentarget/api/customers", data),
-  updateCustomer: (id: any, data: any) =>
-    api.put(`/greentarget/api/customers/${id}`, data),
-  deleteCustomer: (id: any) => api.delete(`/greentarget/api/customers/${id}`),
+  createCustomer: async (data: any) => {
+    const response = await api.post("/greentarget/api/customers", data);
+    // Invalidate customers cache
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
+  updateCustomer: async (id: any, data: any) => {
+    const response = await api.put(`/greentarget/api/customers/${id}`, data);
+    // Invalidate customers cache
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
+  deleteCustomer: async (id: any) => {
+    const response = await api.delete(`/greentarget/api/customers/${id}`);
+    // Invalidate customers cache
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
 
   // Dumpster endpoints
   getDumpsters: () => api.get("/greentarget/api/dumpsters"),
@@ -50,10 +84,24 @@ export const greenTargetApi = {
   // Location endpoints
   getLocationsByCustomer: (customerId: any) =>
     api.get(`/greentarget/api/customers/${customerId}/locations`),
-  createLocation: (data: any) => api.post("/greentarget/api/locations", data),
-  updateLocation: (id: any, data: any) =>
-    api.put(`/greentarget/api/locations/${id}`, data),
-  deleteLocation: (id: any) => api.delete(`/greentarget/api/locations/${id}`),
+  createLocation: async (data: any) => {
+    const response = await api.post("/greentarget/api/locations", data);
+    // Invalidate customers cache since locations are related
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
+  updateLocation: async (id: any, data: any) => {
+    const response = await api.put(`/greentarget/api/locations/${id}`, data);
+    // Invalidate customers cache
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
+  deleteLocation: async (id: any) => {
+    const response = await api.delete(`/greentarget/api/locations/${id}`);
+    // Invalidate customers cache
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
 
   // Debtors endpoints
   getDebtorsReport: () => api.get("/greentarget/api/payments/debtors"),
