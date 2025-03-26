@@ -140,18 +140,35 @@ const RentalCard = ({
         <div className="mb-3 border-b pb-3">
           <div className="flex justify-between items-start w-full">
             <div className="w-full">
-              <div className="flex items-centerw-full">
-                <h3 className="font-semibold text-default-900">
+              <div className="flex items-center justify-between w-full">
+                <h3
+                  className="font-semibold text-default-900 truncate max-w-[60%]"
+                  title={rental.customer_name}
+                >
                   {rental.customer_name}
                 </h3>
                 {(rental.customer_phone_number ||
                   rental.location_phone_number) && (
-                  <p className="text-sm text-default-600 mt-[3px] ml-2">
+                  <p
+                    className="text-sm text-default-600 mt-[3px] truncate max-w-[40%]"
+                    title={
+                      rental.customer_phone_number !==
+                        rental.location_phone_number &&
+                      rental.customer_phone_number &&
+                      rental.location_phone_number
+                        ? `${rental.customer_phone_number}, ${rental.location_phone_number}`
+                        : rental.customer_phone_number ??
+                          rental.location_phone_number ??
+                          undefined
+                    }
+                  >
                     <IconPhone
                       size={14}
-                      className="inline mr-1 mt-0.5 align-top"
+                      className="inline mr-1 mt-0.5 align-top flex-shrink-0"
                     />
-                    {rental.customer_phone_number &&
+                    {rental.customer_phone_number !==
+                      rental.location_phone_number &&
+                    rental.customer_phone_number &&
                     rental.location_phone_number
                       ? `${rental.customer_phone_number}, ${rental.location_phone_number}`
                       : rental.customer_phone_number ||
@@ -160,10 +177,13 @@ const RentalCard = ({
                 )}
               </div>
               {rental.location_address && (
-                <p className="text-sm text-default-600 mt-0.5">
+                <p
+                  className="text-sm text-default-600 mt-0.5 truncate"
+                  title={rental.location_address}
+                >
                   <IconMapPin
                     size={14}
-                    className="inline mr-1 mt-0.5 align-top"
+                    className="inline mr-1 mt-0.5 align-top flex-shrink-0"
                   />
                   {rental.location_address}
                 </p>
@@ -180,7 +200,9 @@ const RentalCard = ({
           </div>
           <div className="bg-default-50 p-2 border border-default-100 rounded-md">
             <p className="text-xs text-default-500 mb-1">Driver</p>
-            <p className="font-medium">{rental.driver}</p>
+            <p className="font-medium truncate" title={rental.driver}>
+              {rental.driver}
+            </p>
           </div>
           <div className="bg-default-50 p-2 border border-default-100 rounded-md">
             <p className="text-xs text-default-500 mb-1">Duration</p>

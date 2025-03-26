@@ -294,40 +294,57 @@ export default function (pool) {
       const newDatePicked =
         date_picked !== undefined ? date_picked : currentRental.date_picked;
 
-      // NEW CODE: Check for overlaps when updating dates on the SAME dumpster
       if (
         (date_placed && date_placed !== currentRental.date_placed) ||
         (date_picked !== undefined && date_picked !== currentRental.date_picked)
       ) {
-        // Check for overlaps with other rentals for the same dumpster
-        const overlapQuery = `
-          SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
-          FROM greentarget.rentals r
-          JOIN greentarget.customers c ON r.customer_id = c.customer_id
-          WHERE r.tong_no = $1 
-          AND r.rental_id != $2
-          AND (
-            ($3::date < COALESCE(r.date_picked, '9999-12-31'::date)) 
-            AND 
-            (r.date_placed < COALESCE($4::date, '9999-12-31'::date))
-          )
-        `;
+        // Only check for overlaps if staying with the same dumpster
+        // If changing dumpsters, the overlap check should use the new dumpster ID
+        const dumpsterToCheck = tong_no || currentRental.tong_no;
 
-        const overlapResult = await client.query(overlapQuery, [
-          currentRental.tong_no,
-          rental_id,
-          newDatePlaced,
-          newDatePicked,
-        ]);
+        // Only perform this check if we're NOT changing dumpsters
+        if (dumpsterToCheck === currentRental.tong_no) {
+          // Check for overlaps with other rentals for the same dumpster
+          const overlapQuery = `
+            SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
+            FROM greentarget.rentals r
+            JOIN greentarget.customers c ON r.customer_id = c.customer_id
+            WHERE r.tong_no = $1 
+            AND r.rental_id != $2
+            AND (
+              ($3::date < COALESCE(r.date_picked, '9999-12-31'::date)) 
+              AND 
+              (r.date_placed < COALESCE($4::date, '9999-12-31'::date))
+            )
+          `;
 
-        if (overlapResult.rows.length > 0) {
-          const conflict = overlapResult.rows[0];
-          throw new Error(
-            `The updated dates overlap with an existing rental for ${conflict.customer_name} ` +
-              `(${conflict.date_placed} to ${
-                conflict.date_picked || "ongoing"
-              })`
-          );
+          const overlapResult = await client.query(overlapQuery, [
+            dumpsterToCheck,
+            rental_id,
+            newDatePlaced,
+            newDatePicked,
+          ]);
+
+          if (overlapResult.rows.length > 0) {
+            const conflict = overlapResult.rows[0];
+            // Format the dates in a more readable way
+            const formatDate = (dateString) => {
+              if (!dateString) return "ongoing";
+              const date = new Date(dateString);
+              return `${date.getDate().toString().padStart(2, "0")}/${(
+                date.getMonth() + 1
+              )
+                .toString()
+                .padStart(2, "0")}/${date.getFullYear()}`;
+            };
+
+            throw new Error(
+              `The updated dates overlap with an existing rental for ${conflict.customer_name} ` +
+                `(${formatDate(conflict.date_placed)} to ${formatDate(
+                  conflict.date_picked
+                )})`
+            );
+          }
         }
       }
 

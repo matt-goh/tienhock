@@ -405,11 +405,7 @@ const RentalFormPage: React.FC = () => {
 
     // If we're only adding or changing a pickup date for an existing rental,
     // consider it valid because the dumpster is already assigned to this rental
-    if (
-      isEditMode &&
-      formData.tong_no === initialFormData.tong_no &&
-      formData.date_placed === initialFormData.date_placed
-    ) {
+    if (isEditMode && formData.tong_no === initialFormData.tong_no) {
       setIsValidSelection(true);
       return;
     }
@@ -536,6 +532,20 @@ const RentalFormPage: React.FC = () => {
           date_picked: formData.date_picked,
           remarks: formData.remarks,
         });
+
+        // Check if the response indicates an error
+        if (
+          response.error ||
+          (response.message && response.message.includes("Error"))
+        ) {
+          // Extract and display the error message
+          const errorMessage = response.error || response.message;
+          toast.error(errorMessage);
+        } else {
+          // Only show success and navigate if we got here (no error)
+          toast.success("Rental updated successfully!");
+          navigate("/greentarget/rentals");
+        }
       } else {
         response = await greenTargetApi.createRental({
           customer_id: formData.customer_id,
@@ -546,32 +556,35 @@ const RentalFormPage: React.FC = () => {
           date_picked: formData.date_picked,
           remarks: formData.remarks,
         });
-      }
 
-      // Only show success and navigate if we got here (no error thrown)
-      toast.success(
-        isEditMode
-          ? "Rental updated successfully!"
-          : "Rental created successfully!"
-      );
-      navigate("/greentarget/rentals");
+        // Same error handling for create operation
+        if (
+          response.error ||
+          (response.message && response.message.includes("Error"))
+        ) {
+          const errorMessage = response.error || response.message;
+          toast.error(errorMessage);
+        } else {
+          toast.success("Rental created successfully!");
+          navigate("/greentarget/rentals");
+        }
+      }
     } catch (error: any) {
       console.error("Error saving rental:", error);
 
-      // Improved error detection - check for any availability/overlap messages
-      if (
-        error.message &&
-        (error.message.includes("not available") ||
-          error.message.includes("overlaps") ||
-          error.message.includes("period") ||
-          error.message.includes("is rented by"))
-      ) {
-        toast.error(
-          error.message ||
-            "The selected dumpster is not available for the chosen period"
-        );
-      } else if (error.message && error.message.includes("after pickup date")) {
-        toast.error("Placement date cannot be after pickup date");
+      // Improved error detection for various cases
+      if (error.message) {
+        if (
+          error.message.includes("overlap") ||
+          error.message.includes("not available") ||
+          error.message.includes("is rented by")
+        ) {
+          toast.error(error.message);
+        } else if (error.message.includes("after pickup date")) {
+          toast.error("Placement date cannot be after pickup date");
+        } else {
+          toast.error("An unexpected error occurred. Please try again.");
+        }
       } else {
         toast.error("An unexpected error occurred. Please try again.");
       }
