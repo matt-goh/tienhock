@@ -144,8 +144,7 @@ const InvoiceFormPage: React.FC = () => {
     try {
       const data = await greenTargetApi.getCustomers();
       // Filter to only active customers
-      const activeCustomers = data.filter((c: any) => c.status === "active");
-      setCustomers(activeCustomers);
+      setCustomers(data);
     } catch (err) {
       console.error("Error fetching customers:", err);
       toast.error("Failed to load customers.");
@@ -527,11 +526,11 @@ const InvoiceFormPage: React.FC = () => {
                       <IconChevronDown size={20} className="text-default-500" />
                     </span>
                   </ListboxButton>
-                  <ListboxOptions className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
+                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
                     <ListboxOption
                       value=""
                       className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 px-4 ${
+                        `relative cursor-pointer select-none rounded py-2 px-3 pr-9 ${
                           active ? "bg-default-100" : "text-default-900"
                         }`
                       }
@@ -558,7 +557,7 @@ const InvoiceFormPage: React.FC = () => {
                         key={customer.customer_id}
                         value={customer.customer_id}
                         className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-4 ${
+                          `relative cursor-pointer select-none rounded py-2 px-3 pr-9 ${
                             active ? "bg-default-100" : "text-default-900"
                           }`
                         }
@@ -654,11 +653,11 @@ const InvoiceFormPage: React.FC = () => {
                         />
                       </span>
                     </ListboxButton>
-                    <ListboxOptions className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
+                    <ListboxOptions className="absolute z-10 w-full p-1 mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
                       <ListboxOption
                         value=""
                         className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-4 ${
+                          `relative cursor-pointer select-none rounded py-2 px-3 pr-9 ${
                             active ? "bg-default-100" : "text-default-900"
                           }`
                         }
@@ -685,7 +684,7 @@ const InvoiceFormPage: React.FC = () => {
                           key={rental.rental_id}
                           value={rental.rental_id}
                           className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 px-4 ${
+                            `relative cursor-pointer select-none rounded py-2 px-3 pr-9 ${
                               active ? "bg-default-100" : "text-default-900"
                             }`
                           }
