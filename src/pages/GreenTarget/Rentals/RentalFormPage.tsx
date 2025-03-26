@@ -17,7 +17,6 @@ import {
   IconPhone,
   IconTrash,
 } from "@tabler/icons-react";
-import { api } from "../../../routes/utils/api";
 import {
   Listbox,
   ListboxButton,
@@ -25,6 +24,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
+import { api } from "../../../routes/utils/api";
 
 interface Customer {
   customer_id: number;
@@ -133,7 +133,7 @@ const RentalFormPage: React.FC = () => {
     const loadReferenceData = async () => {
       try {
         const [customersData, driversData] = await Promise.all([
-          api.get("/greentarget/api/customers"),
+          greenTargetApi.getCustomers(),
           api.get("/api/staffs/get-drivers"),
         ]);
 
@@ -1479,9 +1479,7 @@ const RentalFormPage: React.FC = () => {
                 }
 
                 // Fetch updated customers list
-                const customersData = await api.get(
-                  "/greentarget/api/customers"
-                );
+                const customersData = await greenTargetApi.getCustomers();
                 setCustomers(customersData);
 
                 // Select the new customer
