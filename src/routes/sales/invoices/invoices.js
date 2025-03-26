@@ -1039,6 +1039,39 @@ export default function (pool, config) {
     }
   });
 
+  // Get all invoice IDs from the last year
+  router.get("/ids", async (req, res) => {
+    try {
+      // Calculate date range (1 year ago to current date)
+      const currentDate = Date.now();
+      const oneYearAgo = currentDate - 365 * 24 * 60 * 60 * 1000; // 365 days in milliseconds
+
+      const query = `
+      SELECT id 
+      FROM invoices 
+      WHERE CAST(createddate AS bigint) >= $1 
+      AND CAST(createddate AS bigint) <= $2
+      ORDER BY CAST(createddate AS bigint) DESC
+    `;
+
+      const result = await pool.query(query, [
+        oneYearAgo.toString(),
+        currentDate.toString(),
+      ]);
+
+      // Extract just the IDs into an array
+      const invoiceIds = result.rows.map((row) => row.id);
+
+      res.json(invoiceIds);
+    } catch (error) {
+      console.error("Error fetching invoice IDs:", error);
+      res.status(500).json({
+        message: "Error fetching invoice IDs",
+        error: error.message,
+      });
+    }
+  });
+
   // Check for duplicate invoice numbers
   router.get("/check-duplicate", async (req, res) => {
     const { invoiceNo } = req.query;
