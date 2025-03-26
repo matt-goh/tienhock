@@ -728,7 +728,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     <td className="py-2 pr-4 text-default-500 font-medium align-top">
                       Statement Period:
                     </td>
-                    <td className="py-2 font-medium text-default-900">
+                    <td className="py-2 font-medium text-default-900 truncate max-w-[200px] md:max-w-none">
                       {formatDate(invoice.statement_period_start || "")} to{" "}
                       {formatDate(invoice.statement_period_end || "")}
                     </td>
@@ -746,12 +746,18 @@ const InvoiceDetailsPage: React.FC = () => {
                             `/greentarget/customers/${invoice.customer_id}`
                           )
                         }
-                        className="text-default-900 hover:text-sky-600 font-medium hover:underline focus:outline-none"
+                        className="text-default-900 hover:text-sky-600 font-medium hover:underline focus:outline-none truncate block max-w-[200px] md:max-w-none"
+                        title={invoice.customer_name}
                       >
                         {invoice.customer_name}
                       </button>
                     ) : (
-                      invoice.customer_name
+                      <span
+                        className="truncate block max-w-[200px] md:max-w-none"
+                        title={invoice.customer_name}
+                      >
+                        {invoice.customer_name}
+                      </span>
                     )}
                   </td>
                 </tr>
