@@ -33,6 +33,11 @@ interface Rental {
   date_placed: string;
   date_picked: string | null;
   remarks: string | null;
+  invoice_info?: {
+    invoice_id: number;
+    invoice_number: string;
+    has_payments: boolean;
+  } | null;
 }
 
 const RentalCard = ({
@@ -231,16 +236,39 @@ const RentalCard = ({
             </button>
           )}
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onCreateInvoice(rental);
-            }}
-            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
-            title="Create Invoice"
-          >
-            <IconFileInvoice size={18} stroke={1.5} />
-          </button>
+          {/* Show "View Invoice" or "Create Invoice" based on invoice status */}
+          {rental.invoice_info ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // Navigate to the existing invoice
+                if (rental.invoice_info) {
+                  navigate(
+                    `/greentarget/invoices/${rental.invoice_info.invoice_id}`
+                  );
+                }
+              }}
+              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+              title={
+                rental.invoice_info.has_payments
+                  ? "View Invoice"
+                  : "View Invoice"
+              }
+            >
+              <IconFileInvoice size={18} stroke={1.5} />
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateInvoice(rental);
+              }}
+              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+              title="Create Invoice"
+            >
+              <IconFileInvoice size={18} stroke={1.5} />
+            </button>
+          )}
 
           <button
             onClick={(e) => {
