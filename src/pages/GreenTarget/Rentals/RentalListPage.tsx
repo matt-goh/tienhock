@@ -92,11 +92,14 @@ const RentalCard = ({
   const isActive = () => {
     if (!rental.date_picked) return true;
 
-    // If pickup date exists but is in the future, still consider active
+    // Convert dates to YYYY-MM-DD format for reliable comparison
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to beginning of today
-    const pickupDate = new Date(rental.date_picked);
-    return pickupDate > today;
+    const todayStr = today.toISOString().split("T")[0];
+
+    const pickupDateStr = rental.date_picked.split("T")[0]; // Get just the date part
+
+    // If pickup date is today or in the past, consider it completed
+    return pickupDateStr > todayStr;
   };
 
   const activeStatus = isActive();
@@ -400,8 +403,7 @@ const RentalListPage = () => {
   };
 
   const filteredRentals = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = new Date().toISOString().split("T")[0];
 
     return rentals.filter((rental) => {
       // Filter by search term (customer name, location, driver or dumpster number)
@@ -416,7 +418,7 @@ const RentalListPage = () => {
 
       // Filter by active status - consider rentals with future pickup dates as active
       const isRentalActive =
-        !rental.date_picked || new Date(rental.date_picked) > today;
+        !rental.date_picked || rental.date_picked.split("T")[0] > todayStr;
 
       const matchesStatus = activeOnly ? isRentalActive : true;
 
