@@ -84,13 +84,21 @@ const Button: React.FC<ButtonProps> = ({
 
   return (
     <button className={classes} disabled={disabled} {...props}>
-      <span className="flex items-center justify-center">
+      <span className="flex items-center justify-center w-full">
         {Icon && iconPosition === "left" && (
-          <Icon stroke={iconStroke} size={iconSize} className="mr-2" />
+          <Icon
+            stroke={iconStroke}
+            size={iconSize}
+            className="mr-2 flex-shrink-0"
+          />
         )}
-        {children}
+        <span className="truncate">{children}</span>
         {Icon && iconPosition === "right" && (
-          <Icon stroke={iconStroke} size={iconSize} className="ml-2" />
+          <Icon
+            stroke={iconStroke}
+            size={iconSize}
+            className="ml-2 flex-shrink-0"
+          />
         )}
       </span>
     </button>
