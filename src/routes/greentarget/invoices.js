@@ -121,7 +121,7 @@ export default function (pool) {
       await client.query('BEGIN');
       
       // Check if required fields are provided
-      if (!type || !customer_id || !amount_before_tax || !tax_amount || !date_issued) {
+      if (!type || !customer_id || !amount_before_tax || !date_issued) {
         throw new Error("Missing required fields");
       }
       
