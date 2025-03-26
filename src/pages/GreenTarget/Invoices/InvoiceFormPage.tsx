@@ -169,7 +169,7 @@ const InvoiceFormPage: React.FC = () => {
 
       // Filter out rentals that already have invoices
       const availableRentalsData = data.filter(
-        (rental: Rental) => !rental.invoice_info && rental.date_picked
+        (rental: Rental) => !rental.invoice_info
       );
 
       setAvailableRentals(availableRentalsData);
