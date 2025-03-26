@@ -642,7 +642,13 @@ const RentalFormPage: React.FC = () => {
                               <div className="flex flex-col">
                                 <span className="block truncate font-medium">
                                   {selectedCustomer?.name || "Select Customer"}
-                                </span>
+                                </span>{" "}
+                                {selectedCustomer?.phone_number && (
+                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                    <IconPhone size={12} className="mr-1" />
+                                    {selectedCustomer.phone_number}
+                                  </span>
+                                )}
                               </div>
                             );
                           })()
@@ -757,7 +763,13 @@ const RentalFormPage: React.FC = () => {
                                 <span className="block truncate font-medium">
                                   {selectedLocation?.address ||
                                     "No Specific Location"}
-                                </span>
+                                </span>{" "}
+                                {selectedLocation?.phone_number && (
+                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                    <IconPhone size={12} className="mr-1" />
+                                    {selectedLocation.phone_number}
+                                  </span>
+                                )}
                               </div>
                             );
                           })()
