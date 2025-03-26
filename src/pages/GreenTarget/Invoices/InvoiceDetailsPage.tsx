@@ -714,13 +714,13 @@ const InvoiceDetailsPage: React.FC = () => {
                   <p className="font-medium">{invoice.tong_no || "N/A"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Date Placed</p>
+                  <p className="text-sm text-default-500">Placement Date</p>
                   <p className="font-medium">
                     {formatDate(invoice.date_placed || "")}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Date Picked Up</p>
+                  <p className="text-sm text-default-500">Pickup Date</p>
                   <p className="font-medium">
                     {formatDate(invoice.date_picked || "")}
                   </p>
