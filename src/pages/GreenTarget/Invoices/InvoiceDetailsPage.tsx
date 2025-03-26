@@ -6,6 +6,7 @@ import {
   IconCash,
   IconPrinter,
   IconChevronLeft,
+  IconTrash,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -84,6 +85,9 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [isDeleteInvoiceDialogOpen, setIsDeleteInvoiceDialogOpen] =
+    useState(false);
+  const [isDeletingInvoice, setIsDeletingInvoice] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -292,6 +296,32 @@ const InvoiceDetailsPage: React.FC = () => {
     // 3. Send to a backend endpoint for printing
   };
 
+  const handleDeleteInvoice = async () => {
+    if (!invoice) return;
+
+    // Check if invoice has payments
+    if (payments.length > 0) {
+      toast.error(
+        "Cannot delete invoice: it has associated payments. Delete the payments first."
+      );
+      setIsDeleteInvoiceDialogOpen(false);
+      return;
+    }
+
+    setIsDeletingInvoice(true);
+    try {
+      await greenTargetApi.deleteInvoice(invoice.invoice_id);
+      toast.success("Invoice deleted successfully");
+      navigate("/greentarget/invoices");
+    } catch (error: any) {
+      console.error("Error deleting invoice:", error);
+      toast.error(error.message || "Failed to delete invoice");
+    } finally {
+      setIsDeletingInvoice(false);
+      setIsDeleteInvoiceDialogOpen(false);
+    }
+  };
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-MY", {
@@ -351,14 +381,6 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
 
         <div className="flex space-x-3 mt-4 md:mt-0">
-          <Button
-            onClick={handlePrintInvoice}
-            icon={IconPrinter}
-            variant="outline"
-          >
-            Print
-          </Button>
-
           {invoice.current_balance > 0 && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -369,6 +391,21 @@ const InvoiceDetailsPage: React.FC = () => {
               {showPaymentForm ? "Cancel" : "Record Payment"}
             </Button>
           )}
+          <Button
+            onClick={handlePrintInvoice}
+            icon={IconPrinter}
+            variant="outline"
+          >
+            Print
+          </Button>
+          <Button
+            onClick={() => setIsDeleteInvoiceDialogOpen(true)}
+            icon={IconTrash}
+            variant="outline"
+            color="rose"
+          >
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -988,6 +1025,21 @@ const InvoiceDetailsPage: React.FC = () => {
             : ""
         }? This will affect the invoice balance.`}
         confirmButtonText={isDeletingPayment ? "Deleting..." : "Delete"}
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteInvoiceDialogOpen}
+        onClose={() => setIsDeleteInvoiceDialogOpen(false)}
+        onConfirm={handleDeleteInvoice}
+        title="Delete Invoice"
+        message={`Are you sure you want to delete invoice ${
+          invoice?.invoice_number
+        }? This action cannot be undone.${
+          payments.length > 0
+            ? " Note: You must delete all payments first."
+            : ""
+        }`}
+        confirmButtonText={isDeletingInvoice ? "Deleting..." : "Delete"}
         variant="danger"
       />
     </div>
