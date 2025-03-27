@@ -154,7 +154,7 @@ const RentalCard = ({
                 {(rental.customer_phone_number ||
                   rental.location_phone_number) && (
                   <p
-                    className="text-sm text-default-600 mt-[3px] truncate max-w-[40%]"
+                    className="text-sm text-default-600 mt-[3px] truncate w-full"
                     title={
                       rental.customer_phone_number !==
                         rental.location_phone_number &&
