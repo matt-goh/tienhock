@@ -212,47 +212,49 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
-      // Fetch all payments to find the highest reference number for this year
+      // Fetch all payments to find unused reference numbers for the current month and year
       const allPayments = await greenTargetApi.getPayments();
 
-      // Get current year (last 2 digits)
+      // Get current year (last 2 digits) and month (padded with zero)
       const currentYear = new Date().getFullYear().toString().slice(-2);
+      const currentMonth = (new Date().getMonth() + 1)
+        .toString()
+        .padStart(2, "0");
 
-      // Find the highest number for the current year
-      let highestNumber = 0;
-      const regex = new RegExp(`^RV/${currentYear}/(\\d+)$`);
+      // Regular expression to match the format RV{year}/{month}/{number}
+      const regex = new RegExp(`^RV${currentYear}/${currentMonth}/(\\d+)$`);
 
+      // Extract all used numbers for the current month and year
+      const usedNumbers = new Set();
       allPayments.forEach((payment: { internal_reference: string }) => {
         if (payment.internal_reference) {
           const match = payment.internal_reference.match(regex);
           if (match) {
-            const num = parseInt(match[1]);
-            if (num > highestNumber) {
-              highestNumber = num;
-            }
+            usedNumbers.add(parseInt(match[1]));
           }
         }
       });
 
-      // Increment for the new payment
-      const nextNumber = highestNumber + 1;
+      // Find the first unused number starting from 1
+      let nextNumber = 1;
+      while (usedNumbers.has(nextNumber)) {
+        nextNumber++;
+      }
+
+      // Format the reference number
       const paddedNumber = nextNumber.toString().padStart(2, "0");
-      const referenceNumber = `RV/${currentYear}/${paddedNumber}`;
+      const referenceNumber = `RV${currentYear}/${currentMonth}/${paddedNumber}`;
 
       const paymentData = {
         invoice_id: invoice.invoice_id,
         ...paymentFormData,
-        internal_reference: referenceNumber, // Set the auto-generated reference number
+        internal_reference: referenceNumber,
       };
 
       const response = await greenTargetApi.createPayment(paymentData);
 
       toast.success("Payment processed successfully");
-
-      // Refresh the invoice details to get updated balance
       fetchInvoiceDetails(invoice.invoice_id);
-
-      // Hide the payment form
       setShowPaymentForm(false);
     } catch (error) {
       console.error("Error processing payment:", error);
