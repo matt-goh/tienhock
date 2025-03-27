@@ -568,106 +568,124 @@ const InvoiceListPage: React.FC = () => {
 
   return (
     <div className="relative w-full mx-20">
-      <div className="flex items-center justify-between mb-6">
-        <h1
-          className="text-2xl text-default-700 font-bold truncate max-w-xs"
-          title={`Invoices (${filteredInvoices.length})`}
-        >
-          Invoices ({filteredInvoices.length})
-        </h1>
-        <div className="flex space-x-3 items-center">
-          {/* DateRangePicker - hidden on small screens */}
-          <div className="hidden lg:flex items-center gap-3 flex-1">
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateChange={(newDateRange) => {
-                // Save to storage
-                saveDatesToStorage(newDateRange.start, newDateRange.end);
-                setDateRange(newDateRange);
-                // Reset to first page when date changes
-                setCurrentPage(1);
-              }}
-              className="max-w-md"
-            />
+      <div className="flex flex-col space-y-4 mb-6">
+        {/* Header and controls row */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center justify-between">
+            <h1
+              className="text-2xl text-default-700 font-bold truncate max-w-xs"
+              title={`Invoices (${filteredInvoices.length})`}
+            >
+              Invoices ({filteredInvoices.length})
+            </h1>
+
+            {/* Create Invoice Button - Visible on mobile */}
+            <div className="lg:hidden flex-shrink-0">
+              <Button
+                onClick={() => navigate("/greentarget/invoices/new")}
+                icon={IconPlus}
+                variant="outline"
+              >
+                Create Invoice
+              </Button>
+            </div>
           </div>
 
-          {/* Month selection - hidden on small screens */}
-          <div className="hidden lg:block w-40">
-            <Listbox value={selectedMonth} onChange={handleMonthChange}>
-              <div className="relative">
-                <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                  <span className="block truncate pl-2">
-                    {selectedMonth.name}
-                  </span>
-                  <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                    <IconChevronDown
-                      className="h-5 w-5 text-default-400"
-                      aria-hidden="true"
-                    />
-                  </span>
-                </ListboxButton>
-                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                  {monthOptions.map((month) => (
-                    <ListboxOption
-                      key={month.id}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                          active
-                            ? "bg-default-100 text-default-900"
-                            : "text-default-900"
-                        }`
-                      }
-                      value={month}
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : "font-normal"
-                            }`}
-                          >
-                            {month.name}
-                          </span>
-                          {selected && (
-                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                              <IconCheck
-                                className="h-5 w-5"
-                                aria-hidden="true"
-                              />
+          {/* Filters and Create Button Row - responsive */}
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap lg:flex-nowrap">
+            {/* DateRangePicker */}
+            <div className="w-full sm:w-auto flex-grow lg:flex-grow-0">
+              <DateRangePicker
+                dateRange={dateRange}
+                onDateChange={(newDateRange) => {
+                  saveDatesToStorage(newDateRange.start, newDateRange.end);
+                  setDateRange(newDateRange);
+                  setCurrentPage(1);
+                }}
+                className="w-full"
+              />
+            </div>
+
+            {/* Month selection */}
+            <div className="w-full sm:w-48">
+              <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                <div className="relative">
+                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                    <span className="block truncate pl-2">
+                      {selectedMonth.name}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                      <IconChevronDown
+                        className="h-5 w-5 text-default-400"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </ListboxButton>
+                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                    {monthOptions.map((month) => (
+                      <ListboxOption
+                        key={month.id}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                            active
+                              ? "bg-default-100 text-default-900"
+                              : "text-default-900"
+                          }`
+                        }
+                        value={month}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              {month.name}
                             </span>
-                          )}
-                        </>
-                      )}
-                    </ListboxOption>
-                  ))}
-                </ListboxOptions>
-              </div>
-            </Listbox>
-          </div>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <IconCheck
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                    ))}
+                  </ListboxOptions>
+                </div>
+              </Listbox>
+            </div>
 
-          {/* Search box - hidden on small screens */}
-          <div className="hidden lg:block relative">
-            <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-              size={22}
-            />
-            <input
-              type="text"
-              placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+            {/* Search box */}
+            <div className="w-full sm:w-auto flex-grow relative">
+              <IconSearch
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
+                size={22}
+              />
+              <input
+                type="text"
+                placeholder="Search"
+                className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
 
-          {/* Create Invoice Button */}
-          <Button
-            onClick={() => navigate("/greentarget/invoices/new")}
-            icon={IconPlus}
-            variant="outline"
-          >
-            Create Invoice
-          </Button>
+            {/* Create Invoice Button - Hidden on mobile, visible on larger screens */}
+            <div className="hidden lg:block flex-shrink-0">
+              <Button
+                onClick={() => navigate("/greentarget/invoices/new")}
+                icon={IconPlus}
+                variant="outline"
+              >
+                Create Invoice
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
