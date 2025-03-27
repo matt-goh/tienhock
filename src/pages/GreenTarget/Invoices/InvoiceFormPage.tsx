@@ -410,13 +410,47 @@ const InvoiceFormPage: React.FC = () => {
         if (isPaid && response.invoice && response.invoice.invoice_id) {
           const invoiceId = response.invoice.invoice_id;
 
-          // Create payment
+          // Fetch all payments to find unused reference numbers for the current month and year
+          const allPayments = await greenTargetApi.getPayments();
+
+          // Get current year (last 2 digits) and month (padded with zero)
+          const currentYear = new Date().getFullYear().toString().slice(-2);
+          const currentMonth = (new Date().getMonth() + 1)
+            .toString()
+            .padStart(2, "0");
+
+          // Regular expression to match the format RV{year}/{month}/{number}
+          const regex = new RegExp(`^RV${currentYear}/${currentMonth}/(\\d+)$`);
+
+          // Extract all used numbers for the current month and year
+          const usedNumbers = new Set();
+          allPayments.forEach((payment: { internal_reference: string }) => {
+            if (payment.internal_reference) {
+              const match = payment.internal_reference.match(regex);
+              if (match) {
+                usedNumbers.add(parseInt(match[1]));
+              }
+            }
+          });
+
+          // Find the first unused number starting from 1
+          let nextNumber = 1;
+          while (usedNumbers.has(nextNumber)) {
+            nextNumber++;
+          }
+
+          // Format the reference number
+          const paddedNumber = nextNumber.toString().padStart(2, "0");
+          const referenceNumber = `RV${currentYear}/${currentMonth}/${paddedNumber}`;
+
+          // Create payment with reference number
           const paymentData = {
             invoice_id: invoiceId,
-            payment_date: new Date().toISOString().split("T")[0], // Today's date
+            payment_date: new Date().toISOString().split("T")[0],
             amount_paid: totalAmount,
             payment_method: paymentMethod,
             payment_reference: paymentReference || null,
+            internal_reference: referenceNumber,
           };
 
           await greenTargetApi.createPayment(paymentData);
