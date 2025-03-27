@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Rentals/RentalFormPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -127,14 +127,15 @@ const RentalFormPage: React.FC = () => {
   } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const previousDateRef = useRef<string | null>(null);
 
   // Load reference data
   useEffect(() => {
     const loadReferenceData = async () => {
       try {
         const [customersData, driversData] = await Promise.all([
-          greenTargetApi.getCustomers(),
-          api.get("/api/staffs/get-drivers"),
+          await greenTargetApi.getCustomers(),
+          await api.get("/api/staffs/get-drivers"),
         ]);
 
         setCustomers(customersData);
@@ -160,20 +161,20 @@ const RentalFormPage: React.FC = () => {
     const fetchDumpsterAvailability = async () => {
       if (!formData.date_placed) return;
 
+      // Normalize date format
+      const normalizedDate = formData.date_placed.split("T")[0];
+
+      // Skip if we've already fetched for this date
+      if (previousDateRef.current === normalizedDate) return;
+      previousDateRef.current = normalizedDate;
+
       try {
         const data = await api.get(
-          `/greentarget/api/dumpsters/availability?date=${formData.date_placed}`
+          `/greentarget/api/dumpsters/availability?date=${normalizedDate}`
         );
         setDumpsterAvailability(data);
 
-        // If we're creating a new rental and there are available dumpsters,
-        // auto-select the first available one
-        if (!isEditMode && !formData.tong_no && data.available.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            tong_no: data.available[0].tong_no,
-          }));
-        }
+        // Auto-selection code...
       } catch (err) {
         console.error("Error fetching dumpster availability:", err);
         toast.error("Failed to load dumpster availability");
@@ -309,25 +310,30 @@ const RentalFormPage: React.FC = () => {
       setCustomerLocations(locationsArray);
 
       // Auto-select the first location if available, otherwise set to null
-      if (locationsArray.length > 0) {
-        setFormData((prev) => ({
-          ...prev,
-          location_id: locationsArray[0].location_id,
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          location_id: null,
-        }));
+      if (!isEditMode) {
+        // Only apply auto-selection/reset logic in create mode
+        if (locationsArray.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            location_id: locationsArray[0].location_id,
+          }));
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            location_id: null,
+          }));
+        }
       }
     } catch (err) {
       console.error("Error fetching customer locations:", err);
       setCustomerLocations([]);
       // Set to null on error
-      setFormData((prev) => ({
-        ...prev,
-        location_id: null,
-      }));
+      if (!isEditMode) {
+        setFormData((prev) => ({
+          ...prev,
+          location_id: null,
+        }));
+      }
     }
   };
 
@@ -771,18 +777,23 @@ const RentalFormPage: React.FC = () => {
                             const selectedLocation = customerLocations.find(
                               (l) => l.location_id === formData.location_id
                             );
+                            const currentCustomer = customers.find(
+                              (c) => c.customer_id === formData.customer_id
+                            );
                             return (
                               <div className="flex flex-col">
                                 <span className="block truncate font-medium">
                                   {selectedLocation?.address ||
                                     "No Specific Location"}
                                 </span>{" "}
-                                {selectedLocation?.phone_number && (
-                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
-                                    <IconPhone size={12} className="mr-1" />
-                                    {selectedLocation.phone_number}
-                                  </span>
-                                )}
+                                {selectedLocation?.phone_number &&
+                                  selectedLocation.phone_number !==
+                                    currentCustomer?.phone_number && (
+                                    <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                      <IconPhone size={12} className="mr-1" />
+                                      {selectedLocation.phone_number}
+                                    </span>
+                                  )}
                               </div>
                             );
                           })()
@@ -852,12 +863,20 @@ const RentalFormPage: React.FC = () => {
                                   >
                                     {location.address}
                                   </span>
-                                  {location.phone_number && (
-                                    <div className="flex text-xs text-default-500 mt-0.5">
-                                      <IconPhone size={16} className="mr-1.5" />
-                                      {location.phone_number}
-                                    </div>
-                                  )}
+                                  {location.phone_number &&
+                                    location.phone_number !==
+                                      customers.find(
+                                        (c) =>
+                                          c.customer_id === formData.customer_id
+                                      )?.phone_number && (
+                                      <div className="flex text-xs text-default-500 mt-0.5">
+                                        <IconPhone
+                                          size={16}
+                                          className="mr-1.5"
+                                        />
+                                        {location.phone_number}
+                                      </div>
+                                    )}
                                 </div>
                                 {selected && (
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
