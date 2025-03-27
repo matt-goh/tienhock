@@ -5,11 +5,16 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
-import { FormInput, FormListbox } from "../../../components/FormComponents";
+import {
+  FormInput,
+  FormInputWithStatus,
+  FormListbox,
+} from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
 import { IconMap, IconMapPin, IconTrash, IconPhone } from "@tabler/icons-react";
+import { validateCustomerIdentity } from "../../../utils/greenTarget/customerValidation";
 
 interface CustomerLocation {
   location_id?: number;
@@ -80,6 +85,7 @@ const CustomerFormPage: React.FC = () => {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<CustomerLocation | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const idTypeOptions = [
     { id: "Select", name: "Select" },
@@ -130,7 +136,7 @@ const CustomerFormPage: React.FC = () => {
       setLoading(true);
       const data = await greenTargetApi.getCustomer(customerId);
 
-      setFormData({
+      const formattedData = {
         customer_id: data.customer_id,
         name: data.name,
         phone_number: data.phone_number || "",
@@ -141,24 +147,12 @@ const CustomerFormPage: React.FC = () => {
         id_type: data.id_type || "Select",
         id_number: data.id_number || "",
         state: data.state || "12",
-      });
+      };
+
+      setFormData(formattedData);
+      setInitialFormData(formattedData);
 
       setLocations(data.locations || []);
-
-      setInitialFormData({
-        customer_id: data.customer_id,
-        name: data.name,
-        phone_number: data.phone_number || "",
-        last_activity_date: data.last_activity_date,
-        locations: data.locations || [],
-        has_active_rental: data.has_active_rental,
-        email: data.email || "",
-        tin_number: data.tin_number || "",
-        id_type: data.id_type || "Select",
-        id_number: data.id_number || "",
-        state: data.state || "12",
-      });
-
       setError(null);
     } catch (err) {
       setError("Failed to fetch customer details. Please try again later.");
@@ -240,6 +234,49 @@ const CustomerFormPage: React.FC = () => {
     setIsSaving(true);
 
     try {
+      // Check if any of the validation fields has input
+      const hasIdType = formData.id_type && formData.id_type !== "Select";
+      const hasIdNumber = Boolean(formData.id_number);
+      const hasTinNumber = Boolean(formData.tin_number);
+
+      // If any field has input, all fields are required
+      if (hasIdType || hasIdNumber || hasTinNumber) {
+        if (!hasIdType) {
+          toast.error(
+            "ID Type is required when entering e-Invoice information"
+          );
+          setIsSaving(false);
+          return;
+        }
+        if (!hasIdNumber) {
+          toast.error(
+            "ID Number is required when entering e-Invoice information"
+          );
+          setIsSaving(false);
+          return;
+        }
+        if (!hasTinNumber) {
+          toast.error(
+            "TIN Number is required when entering e-Invoice information"
+          );
+          setIsSaving(false);
+          return;
+        }
+
+        // Check if data is already verified (exists and unchanged)
+        const isDataVerified =
+          isEditMode && isValidationDataUnchanged(formData, initialFormData);
+
+        // Only validate if data has changed or is new
+        if (!isDataVerified) {
+          const validationResult = await validateCustomerIdentity(formData);
+          if (!validationResult.isValid) {
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+
       let customerResponse;
 
       if (isEditMode && formData.customer_id) {
@@ -328,21 +365,97 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
+  const handleDeleteCustomer = async () => {
+    try {
+      setIsSaving(true);
+
+      if (!formData.customer_id) {
+        toast.error("Cannot delete: customer ID is missing");
+        return;
+      }
+
+      const response = await greenTargetApi.deleteCustomer(
+        formData.customer_id
+      );
+
+      // Check if the response contains an error message
+      if (
+        response.error ||
+        (response.message && response.message.includes("Cannot delete"))
+      ) {
+        // Show error toast with the server's message
+        toast.error(
+          response.message || "Cannot delete customer: unknown error occurred"
+        );
+      } else {
+        // Show success message and navigate back to customer list
+        toast.success("Customer deleted successfully");
+        navigate("/greentarget/customers");
+      }
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to delete customer");
+      }
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setIsSaving(false);
+    }
+  };
+
+  const isValidationDataUnchanged = (
+    currentData: Customer,
+    initialData: Customer
+  ): boolean => {
+    return (
+      currentData.id_type === initialData.id_type &&
+      currentData.id_number === initialData.id_number &&
+      currentData.tin_number === initialData.tin_number &&
+      // Make sure all values exist
+      Boolean(currentData.id_type) &&
+      currentData.id_type !== "Select" &&
+      Boolean(currentData.id_number) &&
+      Boolean(currentData.tin_number)
+    );
+  };
+
   const renderInput = (
     name: keyof Customer,
     label: string,
     type: string = "text",
     placeholder: string = ""
-  ) => (
-    <FormInput
-      name={name}
-      label={label}
-      placeholder={placeholder}
-      value={formData[name]?.toString() || ""}
-      onChange={handleInputChange}
-      type={type}
-    />
-  );
+  ) => {
+    const value = formData[name]?.toString() || "";
+
+    // Determine if this field should have verification capability
+    const showStatus = name === "id_number" || name === "tin_number";
+    const isVerified =
+      isEditMode && isValidationDataUnchanged(formData, initialFormData);
+
+    return showStatus ? (
+      <FormInputWithStatus
+        name={name}
+        label={label}
+        value={value}
+        onChange={handleInputChange}
+        type={type}
+        placeholder={placeholder}
+        showStatus={true}
+        isVerified={isVerified}
+      />
+    ) : (
+      <FormInput
+        name={name}
+        label={label}
+        value={value}
+        onChange={handleInputChange}
+        type={type}
+        placeholder={placeholder}
+      />
+    );
+  };
 
   const renderListbox = (
     name: keyof Customer,
@@ -592,7 +705,10 @@ const CustomerFormPage: React.FC = () => {
             {/* e-Invoice fields */}
             <div className="border-t pt-6 mt-6">
               <h2 className="text-lg font-medium mb-4">
-                e-Invoice Information
+                e-Invoice Information{" "}
+                <span className="text-sm font-medium text-default-400">
+                  (optional)
+                </span>
               </h2>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                 {renderListbox("id_type", "ID Type", idTypeOptions)}
@@ -612,6 +728,17 @@ const CustomerFormPage: React.FC = () => {
           </div>
 
           <div className="mt-8 py-3 text-right">
+            {isEditMode && (
+              <Button
+                type="button"
+                color="rose"
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="mr-3"
+              >
+                Delete
+              </Button>
+            )}
             <Button
               type="submit"
               variant="boldOutline"
@@ -693,6 +820,16 @@ const CustomerFormPage: React.FC = () => {
         title="Discard Changes"
         message="Are you sure you want to go back? All unsaved changes will be lost."
         confirmButtonText="Discard"
+        variant="danger"
+      />
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteCustomer}
+        title="Delete Customer"
+        message={`Are you sure you want to delete ${formData.name}? This action cannot be undone.`}
+        confirmButtonText="Delete"
         variant="danger"
       />
     </div>
