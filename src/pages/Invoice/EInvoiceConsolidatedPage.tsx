@@ -29,6 +29,7 @@ import Button from "../../components/Button";
 import toast from "react-hot-toast";
 import { SubmissionDisplay } from "../../components/Invoice/SubmissionDisplay";
 import { StatusIndicator } from "../../components/StatusIndicator";
+import { useLocation, useNavigate } from "react-router-dom";
 
 interface MonthOption {
   id: number;
@@ -98,8 +99,6 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     useState<SubmissionState | null>(null);
 
   // Selection states
-  const [selectedCount, setSelectedCount] = useState(0);
-  const [isAllSelected, setIsAllSelected] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState<EligibleInvoice[]>(
     []
   );
@@ -109,6 +108,8 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     total: 0,
     rounding: 0,
   });
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Token validation function
   const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
@@ -194,6 +195,16 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     calculateTotals();
   }, [selectedInvoices]);
 
+  const handleInvoiceClick = (invoiceData: EligibleInvoice) => {
+    navigate(`/sales/invoice/details`, {
+      state: {
+        invoiceData,
+        isNewInvoice: false,
+        previousPath: location.pathname,
+      },
+    });
+  };
+
   // Define columns for the table
   const invoiceColumns: ColumnConfig[] = [
     {
@@ -205,10 +216,13 @@ const EInvoiceConsolidatedPage: React.FC = () => {
         getValue: () => any;
         row: { original: EligibleInvoice };
       }) => (
-        <div className="px-6 py-3">
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
           {info.row.original.paymenttype === "CASH" ? "C" : "I"}
           {info.getValue()}
-        </div>
+        </button>
       ),
     },
     {
@@ -216,10 +230,20 @@ const EInvoiceConsolidatedPage: React.FC = () => {
       header: "Date",
       type: "readonly",
       width: 150,
-      cell: (info: { getValue: () => any }) => {
+      cell: (info: {
+        getValue: () => any;
+        row: { original: EligibleInvoice };
+      }) => {
         const timestamp = info.getValue();
         const { date } = parseDatabaseTimestamp(timestamp);
-        return <div className="px-6 py-3">{formatDisplayDate(date)}</div>;
+        return (
+          <div
+            className="px-6 py-3 cursor-pointer group-hover:font-semibold"
+            onClick={() => handleInvoiceClick(info.row.original)}
+          >
+            {formatDisplayDate(date)}
+          </div>
+        );
       },
     },
     {
@@ -227,20 +251,48 @@ const EInvoiceConsolidatedPage: React.FC = () => {
       header: "Salesman",
       type: "readonly",
       width: 150,
+      cell: (info: {
+        getValue: () => any;
+        row: { original: EligibleInvoice };
+      }) => (
+        <div
+          className="px-6 py-3 cursor-pointer group-hover:font-semibold"
+          onClick={() => handleInvoiceClick(info.row.original)}
+        >
+          {info.getValue()}
+        </div>
+      ),
     },
     {
       id: "customerid",
       header: "Customer",
       type: "readonly",
       width: 500,
+      cell: (info: {
+        getValue: () => any;
+        row: { original: EligibleInvoice };
+      }) => (
+        <div
+          className="px-6 py-3 cursor-pointer group-hover:font-semibold"
+          onClick={() => handleInvoiceClick(info.row.original)}
+        >
+          {info.getValue()}
+        </div>
+      ),
     },
     {
       id: "totalamountpayable",
       header: "Amount",
       type: "amount",
       width: 150,
-      cell: (info: { getValue: () => any }) => (
-        <div className="px-6 py-3 text-right">
+      cell: (info: {
+        getValue: () => any;
+        row: { original: EligibleInvoice };
+      }) => (
+        <div
+          className="px-6 py-3 text-right cursor-pointer group-hover:font-semibold"
+          onClick={() => handleInvoiceClick(info.row.original)}
+        >
           {Number(info.getValue() || 0).toFixed(2)}
         </div>
       ),
@@ -250,8 +302,6 @@ const EInvoiceConsolidatedPage: React.FC = () => {
   // Handler for selection changes
   const handleSelectionChange = useCallback(
     (count: number, allSelected: boolean, selectedRows: EligibleInvoice[]) => {
-      setSelectedCount(count);
-      setIsAllSelected(allSelected);
       setSelectedInvoices(selectedRows);
     },
     []
@@ -264,8 +314,6 @@ const EInvoiceConsolidatedPage: React.FC = () => {
     const newYear = month.id > currentMonth ? currentYear - 1 : currentYear;
     setSelectedYear(newYear);
     setSelectedInvoices([]);
-    setSelectedCount(0);
-    setIsAllSelected(false);
   };
 
   // Fetch eligible invoices function
@@ -636,8 +684,6 @@ const EInvoiceConsolidatedPage: React.FC = () => {
 
               // Clear selection state
               setSelectedInvoices([]);
-              setSelectedCount(0);
-              setIsAllSelected(false);
 
               // Refresh the eligible invoices
               fetchEligibleInvoices();
