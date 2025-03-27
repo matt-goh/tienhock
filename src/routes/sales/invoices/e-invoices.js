@@ -877,6 +877,32 @@ export default function (pool, config) {
         );
         const consolidatedData = finalStatus.documentSummary[0];
 
+        if (
+          finalStatus.overallStatus === "Invalid" ||
+          consolidatedData.status === "Invalid"
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Consolidated invoice submission was rejected",
+            submissionUid: submissionResponse.submissionUid,
+            consolidatedId,
+            uuid: consolidatedData.uuid,
+            status: consolidatedData.status,
+            errors: [
+              {
+                code: "INVALID_SUBMISSION",
+                message: "The submission was marked as invalid by MyInvois",
+              },
+            ],
+          });
+        }
+
+        // Check if the submission is still pending
+        const isPending =
+          finalStatus.overallStatus === "InProgress" ||
+          consolidatedData.status === "Submitted" ||
+          !consolidatedData.longId;
+
         // Mark the original invoices as consolidated
         const client = await pool.connect();
         try {
@@ -916,14 +942,18 @@ export default function (pool, config) {
           client.release();
         }
 
-        // Return success with details
+        // Return success with details, including pending status
         return res.json({
           success: true,
-          message: "Consolidated invoice submitted successfully",
+          message: isPending
+            ? "Consolidated invoice submitted, but is still pending"
+            : "Consolidated invoice submitted successfully",
           submissionUid: submissionResponse.submissionUid,
           consolidatedId,
           uuid: consolidatedData.uuid,
-          longId: consolidatedData.longId,
+          longId: consolidatedData.longId || "",
+          isPending,
+          status: consolidatedData.status,
         });
       } else {
         return res.status(400).json({

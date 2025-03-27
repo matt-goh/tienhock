@@ -432,9 +432,9 @@ const EInvoiceConsolidatedPage: React.FC = () => {
               2,
               "0"
             )}`,
-          currentStatus: "COMPLETED",
+          currentStatus: response.isPending ? "PROCESSING" : "COMPLETED",
           summary: {
-            status: "Valid",
+            status: response.isPending ? "Submitted" : "Valid",
             receiverName: "Consolidated Buyers",
             uuid: response.uuid,
             longId: response.longId,
@@ -460,15 +460,59 @@ const EInvoiceConsolidatedPage: React.FC = () => {
             },
             documents,
             processingUpdates: [],
-            overallStatus: "Valid",
+            overallStatus: response.isPending ? "InProgress" : "Valid",
           },
         });
 
-        toast.success("Consolidated invoices submitted successfully");
-      } else {
-        throw new Error(
-          response.message || "Failed to submit consolidated invoices"
+        // Show appropriate toast message based on pending status
+        toast.success(
+          response.isPending
+            ? "Consolidated invoice submitted, but is still processing"
+            : "Consolidated invoices submitted successfully"
         );
+      } else {
+        const documents: Record<string, DocumentStatus> = {};
+        documents["consolidated"] = {
+          invoiceNo:
+            response.consolidatedId ||
+            `CON-${selectedYear}${String(selectedMonth.id + 1).padStart(
+              2,
+              "0"
+            )}`,
+          currentStatus: "REJECTED",
+          errors: response.errors || [
+            {
+              code: "ERR",
+              message:
+                response.message || "Failed to submit consolidated invoices",
+            },
+          ],
+        };
+
+        setSubmissionState({
+          phase: "COMPLETED",
+          tracker: {
+            submissionUid: response.submissionUid || "error",
+            batchInfo: {
+              size: 1,
+              submittedAt: new Date().toISOString(),
+              completedAt: new Date().toISOString(),
+            },
+            statistics: {
+              totalDocuments: 1,
+              processed: 1,
+              accepted: 0,
+              rejected: 1,
+              processing: 0,
+              completed: 0,
+            },
+            documents,
+            processingUpdates: [],
+            overallStatus: "Invalid",
+          },
+        });
+
+        toast.error(response.message || "Submission failed");
       }
     } catch (error: any) {
       console.error("Submission Error:", error);
