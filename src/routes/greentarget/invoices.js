@@ -6,24 +6,21 @@ export default function (pool) {
 
   // Get all invoices (with optional filters)
   router.get("/", async (req, res) => {
-    const {
-      customer_id,
-      rental_id,
-      start_date,
-      end_date,
-      type,
-      outstanding_only,
-    } = req.query;
+    const { customer_id, rental_id, start_date, end_date } = req.query;
 
     try {
       let query = `
       SELECT i.*, 
              c.name as customer_name,
+             c.phone_number as customer_phone_number,
+             l.address as location_address,
+             l.phone_number as location_phone_number,
              r.driver, 
              COALESCE(SUM(p.amount_paid), 0) as amount_paid
       FROM greentarget.invoices i
       JOIN greentarget.customers c ON i.customer_id = c.customer_id
       LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+      JOIN greentarget.locations l ON r.location_id = l.location_id
       LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
       WHERE 1=1
     `;
@@ -55,17 +52,7 @@ export default function (pool) {
         paramCounter++;
       }
 
-      if (type) {
-        query += ` AND i.type = $${paramCounter}`;
-        queryParams.push(type);
-        paramCounter++;
-      }
-
-      query += ` GROUP BY i.invoice_id, c.name, r.driver`;
-
-      if (outstanding_only === "true") {
-        query += ` HAVING i.total_amount > COALESCE(SUM(p.amount_paid), 0)`;
-      }
+      query += ` GROUP BY i.invoice_id, c.name, r.driver, c.phone_number, l.address, l.phone_number`;
 
       query += " ORDER BY i.date_issued DESC";
 

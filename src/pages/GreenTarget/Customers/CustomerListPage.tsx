@@ -325,13 +325,13 @@ const CustomerListPage = () => {
                         {customer.name}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-default-600">
                       {customer.customer_id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-default-600">
                       {customer.phone_number || "N/A"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-default-600">
                       {formatDate(customer.last_activity_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -345,7 +345,7 @@ const CustomerListPage = () => {
                         {customer.has_active_rental ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();

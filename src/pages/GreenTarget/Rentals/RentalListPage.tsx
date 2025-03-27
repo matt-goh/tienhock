@@ -140,10 +140,14 @@ const RentalCard = ({
         <div className="mb-3 border-b pb-3">
           <div className="flex justify-between items-start w-full">
             <div className="w-full">
-              <div className="flex items-center justify-between w-full">
+              <div className="w-full">
                 <h3
-                  className="font-semibold text-default-900 truncate max-w-[60%]"
+                  className="font-semibold text-default-900 truncate cursor-pointer hover:underline max-w-[60%]"
                   title={rental.customer_name}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/greentarget/customers/${rental.customer_id}`);
+                  }}
                 >
                   {rental.customer_name}
                 </h3>

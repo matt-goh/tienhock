@@ -14,6 +14,9 @@ import {
   IconFileDownload,
   IconChevronDown,
   IconCheck,
+  IconTruck,
+  IconPhone,
+  IconMapPin,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -34,6 +37,9 @@ interface Invoice {
   type: "regular" | "statement";
   customer_id: number;
   customer_name: string;
+  customer_phone_number?: string;
+  location_address?: string;
+  location_phone_number?: string;
   rental_id?: number;
   driver?: string;
   amount_before_tax: number;
@@ -119,14 +125,43 @@ const InvoiceCard = ({
           <div className="flex justify-between items-start">
             <div className="max-w-[65%]">
               <h3
-                className="font-semibold text-default-900 truncate"
+                className="font-semibold text-default-900 truncate cursor-pointer hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/greentarget/customers/${invoice.customer_id}`);
+                }}
                 title={invoice.customer_name}
               >
                 {invoice.customer_name}
               </h3>
-              <p className="text-sm text-default-600 mt-0.5 truncate">
-                {invoice.type === "regular" ? "Regular Invoice" : "Statement"}
-              </p>
+              {(invoice.customer_phone_number ||
+                invoice.location_phone_number) && (
+                <p
+                  className="text-sm text-default-600 mt-[3px] truncate"
+                  title={
+                    invoice.customer_phone_number !==
+                      invoice.location_phone_number &&
+                    invoice.customer_phone_number &&
+                    invoice.location_phone_number
+                      ? `${invoice.customer_phone_number}, ${invoice.location_phone_number}`
+                      : invoice.customer_phone_number ??
+                        invoice.location_phone_number ??
+                        undefined
+                  }
+                >
+                  <IconPhone
+                    size={14}
+                    className="inline mr-1 mt-0.5 align-top flex-shrink-0"
+                  />
+                  {invoice.customer_phone_number !==
+                    invoice.location_phone_number &&
+                  invoice.customer_phone_number &&
+                  invoice.location_phone_number
+                    ? `${invoice.customer_phone_number}, ${invoice.location_phone_number}`
+                    : invoice.customer_phone_number ||
+                      invoice.location_phone_number}
+                </p>
+              )}
             </div>
             {/* Add rental ID and driver info in the right side */}
             {invoice.rental_id && (
@@ -141,17 +176,33 @@ const InvoiceCard = ({
                 >
                   Rental #{invoice.rental_id}
                 </h3>
-                {invoice.driver && (
-                  <p
-                    className="text-sm text-default-600 mt-0.5 truncate"
-                    title={invoice.driver}
-                  >
-                    Driver: {invoice.driver}
-                  </p>
-                )}
               </div>
             )}
           </div>
+          {invoice.location_address && (
+            <p
+              className="text-sm text-default-600 mt-0.5 truncate"
+              title={invoice.location_address}
+            >
+              <IconMapPin
+                size={14}
+                className="inline mr-1 mt-0.5 align-top flex-shrink-0"
+              />
+              {invoice.location_address}
+            </p>
+          )}
+          {invoice.driver && (
+            <p
+              className="text-sm text-default-600 mt-0.5 truncate"
+              title={invoice.driver}
+            >
+              <IconTruck
+                size={14}
+                className="inline mr-1 mt-[3px] align-top flex-shrink-0"
+              />
+              {invoice.driver}
+            </p>
+          )}
         </div>
 
         {/* Details grid */}
