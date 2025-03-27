@@ -218,8 +218,28 @@ export default function (pool, config) {
       let query = `
         SELECT 
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-          i.amount, i.rounding, i.totalamountpayable
+          i.amount, i.rounding, i.totalamountpayable,
+          COALESCE(
+            json_agg(
+              CASE WHEN od.id IS NOT NULL THEN 
+                json_build_object(
+                  'code', od.code,
+                  'quantity', od.quantity,
+                  'price', od.price,
+                  'freeProduct', od.freeproduct,
+                  'returnProduct', od.returnproduct,
+                  'description', od.description,
+                  'tax', od.tax,
+                  'total', od.total,
+                  'issubtotal', od.issubtotal
+                )
+              ELSE NULL END
+              ORDER BY od.id  -- Maintain order of products and subtotals
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
+          ) as products
         FROM invoices i
+        LEFT JOIN order_details od ON i.id = od.invoiceid
         LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
         WHERE 1=1
         AND e.internal_id IS NULL
@@ -241,13 +261,32 @@ export default function (pool, config) {
         paramCounter += 2;
       }
 
-      query += ` ORDER BY i.createddate DESC`;
+      query += ` GROUP BY i.id ORDER BY i.createddate DESC`;
 
       const result = await pool.query(query, queryParams);
 
+      // Transform results and ensure proper data types
+      const transformedResults = result.rows.map((row) => ({
+        ...row,
+        products: (row.products || []).map((product) => ({
+          ...product,
+          uid: crypto.randomUUID(),
+          price: parseFloat(product.price) || 0,
+          quantity: parseInt(product.quantity) || 0,
+          freeProduct: parseInt(product.freeProduct) || 0,
+          returnProduct: parseInt(product.returnProduct) || 0,
+          tax: parseFloat(product.tax) || 0,
+          total: parseFloat(product.total) || 0,
+          issubtotal: Boolean(product.issubtotal),
+        })),
+        amount: parseFloat(row.amount) || 0,
+        rounding: parseFloat(row.rounding) || 0,
+        totalamountpayable: parseFloat(row.totalamountpayable) || 0,
+      }));
+
       res.json({
         success: true,
-        data: result.rows,
+        data: transformedResults,
       });
     } catch (error) {
       console.error("Error fetching eligible invoices:", error);

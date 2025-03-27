@@ -128,7 +128,6 @@ const EInvoiceHistoryPage: React.FC = () => {
   const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
     null
   );
-  const [isConnecting, setIsConnecting] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
     monthOptions[currentMonth]
   );
@@ -247,47 +246,6 @@ const EInvoiceHistoryPage: React.FC = () => {
     };
   };
 
-  // Adjust date range to maintain constraints
-  const adjustDateRange = (
-    newDate: Date,
-    type: "start" | "end",
-    currentRange: { start: Date; end: Date }
-  ): { start: Date; end: Date } => {
-    const oneMonthMs = 31 * 24 * 60 * 60 * 1000;
-
-    // Check if the new range would exceed one month
-    const rangeInfo = getDateRangeInfo(
-      type === "start" ? newDate : currentRange.start,
-      type === "end" ? newDate : currentRange.end
-    );
-
-    if (!rangeInfo.isValidDirection) {
-      // If dates are in wrong order, adjust the other date
-      return type === "start"
-        ? {
-            start: newDate,
-            end: new Date(newDate.getTime() + 24 * 60 * 60 * 1000),
-          }
-        : {
-            start: new Date(newDate.getTime() - 24 * 60 * 60 * 1000),
-            end: newDate,
-          };
-    }
-
-    if (!rangeInfo.isWithinMonth) {
-      // If range exceeds one month, adjust the other date
-      return type === "start"
-        ? { start: newDate, end: new Date(newDate.getTime() + oneMonthMs) }
-        : { start: new Date(newDate.getTime() - oneMonthMs), end: newDate };
-    }
-
-    // If range is valid, return new date with existing other date
-    return {
-      start: type === "start" ? newDate : currentRange.start,
-      end: type === "end" ? newDate : currentRange.end,
-    };
-  };
-
   const handleMonthChange = (month: MonthOption) => {
     setSelectedMonth(month);
 
@@ -354,7 +312,6 @@ const EInvoiceHistoryPage: React.FC = () => {
     }
 
     try {
-      setIsConnecting(true);
       const data = await api.post("/api/einvoice/login");
       if (data.success && data.tokenInfo) {
         const loginDataWithTime = { ...data, tokenCreationTime: Date.now() };
@@ -376,8 +333,6 @@ const EInvoiceHistoryPage: React.FC = () => {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       return false;
-    } finally {
-      setIsConnecting(false);
     }
   }, [isTokenValid]);
 
