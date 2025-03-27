@@ -300,10 +300,6 @@ const InvoiceListPage: React.FC = () => {
 
   const ITEMS_PER_PAGE = 12;
 
-  useEffect(() => {
-    fetchInvoices();
-  }, []);
-
   // Effect to fetch invoices when filters change
   useEffect(() => {
     fetchInvoices();
