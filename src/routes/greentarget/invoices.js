@@ -13,6 +13,8 @@ export default function (pool) {
       SELECT i.*, 
              c.name as customer_name,
              c.phone_number as customer_phone_number,
+             c.tin_number,
+             c.id_number,
              l.address as location_address,
              l.phone_number as location_phone_number,
              r.driver, 
@@ -52,7 +54,7 @@ export default function (pool) {
         paramCounter++;
       }
 
-      query += ` GROUP BY i.invoice_id, c.name, r.driver, c.phone_number, l.address, l.phone_number`;
+      query += ` GROUP BY i.invoice_id, c.name, r.driver, c.phone_number, c.tin_number, c.id_number, l.address, l.phone_number`;
 
       query += " ORDER BY i.date_issued DESC";
 
@@ -205,6 +207,8 @@ export default function (pool) {
       const invoiceQuery = `
         SELECT i.*, 
                c.name as customer_name,
+               c.tin_number,
+               c.id_number,
                r.rental_id,
                r.tong_no,
                r.date_placed,
