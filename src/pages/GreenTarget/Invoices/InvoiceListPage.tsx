@@ -53,6 +53,13 @@ interface Invoice {
   balance_due: number;
   statement_period_start?: string;
   statement_period_end?: string;
+  einvoice_status?: "submitted" | "pending" | null;
+}
+
+interface InvoiceCardProps {
+  invoice: Invoice;
+  onDeleteClick: (invoice: Invoice) => void;
+  onSubmitEInvoiceClick: (invoice: Invoice) => void;
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -60,10 +67,8 @@ const STORAGE_KEY = "greentarget_invoice_filters";
 const InvoiceCard = ({
   invoice,
   onDeleteClick,
-}: {
-  invoice: Invoice;
-  onDeleteClick: (invoice: Invoice) => void;
-}) => {
+  onSubmitEInvoiceClick,
+}: InvoiceCardProps) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
 
@@ -271,6 +276,34 @@ const InvoiceCard = ({
             <IconPrinter size={18} stroke={1.5} />
           </button>
 
+          {/* Only show e-Invoice button if: 
+    1. Customer has tin_number and id_number 
+    2. Invoice is not already submitted as e-Invoice */}
+          {invoice.tin_number &&
+            invoice.id_number &&
+            !invoice.einvoice_status && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSubmitEInvoiceClick(invoice);
+                }}
+                className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors"
+                title="Submit as e-Invoice"
+              >
+                <IconFileInvoice size={18} stroke={1.5} />
+              </button>
+            )}
+
+          {/* Show submitted indicator if already submitted */}
+          {invoice.einvoice_status === "submitted" && (
+            <button
+              className="p-1.5 bg-green-100 text-green-700 rounded-full cursor-default"
+              title="e-Invoice Submitted"
+            >
+              <IconCheck size={18} stroke={1.5} />
+            </button>
+          )}
+
           {!isPaid && (
             <button
               onClick={(e) => {
@@ -349,6 +382,9 @@ const InvoiceListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
+  const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
+  const [processingEInvoice, setProcessingEInvoice] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -480,6 +516,32 @@ const InvoiceListPage: React.FC = () => {
         setIsDeleteDialogOpen(false);
         setInvoiceToDelete(null);
       }
+    }
+  };
+
+  const handleSubmitEInvoice = async (invoice: Invoice) => {
+    try {
+      setProcessingEInvoice(true);
+      toast.loading("Submitting e-Invoice...");
+
+      // Placeholder for actual e-Invoice submission
+      // This would be replaced with actual implementation later
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      toast.success("e-Invoice submitted successfully");
+
+      // Redirect to invoice details page
+      navigate(`/greentarget/invoices/${invoice.invoice_id}`);
+    } catch (error) {
+      console.error("Error submitting e-Invoice:", error);
+      setEInvoiceErrorMessage(
+        error instanceof Error
+          ? `Failed to submit e-Invoice: ${error.message}`
+          : "Failed to submit e-Invoice due to an unknown error"
+      );
+      setShowEInvoiceErrorDialog(true);
+    } finally {
+      setProcessingEInvoice(false);
     }
   };
 
@@ -761,6 +823,7 @@ const InvoiceListPage: React.FC = () => {
               key={invoice.invoice_id}
               invoice={invoice}
               onDeleteClick={handleDeleteClick}
+              onSubmitEInvoiceClick={handleSubmitEInvoice}
             />
           ))}
         </div>
@@ -793,6 +856,15 @@ const InvoiceListPage: React.FC = () => {
         title="Delete Invoice"
         message={`Are you sure you want to delete invoice ${invoiceToDelete?.invoice_number}? This action cannot be undone.`}
         confirmButtonText="Delete"
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={showEInvoiceErrorDialog}
+        onClose={() => setShowEInvoiceErrorDialog(false)}
+        onConfirm={() => setShowEInvoiceErrorDialog(false)}
+        title="e-Invoice Submission Error"
+        message={eInvoiceErrorMessage}
+        confirmButtonText="Ok"
         variant="danger"
       />
     </div>

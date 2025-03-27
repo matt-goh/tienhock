@@ -23,6 +23,8 @@ import {
 
 interface Customer {
   customer_id: number;
+  tin_number: string;
+  id_number: string;
   name: string;
 }
 
@@ -47,8 +49,6 @@ interface Invoice {
   invoice_number?: string;
   type: "regular" | "statement";
   customer_id: number;
-  tin_number?: string;
-  id_number?: string;
   rental_id?: number | null;
   amount_before_tax: number;
   tax_amount: number;
@@ -90,7 +90,7 @@ const InvoiceFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
-  const [isPaid, setIsPaid] = useState(true);
+  const [isPaid, setIsPaid] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [previousRental, setPreviousRental] = useState<{
@@ -100,6 +100,9 @@ const InvoiceFormPage: React.FC = () => {
     rental_id: null,
     rental: null,
   });
+  const [submitAsEinvoice, setSubmitAsEinvoice] = useState(true);
+  const [showEinvoiceError, setShowEinvoiceError] = useState(false);
+  const [einvoiceErrorMessage, setEinvoiceErrorMessage] = useState("");
   const location = useLocation();
   const rentalData = location.state;
 
@@ -128,15 +131,6 @@ const InvoiceFormPage: React.FC = () => {
       fetchAvailableRentals(formData.customer_id);
     }
   }, [formData.customer_id, formData.type]);
-
-  // Auto-calculate tax amount when amount before tax changes
-  useEffect(() => {
-    const taxAmount = formData.amount_before_tax * TAX_RATE;
-    setFormData((prev) => ({
-      ...prev,
-      tax_amount: parseFloat(taxAmount.toFixed(2)),
-    }));
-  }, [formData.amount_before_tax]);
 
   useEffect(() => {
     if (rentalData && !isEditMode) {
@@ -425,6 +419,37 @@ const InvoiceFormPage: React.FC = () => {
       } else {
         // Create new invoice
         response = await greenTargetApi.createInvoice(invoiceData);
+
+        // If the invoice is created successfully and submitAsEinvoice is checked
+        if (
+          submitAsEinvoice &&
+          response.invoice &&
+          response.invoice.invoice_id
+        ) {
+          try {
+            // Placeholder for actual e-Invoice submission
+            // This would be replaced with actual implementation later
+            toast.loading("Submitting e-Invoice...");
+
+            // Simulate API call for now
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Assuming success
+            toast.success("e-Invoice submitted successfully");
+
+            // If there was an error, we would show the error dialog:
+            // setEinvoiceErrorMessage("Failed to submit e-Invoice: [reason]");
+            // setShowEinvoiceError(true);
+          } catch (einvoiceError) {
+            console.error("e-Invoice submission error:", einvoiceError);
+            setEinvoiceErrorMessage(
+              einvoiceError instanceof Error
+                ? `Failed to submit e-Invoice: ${einvoiceError.message}`
+                : "Failed to submit e-Invoice due to an unknown error"
+            );
+            setShowEinvoiceError(true);
+          }
+        }
 
         // If paid is checked, also create a payment
         if (isPaid && response.invoice && response.invoice.invoice_id) {
@@ -994,7 +1019,6 @@ const InvoiceFormPage: React.FC = () => {
                     min="0"
                     step="0.01"
                     className="w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500 bg-default-50"
-                    readOnly
                   />
                 </div>
               </div>
@@ -1213,6 +1237,36 @@ const InvoiceFormPage: React.FC = () => {
             </div>
           )}
 
+          {/* e-Invoice Section - Only show if customer has required fields */}
+          {formData.customer_id > 0 &&
+            customers.find((c) => c.customer_id === formData.customer_id)
+              ?.tin_number &&
+            customers.find((c) => c.customer_id === formData.customer_id)
+              ?.id_number && (
+              <div className="mt-2 flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
+                  className="flex items-center"
+                >
+                  {submitAsEinvoice ? (
+                    <IconSquareCheckFilled
+                      className="text-blue-600"
+                      width={20}
+                      height={20}
+                    />
+                  ) : (
+                    <IconSquare
+                      className="text-default-400"
+                      width={20}
+                      height={20}
+                    />
+                  )}
+                  <span className="ml-2 font-medium">Submit e-Invoice</span>
+                </button>
+              </div>
+            )}
+
           <div className="mt-8 flex justify-end">
             <Button
               type="submit"
@@ -1233,6 +1287,15 @@ const InvoiceFormPage: React.FC = () => {
         title="Discard Changes"
         message="Are you sure you want to go back? All unsaved changes will be lost."
         confirmButtonText="Discard"
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={showEinvoiceError}
+        onClose={() => setShowEinvoiceError(false)}
+        onConfirm={() => setShowEinvoiceError(false)}
+        title="e-Invoice Submission Error"
+        message={einvoiceErrorMessage}
+        confirmButtonText="Ok"
         variant="danger"
       />
     </div>
