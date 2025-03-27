@@ -101,6 +101,7 @@ const InvoicePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [isDeletingInvoices, setIsDeletingInvoices] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState<InvoiceData[]>([]);
   const [filters, setFilters] = useState<InvoiceFilters>({
@@ -242,6 +243,7 @@ const InvoicePage: React.FC = () => {
 
   const handleBulkDelete = async () => {
     setShowDeleteConfirmation(false);
+    setIsDeletingInvoices(true); // Show loading overlay when deletion starts
 
     try {
       const deletePromises = selectedInvoices.map((invoice) =>
@@ -278,6 +280,8 @@ const InvoicePage: React.FC = () => {
     } catch (error) {
       console.error("Error deleting invoices:", error);
       toast.error("Failed to delete invoices. Please try again.");
+    } finally {
+      setIsDeletingInvoices(false); // Hide loading overlay when deletion completes
     }
   };
 
@@ -825,6 +829,16 @@ const InvoicePage: React.FC = () => {
           invoices={selectedCount > 0 ? selectedInvoices : filteredInvoices}
           onComplete={() => setShowPrintOverlay(false)}
         />
+      )}
+      {isDeletingInvoices && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center justify-center">
+            <LoadingSpinner size="lg" hideText />
+            <p className="mt-4 text-default-700 font-medium">
+              Deleting invoices...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
