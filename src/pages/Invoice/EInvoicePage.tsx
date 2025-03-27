@@ -8,10 +8,10 @@ import EInvoiceHistoryPage from "./EInvoiceHistoryPage";
 const EInvoicePage: React.FC = () => {
   return (
     <div className="flex flex-col px-12">
-      <Tab labels={["Consolidate", "Submit", "History"]}>
+      <Tab labels={["History", "Consolidate", "Submit"]}>
+        <EInvoiceHistoryPage />
         <EInvoiceConsolidatedPage />
         <EInvoiceSubmitPage />
-        <EInvoiceHistoryPage />
       </Tab>
     </div>
   );
