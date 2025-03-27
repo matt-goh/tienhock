@@ -91,6 +91,13 @@ const InvoiceFormPage: React.FC = () => {
   const [isPaid, setIsPaid] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
+  const [previousRental, setPreviousRental] = useState<{
+    rental_id: number | null;
+    rental: Rental | null;
+  }>({
+    rental_id: null,
+    rental: null,
+  });
   const location = useLocation();
   const rentalData = location.state;
 
@@ -295,13 +302,24 @@ const InvoiceFormPage: React.FC = () => {
           [name]: value,
           statement_period_start: null,
           statement_period_end: null,
+          // Restore the previously selected rental if available
+          rental_id: previousRental.rental_id,
         }));
+        // Also restore the selected rental UI state
+        setSelectedRental(previousRental.rental);
       } else if (value === "statement") {
+        // Save the current rental before setting it to null
+        setPreviousRental({
+          rental_id: formData.rental_id ?? null,
+          rental: selectedRental,
+        });
         setFormData((prev) => ({
           ...prev,
           [name]: value,
           rental_id: null,
         }));
+        // Clear the selected rental UI state for consistency
+        setSelectedRental(null);
       }
     }
 
