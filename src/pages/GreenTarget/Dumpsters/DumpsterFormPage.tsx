@@ -430,13 +430,16 @@ const DumpsterFormPage: React.FC = () => {
                         // A rental is scheduled if the placement date is in the future
                         const isScheduled = placementDate > today;
 
-                        // A rental is completed if it has a pickup date in the past
-                        const isCompleted = pickupDate && pickupDate <= today;
-
                         return (
                           <tr
                             key={rental.rental_id}
                             className="hover:bg-default-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(
+                                `/greentarget/rentals/${rental.rental_id}`
+                              );
+                            }}
                           >
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
                               {rental.customer_name}

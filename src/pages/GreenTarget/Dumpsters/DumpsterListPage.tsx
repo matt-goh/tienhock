@@ -672,7 +672,7 @@ const DumpsterListPage: React.FC = () => {
                     <div className="space-y-1.5 text-sm border-t border-default-100 pt-2 mt-1">
                       <div className="flex items-start gap-2">
                         <IconUser
-                          size={14}
+                          size={16}
                           className="mt-0.5 text-default-400 shrink-0"
                         />
                         <span className="text-default-700">
