@@ -54,6 +54,7 @@ interface Invoice {
   balance_due: number;
   statement_period_start?: string;
   statement_period_end?: string;
+  einvoice_status?: "submitted" | "pending" | null;
 }
 
 interface PaymentFormData {
@@ -90,6 +91,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isDeleteInvoiceDialogOpen, setIsDeleteInvoiceDialogOpen] =
     useState(false);
   const [isDeletingInvoice, setIsDeletingInvoice] = useState(false);
+  const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
+  const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
+  const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
 
   useEffect(() => {
     if (id) {
@@ -291,6 +295,34 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const handleSubmitEInvoice = async () => {
+    if (!invoice) return;
+
+    try {
+      setIsSubmittingEInvoice(true);
+      toast.loading("Submitting e-Invoice...");
+
+      // Placeholder for actual e-Invoice submission
+      // This would be replaced with actual implementation later
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      toast.success("e-Invoice submitted successfully");
+
+      // Don't set a separate status, just refresh invoice details
+      fetchInvoiceDetails(invoice.invoice_id);
+    } catch (error) {
+      console.error("Error submitting e-Invoice:", error);
+      setEInvoiceErrorMessage(
+        error instanceof Error
+          ? `Failed to submit e-Invoice: ${error.message}`
+          : "Failed to submit e-Invoice due to an unknown error"
+      );
+      setShowEInvoiceErrorDialog(true);
+    } finally {
+      setIsSubmittingEInvoice(false);
+    }
+  };
+
   const handlePrintInvoice = () => {
     // Placeholder for print functionality
     toast.success("Invoice printing functionality would go here");
@@ -380,11 +412,40 @@ const InvoiceDetailsPage: React.FC = () => {
           </button>
           <h1 className="text-2xl font-bold text-default-900 flex items-center">
             <IconFileInvoice size={28} className="mr-2 text-default-600" />
-            Invoice {invoice.invoice_number}
+            Invoice{" "}
+            <span
+              className="truncate max-w-[150px] md:max-w-[300px] inline-block"
+              title={invoice.invoice_number}
+            >
+              {invoice.invoice_number}
+            </span>
+            {true && (
+              <button
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 border border-green-300 text-green-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                title="e-Invoice Submitted"
+              >
+                <IconCheck size={18} stroke={1.5} />
+                <span className="truncate">e-Invoice Submitted</span>
+              </button>
+            )}
           </h1>
         </div>
 
-        <div className="flex space-x-3 mt-4 md:mt-0">
+        <div className="flex space-x-3 mt-4 md:mt-0 md:self-end">
+          {/* e-Invoice button - only show if customer has required fields */}
+          {invoice.tin_number &&
+            invoice.id_number &&
+            !invoice.einvoice_status && (
+              <Button
+                onClick={handleSubmitEInvoice}
+                icon={IconFileInvoice}
+                variant="outline"
+                color="amber"
+                disabled={isSubmittingEInvoice}
+              >
+                {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
+              </Button>
+            )}
           {invoice.current_balance > 0 && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -399,6 +460,7 @@ const InvoiceDetailsPage: React.FC = () => {
             onClick={handlePrintInvoice}
             icon={IconPrinter}
             variant="outline"
+            className="hidden md:block"
           >
             Print
           </Button>
@@ -1050,6 +1112,15 @@ const InvoiceDetailsPage: React.FC = () => {
             : ""
         }`}
         confirmButtonText={isDeletingInvoice ? "Deleting..." : "Delete"}
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={showEInvoiceErrorDialog}
+        onClose={() => setShowEInvoiceErrorDialog(false)}
+        onConfirm={() => setShowEInvoiceErrorDialog(false)}
+        title="e-Invoice Submission Error"
+        message={eInvoiceErrorMessage}
+        confirmButtonText="OK"
         variant="danger"
       />
     </div>
