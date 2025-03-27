@@ -20,7 +20,7 @@ export default function (pool) {
       FROM greentarget.invoices i
       JOIN greentarget.customers c ON i.customer_id = c.customer_id
       LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
-      JOIN greentarget.locations l ON r.location_id = l.location_id
+      LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
       LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
       WHERE 1=1
     `;
