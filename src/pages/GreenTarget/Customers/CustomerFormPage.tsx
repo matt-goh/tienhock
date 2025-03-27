@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
-import { FormInput } from "../../../components/FormComponents";
+import { FormInput, FormListbox } from "../../../components/FormComponents";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
@@ -25,6 +25,16 @@ interface Customer {
   last_activity_date?: string;
   locations?: CustomerLocation[];
   has_active_rental?: boolean;
+  email?: string;
+  tin_number?: string;
+  id_type?: string;
+  id_number?: string;
+  state?: string;
+}
+
+interface SelectOption {
+  id: string;
+  name: string;
 }
 
 const CustomerFormPage: React.FC = () => {
@@ -35,11 +45,21 @@ const CustomerFormPage: React.FC = () => {
   const [formData, setFormData] = useState<Customer>({
     name: "",
     phone_number: "",
+    tin_number: "",
+    id_type: "Select",
+    id_number: "",
+    email: "",
+    state: "12",
   });
 
   const [initialFormData, setInitialFormData] = useState<Customer>({
     name: "",
     phone_number: "",
+    tin_number: "",
+    id_type: "Select",
+    id_number: "",
+    email: "",
+    state: "12",
   });
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
@@ -60,6 +80,34 @@ const CustomerFormPage: React.FC = () => {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<CustomerLocation | null>(null);
+
+  const idTypeOptions = [
+    { id: "Select", name: "Select" },
+    { id: "BRN", name: "BRN" },
+    { id: "NRIC", name: "NRIC" },
+    { id: "PASSPORT", name: "PASSPORT" },
+    { id: "ARMY", name: "ARMY" },
+  ];
+
+  const stateOptions: SelectOption[] = [
+    { id: "01", name: "JOHOR" },
+    { id: "02", name: "KEDAH" },
+    { id: "03", name: "KELANTAN" },
+    { id: "04", name: "MELAKA" },
+    { id: "05", name: "NEGERI SEMBILAN" },
+    { id: "06", name: "PAHANG" },
+    { id: "07", name: "PULAU PINANG" },
+    { id: "08", name: "PERAK" },
+    { id: "09", name: "PERLIS" },
+    { id: "10", name: "SELANGOR" },
+    { id: "11", name: "TERENGGANU" },
+    { id: "12", name: "SABAH" },
+    { id: "13", name: "SARAWAK" },
+    { id: "14", name: "WILAYAH PERSEKUTUAN KUALA LUMPUR" },
+    { id: "15", name: "WILAYAH PERSEKUTUAN LABUAN" },
+    { id: "16", name: "WILAYAH PERSEKUTUAN PUTRAJAYA" },
+    { id: "17", name: "NOT APPLICABLE" },
+  ];
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -88,6 +136,11 @@ const CustomerFormPage: React.FC = () => {
         phone_number: data.phone_number || "",
         last_activity_date: data.last_activity_date,
         has_active_rental: data.has_active_rental,
+        email: data.email || "",
+        tin_number: data.tin_number || "",
+        id_type: data.id_type || "Select",
+        id_number: data.id_number || "",
+        state: data.state || "12",
       });
 
       setLocations(data.locations || []);
@@ -99,6 +152,11 @@ const CustomerFormPage: React.FC = () => {
         last_activity_date: data.last_activity_date,
         locations: data.locations || [],
         has_active_rental: data.has_active_rental,
+        email: data.email || "",
+        tin_number: data.tin_number || "",
+        id_type: data.id_type || "Select",
+        id_number: data.id_number || "",
+        state: data.state || "12",
       });
 
       setError(null);
@@ -112,6 +170,13 @@ const CustomerFormPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
+  const handleListboxChange = (name: keyof Customer, value: string) => {
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -184,6 +249,11 @@ const CustomerFormPage: React.FC = () => {
           {
             name: formData.name,
             phone_number: formData.phone_number,
+            tin_number: formData.tin_number,
+            id_type: formData.id_type,
+            id_number: formData.id_number,
+            email: formData.email,
+            state: formData.state,
           }
         );
       } else {
@@ -191,6 +261,11 @@ const CustomerFormPage: React.FC = () => {
         customerResponse = await greenTargetApi.createCustomer({
           name: formData.name,
           phone_number: formData.phone_number,
+          tin_number: formData.tin_number,
+          id_type: formData.id_type,
+          id_number: formData.id_number,
+          email: formData.email,
+          state: formData.state,
         });
       }
 
@@ -256,16 +331,59 @@ const CustomerFormPage: React.FC = () => {
   const renderInput = (
     name: keyof Customer,
     label: string,
-    type: string = "text"
+    type: string = "text",
+    placeholder: string = ""
   ) => (
     <FormInput
       name={name}
       label={label}
+      placeholder={placeholder}
       value={formData[name]?.toString() || ""}
       onChange={handleInputChange}
       type={type}
     />
   );
+
+  const renderListbox = (
+    name: keyof Customer,
+    label: string,
+    options: SelectOption[]
+  ) => {
+    const value = formData[name]?.toString() || "";
+
+    // For state field, we want to show the name but save the code
+    if (name === "state") {
+      const selectedState = stateOptions.find((opt) => opt.id === value);
+      return (
+        <FormListbox
+          name={name}
+          label={label}
+          value={selectedState ? selectedState.name : value}
+          onChange={(selectedName) => {
+            const selectedOption = stateOptions.find(
+              (opt) => opt.name === selectedName
+            );
+            handleListboxChange(
+              name,
+              selectedOption ? selectedOption.id : selectedName
+            );
+          }}
+          options={options}
+        />
+      );
+    }
+
+    // For other fields, normal behavior
+    return (
+      <FormListbox
+        name={name}
+        label={label}
+        value={value}
+        onChange={(value) => handleListboxChange(name, value)}
+        options={options}
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -469,6 +587,27 @@ const CustomerFormPage: React.FC = () => {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* e-Invoice fields */}
+            <div className="border-t pt-6 mt-6">
+              <h2 className="text-lg font-medium mb-4">
+                e-Invoice Information
+              </h2>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                {renderListbox("id_type", "ID Type", idTypeOptions)}
+                {renderInput("id_number", "ID Number", "text")}
+                {renderInput(
+                  "tin_number",
+                  "TIN Number",
+                  "text",
+                  "C21636482050"
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mt-4">
+                {renderInput("email", "Email", "email")}
+                {renderListbox("state", "State", stateOptions)}
+              </div>
             </div>
           </div>
 

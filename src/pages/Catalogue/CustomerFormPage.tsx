@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { Customer, CustomProduct, Employee } from "../../types/types";
+import { Customer, CustomProduct } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import {

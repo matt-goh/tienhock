@@ -7,13 +7,18 @@ export default function (pool) {
   // Get all customers
   router.get("/", async (req, res) => {
     try {
-      // Modified query to include active rental information through a subquery
+      // Modified query to include active rental information and new e-Invoice fields
       const query = `
         SELECT 
           c.customer_id, 
           c.name, 
           c.phone_number, 
           c.last_activity_date,
+          c.tin_number,
+          c.id_type,
+          c.id_number,
+          c.email,
+          c.state,
           EXISTS (
             SELECT 1 FROM greentarget.rentals r 
             WHERE r.customer_id = c.customer_id AND r.date_picked IS NULL
@@ -35,7 +40,8 @@ export default function (pool) {
 
   // Create a new customer
   router.post("/", async (req, res) => {
-    const { name, phone_number } = req.body;
+    const { name, phone_number, tin_number, id_type, id_number, email, state } =
+      req.body;
 
     if (!name) {
       return res.status(400).json({ message: "Customer name is required" });
@@ -43,11 +49,28 @@ export default function (pool) {
 
     try {
       const query = `
-        INSERT INTO greentarget.customers (name, phone_number)
-        VALUES ($1, $2)
+        INSERT INTO greentarget.customers (
+          name, 
+          phone_number, 
+          tin_number, 
+          id_type, 
+          id_number, 
+          email, 
+          state
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `;
-      const result = await pool.query(query, [name, phone_number]);
+      const result = await pool.query(query, [
+        name,
+        phone_number,
+        tin_number || null,
+        id_type || null,
+        id_number || null,
+        email || null,
+        state || "12",
+      ]);
+
       res.status(201).json({
         message: "Customer created successfully",
         customer: result.rows[0],
@@ -95,7 +118,8 @@ export default function (pool) {
   // Update a customer
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { name, phone_number } = req.body;
+    const { name, phone_number, tin_number, id_type, id_number, email, state } =
+      req.body;
 
     try {
       const query = `
@@ -103,11 +127,25 @@ export default function (pool) {
         SET 
           name = $1, 
           phone_number = $2,
+          tin_number = $3,
+          id_type = $4,
+          id_number = $5,
+          email = $6,
+          state = $7,
           last_activity_date = CURRENT_DATE
-        WHERE customer_id = $3
+        WHERE customer_id = $8
         RETURNING *
       `;
-      const result = await pool.query(query, [name, phone_number, id]);
+      const result = await pool.query(query, [
+        name,
+        phone_number,
+        tin_number || null,
+        id_type || null,
+        id_number || null,
+        email || null,
+        state || "12",
+        id,
+      ]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Customer not found" });
