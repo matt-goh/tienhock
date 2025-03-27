@@ -60,17 +60,30 @@ const CustomerListPage = () => {
   const handleConfirmDelete = async () => {
     if (customerToDelete) {
       try {
-        // Actually delete the customer from the database
-        await greenTargetApi.deleteCustomer(customerToDelete.customer_id);
-
-        // Remove from the local state immediately
-        setCustomers(
-          customers.filter(
-            (c) => c.customer_id !== customerToDelete.customer_id
-          )
+        // Delete the customer from the database
+        const response = await greenTargetApi.deleteCustomer(
+          customerToDelete.customer_id
         );
 
-        toast.success("Customer deleted successfully");
+        // Check if the response contains an error message
+        if (
+          response.error ||
+          (response.message && response.message.includes("Cannot delete"))
+        ) {
+          // Show error toast with the server's message
+          toast.error(
+            response.message || "Cannot delete customer: unknown error occurred"
+          );
+        } else {
+          // Only show success and update state if there's no error
+          setCustomers(
+            customers.filter(
+              (c) => c.customer_id !== customerToDelete.customer_id
+            )
+          );
+          toast.success("Customer deleted successfully");
+        }
+
         setShowDeleteDialog(false);
         setCustomerToDelete(null);
       } catch (err) {
