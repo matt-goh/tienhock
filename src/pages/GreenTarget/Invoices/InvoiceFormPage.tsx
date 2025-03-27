@@ -14,7 +14,12 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconCheck,
+  IconSquareCheckFilled,
+  IconSquare,
+} from "@tabler/icons-react";
 
 interface Customer {
   customer_id: number;
@@ -83,6 +88,9 @@ const InvoiceFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const [isPaid, setIsPaid] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentReference, setPaymentReference] = useState("");
   const location = useLocation();
   const rentalData = location.state;
 
@@ -388,8 +396,7 @@ const InvoiceFormPage: React.FC = () => {
       let response;
 
       if (isEditMode && formData.invoice_id) {
-        // Update existing invoice - not typically allowed for accounting records
-        // but we'll include the code for completeness
+        // Update existing invoice
         response = await greenTargetApi.updateInvoice(
           formData.invoice_id,
           invoiceData
@@ -398,7 +405,25 @@ const InvoiceFormPage: React.FC = () => {
       } else {
         // Create new invoice
         response = await greenTargetApi.createInvoice(invoiceData);
-        toast.success("Invoice created successfully");
+
+        // If paid is checked, also create a payment
+        if (isPaid && response.invoice && response.invoice.invoice_id) {
+          const invoiceId = response.invoice.invoice_id;
+
+          // Create payment
+          const paymentData = {
+            invoice_id: invoiceId,
+            payment_date: new Date().toISOString().split("T")[0], // Today's date
+            amount_paid: totalAmount,
+            payment_method: paymentMethod,
+            payment_reference: paymentReference || null,
+          };
+
+          await greenTargetApi.createPayment(paymentData);
+          toast.success("Invoice created and payment recorded successfully");
+        } else {
+          toast.success("Invoice created successfully");
+        }
       }
 
       // Navigate to the invoice detail page
@@ -432,7 +457,7 @@ const InvoiceFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto -mt-8 px-4">
+    <div className="container mx-auto -mt-12 px-4">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
@@ -742,9 +767,7 @@ const InvoiceFormPage: React.FC = () => {
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <h3 className="font-medium">
-                        Rental Details
-                      </h3>
+                      <h3 className="font-medium">Rental Details</h3>
                       <span
                         className={`text-sm font-medium px-2 py-0.5 rounded-full ${
                           isRentalActive(selectedRental.date_picked)
@@ -872,7 +895,7 @@ const InvoiceFormPage: React.FC = () => {
           <div className="mt-6 border-t pt-6">
             <h2 className="text-lg font-medium mb-4">Invoice Amount</h2>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
               <div className="space-y-2">
                 <label
                   htmlFor="amount_before_tax"
@@ -938,8 +961,203 @@ const InvoiceFormPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-default-700">
+                  Payment Status
+                </label>
+                <div className="flex items-center h-[41px]">
+                  <button
+                    type="button"
+                    onClick={() => setIsPaid(!isPaid)}
+                    className="flex items-center"
+                  >
+                    {isPaid ? (
+                      <IconSquareCheckFilled
+                        className="text-blue-600"
+                        width={20}
+                        height={20}
+                      />
+                    ) : (
+                      <IconSquare
+                        className="text-default-400"
+                        width={20}
+                        height={20}
+                      />
+                    )}
+                    <span className="ml-2 font-medium">Paid</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Payment Method Section - Only shown when isPaid is true */}
+          {isPaid && (
+            <div className="mt-6 border-t pt-6">
+              <h2 className="text-lg font-medium mb-4">Payment Information</h2>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="payment_method"
+                    className="block text-sm font-medium text-default-700"
+                  >
+                    Payment Method
+                  </label>
+                  <Listbox value={paymentMethod} onChange={setPaymentMethod}>
+                    <div className="relative">
+                      <ListboxButton className="w-full px-3 py-2 border border-default-300 rounded-lg text-left focus:outline-none focus:border-default-500 focus:ring-0">
+                        <span className="block truncate">
+                          {paymentMethod === "cash"
+                            ? "Cash"
+                            : paymentMethod === "cheque"
+                            ? "Cheque"
+                            : paymentMethod === "bank_transfer"
+                            ? "Bank Transfer"
+                            : paymentMethod === "online"
+                            ? "Online Payment"
+                            : "Select Payment Method"}
+                        </span>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                          <IconChevronDown
+                            size={20}
+                            className="text-default-500"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <div className="absolute bottom-full mb-1 w-full">
+                        <ListboxOptions className="w-full bg-white shadow-lg max-h-40 overflow-y-auto rounded-lg focus:outline-none border border-default-200">
+                          <ListboxOption
+                            value="cash"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-4 ${
+                                active ? "bg-default-100" : ""
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  Cash
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck size={20} />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                          <ListboxOption
+                            value="cheque"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-4 ${
+                                active ? "bg-default-100" : ""
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  Cheque
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck size={20} />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                          <ListboxOption
+                            value="bank_transfer"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-4 ${
+                                active ? "bg-default-100" : ""
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  Bank Transfer
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck size={20} />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                          <ListboxOption
+                            value="online"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-4 ${
+                                active ? "bg-default-100" : ""
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  Online Payment
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                    <IconCheck size={20} />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        </ListboxOptions>
+                      </div>
+                    </div>
+                  </Listbox>
+                </div>
+
+                {/* Show reference field based on payment method */}
+                {(paymentMethod === "cheque" ||
+                  paymentMethod === "bank_transfer") && (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="payment_reference"
+                      className="block text-sm font-medium text-default-700"
+                    >
+                      {paymentMethod === "cheque"
+                        ? "Cheque Number"
+                        : "Transaction Reference"}
+                    </label>
+                    <input
+                      type="text"
+                      id="payment_reference"
+                      name="payment_reference"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 flex justify-end">
             <Button
