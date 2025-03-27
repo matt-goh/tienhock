@@ -37,6 +37,8 @@ interface Invoice {
   type: "regular" | "statement";
   customer_id: number;
   customer_name: string;
+  tin_number?: string;
+  id_number?: string;
   rental_id?: number;
   location_address?: string;
   tong_no?: string;
