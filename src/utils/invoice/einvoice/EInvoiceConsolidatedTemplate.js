@@ -97,7 +97,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
   <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;
 
-    // Add supplier party (company info)
+    // Supplier party (company info)
     xml += `
   <cac:AccountingSupplierParty>
     <cac:Party>
@@ -145,7 +145,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
     </cac:Party>
   </cac:AccountingSupplierParty>`;
 
-    // Add generic customer party for consolidated invoices
+    // Generic customer party for consolidated invoices
     xml += `
   <cac:AccountingCustomerParty>
     <cac:Party>
@@ -249,7 +249,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
         <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
       </cac:OriginCountry>
       <cac:CommodityClassification>
-        <cbc:ItemClassificationCode listID="PTC"></cbc:ItemClassificationCode>
+        <cbc:ItemClassificationCode listID="PTC"/>
       </cac:CommodityClassification>
       <cac:CommodityClassification>
         <cbc:ItemClassificationCode listID="CLASS">004</cbc:ItemClassificationCode>

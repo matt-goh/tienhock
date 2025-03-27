@@ -11,6 +11,7 @@ import {
   parseDatabaseTimestamp,
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const EInvoiceSubmitPage: React.FC = () => {
   const [invoices, setInvoices] = useState<ExtendedInvoiceData[]>([]);
@@ -23,6 +24,8 @@ const EInvoiceSubmitPage: React.FC = () => {
     {}
   );
   const clearSelectionRef = useRef<(() => void) | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const fetchInvoices = useCallback(async () => {
     setIsLoading(true);
@@ -72,6 +75,16 @@ const EInvoiceSubmitPage: React.FC = () => {
     },
     []
   );
+
+  const handleInvoiceClick = (invoiceData: ExtendedInvoiceData) => {
+    navigate(`/sales/invoice/details`, {
+      state: {
+        invoiceData,
+        isNewInvoice: false,
+        previousPath: location.pathname,
+      },
+    });
+  };
 
   const handleSubmissionComplete = useCallback(() => {
     setSelectedInvoices([]);
@@ -160,10 +173,13 @@ const EInvoiceSubmitPage: React.FC = () => {
         getValue: () => any;
         row: { original: ExtendedInvoiceData };
       }) => (
-        <div className="px-6 py-3">
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
           {info.row.original.paymenttype === "CASH" ? "C" : "I"}
           {info.getValue()}
-        </div>
+        </button>
       ),
     },
     {
@@ -171,10 +187,20 @@ const EInvoiceSubmitPage: React.FC = () => {
       header: "Date",
       type: "readonly",
       width: 150,
-      cell: (info: { getValue: () => any }) => {
+      cell: (info: {
+        getValue: () => any;
+        row: { original: ExtendedInvoiceData };
+      }) => {
         const timestamp = info.getValue();
         const { date } = parseDatabaseTimestamp(timestamp);
-        return <div className="px-6 py-3">{formatDisplayDate(date)}</div>;
+        return (
+          <button
+            onClick={() => handleInvoiceClick(info.row.original)}
+            className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+          >
+            {formatDisplayDate(date)}
+          </button>
+        );
       },
     },
     {
@@ -182,6 +208,17 @@ const EInvoiceSubmitPage: React.FC = () => {
       header: "Salesman",
       type: "readonly",
       width: 150,
+      cell: (info: {
+        getValue: () => any;
+        row: { original: ExtendedInvoiceData };
+      }) => (
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
+          {info.getValue()}
+        </button>
+      ),
     },
     {
       id: "customerid",
@@ -192,9 +229,12 @@ const EInvoiceSubmitPage: React.FC = () => {
         getValue: () => any;
         row: { original: ExtendedInvoiceData };
       }) => (
-        <div className="px-6 py-3">
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
           {customerNames[info.getValue()] || info.getValue()}
-        </div>
+        </button>
       ),
     },
     {
@@ -202,10 +242,16 @@ const EInvoiceSubmitPage: React.FC = () => {
       header: "Amount",
       type: "amount",
       width: 150,
-      cell: (info: { getValue: () => any }) => (
-        <div className="px-6 py-3 text-right">
+      cell: (info: {
+        getValue: () => any;
+        row: { original: ExtendedInvoiceData };
+      }) => (
+        <button
+          onClick={() => handleInvoiceClick(info.row.original)}
+          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent cursor-pointer group-hover:font-semibold"
+        >
           {Number(info.getValue() || 0).toFixed(2)}
-        </div>
+        </button>
       ),
     },
   ];
