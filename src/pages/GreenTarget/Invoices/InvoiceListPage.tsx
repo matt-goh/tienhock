@@ -38,6 +38,8 @@ interface Invoice {
   customer_id: number;
   customer_name: string;
   customer_phone_number?: string;
+  tin_number?: string;
+  id_number?: string;
   location_address?: string;
   location_phone_number?: string;
   rental_id?: number;
