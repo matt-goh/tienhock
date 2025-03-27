@@ -1213,9 +1213,7 @@ function TableEditing<T extends Record<string, any>>({
                 return (
                   <tr
                     key={row.id}
-                    className={`border-t ${
-                      tableKey === "invoice" ? "group" : ""
-                    } ${
+                    className={`border-t ${isSelectionEnabled ? "group" : ""} ${
                       isLastRow
                         ? "border-b-0 rounded-b-lg"
                         : "border-b border-default-300"
