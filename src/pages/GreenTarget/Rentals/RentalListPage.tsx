@@ -640,11 +640,11 @@ const RentalListPage = () => {
   return (
     <div className="relative w-full mx-20">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-default-700 font-bold">
+        <h1 className="text-2xl text-default-700 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
           Rentals ({filteredRentals.length})
         </h1>
-        <div className="flex space-x-3">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-end ml-auto">
+          <div className="flex items-center">
             <button
               type="button"
               onClick={() => setActiveOnly(!activeOnly)}
@@ -666,7 +666,7 @@ const RentalListPage = () => {
               <span className="ml-2 font-medium">Active Rentals Only</span>
             </button>
           </div>
-          <div className="relative">
+          <div className="relative w-full sm:w-64">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
               size={22}
@@ -679,13 +679,16 @@ const RentalListPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button
-            onClick={() => navigate("/greentarget/rentals/new")}
-            icon={IconPlus}
-            variant="outline"
-          >
-            New Rental
-          </Button>
+          <div className="flex">
+            <Button
+              onClick={() => navigate("/greentarget/rentals/new")}
+              icon={IconPlus}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              New Rental
+            </Button>
+          </div>
         </div>
       </div>
 
