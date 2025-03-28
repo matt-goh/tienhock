@@ -299,7 +299,7 @@ export default function (pool, config) {
   });
 
   // Submit invoice to MyInvois
-  router.post("/submit", async (req, res) => {
+  router.post("/submit-system", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
       const fieldsParam = req.query.fields;
