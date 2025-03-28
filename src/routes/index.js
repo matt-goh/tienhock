@@ -40,6 +40,7 @@ import greenTargetLocationRouter from "./greentarget/locations.js";
 import greenTargetDumpsterRouter from "./greentarget/dumpsters.js";
 import greenTargetRentalRouter from "./greentarget/rentals.js";
 import greenTargetInvoiceRouter from "./greentarget/invoices.js";
+import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
 
 // Jellypolly routes
@@ -49,6 +50,8 @@ import {
   MYINVOIS_API_BASE_URL,
   MYINVOIS_CLIENT_ID,
   MYINVOIS_CLIENT_SECRET,
+  MYINVOIS_GT_CLIENT_ID,
+  MYINVOIS_GT_CLIENT_SECRET,
 } from "../configs/config.js";
 
 const checkRestoreState = (req, res, next) => {
@@ -100,6 +103,14 @@ export default function setupRoutes(app, pool) {
   app.use("/greentarget/api/rentals", greenTargetRentalRouter(pool));
   app.use("/greentarget/api/invoices", greenTargetInvoiceRouter(pool));
   app.use("/greentarget/api/payments", greenTargetPaymentRouter(pool));
+  app.use(
+    "/greentarget/api/einvoice",
+    greenTargetEInvoiceRouter(pool, {
+      MYINVOIS_API_BASE_URL,
+      MYINVOIS_GT_CLIENT_ID,
+      MYINVOIS_GT_CLIENT_SECRET,
+    })
+  );
 
   // Jellypolly routes
   app.use(

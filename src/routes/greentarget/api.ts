@@ -7,6 +7,11 @@ import {
   CACHE_KEYS,
   CACHE_EXPIRY,
 } from "../../utils/greenTarget/cacheUtils";
+import {
+  MYINVOIS_API_BASE_URL,
+  MYINVOIS_GT_CLIENT_ID,
+  MYINVOIS_GT_CLIENT_SECRET,
+} from "../../configs/config.js";
 
 export const greenTargetApi = {
   // Customer endpoints
@@ -71,6 +76,32 @@ export const greenTargetApi = {
   updateInvoice: (id: any, data: any) =>
     api.put(`/greentarget/api/invoices/${id}`, data),
   deleteInvoice: (id: any) => api.delete(`/greentarget/api/invoices/${id}`),
+
+  // e-Invoice endpoints
+  submitEInvoice: async (invoiceId: number) => {
+    try {
+      const response = await api.post(
+        `/greentarget/api/einvoice/submit/${invoiceId}`,
+        {
+          clientConfig: {
+            MYINVOIS_API_BASE_URL,
+            MYINVOIS_GT_CLIENT_ID,
+            MYINVOIS_GT_CLIENT_SECRET,
+          },
+        }
+      );
+      return response;
+    } catch (error) {
+      console.error("Error submitting e-Invoice:", error);
+      throw error;
+    }
+  },
+
+  getEInvoiceStatus: (uuid: string) =>
+    api.get(`/greentarget/api/einvoice/status/${uuid}`),
+
+  checkEInvoiceForInvoice: (invoiceId: number) =>
+    api.get(`/greentarget/api/einvoice/check/${invoiceId}`),
 
   // Payment endpoints
   getPayments: () => api.get("/greentarget/api/payments"),
