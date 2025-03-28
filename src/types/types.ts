@@ -343,6 +343,8 @@ export interface ExtendedInvoiceData extends InvoiceData {
   customerName?: string; // For UI display
   isEditing?: boolean; // UI state
   originalId?: string;
+  cancellation_date?: string; // ISO date string of cancellation
+  invoice_id?: string;
 }
 
 export interface ProductItem {
