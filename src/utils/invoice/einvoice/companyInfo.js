@@ -8,7 +8,7 @@ export const TIENHOCK_INFO = {
   msic_code: "10741",
   msic_description:
     "Manufacture of meehoon, noodles and other related products",
-  phone: "0168329291",
+  phone: "088719795",
   email: "tienhockfood@gmail.com",
   postcode: "88811",
 
