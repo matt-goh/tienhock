@@ -40,7 +40,7 @@ export async function validateCustomerIdentity(
     );
 
     if (response.success) {
-      toast.success("Customer identity validated successfully");
+      toast.success("Customer e-Invoice IDs validated successfully");
       return {
         isValid: true,
         message: "Validation successful",

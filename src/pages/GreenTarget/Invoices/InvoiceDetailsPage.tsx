@@ -419,7 +419,7 @@ const InvoiceDetailsPage: React.FC = () => {
             >
               {invoice.invoice_number}
             </span>
-            {true && (
+            {invoice.einvoice_status === "submitted" && (
               <button
                 className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 border border-green-300 text-green-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
                 title="e-Invoice Submitted"
