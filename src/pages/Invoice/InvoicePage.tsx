@@ -19,6 +19,7 @@ import {
   IconPrinter,
   IconSearch,
   IconRefresh,
+  IconClockCancel,
 } from "@tabler/icons-react";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
@@ -243,7 +244,7 @@ const InvoicePage: React.FC = () => {
 
   const handleBulkDelete = async () => {
     setShowDeleteConfirmation(false);
-    setIsDeletingInvoices(true); // Show loading overlay when deletion starts
+    setIsDeletingInvoices(true); // Show loading overlay when cancellation starts
 
     try {
       const deletePromises = selectedInvoices.map((invoice) =>
@@ -276,12 +277,12 @@ const InvoicePage: React.FC = () => {
       });
       setInvoices(fetchedInvoices);
 
-      toast.success("Selected invoices deleted successfully");
+      toast.success("Selected invoices cancelled successfully");
     } catch (error) {
-      console.error("Error deleting invoices:", error);
-      toast.error("Failed to delete invoices. Please try again.");
+      console.error("Error cancelling invoices:", error);
+      toast.error("Failed to cancel invoices. Please try again.");
     } finally {
-      setIsDeletingInvoices(false); // Hide loading overlay when deletion completes
+      setIsDeletingInvoices(false); // Hide loading overlay when cancellation completes
     }
   };
 
@@ -623,7 +624,7 @@ const InvoicePage: React.FC = () => {
                   onClick={() => setShowDeleteConfirmation(true)}
                   className="inline-flex items-center px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-white active:text-rose-100 rounded-full transition-colors duration-200"
                 >
-                  Delete
+                  Cancel
                 </button>
               )}
               <Button
@@ -655,6 +656,17 @@ const InvoicePage: React.FC = () => {
               >
                 Print
               </Button>
+
+              <Button
+                onClick={() => navigate("/sales/invoice/cancelled")}
+                icon={IconClockCancel}
+                iconSize={16}
+                iconStroke={2}
+                variant="outline"
+              >
+                Cancelled
+              </Button>
+
               <Button
                 onClick={handleRefresh}
                 icon={IconRefresh}
@@ -813,15 +825,15 @@ const InvoicePage: React.FC = () => {
           isOpen={showDeleteConfirmation}
           onClose={() => setShowDeleteConfirmation(false)}
           onConfirm={handleBulkDelete}
-          title="Delete Confirmation"
+          title="Cancel Confirmation"
           message={
             isAllSelected
-              ? "Are you sure you want to delete all invoices? This action cannot be undone."
-              : `Are you sure you want to delete ${selectedCount} selected invoice${
+              ? "Are you sure you want to cancel all invoices? This action cannot be undone."
+              : `Are you sure you want to cancel ${selectedCount} selected invoice${
                   selectedCount === 1 ? "" : "s"
                 }? This action cannot be undone.`
           }
-          confirmButtonText="Delete"
+          confirmButtonText="Cancel Invoices"
         />
       </div>
       {showPrintOverlay && (
@@ -835,7 +847,7 @@ const InvoicePage: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center justify-center">
             <LoadingSpinner size="lg" hideText />
             <p className="mt-4 text-default-700 font-medium">
-              Deleting invoices...
+              Cancelling invoices...
             </p>
           </div>
         </div>

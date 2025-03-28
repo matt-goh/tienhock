@@ -1096,6 +1096,62 @@ export default function (pool, config) {
     }
   });
 
+  // Get cancelled invoices
+  router.get("/cancelled", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      let query = `
+      SELECT 
+        ci.*,
+        COALESCE(
+          json_agg(
+            CASE WHEN products IS NOT NULL THEN 
+              products
+            ELSE NULL END
+          ),
+          '[]'::json
+        ) as products
+      FROM 
+        cancelled_invoices ci
+      WHERE 1=1
+    `;
+
+      const queryParams = [];
+      let paramCounter = 1;
+
+      // Filter by date range
+      if (startDate && endDate) {
+        queryParams.push(startDate, endDate);
+        query += ` AND CAST(ci.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
+          paramCounter + 1
+        } AS bigint)`;
+        paramCounter += 2;
+      }
+
+      query += ` GROUP BY ci.id ORDER BY ci.cancellation_date DESC`;
+
+      const result = await pool.query(query, queryParams);
+
+      // Transform results
+      const transformedResults = result.rows.map((row) => ({
+        ...row,
+        products: Array.isArray(row.products) ? row.products : [],
+        amount: parseFloat(row.amount) || 0,
+        rounding: parseFloat(row.rounding) || 0,
+        totalamountpayable: parseFloat(row.totalamountpayable) || 0,
+      }));
+
+      res.json(transformedResults);
+    } catch (error) {
+      console.error("Error fetching cancelled invoices:", error);
+      res.status(500).json({
+        message: "Error fetching cancelled invoices",
+        error: error.message,
+      });
+    }
+  });
+
   // Get order details for a specific invoice
   router.get("/details/:id/items", async (req, res) => {
     const { id } = req.params;
@@ -1127,7 +1183,7 @@ export default function (pool, config) {
     }
   });
 
-  // Delete invoice from database and cancel/delete e-invoice if found too
+  // Delete invoice from database and move to cancelled_invoices, cancel e-invoice if found too
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
@@ -1143,52 +1199,135 @@ export default function (pool, config) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
-      // First check if the invoice is of type INVOICE
-      const invoiceTypeQuery =
-        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
-      const invoiceTypeResult = await client.query(invoiceTypeQuery, [id]);
+      // First, get full invoice information including products
+      const invoiceQuery = `
+      SELECT 
+        i.*,
+        COALESCE(
+          json_agg(
+            CASE WHEN od.id IS NOT NULL THEN 
+              json_build_object(
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+            ELSE NULL END
+            ORDER BY od.id  -- Maintain order of products and subtotals
+          ) FILTER (WHERE od.id IS NOT NULL),
+          '[]'::json
+        ) as products
+      FROM invoices i
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE i.id = $1
+      GROUP BY i.id`;
 
-      if (invoiceTypeResult.rows.length > 0) {
-        const invoiceDetails = invoiceTypeResult.rows[0];
+      const invoiceResult = await client.query(invoiceQuery, [id]);
 
-        // If it's an INVOICE type, reduce the customer's credit used
-        if (invoiceDetails.paymenttype === "INVOICE") {
-          await updateCustomerCredit(
-            client,
-            invoiceDetails.customerid,
-            -parseFloat(invoiceDetails.totalamountpayable || 0)
-          );
-        }
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Invoice details not found" });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // If it's an INVOICE type, reduce the customer's credit used
+      if (invoice.paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          invoice.customerid,
+          -parseFloat(invoice.totalamountpayable || 0)
+        );
       }
 
       // Check if there's also an e-invoice for this invoice
       const eInvoiceQuery = "SELECT uuid FROM einvoices WHERE internal_id = $1";
       const eInvoiceResult = await pool.query(eInvoiceQuery, [id]);
 
-      if (eInvoiceResult.rows.length > 0 && apiClient) {
-        const uuid = eInvoiceResult.rows[0].uuid;
+      if (eInvoiceResult.rows.length > 0) {
+        const einvoice = eInvoiceResult.rows[0];
 
-        // Try to cancel the e-invoice in MyInvois
-        try {
-          await apiClient.makeApiCall(
-            "PUT",
-            `/api/v1.0/documents/state/${uuid}/state`,
-            {
-              status: "cancelled",
-              reason: "Invoice deleted",
+        // Only try to cancel if not already cancelled
+        if (einvoice.status !== "Cancelled") {
+          try {
+            // Make the API call to cancel the e-invoice in MyInvois
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${einvoice.uuid}/state`,
+              {
+                status: "cancelled",
+                reason: "Invoice cancelled",
+              }
+            );
+
+            console.log(
+              `Successfully cancelled e-invoice with UUID ${einvoice.uuid} in MyInvois`
+            );
+          } catch (cancelError) {
+            console.error(
+              "Error cancelling e-invoice in MyInvois:",
+              cancelError
+            );
+
+            // Check if it's a critical error that should stop the process
+            if (
+              cancelError.status === 400 &&
+              cancelError.response?.error?.code === "OperationPeriodOver"
+            ) {
+              await client.query("ROLLBACK");
+              return res.status(400).json({
+                message:
+                  "The time limit for cancellation of the e-invoice has expired",
+              });
             }
-          );
 
-          // Delete the e-invoice from local database
-          await pool.query("DELETE FROM einvoices WHERE uuid = $1", [uuid]);
-          console.log(
-            `Cancelled and deleted e-invoice with UUID ${uuid} for invoice ID ${id}`
-          );
-        } catch (cancelError) {
-          console.error("Error cancelling e-invoice in MyInvois:", cancelError);
-          // We continue with invoice deletion even if e-invoice cancellation fails
+            // For other errors, we'll log but continue the process
+            console.warn(
+              "Continuing with invoice cancellation despite e-invoice API error"
+            );
+          }
         }
+
+        // Update local e-invoice record
+        const updateQuery =
+          "UPDATE einvoices SET status = 'Cancelled', cancellation_date = NOW() WHERE uuid = $1";
+        await pool.query(updateQuery, [einvoice.uuid]);
       }
+
+      // Insert into cancelled_invoices
+      const insertQuery = `
+      INSERT INTO cancelled_invoices (
+        invoice_id, 
+        salespersonid, 
+        customerid, 
+        createddate, 
+        paymenttype, 
+        amount, 
+        rounding, 
+        totalamountpayable, 
+        products,
+        cancellation_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      RETURNING *`;
+
+      const insertParams = [
+        invoice.id,
+        invoice.salespersonid,
+        invoice.customerid,
+        invoice.createddate,
+        invoice.paymenttype,
+        invoice.amount,
+        invoice.rounding,
+        invoice.totalamountpayable,
+        JSON.stringify(invoice.products),
+      ];
+
+      const insertResult = await client.query(insertQuery, insertParams);
 
       // Delete order details first
       await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
@@ -1196,21 +1335,22 @@ export default function (pool, config) {
       ]);
 
       // Then delete the invoice
-      const result = await client.query(
+      const deleteResult = await client.query(
         "DELETE FROM invoices WHERE id = $1 RETURNING *",
         [id]
       );
 
       await client.query("COMMIT");
       res.status(200).json({
-        message: "Invoice deleted successfully",
-        deletedInvoice: result.rows[0],
+        message: "Invoice cancelled successfully",
+        cancelledInvoice: insertResult.rows[0],
+        deletedInvoice: deleteResult.rows[0],
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error deleting invoice:", error);
+      console.error("Error cancelling invoice:", error);
       res.status(500).json({
-        message: "Error deleting invoice",
+        message: "Error cancelling invoice",
         error: error.message,
       });
     } finally {

@@ -9,6 +9,9 @@ import {
   IconTrash,
   IconChevronDown,
   IconCheck,
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconBan,
 } from "@tabler/icons-react";
 import PaginationControls from "../../components/Invoice/Paginationcontrols";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
@@ -31,7 +34,7 @@ const COLUMN_CONFIG = [
   { name: "Invoice No", width: "w-[10%]" },
   { name: "Type", width: "w-[8%]" },
   { name: "Customer", width: "w-[18%]" },
-  { name: "Validated At", width: "w-[15%]" },
+  { name: "Date", width: "w-[15%]" },
   { name: "Amount", width: "w-[7%]" },
   { name: "Filler", width: "w-[2%]" },
   { name: "Submission ID", width: "w-[20%]" },
@@ -52,6 +55,8 @@ interface EInvoice {
   total_net_amount: number;
   isConsolidated: boolean;
   consolidated_invoices: number[] | string[];
+  status?: string;
+  cancellation_date?: string;
 }
 
 interface PaginationState {
@@ -142,6 +147,14 @@ const EInvoiceHistoryPage: React.FC = () => {
         invoice.receiver_name.toLowerCase().includes(searchLower) ||
         invoice.submission_uid.toLowerCase().includes(searchLower) ||
         invoice.type_name.toLowerCase().includes(searchLower) ||
+        (invoice.datetime_validated &&
+          formatDate(invoice.datetime_validated)
+            .toLowerCase()
+            .includes(searchLower)) ||
+        (invoice.cancellation_date &&
+          formatDate(invoice.cancellation_date)
+            .toLowerCase()
+            .includes(searchLower)) ||
         invoice.total_payable_amount.toString().includes(searchLower)
     );
   };
@@ -235,15 +248,38 @@ const EInvoiceHistoryPage: React.FC = () => {
     return () => resizeObserver.disconnect();
   }, [filteredInvoices]);
 
-  // Get date range info for validation
-  const getDateRangeInfo = (start: Date, end: Date) => {
-    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
-    const rangeDuration = end.getTime() - start.getTime();
-    return {
-      isWithinMonth: rangeDuration <= oneMonthMs,
-      isValidDirection: rangeDuration > 0,
-      rangeDuration,
-    };
+  // Function to display the appropriate date with formatting
+  const displayProcessDate = (einvoice: EInvoice) => {
+    const dateToShow =
+      einvoice.status === "Cancelled"
+        ? einvoice.cancellation_date
+        : einvoice.datetime_validated;
+
+    if (!dateToShow) return "N/A";
+
+    const date = new Date(dateToShow);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // Convert 0 to 12
+
+    const dateString = `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+
+    // Add visual indicator for cancelled dates
+    if (einvoice.status === "Cancelled") {
+      return (
+        <span className="text-rose-600 flex items-center">
+          <IconBan size={14} className="mr-1" stroke={1.5} />
+          {dateString}
+        </span>
+      );
+    }
+
+    return dateString;
   };
 
   const handleMonthChange = (month: MonthOption) => {
@@ -336,6 +372,39 @@ const EInvoiceHistoryPage: React.FC = () => {
     }
   }, [isTokenValid]);
 
+  // Function to render status badge
+  const renderStatusBadge = (einvoice: EInvoice) => {
+    if (einvoice.status === "Cancelled") {
+      return (
+        <span className="ml-2 px-2 py-0.5 bg-rose-100 text-rose-800 text-xs rounded-full flex items-center gap-1">
+          <IconBan size={12} />
+          Cancelled
+        </span>
+      );
+    } else if (einvoice.status === "Invalid") {
+      return (
+        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full flex items-center gap-1">
+          <IconAlertTriangle size={12} />
+          Invalid
+        </span>
+      );
+    } else if (!einvoice.long_id) {
+      return (
+        <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center gap-1">
+          Pending
+        </span>
+      );
+    } else if (einvoice.status === "Valid" || einvoice.long_id) {
+      return (
+        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full flex items-center gap-1">
+          <IconCircleCheck size={12} />
+          Valid
+        </span>
+      );
+    }
+    return null;
+  };
+
   const checkEInvoiceStatus = async (uuid: string) => {
     try {
       const loadingToastId = toast.loading("Checking e-invoice status...");
@@ -358,7 +427,7 @@ const EInvoiceHistoryPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleCancel = async () => {
     if (!einvoiceToDelete) return;
     try {
       // First authenticate with MyInvois if needed
@@ -377,15 +446,15 @@ const EInvoiceHistoryPage: React.FC = () => {
         }
       }
 
-      // Now proceed with deletion which will handle cancellation on backend
-      const deleteToastId = toast.loading("Cancelling e-invoice...");
+      // Now proceed with cancellation
+      const cancelToastId = toast.loading("Cancelling e-invoice...");
       await api.delete(`/api/einvoice/${einvoiceToDelete.uuid}`);
-      toast.dismiss(deleteToastId);
+      toast.dismiss(cancelToastId);
 
       setEinvoiceToDelete(null);
       setShowDeleteDialog(false);
       if (fetchDataRef.current) await fetchDataRef.current();
-      toast.success("E-invoice cancelled and deleted successfully");
+      toast.success("E-invoice cancelled successfully");
     } catch (error: any) {
       console.error("Error cancelling e-invoice:", error);
 
@@ -397,6 +466,10 @@ const EInvoiceHistoryPage: React.FC = () => {
         toast.error(
           "Cannot cancel: The time limit for cancellation has expired"
         );
+      } else if (
+        error?.response?.data?.message === "This e-invoice is already cancelled"
+      ) {
+        toast.error("This e-invoice is already cancelled");
       } else {
         toast.error(error.message || "Failed to cancel e-invoice");
       }
@@ -584,11 +657,7 @@ const EInvoiceHistoryPage: React.FC = () => {
                                 invoices={einvoice.consolidated_invoices}
                               />
                             )}
-                          {!einvoice.long_id && (
-                            <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                              Pending
-                            </span>
-                          )}
+                          {renderStatusBadge(einvoice)}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-default-700">
@@ -597,8 +666,21 @@ const EInvoiceHistoryPage: React.FC = () => {
                       <td className="px-4 py-3 text-default-700 truncate">
                         {einvoice.receiver_name}
                       </td>
-                      <td className="px-4 py-3 text-default-700 truncate">
-                        {formatDate(einvoice.datetime_validated)}
+                      <td className="px-4 py-3 text-default-700 truncate relative group">
+                        <div className="flex items-center">
+                          {displayProcessDate(einvoice)}
+                          <div
+                            className="absolute z-10 invisible bg-default-800 text-white text-xs rounded p-2 mt-1 
+                    bottom-full left-1/2 transform -translate-x-1/2 group-hover:visible w-48 
+                    after:content-[''] after:absolute after:top-full after:left-1/2 
+                    after:-translate-x-1/2 after:border-8 after:border-t-default-800 
+                    after:border-x-transparent after:border-b-transparent"
+                          >
+                            {einvoice.status === "Cancelled"
+                              ? "Date when the e-invoice was cancelled"
+                              : "Date when the e-invoice was validated"}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-default-700 text-right">
                         {formatAmount(einvoice.total_payable_amount)}
@@ -609,12 +691,14 @@ const EInvoiceHistoryPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          {einvoice.long_id ? (
+                          {einvoice.long_id &&
+                          einvoice.status !== "Cancelled" ? (
                             <EInvoicePDFHandler
                               einvoice={einvoice}
                               disabled={false}
                             />
-                          ) : (
+                          ) : !einvoice.long_id &&
+                            einvoice.status !== "Cancelled" ? (
                             <Button
                               onClick={() => checkEInvoiceStatus(einvoice.uuid)}
                               variant="outline"
@@ -624,19 +708,21 @@ const EInvoiceHistoryPage: React.FC = () => {
                             >
                               Check Status
                             </Button>
+                          ) : null}
+                          {einvoice.status !== "Cancelled" && (
+                            <Button
+                              onClick={() => {
+                                setEinvoiceToDelete(einvoice);
+                                setShowDeleteDialog(true);
+                              }}
+                              variant="outline"
+                              color="rose"
+                              size="sm"
+                              icon={IconBan}
+                            >
+                              Cancel
+                            </Button>
                           )}
-                          <Button
-                            onClick={() => {
-                              setEinvoiceToDelete(einvoice);
-                              setShowDeleteDialog(true);
-                            }}
-                            variant="outline"
-                            color="rose"
-                            size="sm"
-                            icon={IconTrash}
-                          >
-                            Delete
-                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -658,14 +744,14 @@ const EInvoiceHistoryPage: React.FC = () => {
       <ConfirmationDialog
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
-        onConfirm={handleDelete}
-        title="Delete E-Invoice"
+        onConfirm={handleCancel}
+        title="Cancel E-Invoice"
         message={
           einvoiceToDelete
-            ? `Are you sure you want to delete e-invoice ${einvoiceToDelete.internal_id}? This action cannot be undone.`
-            : "Are you sure you want to delete this e-invoice?"
+            ? `Are you sure you want to cancel e-invoice ${einvoiceToDelete.internal_id}? This action cannot be undone and will mark the invoice as cancelled in the MyInvois system.`
+            : "Are you sure you want to cancel this e-invoice?"
         }
-        confirmButtonText="Delete"
+        confirmButtonText="Cancel E-Invoice"
         variant="danger"
       />
     </div>

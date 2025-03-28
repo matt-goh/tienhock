@@ -78,7 +78,7 @@ const InvoiceDetailsPage: React.FC = () => {
   });
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { products } = useProductsCache();
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
@@ -663,8 +663,8 @@ const InvoiceDetailsPage: React.FC = () => {
     navigate(previousPath);
   };
 
-  const handleDeleteClick = () => {
-    setShowDeleteConfirmation(true);
+  const handleCancelClick= () => {
+    setShowCancelConfirmation(true);
   };
 
   const validateInvoiceData = (data: ExtendedInvoiceData): string[] => {
@@ -844,18 +844,20 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmCancel = async () => {
     if (invoiceData) {
       try {
+        const toastId = toast.loading("Cancelling invoice...");
         await deleteInvoice(invoiceData.id);
-        toast.success("Invoice deleted successfully");
+        toast.dismiss(toastId);
+        toast.success("Invoice cancelled successfully");
         navigate(previousPath);
       } catch (error) {
-        console.error("Error deleting invoice:", error);
-        toast.error("Failed to delete invoice. Please try again.");
+        console.error("Error cancelling invoice:", error);
+        toast.error("Failed to cancel invoice. Please try again.");
       }
     }
-    setShowDeleteConfirmation(false);
+    setShowCancelConfirmation(false);
   };
 
   const handleAddRegularItem = () => {
@@ -1125,8 +1127,8 @@ const InvoiceDetailsPage: React.FC = () => {
         <BackButton onClick={handleBackClick} />
         <div className="space-x-2">
           {!isNewInvoice && (
-            <Button onClick={handleDeleteClick} variant="outline" color="rose">
-              Delete
+            <Button onClick={handleCancelClick} variant="outline" color="rose">
+              Cancel Invoice
             </Button>
           )}
           <Button
@@ -1305,12 +1307,13 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText="Confirm"
       />
       <ConfirmationDialog
-        isOpen={showDeleteConfirmation}
-        onClose={() => setShowDeleteConfirmation(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Invoice"
-        message="Are you sure you want to delete this invoice? This action cannot be undone."
-        confirmButtonText="Delete"
+        isOpen={showCancelConfirmation}
+        onClose={() => setShowCancelConfirmation(false)}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Invoice"
+        message={`Are you sure you want to cancel this invoice? The invoice will be archived and can be viewed in the Cancelled Invoices section.`}
+        confirmButtonText="Cancel Invoice"
+        variant="danger"
       />
     </div>
   );

@@ -298,7 +298,7 @@ export default function (pool, config) {
     }
   });
 
-  // Submit invoice to MyInvois
+  // Submit invoice to MyInvois from system
   router.post("/submit-system", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
@@ -977,11 +977,18 @@ export default function (pool, config) {
 
     try {
       // Check if the e-invoice exists before attempting to delete
-      const checkQuery = "SELECT uuid FROM einvoices WHERE uuid = $1";
+      const checkQuery = "SELECT uuid, status FROM einvoices WHERE uuid = $1";
       const checkResult = await pool.query(checkQuery, [uuid]);
 
       if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "E-invoice not found" });
+      }
+
+      // Check if already cancelled
+      if (checkResult.rows[0].status === "Cancelled") {
+        return res.status(400).json({
+          message: "This e-invoice is already cancelled",
+        });
       }
 
       // First, try to cancel the invoice in MyInvois
@@ -1013,18 +1020,19 @@ export default function (pool, config) {
         });
       }
 
-      // If cancellation was successful, delete locally
-      const deleteQuery = "DELETE FROM einvoices WHERE uuid = $1 RETURNING *";
-      const result = await pool.query(deleteQuery, [uuid]);
+      // If cancellation was successful, update status locally instead of deleting
+      const updateQuery =
+        "UPDATE einvoices SET status = 'Cancelled', cancellation_date = NOW() WHERE uuid = $1 RETURNING *";
+      const result = await pool.query(updateQuery, [uuid]);
 
       res.status(200).json({
-        message: "E-invoice cancelled and deleted successfully",
+        message: "E-invoice cancelled successfully",
         einvoice: result.rows[0],
       });
     } catch (error) {
-      console.error("Error deleting e-invoice:", error);
+      console.error("Error cancelling e-invoice:", error);
       res.status(500).json({
-        message: "Error deleting e-invoice",
+        message: "Error cancelling e-invoice",
         error: error.message,
       });
     }
