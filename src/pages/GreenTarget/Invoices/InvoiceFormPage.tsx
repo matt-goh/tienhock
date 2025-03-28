@@ -58,8 +58,6 @@ interface Invoice {
   statement_period_end?: string | null;
 }
 
-const TAX_RATE = 0;
-
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -427,21 +425,30 @@ const InvoiceFormPage: React.FC = () => {
           response.invoice.invoice_id
         ) {
           try {
-            // Placeholder for actual e-Invoice submission
-            // This would be replaced with actual implementation later
-            toast.loading("Submitting e-Invoice...");
+            toast.loading("Submitting e-Invoice...", { id: "einvoice-toast" });
 
-            // Simulate API call for now
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            // Submit e-Invoice
+            const einvoiceResponse = await greenTargetApi.submitEInvoice(
+              response.invoice.invoice_id
+            );
 
-            // Assuming success
-            toast.success("e-Invoice submitted successfully");
-
-            // If there was an error, we would show the error dialog:
-            // setEinvoiceErrorMessage("Failed to submit e-Invoice: [reason]");
-            // setShowEinvoiceError(true);
+            if (einvoiceResponse.success) {
+              toast.success("e-Invoice submitted successfully", {
+                id: "einvoice-toast",
+              });
+            } else {
+              toast.error(
+                einvoiceResponse.message || "Failed to submit e-Invoice",
+                { id: "einvoice-toast" }
+              );
+              setEinvoiceErrorMessage(
+                einvoiceResponse.message || "Failed to submit e-Invoice"
+              );
+              setShowEinvoiceError(true);
+            }
           } catch (einvoiceError) {
             console.error("e-Invoice submission error:", einvoiceError);
+            toast.error("Failed to submit e-Invoice", { id: "einvoice-toast" });
             setEinvoiceErrorMessage(
               einvoiceError instanceof Error
                 ? `Failed to submit e-Invoice: ${einvoiceError.message}`
@@ -1295,8 +1302,9 @@ const InvoiceFormPage: React.FC = () => {
         onConfirm={() => setShowEinvoiceError(false)}
         title="e-Invoice Submission Error"
         message={einvoiceErrorMessage}
-        confirmButtonText="Ok"
+        confirmButtonText="Close"
         variant="danger"
+        hideCancelButton={true}
       />
     </div>
   );

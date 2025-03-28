@@ -97,6 +97,70 @@ export default function (pool) {
     }
   }
 
+  // Get invoice details with payments
+  router.get("/:invoice_id", async (req, res) => {
+    const { invoice_id } = req.params;
+
+    try {
+      // Get invoice details
+      const invoiceQuery = `
+        SELECT i.*, 
+               c.name as customer_name,
+               c.tin_number,
+               c.id_number,
+               r.rental_id,
+               r.tong_no,
+               r.date_placed,
+               r.date_picked,
+               r.driver
+        FROM greentarget.invoices i
+        JOIN greentarget.customers c ON i.customer_id = c.customer_id
+        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+        WHERE i.invoice_id = $1
+      `;
+
+      const invoiceResult = await pool.query(invoiceQuery, [invoice_id]);
+
+      if (invoiceResult.rows.length === 0) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // Get payments for this invoice
+      const paymentsQuery = `
+        SELECT * FROM greentarget.payments
+        WHERE invoice_id = $1
+        ORDER BY payment_date
+      `;
+
+      const paymentsResult = await pool.query(paymentsQuery, [invoice_id]);
+
+      // Calculate amount paid and current balance
+      const amountPaid = paymentsResult.rows.reduce(
+        (sum, payment) => sum + parseFloat(payment.amount_paid),
+        0
+      );
+
+      const currentBalance = parseFloat(invoice.total_amount) - amountPaid;
+
+      res.json({
+        invoice: {
+          ...invoice,
+          amount_paid: amountPaid,
+          current_balance: currentBalance,
+        },
+        payments: paymentsResult.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching invoice details:", error);
+      res.status(500).json({
+        message: "Error fetching invoice details",
+        error: error.message,
+      });
+    }
+  });
+
   // Create a new invoice
   router.post("/", async (req, res) => {
     const {
@@ -195,70 +259,6 @@ export default function (pool) {
       });
     } finally {
       client.release();
-    }
-  });
-
-  // Get invoice details with payments
-  router.get("/:invoice_id", async (req, res) => {
-    const { invoice_id } = req.params;
-
-    try {
-      // Get invoice details
-      const invoiceQuery = `
-        SELECT i.*, 
-               c.name as customer_name,
-               c.tin_number,
-               c.id_number,
-               r.rental_id,
-               r.tong_no,
-               r.date_placed,
-               r.date_picked,
-               r.driver
-        FROM greentarget.invoices i
-        JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
-        WHERE i.invoice_id = $1
-      `;
-
-      const invoiceResult = await pool.query(invoiceQuery, [invoice_id]);
-
-      if (invoiceResult.rows.length === 0) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
-
-      const invoice = invoiceResult.rows[0];
-
-      // Get payments for this invoice
-      const paymentsQuery = `
-        SELECT * FROM greentarget.payments
-        WHERE invoice_id = $1
-        ORDER BY payment_date
-      `;
-
-      const paymentsResult = await pool.query(paymentsQuery, [invoice_id]);
-
-      // Calculate amount paid and current balance
-      const amountPaid = paymentsResult.rows.reduce(
-        (sum, payment) => sum + parseFloat(payment.amount_paid),
-        0
-      );
-
-      const currentBalance = parseFloat(invoice.total_amount) - amountPaid;
-
-      res.json({
-        invoice: {
-          ...invoice,
-          amount_paid: amountPaid,
-          current_balance: currentBalance,
-        },
-        payments: paymentsResult.rows,
-      });
-    } catch (error) {
-      console.error("Error fetching invoice details:", error);
-      res.status(500).json({
-        message: "Error fetching invoice details",
-        error: error.message,
-      });
     }
   });
 

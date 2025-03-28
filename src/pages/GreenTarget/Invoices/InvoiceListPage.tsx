@@ -522,18 +522,31 @@ const InvoiceListPage: React.FC = () => {
   const handleSubmitEInvoice = async (invoice: Invoice) => {
     try {
       setProcessingEInvoice(true);
-      toast.loading("Submitting e-Invoice...");
+      const toastId = toast.loading("Submitting e-Invoice...");
 
-      // Placeholder for actual e-Invoice submission
-      // This would be replaced with actual implementation later
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call the actual e-Invoice submission API
+      const response = await greenTargetApi.submitEInvoice(invoice.invoice_id);
 
-      toast.success("e-Invoice submitted successfully");
+      if (response.success) {
+        toast.success("e-Invoice submitted successfully", { id: toastId });
 
-      // Redirect to invoice details page
-      navigate(`/greentarget/invoices/${invoice.invoice_id}`);
+        // Refresh invoices list to update the status
+        fetchInvoices();
+
+        // Optionally redirect to invoice details
+        // navigate(`/greentarget/invoices/${invoice.invoice_id}`);
+      } else {
+        toast.error(response.message || "Failed to submit e-Invoice", {
+          id: toastId,
+        });
+        setEInvoiceErrorMessage(
+          response.message || "Failed to submit e-Invoice"
+        );
+        setShowEInvoiceErrorDialog(true);
+      }
     } catch (error) {
       console.error("Error submitting e-Invoice:", error);
+      toast.error("Failed to submit e-Invoice");
       setEInvoiceErrorMessage(
         error instanceof Error
           ? `Failed to submit e-Invoice: ${error.message}`
@@ -864,8 +877,9 @@ const InvoiceListPage: React.FC = () => {
         onConfirm={() => setShowEInvoiceErrorDialog(false)}
         title="e-Invoice Submission Error"
         message={eInvoiceErrorMessage}
-        confirmButtonText="Ok"
+        confirmButtonText="Close"
         variant="danger"
+        hideCancelButton={true}
       />
     </div>
   );
