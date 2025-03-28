@@ -5,6 +5,7 @@ import {
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
+import InvoiceCancelledPage from "./Invoice/InvoiceCancelledPage";
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
 import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
@@ -53,6 +54,11 @@ export const TienHockSidebarData: SidebarItem[] = [
             name: "Create New Invoice Page",
             path: "/sales/invoice/create",
             component: InvoiceDetailsPage,
+          },
+          {
+            name: "Cancelled Invoices",
+            path: "/sales/invoice/cancelled",
+            component: InvoiceCancelledPage,
           },
         ],
       },
