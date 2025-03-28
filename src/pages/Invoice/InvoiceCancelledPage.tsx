@@ -1,17 +1,18 @@
-// src/pages/Invoice/InvoiceCancelledPage.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { ColumnConfig, ExtendedInvoiceData } from "../../types/types";
+// src/pages/Invoice/InvoiceCancelledPage.tsx - revised version
+import React, { useState, useEffect, useCallback } from "react";
+import { ExtendedInvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import {
-  IconEye,
   IconSearch,
   IconRefresh,
   IconClock,
+  IconCalendar,
+  IconEye,
+  IconReceiptOff,
+  IconBuildingStore,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import toast from "react-hot-toast";
-import TableEditing from "../../components/Table/TableEditing";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import DateRangePicker from "../../components/DateRangePicker";
 import {
@@ -25,6 +26,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import CancelledInvoiceModal from "../../components/Invoice/CancelledInvoiceModal";
 
 interface MonthOption {
   id: number;
@@ -93,8 +95,7 @@ const InvoiceCancelledPage: React.FC = () => {
   );
   const [selectedInvoice, setSelectedInvoice] =
     useState<ExtendedInvoiceData | null>(null);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Function to save dates to localStorage
   const saveDatesToStorage = (startDate: Date | null, endDate: Date | null) => {
@@ -243,136 +244,36 @@ const InvoiceCancelledPage: React.FC = () => {
     // Search filter
     if (searchTerm) {
       const lowercasedSearch = searchTerm.toLowerCase();
-      filtered = filtered.filter((invoice) =>
-        Object.values(invoice).some((value) =>
-          String(value).toLowerCase().includes(lowercasedSearch)
-        )
-      );
+      filtered = filtered.filter((invoice) => {
+        // Check in invoice fields
+        const invoiceMatch = Object.values(invoice).some(
+          (value) =>
+            typeof value === "string" &&
+            value.toLowerCase().includes(lowercasedSearch)
+        );
+
+        // Check in customer name
+        const customerName = customerNames[invoice.customerid] || "";
+        const customerMatch = customerName
+          .toLowerCase()
+          .includes(lowercasedSearch);
+
+        return invoiceMatch || customerMatch;
+      });
     }
 
     setFilteredInvoices(filtered);
-  }, [cancelledInvoices, searchTerm]);
+  }, [cancelledInvoices, searchTerm, customerNames]);
 
-  const handleInvoiceClick = (invoiceData: ExtendedInvoiceData) => {
-    // Set the selected invoice for possible viewing
-    setSelectedInvoice(invoiceData);
+  const handleInvoiceClick = (invoice: ExtendedInvoiceData) => {
+    setSelectedInvoice(invoice);
+    setIsModalOpen(true);
   };
 
-  const invoiceColumns: ColumnConfig[] = [
-    {
-      id: "id",
-      header: "Invoice",
-      type: "readonly",
-      width: 150,
-      cell: (info: {
-        getValue: () => any;
-        row: { original: ExtendedInvoiceData };
-      }) => (
-        <button
-          onClick={() => handleInvoiceClick(info.row.original)}
-          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
-        >
-          {info.row.original.paymenttype === "CASH" ? "C" : "I"}
-          {info.getValue()}
-        </button>
-      ),
-    },
-    {
-      id: "createddate",
-      header: "Created Date",
-      type: "readonly",
-      width: 150,
-      cell: (info: {
-        getValue: () => any;
-        row: { original: ExtendedInvoiceData };
-      }) => {
-        const timestamp = info.getValue();
-        const { date } = parseDatabaseTimestamp(timestamp);
-        return (
-          <button
-            onClick={() => handleInvoiceClick(info.row.original)}
-            className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
-          >
-            {formatDisplayDate(date)}
-          </button>
-        );
-      },
-    },
-    {
-      id: "cancellation_date",
-      header: "Cancelled Date",
-      type: "readonly",
-      width: 150,
-      cell: (info: {
-        getValue: () => any;
-        row: { original: ExtendedInvoiceData };
-      }) => {
-        const timestamp = info.getValue();
-        if (!timestamp) return <span className="px-6 py-3">-</span>;
-
-        const date = new Date(timestamp);
-        return (
-          <button
-            onClick={() => handleInvoiceClick(info.row.original)}
-            className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold text-rose-600"
-          >
-            {formatDisplayDate(date)}
-          </button>
-        );
-      },
-    },
-    {
-      id: "salespersonid",
-      header: "Salesman",
-      type: "readonly",
-      width: 150,
-      cell: (info: {
-        getValue: () => any;
-        row: { original: ExtendedInvoiceData };
-      }) => (
-        <button
-          onClick={() => handleInvoiceClick(info.row.original)}
-          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
-        >
-          {info.getValue()}
-        </button>
-      ),
-    },
-    {
-      id: "customerid",
-      header: "Customer",
-      type: "readonly",
-      width: 350,
-      cell: (info: {
-        getValue: () => any;
-        row: { original: ExtendedInvoiceData };
-      }) => (
-        <button
-          onClick={() => handleInvoiceClick(info.row.original)}
-          className="w-full h-full px-6 py-3 text-left outline-none bg-transparent cursor-pointer group-hover:font-semibold"
-        >
-          {customerNames[info.getValue()] || info.getValue()}
-        </button>
-      ),
-    },
-    {
-      id: "totalamountpayable",
-      header: "Amount",
-      type: "amount",
-      width: 150,
-      cell: (info: {
-        getValue: () => any;
-        row: { original: ExtendedInvoiceData };
-      }) => (
-        <button
-          onClick={() => handleInvoiceClick(info.row.original)}
-          className="w-full h-full px-6 py-3 text-right outline-none bg-transparent cursor-pointer group-hover:font-semibold"
-        >
-          {Number(info.getValue() || 0).toFixed(2)}
-        </button>
-      ),
-    },
-  ];
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedInvoice(null);
+  };
 
   if (isLoading) {
     return (
@@ -388,10 +289,13 @@ const InvoiceCancelledPage: React.FC = () => {
       <div className="sticky top-0 z-20 bg-white px-6">
         <div className="flex flex-col space-y-4">
           {/* Title and Actions Row */}
-          <div className={`flex items-center justify-between pl-[45px]`}>
-            <h1 className="text-3xl font-semibold text-default-900">
-              Cancelled Invoices
-            </h1>
+          <div className={`flex items-center justify-between`}>
+            <div className="flex items-center">
+              <IconReceiptOff size={28} className="mr-3 mt-1" />
+              <h1 className="text-3xl font-semibold text-default-900">
+                Cancelled Invoices
+              </h1>
+            </div>
             <div className="flex items-center gap-3">
               <Button
                 onClick={handleRefresh}
@@ -406,7 +310,7 @@ const InvoiceCancelledPage: React.FC = () => {
           </div>
 
           {/* Filters Row */}
-          <div className={`space-y-4 pl-[45px]`}>
+          <div className={`space-y-4`}>
             <div className="flex gap-4">
               {/* Date Range */}
               <div className="flex-1">
@@ -498,36 +402,116 @@ const InvoiceCancelledPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 px-6 pt-1 pb-4">
+      <div className="flex-1 px-6 pt-6 pb-8">
         {error && (
           <div className="bg-rose-50 text-rose-600 p-4 rounded-lg mb-4">
             {error}
           </div>
         )}
 
-        {/* Table Section */}
-        <div className="bg-white overflow-hidden">
-          {filteredInvoices.length > 0 ? (
-            <TableEditing<ExtendedInvoiceData>
-              initialData={filteredInvoices}
-              columns={invoiceColumns}
-              onChange={setCancelledInvoices}
-              tableKey="cancelled-invoice"
-            />
-          ) : (
-            <div className="py-16 flex flex-col items-center justify-center">
-              <IconClock size={48} className="text-default-300 mb-4" />
-              <p className="text-center text-default-500 font-medium">
-                No cancelled invoices found.
-              </p>
-              <p className="text-center text-default-400 text-sm mt-1">
-                Cancelled invoices will appear here after they have been
-                cancelled.
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Card Grid Display */}
+        {filteredInvoices.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredInvoices.map((invoice) => {
+              const createdDate = parseDatabaseTimestamp(
+                invoice.createddate
+              ).date;
+              const cancelledDate = invoice.cancellation_date
+                ? new Date(invoice.cancellation_date)
+                : null;
+              const customerName =
+                customerNames[invoice.customerid] || invoice.customerid;
+
+              return (
+                <div
+                  key={invoice.invoice_id}
+                  className="bg-white border border-default-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden cursor-pointer"
+                  onClick={() => handleInvoiceClick(invoice)}
+                >
+                  <div className="p-4 border-b border-default-100">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-lg font-semibold text-default-900">
+                          {invoice.paymenttype === "CASH" ? "C" : "I"}
+                          {invoice.invoice_id}
+                        </div>
+                        <div className="text-sm text-default-600 mt-1 flex items-center">
+                          <IconBuildingStore
+                            size={16}
+                            className="mr-1 flex-shrink-0"
+                          />
+                          {customerName}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-default-500">Created</div>
+                        <div className="text-sm font-medium flex items-center mt-1">
+                          <IconCalendar
+                            size={15}
+                            className="mr-1 text-default-400"
+                          />
+                          {formatDisplayDate(createdDate)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-default-500">
+                          Cancelled
+                        </div>
+                        <div className="text-sm font-medium text-rose-600 flex items-center mt-1">
+                          <IconClock size={15} className="mr-1" />
+                          {cancelledDate
+                            ? formatDisplayDate(cancelledDate)
+                            : "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-between items-center">
+                      <div className="text-default-600 text-sm">
+                        {invoice.salespersonid}
+                      </div>
+                      <div className="text-lg font-semibold text-default-900">
+                        RM {Number(invoice.totalamountpayable || 0).toFixed(2)}
+                      </div>
+                    </div>
+
+                    <button className="w-full mt-4 py-2 flex items-center justify-center text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-md transition-colors duration-150 text-sm font-medium">
+                      <IconEye size={16} className="mr-1.5" />
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-16 flex flex-col items-center justify-center bg-white rounded-lg border border-default-200">
+            <IconClock size={48} className="text-default-300 mb-4" />
+            <p className="text-center text-default-600 font-medium">
+              No cancelled invoices found
+            </p>
+            <p className="text-center text-default-400 text-sm mt-1 max-w-md">
+              Cancelled invoices will appear here after they have been
+              cancelled. Try adjusting your filters or date range.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Invoice Details Modal */}
+      <CancelledInvoiceModal
+        invoice={selectedInvoice}
+        onClose={closeModal}
+        customerName={
+          selectedInvoice ? customerNames[selectedInvoice.customerid] : ""
+        }
+        isOpen={isModalOpen}
+      />
     </div>
   );
 };

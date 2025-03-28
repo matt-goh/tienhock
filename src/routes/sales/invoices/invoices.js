@@ -1103,15 +1103,17 @@ export default function (pool, config) {
 
       let query = `
       SELECT 
-        ci.*,
-        COALESCE(
-          json_agg(
-            CASE WHEN products IS NOT NULL THEN 
-              products
-            ELSE NULL END
-          ),
-          '[]'::json
-        ) as products
+        ci.id,
+        ci.invoice_id,
+        ci.salespersonid,
+        ci.customerid,
+        ci.createddate,
+        ci.paymenttype,
+        ci.amount,
+        ci.rounding,
+        ci.totalamountpayable,
+        ci.cancellation_date,
+        ci.products
       FROM 
         cancelled_invoices ci
       WHERE 1=1
@@ -1126,17 +1128,14 @@ export default function (pool, config) {
         query += ` AND CAST(ci.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
           paramCounter + 1
         } AS bigint)`;
-        paramCounter += 2;
+        query += ` ORDER BY ci.cancellation_date DESC`;
       }
-
-      query += ` GROUP BY ci.id ORDER BY ci.cancellation_date DESC`;
 
       const result = await pool.query(query, queryParams);
 
       // Transform results
       const transformedResults = result.rows.map((row) => ({
         ...row,
-        products: Array.isArray(row.products) ? row.products : [],
         amount: parseFloat(row.amount) || 0,
         rounding: parseFloat(row.rounding) || 0,
         totalamountpayable: parseFloat(row.totalamountpayable) || 0,
