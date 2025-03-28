@@ -458,7 +458,7 @@ const InvoiceCancelledPage: React.FC = () => {
                           {formatDisplayDate(createdDate)}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right justify-self-end">
                         <div className="text-xs text-default-500">
                           Cancelled
                         </div>
