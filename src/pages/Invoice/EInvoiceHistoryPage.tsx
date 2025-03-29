@@ -6,7 +6,6 @@ import {
   IconRefresh,
   IconSearch,
   IconRotateClockwise,
-  IconTrash,
   IconChevronDown,
   IconCheck,
   IconAlertTriangle,
