@@ -44,7 +44,6 @@ import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
 
 // Jellypolly routes
-import jellypollyInvoiceRouter from "./sales/invoices/invoicesJP.js";
 
 import {
   MYINVOIS_API_BASE_URL,
@@ -113,10 +112,7 @@ export default function setupRoutes(app, pool) {
   );
 
   // Jellypolly routes
-  app.use(
-    "/jellypolly/api/invoices",
-    jellypollyInvoiceRouter(pool, myInvoisConfig)
-  );
+  
 
   // Catalogue - Main routes
   app.use("/api/staffs", staffRouter(pool));
