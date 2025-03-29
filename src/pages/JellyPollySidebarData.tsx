@@ -1,8 +1,8 @@
 import { IconFileInvoice } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
-import InvoicePageJP from "./Invoice/InvoicePageJP";
-import InvoiceDetailsPageJP from "./Invoice/InvoiceDetailsPageJP";
+import InvoicePage from "./Invoice/InvoicePage";
+import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 
 export const JellyPollySidebarData: SidebarItem[] = [
   {
@@ -12,17 +12,17 @@ export const JellyPollySidebarData: SidebarItem[] = [
       {
         name: "Invoice",
         path: "/sales/invoice",
-        component: InvoicePageJP,
+        component: InvoicePage,
         subItems: [
           {
             name: "Invoice Details",
             path: "/sales/invoice/:id",
-            component: InvoiceDetailsPageJP,
+            component: InvoiceDetailsPage,
           },
           {
             name: "Create New Invoice Page",
             path: "/sales/invoice/create",
-            component: InvoiceDetailsPageJP,
+            component: InvoiceDetailsPage,
           },
         ],
       },
