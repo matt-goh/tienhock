@@ -114,6 +114,10 @@ const InvoicePage: React.FC = () => {
     applyCustomerFilter: true,
     paymentType: null,
     applyPaymentTypeFilter: true,
+    invoiceStatus: [], // Array for multi-select
+    applyInvoiceStatusFilter: false, // Default to not applying
+    eInvoiceStatus: [], // Array for multi-select
+    applyEInvoiceStatusFilter: false, // Default to not applying
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
@@ -262,6 +266,10 @@ const InvoicePage: React.FC = () => {
         applyCustomerFilter: true,
         paymentType: null,
         applyPaymentTypeFilter: true,
+        invoiceStatus: [], // Array for multi-select
+        applyInvoiceStatusFilter: false, // Default to not applying
+        eInvoiceStatus: [], // Array for multi-select
+        applyEInvoiceStatusFilter: false, // Default to not applying
       });
 
       setSearchTerm("");
@@ -275,6 +283,10 @@ const InvoicePage: React.FC = () => {
         applyCustomerFilter: true,
         paymentType: null,
         applyPaymentTypeFilter: true,
+        invoiceStatus: [], // Array for multi-select
+        applyInvoiceStatusFilter: false, // Default to not applying
+        eInvoiceStatus: [], // Array for multi-select
+        applyEInvoiceStatusFilter: false, // Default to not applying
       });
       setInvoices(fetchedInvoices);
 

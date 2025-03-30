@@ -6,24 +6,31 @@ import {
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
-import InvoiceCancelledPage from "./Invoice/InvoiceCancelledPage";
+// Invoice related imports
+import InvoiceListPage from "./Invoice/InvoiceListPage";
+import InvoiceDetailsPagev2 from "./Invoice/InvoiceDetailsPagev2";
+
+// Sales related imports
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
-import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
-import CustomerFormPage from "./Catalogue/CustomerFormPage";
-import CustomerAddPage from "./Catalogue/CustomerAddPage";
-import JobCategoryPage from "./Catalogue/JobCategoryPage";
-import StaffFormPage from "./Catalogue/StaffFormPage";
-import CustomerPage from "./Catalogue/CustomerPage";
-import StaffAddPage from "./Catalogue/StaffAddPage";
-import PDFViewerPage from "./Invoice/PDFViewerPage";
-import ProductPage from "./Catalogue/ProductPage";
-import EInvoicePage from "./Invoice/EInvoicePage";
-import InvoicePage from "./Invoice/InvoicePage";
-import BasicPage from "./Catalogue/BasicPage";
+
+// Catalogue related imports
+// Staff
 import StaffPage from "./Catalogue/StaffPage";
+import StaffAddPage from "./Catalogue/StaffAddPage";
+import StaffFormPage from "./Catalogue/StaffFormPage";
+
+// Customer
+import CustomerPage from "./Catalogue/CustomerPage";
+import CustomerAddPage from "./Catalogue/CustomerAddPage";
+import CustomerFormPage from "./Catalogue/CustomerFormPage";
+
+// Other catalogues
+import ProductPage from "./Catalogue/ProductPage";
 import JobPage from "./Catalogue/JobPage";
+import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
+import BasicPage from "./Catalogue/BasicPage";
 
 export const TienHockSidebarData: SidebarItem[] = [
   {
@@ -39,34 +46,21 @@ export const TienHockSidebarData: SidebarItem[] = [
       {
         name: "Invoice",
         path: "/sales/invoice",
-        component: InvoicePage,
+        component: InvoiceListPage,
         subItems: [
+          // Route for creating a new invoice
           {
-            name: "Invoice Details",
+            name: "Create New Invoice",
+            path: "/sales/invoice/new",
+            component: InvoiceDetailsPagev2,
+          },
+          // Route for viewing/editing an existing invoice
+          {
+            name: "Invoice Details", // Keep name descriptive
             path: "/sales/invoice/:id",
-            component: InvoiceDetailsPage,
-          },
-          {
-            name: "Invoice PDF Viewer",
-            path: "/pdf-viewer",
-            component: PDFViewerPage,
-          },
-          {
-            name: "Create New Invoice Page",
-            path: "/sales/invoice/create",
-            component: InvoiceDetailsPage,
-          },
-          {
-            name: "Cancelled Invoices",
-            path: "/sales/invoice/cancelled",
-            component: InvoiceCancelledPage,
+            component: InvoiceDetailsPagev2,
           },
         ],
-      },
-      {
-        name: "e-Invoice",
-        path: "/sales/einvoice",
-        component: EInvoicePage,
       },
       {
         name: "Sales by Products",
