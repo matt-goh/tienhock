@@ -192,15 +192,6 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
           {invoice.invoice_status.charAt(0).toUpperCase() +
             invoice.invoice_status.slice(1)}
         </span>
-        {/* Payment Type */}
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          {invoice.paymenttype === "CASH" ? (
-            <IconCash size={14} className="mr-1" />
-          ) : (
-            <IconFileInvoice size={14} className="mr-1" />
-          )}
-          {invoice.paymenttype}
-        </span>
         {/* E-Invoice Status */}
         {eInvoiceStatusInfo && EInvoiceIcon && (
           <span

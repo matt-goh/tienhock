@@ -203,8 +203,24 @@ export default function (pool, config) {
       }
       if (search) {
         queryParams.push(`%${search}%`);
-        // Search invoice ID or customer name
-        query += ` AND (i.id ILIKE $${paramCounter} OR c.name ILIKE $${paramCounter})`;
+        // Search across multiple fields: invoice ID, customer name/ID, salesperson ID, payment type, and product details
+        query += ` AND (
+          i.id ILIKE $${paramCounter} OR 
+          c.name ILIKE $${paramCounter} OR 
+          CAST(i.customerid AS TEXT) ILIKE $${paramCounter} OR
+          CAST(i.salespersonid AS TEXT) ILIKE $${paramCounter} OR
+          i.paymenttype ILIKE $${paramCounter} OR
+          i.invoice_status ILIKE $${paramCounter} OR
+          i.einvoice_status ILIKE $${paramCounter} OR
+          CAST(i.totalamountpayable AS TEXT) ILIKE $${paramCounter} OR
+          EXISTS (
+            SELECT 1 FROM order_details od 
+            WHERE od.invoiceid = i.id AND (
+              od.code ILIKE $${paramCounter} OR 
+              od.description ILIKE $${paramCounter}
+            )
+          )
+        )`;
         paramCounter++;
       }
 
