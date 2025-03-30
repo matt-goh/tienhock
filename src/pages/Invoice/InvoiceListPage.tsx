@@ -10,20 +10,17 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   ExtendedInvoiceData,
   InvoiceFilters,
-  InvoiceStatus,
-  EInvoiceStatus,
-} from "../../types/types"; // Adjust path
-import Button from "../../components/Button"; // Adjust path
-import LoadingSpinner from "../../components/LoadingSpinner"; // Adjust path
-import DateRangePicker from "../../components/DateRangePicker"; // Adjust path
-import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu"; // Adjust path
+} from "../../types/types";
+import Button from "../../components/Button";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import DateRangePicker from "../../components/DateRangePicker";
+import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
 // import FilterSummary from "../../components/Invoice/FilterSummary"; // Keep if using
-import InvoiceGrid from "../../components/Invoice/InvoiceGrid"; // Adjust path
-import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache"; // Adjust path
-import ConfirmationDialog from "../../components/ConfirmationDialog"; // Adjust path
+import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
-import { api } from "../../routes/utils/api"; // Adjust path
-
+import { api } from "../../routes/utils/api";
 import {
   IconPlus,
   IconRefresh,
@@ -44,10 +41,10 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { useCustomerNames } from "../../hooks/useCustomerNames"; // Adjust path
-import PaginationControls from "../../components/Invoice/PaginationControls"; // Adjust path
+import { useCustomerNames } from "../../hooks/useCustomerNames";
+import PaginationControls from "../../components/Invoice/PaginationControls";
 // Import the specific utilities needed
-import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils"; // Adjust path
+import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
