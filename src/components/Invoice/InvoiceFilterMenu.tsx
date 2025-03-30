@@ -117,6 +117,10 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       applyCustomerFilter: true,
       paymentType: null,
       applyPaymentTypeFilter: true,
+      invoiceStatus: [],
+      applyInvoiceStatusFilter: true,
+      eInvoiceStatus: [],
+      applyEInvoiceStatusFilter: true,
     };
     onFilterChange(clearedFilters);
   };

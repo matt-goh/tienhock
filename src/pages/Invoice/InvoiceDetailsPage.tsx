@@ -1,4 +1,4 @@
-// src/pages/Invoice/InvoiceDetailsPage.tsx
+// src/pages/Invoice/InvoiceDetailsPage.tsx (Abandoned)
 import React, {
   useState,
   useEffect,
@@ -596,7 +596,7 @@ const InvoiceDetailsPage: React.FC = () => {
           return {
             ...prevData,
             products: productsWithTotal,
-            amount: subtotalAmount, // Tax exclusive amount
+            total_excluding_tax: subtotalAmount, // Tax exclusive amount
             rounding: roundingValue,
             totalamountpayable: totalAmountPayable, // Tax inclusive amount
           };
@@ -713,46 +713,8 @@ const InvoiceDetailsPage: React.FC = () => {
             return;
           }
 
-          // Format products for saving - including all required fields
-          const productsToSave = invoiceData.products
-            .filter((product) => !product.istotal)
-            .map((product) => ({
-              code: product.code,
-              quantity: product.quantity || 0,
-              price: product.price || 0,
-              freeProduct: product.freeProduct || 0,
-              returnProduct: product.returnProduct || 0,
-              tax: product.tax || 0,
-              total: product.total,
-              description: product.description,
-              issubtotal: product.issubtotal || false,
-            }));
-
-          const dataToSave: ExtendedInvoiceData = {
-            id: invoiceData.id,
-            salespersonid: invoiceData.salespersonid,
-            customerid: invoiceData.customerid,
-            customername: invoiceData.customername,
-            createddate: invoiceData.createddate,
-            paymenttype: invoiceData.paymenttype || "INVOICE",
-            amount: invoiceData.amount || 0,
-            rounding: invoiceData.rounding || 0,
-            totalamountpayable: invoiceData.totalamountpayable || 0,
-            products: productsToSave,
-            customerName: invoiceData.customerName,
-          };
-
-          // Try to create the invoice
-          const created = await createInvoice(dataToSave);
-          const savedInvoice = {
-            ...created,
-            customerName: created.customerid || "",
-            isEditing: false,
-          };
-
           toast.success("New invoice created successfully");
           navigate(previousPath);
-          setInvoiceData(savedInvoice);
           setIsFormChanged(false);
           setIsNewInvoice(false);
         } catch (error) {
@@ -788,32 +750,9 @@ const InvoiceDetailsPage: React.FC = () => {
               issubtotal: product.issubtotal || false,
             }));
 
-          const dataToSave: ExtendedInvoiceData = {
-            id: invoiceData.id,
-            originalId: invoiceData.originalId,
-            salespersonid: invoiceData.salespersonid,
-            customerid: invoiceData.customerid,
-            customername: invoiceData.customername,
-            createddate: invoiceData.createddate,
-            paymenttype: invoiceData.paymenttype || "INVOICE",
-            amount: invoiceData.amount || 0,
-            rounding: invoiceData.rounding || 0,
-            totalamountpayable: invoiceData.totalamountpayable || 0,
-            products: productsToSave,
-            customerName: invoiceData.customerName,
-          };
-
-          const saved = await updateInvoice(dataToSave);
-          const savedInvoice = {
-            ...saved,
-            customerName: saved.customerid || "",
-            isEditing: false,
-          };
-
           toast.success("Invoice updated successfully in database");
 
           navigate(previousPath);
-          setInvoiceData(savedInvoice);
           setIsFormChanged(false);
         } catch (error) {
           if (error instanceof Error) {
