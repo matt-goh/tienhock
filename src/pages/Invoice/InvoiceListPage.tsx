@@ -709,8 +709,18 @@ const InvoiceListPage: React.FC = () => {
 
         {/* Conditional text based on selection */}
         {selectedInvoiceIds.size > 0 ? (
-          <span className="font-medium text-sky-800 text-sm">
+          <span className="font-medium text-sky-800 text-sm flex items-center">
             {selectedInvoiceIds.size} selected
+            <span className="mx-2 border-r border-sky-300 h-4"></span>
+            Total:{" "}
+            {new Intl.NumberFormat("en-MY", {
+              style: "currency",
+              currency: "MYR",
+            }).format(
+              invoices
+                .filter((inv) => selectedInvoiceIds.has(inv.id))
+                .reduce((sum, inv) => sum + (inv.totalamountpayable || 0), 0)
+            )}
           </span>
         ) : (
           <span className="text-default-500 text-sm">
