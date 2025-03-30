@@ -556,11 +556,7 @@ const InvoiceDetailsPagev2: React.FC = () => {
       isNewInvoice ? "Creating Invoice..." : "Updating Invoice..."
     );
 
-    // Ensure the full ID with prefix is passed to the utility
-    const fullInvoiceId = `${invoiceData.paymenttype === "CASH" ? "C" : "I"}${
-      invoiceData.id
-    }`;
-    const dataToSend = { ...invoiceData, id: fullInvoiceId };
+    const dataToSend = { ...invoiceData };
 
     try {
       let savedInvoice: ExtendedInvoiceData;

@@ -113,15 +113,15 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     >
       {/* Selection Checkbox Area */}
       <div
-        className="invoice-card-select absolute top-2 right-2 z-10 p-1"
+        className="invoice-card-select absolute top-3 right-3 z-10"
         onClick={handleSelectClick}
       >
         {isSelected ? (
-          <IconSquareCheckFilled className="text-blue-600" size={24} />
+          <IconSquareCheckFilled className="text-blue-600" size={20} />
         ) : (
           <IconSquare
             className="text-default-400 hover:text-default-600 transition-colors"
-            size={24}
+            size={20}
           />
         )}
       </div>
@@ -134,7 +134,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
           {invoice.paymenttype === "CASH" ? "C" : "I"}
           {invoice.id}
         </span>
-        <span className={`text-sm ${invoiceStatusStyle.text}`}>
+        <span className={`text-sm ${invoiceStatusStyle.text} pr-5`}>
           {formatDisplayDate(date)}
         </span>
       </div>
@@ -142,10 +142,13 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
       {/* Body */}
       <div className="p-3 space-y-2">
         <p
-          className="font-medium text-default-800 truncate"
+          className="flex flex-col font-medium text-default-800 truncate"
           title={invoice.customerName || invoice.customerid}
         >
           {invoice.customerName || invoice.customerid}
+          <span className="text-xs text-default-500 truncate">
+            {invoice.salespersonid}
+          </span>
         </p>
         <p className="text-lg font-semibold text-default-900">
           {`RM ${invoice.totalamountpayable.toFixed(2)}`}
