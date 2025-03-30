@@ -1,4 +1,4 @@
-// src/pages/Invoice/InvoiceDetailsPagev2.tsx
+// src/pages/Invoice/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -31,7 +31,7 @@ import { parseDatabaseTimestamp } from "../../utils/invoice/dateUtils"; // Assum
 // Interface for customer products (if not already in types)
 // interface CustomProduct { id: string; /* ... other fields */ }
 
-const InvoiceDetailsPagev2: React.FC = () => {
+const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>(); // id from URL (e.g., "1001", "new")
@@ -876,4 +876,4 @@ const InvoiceDetailsPagev2: React.FC = () => {
   );
 };
 
-export default InvoiceDetailsPagev2;
+export default InvoiceDetailsPage;

@@ -8,7 +8,7 @@ import { SidebarItem } from "./pagesRoute";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
-import InvoiceDetailsPagev2 from "./Invoice/InvoiceDetailsPagev2";
+import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 
 // Sales related imports
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
@@ -52,13 +52,13 @@ export const TienHockSidebarData: SidebarItem[] = [
           {
             name: "Create New Invoice",
             path: "/sales/invoice/new",
-            component: InvoiceDetailsPagev2,
+            component: InvoiceDetailsPage,
           },
           // Route for viewing/editing an existing invoice
           {
             name: "Invoice Details", // Keep name descriptive
             path: "/sales/invoice/:id",
-            component: InvoiceDetailsPagev2,
+            component: InvoiceDetailsPage,
           },
         ],
       },
