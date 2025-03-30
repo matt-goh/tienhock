@@ -3,22 +3,13 @@ import React from "react";
 import {
   ExtendedInvoiceData,
   Customer,
-  InvoiceStatus,
-  EInvoiceStatus,
 } from "../../types/types"; // Use updated types
 import { FormInput, FormListbox } from "../FormComponents"; // Reusable components
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
 import {
   formatDateForInput,
   parseDatabaseTimestamp,
-  dateInputToTimestamp,
 } from "../../utils/invoice/dateUtils";
-import {
-  IconAlertTriangle,
-  IconBan,
-  IconCircleCheck,
-  IconClockHour4,
-} from "@tabler/icons-react"; // For status
 
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
@@ -40,73 +31,6 @@ interface InvoiceHeaderProps {
   isDuplicate?: boolean;
   readOnly?: boolean;
 }
-
-// Helper to get status styles and icon
-const getStatusInfo = (
-  status: InvoiceStatus | EInvoiceStatus | null,
-  type: "invoice" | "einvoice"
-) => {
-  if (type === "invoice") {
-    switch (status as InvoiceStatus) {
-      case "paid":
-        return {
-          text: "Paid",
-          color: "text-green-700",
-          bg: "bg-green-100",
-          icon: IconCircleCheck,
-        };
-      case "cancelled":
-        return {
-          text: "Cancelled",
-          color: "text-rose-700",
-          bg: "bg-rose-100",
-          icon: IconBan,
-        };
-      case "active":
-      default:
-        return {
-          text: "Active",
-          color: "text-amber-700",
-          bg: "bg-amber-100",
-          icon: null,
-        }; // No icon for default active
-    }
-  } else {
-    // einvoice
-    switch (status as EInvoiceStatus) {
-      case "valid":
-        return {
-          text: "E-Invoice Valid",
-          color: "text-green-700",
-          bg: "bg-green-100",
-          icon: IconCircleCheck,
-        };
-      case "pending":
-        return {
-          text: "E-Invoice Pending",
-          color: "text-yellow-700",
-          bg: "bg-yellow-100",
-          icon: IconClockHour4,
-        };
-      case "invalid":
-        return {
-          text: "E-Invoice Invalid",
-          color: "text-red-700",
-          bg: "bg-red-100",
-          icon: IconAlertTriangle,
-        };
-      case "cancelled":
-        return {
-          text: "E-Invoice Cancelled",
-          color: "text-rose-700",
-          bg: "bg-rose-100",
-          icon: IconBan,
-        };
-      default:
-        return null;
-    }
-  }
-};
 
 const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
   invoice,
@@ -156,11 +80,6 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
       await onInvoiceIdBlur(invoice.id);
     }
   };
-
-  const invoiceStatusInfo = getStatusInfo(invoice.invoice_status, "invoice");
-  const einvoiceStatusInfo = getStatusInfo(invoice.einvoice_status, "einvoice");
-  const InvoiceStatusIcon = invoiceStatusInfo?.icon;
-  const EInvoiceStatusIcon = einvoiceStatusInfo?.icon;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">

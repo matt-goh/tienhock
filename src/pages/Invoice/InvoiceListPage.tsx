@@ -262,12 +262,28 @@ const InvoiceListPage: React.FC = () => {
     [handleFilterChange]
   );
 
-  // Search Handler (triggers fetch immediately)
+  // Search Handlers - separate state update from triggering fetch
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
+  };
+
+  // New handler for blur event
+  const handleSearchBlur = () => {
     if (currentPage !== 1) setCurrentPage(1);
     else setIsFetchTriggered(true);
     setSelectedInvoiceIds(new Set()); // Clear selection on search
+  };
+
+  // Handle Enter key press in search input
+  const handleSearchKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === "Enter") {
+      // Blur the input to trigger the onBlur handler
+      event.currentTarget.blur();
+      // Or directly call the search function:
+      // handleSearchBlur();
+    }
   };
 
   // Select/Deselect a single invoice
@@ -642,17 +658,19 @@ const InvoiceListPage: React.FC = () => {
           </Listbox>
         </div>
         {/* Search */}
-        <div className="flex-grow h-full relative">
+        <div className="flex-grow relative">
           <IconSearch
             className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400"
             size={20}
           />
           <input
             type="text"
-            placeholder="Search by invoice, customer, product, amount, status, payment type..."
-            className="w-full h-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+            placeholder="Search by invoice, product, amount, customer, salesman, status, payment type..."
+            className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
             value={searchTerm}
             onChange={handleSearchChange}
+            onBlur={handleSearchBlur}
+            onKeyDown={handleSearchKeyDown}
           />
         </div>
         <div className="flex-shrink-0">

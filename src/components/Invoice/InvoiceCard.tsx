@@ -83,7 +83,6 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   isSelected,
   onSelect,
   onViewDetails,
-  salesmanName, // <-- Destructure salesmanName
 }) => {
   const { date } = parseDatabaseTimestamp(invoice.createddate);
   const invoiceStatusStyle = getInvoiceStatusStyles(invoice.invoice_status);
@@ -150,7 +149,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
         {/* Selection Checkbox Area - Still clickable individually */}
         <div
-          className="invoice-card-select-action flex-shrink-0 z-10" // Add z-index just in case, ensure it's above header click area conceptually
+          className="invoice-card-select-action flex-shrink-0 z-0" // Add z-index just in case, ensure it's above header click area conceptually
           onClick={handleSelectIconClick} // <-- Use specific handler for icon
         >
           {isSelected ? (
