@@ -7,10 +7,11 @@ import { IconFileInvoice } from "@tabler/icons-react"; // For empty state
 interface InvoiceGridProps {
   invoices: ExtendedInvoiceData[];
   selectedInvoiceIds: Set<string>;
-  onSelectInvoice: (id: string) => void;
-  onViewDetails: (id: string) => void;
-  isLoading: boolean; // Pass loading state
-  error: string | null; // Pass error state
+  onSelectInvoice: (invoiceId: string) => void;
+  onViewDetails: (invoiceId: string) => void;
+  isLoading: boolean;
+  error: string | null;
+  customerNames: Record<string, string>;
 }
 
 const InvoiceGrid: React.FC<InvoiceGridProps> = ({

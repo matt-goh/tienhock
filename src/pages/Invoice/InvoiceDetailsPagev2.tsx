@@ -6,60 +6,67 @@ import {
   ProductItem,
   Customer,
   CustomProduct,
-} from "../../types/types"; // Use updated types
-import BackButton from "../../components/BackButton";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import InvoiceHeader from "../../components/Invoice/InvoiceHeader";
-import LineItemsTable from "../../components/Invoice/LineItemsTable";
-import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
-import { useProductsCache } from "../../utils/invoice/useProductsCache";
-import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
-import { useCustomerData } from "../../hooks/useCustomerData";
+  InvoiceStatus, // Import status types if needed for comparison
+  EInvoiceStatus,
+} from "../../types/types"; // Adjust path as needed
+import BackButton from "../../components/BackButton"; // Adjust path
+import Button from "../../components/Button"; // Adjust path
+import LoadingSpinner from "../../components/LoadingSpinner"; // Adjust path
+import ConfirmationDialog from "../../components/ConfirmationDialog"; // Adjust path
+import InvoiceHeader from "../../components/Invoice/InvoiceHeader"; // Adjust path
+import LineItemsTable from "../../components/Invoice/LineItemsTable"; // Adjust path
+import InvoiceTotals from "../../components/Invoice/InvoiceTotals"; // Adjust path
+import { useProductsCache } from "../../utils/invoice/useProductsCache"; // Adjust path
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache"; // Adjust path
+import { useCustomerData } from "../../hooks/useCustomerData"; // Adjust path
 import {
-  checkDuplicateInvoiceNo,
   createInvoice,
   updateInvoice,
-  deleteInvoice,
-  // getInvoiceById
-} from "../../utils/invoice/InvoiceUtils";
+  cancelInvoice,
+  getInvoiceById,
+  checkDuplicateInvoiceNo,
+} from "../../utils/invoice/InvoiceUtils"; // Adjust path
 import toast from "react-hot-toast";
 import { debounce } from "lodash";
+import { parseDatabaseTimestamp } from "../../utils/invoice/dateUtils"; // Assuming you have this
+
+// Interface for customer products (if not already in types)
+// interface CustomProduct { id: string; /* ... other fields */ }
 
 const InvoiceDetailsPagev2: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>(); // id from URL (e.g., "1001", "new")
 
   const isNewInvoice = !id || id.toLowerCase() === "new";
-  const state = location.state as
-    | { invoiceData?: ExtendedInvoiceData; previousPath?: string }
-    | undefined;
+  const state = location.state as { previousPath?: string } | undefined;
 
+  // --- State ---
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData | null>(
     null
   );
   const [initialInvoiceData, setInitialInvoiceData] =
     useState<ExtendedInvoiceData | null>(null);
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(true); // Loading page shell (hooks etc)
   const [isLoadingInvoiceData, setIsLoadingInvoiceData] = useState(
     !isNewInvoice
-  );
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isFormChanged, setIsFormChanged] = useState(false);
+  ); // Loading specific invoice data
+  const [isSaving, setIsSaving] = useState(false); // Saving state (Create/Update)
+  const [error, setError] = useState<string | null>(null); // Data loading error
+  const [isFormChanged, setIsFormChanged] = useState(false); // Track unsaved changes
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
-  const [previousPath, setPreviousPath] = useState("/sales/invoice");
-  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
-  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
-  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [previousPath, setPreviousPath] = useState("/sales/invoice"); // Default back path
+  const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]); // Custom pricing
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false); // Duplicate ID check state
+  const [isDuplicate, setIsDuplicate] = useState(false); // Duplicate ID result
 
+  // --- Hooks ---
   const { products: productsCache, isLoading: productsLoading } =
     useProductsCache();
   const { salesmen: salesmenCache, isLoading: salesmenLoading } =
     useSalesmanCache();
+  // Pass customerid only after invoiceData is loaded
   const {
     customers,
     selectedCustomer,
@@ -71,52 +78,76 @@ const InvoiceDetailsPagev2: React.FC = () => {
     isFetchingCustomers,
   } = useCustomerData(invoiceData?.customerid);
 
+  // --- Memoized Values ---
   const lineItems = useMemo(
     () => invoiceData?.products || [],
     [invoiceData?.products]
   );
 
+  const isReadOnly = useMemo(() => {
+    if (!invoiceData) return true; // No data, treat as read-only
+    return (
+      isSaving ||
+      invoiceData.invoice_status === "cancelled" ||
+      invoiceData.invoice_status === "paid" ||
+      // Optionally make stricter: disallow edits once e-invoice submitted/processed
+      (!!invoiceData.uuid && invoiceData.einvoice_status !== "invalid")
+    );
+  }, [
+    isSaving,
+    invoiceData?.invoice_status,
+    invoiceData?.uuid,
+    invoiceData?.einvoice_status,
+  ]);
+
   // --- Effects ---
 
+  // Overall page loading state depends on data hooks finishing
   useEffect(() => {
+    // Page is considered loaded when invoice data *specific* loading is done,
+    // AND supporting data (products, salesmen) are done.
     setIsLoadingPage(
       isLoadingInvoiceData || productsLoading || salesmenLoading
     );
   }, [isLoadingInvoiceData, productsLoading, salesmenLoading]);
 
+  // Fetch custom product prices when customer changes
   const fetchCustomerProducts = useCallback(async (customerId: string) => {
     if (!customerId) {
       setCustomerProducts([]);
       return;
     }
     try {
-      console.log("Fetching custom products for:", customerId); // Mock
-      setCustomerProducts([]);
+      // TODO: Implement actual API call to fetch custom products
+      console.log("Fetching custom products for (mock):", customerId);
+      // const prods = await api.get(`/api/customer-products/${customerId}`);
+      // setCustomerProducts(prods);
+      setCustomerProducts([]); // Mock: clear
     } catch (error) {
       console.error("Error fetching customer products:", error);
       toast.error("Could not load custom product prices.");
       setCustomerProducts([]);
     }
   }, []);
-
   useEffect(() => {
     if (invoiceData?.customerid) {
       fetchCustomerProducts(invoiceData.customerid);
     } else {
-      setCustomerProducts([]);
+      setCustomerProducts([]); // Clear if no customer selected
     }
   }, [invoiceData?.customerid, fetchCustomerProducts]);
 
+  // Initial Load Effect: Fetch existing invoice or setup a new one
   useEffect(() => {
     if (state?.previousPath) {
       setPreviousPath(state.previousPath);
     }
 
     if (isNewInvoice) {
-      setIsLoadingInvoiceData(false);
+      setIsLoadingInvoiceData(false); // Not loading existing data
       const newInv: ExtendedInvoiceData = {
-        id: "",
-        salespersonid: "",
+        id: "", // Empty ID, user/logic needs to set this
+        salespersonid: salesmenCache.length > 0 ? salesmenCache[0].id : "", // Default to first salesman?
         customerid: "",
         createddate: Date.now().toString(),
         paymenttype: "INVOICE",
@@ -134,7 +165,6 @@ const InvoiceDetailsPagev2: React.FC = () => {
         einvoice_status: null,
         products: [
           {
-            // Add initial empty row with uid
             uid: crypto.randomUUID(),
             code: "",
             description: "",
@@ -148,32 +178,21 @@ const InvoiceDetailsPagev2: React.FC = () => {
           },
         ],
         customerName: "",
-        isEditing: true,
+        isEditing: true, // New invoices are always in editing mode initially
       };
       setInvoiceData(newInv);
       setInitialInvoiceData(structuredClone(newInv));
+      // setIsLoadingPage(false); // Handled by the general isLoadingPage effect
     } else if (id) {
+      // Fetch existing invoice details using the utility function
       const fetchInvoiceDetails = async (invoiceId: string) => {
         setIsLoadingInvoiceData(true);
         setError(null);
         try {
-          console.log(`Fetching invoice ${invoiceId} (mock)...`);
-          await new Promise((res) => setTimeout(res, 300));
-          const mockExisting: ExtendedInvoiceData | undefined =
-            MOCK_INVOICES_DETAILS.find((inv) => inv.id === invoiceId);
-          const fetchedInvoice = mockExisting;
-          if (!fetchedInvoice) throw new Error("Invoice not found");
-          // Ensure products have UIDs
-          const productsWithUid = (fetchedInvoice.products || []).map((p) => ({
-            ...p,
-            uid: p.uid || crypto.randomUUID(),
-          }));
-          const loadedInvoice = {
-            ...fetchedInvoice,
-            products: productsWithUid,
-          };
-          setInvoiceData(loadedInvoice);
-          setInitialInvoiceData(structuredClone(loadedInvoice));
+          console.log(`Fetching invoice ${invoiceId}...`);
+          const fetchedInvoice = await getInvoiceById(invoiceId);
+          setInvoiceData(fetchedInvoice);
+          setInitialInvoiceData(structuredClone(fetchedInvoice));
         } catch (err: any) {
           setError(err.message || "Failed to load invoice details.");
           toast.error(err.message || "Failed to load invoice details.");
@@ -184,8 +203,10 @@ const InvoiceDetailsPagev2: React.FC = () => {
       };
       fetchInvoiceDetails(id);
     }
-  }, [id, isNewInvoice, state?.previousPath]); // Removed fetchInvoiceDetails from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isNewInvoice, state?.previousPath, salesmenCache]); // Added salesmenCache as potential dep for default
 
+  // Effect to select initial customer after data loads
   useEffect(() => {
     if (
       !isLoadingPage &&
@@ -200,6 +221,7 @@ const InvoiceDetailsPagev2: React.FC = () => {
       if (initialCust) {
         setSelectedCustomer(initialCust);
       }
+      // Consider fetching customer details specifically if not in initial list from hook
     }
   }, [
     isLoadingPage,
@@ -210,8 +232,10 @@ const InvoiceDetailsPagev2: React.FC = () => {
     setSelectedCustomer,
   ]);
 
+  // Effect to detect form changes by comparing current vs initial state
   useEffect(() => {
     if (initialInvoiceData && invoiceData) {
+      // Simple JSON comparison. For deep objects, consider a library like `fast-deep-equal`.
       const currentSnapshot = JSON.stringify(invoiceData);
       const initialSnapshot = JSON.stringify(initialInvoiceData);
       setIsFormChanged(currentSnapshot !== initialSnapshot);
@@ -220,22 +244,29 @@ const InvoiceDetailsPagev2: React.FC = () => {
     }
   }, [invoiceData, initialInvoiceData]);
 
+  // Effect to recalculate totals whenever products or rounding change
   useEffect(() => {
     if (!invoiceData) return;
+
     let subtotal = 0;
     let taxTotal = 0;
     invoiceData.products.forEach((item) => {
-      if (!item.issubtotal) {
+      if (!item.issubtotal && !item.istotal) {
+        // Exclude subtotal/total rows from calc
         subtotal += (Number(item.quantity) || 0) * (Number(item.price) || 0);
         taxTotal += Number(item.tax) || 0;
       }
     });
+
     const rounding = Number(invoiceData.rounding) || 0;
+    // Ensure totals are calculated correctly (Subtotal + Tax + Rounding)
     const totalPayable = subtotal + taxTotal + rounding;
+
+    // Update state only if calculated values differ from current state to prevent infinite loops
     if (
-      invoiceData.total_excluding_tax !== subtotal ||
-      invoiceData.tax_amount !== taxTotal ||
-      invoiceData.totalamountpayable !== totalPayable
+      Math.abs(invoiceData.total_excluding_tax - subtotal) > 0.001 || // Use tolerance for float comparison
+      Math.abs(invoiceData.tax_amount - taxTotal) > 0.001 ||
+      Math.abs(invoiceData.totalamountpayable - totalPayable) > 0.001
     ) {
       setInvoiceData((prev) =>
         prev
@@ -248,42 +279,57 @@ const InvoiceDetailsPagev2: React.FC = () => {
           : null
       );
     }
-  }, [invoiceData?.products, invoiceData?.rounding]);
+  }, [invoiceData?.products, invoiceData?.rounding]); // invoiceData needed in dep array for direct access
 
+  // Debounced Duplicate Check Function
   const checkDuplicateDebounced = useCallback(
     debounce(async (invoiceIdToCheck: string) => {
-      if (!invoiceIdToCheck) {
+      // Only perform check for NEW invoices when an ID is entered
+      if (!isNewInvoice || !invoiceIdToCheck) {
         setIsDuplicate(false);
         setIsCheckingDuplicate(false);
-        return false;
+        return;
       }
+
       setIsCheckingDuplicate(true);
-      let isDup = false;
       try {
-        console.log("Checking duplicate (mock):", invoiceIdToCheck);
-        await new Promise((res) => setTimeout(res, 400));
-        isDup = MOCK_INVOICES_DETAILS.some(
-          (inv) =>
-            inv.id === invoiceIdToCheck && inv.id !== initialInvoiceData?.id
-        );
+        // Assuming checkDuplicateInvoiceNo expects just the number part
+        const numberPart =
+          invoiceIdToCheck.startsWith("I") || invoiceIdToCheck.startsWith("C")
+            ? invoiceIdToCheck.slice(1)
+            : invoiceIdToCheck;
+
+        if (!numberPart) {
+          // If only prefix was entered
+          setIsDuplicate(false);
+          setIsCheckingDuplicate(false);
+          return;
+        }
+
+        const isDup = await checkDuplicateInvoiceNo(numberPart);
         setIsDuplicate(isDup);
         if (isDup) {
-          toast.error(`Invoice number ${invoiceIdToCheck} already exists!`);
+          toast.error(`Invoice number ${numberPart} already exists!`);
+        } else {
+          // Optionally show a success/available message if desired
+          // toast.success(`Invoice number ${numberPart} is available.`);
         }
       } catch (error) {
-        toast.error("Failed to check for duplicate invoice number.");
-        setIsDuplicate(false);
+        // Error is handled within checkDuplicateInvoiceNo, maybe log here too
+        console.error("Duplicate check failed:", error);
+        setIsDuplicate(false); // Assume not duplicate on error during check
       } finally {
         setIsCheckingDuplicate(false);
       }
-      return isDup;
-    }, 500),
-    [initialInvoiceData?.id]
+    }, 500), // 500ms debounce delay
+    [isNewInvoice] // Dependency: only relevant for new invoices
   );
 
-  // --- Handlers ---
+  // --- Input & Action Handlers ---
+
   const handleBackClick = () => {
-    if (isFormChanged && !isSaving) {
+    if (isFormChanged && !isSaving && !isReadOnly) {
+      // Check readOnly too
       setShowBackConfirmation(true);
     } else if (!isSaving) {
       navigate(previousPath);
@@ -293,73 +339,130 @@ const InvoiceDetailsPagev2: React.FC = () => {
     setShowBackConfirmation(false);
     navigate(previousPath);
   };
+
   const handleCancelInvoiceClick = () => {
-    if (invoiceData?.invoice_status === "cancelled") {
-      toast.error("This invoice is already cancelled.");
+    if (
+      isNewInvoice ||
+      !invoiceData ||
+      invoiceData.invoice_status === "cancelled"
+    ) {
+      toast.error(
+        isNewInvoice
+          ? "Cannot cancel a new invoice."
+          : "This invoice is already cancelled."
+      );
       return;
     }
     setShowCancelConfirmation(true);
   };
+
   const handleConfirmCancelInvoice = async () => {
-    if (!invoiceData || isNewInvoice || isSaving) return;
+    if (!invoiceData || !invoiceData.id || isNewInvoice || isSaving) return;
+
     const toastId = toast.loading("Cancelling invoice...");
     setIsSaving(true);
+    setShowCancelConfirmation(false);
+
     try {
-      console.log(`Cancelling invoice ${invoiceData.id} (mock)...`);
-      await new Promise((res) => setTimeout(res, 500));
-      toast.success("Invoice cancelled successfully", { id: toastId });
-      navigate(previousPath);
+      const cancelledInvoiceData = await cancelInvoice(invoiceData.id);
+      setInvoiceData(cancelledInvoiceData); // Update state with cancelled data
+      setInitialInvoiceData(structuredClone(cancelledInvoiceData)); // Reset initial state
+      setIsFormChanged(false); // Reset change flag
+      toast.success("Invoice cancelled successfully.", { id: toastId });
+      // Stay on page, it's now read-only
     } catch (error: any) {
-      toast.error(`Failed to cancel invoice: ${error.message}`, {
-        id: toastId,
-      });
+      // Error toast handled by utility
+      // toast.error(`Failed to cancel invoice: ${error.message}`, { id: toastId });
     } finally {
-      setShowCancelConfirmation(false);
       setIsSaving(false);
     }
   };
+
+  // Update header fields (Generic)
   const handleHeaderInputChange = useCallback(
     (field: keyof ExtendedInvoiceData, value: any) => {
-      setInvoiceData((prev) => (prev ? { ...prev, [field]: value } : null));
+      if (isReadOnly) return; // Prevent changes if read-only
+
+      setInvoiceData((prev) => {
+        if (!prev) return null;
+
+        // Handle Invoice ID specifically for prefix logic
+        if (field === "id" && typeof value === "string") {
+          const numberPart =
+            value.startsWith("I") || value.startsWith("C")
+              ? value.slice(1)
+              : value;
+          const currentPrefix = prev.paymenttype === "CASH" ? "C" : "I";
+          return { ...prev, id: numberPart }; // Store only number part
+        }
+
+        // Handle Payment Type change and update ID prefix display logic elsewhere (InvoiceHeader)
+        if (field === "paymenttype") {
+          // ID prefix logic is handled in InvoiceHeader displayValue
+          return { ...prev, paymenttype: value };
+        }
+
+        // Default update for other fields
+        return { ...prev, [field]: value };
+      });
     },
-    []
+    [isReadOnly] // Add isReadOnly dependency
   );
+
+  // Customer selection from Combobox
   const handleCustomerSelectionChange = useCallback(
     (customer: Customer | null) => {
-      setSelectedCustomer(customer);
+      if (isReadOnly) return;
+      setSelectedCustomer(customer); // Update the selected customer object from the hook
       setInvoiceData((prev) =>
         prev
           ? {
               ...prev,
               customerid: customer ? customer.id : "",
-              customerName: customer ? customer.name : "",
+              customerName: customer ? customer.name : "", // Store name for display fallback
             }
           : null
       );
+      // Trigger fetch for custom products if needed
       if (customer) {
         fetchCustomerProducts(customer.id);
       } else {
         setCustomerProducts([]);
       }
     },
-    [setSelectedCustomer, fetchCustomerProducts]
+    [isReadOnly, setSelectedCustomer, fetchCustomerProducts]
   );
-  const handleLineItemsChange = useCallback((updatedItems: ProductItem[]) => {
-    const itemsWithUid = updatedItems.map((item) => ({
-      ...item,
-      uid: item.uid || crypto.randomUUID(),
-    }));
-    setInvoiceData((prev) =>
-      prev ? { ...prev, products: itemsWithUid } : null
-    );
-  }, []);
-  const handleRoundingChange = useCallback((newRounding: number) => {
-    setInvoiceData((prev) =>
-      prev ? { ...prev, rounding: parseFloat(newRounding.toFixed(2)) } : null
-    );
-  }, []);
+
+  // Line item changes from table
+  const handleLineItemsChange = useCallback(
+    (updatedItems: ProductItem[]) => {
+      if (isReadOnly) return;
+      // Ensure UIDs exist on all items
+      const itemsWithUid = updatedItems.map((item) => ({
+        ...item,
+        uid: item.uid || crypto.randomUUID(),
+      }));
+      setInvoiceData((prev) =>
+        prev ? { ...prev, products: itemsWithUid } : null
+      );
+    },
+    [isReadOnly]
+  );
+
+  // Rounding change from totals component
+  const handleRoundingChange = useCallback(
+    (newRounding: number) => {
+      if (isReadOnly) return;
+      setInvoiceData((prev) =>
+        prev ? { ...prev, rounding: parseFloat(newRounding.toFixed(2)) } : null
+      );
+    },
+    [isReadOnly]
+  );
+
+  // Add new row to line items
   const handleAddRow = () => {
-    if (!invoiceData) return;
+    if (isReadOnly || !invoiceData) return;
     const newRow: ProductItem = {
       uid: crypto.randomUUID(),
       code: "",
@@ -372,18 +475,22 @@ const InvoiceDetailsPagev2: React.FC = () => {
       total: "0.00",
       issubtotal: false,
     };
-    handleLineItemsChange([...invoiceData.products, newRow]);
+    handleLineItemsChange([...invoiceData.products, newRow]); // Use existing handler
   };
+
+  // Add subtotal row
   const handleAddSubtotal = () => {
-    if (!invoiceData) return;
+    if (isReadOnly || !invoiceData) return;
     let runningTotal = 0;
-    invoiceData.products.forEach((item) => {
-      if (!item.issubtotal) {
+    // Calculate running total since last subtotal or beginning
+    for (let i = invoiceData.products.length - 1; i >= 0; i--) {
+      const item = invoiceData.products[i];
+      if (item.issubtotal) break; // Stop at the previous subtotal
+      if (!item.istotal) {
         runningTotal += parseFloat(item.total || "0");
-      } else {
-        runningTotal = 0;
       }
-    });
+    }
+
     const subtotalRow: ProductItem = {
       uid: crypto.randomUUID(),
       code: "SUBTOTAL",
@@ -393,78 +500,91 @@ const InvoiceDetailsPagev2: React.FC = () => {
       freeProduct: 0,
       returnProduct: 0,
       tax: 0,
-      total: runningTotal.toFixed(2),
+      total: runningTotal.toFixed(2), // Use calculated running total
       issubtotal: true,
     };
     handleLineItemsChange([...invoiceData.products, subtotalRow]);
   };
+
+  // SAVE (Create or Update)
   const handleSaveClick = async () => {
-    if (!invoiceData || isSaving) return;
-    /* Validation */ let errors: string[] = [];
-    if (!invoiceData.id && isNewInvoice)
-      errors.push("Invoice Number is required.");
-    if (isNewInvoice && invoiceData.id && isCheckingDuplicate) {
-      toast.error("Please wait for duplicate check to complete.");
+    if (!invoiceData || isSaving || isReadOnly) return; // Prevent save if read-only
+
+    // --- Validation ---
+    let errors: string[] = [];
+    const numberPartId = invoiceData.id; // Assumes ID in state is just the number part now
+
+    if (!numberPartId) errors.push("Invoice Number is required.");
+    if (isNewInvoice && numberPartId && isCheckingDuplicate) {
+      toast.error("Please wait for duplicate check.");
       return;
     }
-    if (isDuplicate && isNewInvoice)
-      errors.push("Invoice Number is already taken.");
+    if (isNewInvoice && numberPartId && isDuplicate)
+      errors.push(`Invoice Number ${numberPartId} is already taken.`);
     if (!invoiceData.customerid) errors.push("Customer is required.");
     if (!invoiceData.salespersonid) errors.push("Salesman is required.");
-    if (!invoiceData.createddate) errors.push("Date/Time is required.");
-    const itemsToValidate = lineItems.filter((li) => !li.issubtotal);
+    // Basic check for valid date string
+    if (!invoiceData.createddate || isNaN(parseInt(invoiceData.createddate)))
+      errors.push("Valid Date/Time is required.");
+
+    const itemsToValidate = lineItems.filter(
+      (li) => !li.issubtotal && !li.istotal
+    );
     if (itemsToValidate.length === 0) {
-      errors.push("Invoice must have at least one item.");
+      errors.push("Invoice must have at least one product item.");
     } else {
       itemsToValidate.forEach((item, index) => {
-        if (!item.code || !item.description) {
-          errors.push(`Item #${index + 1}: Product must be selected.`);
-        }
+        if (!item.code || !item.description)
+          errors.push(
+            `Item #${index + 1}: Product code and description required.`
+          );
+        // Add quantity/price > 0 checks?
+        if (Number(item.quantity || 0) <= 0)
+          errors.push(`Item #${index + 1}: Quantity must be positive.`);
+        if (Number(item.price || 0) < 0)
+          errors.push(`Item #${index + 1}: Price cannot be negative.`);
       });
     }
     if (errors.length > 0) {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
       return;
     }
-    /* End Validation */ setIsSaving(true);
+    // --- End Validation ---
+
+    setIsSaving(true);
     const toastId = toast.loading(
       isNewInvoice ? "Creating Invoice..." : "Updating Invoice..."
     );
-    const dataToSave = {
-      ...invoiceData,
-      products: lineItems.map(
-        ({ uid, istotal, rounding, amount, ...rest }) => rest
-      ),
-      originalId: invoiceData.originalId,
-    };
+
+    // Ensure the full ID with prefix is passed to the utility
+    const fullInvoiceId = `${invoiceData.paymenttype === "CASH" ? "C" : "I"}${
+      invoiceData.id
+    }`;
+    const dataToSend = { ...invoiceData, id: fullInvoiceId };
+
     try {
       let savedInvoice: ExtendedInvoiceData;
       if (isNewInvoice) {
-        console.log("Creating invoice (mock)...", dataToSave);
-        savedInvoice = {
-          ...dataToSave,
-          id: dataToSave.id || `NEW${Date.now()}`,
-        };
-        await new Promise((res) => setTimeout(res, 600));
+        savedInvoice = await createInvoice(dataToSend); // Pass data with full ID
         toast.success(`Invoice ${savedInvoice.id} created!`, { id: toastId });
-        navigate(`/sales/invoice/${savedInvoice.id}`);
+        navigate(`/sales/invoice/${savedInvoice.id}`, { replace: true }); // Navigate to new ID
       } else {
-        console.log("Updating invoice (mock)...", dataToSave);
-        savedInvoice = { ...dataToSave };
-        await new Promise((res) => setTimeout(res, 600));
+        savedInvoice = await updateInvoice(dataToSend); // Pass data with full ID
         toast.success(`Invoice ${savedInvoice.id} updated!`, { id: toastId });
-        setInvoiceData(structuredClone(savedInvoice));
+        // Update state with response (which should have the correct ID and updated data)
+        setInvoiceData(savedInvoice);
         setInitialInvoiceData(structuredClone(savedInvoice));
         setIsFormChanged(false);
       }
     } catch (error: any) {
-      toast.error(`Failed to save invoice: ${error.message}`, { id: toastId });
+      // Error handled in utils
     } finally {
       setIsSaving(false);
     }
   };
 
-  // --- Render ---
+  // --- Render Logic ---
+
   if (isLoadingPage)
     return (
       <div className="mt-40 flex justify-center">
@@ -485,21 +605,18 @@ const InvoiceDetailsPagev2: React.FC = () => {
       </div>
     );
 
-  const isReadOnly =
-    isSaving ||
-    invoiceData.invoice_status === "cancelled" ||
-    invoiceData.invoice_status === "paid";
   const salesmenOptions = salesmenCache.map((s) => ({
     id: s.id,
     name: s.name || s.id,
   }));
-
-  // Map productsCache for LineItemsTable Combobox - transform to ProductItem format
+  // Map productsCache for LineItemsTable Combobox (ensure correct price field)
   const productsForTable = productsCache.map((product) => ({
-    uid: crypto.randomUUID(), // Generate proper UUID instead of using product.id
-    code: product.id,
+    uid: crypto.randomUUID(), // Use UUID for temporary key
+    id: parseInt(product.id), // Use actual product ID (if needed by combobox)
+    code: product.id, // Product Code/ID
     description: product.description,
-    price: product.price_per_unit,
+    price: product.price_per_unit, // Make sure this matches cache structure
+    // Default values for a new line item when selected
     quantity: 1,
     freeProduct: 0,
     returnProduct: 0,
@@ -508,33 +625,43 @@ const InvoiceDetailsPagev2: React.FC = () => {
     issubtotal: false,
   }));
 
+  // --- JSX Output ---
   return (
     <div className="px-4 md:px-6 pb-8 max-w-full">
-      <BackButton onClick={handleBackClick} />
+      <BackButton onClick={handleBackClick} disabled={isSaving} />
+
+      {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
         <h1 className="text-2xl font-bold text-default-900 flex-shrink-0 pr-4">
-          {isNewInvoice ? "New Invoice" : `Invoice #${invoiceData.id || "..."}`}
+          {/* Display full ID with prefix */}
+          {isNewInvoice
+            ? "New Invoice"
+            : `Invoice #${invoiceData.paymenttype === "CASH" ? "C" : "I"}${
+                invoiceData.id
+              }`}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Cancel Button */}
           {!isNewInvoice && invoiceData.invoice_status !== "cancelled" && (
             <Button
               onClick={handleCancelInvoiceClick}
               variant="outline"
               color="rose"
               size="md"
-              disabled={isSaving || isReadOnly}
+              disabled={isReadOnly || isSaving} // Disable if read-only or saving
             >
               {" "}
               Cancel Invoice{" "}
             </Button>
           )}
+          {/* Save/Create Button */}
           <Button
             onClick={handleSaveClick}
             variant="filled"
             color="sky"
             size="md"
             disabled={
-              isSaving || isReadOnly || (!isNewInvoice && !isFormChanged)
+              isReadOnly || isSaving || (!isNewInvoice && !isFormChanged)
             }
           >
             {isSaving
@@ -545,7 +672,10 @@ const InvoiceDetailsPagev2: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Main Content Area */}
       <div className="space-y-5">
+        {/* Invoice Header Fields */}
         <section className="p-4 border rounded-lg bg-white shadow-sm">
           <InvoiceHeader
             invoice={invoiceData}
@@ -562,19 +692,23 @@ const InvoiceDetailsPagev2: React.FC = () => {
             onLoadMoreCustomers={loadMoreCustomers}
             hasMoreCustomers={hasMoreCustomers}
             isFetchingCustomers={isFetchingCustomers}
-            onInvoiceIdBlur={(id) =>
-              checkDuplicateDebounced(id) || Promise.resolve(false)
-            }
+            // Pass the full potential ID from state for blur check
+            onInvoiceIdBlur={async (invIdInput) => {
+              await checkDuplicateDebounced(invIdInput);
+              return isDuplicate; // Return current state after check
+            }}
             isCheckingDuplicate={isCheckingDuplicate}
             isDuplicate={isDuplicate}
+            readOnly={isReadOnly} // Pass readOnly state
           />
         </section>
+
+        {/* Line Items Section */}
         <section className="p-4 border rounded-lg bg-white shadow-sm">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">Line Items</h2>
             {!isReadOnly && (
               <div>
-                {" "}
                 <Button
                   onClick={handleAddSubtotal}
                   variant="outline"
@@ -582,10 +716,10 @@ const InvoiceDetailsPagev2: React.FC = () => {
                   className="mr-2"
                 >
                   Add Subtotal
-                </Button>{" "}
+                </Button>
                 <Button onClick={handleAddRow} variant="outline" size="sm">
                   Add Item
-                </Button>{" "}
+                </Button>
               </div>
             )}
           </div>
@@ -593,10 +727,12 @@ const InvoiceDetailsPagev2: React.FC = () => {
             items={lineItems}
             onItemsChange={handleLineItemsChange}
             customerProducts={customerProducts}
-            productsCache={productsForTable} // Pass the raw Product cache
+            productsCache={productsForTable} // Pass formatted product cache
             readOnly={isReadOnly}
           />
         </section>
+
+        {/* Totals Section */}
         <section className="p-4 border rounded-lg bg-white shadow-sm">
           <InvoiceTotals
             subtotal={invoiceData.total_excluding_tax}
@@ -607,46 +743,70 @@ const InvoiceDetailsPagev2: React.FC = () => {
             readOnly={isReadOnly}
           />
         </section>
+
+        {/* E-Invoice Details Section (Conditional Display) */}
         {!isNewInvoice && invoiceData.uuid && (
           <section className="p-4 border rounded-lg bg-white shadow-sm">
-            {" "}
-            <h2 className="text-lg font-semibold mb-3">
-              E-Invoice Details
-            </h2>{" "}
+            <h2 className="text-lg font-semibold mb-3">E-Invoice Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              {" "}
               <p>
                 <strong className="text-gray-600">UUID:</strong>{" "}
-                <span className="font-mono text-xs">{invoiceData.uuid}</span>
-              </p>{" "}
+                <span className="font-mono text-xs break-all">
+                  {invoiceData.uuid}
+                </span>
+              </p>
               <p>
                 <strong className="text-gray-600">Long ID:</strong>{" "}
-                <span className="font-mono text-xs">
+                <span className="font-mono text-xs break-all">
                   {invoiceData.long_id || "N/A"}
                 </span>
-              </p>{" "}
+              </p>
               <p>
                 <strong className="text-gray-600">Submission UID:</strong>{" "}
-                <span className="font-mono text-xs">
+                <span className="font-mono text-xs break-all">
                   {invoiceData.submission_uid || "N/A"}
                 </span>
-              </p>{" "}
+              </p>
               <p>
                 <strong className="text-gray-600">Validated:</strong>{" "}
                 {invoiceData.datetime_validated
-                  ? new Date(invoiceData.datetime_validated).toLocaleString()
+                  ? parseDatabaseTimestamp(invoiceData.datetime_validated)
+                      .formattedTime
                   : "N/A"}
-              </p>{" "}
-            </div>{" "}
+              </p>
+              <p>
+                <strong className="text-gray-600">Status:</strong>{" "}
+                <span
+                  className={`font-medium ${
+                    invoiceData.einvoice_status === "valid"
+                      ? "text-green-700"
+                      : invoiceData.einvoice_status === "invalid"
+                      ? "text-red-700"
+                      : invoiceData.einvoice_status === "pending"
+                      ? "text-yellow-700"
+                      : invoiceData.einvoice_status === "cancelled"
+                      ? "text-rose-700"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {invoiceData.einvoice_status
+                    ? invoiceData.einvoice_status.charAt(0).toUpperCase() +
+                      invoiceData.einvoice_status.slice(1)
+                    : "N/A"}
+                </span>
+              </p>
+            </div>
           </section>
         )}
       </div>
+
+      {/* Confirmation Dialogs */}
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
         title="Discard Changes"
-        message="Are you sure? Unsaved changes will be lost."
+        message="Are you sure you want to leave? Unsaved changes will be lost."
         confirmButtonText="Discard"
         variant="danger"
       />
@@ -655,94 +815,12 @@ const InvoiceDetailsPagev2: React.FC = () => {
         onClose={() => setShowCancelConfirmation(false)}
         onConfirm={handleConfirmCancelInvoice}
         title="Cancel Invoice"
-        message={`Are you sure you want to cancel invoice ${invoiceData?.id}? This action cannot be undone.`}
+        message={`Are you sure you want to cancel Invoice #${invoiceData?.id}? This action cannot be undone and may attempt to cancel the e-invoice if submitted.`}
         confirmButtonText="Confirm Cancellation"
         variant="danger"
       />
     </div>
   );
 };
-
-// Add MOCK_INVOICES_DETAILS here for testing
-const MOCK_INVOICES_DETAILS: ExtendedInvoiceData[] = [
-  {
-    id: "1001",
-    salespersonid: "S01",
-    customerid: "CUST001",
-    customerName: "ABC Trading",
-    createddate: new Date(2023, 10, 15, 10, 30).getTime().toString(),
-    paymenttype: "INVOICE",
-    total_excluding_tax: 150.0,
-    tax_amount: 15.0,
-    rounding: 0.05,
-    totalamountpayable: 165.05,
-    uuid: "uuid-123",
-    submission_uid: "sub-abc",
-    long_id: "long-123",
-    datetime_validated: "2023-11-15T11:00:00Z",
-    is_consolidated: false,
-    consolidated_invoices: null,
-    invoice_status: "active",
-    einvoice_status: "valid",
-    products: [
-      {
-        id: 41,
-        code: "P01",
-        description: "Product A",
-        quantity: 10,
-        price: 10,
-        freeProduct: 1,
-        returnProduct: 0,
-        tax: 10.0,
-        total: "110.00",
-      },
-      {
-        id: 42,
-        code: "P02",
-        description: "Product B",
-        quantity: 5,
-        price: 10,
-        freeProduct: 0,
-        returnProduct: 0,
-        tax: 5.0,
-        total: "55.00",
-      },
-    ],
-  },
-  {
-    id: "1002",
-    salespersonid: "S02",
-    customerid: "CUST002",
-    customerName: "XYZ Corp",
-    createddate: new Date(2023, 10, 14, 14, 0).getTime().toString(),
-    paymenttype: "CASH",
-    total_excluding_tax: 200.0,
-    tax_amount: 0.0,
-    rounding: 0.0,
-    totalamountpayable: 200.0,
-    uuid: null,
-    submission_uid: null,
-    long_id: null,
-    datetime_validated: null,
-    is_consolidated: false,
-    consolidated_invoices: null,
-    invoice_status: "paid",
-    einvoice_status: null,
-    products: [
-      {
-        id: 1234,
-        code: "P03",
-        description: "Product C",
-        quantity: 20,
-        price: 10,
-        freeProduct: 0,
-        returnProduct: 0,
-        tax: 0.0,
-        total: "200.00",
-      },
-    ],
-  },
-  // Add more mock data as needed
-];
 
 export default InvoiceDetailsPagev2;

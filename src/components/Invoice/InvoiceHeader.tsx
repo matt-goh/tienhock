@@ -38,6 +38,7 @@ interface InvoiceHeaderProps {
   onInvoiceIdBlur?: (id: string) => Promise<boolean>; // Optional check on blur
   isCheckingDuplicate?: boolean;
   isDuplicate?: boolean;
+  readOnly?: boolean;
 }
 
 // Helper to get status styles and icon

@@ -12,16 +12,17 @@ import {
   InvoiceFilters,
   InvoiceStatus,
   EInvoiceStatus,
-} from "../../types/types"; // Use updated types
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import DateRangePicker from "../../components/DateRangePicker"; // Import
-import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu"; // Import (needs updates later)
-import FilterSummary from "../../components/Invoice/FilterSummary"; // Import (needs updates later)
-import InvoiceGrid from "../../components/Invoice/InvoiceGrid"; // Import
-import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache"; // For filter options
-import ConfirmationDialog from "../../components/ConfirmationDialog"; // For bulk actions
+} from "../../types/types"; // Adjust path
+import Button from "../../components/Button"; // Adjust path
+import LoadingSpinner from "../../components/LoadingSpinner"; // Adjust path
+import DateRangePicker from "../../components/DateRangePicker"; // Adjust path
+import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu"; // Adjust path
+// import FilterSummary from "../../components/Invoice/FilterSummary"; // Keep if using
+import InvoiceGrid from "../../components/Invoice/InvoiceGrid"; // Adjust path
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache"; // Adjust path
+import ConfirmationDialog from "../../components/ConfirmationDialog"; // Adjust path
 import toast from "react-hot-toast";
+import { api } from "../../routes/utils/api"; // Adjust path
 
 import {
   IconPlus,
@@ -31,7 +32,11 @@ import {
   IconCheck,
   IconSquare,
   IconSquareCheckFilled,
-  IconSquareMinusFilled, // Import selection icons
+  IconSquareMinusFilled,
+  IconSend,
+  IconFileDownload,
+  IconPrinter,
+  IconBan,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -39,12 +44,14 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { useCustomerNames } from "../../hooks/useCustomerNames";
-import PaginationControls from "../../components/Invoice/PaginationControls";
+import { useCustomerNames } from "../../hooks/useCustomerNames"; // Adjust path
+import PaginationControls from "../../components/Invoice/PaginationControls"; // Adjust path
+// Import the specific utilities needed
+import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils"; // Adjust path
 
 // --- Constants ---
-const STORAGE_KEY = "invoisDateFilters";
-const ITEMS_PER_PAGE = 10; // Target items per page
+const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
+const ITEMS_PER_PAGE = 15; // Number of items per page
 
 interface MonthOption {
   id: number;
@@ -52,285 +59,508 @@ interface MonthOption {
 }
 
 // --- Helper Functions ---
-const getInitialDates = () => {
+const getInitialDates = (): { start: Date; end: Date } => {
   const savedFilters = localStorage.getItem(STORAGE_KEY);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
   if (savedFilters) {
-    const { start, end } = JSON.parse(savedFilters);
-    return {
-      start: start
-        ? new Date(start)
-        : new Date(new Date().setDate(new Date().getDate() - 30)), // Default to last 30 days
-      end: end ? new Date(end) : new Date(),
-    };
+    try {
+      const { start, end } = JSON.parse(savedFilters);
+      return {
+        start: start ? new Date(start) : thirtyDaysAgo,
+        end: end ? new Date(end) : today,
+      };
+    } catch {
+      /* Ignore parsing error, use defaults */
+    }
   }
-  return {
-    start: new Date(new Date().setDate(new Date().getDate() - 30)),
-    end: new Date(),
-  };
+  return { start: thirtyDaysAgo, end: today };
 };
 
-const saveDatesToStorage = (startDate: Date | null, endDate: Date | null) => {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      start: startDate?.toISOString(),
-      end: endDate?.toISOString(),
-    })
-  );
+const saveDatesToStorage = (startDate: Date, endDate: Date) => {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      })
+    );
+  } catch (e) {
+    console.error("Failed to save date filters to local storage", e);
+  }
 };
 
+// --- Component ---
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
   // --- State ---
-  const [allInvoices, setAllInvoices] = useState<ExtendedInvoiceData[]>([]); // Holds all data for current filters/date range
-  const [paginatedInvoices, setPaginatedInvoices] = useState<
-    ExtendedInvoiceData[]
-  >([]); // Data for the current page
+  const [invoices, setInvoices] = useState<ExtendedInvoiceData[]>([]); // Data for the CURRENT page
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
     new Set()
   );
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0); // Total items matching filters
+  const [totalItems, setTotalItems] = useState(0); // TOTAL items matching filters (from backend)
+  const [totalPages, setTotalPages] = useState(1); // TOTAL pages (from backend)
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFetchTriggered, setIsFetchTriggered] = useState(true); // Trigger initial fetch
+  const [isFetchTriggered, setIsFetchTriggered] = useState(true); // Trigger fetch on load/change
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showEInvoiceConfirm, setShowEInvoiceConfirm] = useState(false);
 
   // Filters State
-  const [filters, setFilters] = useState<InvoiceFilters>({
-    dateRange: getInitialDates(),
-    salespersonId: null,
-    applySalespersonFilter: true,
-    customerId: null,
-    applyCustomerFilter: true,
-    paymentType: null,
-    applyPaymentTypeFilter: true,
-    // --- Add New Filters ---
-    invoiceStatus: [], // Array for multi-select
-    applyInvoiceStatusFilter: false, // Default to not applying
-    eInvoiceStatus: [], // Array for multi-select
-    applyEInvoiceStatusFilter: false, // Default to not applying
-  });
+  const initialFilters = useMemo(
+    () => ({
+      dateRange: getInitialDates(),
+      salespersonId: null,
+      applySalespersonFilter: false, // Default to false unless you want it always on
+      customerId: null,
+      applyCustomerFilter: false,
+      paymentType: null,
+      applyPaymentTypeFilter: false,
+      invoiceStatus: [], // Empty array for multi-select
+      applyInvoiceStatusFilter: false,
+      eInvoiceStatus: [], // Empty array for multi-select
+      applyEInvoiceStatusFilter: false,
+    }),
+    []
+  ); // Calculate initial filters once
+  const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
 
   // Month Selector State
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-  const monthOptions: MonthOption[] = Array.from({ length: 12 }, (_, i) => ({
-    id: i,
-    name: new Date(0, i).toLocaleString("en", { month: "long" }),
-  }));
+  const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
+  const monthOptions: MonthOption[] = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => ({
+        id: i,
+        name: new Date(0, i).toLocaleString("en", { month: "long" }),
+      })),
+    []
+  );
   const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
-    monthOptions[currentMonth]
+    monthOptions[currentMonthIndex]
   );
 
   // Data Hooks
-  const { salesmen, isLoading: salesmenLoading } = useSalesmanCache(); // For filter options
-  const customerIds = allInvoices.map((inv) => inv.customerid);
-  const { customerNames, isLoading: namesLoading } =
-    useCustomerNames(customerIds); // Use custom hook
+  const { salesmen, isLoading: salesmenLoading } = useSalesmanCache();
+  const customerIds = useMemo(
+    () => invoices.map((inv) => inv.customerid),
+    [invoices]
+  );
+  const { customerNames /*, isLoading: namesLoading */ } =
+    useCustomerNames(customerIds);
 
-  const clearSelectionRef = useRef<(() => void) | null>(null); // Ref for clearing selection
+  // Ref for external clearing (optional)
+  const clearSelectionRef = useRef<(() => void) | null>(null);
 
   // --- Derived State ---
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  // Selection state based on currently displayed invoices on the page
   const selectionState = useMemo(() => {
-    const totalSelectable = allInvoices.length; // Select based on all filtered invoices
-    const selectedCount = selectedInvoiceIds.size;
+    if (invoices.length === 0)
+      return { isAllSelectedOnPage: false, isIndeterminate: false };
+    const currentPageIds = new Set(invoices.map((inv) => inv.id));
+    const selectedOnPageCount = Array.from(selectedInvoiceIds).filter((id) =>
+      currentPageIds.has(id)
+    ).length;
+    const totalSelectableOnPage = invoices.length;
+
     return {
-      isAllSelected: totalSelectable > 0 && selectedCount === totalSelectable,
-      isIndeterminate: selectedCount > 0 && selectedCount < totalSelectable,
+      isAllSelectedOnPage: selectedOnPageCount === totalSelectableOnPage,
+      isIndeterminate:
+        selectedOnPageCount > 0 && selectedOnPageCount < totalSelectableOnPage,
     };
-  }, [selectedInvoiceIds, allInvoices]);
+  }, [selectedInvoiceIds, invoices]);
 
   // --- Callbacks ---
 
-  // Fetching Data
-  const fetchInvoices = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      // Date Range
-      if (filters.dateRange.start)
-        params.append(
-          "startDate",
-          filters.dateRange.start.getTime().toString()
+  // Fetch Invoices using the utility
+  const fetchInvoices = useCallback(
+    async (pageToFetch: number) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await getInvoices(
+          filters,
+          pageToFetch,
+          ITEMS_PER_PAGE,
+          searchTerm
         );
-      if (filters.dateRange.end)
-        params.append("endDate", filters.dateRange.end.getTime().toString());
-      // Existing Filters
-      if (filters.applySalespersonFilter && filters.salespersonId?.length)
-        params.append("salesman", filters.salespersonId.join(","));
-      if (filters.applyCustomerFilter && filters.customerId?.length)
-        params.append("customer", filters.customerId.join(","));
-      if (filters.applyPaymentTypeFilter && filters.paymentType)
-        params.append("paymentType", filters.paymentType); // Ensure backend expects 'Cash'/'Invoice'
-      // New Filters
-      if (filters.applyInvoiceStatusFilter && filters.invoiceStatus?.length)
-        params.append("invoiceStatus", filters.invoiceStatus.join(","));
-      if (filters.applyEInvoiceStatusFilter && filters.eInvoiceStatus?.length)
-        params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
-      // Search Term (Backend needs to support this)
-      if (searchTerm) params.append("search", searchTerm);
-      // Pagination (if backend supports it)
-      // params.append('page', currentPage.toString());
-      // params.append('limit', ITEMS_PER_PAGE.toString());
+        setInvoices(response.data);
+        setTotalItems(response.total);
+        setTotalPages(response.totalPages);
+        setCurrentPage(pageToFetch); // Ensure page state matches fetched page
+        // Clear selection when data reloads? Optional.
+        // setSelectedInvoiceIds(new Set());
+      } catch (err: any) {
+        setError(err.message || "Failed to fetch invoices.");
+        setInvoices([]); // Clear data on error
+        setTotalItems(0);
+        setTotalPages(1);
+      } finally {
+        setIsLoading(false);
+        setIsFetchTriggered(false); // Reset trigger
+      }
+    },
+    [filters, searchTerm]
+  ); // Dependencies
 
-      console.log("Fetching with params:", params.toString()); // Debugging
-
-      // Replace with actual API call
-      // const response = await api.get(`/api/invoices/v2?${params.toString()}`);
-      // MOCK API CALL
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate delay
-      let mockData = [...MOCK_INVOICES] // Use mock data from previous step
-        .filter((inv) => {
-          const invDate = new Date(parseInt(inv.createddate));
-          const startOk =
-            !filters.dateRange.start || invDate >= filters.dateRange.start;
-          const endOk =
-            !filters.dateRange.end || invDate <= filters.dateRange.end;
-          // Add filter logic here based on state...
-          return startOk && endOk;
-        })
-        .filter((inv) => {
-          // Client-side search for now
-          if (!searchTerm) return true;
-          const term = searchTerm.toLowerCase();
-          const customerName = customerNames[inv.customerid] || inv.customerid;
-          return (
-            inv.id.toLowerCase().includes(term) ||
-            customerName.toLowerCase().includes(term)
-          );
-        });
-
-      setAllInvoices(mockData);
-      setTotalItems(mockData.length); // Set total count based on filtered mock data
-    } catch (err: any) {
-      console.error("Error fetching invoices:", err);
-      setError(err.message || "Failed to fetch invoices. Please try again.");
-      setAllInvoices([]);
-      setTotalItems(0);
-    } finally {
-      setIsLoading(false);
-      setIsFetchTriggered(false); // Mark fetch as done
-    }
-  }, [filters, currentPage, searchTerm, customerNames]); // Include dependencies
-
-  // Trigger fetch when filters, page, or trigger state change
+  // Effect to trigger fetch when needed
   useEffect(() => {
     if (isFetchTriggered) {
-      fetchInvoices();
+      fetchInvoices(currentPage);
     }
-  }, [fetchInvoices, isFetchTriggered]);
-
-  // Apply pagination locally after fetching all filtered data
-  useEffect(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    setPaginatedInvoices(allInvoices.slice(startIndex, endIndex));
-  }, [allInvoices, currentPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFetchTriggered, currentPage]); // fetchInvoices is stable due to useCallback
 
   // Filter Change Handler
   const handleFilterChange = useCallback(
     (newFilters: Partial<InvoiceFilters>) => {
-      const updatedFilters = { ...filters, ...newFilters };
-      // Special handling for date range
-      if (newFilters.dateRange) {
-        saveDatesToStorage(
-          newFilters.dateRange.start,
+      setFilters((prev) => {
+        const updated = { ...prev, ...newFilters };
+        // Special handling for date range saving
+        if (
+          newFilters.dateRange &&
+          newFilters.dateRange.start &&
           newFilters.dateRange.end
-        );
-        updatedFilters.dateRange = newFilters.dateRange;
-      }
-      setFilters(updatedFilters);
-      setCurrentPage(1); // Reset page when filters change
-      setSelectedInvoiceIds(new Set()); // Clear selection
-      setIsFetchTriggered(true); // Trigger fetch
+        ) {
+          saveDatesToStorage(
+            newFilters.dateRange.start,
+            newFilters.dateRange.end
+          );
+          updated.dateRange = newFilters.dateRange; // Ensure it's updated
+        }
+        return updated;
+      });
+      if (currentPage !== 1) setCurrentPage(1); // Reset to page 1
+      else setIsFetchTriggered(true); // If already on page 1, trigger directly
+      // Clear selection on filter change
+      setSelectedInvoiceIds(new Set());
     },
-    [filters]
-  );
+    [currentPage]
+  ); // Dependency on currentPage to decide reset vs trigger
 
   // Month Change Handler
   const handleMonthChange = useCallback(
     (month: MonthOption) => {
       setSelectedMonth(month);
-      const year = month.id > currentMonth ? currentYear - 1 : currentYear;
+      const year = new Date().getFullYear(); // Use current year, or add year selector
+      // Calculate start/end dates for the selected month
       const startDate = new Date(year, month.id, 1);
       startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(year, month.id + 1, 0);
+      const endDate = new Date(year, month.id + 1, 0); // Day 0 of next month = last day of current
       endDate.setHours(23, 59, 59, 999);
 
       handleFilterChange({ dateRange: { start: startDate, end: endDate } });
     },
-    [currentMonth, currentYear, handleFilterChange]
+    [handleFilterChange]
   );
 
-  // Search Handler
+  // Search Handler (triggers fetch immediately)
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
-    setCurrentPage(1); // Reset page on search
-    // Fetch will be triggered by useEffect watching searchTerm if backend search is used
-    // For client-side search, pagination effect will update the view
+    if (currentPage !== 1) setCurrentPage(1);
+    else setIsFetchTriggered(true);
+    setSelectedInvoiceIds(new Set()); // Clear selection on search
   };
 
-  // Selection Handlers
+  // Select/Deselect a single invoice
   const handleSelectInvoice = useCallback((invoiceId: string) => {
     setSelectedInvoiceIds((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(invoiceId)) {
-        newSet.delete(invoiceId);
-      } else {
-        newSet.add(invoiceId);
-      }
+      if (newSet.has(invoiceId)) newSet.delete(invoiceId);
+      else newSet.add(invoiceId);
       return newSet;
     });
   }, []);
 
-  const handleSelectAll = useCallback(() => {
-    if (selectionState.isAllSelected || selectionState.isIndeterminate) {
-      setSelectedInvoiceIds(new Set()); // Clear selection
-    } else {
-      setSelectedInvoiceIds(new Set(allInvoices.map((inv) => inv.id))); // Select all filtered
-    }
-  }, [selectionState, allInvoices]);
+  // Select/Deselect all invoices visible on the current page
+  const handleSelectAllOnPage = useCallback(() => {
+    const currentPageIds = invoices.map((inv) => inv.id);
+    setSelectedInvoiceIds((prev) => {
+      const newSet = new Set(prev);
+      // Check if ALL on the current page are already selected within the main set
+      const allCurrentlySelected =
+        currentPageIds.length > 0 &&
+        currentPageIds.every((id) => newSet.has(id));
 
-  // Clear selection function exposed via ref
+      if (allCurrentlySelected) {
+        // Deselect all on current page
+        currentPageIds.forEach((id) => newSet.delete(id));
+      } else {
+        // Select all on current page
+        currentPageIds.forEach((id) => newSet.add(id));
+      }
+      return newSet;
+    });
+  }, [invoices]); // Depends on the invoices currently displayed
+
+  // Function to clear selection (can be called externally via ref)
   const clearCurrentSelection = useCallback(() => {
     setSelectedInvoiceIds(new Set());
   }, []);
-
   useEffect(() => {
-    if (clearSelectionRef) {
-      clearSelectionRef.current = clearCurrentSelection;
-    }
+    clearSelectionRef.current = clearCurrentSelection;
   }, [clearCurrentSelection]);
 
   // Navigation
   const handleCreateNewInvoice = () => navigate("/sales/invoice/new");
   const handleViewDetails = (invoiceId: string) =>
     navigate(`/sales/invoice/${invoiceId}`, {
-      state: { previousPath: location.pathname },
+      state: { previousPath: location.pathname + location.search },
     });
 
-  // Actions (Placeholders for now)
-  const handleRefresh = () => setIsFetchTriggered(true);
-  const handleBulkCancel = () => toast("Bulk Cancel (Not Implemented)");
-  const handleBulkSubmitEInvoice = () =>
-    toast("Bulk Submit e-Invoice (Not Implemented)");
-  const handleBulkDownload = () => toast("Bulk Download PDF (Not Implemented)");
-  const handleBulkPrint = () => toast("Bulk Print PDF (Not Implemented)");
+  // --- Bulk Actions ---
+  const handleRefresh = () => {
+    if (!isLoading) {
+      // Prevent multiple triggers
+      setIsFetchTriggered(true);
+    }
+  };
 
+  // Initiate Bulk Cancel
+  const handleBulkCancel = () => {
+    if (selectedInvoiceIds.size === 0) return;
+    // Optional: Filter out already cancelled ones?
+    const cancellableCount = invoices.filter(
+      (inv) =>
+        selectedInvoiceIds.has(inv.id) && inv.invoice_status !== "cancelled"
+    ).length;
+    if (cancellableCount === 0) {
+      toast.error("No selected invoices are eligible for cancellation.");
+      return;
+    }
+    setShowCancelConfirm(true);
+  };
+
+  // Confirm Bulk Cancel Action
+  const confirmBulkCancel = async () => {
+    setShowCancelConfirm(false);
+    const idsToCancel = invoices
+      .filter(
+        (inv) =>
+          selectedInvoiceIds.has(inv.id) && inv.invoice_status !== "cancelled"
+      )
+      .map((inv) => inv.id);
+
+    if (idsToCancel.length === 0) return;
+
+    const toastId = toast.loading(
+      `Cancelling ${idsToCancel.length} invoice(s)...`
+    );
+    let successCount = 0;
+    let failCount = 0;
+
+    const results = await Promise.allSettled(
+      idsToCancel.map((id) => cancelInvoice(id))
+    );
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        successCount++;
+        // Update local state for the cancelled invoice
+        setInvoices((prev) =>
+          prev.map((inv) =>
+            inv.id === idsToCancel[index] ? result.value : inv
+          )
+        );
+      } else {
+        failCount++;
+        console.error(
+          `Failed to cancel invoice ${idsToCancel[index]}:`,
+          result.reason
+        );
+        // Error toast is handled in utility, maybe add specific ID here?
+        // toast.error(`Failed cancellation for ${idsToCancel[index]}`);
+      }
+    });
+
+    setSelectedInvoiceIds(new Set()); // Clear selection
+
+    if (failCount > 0) {
+      toast.error(
+        `${failCount} invoice(s) failed to cancel. ${successCount} succeeded.`,
+        { id: toastId, duration: 5000 }
+      );
+    } else {
+      toast.success(`${successCount} invoice(s) cancelled.`, { id: toastId });
+    }
+    // No full refresh needed as local state is updated.
+  };
+
+  // Initiate Bulk E-Invoice Submission
+  const handleBulkSubmitEInvoice = () => {
+    if (selectedInvoiceIds.size === 0) return;
+
+    const eligibleInvoices = invoices.filter(
+      (inv) =>
+        selectedInvoiceIds.has(inv.id) &&
+        inv.invoice_status === "active" && // Must be active
+        !inv.uuid && // Not previously submitted
+        inv.paymenttype !== "CASH" // Cannot submit CASH invoices (assumption)
+      // Add customer TIN/ID check if possible? Requires customer data here.
+    );
+
+    if (eligibleInvoices.length === 0) {
+      toast.error(
+        "No selected invoices are eligible for e-invoice submission (must be Active, non-Cash, not already submitted).",
+        { duration: 5000 }
+      );
+      return;
+    }
+    if (eligibleInvoices.length < selectedInvoiceIds.size) {
+      toast.error(
+        `Only ${eligibleInvoices.length} of the selected invoices are eligible for submission. Proceeding with eligible ones.`,
+        { duration: 5000 }
+      );
+      // Optionally update selection visually, though the confirm function filters again
+      // setSelectedInvoiceIds(new Set(eligibleInvoices.map(inv => inv.id)));
+    }
+
+    setShowEInvoiceConfirm(true);
+  };
+
+  // Confirm Bulk E-Invoice Action
+  const confirmBulkSubmitEInvoice = async () => {
+    setShowEInvoiceConfirm(false);
+    // Filter again *right before* sending
+    const idsToSubmit = invoices
+      .filter(
+        (inv) =>
+          selectedInvoiceIds.has(inv.id) &&
+          inv.invoice_status === "active" &&
+          !inv.uuid &&
+          inv.paymenttype !== "CASH"
+      )
+      .map((inv) => inv.id);
+
+    if (idsToSubmit.length === 0) {
+      toast.error("No eligible invoices to submit.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Submitting ${idsToSubmit.length} invoice(s) for e-invoicing...`
+    );
+
+    try {
+      // Call backend endpoint that handles fetching data & submitting to MyInvois
+      const response = await api.post("/api/einvoice/submit-system", {
+        invoiceIds: idsToSubmit,
+      });
+
+      // --- Process Backend Response ---
+      const message = response.message || "E-invoice submission processed.";
+      const overallStatus = response.overallStatus || "Unknown";
+
+      // Assuming response structure from previous examples (minimal or full)
+      const acceptedCount =
+        response.invoices?.filter(
+          (inv: any) => inv.einvoiceStatus === 0 || inv.einvoiceStatus === 10
+        ).length ??
+        response.acceptedDocuments?.length ??
+        0;
+      const rejectedCount =
+        response.invoices?.filter((inv: any) => inv.einvoiceStatus === 100)
+          .length ??
+        response.rejectedDocuments?.length ??
+        0;
+      const systemErrorCount =
+        response.invoices?.filter((inv: any) => inv.einvoiceStatus === 110)
+          .length ?? 0; // Example code
+
+      if (
+        overallStatus === "Invalid" ||
+        overallStatus === "EInvoiceInvalid" ||
+        overallStatus === "Rejected"
+      ) {
+        toast.error(`${message} Rejections: ${rejectedCount}.`, {
+          id: toastId,
+          duration: 6000,
+        });
+        // Log detailed errors if available
+        if (response.rejectedDocuments || response.invoices) {
+          console.error(
+            "E-invoice Rejections:",
+            response.rejectedDocuments ||
+              response.invoices?.filter((inv: any) => inv.error)
+          );
+          (
+            response.rejectedDocuments ||
+            response.invoices?.filter((inv: any) => inv.error)
+          ).forEach((rej: any) => {
+            const invId = rej.internalId || rej.id || "N/A";
+            const errMsg = rej.error?.message || "Rejected/Error";
+            toast.error(`Inv ${invId}: ${errMsg}`, { duration: 4000 });
+          });
+        }
+      } else if (
+        overallStatus === "Partial" ||
+        overallStatus === "EInvoiceSystemError" ||
+        systemErrorCount > 0
+      ) {
+        toast.error(
+          `${message} Accepted: ${acceptedCount}, Rejected/Errors: ${
+            rejectedCount + systemErrorCount
+          }.`,
+          { id: toastId, duration: 6000 }
+        );
+        // Log/toast detailed errors
+        if (response.rejectedDocuments || response.invoices) {
+          console.error(
+            "E-invoice Rejections/Errors:",
+            response.rejectedDocuments ||
+              response.invoices?.filter((inv: any) => inv.error)
+          );
+          (
+            response.rejectedDocuments ||
+            response.invoices?.filter((inv: any) => inv.error)
+          ).forEach((rej: any) => {
+            const invId = rej.internalId || rej.id || "N/A";
+            const errMsg = rej.error?.message || "Rejected/Error";
+            toast.error(`Inv ${invId}: ${errMsg}`, { duration: 4000 });
+          });
+        }
+      } else {
+        // Success or Valid
+        toast.success(`${message} Processed: ${acceptedCount}.`, {
+          id: toastId,
+        });
+      }
+
+      setSelectedInvoiceIds(new Set()); // Clear selection
+      setIsFetchTriggered(true); // Refresh list data
+    } catch (error: any) {
+      console.error("Error calling bulk e-invoice submission endpoint:", error);
+      toast.error(
+        `Submission failed: ${
+          error.response?.data?.message || error.message || "Unknown error"
+        }`,
+        { id: toastId }
+      );
+    }
+  };
+
+  // Other placeholder actions
+  const handleBulkDownload = () =>
+    toast.error("Bulk Download PDF (Not Implemented)");
+  const handleBulkPrint = () => toast.error("Bulk Print PDF (Not Implemented)");
+
+  // --- Render ---
   return (
-    <div className="flex flex-col p-6 space-y-4">
+    <div className="flex flex-col p-4 md:p-6 space-y-4">
       {/* --- Header --- */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-semibold text-default-900">
-          Invoices {totalItems > 0 && `(${totalItems})`}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
+          Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             onClick={handleRefresh}
             icon={IconRefresh}
@@ -342,17 +572,17 @@ const InvoiceListPage: React.FC = () => {
           <Button
             onClick={handleCreateNewInvoice}
             icon={IconPlus}
-            variant="outline"
+            variant="filled"
+            color="sky"
           >
-            Create
+            Create New
           </Button>
         </div>
       </div>
 
       {/* --- Filters --- */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
-        {/* Date Range */}
-        <div className="flex-grow sm:flex-grow-0">
+      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center flex-wrap">
+        <div className="flex-grow lg:flex-grow-0">
           <DateRangePicker
             dateRange={{
               start: filters.dateRange.start || new Date(),
@@ -413,51 +643,59 @@ const InvoiceListPage: React.FC = () => {
           <input
             type="text"
             placeholder="Search Invoice # or Customer..."
-            className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-default-500"
+            className="w-full pl-11 pr-4 py-2 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
             value={searchTerm}
             onChange={handleSearchChange}
           />
         </div>
-        {/* Filter Menu */}
         <div className="flex-shrink-0">
-          {/* TODO: Update InvoiceFilterMenu props and logic */}
           <InvoiceFilterMenu
             currentFilters={filters}
             onFilterChange={handleFilterChange}
-            salesmanOptions={salesmen.map((s) => s.id)} // Pass only IDs
-            customerOptions={[]} // Pass empty or fetched customer IDs if needed
-            today={currentDate}
-            tomorrow={new Date(currentDate.setDate(currentDate.getDate() + 1))}
+            salesmanOptions={salesmen.map((s) => s.name || s.id)}
+            customerOptions={[]} // Populate if filter menu needs customers
+            today={new Date()} // Current date
+            tomorrow={new Date(new Date().setDate(new Date().getDate() + 1))} // Tomorrow's date
           />
         </div>
       </div>
-      {/* TODO: FilterSummary component - needs update */}
       {/* <FilterSummary filters={filters} /> */}
 
       {/* --- Batch Action Bar --- */}
       {selectedInvoiceIds.size > 0 && (
-        <div className="p-3 bg-sky-50 rounded-lg border border-sky-200 flex items-center gap-3 flex-wrap">
+        <div className="p-3 bg-sky-50 rounded-lg border border-sky-200 flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-10 shadow-sm">
+          {" "}
+          {/* Sticky bar */}
           <button
-            onClick={handleSelectAll}
-            className={`p-1 mr-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200`}
+            onClick={handleSelectAllOnPage}
+            className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
+            title={
+              selectionState.isAllSelectedOnPage
+                ? "Deselect All on Page"
+                : "Select All on Page"
+            }
           >
-            {selectionState.isAllSelected ? (
-              <IconSquareCheckFilled className="text-blue-600" size={20} />
+            {selectionState.isAllSelectedOnPage ? (
+              <IconSquareCheckFilled className="text-sky-600" size={20} />
             ) : selectionState.isIndeterminate ? (
-              <IconSquareMinusFilled className="text-blue-600" size={20} />
+              <IconSquareMinusFilled className="text-sky-600" size={20} />
             ) : (
               <IconSquare className="text-default-400" size={20} />
             )}
           </button>
-          <span className="font-medium text-sky-800">
+          <span className="font-medium text-sky-800 text-sm">
             {selectedInvoiceIds.size} selected
           </span>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap ml-auto">
+            {" "}
+            {/* Push actions to right */}
             <Button
               size="sm"
               variant="outline"
               color="rose"
               onClick={handleBulkCancel}
+              icon={IconBan}
+              disabled={isLoading}
             >
               Cancel
             </Button>
@@ -466,13 +704,27 @@ const InvoiceListPage: React.FC = () => {
               variant="outline"
               color="amber"
               onClick={handleBulkSubmitEInvoice}
+              icon={IconSend}
+              disabled={isLoading}
             >
               Submit e-Invoice
             </Button>
-            <Button size="sm" variant="outline" onClick={handleBulkDownload}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkDownload}
+              icon={IconFileDownload}
+              disabled={isLoading}
+            >
               Download
             </Button>
-            <Button size="sm" variant="outline" onClick={handleBulkPrint}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkPrint}
+              icon={IconPrinter}
+              disabled={isLoading}
+            >
               Print
             </Button>
           </div>
@@ -480,85 +732,72 @@ const InvoiceListPage: React.FC = () => {
       )}
 
       {/* --- Invoice Grid --- */}
-      <div className="flex-1 min-h-[400px]">
+      <div className="flex-1 min-h-[400px] relative">
         {" "}
-        {/* Added min-height */}
-        {isLoading && !isFetchTriggered ? ( // Show spinner only during initial load or refresh
-          <div className="flex justify-center items-center h-full">
+        {/* Relative for potential overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/50 flex justify-center items-center z-20">
+            {" "}
+            {/* Loading overlay */}
             <LoadingSpinner />
           </div>
-        ) : error ? (
+        )}
+        {error && !isLoading && (
           <div className="p-4 text-center text-rose-600 bg-rose-50 rounded-lg">
-            Error loading invoices: {error}
+            Error: {error}
           </div>
-        ) : (
+        )}
+        {!isLoading && !error && (
           <InvoiceGrid
-            invoices={paginatedInvoices} // Pass paginated data
+            invoices={invoices}
             selectedInvoiceIds={selectedInvoiceIds}
             onSelectInvoice={handleSelectInvoice}
             onViewDetails={handleViewDetails}
-            isLoading={isLoading && isFetchTriggered} // Show loading within grid only if actively fetching
-            error={null} // Error handled above grid
+            isLoading={false}
+            error={null}
+            customerNames={customerNames} // Pass names down
           />
         )}
       </div>
 
       {/* --- Pagination --- */}
-      {!isLoading && totalPages > 1 && (
+      {!isLoading && totalItems > 0 && totalPages > 1 && (
         <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={(page) => setCurrentPage(page)}
-          itemsCount={paginatedInvoices.length} // Items on current page
-          totalItems={totalItems} // Total items matching filter
+          onPageChange={(page) => {
+            if (page !== currentPage) {
+              // Only trigger if page actually changes
+              setCurrentPage(page);
+              setIsFetchTriggered(true);
+            }
+          }}
+          itemsCount={invoices.length}
+          totalItems={totalItems}
           pageSize={ITEMS_PER_PAGE}
         />
       )}
 
       {/* --- Confirmation Dialogs --- */}
-      {/* TODO: Add ConfirmationDialog instances for bulk actions */}
+      <ConfirmationDialog
+        isOpen={showCancelConfirm}
+        onClose={() => setShowCancelConfirm(false)}
+        onConfirm={confirmBulkCancel}
+        title={`Cancel ${selectedInvoiceIds.size} Invoice(s)`}
+        message={`Cancel the ${selectedInvoiceIds.size} selected eligible invoice(s)? This may also attempt to cancel submitted e-invoices.`}
+        confirmButtonText="Confirm Cancellation"
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={showEInvoiceConfirm}
+        onClose={() => setShowEInvoiceConfirm(false)}
+        onConfirm={confirmBulkSubmitEInvoice}
+        title={`Submit E-Invoice(s)`}
+        message={`Proceed to submit ${selectedInvoiceIds.size} eligible invoice(s) for e-invoicing?`}
+        confirmButtonText="Submit Now"
+      />
     </div>
   );
 };
-
-// Example Mock Data (keep for testing)
-const MOCK_INVOICES: ExtendedInvoiceData[] = Array.from(
-  { length: 25 },
-  (_, i) => ({
-    id: `${1001 + i}`,
-    salespersonid: `S0${(i % 3) + 1}`,
-    customerid: `CUST00${(i % 5) + 1}`,
-    customerName: `Customer ${String.fromCharCode(65 + (i % 5))}`,
-    createddate: new Date(2023, 10, 15 - i, 10, 30).getTime().toString(),
-    paymenttype: i % 4 === 0 ? "CASH" : "INVOICE",
-    total_excluding_tax: 150.0 + i * 10,
-    tax_amount: i % 4 !== 0 ? 15.0 + i : 0.0,
-    rounding: i % 2 === 0 ? 0.05 : -0.03,
-    totalamountpayable:
-      150.0 +
-      i * 10 +
-      (i % 4 !== 0 ? 15.0 + i : 0.0) +
-      (i % 2 === 0 ? 0.05 : -0.03),
-    uuid: i % 3 === 0 ? `uuid-${123 + i}` : null,
-    submission_uid: i % 3 === 0 ? `sub-abc${i}` : null,
-    long_id: i % 3 === 0 && i % 2 === 0 ? `long-${123 + i}` : null,
-    datetime_validated:
-      i % 3 === 0 && i % 2 === 0
-        ? new Date(2023, 10, 16 - i).toISOString()
-        : null,
-    is_consolidated: false,
-    consolidated_invoices: null,
-    invoice_status: i % 5 === 0 ? "paid" : i % 6 === 0 ? "cancelled" : "active",
-    einvoice_status:
-      i % 3 === 0
-        ? i % 2 === 0
-          ? "valid"
-          : i % 5 === 0
-          ? "cancelled"
-          : "pending"
-        : null,
-    products: [],
-  })
-);
 
 export default InvoiceListPage;
