@@ -1,3 +1,4 @@
+// src/components/Table/TableEditableCell.tsx
 import React, { useState, useRef, useEffect, CSSProperties } from "react";
 import { ColumnType } from "../../types/types";
 import {

@@ -1,3 +1,4 @@
+// src/components/Button.tsx
 import React from "react";
 import { Icon } from "@tabler/icons-react";
 

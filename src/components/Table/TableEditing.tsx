@@ -1,3 +1,4 @@
+// src/components/Table/TableEditing.tsx
 import React, {
   useState,
   useEffect,
@@ -90,9 +91,7 @@ function TableEditing<T extends Record<string, any>>({
   // Constants
   const isSortingDisabled = [
     "invoice",
-    "invoiceJP",
     "orderDetails",
-    "orderDetailsJP",
     "customerProducts",
     "einvoice-submit",
     "consolidate",
@@ -100,7 +99,6 @@ function TableEditing<T extends Record<string, any>>({
 
   const isSelectionEnabled = [
     "invoice",
-    "invoiceJP",
     "consolidate",
     "einvoice-submit",
   ].includes(tableKey || "");

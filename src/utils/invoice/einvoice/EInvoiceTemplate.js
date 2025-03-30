@@ -1,4 +1,4 @@
-// EInvoiceTemplate.js
+//src/utils/invoice/einvoice/EInvoiceTemplate.js
 import { TIENHOCK_INFO } from "./companyInfo.js";
 
 // Helper function to format phone number

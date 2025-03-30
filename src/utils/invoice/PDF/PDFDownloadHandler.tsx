@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/utils/invoice/PDF/PDFDownloadHandler.tsx
+import React, { useState } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import { InvoiceData } from "../../../types/types";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
@@ -6,7 +7,6 @@ import Button from "../../../components/Button";
 import InvoicePDF from "./InvoicePDF";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
-import { api } from "../../../routes/utils/api";
 
 interface PDFDownloadHandlerProps {
   invoices: InvoiceData[];

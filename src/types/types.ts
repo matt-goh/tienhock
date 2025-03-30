@@ -1,3 +1,4 @@
+// src/types/types.ts
 export interface DeviceInfo {
   userAgent: string;
   deviceType: "Mobile" | "Desktop";
