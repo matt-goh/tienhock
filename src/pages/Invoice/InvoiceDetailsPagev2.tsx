@@ -6,8 +6,6 @@ import {
   ProductItem,
   Customer,
   CustomProduct,
-  InvoiceStatus, // Import status types if needed for comparison
-  EInvoiceStatus,
 } from "../../types/types"; // Adjust path as needed
 import BackButton from "../../components/BackButton"; // Adjust path
 import Button from "../../components/Button"; // Adjust path
@@ -628,14 +626,54 @@ const InvoiceDetailsPagev2: React.FC = () => {
 
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
-        <h1 className="text-2xl font-bold text-default-900 flex-shrink-0 pr-4">
+        <h1 className="flex space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4">
           {/* Display full ID with prefix */}
-          {isNewInvoice
-            ? "New Invoice"
-            : `Invoice #${invoiceData.paymenttype === "CASH" ? "C" : "I"}${
-                invoiceData.id
-              }`}
+          <span>
+            {isNewInvoice
+              ? "New Invoice"
+              : `Invoice #${invoiceData.paymenttype === "CASH" ? "C" : "I"}${
+                  invoiceData.id
+                }`}
+          </span>
+
+          {/* Add status indicators here */}
+          {!isNewInvoice && (
+            <div className="flex flex-wrap items-center gap-2 -mb-0.5 ml-auto mr-auto">
+              {invoiceData.invoice_status && (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                    invoiceData.invoice_status === "active"
+                      ? "bg-amber-100 text-amber-700"
+                      : invoiceData.invoice_status === "paid"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-rose-100 text-rose-700"
+                  }`}
+                >
+                  {invoiceData.invoice_status.charAt(0).toUpperCase() +
+                    invoiceData.invoice_status.slice(1)}
+                </span>
+              )}
+              {invoiceData.einvoice_status && (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                    invoiceData.einvoice_status === "valid"
+                      ? "bg-green-100 text-green-700"
+                      : invoiceData.einvoice_status === "pending"
+                      ? "bg-amber-100 text-amber-700"
+                      : invoiceData.einvoice_status === "invalid"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-rose-100 text-rose-700"
+                  }`}
+                >
+                  e-Invoice:{" "}
+                  {invoiceData.einvoice_status.charAt(0).toUpperCase() +
+                    invoiceData.einvoice_status.slice(1)}
+                </span>
+              )}
+            </div>
+          )}
         </h1>
+
         <div className="flex flex-wrap items-center gap-2">
           {/* Cancel Button */}
           {!isNewInvoice && invoiceData.invoice_status !== "cancelled" && (
@@ -644,10 +682,9 @@ const InvoiceDetailsPagev2: React.FC = () => {
               variant="outline"
               color="rose"
               size="md"
-              disabled={isReadOnly || isSaving} // Disable if read-only or saving
+              disabled={isReadOnly || isSaving}
             >
-              {" "}
-              Cancel Invoice{" "}
+              Cancel Invoice
             </Button>
           )}
           {/* Save/Create Button */}

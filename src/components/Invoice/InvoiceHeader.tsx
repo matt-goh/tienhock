@@ -294,33 +294,6 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           value={invoice.customerid || ""}
           disabled // Always disabled
         />
-
-        {/* Status Display (Read Only) */}
-        {!isNewInvoice && (
-          <div className="pt-2 space-y-1">
-            <label className="block text-sm font-medium text-default-700">
-              Status
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {invoiceStatusInfo && (
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${invoiceStatusInfo.bg} ${invoiceStatusInfo.text}`}
-                >
-                  {InvoiceStatusIcon && <InvoiceStatusIcon size={14} />}
-                  {invoiceStatusInfo.text}
-                </span>
-              )}
-              {einvoiceStatusInfo && (
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${einvoiceStatusInfo.bg} ${einvoiceStatusInfo.text}`}
-                >
-                  {EInvoiceStatusIcon && <EInvoiceStatusIcon size={14} />}
-                  {einvoiceStatusInfo.text}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -31,12 +31,12 @@ import {
   IconChevronDown,
   IconCheck,
   IconSquare,
-  IconSquareCheckFilled,
   IconSquareMinusFilled,
   IconSend,
   IconFileDownload,
   IconPrinter,
   IconBan,
+  IconSelectAll,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -683,9 +683,9 @@ const InvoiceListPage: React.FC = () => {
             }
           >
             {selectionState.isAllSelectedOnPage ? (
-              <IconSquareCheckFilled className="text-sky-600" size={20} />
-            ) : selectionState.isIndeterminate ? (
               <IconSquareMinusFilled className="text-sky-600" size={20} />
+            ) : selectionState.isIndeterminate ? (
+              <IconSelectAll className="text-sky-600" size={20} />
             ) : (
               <IconSquare className="text-default-400" size={20} />
             )}
