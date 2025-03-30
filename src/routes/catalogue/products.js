@@ -1,4 +1,4 @@
-// src/routes/products.js
+// src/routes/catalogue/products.js
 import { Router } from "express";
 
 export default function (pool) {

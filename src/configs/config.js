@@ -1,4 +1,4 @@
-// config.js
+// src/config.js
 const getEnvVariable = (key, defaultValue) => {
   // Try REACT_APP_ prefix first, then fallback to regular env var, then default
   return process.env[`REACT_APP_${key}`] || process.env[key] || defaultValue;
