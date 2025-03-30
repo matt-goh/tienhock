@@ -564,7 +564,7 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="flex flex-col p-4 md:p-6 space-y-4">
+    <div className="flex flex-col px-4 md:w-full md:px-12 space-y-4">
       {/* --- Header --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
