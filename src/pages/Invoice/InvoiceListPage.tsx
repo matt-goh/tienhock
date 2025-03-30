@@ -610,9 +610,16 @@ const InvoiceListPage: React.FC = () => {
                 {monthOptions.map((month) => (
                   <ListboxOption
                     key={month.id}
-                    value={month} /* ... options styling */
+                    value={month}
+                    className={({ active }) =>
+                      `relative cursor-pointer select-none py-2 pl-4 pr-4 ${
+                        active
+                          ? "bg-default-100 text-default-900"
+                          : "text-gray-900"
+                      }`
+                    }
                   >
-                    {({ selected } /* ... option content */) => (
+                    {({ selected }) => (
                       <>
                         <span
                           className={`block truncate ${
@@ -663,7 +670,7 @@ const InvoiceListPage: React.FC = () => {
 
       {/* --- Batch Action Bar --- */}
       {selectedInvoiceIds.size > 0 && (
-        <div className="p-3 bg-sky-50 rounded-lg border border-sky-200 flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-10 shadow-sm">
+        <div className="p-3 bg-sky-50 rounded-lg border border-sky-200 flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm">
           {" "}
           {/* Sticky bar */}
           <button

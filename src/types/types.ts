@@ -337,7 +337,7 @@ export interface InvoiceData {
 
 export interface ProductItem {
   uid?: string; // Unique ID for front-end list rendering (not in DB)
-  id?: number; // Corresponds to order_details.id (optional, might not be needed everywhere)
+  id?: string; // Corresponds to order_details.id in DB
   code: string;
   price: number;
   quantity: number;
