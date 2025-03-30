@@ -435,13 +435,33 @@ const InvoiceDetailsPagev2: React.FC = () => {
   const handleLineItemsChange = useCallback(
     (updatedItems: ProductItem[]) => {
       if (isReadOnly) return;
+
       // Ensure UIDs exist on all items
       const itemsWithUid = updatedItems.map((item) => ({
         ...item,
         uid: item.uid || crypto.randomUUID(),
       }));
+
+      // Recalculate subtotal rows
+      let runningTotal = 0;
+      const recalculatedItems = itemsWithUid.map((item) => {
+        if (!item.issubtotal && !item.istotal) {
+          // Add to running total for regular items
+          const itemTotal = parseFloat(item.total || "0");
+          runningTotal += itemTotal;
+          return item;
+        } else if (item.issubtotal) {
+          // Update subtotal rows with current running total
+          return {
+            ...item,
+            total: runningTotal.toFixed(2),
+          };
+        }
+        return item;
+      });
+
       setInvoiceData((prev) =>
-        prev ? { ...prev, products: itemsWithUid } : null
+        prev ? { ...prev, products: recalculatedItems } : null
       );
     },
     [isReadOnly]
