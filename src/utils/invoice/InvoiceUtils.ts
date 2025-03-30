@@ -2,7 +2,6 @@
 import toast from "react-hot-toast";
 import {
   ExtendedInvoiceData,
-  InvoiceData, // Keep if used elsewhere, otherwise ExtendedInvoiceData is primary
   InvoiceFilters,
   ProductItem,
 } from "../../types/types";
@@ -183,14 +182,13 @@ export const getInvoices = async (
         tax_amount: parseFloat(inv.tax_amount || 0),
         rounding: parseFloat(inv.rounding || 0),
         totalamountpayable: parseFloat(inv.totalamountpayable || 0),
-        // Ensure products have UIDs and correct types
-        products: ensureProductsHaveUid(inv.products),
         // Use customerName from backend if available, otherwise fallback
         customerName: inv.customerName || inv.customerid,
         // Ensure boolean type for is_consolidated
         is_consolidated: Boolean(inv.is_consolidated || false),
         // Parse consolidated_invoices if it's JSON string (backend returns JSON object)
         consolidated_invoices: inv.consolidated_invoices, // Assuming backend sends parsed JSON array or null
+        products: [], // Assuming products are not returned in the list endpoint
       })
     );
 

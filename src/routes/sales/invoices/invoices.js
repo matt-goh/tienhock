@@ -133,28 +133,9 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName, -- Fetch customer name directly
-          COALESCE(
-            json_agg(
-              json_build_object(
-                'id', od.id, -- order_details primary key
-                'code', od.code,
-                'quantity', od.quantity,
-                'price', od.price,
-                'freeProduct', od.freeproduct,
-                'returnProduct', od.returnproduct,
-                'description', od.description,
-                'tax', od.tax,
-                'total', od.total,
-                'issubtotal', od.issubtotal
-              )
-              ORDER BY od.id
-            ) FILTER (WHERE od.id IS NOT NULL),
-            '[]'::json
-          ) as products
+          c.name as customerName
         FROM invoices i
-        LEFT JOIN customers c ON i.customerid = c.id -- Join customers for name and search
-        LEFT JOIN order_details od ON i.id = od.invoiceid -- Assumes od.invoiceid is now VARCHAR
+        LEFT JOIN customers c ON i.customerid = c.id
         WHERE 1=1
       `;
 
@@ -278,20 +259,6 @@ export default function (pool, config) {
         is_consolidated: row.is_consolidated || false,
         consolidated_invoices: row.consolidated_invoices, // Should be JSONB/JSON in DB
         customerName: row.customername || row.customerid, // Use fetched name
-        products: (row.products || []).map((product) => ({
-          // Map order_details 'id' to frontend's 'id' if needed, keep numbers numeric
-          id: product.id, // This is order_details.id
-          code: product.code,
-          price: parseFloat(product.price || 0),
-          quantity: parseInt(product.quantity || 0),
-          freeProduct: parseInt(product.freeProduct || 0),
-          returnProduct: parseInt(product.returnProduct || 0),
-          tax: parseFloat(product.tax || 0),
-          description: product.description,
-          total: String(product.total || "0.00"), // Keep as string for FE
-          issubtotal: product.issubtotal || false,
-          // uid is added by frontend
-        })),
       }));
 
       res.json({
