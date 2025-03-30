@@ -8,13 +8,10 @@ import {
 import {
   IconSquare,
   IconSquareCheckFilled,
-  IconCash,
-  IconFileInvoice,
   IconClockHour4,
   IconBan,
   IconAlertTriangle,
   IconCircleCheck,
-  IconUser, // Import IconUser for salesman
 } from "@tabler/icons-react";
 import {
   formatDisplayDate,

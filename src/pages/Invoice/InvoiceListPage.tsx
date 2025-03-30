@@ -703,7 +703,7 @@ const InvoiceListPage: React.FC = () => {
           ) : selectionState.isIndeterminate ? (
             <IconSelectAll className="text-sky-600" size={20} />
           ) : (
-            <IconSquare className="text-default-400" size={20} />
+            <IconSelectAll className="text-default-400" size={20} />
           )}
         </button>
 
