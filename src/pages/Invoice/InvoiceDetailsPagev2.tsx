@@ -612,7 +612,7 @@ const InvoiceDetailsPagev2: React.FC = () => {
   // Map productsCache for LineItemsTable Combobox (ensure correct price field)
   const productsForTable = productsCache.map((product) => ({
     uid: crypto.randomUUID(), // Use UUID for temporary key
-    id: parseInt(product.id), // Use actual product ID (if needed by combobox)
+    id: product.id, // Keep original ID as string
     code: product.id, // Product Code/ID
     description: product.description,
     price: product.price_per_unit, // Make sure this matches cache structure

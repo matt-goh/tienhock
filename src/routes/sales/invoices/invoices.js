@@ -209,14 +209,25 @@ export default function (pool, config) {
       }
 
       // Group by before pagination
-      query += ` GROUP BY i.id, c.name`; // Group by invoice id and customer name
+      query +=
+        ` GROUP BY i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,` +
+        ` i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,` +
+        ` i.invoice_status, i.einvoice_status,` +
+        ` i.uuid, i.submission_uid, i.long_id, i.datetime_validated,` +
+        ` i.is_consolidated, i.consolidated_invoices, c.name`;
 
       // Get count for pagination (adjust based on simplified query)
-      const countQuery = `SELECT COUNT(*) FROM (${
-        query
-          .replace(/SELECT .+? FROM/, "SELECT i.id FROM") // Select only the grouping key
-          .replace(/ GROUP BY .+/, " GROUP BY i.id") // Group only by ID for counting
-      }) AS count_query`;
+      const countQuery =
+        `
+        SELECT COUNT(DISTINCT i.id) 
+        FROM invoices i
+        LEFT JOIN customers c ON i.customerid = c.id
+        WHERE 1=1
+      ` +
+        query.substring(
+          query.indexOf("WHERE 1=1") + 9,
+          query.indexOf("GROUP BY")
+        );
 
       // Add ordering and pagination
       query += ` ORDER BY CAST(i.createddate AS bigint) DESC LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;

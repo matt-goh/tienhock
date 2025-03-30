@@ -131,11 +131,14 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
       query === ""
         ? productsCache
         : productsCache.filter(
-          (prod) =>
-            (prod.description?.toLowerCase() ?? "").includes(
-              query.toLowerCase()
-            ) || (String(prod.id || "").toLowerCase()).includes(query.toLowerCase())
-        );
+            (prod) =>
+              (prod.description?.toLowerCase() ?? "").includes(
+                query.toLowerCase()
+              ) ||
+              String(prod.id || "")
+                .toLowerCase()
+                .includes(query.toLowerCase())
+          );
 
     return (
       <Combobox
