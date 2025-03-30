@@ -7,10 +7,7 @@ import React, {
   useMemo,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  ExtendedInvoiceData,
-  InvoiceFilters,
-} from "../../types/types";
+import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import DateRangePicker from "../../components/DateRangePicker";
@@ -684,74 +681,84 @@ const InvoiceListPage: React.FC = () => {
       {/* <FilterSummary filters={filters} /> */}
 
       {/* --- Batch Action Bar --- */}
-      {selectedInvoiceIds.size > 0 && (
-        <div className="p-3 bg-sky-50 rounded-lg border border-sky-200 flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm">
-          {" "}
-          {/* Sticky bar */}
-          <button
-            onClick={handleSelectAllOnPage}
-            className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
-            title={
-              selectionState.isAllSelectedOnPage
-                ? "Deselect All on Page"
-                : "Select All on Page"
-            }
-          >
-            {selectionState.isAllSelectedOnPage ? (
-              <IconSquareMinusFilled className="text-sky-600" size={20} />
-            ) : selectionState.isIndeterminate ? (
-              <IconSelectAll className="text-sky-600" size={20} />
-            ) : (
-              <IconSquare className="text-default-400" size={20} />
-            )}
-          </button>
+      <div
+        className={`p-3 ${
+          selectedInvoiceIds.size > 0
+            ? "bg-sky-50 border border-sky-200"
+            : "bg-white border border-dashed border-default-200"
+        } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
+      >
+        {/* Selection checkbox - always visible */}
+        <button
+          onClick={handleSelectAllOnPage}
+          className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
+          title={
+            selectionState.isAllSelectedOnPage
+              ? "Deselect All on Page"
+              : "Select All on Page"
+          }
+        >
+          {selectionState.isAllSelectedOnPage ? (
+            <IconSquareMinusFilled className="text-sky-600" size={20} />
+          ) : selectionState.isIndeterminate ? (
+            <IconSelectAll className="text-sky-600" size={20} />
+          ) : (
+            <IconSquare className="text-default-400" size={20} />
+          )}
+        </button>
+
+        {/* Conditional text based on selection */}
+        {selectedInvoiceIds.size > 0 ? (
           <span className="font-medium text-sky-800 text-sm">
             {selectedInvoiceIds.size} selected
           </span>
-          <div className="flex gap-2 flex-wrap ml-auto">
-            {" "}
-            {/* Push actions to right */}
-            <Button
-              size="sm"
-              variant="outline"
-              color="rose"
-              onClick={handleBulkCancel}
-              icon={IconBan}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              color="amber"
-              onClick={handleBulkSubmitEInvoice}
-              icon={IconSend}
-              disabled={isLoading}
-            >
-              Submit e-Invoice
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBulkDownload}
-              icon={IconFileDownload}
-              disabled={isLoading}
-            >
-              Download
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBulkPrint}
-              icon={IconPrinter}
-              disabled={isLoading}
-            >
-              Print
-            </Button>
-          </div>
+        ) : (
+          <span className="text-default-500 text-sm">
+            Select invoices to perform batch actions
+          </span>
+        )}
+
+        <div className="flex gap-2 flex-wrap ml-auto">
+          <Button
+            size="sm"
+            variant="outline"
+            color="rose"
+            onClick={handleBulkCancel}
+            icon={IconBan}
+            disabled={isLoading || selectedInvoiceIds.size === 0}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            color="amber"
+            onClick={handleBulkSubmitEInvoice}
+            icon={IconSend}
+            disabled={isLoading || selectedInvoiceIds.size === 0}
+          >
+            Submit e-Invoice
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBulkDownload}
+            icon={IconFileDownload}
+            disabled={isLoading || selectedInvoiceIds.size === 0}
+          >
+            Download
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBulkPrint}
+            icon={IconPrinter}
+            disabled={isLoading || selectedInvoiceIds.size === 0}
+          >
+            Print
+          </Button>
         </div>
-      )}
+      </div>
 
       {/* --- Invoice Grid --- */}
       <div className="flex-1 min-h-[400px] relative">

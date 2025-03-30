@@ -118,7 +118,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
   return (
     <div
-      className={`relative border rounded-lg overflow-hidden transition-shadow duration-200 group
+      className={`relative border rounded-lg overflow-hidden bg-white transition-shadow duration-200 group
         ${
           isSelected
             ? "shadow-md ring-2 ring-blue-500 ring-offset-1"
