@@ -35,20 +35,36 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
   const displayRounding = rounding.toFixed(2);
 
   return (
-    <div className="mt-4 flex justify-end">
+    <div className="flex justify-end">
       {/* Use grid for precise alignment */}
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 w-full max-w-xs text-sm">
         {/* Subtotal Row */}
-        <span className="text-gray-600 text-right">Subtotal:</span>
-        <span className="font-medium text-gray-800 text-right">
-          RM {formatCurrency(subtotal)}
-        </span>
+        <label className="text-gray-600 text-right self-center">
+          Subtotal:
+        </label>
+        <div className="flex items-center justify-end">
+          <span className="mr-1 text-gray-800 font-medium">RM</span>
+          <input
+            type="text"
+            value={formatCurrency(subtotal)}
+            className="w-[75px] px-2 py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
+            disabled
+          />
+        </div>
 
         {/* Tax Row */}
-        <span className="text-gray-600 text-right">Total Tax:</span>
-        <span className="font-medium text-gray-800 text-right">
-          RM {formatCurrency(taxTotal)}
-        </span>
+        <label className="text-gray-600 text-right self-center">
+          Total Tax:
+        </label>
+        <div className="flex items-center justify-end">
+          <span className="mr-1 text-gray-800 font-medium">RM</span>
+          <input
+            type="text"
+            value={formatCurrency(taxTotal)}
+            className="w-[75px] px-2 py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
+            disabled
+          />
+        </div>
 
         {/* Rounding Row */}
         <label
@@ -58,8 +74,6 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
           Rounding:
         </label>
         <div className="flex items-center justify-end">
-          {" "}
-          {/* Align input to right */}
           <span className="mr-1 text-gray-800 font-medium">RM</span>
           <input
             id="rounding-input"
@@ -80,12 +94,18 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
         <div className="col-span-2 border-t border-gray-300 mt-1 mb-1"></div>
 
         {/* Grand Total Row */}
-        <span className="font-semibold text-base text-gray-900 text-right">
+        <label className="font-semibold text-base text-gray-900 text-right self-center">
           Total Payable:
-        </span>
-        <span className="font-semibold text-base text-gray-900 text-right">
-          RM {formatCurrency(grandTotal)}
-        </span>
+        </label>
+        <div className="flex items-center justify-end">
+          <span className="mr-1 font-semibold text-base text-gray-900">RM</span>
+          <input
+            type="text"
+            value={formatCurrency(grandTotal)}
+            className="w-[75px] px-2 py-0.5 border border-transparent bg-transparent text-right font-semibold text-base text-gray-900"
+            disabled
+          />
+        </div>
       </div>
     </div>
   );
