@@ -90,23 +90,39 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
     field: keyof ProductItem;
     value: number | undefined;
     min?: number;
-  }) => (
-    <input
-      type="number"
-      min={min}
-      step={field === "price" || field === "tax" ? "0.01" : "1"}
-      value={value ?? ""}
-      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-        handleItemChange(
-          rowIndex,
-          field,
-          e.target.value === "" ? undefined : parseFloat(e.target.value)
-        )
-      }
-      className="w-full px-2 py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right text-sm" // Added text-sm
-      disabled={readOnly}
-    />
-  );
+  }) => {
+    // Add local state to track input during typing
+    const [localValue, setLocalValue] = useState<string>(
+      value?.toString() || ""
+    );
+
+    // Update local state when prop value changes
+    useEffect(() => {
+      setLocalValue(value?.toString() || "");
+    }, [value]);
+
+    return (
+      <input
+        type="number"
+        min={min}
+        step={field === "price" || field === "tax" ? "0.01" : "1"}
+        // Use local state for display during editing
+        value={localValue}
+        // Update local state only without triggering parent updates
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          setLocalValue(e.target.value);
+        }}
+        // Only update parent state when finished typing
+        onBlur={(e) => {
+          const newValue =
+            e.target.value === "" ? undefined : parseFloat(e.target.value);
+          handleItemChange(rowIndex, field, newValue);
+        }}
+        className="w-full px-2 py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right text-sm"
+        disabled={readOnly}
+      />
+    );
+  };
 
   const ProductComboboxCell = ({
     rowIndex,
@@ -259,7 +275,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
             item.issubtotal ? (
               <tr
                 key={item.uid || `subtotal-${index}`}
-                className="bg-gray-100 font-medium"
+                className="bg-gray-100 font-medium group"
               >
                 <td
                   colSpan={7}
@@ -273,12 +289,12 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                   {parseFloat(item.total || "0").toFixed(2)}{" "}
                 </td>
                 {!readOnly && (
-                  <td className="px-2 py-1.5 text-center align-middle">
+                  <td className="px-2 py-1.5 text-center">
                     {" "}
                     <button
                       type="button"
                       onClick={() => handleDeleteRow(index)}
-                      className="text-gray-400 hover:text-red-600"
+                      className="flex items-center text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100"
                       title="Delete Subtotal Row"
                       disabled={readOnly}
                     >
@@ -342,12 +358,12 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                   {parseFloat(item.total || "0").toFixed(2)}
                 </td>
                 {!readOnly && (
-                  <td className="px-1 py-1 text-center align-middle">
+                  <td className="px-2 py-1 text-center align-middle">
                     {" "}
                     <button
                       type="button"
                       onClick={() => handleDeleteRow(index)}
-                      className="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="flex items-center justify-center text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Delete Row"
                     >
                       {" "}
