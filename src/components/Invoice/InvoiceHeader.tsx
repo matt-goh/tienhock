@@ -219,7 +219,6 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           onLoadMore={onLoadMoreCustomers}
           hasMore={hasMoreCustomers}
           isLoading={isFetchingCustomers}
-          disabled={readOnly} // Use readOnly
         />
 
         {/* Customer ID (Read Only) */}
