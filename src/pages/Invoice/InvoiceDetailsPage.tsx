@@ -6,24 +6,24 @@ import {
   ProductItem,
   Customer,
   CustomProduct,
-} from "../../types/types"; // Adjust path as needed
-import BackButton from "../../components/BackButton"; // Adjust path
-import Button from "../../components/Button"; // Adjust path
-import LoadingSpinner from "../../components/LoadingSpinner"; // Adjust path
-import ConfirmationDialog from "../../components/ConfirmationDialog"; // Adjust path
-import InvoiceHeader from "../../components/Invoice/InvoiceHeader"; // Adjust path
-import LineItemsTable from "../../components/Invoice/LineItemsTable"; // Adjust path
-import InvoiceTotals from "../../components/Invoice/InvoiceTotals"; // Adjust path
-import { useProductsCache } from "../../utils/invoice/useProductsCache"; // Adjust path
-import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache"; // Adjust path
-import { useCustomerData } from "../../hooks/useCustomerData"; // Adjust path
+} from "../../types/types";
+import BackButton from "../../components/BackButton";
+import Button from "../../components/Button";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import InvoiceHeader from "../../components/Invoice/InvoiceHeader";
+import LineItemsTable from "../../components/Invoice/LineItemsTable";
+import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import { useCustomerData } from "../../hooks/useCustomerData";
 import {
   createInvoice,
   updateInvoice,
   cancelInvoice,
   getInvoiceById,
   checkDuplicateInvoiceNo,
-} from "../../utils/invoice/InvoiceUtils"; // Adjust path
+} from "../../utils/invoice/InvoiceUtils";
 import toast from "react-hot-toast";
 import { debounce } from "lodash";
 import { parseDatabaseTimestamp } from "../../utils/invoice/dateUtils"; // Assuming you have this
