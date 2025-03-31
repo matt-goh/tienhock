@@ -9,6 +9,7 @@ import { SidebarItem } from "./pagesRoute";
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
 import InvoiceFormPage from "./Invoice/InvoiceFormPage";
+import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 
 // Sales related imports
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
@@ -54,11 +55,11 @@ export const TienHockSidebarData: SidebarItem[] = [
             path: "/sales/invoice/new",
             component: InvoiceFormPage,
           },
-          // Route for viewing/editing an existing invoice
+          // Route for viewing an existing invoice
           {
-            name: "Invoice Details", // Keep name descriptive
+            name: "Invoice Details",
             path: "/sales/invoice/:id",
-            component: InvoiceFormPage,
+            component: InvoiceDetailsPage,
           },
         ],
       },

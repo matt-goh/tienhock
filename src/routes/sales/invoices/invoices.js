@@ -111,10 +111,9 @@ export default function (pool, config) {
     try {
       const {
         page = 1,
-        limit = 10,
+        limit = 15, // Use consistent limit (e.g., 15 to match FE)
         startDate,
         endDate,
-        invoiceId,
         salesman,
         customer,
         paymentType,
@@ -125,116 +124,113 @@ export default function (pool, config) {
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
-      // Updated Query: Selects new columns, removes einvoices join
-      let query = `
+      // Base queries
+      let selectClause = `
         SELECT
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
           i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
-          i.invoice_status, i.einvoice_status,
+          i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName
+      `;
+      let fromClause = `
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
-        WHERE 1=1
       `;
+      let whereClause = ` WHERE 1=1 `;
+      let groupByClause = `
+        GROUP BY i.id, c.name
+      `; // Grouping by primary key is sufficient if using aggregates or joins correctly
 
-      const queryParams = [];
-      let paramCounter = 1;
+      const filterParams = []; // Parameters ONLY for filtering (WHERE clause)
+      let filterParamCounter = 1;
 
-      // Apply Filters (Logic mostly similar, check column names)
+      // Apply Filters and build WHERE clause + filterParams
       if (startDate && endDate) {
-        queryParams.push(startDate, endDate);
-        query += ` AND CAST(i.createddate AS bigint) BETWEEN $${paramCounter} AND $${
-          paramCounter + 1
-        }`;
-        paramCounter += 2;
-      }
-      if (invoiceId) {
-        queryParams.push(invoiceId);
-        query += ` AND i.id = $${paramCounter++}`;
+        const start = `$${filterParamCounter++}`;
+        const end = `$${filterParamCounter++}`;
+        filterParams.push(startDate, endDate);
+        whereClause += ` AND CAST(i.createddate AS bigint) BETWEEN ${start} AND ${end}`;
       }
       if (salesman) {
-        queryParams.push(salesman.split(","));
-        query += ` AND i.salespersonid = ANY($${paramCounter++})`;
+        const salesmanParam = `$${filterParamCounter++}`;
+        filterParams.push(salesman.split(","));
+        whereClause += ` AND i.salespersonid = ANY(${salesmanParam})`;
       }
       if (customer) {
-        queryParams.push(customer.split(","));
-        query += ` AND i.customerid = ANY($${paramCounter++})`;
+        const customerParam = `$${filterParamCounter++}`;
+        filterParams.push(customer.split(","));
+        whereClause += ` AND i.customerid = ANY(${customerParam})`;
       }
       if (paymentType) {
-        queryParams.push(paymentType);
-        query += ` AND i.paymenttype = $${paramCounter++}`;
+        const paymentTypeParam = `$${filterParamCounter++}`;
+        filterParams.push(paymentType);
+        whereClause += ` AND i.paymenttype = ${paymentTypeParam}`;
       }
       if (invoiceStatus) {
-        queryParams.push(invoiceStatus.split(","));
-        query += ` AND i.invoice_status = ANY($${paramCounter++})`; // Use new column
+        const statusParam = `$${filterParamCounter++}`;
+        filterParams.push(invoiceStatus.split(","));
+        whereClause += ` AND i.invoice_status = ANY(${statusParam})`;
       }
       if (eInvoiceStatus) {
-        queryParams.push(eInvoiceStatus.split(","));
-        // Handle null case if filtering for invoices without e-invoice status
+        const eStatusParam = `$${filterParamCounter++}`;
         const statuses = eInvoiceStatus.split(",");
         if (statuses.includes("null")) {
-          query += ` AND (i.einvoice_status = ANY($${paramCounter++}) OR i.einvoice_status IS NULL)`;
-          queryParams.push(statuses.filter((s) => s !== "null"));
+          // Handle 'null' specifically if needed, ensure parameter matches
+          filterParams.push(statuses.filter((s) => s !== "null"));
+          whereClause += ` AND (i.einvoice_status = ANY(${eStatusParam}) OR i.einvoice_status IS NULL)`;
         } else {
-          query += ` AND i.einvoice_status = ANY($${paramCounter++})`;
-          queryParams.push(statuses);
+          filterParams.push(statuses);
+          whereClause += ` AND i.einvoice_status = ANY(${eStatusParam})`;
         }
       }
       if (search) {
-        queryParams.push(`%${search}%`);
-        // Search across multiple fields: invoice ID, customer name/ID, salesperson ID, payment type, and product details
-        query += ` AND (
-          i.id ILIKE $${paramCounter} OR 
-          c.name ILIKE $${paramCounter} OR 
-          CAST(i.customerid AS TEXT) ILIKE $${paramCounter} OR
-          CAST(i.salespersonid AS TEXT) ILIKE $${paramCounter} OR
-          i.paymenttype ILIKE $${paramCounter} OR
-          i.invoice_status ILIKE $${paramCounter} OR
-          i.einvoice_status ILIKE $${paramCounter} OR
-          CAST(i.totalamountpayable AS TEXT) ILIKE $${paramCounter} OR
+        const searchParam = `$${filterParamCounter++}`;
+        filterParams.push(`%${search}%`);
+        whereClause += ` AND (
+          i.id ILIKE ${searchParam} OR
+          c.name ILIKE ${searchParam} OR
+          CAST(i.customerid AS TEXT) ILIKE ${searchParam} OR
+          CAST(i.salespersonid AS TEXT) ILIKE ${searchParam} OR
+          i.paymenttype ILIKE ${searchParam} OR
+          i.invoice_status ILIKE ${searchParam} OR
+          COALESCE(i.einvoice_status, '') ILIKE ${searchParam} OR
+          CAST(i.totalamountpayable AS TEXT) ILIKE ${searchParam} OR
           EXISTS (
-            SELECT 1 FROM order_details od 
+            SELECT 1 FROM order_details od
             WHERE od.invoiceid = i.id AND (
-              od.code ILIKE $${paramCounter} OR 
-              od.description ILIKE $${paramCounter}
+              od.code ILIKE ${searchParam} OR
+              od.description ILIKE ${searchParam}
             )
           )
         )`;
-        paramCounter++;
       }
 
-      // Group by before pagination
-      query +=
-        ` GROUP BY i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,` +
-        ` i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,` +
-        ` i.invoice_status, i.einvoice_status,` +
-        ` i.uuid, i.submission_uid, i.long_id, i.datetime_validated,` +
-        ` i.is_consolidated, i.consolidated_invoices, c.name`;
+      // Construct Count Query
+      const countQuery = `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
 
-      // Get count for pagination (adjust based on simplified query)
-      const countQuery =
-        `
-        SELECT COUNT(DISTINCT i.id) 
-        FROM invoices i
-        LEFT JOIN customers c ON i.customerid = c.id
-        WHERE 1=1
-      ` +
-        query.substring(
-          query.indexOf("WHERE 1=1") + 9,
-          query.indexOf("GROUP BY")
-        );
+      // Construct Data Query
+      let dataQuery = `${selectClause} ${fromClause} ${whereClause} ${groupByClause}`;
+      dataQuery += ` ORDER BY CAST(i.createddate AS bigint) DESC`;
 
-      // Add ordering and pagination
-      query += ` ORDER BY CAST(i.createddate AS bigint) DESC LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
-      queryParams.push(parseInt(limit), offset);
+      // Add Pagination to Data Query parameters
+      const paginationParams = [];
+      paginationParams.push(parseInt(limit));
+      paginationParams.push(offset);
+      dataQuery += ` LIMIT $${filterParamCounter++} OFFSET $${filterParamCounter++}`;
 
-      // Execute queries
+      // Combine filter and pagination params for the main data query
+      const dataQueryParams = [...filterParams, ...paginationParams];
+
+      // --- Execute Queries ---
+      // Execute count query with ONLY filter parameters
+      // Execute data query with filter AND pagination parameters
       const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, queryParams.slice(0, -2)), // Use params matching the count query
-        pool.query(query, queryParams),
+        pool.query(countQuery, filterParams), // Use filterParams for count
+        pool.query(dataQuery, dataQueryParams), // Use combined params for data
       ]);
+      // --- End Execute Queries ---
 
       const total = parseInt(countResult.rows[0].count);
       const totalPages = Math.ceil(total / parseInt(limit));
@@ -250,15 +246,16 @@ export default function (pool, config) {
         tax_amount: parseFloat(row.tax_amount || 0),
         rounding: parseFloat(row.rounding || 0),
         totalamountpayable: parseFloat(row.totalamountpayable || 0),
-        invoice_status: row.invoice_status, // Direct mapping
-        einvoice_status: row.einvoice_status, // Direct mapping
+        balance_due: parseFloat(row.balance_due || 0),
+        invoice_status: row.invoice_status,
+        einvoice_status: row.einvoice_status,
         uuid: row.uuid,
         submission_uid: row.submission_uid,
         long_id: row.long_id,
         datetime_validated: row.datetime_validated,
         is_consolidated: row.is_consolidated || false,
-        consolidated_invoices: row.consolidated_invoices, // Should be JSONB/JSON in DB
-        customerName: row.customername || row.customerid, // Use fetched name
+        consolidated_invoices: row.consolidated_invoices,
+        customerName: row.customername || row.customerid,
       }));
 
       res.json({
@@ -308,14 +305,14 @@ export default function (pool, config) {
         SELECT
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
           i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
-          i.invoice_status, i.einvoice_status,
+          i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName,
           COALESCE(
             json_agg(
               json_build_object(
-                 'id', od.id, -- order_details pk
+                 'id', od.id,
                  'code', od.code,
                  'quantity', od.quantity,
                  'price', od.price,
@@ -332,9 +329,9 @@ export default function (pool, config) {
           ) as products
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
-        LEFT JOIN order_details od ON i.id = od.invoiceid -- Assumes VARCHAR join
+        LEFT JOIN order_details od ON i.id = od.invoiceid
         WHERE i.id = $1
-        GROUP BY i.id, c.name -- Group by invoice id and customer name
+        GROUP BY i.id, c.name
       `;
 
       const result = await pool.query(query, [id]);
@@ -356,6 +353,7 @@ export default function (pool, config) {
         tax_amount: parseFloat(invoice.tax_amount || 0),
         rounding: parseFloat(invoice.rounding || 0),
         totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
+        balance_due: parseFloat(invoice.balance_due || 0),
         invoice_status: invoice.invoice_status,
         einvoice_status: invoice.einvoice_status,
         uuid: invoice.uuid,
@@ -374,9 +372,8 @@ export default function (pool, config) {
           returnProduct: parseInt(product.returnProduct || 0),
           tax: parseFloat(product.tax || 0),
           description: product.description,
-          total: String(product.total || "0.00"), // Keep as string for FE
+          total: String(product.total || "0.00"),
           issubtotal: product.issubtotal || false,
-          // uid added by frontend
         })),
       });
     } catch (error) {
@@ -393,9 +390,9 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
 
-      const invoice = req.body; // Matches ExtendedInvoiceData from frontend
+      const invoice = req.body; // Frontend sends data matching ExtendedInvoiceData
 
-      // Validate required fields
+      // Validation
       if (
         !invoice.id ||
         !invoice.salespersonid ||
@@ -407,31 +404,30 @@ export default function (pool, config) {
         );
       }
 
-      // Check for duplicate invoice ID
       const checkQuery = "SELECT id FROM invoices WHERE id = $1";
       const checkResult = await client.query(checkQuery, [invoice.id]);
       if (checkResult.rows.length > 0) {
-        throw new Error(`Invoice with ID ${invoice.id} already exists`);
+        return res
+          .status(409) // Conflict
+          .json({ message: `Invoice with ID ${invoice.id} already exists` });
       }
 
-      // Set balance_due equal to totalamountpayable initially
-      const balance_due = parseFloat(invoice.totalamountpayable || 0);
+      // Initial balance and status
+      const totalPayable = parseFloat(invoice.totalamountpayable || 0);
+      const balance_due = totalPayable;
+      const invoice_status = "Unpaid"; // Default status for new invoices
 
-      // Insert invoice using new schema
+      // Insert invoice
       const insertInvoiceQuery = `
-      INSERT INTO invoices (
-        id, salespersonid, customerid, createddate, paymenttype,
-        total_excluding_tax, tax_amount, rounding, totalamountpayable,
-        invoice_status, einvoice_status, balance_due
-        -- uuid, submission_uid etc. are usually set later by e-invoice process
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING *
-    `;
-
-      // Prepare values, ensuring correct types and defaults
+        INSERT INTO invoices (
+          id, salespersonid, customerid, createddate, paymenttype,
+          total_excluding_tax, tax_amount, rounding, totalamountpayable,
+          invoice_status, einvoice_status, balance_due
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING *
+      `;
       const values = [
-        invoice.id, // Provided ID (VARCHAR)
+        invoice.id,
         invoice.salespersonid,
         invoice.customerid,
         invoice.createddate,
@@ -439,212 +435,27 @@ export default function (pool, config) {
         parseFloat(invoice.total_excluding_tax || 0),
         parseFloat(invoice.tax_amount || 0),
         parseFloat(invoice.rounding || 0),
-        parseFloat(invoice.totalamountpayable || 0),
-        "Unpaid", // Default is Unpaid now
-        invoice.einvoice_status || null, // Usually null on creation
-        balance_due, // Add the balance_due value
+        totalPayable,
+        invoice_status, // Use 'Unpaid'
+        null, // einvoice_status starts as null
+        balance_due, // balance_due equals total payable initially
       ];
 
       const invoiceResult = await client.query(insertInvoiceQuery, values);
       const createdInvoice = invoiceResult.rows[0];
 
-      // Insert products (order_details)
+      // Insert products (order_details) - NO CHANGE HERE
       if (invoice.products && invoice.products.length > 0) {
         const productQuery = `
           INSERT INTO order_details (
             invoiceid, code, price, quantity, freeproduct,
             returnproduct, description, tax, total, issubtotal
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `;
-
         for (const product of invoice.products) {
-          // Skip frontend-only total rows if they were somehow sent
           if (product.istotal) continue;
-
           await client.query(productQuery, [
-            createdInvoice.id, // Use the VARCHAR ID
-            product.code || (product.issubtotal ? "SUBTOTAL" : ""),
-            parseFloat(product.price || 0),
-            parseInt(product.quantity || 0),
-            parseInt(product.freeProduct || 0),
-            parseInt(product.returnProduct || 0),
-            product.description || (product.issubtotal ? "Subtotal" : ""),
-            parseFloat(product.tax || 0),
-            String(product.total || "0.00"), // Store total as string/numeric based on FE
-            product.issubtotal || false,
-          ]);
-        }
-      }
-
-      // Update customer credit if applicable
-      if (createdInvoice.paymenttype === "INVOICE") {
-        await updateCustomerCredit(
-          client,
-          createdInvoice.customerid,
-          createdInvoice.totalamountpayable
-        );
-      }
-
-      await client.query("COMMIT");
-
-      // Fetch customer name for the response
-      const customer = await fetchCustomerData(pool, createdInvoice.customerid);
-
-      // Format response to match ExtendedInvoiceData
-      res.status(201).json({
-        message: "Invoice created successfully",
-        invoice: {
-          ...createdInvoice,
-          total_excluding_tax: parseFloat(
-            createdInvoice.total_excluding_tax || 0
-          ),
-          tax_amount: parseFloat(createdInvoice.tax_amount || 0),
-          rounding: parseFloat(createdInvoice.rounding || 0),
-          totalamountpayable: parseFloat(
-            createdInvoice.totalamountpayable || 0
-          ),
-          customerName: customer?.name || createdInvoice.customerid,
-          products: invoice.products || [], // Return products sent by FE, frontend adds uid
-        },
-      });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      console.error("Error submitting invoice:", error);
-      res
-        .status(500)
-        .json({ message: "Error submitting invoice", error: error.message });
-    } finally {
-      client.release();
-    }
-  });
-
-  // POST /api/invoices/update - Update Invoice (Updated Schema, ID immutable)
-  router.post("/update", async (req, res) => {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      const invoice = req.body; // Matches ExtendedInvoiceData
-
-      // Validate required fields for update
-      if (
-        !invoice.id ||
-        !invoice.salespersonid ||
-        !invoice.customerid ||
-        !invoice.createddate
-      ) {
-        throw new Error(
-          "Missing required fields: id, salespersonid, customerid, createddate"
-        );
-      }
-
-      // 1. Get Original Invoice for comparison
-      const originalInvoiceQuery = `
-      SELECT customerid, paymenttype, totalamountpayable, balance_due, invoice_status
-      FROM invoices
-      WHERE id = $1 FOR UPDATE`; // Lock the row
-      const originalInvoiceResult = await client.query(originalInvoiceQuery, [
-        invoice.id,
-      ]);
-
-      if (originalInvoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${invoice.id} not found for update`);
-      }
-      const originalInvoice = originalInvoiceResult.rows[0];
-
-      // 2. Handle Credit Adjustments
-      const originalType = (originalInvoice.paymenttype || "").toUpperCase();
-      const newType = (invoice.paymenttype || "INVOICE").toUpperCase();
-      const originalAmount = parseFloat(
-        originalInvoice.totalamountpayable || 0
-      );
-      const newAmount = parseFloat(invoice.totalamountpayable || 0);
-      const originalCustomerId = originalInvoice.customerid;
-      const newCustomerId = invoice.customerid;
-
-      // Revert original credit impact if it was an INVOICE
-      if (originalType === "INVOICE" && originalAmount !== 0) {
-        await updateCustomerCredit(client, originalCustomerId, -originalAmount);
-      }
-      // Apply new credit impact if it's now an INVOICE
-      if (newType === "INVOICE" && newAmount !== 0) {
-        await updateCustomerCredit(client, newCustomerId, newAmount);
-      }
-
-      // Calculate new balance_due
-      // If totalamountpayable changes, we need to adjust balance_due by the difference
-      const originalTotal = parseFloat(originalInvoice.totalamountpayable || 0);
-      const newTotal = parseFloat(invoice.totalamountpayable || 0);
-      const currentBalance = parseFloat(originalInvoice.balance_due || 0);
-
-      // Adjust balance by the difference in total
-      let newBalance = currentBalance + (newTotal - originalTotal);
-      newBalance = Math.max(0, parseFloat(newBalance.toFixed(2))); // Ensure positive and round to 2 decimal places
-
-      // Determine invoice status based on balance_due
-      const newStatus = newBalance <= 0 ? "paid" : "Unpaid";
-
-      // 3. Update the Invoice Record (ID is NOT updated)
-      const updateInvoiceQuery = `
-      UPDATE invoices SET
-        salespersonid = $1,
-        customerid = $2,
-        createddate = $3,
-        paymenttype = $4,
-        total_excluding_tax = $5,
-        tax_amount = $6,
-        rounding = $7,
-        totalamountpayable = $8,
-        invoice_status = $9,
-        balance_due = $10
-        -- einvoice_status, uuid etc. are typically not updated here
-      WHERE id = $11 -- Use ID in WHERE clause
-      RETURNING *
-    `;
-      const updateValues = [
-        invoice.salespersonid,
-        invoice.customerid,
-        invoice.createddate,
-        invoice.paymenttype || "INVOICE",
-        parseFloat(invoice.total_excluding_tax || 0),
-        parseFloat(invoice.tax_amount || 0),
-        parseFloat(invoice.rounding || 0),
-        parseFloat(invoice.totalamountpayable || 0),
-        newStatus, // Update status based on balance
-        newBalance, // Update the balance_due
-        invoice.id, // For WHERE clause
-      ];
-
-      const invoiceResult = await client.query(
-        updateInvoiceQuery,
-        updateValues
-      );
-      if (invoiceResult.rows.length === 0) {
-        // Should not happen due to the initial check, but good practice
-        throw new Error(
-          `Invoice with ID ${invoice.id} disappeared during update`
-        );
-      }
-      const updatedInvoice = invoiceResult.rows[0];
-
-      // 4. Delete and Re-insert Products
-      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
-        invoice.id,
-      ]);
-
-      if (invoice.products && invoice.products.length > 0) {
-        const productQuery = `
-          INSERT INTO order_details (
-            invoiceid, code, price, quantity, freeproduct,
-            returnproduct, description, tax, total, issubtotal
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `;
-        for (const product of invoice.products) {
-          if (product.istotal) continue; // Skip frontend total rows
-          await client.query(productQuery, [
-            updatedInvoice.id, // Use the same VARCHAR ID
+            createdInvoice.id,
             product.code || (product.issubtotal ? "SUBTOTAL" : ""),
             parseFloat(product.price || 0),
             parseInt(product.quantity || 0),
@@ -658,34 +469,51 @@ export default function (pool, config) {
         }
       }
 
+      // Update customer credit if INVOICE type - NO CHANGE HERE
+      if (createdInvoice.paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          createdInvoice.customerid,
+          createdInvoice.totalamountpayable // Add full amount to credit used
+        );
+      }
+
       await client.query("COMMIT");
 
-      // Fetch customer name for response consistency
-      const customer = await fetchCustomerData(pool, updatedInvoice.customerid);
+      // Fetch customer name for the response
+      const customer = await fetchCustomerDataWithCache(
+        createdInvoice.customerid
+      );
 
-      // Format response
-      res.json({
-        message: "Invoice updated successfully",
+      // Format response (Match ExtendedInvoiceData, include balance_due)
+      res.status(201).json({
+        message: "Invoice created successfully",
         invoice: {
-          ...updatedInvoice,
+          ...createdInvoice,
           total_excluding_tax: parseFloat(
-            updatedInvoice.total_excluding_tax || 0
+            createdInvoice.total_excluding_tax || 0
           ),
-          tax_amount: parseFloat(updatedInvoice.tax_amount || 0),
-          rounding: parseFloat(updatedInvoice.rounding || 0),
+          tax_amount: parseFloat(createdInvoice.tax_amount || 0),
+          rounding: parseFloat(createdInvoice.rounding || 0),
           totalamountpayable: parseFloat(
-            updatedInvoice.totalamountpayable || 0
+            createdInvoice.totalamountpayable || 0
           ),
-          customerName: customer?.name || updatedInvoice.customerid,
-          products: invoice.products || [], // Return products sent by FE
+          balance_due: parseFloat(createdInvoice.balance_due || 0), // Include parsed balance
+          customerName: customer?.name || createdInvoice.customerid,
+          products: invoice.products || [],
         },
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error updating invoice:", error);
-      res
-        .status(500)
-        .json({ message: "Error updating invoice", error: error.message });
+      console.error("Error submitting invoice:", error);
+      // Send specific duplicate error if applicable
+      if (error.message && error.message.includes("already exists")) {
+        res.status(409).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Error submitting invoice", error: error.message });
+      }
     } finally {
       client.release();
     }
@@ -1413,6 +1241,7 @@ export default function (pool, config) {
           totalamountpayable: parseFloat(
             updateResult.rows[0].totalamountpayable || 0
           ),
+          balance_due: parseFloat(updateResult.rows[0].balance_due || 0),
           customerName: customer?.name || updateResult.rows[0].customerid,
           // products are not typically returned on cancel, but could be queried if needed
         },

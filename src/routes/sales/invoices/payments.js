@@ -1,130 +1,179 @@
 // src/routes/sales/invoices/payments.js
 import { Router } from "express";
 
+// Helper function (can be moved to a shared util if used elsewhere)
+const updateCustomerCredit = async (client, customerId, amount) => {
+  try {
+    const updateQuery = `
+      UPDATE customers
+      SET credit_used = GREATEST(0, COALESCE(credit_used, 0) + $1)
+      WHERE id = $2
+      RETURNING credit_used, credit_limit
+    `;
+    const result = await client.query(updateQuery, [amount, customerId]);
+    if (result.rows.length === 0) {
+      console.warn(`Customer ${customerId} not found when updating credit`);
+      return null;
+    }
+    return result.rows[0];
+  } catch (error) {
+    console.error(`Error updating credit for customer ${customerId}:`, error);
+    throw error; // Re-throw to be caught by transaction handler
+  }
+};
+
 export default function (pool) {
   const router = Router();
 
-  // Get all payments (with optional invoice_id filter)
+  // --- GET /api/payments (Get Payments) ---
+  // Added filtering by invoice_id
   router.get("/", async (req, res) => {
-    const { invoice_id } = req.query;
+    const { invoice_id } = req.query; // Filter parameter
 
     try {
       let query = `
-        SELECT p.*, 
-               i.id as invoice_number,
-               c.name as customer_name
+        SELECT
+          p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+          p.payment_method, p.payment_reference, p.internal_reference,
+          p.notes, p.created_at
+          -- Optionally join other tables if needed, but keep it simple for now
+          -- , i.id as invoice_number -- Example join
         FROM payments p
-        JOIN invoices i ON p.invoice_id = i.id
-        LEFT JOIN customers c ON i.customerid = c.id
+        -- LEFT JOIN invoices i ON p.invoice_id = i.id -- Example join
+        WHERE 1=1
       `;
-
       const queryParams = [];
+      let paramCounter = 1;
 
       if (invoice_id) {
-        query += " WHERE p.invoice_id = $1";
         queryParams.push(invoice_id);
+        query += ` AND p.invoice_id = $${paramCounter++}`;
       }
 
-      query += " ORDER BY p.payment_date DESC";
+      query += " ORDER BY p.payment_date DESC, p.created_at DESC"; // Order by date, then creation time
 
       const result = await pool.query(query, queryParams);
-      res.json(result.rows);
+
+      // Parse amount_paid to number before sending
+      const payments = result.rows.map((p) => ({
+        ...p,
+        amount_paid: parseFloat(p.amount_paid || 0),
+      }));
+
+      res.json(payments);
     } catch (error) {
       console.error("Error fetching payments:", error);
-      res.status(500).json({
-        message: "Error fetching payments",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error fetching payments", error: error.message });
     }
   });
 
-  // Create a new payment
+  // --- POST /api/payments (Create Payment) ---
   router.post("/", async (req, res) => {
     const {
-      invoice_id,
-      payment_date,
-      amount_paid,
-      payment_method,
-      payment_reference,
-      internal_reference,
-      notes,
+      invoice_id, // Required: ID of the invoice being paid
+      payment_date, // Required: Date of payment
+      amount_paid, // Required: Amount being paid
+      payment_method, // Required: 'cash', 'cheque', 'bank_transfer', 'online'
+      payment_reference, // Optional: Cheque no, transaction ID, etc.
+      notes, // Optional: Any notes about the payment
+      // internal_reference is NOT expected from frontend for standard payments
     } = req.body;
 
-    const client = await pool.connect();
+    // Basic validation
+    if (!invoice_id || !payment_date || !amount_paid || !payment_method) {
+      return res.status(400).json({
+        message:
+          "Missing required fields: invoice_id, payment_date, amount_paid, payment_method",
+      });
+    }
+    if (isNaN(parseFloat(amount_paid)) || parseFloat(amount_paid) <= 0) {
+      return res
+        .status(400)
+        .json({
+          message: "Invalid payment amount. Must be a positive number.",
+        });
+    }
 
+    const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // Check if required fields are provided
-      if (!invoice_id || !payment_date || !amount_paid || !payment_method) {
-        throw new Error(
-          "Missing required fields: invoice_id, payment_date, amount_paid, payment_method"
-        );
-      }
-
-      // Get invoice details
+      // 1. Get Invoice details & Lock the row
       const invoiceQuery = `
-        SELECT i.*, c.id as customer_id
-        FROM invoices i
-        LEFT JOIN customers c ON i.customerid = c.id
-        WHERE i.id = $1
+        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, invoice_status
+        FROM invoices
+        WHERE id = $1 FOR UPDATE
       `;
-
       const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
 
       if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${invoice_id} not found`);
+        throw new Error(`Invoice ${invoice_id} not found.`);
+      }
+      const invoice = invoiceResult.rows[0];
+      const currentBalance = parseFloat(invoice.balance_due || 0);
+
+      // 2. Check invoice status and payment amount
+      if (invoice.invoice_status === "cancelled") {
+        throw new Error(
+          `Invoice ${invoice_id} is cancelled and cannot receive payments.`
+        );
+      }
+      if (parseFloat(amount_paid) > currentBalance) {
+        throw new Error(
+          `Payment amount (${parseFloat(amount_paid).toFixed(
+            2
+          )}) exceeds balance due (${currentBalance.toFixed(2)}).`
+        );
       }
 
-      const invoice = invoiceResult.rows[0];
-
-      // Create the payment
-      const paymentQuery = `
+      // 3. Insert the payment record
+      // (Removed internal_reference generation logic - assume not needed or handled elsewhere)
+      const insertPaymentQuery = `
         INSERT INTO payments (
-          invoice_id,
-          payment_date,
-          amount_paid,
-          payment_method,
-          payment_reference,
-          internal_reference,
-          notes
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+          invoice_id, payment_date, amount_paid, payment_method,
+          payment_reference, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
       `;
-
-      const paymentResult = await client.query(paymentQuery, [
+      const paymentValues = [
         invoice_id,
         payment_date,
-        amount_paid,
+        parseFloat(amount_paid),
         payment_method,
-        payment_reference || null,
-        internal_reference || null,
+        payment_reference || null, // Use null if empty/undefined
         notes || null,
+      ];
+      const paymentResult = await client.query(
+        insertPaymentQuery,
+        paymentValues
+      );
+      const createdPayment = paymentResult.rows[0];
+
+      // 4. Update Invoice balance and status
+      const newBalance = Math.max(0, currentBalance - parseFloat(amount_paid));
+      // Round to 2 decimal places to avoid floating point issues
+      const finalNewBalance = parseFloat(newBalance.toFixed(2));
+      const newStatus = finalNewBalance <= 0 ? "paid" : "Unpaid"; // Update status based on new balance
+
+      const updateInvoiceQuery = `
+        UPDATE invoices
+        SET balance_due = $1, invoice_status = $2
+        WHERE id = $3
+      `;
+      await client.query(updateInvoiceQuery, [
+        finalNewBalance,
+        newStatus,
+        invoice_id,
       ]);
 
-      // Update invoice balance_due and status
-      const newBalance = Math.max(
-        0,
-        parseFloat(invoice.balance_due) - parseFloat(amount_paid)
-      );
-
-      // If balance is 0, set status to "paid"
-      const newStatus = newBalance === 0 ? "paid" : "Unpaid";
-
-      await client.query(
-        `UPDATE invoices SET balance_due = $1, invoice_status = $2 WHERE id = $3`,
-        [newBalance, newStatus, invoice_id]
-      );
-
-      // Update customer credit_used if this is an INVOICE payment
-      if (invoice.paymenttype === "INVOICE" && invoice.customerid) {
-        // Reduce the customer's credit_used by the payment amount
-        await client.query(
-          `UPDATE customers 
-           SET credit_used = GREATEST(0, COALESCE(credit_used, 0) - $1)
-           WHERE id = $2`,
-          [amount_paid, invoice.customerid]
+      // 5. Update Customer Credit if it was an INVOICE payment
+      if (invoice.paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          invoice.customerid,
+          -parseFloat(amount_paid) // Reduce credit used
         );
       }
 
@@ -132,94 +181,121 @@ export default function (pool) {
 
       res.status(201).json({
         message: "Payment created successfully",
-        payment: paymentResult.rows[0],
+        // Parse amount back to float for consistency in response
+        payment: {
+          ...createdPayment,
+          amount_paid: parseFloat(createdPayment.amount_paid || 0),
+        },
       });
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error creating payment:", error);
-      res.status(500).json({
-        message: "Error creating payment",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error creating payment", error: error.message });
     } finally {
       client.release();
     }
   });
 
-  // Delete a payment
+  // --- DELETE /api/payments/:payment_id (Delete Payment) ---
   router.delete("/:payment_id", async (req, res) => {
     const { payment_id } = req.params;
-    const client = await pool.connect();
+    const paymentIdNum = parseInt(payment_id);
 
+    if (isNaN(paymentIdNum)) {
+      return res.status(400).json({ message: "Invalid payment ID." });
+    }
+
+    const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // Get payment details before deleting (to update invoice balance)
-      const paymentQuery = "SELECT * FROM payments WHERE payment_id = $1";
-      const paymentResult = await client.query(paymentQuery, [payment_id]);
+      // 1. Get Payment details & Lock Invoice Row
+      const paymentQuery = `
+        SELECT p.*, i.customerid, i.paymenttype, i.invoice_status
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        WHERE p.payment_id = $1 FOR UPDATE OF i -- Lock the associated invoice row
+      `;
+      const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
 
       if (paymentResult.rows.length === 0) {
-        return res.status(404).json({ message: "Payment not found" });
+        throw new Error(`Payment ${paymentIdNum} not found.`);
       }
-
       const payment = paymentResult.rows[0];
-      const { invoice_id, amount_paid } = payment;
+      const {
+        invoice_id,
+        amount_paid,
+        customerid,
+        paymenttype,
+        invoice_status,
+      } = payment;
+      const paidAmount = parseFloat(amount_paid || 0);
 
-      // Get the current invoice balance and customer info
-      const invoiceQuery = `
-        SELECT i.*, c.id as customer_id
-        FROM invoices i
-        LEFT JOIN customers c ON i.customerid = c.id
-        WHERE i.id = $1
-      `;
-      const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
-
-      if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${invoice_id} not found`);
-      }
-
-      const invoice = invoiceResult.rows[0];
-
-      // Calculate the new balance (add the deleted payment amount back to the balance)
-      const currentBalance = parseFloat(invoice.balance_due);
-      const newBalance = currentBalance + parseFloat(amount_paid);
-      const status = newBalance <= 0 ? "paid" : "Unpaid";
-
-      // Update the invoice balance
-      await client.query(
-        "UPDATE invoices SET balance_due = $1, invoice_status = $2 WHERE id = $3",
-        [newBalance, status, invoice_id]
-      );
-
-      // Update customer credit_used if this was an INVOICE payment
-      if (invoice.paymenttype === "INVOICE" && invoice.customerid) {
-        // Increase the customer's credit_used by the payment amount
-        await client.query(
-          `UPDATE customers 
-           SET credit_used = COALESCE(credit_used, 0) + $1
-           WHERE id = $2`,
-          [amount_paid, invoice.customerid]
+      // Optional: Prevent deleting payment if invoice is cancelled?
+      if (invoice_status === "cancelled") {
+        throw new Error(
+          `Cannot delete payment for a cancelled invoice (${invoice_id}).`
         );
       }
 
-      // Delete the payment
+      // 2. Delete the payment
       const deleteQuery =
         "DELETE FROM payments WHERE payment_id = $1 RETURNING *";
-      const deleteResult = await client.query(deleteQuery, [payment_id]);
+      const deleteResult = await client.query(deleteQuery, [paymentIdNum]);
+      const deletedPayment = deleteResult.rows[0];
+
+      // 3. Update Invoice balance and status
+      // Get current balance *after* locking
+      const currentInvoiceState = await client.query(
+        "SELECT balance_due FROM invoices WHERE id = $1",
+        [invoice_id]
+      );
+      const currentBalance = parseFloat(
+        currentInvoiceState.rows[0].balance_due || 0
+      );
+
+      const newBalance = currentBalance + paidAmount;
+      // Round to 2 decimal places
+      const finalNewBalance = parseFloat(newBalance.toFixed(2));
+      const newStatus = finalNewBalance <= 0 ? "paid" : "Unpaid"; // Status might revert to Unpaid
+
+      const updateInvoiceQuery = `
+        UPDATE invoices SET balance_due = $1, invoice_status = $2
+        WHERE id = $3
+      `;
+      await client.query(updateInvoiceQuery, [
+        finalNewBalance,
+        newStatus,
+        invoice_id,
+      ]);
+
+      // 4. Update Customer Credit if it was an INVOICE payment
+      if (paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          customerid,
+          paidAmount // Add back the amount to credit used
+        );
+      }
 
       await client.query("COMMIT");
 
       res.json({
         message: "Payment deleted successfully",
-        payment: deleteResult.rows[0],
+        // Parse amount back to float
+        payment: {
+          ...deletedPayment,
+          amount_paid: parseFloat(deletedPayment.amount_paid || 0),
+        },
       });
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error deleting payment:", error);
-      res.status(500).json({
-        message: "Error deleting payment",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error deleting payment", error: error.message });
     } finally {
       client.release();
     }

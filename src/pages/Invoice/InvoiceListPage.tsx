@@ -323,6 +323,7 @@ const InvoiceListPage: React.FC = () => {
   const handleCreateNewInvoice = () => navigate("/sales/invoice/new");
   const handleViewDetails = (invoiceId: string) =>
     navigate(`/sales/invoice/${invoiceId}`, {
+      // <-- Updated path
       state: { previousPath: location.pathname + location.search },
     });
 
