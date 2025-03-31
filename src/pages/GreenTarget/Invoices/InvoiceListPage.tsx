@@ -121,7 +121,7 @@ const InvoiceCard = ({
         <div className="flex justify-between items-center">
           <span>{invoice.invoice_number}</span>
           <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
-            {isPaid ? "Paid" : "Outstanding"}
+            {isPaid ? "Paid" : "Unpaid"}
           </span>
         </div>
       </div>
