@@ -4,6 +4,7 @@ import {
   ExtendedInvoiceData,
   InvoiceFilters,
   ProductItem,
+  Payment,
 } from "../../types/types";
 import { api } from "../../routes/utils/api"; // Adjust path as needed
 
@@ -206,82 +207,6 @@ export const getInvoices = async (
   }
 };
 
-// UPDATE Invoice
-export const updateInvoice = async (
-  invoiceData: ExtendedInvoiceData
-): Promise<ExtendedInvoiceData> => {
-  try {
-    if (!invoiceData.id) {
-      throw new Error("Cannot update invoice: missing ID");
-    }
-
-    // Prepare data for backend
-    const dataToSubmit = {
-      // Include only fields the backend needs for update
-      id: invoiceData.id, // ID is used in WHERE clause, not SET clause
-      salespersonid: invoiceData.salespersonid,
-      customerid: invoiceData.customerid,
-      createddate: invoiceData.createddate,
-      paymenttype: invoiceData.paymenttype,
-      total_excluding_tax: Number(invoiceData.total_excluding_tax || 0),
-      tax_amount: Number(invoiceData.tax_amount || 0),
-      rounding: Number(invoiceData.rounding || 0),
-      totalamountpayable: Number(invoiceData.totalamountpayable || 0),
-      invoice_status: invoiceData.invoice_status,
-      // Send products without frontend-specific fields
-      products: (invoiceData.products || [])
-        .filter((p) => !p.istotal)
-        .map(
-          ({
-            uid,
-            istotal,
-            issubtotal,
-            amount,
-            rounding: productRounding,
-            ...rest
-          }) => ({
-            ...rest,
-            issubtotal: issubtotal || false,
-            price: Number(rest.price || 0),
-            quantity: Number(rest.quantity || 0),
-            freeProduct: Number(rest.freeProduct || 0),
-            returnProduct: Number(rest.returnProduct || 0),
-            tax: Number(rest.tax || 0),
-            total: String(rest.total || "0.00"),
-          })
-        ),
-      // Explicitly DO NOT send e-invoice fields - they are updated via e-invoice endpoints
-    };
-
-    const response = await api.post("/api/invoices/update", dataToSubmit); // Use the correct update endpoint
-
-    if (!response || !response.invoice) {
-      throw new Error("Invalid response received after updating invoice.");
-    }
-
-    // Map response back to frontend state shape
-    const savedInvoice = response.invoice;
-    return {
-      ...invoiceData, // Start with current state
-      ...savedInvoice, // Overwrite with updated fields from backend
-      // Ensure correct types and add UIDs for products
-      products: ensureProductsHaveUid(
-        savedInvoice.products || invoiceData.products
-      ), // Use original if not returned
-      customerName:
-        savedInvoice.customerName ||
-        invoiceData.customerName ||
-        savedInvoice.customerid,
-    };
-  } catch (error) {
-    console.error("Error updating invoice:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to update invoice";
-    toast.error(errorMessage);
-    throw new Error(errorMessage); // Re-throw
-  }
-};
-
 // CANCEL Invoice (formerly delete) - Now returns the updated invoice data
 export const cancelInvoice = async (
   id: string
@@ -360,5 +285,64 @@ export const checkDuplicateInvoiceNo = async (
     console.error("Error checking duplicate invoice number:", error);
     // Don't necessarily throw, maybe return false and let backend handle final check
     return false;
+  }
+};
+
+// --- NEW Payment Utilities ---
+
+// CREATE Payment
+export const createPayment = async (
+  paymentData: Omit<Payment, "payment_id" | "created_at">
+): Promise<Payment> => {
+  try {
+    const response = await api.post("/api/payments", paymentData);
+    if (!response || !response.payment) {
+      throw new Error("Invalid response received after creating payment.");
+    }
+    return response.payment;
+  } catch (error: any) {
+    console.error("Error creating payment:", error);
+    const errorMessage =
+      error.response?.data?.message || // Use backend error message if available
+      (error instanceof Error ? error.message : "Failed to record payment");
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
+// GET Payments for a specific Invoice
+export const getPaymentsForInvoice = async (
+  invoiceId: string
+): Promise<Payment[]> => {
+  try {
+    const response = await api.get(`/api/payments?invoice_id=${invoiceId}`);
+    return response || []; // Assuming backend returns array directly or null/undefined
+  } catch (error: any) {
+    console.error(`Error fetching payments for invoice ${invoiceId}:`, error);
+    const errorMessage =
+      error.response?.data?.message ||
+      (error instanceof Error
+        ? error.message
+        : "Failed to fetch payment history");
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
+// DELETE Payment
+export const deletePayment = async (paymentId: number): Promise<Payment> => {
+  try {
+    const response = await api.delete(`/api/payments/${paymentId}`);
+    if (!response || !response.payment) {
+      throw new Error("Invalid response received after deleting payment.");
+    }
+    return response.payment;
+  } catch (error: any) {
+    console.error(`Error deleting payment ${paymentId}:`, error);
+    const errorMessage =
+      error.response?.data?.message ||
+      (error instanceof Error ? error.message : "Failed to delete payment");
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
   }
 };

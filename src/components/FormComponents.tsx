@@ -24,12 +24,15 @@ interface SelectOption {
 interface InputProps {
   name: string;
   label: string;
-  value: string | undefined;
+  value: string | number | undefined;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
   type?: string;
   placeholder?: string;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  step?: string;
+  min?: string;
+  max?: number;
 }
 
 interface ExtendedInputProps extends InputProps {
@@ -45,6 +48,10 @@ export const FormInput: React.FC<InputProps> = ({
   disabled = false,
   type = "text",
   placeholder = "",
+  onBlur,
+  step,
+  min,
+  max,
 }) => (
   <div className={`${label === "" ? "" : "space-y-2"}`}>
     <label
@@ -61,6 +68,10 @@ export const FormInput: React.FC<InputProps> = ({
       onChange={onChange}
       disabled={disabled}
       placeholder={placeholder}
+      onBlur={onBlur}
+      step={step}
+      min={min}
+      max={max}
       className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
     />
   </div>
