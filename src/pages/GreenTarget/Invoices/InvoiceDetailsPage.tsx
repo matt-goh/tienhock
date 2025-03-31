@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Fragment } from "react"; // Added Fragment
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   IconFileInvoice,
@@ -7,6 +7,8 @@ import {
   IconPrinter,
   IconChevronLeft,
   IconTrash,
+  IconCheck,
+  IconChevronDown,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -14,12 +16,15 @@ import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   Listbox,
-  ListboxButton,
+  // ListboxButton, // Use renamed HeadlessListboxButton
   ListboxOption,
   ListboxOptions,
+  Transition, // Added Transition
+  ListboxButton as HeadlessListboxButton, // Renamed import
 } from "@headlessui/react";
-import { IconCheck, IconChevronDown } from "@tabler/icons-react";
+import clsx from "clsx"; // Added clsx
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import { SelectOption } from "../../../components/FormComponents"; // Import SelectOption if needed for payment methods
 
 interface Payment {
   payment_id: number;
@@ -60,10 +65,18 @@ interface Invoice {
 interface PaymentFormData {
   amount_paid: number;
   payment_date: string;
-  payment_method: string;
+  payment_method: string; // Keep as string ('cash', 'cheque', etc.)
   payment_reference: string;
   internal_reference: string;
 }
+
+// Define payment method options compatible with SelectOption
+const paymentMethodOptions: SelectOption[] = [
+  { id: "cash", name: "Cash" },
+  { id: "cheque", name: "Cheque" },
+  { id: "bank_transfer", name: "Bank Transfer" },
+  { id: "online", name: "Online Payment" },
+];
 
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -79,7 +92,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [paymentFormData, setPaymentFormData] = useState<PaymentFormData>({
     amount_paid: 0,
     payment_date: new Date().toISOString().split("T")[0],
-    payment_method: "cash",
+    payment_method: "cash", // Default value
     payment_reference: "",
     internal_reference: "",
   });
@@ -140,6 +153,7 @@ const InvoiceDetailsPage: React.FC = () => {
       setPaymentFormData((prev) => ({
         ...prev,
         amount_paid: invoice.current_balance,
+        payment_method: prev.payment_method || "cash", // Ensure a default if needed
       }));
 
       setError(null);
@@ -182,6 +196,14 @@ const InvoiceDetailsPage: React.FC = () => {
         [name]: value,
       }));
     }
+  };
+
+  // Specific handler for Listbox change
+  const handlePaymentMethodChange = (value: string) => {
+    setPaymentFormData((prev) => ({
+      ...prev,
+      payment_method: value,
+    }));
   };
 
   const validatePaymentForm = (): boolean => {
@@ -231,12 +253,13 @@ const InvoiceDetailsPage: React.FC = () => {
       const regex = new RegExp(`^RV${currentYear}/${currentMonth}/(\\d+)$`);
 
       // Extract all used numbers for the current month and year
-      const usedNumbers = new Set();
-      allPayments.forEach((payment: { internal_reference: string }) => {
+      const usedNumbers = new Set<number>(); // Use Set<number>
+      allPayments.forEach((payment: { internal_reference: string | null }) => {
+        // Handle potential null
         if (payment.internal_reference) {
           const match = payment.internal_reference.match(regex);
           if (match) {
-            usedNumbers.add(parseInt(match[1]));
+            usedNumbers.add(parseInt(match[1], 10)); // Specify radix 10
           }
         }
       });
@@ -253,15 +276,26 @@ const InvoiceDetailsPage: React.FC = () => {
 
       const paymentData = {
         invoice_id: invoice.invoice_id,
-        ...paymentFormData,
+        amount_paid: paymentFormData.amount_paid, // Use values from state
+        payment_date: paymentFormData.payment_date,
+        payment_method: paymentFormData.payment_method,
+        payment_reference: paymentFormData.payment_reference || null, // Ensure null if empty
         internal_reference: referenceNumber,
       };
 
       const response = await greenTargetApi.createPayment(paymentData);
 
       toast.success("Payment processed successfully");
-      fetchInvoiceDetails(invoice.invoice_id);
-      setShowPaymentForm(false);
+      fetchInvoiceDetails(invoice.invoice_id); // Refresh details
+      setShowPaymentForm(false); // Close form
+      // Optionally reset form fields
+      setPaymentFormData({
+        amount_paid: 0,
+        payment_date: new Date().toISOString().split("T")[0],
+        payment_method: "cash",
+        payment_reference: "",
+        internal_reference: "",
+      });
     } catch (error) {
       console.error("Error processing payment:", error);
       if (error instanceof Error) {
@@ -369,18 +403,34 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   // Format currency
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
+    // Allow string input
+    const numericAmount =
+      typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(numericAmount)) {
+      return "N/A"; // Or some other placeholder for invalid numbers
+    }
     return new Intl.NumberFormat("en-MY", {
       style: "currency",
       currency: "MYR",
-    }).format(amount);
+    }).format(numericAmount);
   };
 
   // Format date
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    // Allow null/undefined
     if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid after parsing
+      if (isNaN(date.getTime())) {
+        return "Invalid Date";
+      }
+      return date.toLocaleDateString("en-GB"); // Use 'en-GB' for DD/MM/YYYY or adjust as needed
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return "Invalid Date";
+    }
   };
 
   if (loading) {
@@ -407,6 +457,14 @@ const InvoiceDetailsPage: React.FC = () => {
       </div>
     );
   }
+
+  // Find the selected payment method option for display
+  const selectedPaymentMethod = paymentMethodOptions.find(
+    (option) => option.id === paymentFormData.payment_method
+  );
+  const paymentMethodDisplayValue = selectedPaymentMethod
+    ? selectedPaymentMethod.name
+    : "Select Payment Method";
 
   return (
     <div className="container mx-auto px-8 pb-8 -mt-8">
@@ -491,6 +549,7 @@ const InvoiceDetailsPage: React.FC = () => {
           <h2 className="text-lg font-medium mb-4">Record Payment</h2>
           <form onSubmit={handleSubmitPayment}>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Payment Date Input */}
               <div className="space-y-2">
                 <label
                   htmlFor="payment_date"
@@ -504,10 +563,16 @@ const InvoiceDetailsPage: React.FC = () => {
                   name="payment_date"
                   value={paymentFormData.payment_date}
                   onChange={handlePaymentFormChange}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                  required // Added required
+                  className={clsx(
+                    // Use clsx for consistency
+                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                  )}
                 />
               </div>
 
+              {/* Amount Paid Input */}
               <div className="space-y-2">
                 <label
                   htmlFor="amount_paid"
@@ -528,160 +593,109 @@ const InvoiceDetailsPage: React.FC = () => {
                     min="0.01"
                     max={invoice.current_balance}
                     step="0.01"
-                    className="w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                    required // Added required
+                    className={clsx(
+                      // Use clsx for consistency
+                      "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    )}
                   />
                 </div>
               </div>
 
+              {/* Payment Method Listbox (Styled like FormListbox) */}
               <div className="space-y-2">
                 <label
-                  htmlFor="payment_method"
+                  htmlFor="payment_method-button" // Target the button ID
                   className="block text-sm font-medium text-default-700"
                 >
                   Payment Method
                 </label>
                 <Listbox
                   value={paymentFormData.payment_method}
-                  onChange={(value) => {
-                    setPaymentFormData((prev) => ({
-                      ...prev,
-                      payment_method: value,
-                    }));
-                  }}
+                  onChange={handlePaymentMethodChange} // Use dedicated handler
+                  name="payment_method"
                 >
                   <div className="relative">
-                    <ListboxButton className="w-full px-3 py-2 border border-default-300 rounded-lg text-left focus:outline-none focus:border-default-500 focus:ring-0">
+                    <HeadlessListboxButton
+                      id="payment_method-button"
+                      className={clsx(
+                        "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      )}
+                    >
                       <span className="block truncate">
-                        {paymentFormData.payment_method === "cash"
-                          ? "Cash"
-                          : paymentFormData.payment_method === "cheque"
-                          ? "Cheque"
-                          : paymentFormData.payment_method === "bank_transfer"
-                          ? "Bank Transfer"
-                          : paymentFormData.payment_method === "online"
-                          ? "Online Payment"
-                          : "Select Payment Method"}
+                        {paymentMethodDisplayValue}
                       </span>
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                         <IconChevronDown
                           size={20}
-                          className="text-default-500"
+                          className="text-gray-400"
+                          aria-hidden="true"
                         />
                       </span>
-                    </ListboxButton>
-                    <ListboxOptions className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-lg overflow-auto focus:outline-none border border-default-200">
-                      <ListboxOption
-                        value="cash"
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-4 ${
-                            active ? "bg-default-100" : ""
-                          }`
-                        }
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              Cash
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck size={20} />
-                              </span>
-                            )}
-                          </>
+                    </HeadlessListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions
+                        className={clsx(
+                          "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                          "mt-1" // Default position bottom
                         )}
-                      </ListboxOption>
-                      <ListboxOption
-                        value="cheque"
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-4 ${
-                            active ? "bg-default-100" : ""
-                          }`
-                        }
                       >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              Cheque
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck size={20} />
-                              </span>
+                        {paymentMethodOptions.map((option) => (
+                          <ListboxOption
+                            key={option.id}
+                            className={({ active }) =>
+                              clsx(
+                                "relative cursor-default select-none py-2 pl-3 pr-10",
+                                active
+                                  ? "bg-sky-100 text-sky-900"
+                                  : "text-gray-900"
+                              )
+                            }
+                            value={option.id.toString()} // Ensure value is string
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={clsx(
+                                    "block truncate",
+                                    selected ? "font-medium" : "font-normal"
+                                  )}
+                                >
+                                  {option.name}
+                                </span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                    <IconCheck size={20} aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
                             )}
-                          </>
-                        )}
-                      </ListboxOption>
-                      <ListboxOption
-                        value="bank_transfer"
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-4 ${
-                            active ? "bg-default-100" : ""
-                          }`
-                        }
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              Bank Transfer
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck size={20} />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                      <ListboxOption
-                        value="online"
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-4 ${
-                            active ? "bg-default-100" : ""
-                          }`
-                        }
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              Online Payment
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck size={20} />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    </ListboxOptions>
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </Transition>
                   </div>
                 </Listbox>
               </div>
 
-              {paymentFormData.payment_method === "cheque" && (
+              {/* Conditional Reference Input */}
+              {(paymentFormData.payment_method === "cheque" ||
+                paymentFormData.payment_method === "bank_transfer") && (
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
                     className="block text-sm font-medium text-default-700"
                   >
-                    Cheque Number
+                    {paymentFormData.payment_method === "cheque"
+                      ? "Cheque Number"
+                      : "Transaction Reference"}
                   </label>
                   <input
                     type="text"
@@ -689,26 +703,11 @@ const InvoiceDetailsPage: React.FC = () => {
                     name="payment_reference"
                     value={paymentFormData.payment_reference}
                     onChange={handlePaymentFormChange}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                  />
-                </div>
-              )}
-
-              {paymentFormData.payment_method === "bank_transfer" && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="payment_reference"
-                    className="block text-sm font-medium text-default-700"
-                  >
-                    Transaction Reference
-                  </label>
-                  <input
-                    type="text"
-                    id="payment_reference"
-                    name="payment_reference"
-                    value={paymentFormData.payment_reference}
-                    onChange={handlePaymentFormChange}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                    className={clsx(
+                      // Use clsx for consistency
+                      "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    )}
                   />
                 </div>
               )}
@@ -923,7 +922,7 @@ const InvoiceDetailsPage: React.FC = () => {
           <div className="px-6 py-4 border-t border-default-200">
             <h2 className="text-lg font-medium mb-3">Rental Details</h2>
             <div
-              className="rounded-lg border border-default-200 overflow-hidden cursor-pointer"
+              className="rounded-lg border border-default-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" // Added hover effect
               onClick={() =>
                 navigate(`/greentarget/rentals/${invoice.rental_id}`)
               }
@@ -1084,6 +1083,8 @@ const InvoiceDetailsPage: React.FC = () => {
                             setPaymentToDelete(payment);
                             setIsDeletePaymentDialogOpen(true);
                           }}
+                          icon={IconTrash} // Add icon for consistency
+                          className="px-2" // Adjust padding if needed
                         >
                           Delete
                         </Button>
