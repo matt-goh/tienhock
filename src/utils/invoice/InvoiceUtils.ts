@@ -312,10 +312,15 @@ export const createPayment = async (
 
 // GET Payments for a specific Invoice
 export const getPaymentsForInvoice = async (
-  invoiceId: string
+  invoiceId: string,
+  includeCancelled: boolean = false
 ): Promise<Payment[]> => {
   try {
-    const response = await api.get(`/api/payments?invoice_id=${invoiceId}`);
+    const response = await api.get(
+      `/api/payments?invoice_id=${invoiceId}${
+        includeCancelled ? "&include_cancelled=true" : ""
+      }`
+    );
     return response || []; // Assuming backend returns array directly or null/undefined
   } catch (error: any) {
     console.error(`Error fetching payments for invoice ${invoiceId}:`, error);
@@ -329,20 +334,33 @@ export const getPaymentsForInvoice = async (
   }
 };
 
-// DELETE Payment
-export const deletePayment = async (paymentId: number): Promise<Payment> => {
+// CANCEL Payment
+export const cancelPayment = async (
+  paymentId: number,
+  reason?: string
+): Promise<Payment> => {
   try {
-    const response = await api.delete(`/api/payments/${paymentId}`);
+    const response = await api.put(`/api/payments/${paymentId}/cancel`, {
+      reason,
+    });
     if (!response || !response.payment) {
-      throw new Error("Invalid response received after deleting payment.");
+      throw new Error("Invalid response received after cancelling payment.");
     }
     return response.payment;
   } catch (error: any) {
-    console.error(`Error deleting payment ${paymentId}:`, error);
+    console.error(`Error cancelling payment ${paymentId}:`, error);
     const errorMessage =
       error.response?.data?.message ||
-      (error instanceof Error ? error.message : "Failed to delete payment");
+      (error instanceof Error ? error.message : "Failed to cancel payment");
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }
+};
+
+// Keep the deletePayment function for backward compatibility, but mark as deprecated
+/**
+ * @deprecated Use cancelPayment instead
+ */
+export const deletePayment = async (paymentId: number): Promise<Payment> => {
+  return cancelPayment(paymentId);
 };
