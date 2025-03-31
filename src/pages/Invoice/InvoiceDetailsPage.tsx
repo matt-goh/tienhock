@@ -825,7 +825,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Amount
                     </th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-[10%]">
                       Action
                     </th>
                   </tr>
@@ -839,6 +839,17 @@ const InvoiceDetailsPage: React.FC = () => {
                           ? "bg-gray-50 text-gray-400 line-through"
                           : ""
                       }`}
+                      title={
+                        isCancelled
+                          ? "Cannot cancel payment for cancelled invoice"
+                          : p.status === "cancelled"
+                          ? p.cancellation_date
+                            ? `Cancelled on ${formatDisplayDate(
+                                new Date(p.cancellation_date)
+                              )}`
+                            : "Payment cancelled"
+                          : "Paid"
+                      }
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         {formatDisplayDate(new Date(p.payment_date))}
@@ -857,7 +868,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-green-600">
                         {formatCurrency(p.amount_paid)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
                         <Button
                           size="sm"
                           variant="outline"
@@ -872,7 +883,11 @@ const InvoiceDetailsPage: React.FC = () => {
                             isCancelled
                               ? "Cannot cancel payment for cancelled invoice"
                               : p.status === "cancelled"
-                              ? "Payment already cancelled"
+                              ? p.cancellation_date
+                                ? `Cancelled on ${formatDisplayDate(
+                                    new Date(p.cancellation_date)
+                                  )}`
+                                : "Payment cancelled"
                               : "Cancel Payment"
                           }
                           className="ml-auto"

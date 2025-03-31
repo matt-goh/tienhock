@@ -104,14 +104,23 @@ export const greenTargetApi = {
     api.get(`/greentarget/api/einvoice/check/${invoiceId}`),
 
   // Payment endpoints
-  getPayments: () => api.get("/greentarget/api/payments"),
-  getPaymentsByInvoice: (invoiceId: any) =>
-    api.get(`/greentarget/api/invoices/${invoiceId}/payments`),
+  getPayments: (includeCancelled = false) =>
+    api.get(
+      `/greentarget/api/payments${
+        includeCancelled ? "?include_cancelled=true" : ""
+      }`
+    ),
+  getPaymentsByInvoice: (invoiceId: any, includeCancelled = false) =>
+    api.get(
+      `/greentarget/api/invoices/${invoiceId}/payments${
+        includeCancelled ? "?include_cancelled=true" : ""
+      }`
+    ),
+  cancelPayment: (paymentId: number, reason?: string) =>
+    api.put(`/greentarget/api/payments/${paymentId}/cancel`, { reason }),
   createPayment: (data: any) => api.post("/greentarget/api/payments", data),
   updatePayment: (id: any, data: any) =>
     api.put(`/greentarget/api/payments/${id}`, data),
-  deletePayment: (paymentId: number) =>
-    api.delete(`/greentarget/api/payments/${paymentId}`),
 
   // Location endpoints
   getLocationsByCustomer: (customerId: any) =>
