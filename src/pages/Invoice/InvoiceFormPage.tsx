@@ -122,6 +122,13 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [isLoadingPage, salesmenCache, invoiceData]); // invoiceData added to prevent re-init
 
+  useEffect(() => {
+    // Auto-check "Mark as Paid" when CASH type is selected
+    if (invoiceData?.paymenttype === "CASH" && !isPaid) {
+      setIsPaid(true);
+    }
+  }, [invoiceData?.paymenttype, isPaid]);
+
   // Fetch custom product prices when customer changes (No change needed)
   const fetchCustomerProducts = useCallback(async (customerId: string) => {
     if (!customerId) {
@@ -256,12 +263,16 @@ const InvoiceFormPage: React.FC = () => {
           return { ...prev, id: numberPart };
         }
         if (field === "paymenttype") {
+          // If switching to CASH, ensure isPaid is true
+          if (value === "CASH") {
+            setIsPaid(true);
+          }
           return { ...prev, paymenttype: value };
         }
         return { ...prev, [field]: value };
       });
     },
-    [] // No isReadOnly dependency
+    [setIsPaid] // Add setIsPaid as a dependency
   );
 
   // Customer selection (No change needed, readOnly removed)
@@ -603,16 +614,36 @@ const InvoiceFormPage: React.FC = () => {
             <div className="flex items-center pt-1">
               <button
                 type="button"
-                onClick={() => !isSaving && setIsPaid(!isPaid)}
-                className="flex items-center disabled:opacity-50"
+                onClick={() => {
+                  if (
+                    !isSaving &&
+                    (invoiceData?.paymenttype !== "CASH" || !isPaid)
+                  ) {
+                    setIsPaid(!isPaid);
+                  }
+                }}
+                className={`flex items-center ${
+                  invoiceData?.paymenttype === "CASH"
+                    ? "cursor-not-allowed opacity-70"
+                    : ""
+                } disabled:opacity-50`}
                 disabled={isSaving}
+                title={
+                  invoiceData?.paymenttype === "CASH"
+                    ? "Cash invoices are always paid"
+                    : ""
+                }
               >
                 {isPaid ? (
                   <IconSquareCheckFilled className="text-blue-600" size={20} />
                 ) : (
                   <IconSquare className="text-default-400" size={20} />
                 )}
-                <span className="ml-2 font-medium text-sm">Mark as Paid</span>
+                <span className="ml-2 font-medium text-sm">
+                  {invoiceData?.paymenttype === "CASH"
+                    ? "Cash Payment"
+                    : "Mark as Paid"}
+                </span>
               </button>
             </div>
 

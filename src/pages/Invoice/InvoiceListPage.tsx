@@ -24,7 +24,6 @@ import {
   IconSearch,
   IconChevronDown,
   IconCheck,
-  IconSquare,
   IconSquareMinusFilled,
   IconSend,
   IconFileDownload,
@@ -262,10 +261,16 @@ const InvoiceListPage: React.FC = () => {
   };
 
   // New handler for blur event
+  const lastSearchTermRef = useRef(searchTerm);
+
   const handleSearchBlur = () => {
-    if (currentPage !== 1) setCurrentPage(1);
-    else setIsFetchTriggered(true);
-    setSelectedInvoiceIds(new Set()); // Clear selection on search
+    // Only trigger search if the search term has changed
+    if (searchTerm !== lastSearchTermRef.current) {
+      lastSearchTermRef.current = searchTerm;
+      if (currentPage !== 1) setCurrentPage(1);
+      else setIsFetchTriggered(true);
+      setSelectedInvoiceIds(new Set()); // Clear selection on search
+    }
   };
 
   // Handle Enter key press in search input
@@ -412,9 +417,8 @@ const InvoiceListPage: React.FC = () => {
     const eligibleInvoices = invoices.filter(
       (inv) =>
         selectedInvoiceIds.has(inv.id) &&
-        inv.invoice_status === "active" && // Must be active
-        !inv.uuid && // Not previously submitted
-        inv.paymenttype !== "CASH" // Cannot submit CASH invoices (assumption)
+        inv.invoice_status === "Unpaid" && // Must be active
+        !inv.uuid
       // Add customer TIN/ID check if possible? Requires customer data here.
     );
 
@@ -688,17 +692,15 @@ const InvoiceListPage: React.FC = () => {
             ? "bg-sky-50 border border-sky-200"
             : "bg-white border border-dashed border-default-200"
         } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
+        onClick={handleSelectAllOnPage}
+        title={
+          selectionState.isAllSelectedOnPage
+            ? "Deselect All on Page"
+            : "Select All on Page"
+        }
       >
         {/* Selection checkbox - always visible */}
-        <button
-          onClick={handleSelectAllOnPage}
-          className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
-          title={
-            selectionState.isAllSelectedOnPage
-              ? "Deselect All on Page"
-              : "Select All on Page"
-          }
-        >
+        <button className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
           {selectionState.isAllSelectedOnPage ? (
             <IconSquareMinusFilled className="text-sky-600" size={20} />
           ) : selectionState.isIndeterminate ? (
@@ -724,17 +726,29 @@ const InvoiceListPage: React.FC = () => {
             )}
           </span>
         ) : (
-          <span className="text-default-500 text-sm">
+          <span
+            className="text-default-500 text-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSelectAllOnPage();
+            }}
+          >
             Select invoices to perform actions
           </span>
         )}
 
-        <div className="flex gap-2 flex-wrap ml-auto">
+        <div
+          className="flex gap-2 flex-wrap ml-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Button
             size="sm"
             variant="outline"
             color="rose"
-            onClick={handleBulkCancel}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBulkCancel();
+            }}
             icon={IconBan}
             disabled={isLoading || selectedInvoiceIds.size === 0}
           >
@@ -744,7 +758,10 @@ const InvoiceListPage: React.FC = () => {
             size="sm"
             variant="outline"
             color="amber"
-            onClick={handleBulkSubmitEInvoice}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBulkSubmitEInvoice();
+            }}
             icon={IconSend}
             disabled={isLoading || selectedInvoiceIds.size === 0}
           >
@@ -753,7 +770,10 @@ const InvoiceListPage: React.FC = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={handleBulkDownload}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBulkDownload();
+            }}
             icon={IconFileDownload}
             disabled={isLoading || selectedInvoiceIds.size === 0}
           >
@@ -762,7 +782,10 @@ const InvoiceListPage: React.FC = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={handleBulkPrint}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBulkPrint();
+            }}
             icon={IconPrinter}
             disabled={isLoading || selectedInvoiceIds.size === 0}
           >
@@ -835,6 +858,7 @@ const InvoiceListPage: React.FC = () => {
         title={`Submit E-Invoice(s)`}
         message={`Proceed to submit ${selectedInvoiceIds.size} eligible invoice(s) for e-invoicing?`}
         confirmButtonText="Submit Now"
+        variant="default"
       />
     </div>
   );
