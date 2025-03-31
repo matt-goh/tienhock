@@ -16,7 +16,7 @@ import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import clsx from "clsx";
 import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
-interface SelectOption {
+export interface SelectOption {
   id: string | number; // Allow number IDs too
   name: string;
 }
