@@ -50,22 +50,22 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
               Code
             </th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[35%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[35%]">
               Description
             </th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
               Qty
             </th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
               Price (RM)
             </th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
               Tax (RM)
             </th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
               Total (RM)
             </th>
           </tr>
@@ -504,14 +504,14 @@ const InvoiceDetailsPage: React.FC = () => {
           </span>
           {/* Status Badges */}
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${invoiceStatusStyle}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${invoiceStatusStyle}`}
           >
             {invoiceData.invoice_status.charAt(0).toUpperCase() +
               invoiceData.invoice_status.slice(1)}
           </span>
           {eInvoiceStatusInfo && EInvoiceIcon && (
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
               title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
             >
               <EInvoiceIcon size={14} className="mr-1" />
@@ -641,61 +641,71 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="space-y-5">
         {/* Invoice Header Display */}
         <section className="p-4 border rounded-lg bg-white shadow-sm">
-          <h2 className="text-lg font-semibold mb-3 text-gray-800">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
             Invoice Details
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <strong className="text-gray-500 block font-medium">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Customer
-              </strong>
-              <span className="text-gray-900">
+              </span>
+              <span className="text-gray-900 font-medium">
                 {invoiceData.customerName || invoiceData.customerid}
               </span>
             </div>
-            <div>
-              <strong className="text-gray-500 block font-medium">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Salesman
-              </strong>
-              <span className="text-gray-900">{invoiceData.salespersonid}</span>{" "}
-              {/* TODO: Fetch/display name */}
-            </div>
-            <div>
-              <strong className="text-gray-500 block font-medium">
-                Date / Time
-              </strong>
-              <span className="text-gray-900">
-                {formatDisplayDate(createdDate)}{" "}
-                {parseDatabaseTimestamp(invoiceData.createddate).formattedTime}
+              </span>
+              <span className="text-gray-900 font-medium">
+                {invoiceData.salespersonid}
               </span>
             </div>
-            <div>
-              <strong className="text-gray-500 block font-medium">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Date / Time
+              </span>
+              <span className="text-gray-900 font-medium">
+                {formatDisplayDate(createdDate)}{" "}
+                <span className="text-gray-600">
+                  {
+                    parseDatabaseTimestamp(invoiceData.createddate)
+                      .formattedTime
+                  }
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Payment Type
-              </strong>
-              <span className="text-gray-900 capitalize">
+              </span>
+              <span className="text-gray-900 font-medium capitalize">
                 {invoiceData.paymenttype.toLowerCase()}
               </span>
             </div>
-            <div className="md:col-span-2">
-              <strong className="text-gray-500 block font-medium">
+            <div className="md:col-span-2 flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Balance Due
-              </strong>
-              <span
-                className={`font-bold text-xl ${
-                  isPaid || isCancelled ? "text-green-600" : "text-amber-600"
-                }`}
-              >
-                {formatCurrency(invoiceData.balance_due)}
               </span>
-              {isPaid && !isCancelled && (
-                <span className="ml-2 text-green-600 text-sm">
-                  (Paid in Full)
+              <div className="flex items-center">
+                <span
+                  className={`font-semibold text-base ${
+                    isPaid || isCancelled ? "text-green-600" : "text-amber-600"
+                  }`}
+                >
+                  {formatCurrency(invoiceData.balance_due)}
                 </span>
-              )}
-              {isCancelled && (
-                <span className="ml-2 text-rose-600 text-sm">(Cancelled)</span>
-              )}
+                {isPaid && !isCancelled && (
+                  <span className="ml-2 text-green-600 text-sm font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                    Paid in Full
+                  </span>
+                )}
+                {isCancelled && (
+                  <span className="ml-2 text-rose-600 text-sm font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                    Cancelled
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -731,7 +741,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <strong className="text-gray-500 font-medium w-24 inline-block">
                   UUID:
                 </strong>{" "}
-                <span className="font-mono text-xs break-all">
+                <span className="font-mono text-sm break-all">
                   {invoiceData.uuid}
                 </span>
               </p>
@@ -740,7 +750,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Long ID:
                   </strong>{" "}
-                  <span className="font-mono text-xs break-all">
+                  <span className="font-mono text-sm break-all">
                     {invoiceData.long_id}
                   </span>
                 </p>
@@ -750,7 +760,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Submission:
                   </strong>{" "}
-                  <span className="font-mono text-xs break-all">
+                  <span className="font-mono text-sm break-all">
                     {invoiceData.submission_uid}
                   </span>
                 </p>
@@ -822,11 +832,11 @@ const InvoiceDetailsPage: React.FC = () => {
                         {formatDisplayDate(new Date(p.payment_date))}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                        <span className="inline-flex px-2 py-1 text-sm font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
                           {p.payment_method.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600">
                         {p.payment_reference || "-"}
                       </td>
                       <td className="px-4 py-3 text-gray-600 truncate max-w-xs">
