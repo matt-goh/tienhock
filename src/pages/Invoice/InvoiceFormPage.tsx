@@ -31,7 +31,7 @@ import { parseDatabaseTimestamp } from "../../utils/invoice/dateUtils"; // Assum
 // Interface for customer products (if not already in types)
 // interface CustomProduct { id: string; /* ... other fields */ }
 
-const InvoiceDetailsPage: React.FC = () => {
+const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>(); // id from URL (e.g., "1001", "new")
@@ -877,4 +877,4 @@ const InvoiceDetailsPage: React.FC = () => {
   );
 };
 
-export default InvoiceDetailsPage;
+export default InvoiceFormPage;
