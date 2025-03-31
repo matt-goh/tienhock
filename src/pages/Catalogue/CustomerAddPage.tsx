@@ -87,7 +87,7 @@ const CustomerAddPage: React.FC = () => {
   ];
 
   const idTypeOptions = [
-    { id: "Select", name: "Select" },
+    { id: "Select...", name: "Select..." },
     { id: "BRN", name: "BRN" },
     { id: "NRIC", name: "NRIC" },
     { id: "PASSPORT", name: "PASSPORT" },
@@ -269,47 +269,20 @@ const CustomerAddPage: React.FC = () => {
     label: string,
     options: SelectOption[]
   ) => {
+    // Get the current ID value from formData
     const value = formData[name]?.toString() || "";
-
-    // For state field, we want to show the name but save the code
-    if (name === "state") {
-      const selectedState = stateOptions.find((opt) => opt.id === value);
-      return (
-        <FormListbox
-          name={name}
-          label={label}
-          value={selectedState ? selectedState.name : value}
-          onChange={(selectedName) => {
-            const selectedOption = stateOptions.find(
-              (opt) => opt.name === selectedName
-            );
-            handleListboxChange(
-              name,
-              selectedOption ? selectedOption.id : selectedName
-            );
-          }}
-          options={options}
-        />
-      );
-    }
-
-    // For other fields, normal behavior
     return (
       <FormListbox
         name={name}
         label={label}
-        value={value}
-        onChange={(value) => handleListboxChange(name, value)}
+        value={value} // Pass the ID value (e.g., "12", "Local")
+        onChange={(selectedId) => {
+          // onChange now correctly receives the ID
+          handleListboxChange(name, selectedId); // Update formData with the ID
+        }}
         options={options}
       />
     );
-  };
-
-  const getProgressBarColor = (used: number, limit: number): string => {
-    const percentage = (used / limit) * 100;
-    if (percentage >= 90) return "bg-rose-500"; // Red for high usage
-    if (percentage >= 70) return "bg-amber-500"; // Yellow/amber for medium usage
-    return "bg-emerald-500"; // Green for low usage
   };
 
   return (
@@ -363,7 +336,20 @@ const CustomerAddPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderListbox("id_type", "ID Type", idTypeOptions)}
+                  <div>
+                    <FormListbox
+                      name="id_type"
+                      label="ID Type"
+                      value={formData.id_type || ""}
+                      onChange={(selectedId) => {
+                        // When "Select..." is chosen, set id_type to empty string
+                        const newValue =
+                          selectedId === "Select..." ? "" : selectedId;
+                        handleListboxChange("id_type", newValue);
+                      }}
+                      options={idTypeOptions}
+                    />
+                  </div>
                   {renderInput(
                     "id_number",
                     "ID Number",

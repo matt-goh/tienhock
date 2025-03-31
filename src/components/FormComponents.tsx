@@ -5,22 +5,23 @@ import {
   Transition,
   Combobox,
   ComboboxInput,
-  ComboboxButton,
+  ComboboxButton as HeadlessComboboxButton, // Rename for clarity
   ComboboxOptions,
   ComboboxOption,
   ListboxOption,
   ListboxOptions,
-  ListboxButton,
+  ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import clsx from "clsx";
-import { StatusIndicator } from "./StatusIndicator";
+import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
 interface SelectOption {
-  id: string;
+  id: string | number; // Allow number IDs too
   name: string;
 }
 
+// --- FormInput ---
 interface InputProps {
   name: string;
   label: string;
@@ -33,11 +34,7 @@ interface InputProps {
   step?: string;
   min?: string;
   max?: number;
-}
-
-interface ExtendedInputProps extends InputProps {
-  showStatus?: boolean;
-  isVerified?: boolean;
+  required?: boolean;
 }
 
 export const FormInput: React.FC<InputProps> = ({
@@ -52,14 +49,19 @@ export const FormInput: React.FC<InputProps> = ({
   step,
   min,
   max,
+  required = false,
 }) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label
-      htmlFor={name}
-      className="text-sm font-medium text-default-700 mt-0.5"
-    >
-      {label}
-    </label>
+  <div className={`${label ? "space-y-2" : ""}`}>
+    {" "}
+    {/* Use space-y-2 */}
+    {label && (
+      <label
+        htmlFor={name}
+        className="block text-sm font-medium text-default-700"
+      >
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+    )}
     <input
       type={type}
       id={name}
@@ -71,11 +73,22 @@ export const FormInput: React.FC<InputProps> = ({
       onBlur={onBlur}
       step={step}
       min={min}
-      max={max}
-      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+      max={max?.toString()}
+      required={required}
+      className={clsx(
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm", // Standard input style
+        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+      )}
     />
   </div>
 );
+
+// --- FormInputWithStatus ---
+interface ExtendedInputProps extends InputProps {
+  showStatus?: boolean;
+  isVerified?: boolean;
+}
 
 export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   name,
@@ -87,15 +100,20 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   placeholder = "",
   showStatus = false,
   isVerified = false,
+  required = false,
 }) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <div className="flex items-center gap-2">
-      <label
-        htmlFor={name}
-        className="text-sm font-medium text-default-700 mt-1"
-      >
-        {label}
-      </label>
+  <div className={`${label ? "space-y-2" : ""}`}>
+    {" "}
+    {/* Use space-y-2 */}
+    <div className="flex items-center justify-between">
+      {label && (
+        <label
+          htmlFor={name}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
       {showStatus && isVerified && (
         <StatusIndicator success={true} type="verification" />
       )}
@@ -104,185 +122,292 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
       type={type}
       id={name}
       name={name}
-      value={value}
+      value={value?.toString() ?? ""}
       onChange={onChange}
       disabled={disabled}
       placeholder={placeholder}
-      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+      required={required}
+      className={clsx(
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm", // Standard input style
+        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+      )}
     />
   </div>
 );
 
+// --- FormListbox (Updated Comparison logic) ---
 interface ListboxProps {
   name: string;
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: SelectOption[];
+  value: string | number | undefined; // The actual ID/value being stored in state
+  onChange: (value: string) => void; // Should receive the ID/value back (as string)
+  options: SelectOption[]; // Array of { id: string | number, name: string }
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+  optionsPosition?: "top" | "bottom";
+  className?: string; // Optional className for additional styling
 }
 
 export const FormListbox: React.FC<ListboxProps> = ({
   name,
   label,
-  value,
+  value, // This is the ID (e.g., 'male', 1, '1')
   onChange,
   options,
-}) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label htmlFor={name} className="text-sm font-medium text-default-700">
-      {label}
-    </label>
-    <Listbox value={value} onChange={onChange}>
-      <div className="relative">
-        <ListboxButton
-          className={clsx(
-            "relative w-full rounded-lg border border-default-300 bg-white py-[8.85px] pl-3 pr-10 text-left",
-            "focus:outline-none focus:border-default-500"
-          )}
-        >
-          <span className="block truncate">{value || "Select"}</span>
-          <span className="absolute inset-y-0 right-1.5 flex items-center pr-2 pointer-events-none">
-            <IconChevronDown size={20} className="text-default-500" />
-          </span>
-        </ListboxButton>
-        <Transition
-          as={Fragment}
-          leave="transition ease-in duration-100"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-            {options.map((option) => (
-              <ListboxOption
-                key={option.id}
-                className={({ active }) =>
-                  `relative cursor-pointer select-none rounded py-2 px-4 ${
-                    active ? "bg-default-100" : "text-default-900"
-                  }`
-                }
-                value={option.name}
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${
-                        selected ? "font-medium" : "font-normal"
-                      }`}
-                    >
-                      {option.name}
-                    </span>
-                    {selected ? (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                        <IconCheck stroke={2} size={22} />
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </ListboxOption>
-            ))}
-          </ListboxOptions>
-        </Transition>
-      </div>
-    </Listbox>
-  </div>
-);
+  disabled = false,
+  required = false,
+  placeholder = "Select...",
+  optionsPosition = "bottom",
+  className = "",
+}) => {
+  // Find the option object that matches the current value (ID), comparing as strings
+  const valueAsString = value?.toString() ?? ""; // Ensure value is a string for comparison
+  const selectedOption = options.find(
+    (option) => option.id.toString() === valueAsString
+  );
+  // Display name if found, otherwise show placeholder or the raw value if options might still be loading
+  const displayValue = selectedOption
+    ? selectedOption.name
+    : valueAsString && options.length > 0
+    ? `Invalid (${valueAsString})`
+    : placeholder; // Only show invalid if options ARE loaded
 
-interface ComboboxProps {
-  name: string;
-  label: string;
-  value: string[];
-  onChange: (value: string[] | null) => void;
-  options: SelectOption[];
-  query: string;
-  setQuery: React.Dispatch<React.SetStateAction<string>>;
-}
-
-export const FormCombobox: React.FC<ComboboxProps> = ({
-  name,
-  label,
-  value,
-  onChange,
-  options,
-  query,
-  setQuery,
-}) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label htmlFor={name} className="text-sm font-medium text-default-700">
-      {label}
-    </label>
-    <Combobox multiple value={value} onChange={onChange}>
-      {({ open }) => (
+  return (
+    <div className={`${label ? "space-y-2" : ""} ${className}`}>
+      {label && (
+        <label
+          htmlFor={`${name}-button`}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      {/* Pass valueAsString to Listbox value prop */}
+      <Listbox
+        value={valueAsString}
+        onChange={onChange}
+        disabled={disabled}
+        name={name}
+      >
         <div className="relative">
-          <ComboboxInput
+          <HeadlessListboxButton
+            id={`${name}-button`}
             className={clsx(
-              "w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",
-              "focus:outline-none focus:border-default-500"
+              "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+              "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+              disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
             )}
-            displayValue={(selected: string[]) =>
-              selected
-                .map((id) => options.find((option) => option.id === id)?.name)
-                .join(", ")
-            }
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <ComboboxButton className="absolute inset-y-0 right-1.5 flex items-center pr-2 text-default-500">
-            <IconChevronDown stroke={2} size={20} />
-          </ComboboxButton>
+          >
+            <span className="block truncate">{displayValue}</span>
+            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+              <IconChevronDown
+                size={20}
+                className="text-gray-400"
+                aria-hidden="true"
+              />
+            </span>
+          </HeadlessListboxButton>
           <Transition
-            show={open}
             as={Fragment}
             leave="transition ease-in duration-100"
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-              {options.length === 0 ||
-              (options.length > 0 &&
-                query !== "" &&
-                options.filter((option) =>
-                  option.name.toLowerCase().includes(query.toLowerCase())
-                ).length === 0) ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-default-700">
-                  No {name}s found.
+            <ListboxOptions
+              className={clsx(
+                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+              )}
+            >
+              {/* Optional Placeholder - might be useful if !required */}
+              {/* {!required && placeholder && (
+                 <ListboxOption value="" className="text-gray-500 italic py-2 pl-3 pr-10" disabled>
+                   {placeholder}
+                 </ListboxOption>
+               )} */}
+              {options.map((option) => (
+                <ListboxOption
+                  key={option.id}
+                  className={({ active }) =>
+                    `relative cursor-default select-none py-2 pl-3 pr-10 ${
+                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                    }`
+                  }
+                  // Pass back the ID as a string
+                  value={option.id.toString()}
+                >
+                  {(
+                    { selected } // selected is determined by Listbox comparing its value with option value
+                  ) => (
+                    <>
+                      <span
+                        className={`block truncate ${
+                          selected ? "font-medium" : "font-normal"
+                        }`}
+                      >
+                        {option.name}
+                      </span>
+                      {selected ? (
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                          <IconCheck size={20} aria-hidden="true" />
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </ListboxOption>
+              ))}
+            </ListboxOptions>
+          </Transition>
+        </div>
+      </Listbox>
+    </div>
+  );
+};
+
+// --- FormCombobox (Updated string conversion) ---
+interface ComboboxProps {
+  name: string;
+  label: string;
+  value: string[]; // Keep as string array for multi-select IDs
+  onChange: (value: string[] | null) => void;
+  options: SelectOption[];
+  query: string;
+  setQuery: React.Dispatch<React.SetStateAction<string>>;
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+}
+
+export const FormCombobox: React.FC<ComboboxProps> = ({
+  name,
+  label,
+  value, // Array of string IDs
+  onChange,
+  options,
+  query,
+  setQuery,
+  disabled = false,
+  required = false,
+  placeholder = "Search...",
+}) => {
+  const filteredOptions =
+    query === ""
+      ? options
+      : options.filter((option) =>
+          option.name
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .includes(query.toLowerCase().replace(/\s+/g, ""))
+        );
+
+  // Display function remains the same, relies on string ID matching
+  const getDisplayValue = (selectedIds: string[]) => {
+    if (!selectedIds || selectedIds.length === 0) return "";
+    return selectedIds
+      .map((id) => options.find((opt) => opt.id.toString() === id)?.name) // Compare as string
+      .filter(Boolean)
+      .join(", ");
+  };
+
+  return (
+    <div className={`${label ? "space-y-2" : ""}`}>
+      {label && (
+        <label
+          htmlFor={`${name}-input`}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      {/* Ensure Combobox value is array of strings */}
+      <Combobox
+        multiple
+        value={value.map((v) => v?.toString() ?? "")}
+        onChange={onChange}
+        disabled={disabled}
+        name={name}
+      >
+        <div className="relative">
+          <div
+            className={clsx(
+              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
+              "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500", // Focus ring on wrapper
+              disabled ? "bg-gray-50" : ""
+            )}
+          >
+            <ComboboxInput
+              as="input" // Explicitly render as input
+              id={`${name}-input`}
+              className={clsx(
+                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0", // Remove input border/ring
+                disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+              )}
+              displayValue={getDisplayValue}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={placeholder}
+              disabled={disabled}
+            />
+            <HeadlessComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+              <IconChevronDown
+                size={20}
+                className="text-gray-400"
+                aria-hidden="true"
+              />
+            </HeadlessComboboxButton>
+          </div>
+          <Transition
+            as={Fragment}
+            leave="transition ease-in duration-100"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+            afterLeave={() => setQuery("")}
+          >
+            <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+              {filteredOptions.length === 0 && query !== "" ? (
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                  Nothing found.
                 </div>
               ) : (
-                options
-                  .filter((option) =>
-                    option.name.toLowerCase().includes(query.toLowerCase())
-                  )
-                  .map((option) => (
-                    <ComboboxOption
-                      key={option.id}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none rounded py-2 px-4 ${
-                          active ? "bg-default-100" : "text-default-900"
-                        }`
-                      }
-                      value={option.id}
-                    >
-                      {({ selected }) => (
-                        <>
+                filteredOptions.map((option) => (
+                  <ComboboxOption
+                    key={option.id}
+                    className={({ active }) =>
+                      `relative cursor-default select-none py-2 pl-3 pr-10 ${
+                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                      }`
+                    }
+                    // Value passed back should be string ID
+                    value={option.id.toString()}
+                  >
+                    {({ selected, active }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          {option.name}
+                        </span>
+                        {selected ? (
                           <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : "font-normal"
+                            className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
+                              active ? "text-sky-600" : "text-sky-600"
                             }`}
                           >
-                            {option.name}
+                            <IconCheck size={20} aria-hidden="true" />
                           </span>
-                          {selected ? (
-                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                              <IconCheck stroke={2} size={22} />
-                            </span>
-                          ) : null}
-                        </>
-                      )}
-                    </ComboboxOption>
-                  ))
+                        ) : null}
+                      </>
+                    )}
+                  </ComboboxOption>
+                ))
               )}
             </ComboboxOptions>
           </Transition>
         </div>
-      )}
-    </Combobox>
-  </div>
-);
+      </Combobox>
+    </div>
+  );
+};

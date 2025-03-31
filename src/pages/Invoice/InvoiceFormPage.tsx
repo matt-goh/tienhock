@@ -543,9 +543,7 @@ const InvoiceFormPage: React.FC = () => {
             isNewInvoice={true} // Always true
             customers={customers}
             salesmen={salesmenOptions}
-            selectedCustomerName={
-              selectedCustomer?.name || invoiceData.customerName || ""
-            }
+            selectedCustomer={selectedCustomer}
             onCustomerChange={handleCustomerSelectionChange}
             customerQuery={customerQuery}
             setCustomerQuery={setCustomerQuery}
@@ -599,7 +597,7 @@ const InvoiceFormPage: React.FC = () => {
         <section className="p-4 border rounded-lg bg-white shadow-sm flex flex-col md:flex-row justify-between items-start gap-6">
           {/* Left Side: Paid Checkbox & Payment Details (if paid) */}
           <div className="w-full md:w-1/3 space-y-4">
-            <div className="flex items-center">
+            <div className="flex items-center pt-1">
               <button
                 type="button"
                 onClick={() => !isSaving && setIsPaid(!isPaid)}
@@ -616,15 +614,19 @@ const InvoiceFormPage: React.FC = () => {
             </div>
 
             {isPaid && (
-              <div className="space-y-3 pl-1 border-l-2 border-blue-200 ml-1">
+              <div className="flex items-center gap-3 w-full">
                 <FormListbox
                   name="paymentMethod"
                   label="Payment Method"
-                  value={paymentMethod}
+                  value={paymentMethod} // Pass the ID state ('cash')
                   onChange={(value) =>
                     setPaymentMethod(value as Payment["payment_method"])
-                  }
-                  options={paymentMethodOptions}
+                  } // Receives ID ('cash')
+                  options={paymentMethodOptions} // Pass options with {id, name}
+                  disabled={isSaving}
+                  placeholder="Select Method..."
+                  optionsPosition="top"
+                  className="w-full"
                 />
 
                 {(paymentMethod === "cheque" ||
@@ -654,7 +656,7 @@ const InvoiceFormPage: React.FC = () => {
               rounding={invoiceData.rounding}
               grandTotal={invoiceData.totalamountpayable}
               onRoundingChange={handleRoundingChange}
-              readOnly={false} // Always editable
+              readOnly={false}
             />
           </div>
         </section>

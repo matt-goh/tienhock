@@ -94,7 +94,7 @@ const StaffAddPage: React.FC = () => {
       await Promise.all([
         fetchOptions("nationalities", setNationalities),
         fetchOptions("races", setRaces),
-        fetchOptions("agamas", setAgamas),
+        fetchOptions("agama", setAgamas),
         fetchOptions("jobs", setJobs),
         fetchOptions("locations", setLocations),
       ]);
