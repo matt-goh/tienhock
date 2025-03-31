@@ -161,6 +161,7 @@ const InvoiceDetailsPage: React.FC = () => {
         consolidated_invoices: null,
         invoice_status: "active",
         einvoice_status: null,
+        balance_due: 0,
         products: [
           {
             uid: crypto.randomUUID(),

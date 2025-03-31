@@ -307,6 +307,13 @@ export interface TableProps<T> {
   onCancel?: () => void;
   tableKey?: string;
 }
+export type InvoiceStatus = "active" | "paid" | "cancelled" | "Unpaid";
+export type EInvoiceStatus =
+  | "valid"
+  | "invalid"
+  | "pending"
+  | "cancelled"
+  | null;
 
 export interface InvoiceData {
   id: string; // PRIMARY KEY, Invoice Number (e.g., "12345")
@@ -319,6 +326,7 @@ export interface InvoiceData {
   rounding: number;
   totalamountpayable: number;
   tax_amount: number;
+  balance_due: number;
 
   // E-invoice fields
   uuid: string | null; // UUID from e-invoice system
@@ -333,6 +341,14 @@ export interface InvoiceData {
   einvoice_status: EInvoiceStatus; // Keep EInvoiceStatus type separate
 
   products: ProductItem[];
+}
+
+// Extended invoice for UI purposes
+export interface ExtendedInvoiceData extends InvoiceData {
+  customerName?: string; // For UI display
+  isEditing?: boolean; // UI state flag
+  originalId?: string; // Used when invoice ID itself is changed during edit
+  cancellation_date?: string | null; // ISO date string of cancellation (might come from cancelled_invoices table)
 }
 
 export interface ProductItem {
@@ -370,21 +386,17 @@ export interface CustomProduct {
   is_available: boolean;
 }
 
-// Extended invoice for UI purposes
-export interface ExtendedInvoiceData extends InvoiceData {
-  customerName?: string; // For UI display
-  isEditing?: boolean; // UI state flag
-  originalId?: string; // Used when invoice ID itself is changed during edit
-  cancellation_date?: string | null; // ISO date string of cancellation (might come from cancelled_invoices table)
+export interface Payment {
+  payment_id: number;
+  invoice_id: string;
+  payment_date: string;
+  amount_paid: number;
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  payment_reference?: string;
+  internal_reference?: string;
+  notes?: string;
+  created_at?: string;
 }
-
-export type InvoiceStatus = "active" | "paid" | "cancelled";
-export type EInvoiceStatus =
-  | "valid"
-  | "invalid"
-  | "pending"
-  | "cancelled"
-  | null;
 
 export interface Employee {
   id: string;
