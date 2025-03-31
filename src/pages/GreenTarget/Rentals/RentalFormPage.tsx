@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Rentals/RentalFormPage.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, Fragment } from "react"; // Removed useRef, Added Fragment
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -19,24 +19,28 @@ import {
 } from "@tabler/icons-react";
 import {
   Listbox,
-  ListboxButton,
   ListboxOption,
   ListboxOptions,
+  Transition,
+  ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
 import { api } from "../../../routes/utils/api";
+import clsx from "clsx";
+import { FormCombobox, SelectOption } from "../../../components/FormComponents"; // Use updated components
 
+// Interfaces (Customer, Location, Dumpster, Rental - unchanged)
 interface Customer {
   customer_id: number;
   name: string;
-  phone_number?: string;
+  phone_number?: string | null;
 }
 
 interface Location {
   location_id: number;
   customer_id: number;
   address: string;
-  phone_number?: string;
+  phone_number?: string | null;
 }
 
 interface Dumpster {
@@ -65,16 +69,26 @@ interface Rental {
   location_address?: string | null;
   tong_no: string;
   driver: string;
-  date_placed: string;
-  date_picked: string | null;
+  date_placed: string; // Keep as YYYY-MM-DD string
+  date_picked: string | null; // Keep as YYYY-MM-DD string or null
   remarks: string | null;
 }
 
 // Helper to format date for input elements
 const formatDateForInput = (dateString: string | null): string => {
   if (!dateString) return "";
-  const date = new Date(dateString);
-  return date.toISOString().split("T")[0]; // Keep YYYY-MM-DD for input fields
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    // Ensure date uses local timezone interpretation before splitting
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    console.error("Error formatting date for input:", dateString, e);
+    return "";
+  }
 };
 
 const RentalFormPage: React.FC = () => {
@@ -85,7 +99,7 @@ const RentalFormPage: React.FC = () => {
   // Form data state
   const [formData, setFormData] = useState<Rental>({
     customer_id: 0,
-    location_id: 0,
+    location_id: null,
     tong_no: "",
     driver: "",
     date_placed: new Date().toISOString().split("T")[0],
@@ -97,28 +111,17 @@ const RentalFormPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [isNewLocationModalOpen, setIsNewLocationModalOpen] = useState(false);
-  const [isValidSelection, setIsValidSelection] = useState(false);
+  const [isValidSelection, setIsValidSelection] = useState(false); // Dumpster validity
   const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
 
   // UI state
-  const [initialFormData, setInitialFormData] = useState<Rental>({
-    customer_id: 0,
-    location_id: null,
-    tong_no: "",
-    driver: "",
-    date_placed: new Date().toISOString().split("T")[0],
-    date_picked: null,
-    remarks: null,
-  });
-
+  const [initialFormData, setInitialFormData] = useState<Rental | null>(null);
   const [customerLocations, setCustomerLocations] = useState<Location[]>([]);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
-  const [loading, setLoading] = useState(isEditMode);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPlacementDateFocused, setIsPlacementDateFocused] = useState(false);
-  const [isPickupDateFocused, setIsPickupDateFocused] = useState(false);
   const [dumpsterAvailability, setDumpsterAvailability] = useState<{
     date: string;
     available: Dumpster[];
@@ -127,264 +130,285 @@ const RentalFormPage: React.FC = () => {
   } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const previousDateRef = useRef<string | null>(null);
 
-  // Load reference data
+  // State for Customer Combobox
+  const [customerQuery, setCustomerQuery] = useState("");
+
+  // Load reference data (customers, drivers)
   useEffect(() => {
+    let isMounted = true;
     const loadReferenceData = async () => {
+      setLoading(true);
       try {
         const [customersData, driversData] = await Promise.all([
-          await greenTargetApi.getCustomers(),
-          await api.get("/api/staffs/get-drivers"),
+          greenTargetApi.getCustomers(),
+          api.get("/api/staffs/get-drivers"),
         ]);
 
-        setCustomers(customersData);
-        setDrivers(driversData);
+        if (isMounted) {
+          setCustomers(customersData || []);
+          const loadedDrivers = driversData || [];
+          setDrivers(loadedDrivers);
 
-        // Auto-select the first driver if available and we're not in edit mode
-        if (!isEditMode && driversData && driversData.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            driver: driversData[0].name,
-          }));
+          if (!isEditMode && loadedDrivers.length > 0) {
+            setFormData((prev) => ({
+              ...prev,
+              driver: loadedDrivers[0].name,
+            }));
+            // Set initial driver in initialFormData too for change detection
+            setInitialFormData((prev) => ({
+              ...(prev ?? formData), // Use current formData as base if initial is null
+              driver: loadedDrivers[0].name,
+            }));
+          }
         }
       } catch (err) {
         console.error("Error loading reference data:", err);
-        toast.error("Failed to load necessary data");
+        if (isMounted) {
+          toast.error("Failed to load necessary data");
+          setError("Could not load customers or drivers.");
+        }
+      } finally {
+        if (isMounted && !isEditMode) {
+          setLoading(false); // Finish loading if creating
+        }
       }
     };
 
     loadReferenceData();
-  }, [isEditMode]);
+    return () => {
+      isMounted = false;
+    };
+  }, [isEditMode]); // Only depends on isEditMode
 
+  // Fetch Dumpster Availability **RESTORED LOGIC**
   useEffect(() => {
+    let isMounted = true;
     const fetchDumpsterAvailability = async () => {
-      if (!formData.date_placed) return;
+      if (!formData.date_placed) return; // Need placement date
 
-      // Normalize date format
-      const normalizedDate = formData.date_placed.split("T")[0];
-
-      // Skip if we've already fetched for this date
-      if (previousDateRef.current === normalizedDate) return;
-      previousDateRef.current = normalizedDate;
-
+      // Don't necessarily show loading indicator just for this unless it's the initial load sequence
       try {
+        const normalizedDate = formData.date_placed.split("T")[0];
         const data = await api.get(
           `/greentarget/api/dumpsters/availability?date=${normalizedDate}`
         );
-        setDumpsterAvailability(data);
-
-        // Auto-selection code...
+        if (isMounted) {
+          setDumpsterAvailability(data);
+          // Check if current selection is still valid AFTER availability is fetched
+          // This triggers the checkDumpsterAvailability effect
+        }
       } catch (err) {
         console.error("Error fetching dumpster availability:", err);
-        toast.error("Failed to load dumpster availability");
+        if (isMounted) {
+          toast.error("Failed to load dumpster availability");
+          setDumpsterAvailability(null);
+        }
       }
     };
 
     fetchDumpsterAvailability();
-  }, [formData.date_placed, isEditMode]);
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.date_placed]); // Trigger ONLY when placement date changes
 
-  // Load rental data in edit mode
+  // Fetch Rental Details in Edit Mode
   useEffect(() => {
+    let isMounted = true;
     if (isEditMode && id) {
-      fetchRentalDetails(parseInt(id));
+      setLoading(true);
+      fetchRentalDetails(parseInt(id), isMounted);
+    } else if (!isEditMode && customers.length > 0) {
+      // Ensure customers are loaded for create mode initial state
+      const initialDriver = drivers.length > 0 ? drivers[0].name : "";
+      const defaultInitialState: Rental = {
+        customer_id: 0,
+        location_id: null,
+        tong_no: "",
+        driver: initialDriver,
+        date_placed: new Date().toISOString().split("T")[0],
+        date_picked: null,
+        remarks: null,
+      };
+      setFormData(defaultInitialState); // Set initial form state
+      setInitialFormData(defaultInitialState); // Set initial comparison state
+      setLoading(false); // Finish loading for create mode
     }
-  }, [id, isEditMode]);
+    return () => {
+      isMounted = false;
+    };
+  }, [id, isEditMode, customers, drivers]); // Add customers/drivers dependencies for create mode
 
-  // Monitor form changes
+  // Load locations when customer changes (excluding initial load in edit mode)
   useEffect(() => {
-    const hasChanged =
-      JSON.stringify(formData) !== JSON.stringify(initialFormData);
-    setIsFormChanged(hasChanged);
+    let isMounted = true;
+    // Only fetch if customer_id is valid and different from initial load (or initial load hasn't happened yet)
+    if (
+      formData.customer_id > 0 &&
+      (!initialFormData || formData.customer_id !== initialFormData.customer_id)
+    ) {
+      fetchCustomerLocations(formData.customer_id, isMounted).then(() => {
+        if (isMounted) {
+          // Auto-select first location OR set to null if none exist for the new customer
+          setFormData((prev) => ({
+            ...prev,
+            location_id:
+              customerLocations.length > 0
+                ? customerLocations[0].location_id
+                : null,
+          }));
+        }
+      });
+    } else if (formData.customer_id === 0) {
+      // If customer deselected
+      setCustomerLocations([]);
+      if (formData.location_id !== null) {
+        setFormData((prev) => ({ ...prev, location_id: null }));
+      }
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.customer_id, initialFormData]); // Rerun when customer changes
+
+  // Monitor form changes against initial data
+  useEffect(() => {
+    if (initialFormData) {
+      const hasChanged =
+        JSON.stringify(formData) !== JSON.stringify(initialFormData);
+      setIsFormChanged(hasChanged);
+    }
   }, [formData, initialFormData]);
 
-  // Load locations when customer changes
-  useEffect(() => {
-    if (formData.customer_id && !isEditMode) {
-      fetchCustomerLocations(formData.customer_id);
-    } else {
-      setCustomerLocations([]);
-      // Reset location_id when customer changes
-      setFormData((prev) => ({ ...prev, location_id: null }));
-    }
-  }, [formData.customer_id]);
-
-  const fetchRentalDetails = async (rentalId: number) => {
+  const fetchRentalDetails = async (rentalId: number, isMounted: boolean) => {
     try {
-      setLoading(true);
-
-      // Get rental data
       const rental = await greenTargetApi.getRental(rentalId);
+      if (!isMounted) return; // Check mount status after async call
+      if (!rental) throw new Error("Rental not found");
 
-      if (!rental) {
-        throw new Error("Rental not found");
-      }
+      // Fetch locations first
+      await fetchCustomerLocations(rental.customer_id, isMounted);
+      if (!isMounted) return;
 
-      // Get all locations for the customer
-      await fetchCustomerLocations(rental.customer_id);
-
-      setFormData({
+      const fetchedFormData: Rental = {
         rental_id: rental.rental_id,
         customer_id: rental.customer_id,
         customer_name: rental.customer_name,
-        location_id: rental.location_id,
+        location_id: rental.location_id ?? null,
         location_address: rental.location_address,
         tong_no: rental.tong_no,
         driver: rental.driver,
-        date_placed: rental.date_placed,
-        date_picked: rental.date_picked,
-        remarks: rental.remarks,
-      });
-
-      setInitialFormData({
-        rental_id: rental.rental_id,
-        customer_id: rental.customer_id,
-        customer_name: rental.customer_name,
-        location_id: rental.location_id,
-        location_address: rental.location_address,
-        tong_no: rental.tong_no,
-        driver: rental.driver,
-        date_placed: rental.date_placed,
-        date_picked: rental.date_picked,
-        remarks: rental.remarks,
-      });
-
+        date_placed: formatDateForInput(rental.date_placed),
+        date_picked: formatDateForInput(rental.date_picked),
+        remarks: rental.remarks ?? null,
+      };
+      setFormData(fetchedFormData);
+      setInitialFormData(fetchedFormData);
       setError(null);
-    } catch (err) {
-      setError("Failed to fetch rental details. Please try again later.");
+    } catch (err: any) {
       console.error("Error fetching rental details:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Calculate days between two dates (correctly)
-  const calculateDaysBetween = (
-    startDateStr: string,
-    endDateStr: string
-  ): number => {
-    // Create date objects and ensure they're set to midnight (start of day)
-    const startDate = new Date(startDateStr);
-    startDate.setHours(0, 0, 0, 0);
-
-    const endDate = new Date(endDateStr);
-    endDate.setHours(0, 0, 0, 0);
-
-    // Calculate the difference in milliseconds and convert to days
-    const differenceMs = endDate.getTime() - startDate.getTime();
-    const days = Math.round(differenceMs / (1000 * 60 * 60 * 24));
-
-    return days;
-  };
-
-  const handleDelete = async () => {
-    if (!formData.rental_id) return;
-
-    setIsDeleting(true);
-    try {
-      await greenTargetApi.deleteRental(formData.rental_id);
-      toast.success("Rental deleted successfully");
-      navigate("/greentarget/rentals");
-    } catch (error: any) {
-      if (error.message && error.message.includes("associated invoices")) {
-        toast.error("Cannot delete rental: it has associated invoices");
-      } else {
-        toast.error("Failed to delete rental");
-        console.error("Error deleting rental:", error);
+      if (isMounted) {
+        setError(
+          `Failed to fetch rental details: ${err.message || "Unknown error"}`
+        );
       }
     } finally {
-      setIsDeleting(false);
-      setIsDeleteDialogOpen(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   };
 
-  const fetchCustomerLocations = async (customerId: number) => {
+  const fetchCustomerLocations = async (
+    customerId: number,
+    isMounted: boolean
+  ) => {
+    if (!customerId || customerId <= 0) {
+      if (isMounted) setCustomerLocations([]);
+      return;
+    }
     try {
-      // Using the correct API endpoint with query parameter
       const locationsData = await api.get(
         `/greentarget/api/locations?customer_id=${customerId}`
       );
-
-      // Ensure we always have an array
-      const locationsArray = Array.isArray(locationsData) ? locationsData : [];
-      setCustomerLocations(locationsArray);
-
-      // Auto-select the first location if available, otherwise set to null
-      if (!isEditMode) {
-        // Only apply auto-selection/reset logic in create mode
-        if (locationsArray.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            location_id: locationsArray[0].location_id,
-          }));
-        } else {
-          setFormData((prev) => ({
-            ...prev,
-            location_id: null,
-          }));
-        }
+      if (isMounted) {
+        setCustomerLocations(Array.isArray(locationsData) ? locationsData : []);
       }
     } catch (err) {
       console.error("Error fetching customer locations:", err);
-      setCustomerLocations([]);
-      // Set to null on error
-      if (!isEditMode) {
-        setFormData((prev) => ({
-          ...prev,
-          location_id: null,
-        }));
+      if (isMounted) {
+        setCustomerLocations([]);
+        toast.error("Failed to load customer locations.");
       }
     }
   };
 
+  // --- Input Handlers ---
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((prevData) => ({ ...prevData, [name]: value }));
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const newDateValue = value || null;
 
-    // For pickup date, validate it's not before placement date
-    if (name === "date_picked" && value) {
-      const placedDate = new Date(formData.date_placed);
-      const pickedDate = new Date(value);
-
-      if (pickedDate < placedDate) {
-        toast.error("Pickup date cannot be earlier than placement date");
-        return; // Don't update state with invalid date
+    if (name === "date_picked" && newDateValue && formData.date_placed) {
+      if (new Date(newDateValue) < new Date(formData.date_placed)) {
+        toast.error("Pickup date cannot be earlier than placement date.");
+        return;
       }
     }
+    if (name === "date_placed" && formData.date_picked) {
+      if (new Date(formData.date_picked) < new Date(value)) {
+        toast.error("Placement date cannot be later than pickup date.");
+        return;
+      }
+    }
+    setFormData((prevData) => ({ ...prevData, [name]: newDateValue }));
+    // No need to manually trigger dumpster fetch here, useEffect handles it
+  };
 
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value || null,
-    }));
+  // Handler for Customer Combobox (single selection mode)
+  const handleCustomerComboboxChange = (
+    selectedId: string | string[] | null
+  ) => {
+    // Expecting single string ID or null from single mode combobox
+    const newCustomerId =
+      selectedId && typeof selectedId === "string" ? Number(selectedId) : 0;
+
+    if (newCustomerId !== formData.customer_id) {
+      setFormData((prev) => ({
+        ...prev,
+        customer_id: newCustomerId,
+        location_id: null, // Reset location
+      }));
+      setCustomerQuery(""); // Clear search
+    }
+  };
+
+  const handleLocationChange = (locationIdString: string) => {
+    const newLocationId =
+      locationIdString === "" ? null : Number(locationIdString);
+    setFormData((prev) => ({ ...prev, location_id: newLocationId }));
+  };
+
+  const handleDumpsterChange = (tongNo: string) => {
+    setFormData((prev) => ({ ...prev, tong_no: tongNo }));
+  };
+
+  const handleDriverChange = (driverName: string) => {
+    setFormData((prev) => ({ ...prev, driver: driverName }));
   };
 
   const handleBackClick = () => {
-    if (isFormChanged) {
-      setShowBackConfirmation(true);
-    } else {
-      navigate("/greentarget/rentals");
-    }
-  };
-
-  const formatDumpsterDate = (dateString: string | undefined): string => {
-    if (!dateString) return "unknown";
-    const date = new Date(dateString);
-    return `${date.getDate().toString().padStart(2, "0")}/${(
-      date.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}/${date.getFullYear()}`;
+    if (isFormChanged) setShowBackConfirmation(true);
+    else navigate("/greentarget/rentals");
   };
 
   const handleConfirmBack = () => {
@@ -392,71 +416,93 @@ const RentalFormPage: React.FC = () => {
     navigate("/greentarget/rentals");
   };
 
+  // --- Dumpster Availability & Validation ---
+  const formatDumpsterDate = (dateString: string | undefined): string => {
+    if (!dateString) return "unknown date";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "invalid date";
+      return date.toLocaleDateString("en-GB");
+    } catch {
+      return "invalid date";
+    }
+  };
+
+  const calculateDaysBetween = (
+    startDateStr: string | null,
+    endDateStr: string | null
+  ): number | null => {
+    if (!startDateStr || !endDateStr) return null;
+    try {
+      const start = new Date(startDateStr);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDateStr);
+      end.setHours(0, 0, 0, 0);
+      if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start)
+        return null;
+      const differenceMs = end.getTime() - start.getTime();
+      return Math.round(differenceMs / (1000 * 60 * 60 * 24)) + 1;
+    } catch {
+      return null;
+    }
+  };
+
+  // Memoized check (re-evaluates when dependencies change)
   const checkDumpsterAvailability = useCallback(() => {
-    if (!formData.date_placed || !formData.tong_no || !dumpsterAvailability) {
-      setIsValidSelection(false);
-      return;
-    }
+    if (!formData.date_placed || !formData.tong_no || !dumpsterAvailability)
+      return false;
 
-    // Edit mode with unchanged values is always valid
-    if (
-      isEditMode &&
-      formData.tong_no === initialFormData.tong_no &&
-      formData.date_placed === initialFormData.date_placed &&
-      formData.date_picked === initialFormData.date_picked
-    ) {
-      setIsValidSelection(true);
-      return;
-    }
-
-    // If we're only adding or changing a pickup date for an existing rental,
-    // consider it valid because the dumpster is already assigned to this rental
-    if (isEditMode && formData.tong_no === initialFormData.tong_no) {
-      setIsValidSelection(true);
-      return;
-    }
-
-    // Find dumpster in available list
-    const availableDumpster = dumpsterAvailability.available.find(
-      (d) => d.tong_no === formData.tong_no
-    );
-
-    // If not in available list, it's not valid
-    if (!availableDumpster) {
-      setIsValidSelection(false);
-      return;
-    }
-
-    // For ongoing rentals (no pickup date)
-    if (!formData.date_picked) {
-      // Check if there are any future bookings
-      if (availableDumpster.next_rental) {
-        setIsValidSelection(false);
-        return;
-      }
-
-      setIsValidSelection(true);
-      return;
-    }
-
-    // For rentals with pickup date, check the entire period
-    const pickupDate = new Date(formData.date_picked);
-    pickupDate.setHours(0, 0, 0, 0);
-
-    // If the dumpster has a known next booking
-    if (availableDumpster.next_rental) {
-      const nextRentalDate = new Date(availableDumpster.next_rental.date);
-      nextRentalDate.setHours(0, 0, 0, 0);
-
-      // If our pickup date is after or equal to the next rental date, we have a conflict
-      if (nextRentalDate < pickupDate) {
-        setIsValidSelection(false);
-        return;
+    if (isEditMode && initialFormData) {
+      if (
+        formData.tong_no === initialFormData.tong_no &&
+        formData.date_placed === initialFormData.date_placed
+      ) {
+        if (
+          formData.date_picked === initialFormData.date_picked ||
+          formData.date_picked === null
+        )
+          return true;
+        // If only pickup date changed, assume valid for now (backend check needed for edge cases)
+        return true;
       }
     }
 
-    // If we got here, the dumpster is available for the requested period
-    setIsValidSelection(true);
+    const targetDumpster =
+      dumpsterAvailability.available.find(
+        (d) => d.tong_no === formData.tong_no
+      ) ||
+      dumpsterAvailability.upcoming.find((d) => d.tong_no === formData.tong_no);
+
+    if (!targetDumpster) {
+      if (
+        isEditMode &&
+        initialFormData &&
+        formData.tong_no === initialFormData.tong_no
+      )
+        return true; // Allow saving if it was the original dumpster
+      return false;
+    }
+
+    const placementDate = new Date(formData.date_placed);
+    placementDate.setHours(0, 0, 0, 0);
+
+    if (targetDumpster.available_after) {
+      const availableAfterDate = new Date(targetDumpster.available_after);
+      availableAfterDate.setHours(0, 0, 0, 0);
+      // If placing *on* the day it becomes available (due to transition), it's okay.
+      // If placing *before* it's available, it's not okay.
+      if (placementDate < availableAfterDate) return false;
+    }
+
+    if (targetDumpster.next_rental?.date) {
+      const nextRentalStartDate = new Date(targetDumpster.next_rental.date);
+      nextRentalStartDate.setHours(0, 0, 0, 0);
+      if (!formData.date_picked) return false; // Ongoing conflicts with any future booking
+      const pickupDate = new Date(formData.date_picked);
+      pickupDate.setHours(0, 0, 0, 0);
+      if (pickupDate >= nextRentalStartDate) return false; // Pickup must be before next rental starts
+    }
+    return true;
   }, [
     formData.date_placed,
     formData.date_picked,
@@ -467,1120 +513,929 @@ const RentalFormPage: React.FC = () => {
   ]);
 
   useEffect(() => {
-    checkDumpsterAvailability();
-  }, [
-    formData.date_placed,
-    formData.tong_no,
-    dumpsterAvailability,
-    checkDumpsterAvailability,
-  ]);
+    setIsValidSelection(checkDumpsterAvailability());
+  }, [checkDumpsterAvailability]);
 
   const validateForm = (): boolean => {
+    if (!formData.customer_id || formData.customer_id <= 0) {
+      toast.error("Please select a customer");
+      return false;
+    }
     if (!formData.date_placed) {
       toast.error("Please select a placement date");
       return false;
     }
-
-    if (!formData.customer_id) {
-      toast.error("Please select a customer");
+    try {
+      new Date(formData.date_placed);
+    } catch {
+      toast.error("Invalid placement date format");
       return false;
     }
-
+    if (formData.date_picked) {
+      try {
+        new Date(formData.date_picked);
+      } catch {
+        toast.error("Invalid pickup date format");
+        return false;
+      }
+      if (new Date(formData.date_picked) < new Date(formData.date_placed)) {
+        toast.error("Pickup date cannot be earlier than placement date.");
+        return false;
+      }
+    }
     if (!formData.tong_no) {
       toast.error("Please select a dumpster");
       return false;
     }
-
     if (!formData.driver) {
       toast.error("Please select a driver");
       return false;
     }
-
-    // Enhanced validation for date ranges
-    if (formData.date_picked) {
-      const placedDate = new Date(formData.date_placed);
-      placedDate.setHours(0, 0, 0, 0);
-      const pickedDate = new Date(formData.date_picked);
-      pickedDate.setHours(0, 0, 0, 0);
-
-      if (pickedDate < placedDate) {
-        toast.error("Pickup date cannot be earlier than placement date");
-        return false;
-      }
-    }
-
-    // More restrictive front-end validation
     if (!isValidSelection) {
-      toast.error(
-        "The selected dumpster is not available for the chosen rental period"
-      );
+      // Find dumpster info for better error message
+      const dumpsterInfo =
+        dumpsterAvailability?.available.find(
+          (d) => d.tong_no === formData.tong_no
+        ) ||
+        dumpsterAvailability?.upcoming.find(
+          (d) => d.tong_no === formData.tong_no
+        ) ||
+        dumpsterAvailability?.unavailable.find(
+          (d) => d.tong_no === formData.tong_no
+        );
+      let reason = "selected dumpster is not available for the chosen dates.";
+      if (dumpsterInfo?.next_rental?.date)
+        reason = `it conflicts with a future booking starting ${formatDumpsterDate(
+          dumpsterInfo.next_rental.date
+        )}.`;
+      else if (dumpsterInfo?.available_after)
+        reason = `it is only available after ${formatDumpsterDate(
+          dumpsterInfo.available_after
+        )}.`;
+      else if (dumpsterInfo?.reason)
+        reason = `it is unavailable (${dumpsterInfo.reason}).`;
+      toast.error(`Cannot save: ${reason}`);
       return false;
     }
-
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validateForm()) return;
-
     setIsSaving(true);
+    const payload: Omit<Rental, "customer_name" | "location_address"> = {
+      customer_id: Number(formData.customer_id),
+      location_id: formData.location_id ? Number(formData.location_id) : null,
+      tong_no: formData.tong_no,
+      driver: formData.driver,
+      date_placed: formData.date_placed,
+      date_picked: formData.date_picked || null,
+      remarks: formData.remarks || null,
+    };
 
     try {
       let response;
       if (isEditMode && formData.rental_id) {
-        response = await greenTargetApi.updateRental(formData.rental_id, {
-          location_id: formData.location_id,
-          tong_no: formData.tong_no,
-          driver: formData.driver,
-          date_placed: formData.date_placed,
-          date_picked: formData.date_picked,
-          remarks: formData.remarks,
-        });
-
-        // Check if the response indicates an error
-        if (
-          response.error ||
-          (response.message && response.message.includes("Error"))
-        ) {
-          // Extract and display the error message
-          const errorMessage = response.error || response.message;
-          toast.error(errorMessage);
-        } else {
-          // Only show success and navigate if we got here (no error)
-          toast.success("Rental updated successfully!");
-          navigate("/greentarget/rentals");
-        }
+        response = await greenTargetApi.updateRental(
+          formData.rental_id,
+          payload
+        );
       } else {
-        response = await greenTargetApi.createRental({
-          customer_id: formData.customer_id,
-          location_id: formData.location_id,
-          tong_no: formData.tong_no,
-          driver: formData.driver,
-          date_placed: formData.date_placed,
-          date_picked: formData.date_picked,
-          remarks: formData.remarks,
-        });
-
-        // Same error handling for create operation
-        if (
-          response.error ||
-          (response.message && response.message.includes("Error"))
-        ) {
-          const errorMessage = response.error || response.message;
-          toast.error(errorMessage);
-        } else {
-          toast.success("Rental created successfully!");
-          navigate("/greentarget/rentals");
-        }
+        response = await greenTargetApi.createRental(payload);
       }
+      // Check for backend validation errors first
+      if (
+        response?.error ||
+        (response?.message && response.message.toLowerCase().includes("error"))
+      ) {
+        throw new Error(
+          response.message || response.error || "Backend validation failed."
+        );
+      }
+      toast.success(
+        `Rental ${isEditMode ? "updated" : "created"} successfully!`
+      );
+      navigate("/greentarget/rentals");
     } catch (error: any) {
       console.error("Error saving rental:", error);
-
-      // Improved error detection for various cases
-      if (error.message) {
-        if (
-          error.message.includes("overlap") ||
-          error.message.includes("not available") ||
-          error.message.includes("is rented by")
-        ) {
-          toast.error(error.message);
-        } else if (error.message.includes("after pickup date")) {
-          toast.error("Placement date cannot be after pickup date");
-        } else {
-          toast.error("An unexpected error occurred. Please try again.");
-        }
-      } else {
-        toast.error("An unexpected error occurred. Please try again.");
+      let errorMsg = "An unexpected error occurred. Please try again.";
+      if (error?.message) {
+        if (error.message.toLowerCase().includes("overlap"))
+          errorMsg =
+            "Error: This rental period overlaps with another booking for the selected dumpster.";
+        else if (error.message.toLowerCase().includes("not available"))
+          errorMsg =
+            "Error: The selected dumpster is not available for the specified dates.";
+        else errorMsg = `Error: ${error.message}`;
       }
+      toast.error(errorMsg);
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mt-40 w-full flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
+  // --- Delete Logic ---
+  const handleDelete = async () => {
+    if (!formData.rental_id) return;
+    setIsDeleting(true);
+    const toastId = toast.loading("Deleting rental...");
+    try {
+      const response = await greenTargetApi.deleteRental(formData.rental_id);
+      if (
+        response?.error ||
+        (response?.message &&
+          response.message.toLowerCase().includes("cannot delete"))
+      ) {
+        throw new Error(
+          response.message || response.error || "Deletion failed."
+        );
+      }
+      toast.success("Rental deleted successfully", { id: toastId });
+      navigate("/greentarget/rentals");
+    } catch (error: any) {
+      console.error("Error deleting rental:", error);
+      let errorMsg = "Failed to delete rental.";
+      if (error?.message?.toLowerCase().includes("associated invoices")) {
+        errorMsg = "Cannot delete rental: It has associated invoices.";
+      } else if (error?.message) {
+        errorMsg = `Error: ${error.message}`;
+      }
+      toast.error(errorMsg, { id: toastId });
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
+  // --- RENDER ---
+  if (loading) return <LoadingSpinner />;
+
+  // Define a type for dumpster options that extends SelectOption
+  interface DumpsterOption extends SelectOption {
+    status: string;
+    info: Dumpster;
   }
 
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
+  // Prepare options for components
+  const customerOptions: SelectOption[] = customers.map((c) => ({
+    id: c.customer_id,
+    name: c.name,
+    phone_number: c.phone_number,
+  }));
+  const locationOptions: SelectOption[] = customerLocations.map((l) => ({
+    id: l.location_id,
+    name: l.address,
+    phone_number: l.phone_number,
+  }));
+  const driverOptions: SelectOption[] = drivers.map((d) => ({
+    id: d.id,
+    name: d.name,
+  }));
+  const dumpsterOptions: DumpsterOption[] = [
+    ...(dumpsterAvailability?.available ?? []).map((d) => ({
+      id: d.tong_no,
+      name: d.tong_no,
+      status: "available",
+      info: d,
+    })),
+    ...(dumpsterAvailability?.upcoming ?? []).map((d) => ({
+      id: d.tong_no,
+      name: d.tong_no,
+      status: "upcoming",
+      info: d,
+    })),
+    ...(dumpsterAvailability?.unavailable ?? []).map((d) => ({
+      id: d.tong_no,
+      name: d.tong_no,
+      status: "unavailable",
+      info: d,
+    })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div className="container mx-auto px-4 -mt-8">
-      <BackButton onClick={handleBackClick} className="ml-5" />
-      <div className="bg-white rounded-lg">
-        <div className="pl-6">
+    <div className="container mx-auto px-4 -mt-8 pb-10">
+      <BackButton onClick={handleBackClick} className="ml-5 mb-2" />
+      <div className="bg-white rounded-lg shadow border border-default-200">
+        <div className="p-6 border-b border-default-200">
+          {/* Header */}
           <h1 className="text-xl font-semibold text-default-900">
-            {isEditMode ? "Edit Rental" : "Create New Rental"}
+            {isEditMode
+              ? `Edit Rental #${formData.rental_id}`
+              : "Create New Rental"}
           </h1>
           <p className="mt-1 text-sm text-default-500">
             {isEditMode
-              ? `Update rental details here.`
-              : "Create a new dumpster rental record."}
+              ? `Update details for the rental placed on ${formatDateForInput(
+                  initialFormData?.date_placed ?? null
+                )}.`
+              : "Fill in the details to create a new dumpster rental record."}
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 pb-0">
-          <div className="space-y-6">
-            {/* Customer & Location Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium">Customer Information</h2>
 
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="customer_id"
-                    className="text-sm font-medium text-default-700"
-                  >
-                    Customer
-                  </label>
-                  <Listbox
-                    value={formData.customer_id}
-                    onChange={(value) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        customer_id: value,
-                      }));
-                    }}
+        {/* Form Start */}
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="space-y-6">
+            {/* --- Customer & Location Section --- */}
+            <div className="border-b border-default-200 pb-6">
+              <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
+                Customer Information
+              </h2>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
+                {/* Customer Combobox (Single Mode) */}
+                <div className="sm:col-span-3">
+                  <FormCombobox
+                    name="customer_id"
+                    label="Customer"
+                    value={
+                      formData.customer_id > 0
+                        ? formData.customer_id.toString()
+                        : undefined
+                    } // Pass single ID string or undefined
+                    onChange={handleCustomerComboboxChange}
+                    options={customerOptions}
+                    query={customerQuery}
+                    setQuery={setCustomerQuery}
+                    placeholder="Search or Select Customer..."
                     disabled={isEditMode}
-                  >
-                    <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
-                        {formData.customer_id ? (
-                          // Selected customer with potential phone number
-                          (() => {
-                            const selectedCustomer = customers.find(
-                              (c) => c.customer_id === formData.customer_id
-                            );
-                            return (
-                              <div className="flex flex-col">
-                                <span className="block truncate font-medium">
-                                  {selectedCustomer?.name || "Select Customer"}
-                                </span>{" "}
-                                {selectedCustomer?.phone_number && (
-                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
-                                    <IconPhone size={12} className="mr-1" />
-                                    {selectedCustomer.phone_number}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          // No customer selected - no extra spacing
-                          <span className="block truncate">
-                            Select Customer
-                          </span>
-                        )}
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                          <IconChevronDown
-                            className="h-5 w-5 text-default-400"
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </ListboxButton>
-                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                        {customers.map((customer) => (
-                          <ListboxOption
-                            key={customer.customer_id}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                active
-                                  ? "bg-default-100 text-default-900"
-                                  : "text-default-900"
-                              }`
-                            }
-                            value={customer.customer_id}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <div className="flex flex-col">
-                                  <span
-                                    className={`block truncate ${
-                                      selected ? "font-medium" : "font-normal"
-                                    }`}
-                                  >
-                                    {customer.name}
-                                  </span>
-                                  {customer.phone_number && (
-                                    <span className="text-xs text-default-500 mt-0.5 flex items-center">
-                                      <IconPhone size={12} className="mr-1" />
-                                      {customer.phone_number}
-                                    </span>
-                                  )}
-                                </div>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                    <IconCheck
-                                      className="h-5 w-5"
-                                      aria-hidden="true"
-                                    />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </ListboxOption>
-                        ))}
-                        {/* Add new customer option */}
-                        <ListboxOption
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
-                              active
-                                ? "bg-default-100 text-sky-600"
-                                : "text-sky-600"
-                            }`
-                          }
-                          value={0}
-                          onClick={() => setIsNewCustomerModalOpen(true)}
-                        >
-                          {({ selected }) => (
-                            <span className="flex items-center font-medium">
-                              <IconPlus size={16} className="mr-1" />
-                              Add new customer
-                            </span>
-                          )}
-                        </ListboxOption>
-                      </ListboxOptions>
-                    </div>
-                  </Listbox>
+                    required={true}
+                    mode="single" // Explicitly set single mode
+                  />
+                  {!isEditMode && (
+                    <button
+                      type="button"
+                      onClick={() => setIsNewCustomerModalOpen(true)}
+                      className="mt-2 text-sm text-sky-600 hover:text-sky-800 flex items-center"
+                    >
+                      <IconPlus size={16} className="mr-1" /> Add New Customer
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-2">
+                {/* Location Listbox (Styled) */}
+                <div className="sm:col-span-3">
                   <label
-                    htmlFor="location_id"
-                    className="text-sm font-medium text-default-700"
+                    htmlFor="location_id-button"
+                    className="block text-sm font-medium text-default-700"
                   >
-                    Location
+                    Delivery Location
                   </label>
-                  <Listbox
-                    value={formData.location_id || ""}
-                    onChange={(value) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        location_id: value === "" ? null : Number(value),
-                      }));
-                    }}
-                    disabled={
-                      !formData.customer_id || formData.customer_id === 0
-                    }
-                  >
-                    <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
-                        {formData.location_id ? (
-                          // Selected location with potential phone number
-                          (() => {
+                  <div className="mt-2">
+                    <Listbox
+                      value={formData.location_id?.toString() ?? ""}
+                      onChange={handleLocationChange}
+                      disabled={!formData.customer_id}
+                      name="location_id"
+                    >
+                      <div className="relative">
+                        <HeadlessListboxButton
+                          id="location_id-button"
+                          className={clsx(
+                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                            !formData.customer_id
+                              ? "bg-gray-50 text-gray-500 cursor-not-allowed"
+                              : ""
+                          )}
+                        >
+                          {/* Display Logic */}
+                          {(() => {
+                            /* ... same display logic as before ... */
                             const selectedLocation = customerLocations.find(
                               (l) => l.location_id === formData.location_id
                             );
-                            const currentCustomer = customers.find(
+                            const displayAddress =
+                              selectedLocation?.address ||
+                              "No Specific Location";
+                            const displayPhone = selectedLocation?.phone_number;
+                            const customerPhone = customers.find(
                               (c) => c.customer_id === formData.customer_id
-                            );
+                            )?.phone_number;
+                            const showPhone =
+                              displayPhone && displayPhone !== customerPhone;
                             return (
                               <div className="flex flex-col">
                                 <span className="block truncate font-medium">
-                                  {selectedLocation?.address ||
-                                    "No Specific Location"}
-                                </span>{" "}
-                                {selectedLocation?.phone_number &&
-                                  selectedLocation.phone_number !==
-                                    currentCustomer?.phone_number && (
-                                    <span className="text-xs text-default-500 flex items-center mt-0.5">
-                                      <IconPhone size={12} className="mr-1" />
-                                      {selectedLocation.phone_number}
-                                    </span>
-                                  )}
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          // No location selected
-                          <span className="block truncate">
-                            No Specific Location
-                          </span>
-                        )}
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                          <IconChevronDown
-                            className="h-5 w-5 text-default-400"
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </ListboxButton>
-                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                        <ListboxOption
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                              active
-                                ? "bg-default-100 text-default-900"
-                                : "text-default-900"
-                            }`
-                          }
-                          value=""
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                No Specific Location
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                  />
+                                  {displayAddress}
                                 </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                        {customerLocations.map((location) => (
-                          <ListboxOption
-                            key={location.location_id}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                active
-                                  ? "bg-default-100 text-default-900"
-                                  : "text-default-900"
-                              }`
-                            }
-                            value={location.location_id}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <div className="flex flex-col">
-                                  <span
-                                    className={`block truncate ${
-                                      selected ? "font-medium" : "font-normal"
-                                    }`}
-                                  >
-                                    {location.address}
-                                  </span>
-                                  {location.phone_number &&
-                                    location.phone_number !==
-                                      customers.find(
-                                        (c) =>
-                                          c.customer_id === formData.customer_id
-                                      )?.phone_number && (
-                                      <div className="flex text-xs text-default-500 mt-0.5">
-                                        <IconPhone
-                                          size={16}
-                                          className="mr-1.5"
-                                        />
-                                        {location.phone_number}
-                                      </div>
-                                    )}
-                                </div>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                    <IconCheck
-                                      className="h-5 w-5"
-                                      aria-hidden="true"
-                                    />
+                                {showPhone && (
+                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                    <IconPhone size={12} className="mr-1" />
+                                    {displayPhone}
                                   </span>
                                 )}
-                              </>
+                              </div>
+                            );
+                          })()}
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                            <IconChevronDown
+                              size={20}
+                              className="text-gray-400"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </HeadlessListboxButton>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <ListboxOptions
+                            className={clsx(
+                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "mt-1"
                             )}
-                          </ListboxOption>
-                        ))}
-
-                        {/* Add new location option */}
-                        {formData.customer_id && (
-                          <ListboxOption
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 mt-1 pt-2 border-t ${
-                                active
-                                  ? "bg-default-100 text-sky-600"
-                                  : "text-sky-600"
-                              }`
-                            }
-                            value={0}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setIsNewLocationModalOpen(true);
-                            }}
                           >
-                            {({ selected }) => (
-                              <span className="flex items-center font-medium">
-                                <IconPlus size={16} className="mr-1" />
-                                Add new location for selected customer
-                              </span>
+                            {/* Options including "No Specific" and "Add New" */}
+                            <ListboxOption
+                              key="no-location"
+                              className={({ active }) =>
+                                clsx(
+                                  "relative cursor-default select-none py-2 pl-3 pr-10",
+                                  active
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "text-gray-900"
+                                )
+                              }
+                              value=""
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span
+                                    className={clsx(
+                                      "block truncate italic",
+                                      selected ? "font-medium" : "font-normal",
+                                      "text-gray-500"
+                                    )}
+                                  >
+                                    No Specific Location
+                                  </span>
+                                  {selected && (
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                      <IconCheck size={20} aria-hidden="true" />
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </ListboxOption>
+                            {customerLocations.map((location) => (
+                              <ListboxOption
+                                key={location.location_id}
+                                className={({ active }) =>
+                                  clsx(
+                                    "relative cursor-default select-none py-2 pl-3 pr-10",
+                                    active
+                                      ? "bg-sky-100 text-sky-900"
+                                      : "text-gray-900"
+                                  )
+                                }
+                                value={location.location_id.toString()}
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    {/* Display logic with phone */}
+                                    <div className="flex flex-col">
+                                      <span
+                                        className={clsx(
+                                          "block truncate",
+                                          selected
+                                            ? "font-medium"
+                                            : "font-normal"
+                                        )}
+                                      >
+                                        {location.address}
+                                      </span>
+                                      {location.phone_number &&
+                                        location.phone_number !==
+                                          customers.find(
+                                            (c) =>
+                                              c.customer_id ===
+                                              formData.customer_id
+                                          )?.phone_number && (
+                                          <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                            <IconPhone
+                                              size={12}
+                                              className="mr-1"
+                                            />
+                                            {location.phone_number}
+                                          </span>
+                                        )}
+                                    </div>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                        <IconCheck
+                                          size={20}
+                                          aria-hidden="true"
+                                        />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            ))}
+                            {formData.customer_id > 0 && (
+                              <ListboxOption
+                                key="add-location"
+                                className={({ active }) =>
+                                  clsx(
+                                    "relative cursor-pointer select-none py-2 pl-3 pr-10 mt-1 pt-2 border-t",
+                                    active
+                                      ? "bg-sky-100 text-sky-600"
+                                      : "text-sky-600"
+                                  )
+                                }
+                                value="add-new"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setIsNewLocationModalOpen(true);
+                                }}
+                              >
+                                <span className="flex items-center font-medium">
+                                  <IconPlus size={16} className="mr-1" /> Add
+                                  New Location
+                                </span>
+                              </ListboxOption>
                             )}
-                          </ListboxOption>
-                        )}
-                      </ListboxOptions>
-                    </div>
-                  </Listbox>
+                          </ListboxOptions>
+                        </Transition>
+                      </div>
+                    </Listbox>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Dates Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium">Rental Dates</h2>
-
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
+            {/* --- Rental Details Section --- */}
+            <div className="border-b border-default-200 pb-6">
+              <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
+                Rental Details
+              </h2>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
+                {/* Placement Date */}
+                <div className="sm:col-span-3">
                   <label
                     htmlFor="date_placed"
-                    className="text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700"
                   >
-                    Placement Date <span className="text-rose-500">*</span>
+                    Placement Date <span className="text-red-500">*</span>
                   </label>
-                  <div
-                    className={`flex relative w-full border rounded-lg ${
-                      isPlacementDateFocused
-                        ? "border-default-500"
-                        : "border-default-300"
-                    }`}
-                  >
+                  <div className="mt-2">
                     <input
                       type="date"
                       id="date_placed"
                       name="date_placed"
-                      value={formatDateForInput(formData.date_placed)}
+                      value={formData.date_placed}
                       onChange={handleDateChange}
-                      onFocus={() => setIsPlacementDateFocused(true)}
-                      onBlur={() => setIsPlacementDateFocused(false)}
-                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none disabled:bg-default-50"
+                      required
+                      className={clsx(
+                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      )}
                     />
                   </div>
                 </div>
-
-                <div className="space-y-2">
+                {/* Pickup Date */}
+                <div className="sm:col-span-3">
                   <label
                     htmlFor="date_picked"
-                    className="text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700"
                   >
                     Pickup Date{" "}
-                    {!isEditMode && "(Leave empty for ongoing rentals)"}
+                    <span className="text-xs text-default-500">(Optional)</span>
                   </label>
-                  <div
-                    className={`flex relative w-full border rounded-lg ${
-                      isPickupDateFocused
-                        ? "border-default-500"
-                        : "border-default-300"
-                    }`}
-                  >
+                  <div className="mt-2">
                     <input
                       type="date"
                       id="date_picked"
                       name="date_picked"
-                      value={formatDateForInput(formData.date_picked)}
+                      value={formData.date_picked ?? ""}
                       onChange={handleDateChange}
-                      onFocus={() => setIsPickupDateFocused(true)}
-                      onBlur={() => setIsPickupDateFocused(false)}
-                      className="w-full px-3 py-2 border-0 bg-transparent focus:outline-none"
+                      min={formData.date_placed}
+                      className={clsx(
+                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      )}
                     />
+                  </div>
+                </div>
+                {/* Dumpster Listbox (Styled) */}
+                <div className="sm:col-span-3">
+                  <label
+                    htmlFor="tong_no-button"
+                    className="block text-sm font-medium text-default-700"
+                  >
+                    Dumpster <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-2">
+                    <Listbox
+                      value={formData.tong_no}
+                      onChange={handleDumpsterChange}
+                      disabled={!formData.date_placed}
+                      name="tong_no"
+                    >
+                      <div className="relative">
+                        <HeadlessListboxButton
+                          id="tong_no-button"
+                          className={clsx(
+                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                            !formData.date_placed
+                              ? "bg-gray-50 text-gray-500 cursor-not-allowed"
+                              : ""
+                          )}
+                        >
+                          <span className="block truncate">
+                            {formData.tong_no ||
+                              (!formData.date_placed
+                                ? "Select date first"
+                                : "Select Dumpster")}
+                          </span>
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                            <IconChevronDown
+                              size={20}
+                              className="text-gray-400"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </HeadlessListboxButton>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <ListboxOptions
+                            className={clsx(
+                              "absolute z-10 max-h-72 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "mt-1"
+                            )}
+                          >
+                            {dumpsterOptions.length === 0 &&
+                            formData.date_placed ? (
+                              <div className="relative cursor-default select-none py-2 px-4 text-gray-500">
+                                Loading or no dumpsters...
+                              </div>
+                            ) : (
+                              dumpsterOptions.map((option) => {
+                                const dumpster = option.info as Dumpster;
+                                let icon = (
+                                  <IconCircleCheck
+                                    size={16}
+                                    className="mr-2 text-green-500 flex-shrink-0"
+                                  />
+                                );
+                                let availabilityText = "";
+                                let textClass = "text-xs ml-6";
+                                if (option.status === "upcoming") {
+                                  icon = (
+                                    <IconCircleDashed
+                                      size={16}
+                                      className="mr-2 text-amber-500 flex-shrink-0"
+                                    />
+                                  );
+                                  textClass += " text-amber-600";
+                                  availabilityText = `Available after ${formatDumpsterDate(
+                                    dumpster.available_after
+                                  )}`;
+                                  if (dumpster.customer)
+                                    availabilityText += ` (from ${dumpster.customer})`;
+                                } else if (option.status === "unavailable") {
+                                  icon = (
+                                    <IconCircleX
+                                      size={16}
+                                      className="mr-2 text-rose-500 flex-shrink-0"
+                                    />
+                                  );
+                                  textClass += " text-rose-600";
+                                  availabilityText =
+                                    dumpster.reason || "Currently unavailable";
+                                  if (dumpster.customer)
+                                    availabilityText += ` (with ${dumpster.customer})`;
+                                } else if (dumpster.next_rental?.date) {
+                                  textClass += " text-amber-600";
+                                  availabilityText = `Available until ${formatDumpsterDate(
+                                    dumpster.available_until
+                                  )}`;
+                                  if (dumpster.next_rental.customer)
+                                    availabilityText += ` (next: ${
+                                      dumpster.next_rental.customer
+                                    } on ${formatDumpsterDate(
+                                      dumpster.next_rental.date
+                                    )})`;
+                                } else if (dumpster.is_transition_day) {
+                                  textClass += " text-blue-600";
+                                  availabilityText = `Transition Day (Available - from ${
+                                    dumpster.transition_from?.customer_name ??
+                                    "previous rental"
+                                  })`;
+                                }
+                                return (
+                                  <ListboxOption
+                                    key={option.id}
+                                    className={({ active }) =>
+                                      clsx(
+                                        "relative cursor-default select-none py-2 pl-3 pr-10",
+                                        active
+                                          ? "bg-sky-100 text-sky-900"
+                                          : "text-gray-900"
+                                      )
+                                    }
+                                    value={option.id.toString()}
+                                    disabled={option.status === "unavailable"}
+                                  >
+                                    {({ selected }) => (
+                                      <>
+                                        <div className="flex flex-col">
+                                          <div className="flex items-center">
+                                            {icon}
+                                            <span
+                                              className={clsx(
+                                                "block truncate",
+                                                selected
+                                                  ? "font-medium"
+                                                  : "font-normal"
+                                              )}
+                                            >
+                                              {option.name}
+                                            </span>
+                                          </div>
+                                          {availabilityText && (
+                                            <span className={textClass}>
+                                              {availabilityText}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {selected && (
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                            <IconCheck
+                                              size={20}
+                                              aria-hidden="true"
+                                            />
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </ListboxOption>
+                                );
+                              })
+                            )}
+                          </ListboxOptions>
+                        </Transition>
+                      </div>
+                    </Listbox>
+                    {/* Validation Message */}
+                    {!isValidSelection &&
+                      formData.tong_no &&
+                      formData.date_placed && (
+                        <p className="mt-1 text-xs text-rose-600 flex items-start">
+                          <IconCircleX
+                            size={14}
+                            className="mr-1 mt-[1px] flex-shrink-0"
+                          />
+                          <span>
+                            Selected dumpster is unavailable for these dates.
+                          </span>
+                        </p>
+                      )}
+                  </div>
+                </div>
+                {/* Driver Listbox (Styled) */}
+                <div className="sm:col-span-3">
+                  <label
+                    htmlFor="driver-button"
+                    className="block text-sm font-medium text-default-700"
+                  >
+                    Driver <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-2">
+                    <Listbox
+                      value={formData.driver}
+                      onChange={handleDriverChange}
+                      name="driver"
+                    >
+                      <div className="relative">
+                        <HeadlessListboxButton
+                          id="driver-button"
+                          className={clsx(
+                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                          )}
+                        >
+                          <span className="block truncate">
+                            {formData.driver || "Select Driver"}
+                          </span>
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                            <IconChevronDown
+                              size={20}
+                              className="text-gray-400"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </HeadlessListboxButton>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <ListboxOptions
+                            className={clsx(
+                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "mt-1"
+                            )}
+                          >
+                            <ListboxOption
+                              key="placeholder"
+                              value=""
+                              disabled
+                              className="text-gray-400 italic py-2 pl-3 pr-10 select-none"
+                            >
+                              Select Driver
+                            </ListboxOption>
+                            {driverOptions.map((option) => (
+                              <ListboxOption
+                                key={option.id}
+                                className={({ active }) =>
+                                  clsx(
+                                    "relative cursor-default select-none py-2 pl-3 pr-10",
+                                    active
+                                      ? "bg-sky-100 text-sky-900"
+                                      : "text-gray-900"
+                                  )
+                                }
+                                value={option.name}
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={clsx(
+                                        "block truncate",
+                                        selected ? "font-medium" : "font-normal"
+                                      )}
+                                    >
+                                      {option.name}
+                                    </span>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                        <IconCheck
+                                          size={20}
+                                          aria-hidden="true"
+                                        />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            ))}
+                          </ListboxOptions>
+                        </Transition>
+                      </div>
+                    </Listbox>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Dumpster & Driver Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium">Rental Details</h2>
-
-              {/* Availability summary */}
-              {dumpsterAvailability && (
-                <div className="text-sm mb-2">
-                  <span className="font-medium">
-                    {dumpsterAvailability.available.length} dumpsters available
-                  </span>
-                  {dumpsterAvailability.upcoming.length > 0 && (
-                    <span className="ml-2 text-default-500">
-                      • {dumpsterAvailability.upcoming.length} upcoming
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="tong_no"
-                    className="text-sm font-medium text-default-700"
-                  >
-                    Dumpster <span className="text-rose-500">*</span>
-                  </label>
-
-                  <Listbox
-                    value={formData.tong_no}
-                    onChange={(value) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        tong_no: value,
-                      }));
-                    }}
-                    disabled={!formData.date_placed}
-                  >
-                    <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
-                        <span className="block truncate">
-                          {formData.tong_no
-                            ? formData.tong_no
-                            : "Select Dumpster"}
-                        </span>
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                          <IconChevronDown
-                            className="h-5 w-5 text-default-400"
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </ListboxButton>
-                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                        {!dumpsterAvailability ? (
-                          <div className="px-3 py-2 text-default-500">
-                            Please select a placement date first
-                          </div>
-                        ) : dumpsterAvailability.available.length === 0 &&
-                          dumpsterAvailability.upcoming.length === 0 &&
-                          dumpsterAvailability.unavailable.length === 0 ? (
-                          <div className="px-3 py-2 text-default-500">
-                            No dumpsters found
-                          </div>
-                        ) : (
-                          <>
-                            {/* Available dumpsters */}
-                            {dumpsterAvailability.available.length > 0 && (
-                              <>
-                                <div className="px-3 py-1.5 text-xs font-semibold text-default-500 bg-default-50">
-                                  Available Dumpsters
-                                </div>
-                                {dumpsterAvailability.available.map(
-                                  (dumpster) => (
-                                    <ListboxOption
-                                      key={dumpster.tong_no}
-                                      className={({ active }) =>
-                                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                          active
-                                            ? "bg-default-100 text-default-900"
-                                            : "text-default-900"
-                                        }`
-                                      }
-                                      value={dumpster.tong_no}
-                                    >
-                                      {({ selected }) => (
-                                        <>
-                                          <div className="flex flex-col">
-                                            <div className="flex items-center">
-                                              <IconCircleCheck
-                                                size={16}
-                                                className="mr-2 text-green-500"
-                                              />
-                                              <span
-                                                className={`block truncate ${
-                                                  selected
-                                                    ? "font-medium"
-                                                    : "font-normal"
-                                                }`}
-                                              >
-                                                {dumpster.tong_no}
-                                                {dumpster.is_transition_day && (
-                                                  <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                                                    Transition Day
-                                                  </span>
-                                                )}
-                                              </span>
-                                            </div>
-
-                                            {dumpster.is_transition_day && (
-                                              <span className="text-xs text-blue-600 ml-6">
-                                                Available today (pickup day from{" "}
-                                                {
-                                                  dumpster.transition_from
-                                                    ?.customer_name
-                                                }
-                                                )
-                                              </span>
-                                            )}
-
-                                            {dumpster.available_until && (
-                                              <span className="text-xs text-amber-600 ml-6">
-                                                {(() => {
-                                                  const today =
-                                                    formData.date_placed; // Use the selected date, not the actual today
-                                                  const endDate =
-                                                    dumpster.available_until;
-                                                  const daysAvailable =
-                                                    calculateDaysBetween(
-                                                      today,
-                                                      endDate
-                                                    );
-
-                                                  if (daysAvailable <= 0) {
-                                                    return `Available until ${formatDumpsterDate(
-                                                      dumpster.available_until
-                                                    )}`;
-                                                  }
-
-                                                  return `Available for ${daysAvailable} day${
-                                                    daysAvailable !== 1
-                                                      ? "s"
-                                                      : ""
-                                                  } until ${formatDumpsterDate(
-                                                    dumpster.available_until
-                                                  )}`;
-                                                })()}
-                                                {dumpster.next_rental &&
-                                                  ` (Next: ${dumpster.next_rental.customer})`}
-                                              </span>
-                                            )}
-                                          </div>
-                                          {selected && (
-                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                              <IconCheck
-                                                className="h-5 w-5"
-                                                aria-hidden="true"
-                                              />
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                    </ListboxOption>
-                                  )
-                                )}
-                              </>
-                            )}
-
-                            {/* Upcoming dumpsters */}
-                            {dumpsterAvailability.upcoming.length > 0 && (
-                              <>
-                                <div className="px-3 py-1.5 text-xs font-semibold text-default-500 bg-default-50 mt-1">
-                                  Future Availability
-                                </div>
-                                {dumpsterAvailability.upcoming.map(
-                                  (dumpster) => (
-                                    <ListboxOption
-                                      key={dumpster.tong_no}
-                                      className={({ active }) =>
-                                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                          active
-                                            ? "bg-default-100 text-default-900"
-                                            : "text-default-900"
-                                        }`
-                                      }
-                                      value={dumpster.tong_no}
-                                    >
-                                      {({ selected }) => (
-                                        <>
-                                          <div className="flex flex-col">
-                                            <div className="flex items-center">
-                                              <IconCircleDashed
-                                                size={16}
-                                                className="mr-2 text-amber-500"
-                                              />
-                                              <span
-                                                className={`block truncate ${
-                                                  selected
-                                                    ? "font-medium"
-                                                    : "font-normal"
-                                                }`}
-                                              >
-                                                {dumpster.tong_no}
-                                              </span>
-                                            </div>
-                                            {dumpster.available_after && (
-                                              <span className="text-xs text-amber-600 ml-6">
-                                                Available after{" "}
-                                                {formatDumpsterDate(
-                                                  dumpster.available_after
-                                                )}
-                                                {dumpster.customer &&
-                                                  ` (Currently with ${dumpster.customer})`}
-                                              </span>
-                                            )}
-                                            {dumpster.has_future_rental &&
-                                              dumpster.next_rental && (
-                                                <span className="text-xs text-rose-600 ml-6">
-                                                  Then unavailable from{" "}
-                                                  {formatDumpsterDate(
-                                                    dumpster.next_rental.date
-                                                  )}
-                                                  {` (Reserved by ${dumpster.next_rental.customer})`}
-                                                </span>
-                                              )}
-                                          </div>
-                                          {selected && (
-                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                              <IconCheck
-                                                className="h-5 w-5"
-                                                aria-hidden="true"
-                                              />
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                    </ListboxOption>
-                                  )
-                                )}
-                              </>
-                            )}
-
-                            {/* Unavailable dumpsters */}
-                            {dumpsterAvailability.unavailable.length > 0 && (
-                              <>
-                                <div className="px-3 py-1.5 text-xs font-semibold text-default-500 bg-default-50 mt-1">
-                                  Unavailable Dumpsters
-                                </div>
-                                {dumpsterAvailability.unavailable.map(
-                                  (dumpster) => (
-                                    <ListboxOption
-                                      key={dumpster.tong_no}
-                                      className={({ active }) =>
-                                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                          active
-                                            ? "bg-default-100 text-default-900"
-                                            : "text-default-900"
-                                        }`
-                                      }
-                                      value={dumpster.tong_no}
-                                    >
-                                      {({ selected }) => (
-                                        <>
-                                          <div className="flex flex-col">
-                                            <div className="flex items-center">
-                                              <IconCircleX
-                                                size={16}
-                                                className="mr-2 text-rose-500"
-                                              />
-                                              <span
-                                                className={`block truncate ${
-                                                  selected
-                                                    ? "font-medium"
-                                                    : "font-normal"
-                                                }`}
-                                              >
-                                                {dumpster.tong_no}
-                                              </span>
-                                            </div>
-                                            <span className="text-xs text-rose-600 ml-6">
-                                              {dumpster.reason ||
-                                                "Currently unavailable"}
-                                            </span>
-                                          </div>
-                                          {selected && (
-                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                              <IconCheck
-                                                className="h-5 w-5"
-                                                aria-hidden="true"
-                                              />
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                    </ListboxOption>
-                                  )
-                                )}
-                              </>
-                            )}
-                          </>
-                        )}
-                      </ListboxOptions>
-                    </div>
-                  </Listbox>
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="driver"
-                    className="text-sm font-medium text-default-700"
-                  >
-                    Driver <span className="text-rose-500">*</span>
-                  </label>
-                  <Listbox
-                    value={formData.driver}
-                    onChange={(value) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        driver: value,
-                      }));
-                    }}
-                  >
-                    <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
-                        <span className="block truncate">
-                          {formData.driver || "Select Driver"}
-                        </span>
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                          <IconChevronDown
-                            className="h-5 w-5 text-default-400"
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </ListboxButton>
-                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                        <ListboxOption
-                          value=""
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                              active
-                                ? "bg-default-100 text-default-900"
-                                : "text-default-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                Select Driver
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                  />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                        {drivers.map((driver) => (
-                          <ListboxOption
-                            key={driver.id}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                                active
-                                  ? "bg-default-100 text-default-900"
-                                  : "text-default-900"
-                              }`
-                            }
-                            value={driver.name}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {driver.name}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                    <IconCheck
-                                      className="h-5 w-5"
-                                      aria-hidden="true"
-                                    />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </ListboxOption>
-                        ))}
-                      </ListboxOptions>
-                    </div>
-                  </Listbox>
-                </div>
-              </div>
-            </div>
-
-            {/* Remarks Section */}
-            <div className="space-y-2">
+            {/* --- Remarks Section --- */}
+            <div className="border-b border-default-200 pb-6">
               <label
                 htmlFor="remarks"
-                className="text-sm font-medium text-default-700"
+                className="block text-sm font-medium leading-6 text-default-700"
               >
-                Remarks (Optional)
+                Remarks{" "}
+                <span className="text-xs text-default-500">(Optional)</span>
               </label>
-              <textarea
-                id="remarks"
-                name="remarks"
-                value={formData.remarks || ""}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                placeholder="Add any special notes or instructions here"
-              ></textarea>
+              <div className="mt-2">
+                <textarea
+                  id="remarks"
+                  name="remarks"
+                  rows={3}
+                  className={clsx(
+                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                    "placeholder-default-400"
+                  )}
+                  placeholder="Add any special notes or instructions..."
+                  value={formData.remarks ?? ""}
+                  onChange={handleInputChange}
+                />
+              </div>
             </div>
           </div>
 
-          {!isValidSelection &&
-            formData.tong_no &&
-            formData.date_placed &&
-            !isEditMode && (
-              <div className="mt-2 text-sm text-rose-600 flex items-center">
-                <IconCircleX size={16} className="mr-1.5 flex-shrink-0" />
-                <span>
-                  The selected dumpster is not available for the chosen date.
-                  {(() => {
-                    const upcomingDumpster =
-                      dumpsterAvailability?.upcoming.find(
-                        (d) => d.tong_no === formData.tong_no
-                      );
-                    const unavailableDumpster =
-                      dumpsterAvailability?.unavailable.find(
-                        (d) => d.tong_no === formData.tong_no
-                      );
-
-                    if (upcomingDumpster?.available_after) {
-                      // Include information about future unavailability
-                      const message = ` It will be available after ${formatDumpsterDate(
-                        upcomingDumpster.available_after
-                      )}${
-                        upcomingDumpster.customer
-                          ? ` (currently with ${upcomingDumpster.customer})`
-                          : ""
-                      }.`;
-
-                      if (
-                        upcomingDumpster.has_future_rental &&
-                        upcomingDumpster.next_rental
-                      ) {
-                        return `${message} Note: It will be reserved again starting ${formatDumpsterDate(
-                          upcomingDumpster.next_rental.date
-                        )}.`;
-                      }
-
-                      return message;
-                    } else if (unavailableDumpster?.reason) {
-                      return ` ${unavailableDumpster.reason}${
-                        unavailableDumpster.customer
-                          ? ` (with ${unavailableDumpster.customer})`
-                          : ""
-                      }.`;
-                    }
-                    return "";
-                  })()}
-                </span>
-              </div>
-            )}
-
-          <div className="mt-6 py-3 flex space-x-2 justify-end">
+          {/* --- Action Buttons --- */}
+          <div className="mt-6 flex items-center justify-end gap-x-4 pb-6">
             {isEditMode && (
               <Button
                 type="button"
                 variant="outline"
                 color="rose"
-                size="lg"
-                icon={IconTrash}
                 onClick={() => setIsDeleteDialogOpen(true)}
                 disabled={isDeleting}
+                icon={IconTrash}
               >
-                {isDeleting ? "Deleting..." : "Delete Rental"}
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             )}
-            <div className={isEditMode ? "" : "ml-auto"}>
-              <Button
-                type="submit"
-                variant="boldOutline"
-                size="lg"
-                disabled={
-                  isSaving ||
-                  (!isEditMode && !isFormChanged) ||
-                  (isEditMode &&
-                    formData.date_picked !== null &&
-                    !isFormChanged) ||
-                  (!isValidSelection && !isEditMode)
-                }
-              >
-                {isSaving
-                  ? "Saving..."
-                  : isEditMode
-                  ? "Update"
-                  : "Create Rental"}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              color="secondary"
+              onClick={handleBackClick}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="filled"
+              color="sky"
+              disabled={isSaving || !isFormChanged || !isValidSelection}
+            >
+              {isSaving
+                ? "Saving..."
+                : isEditMode
+                ? "Save Changes"
+                : "Create Rental"}
+            </Button>
           </div>
         </form>
       </div>
-      {/* New Customer with Location Modal */}
+
+      {/* Modals & Dialogs */}
       <LocationFormModal
         isOpen={isNewCustomerModalOpen}
         onClose={() => setIsNewCustomerModalOpen(false)}
         isCreatingCustomer={true}
         onSubmit={async (data) => {
+          /* ... Submit logic ... */ setIsNewCustomerModalOpen(false);
           try {
-            // Create the new customer
             if (data.customer_name) {
               const customerResponse = await greenTargetApi.createCustomer({
                 name: data.customer_name,
                 phone_number: data.phone_number,
               });
-
-              if (customerResponse && customerResponse.customer) {
+              if (customerResponse?.customer) {
                 const newCustomerId = customerResponse.customer.customer_id;
-
-                // Create the location for the new customer
+                toast.success("Customer created successfully.");
+                const customersData = await greenTargetApi.getCustomers();
+                setCustomers(customersData || []);
+                setFormData((prev) => ({
+                  ...prev,
+                  customer_id: newCustomerId,
+                  location_id: null,
+                }));
+                setCustomerQuery("");
                 if (data.address) {
                   await greenTargetApi.createLocation({
                     customer_id: newCustomerId,
                     address: data.address,
                     phone_number: data.phone_number,
                   });
+                  await fetchCustomerLocations(newCustomerId, true);
                 }
-
-                // Fetch updated customers list
-                const customersData = await greenTargetApi.getCustomers();
-                setCustomers(customersData);
-
-                // Select the new customer
-                setFormData((prev) => ({
-                  ...prev,
-                  customer_id: newCustomerId,
-                }));
-
-                toast.success("Customer and location created successfully");
+              } else {
+                throw new Error("Failed to create customer.");
               }
             }
           } catch (error) {
-            console.error("Error creating customer and location:", error);
-            toast.error("Failed to create customer and location");
+            console.error("Error creating customer:", error);
+            toast.error("Failed to create customer.");
           }
-
-          setIsNewCustomerModalOpen(false);
         }}
       />
-      {/* New Location for Existing Customer Modal */}
       <LocationFormModal
         isOpen={isNewLocationModalOpen}
         onClose={() => setIsNewLocationModalOpen(false)}
         customerId={formData.customer_id}
         customerPhoneNumber={
           customers.find((c) => c.customer_id === formData.customer_id)
-            ?.phone_number || ""
+            ?.phone_number ?? undefined
         }
         onSubmit={async (data) => {
+          /* ... Submit logic ... */ setIsNewLocationModalOpen(false);
           try {
-            // Create new location for selected customer
             if (data.address && formData.customer_id) {
               const locationResponse = await greenTargetApi.createLocation({
                 customer_id: formData.customer_id,
                 address: data.address,
                 phone_number: data.phone_number,
               });
-
-              // Refresh customer locations
-              await fetchCustomerLocations(formData.customer_id);
-
-              // Select the new location
-              if (locationResponse && locationResponse.location) {
+              if (locationResponse?.location) {
+                toast.success("Location added successfully.");
+                await fetchCustomerLocations(formData.customer_id, true);
                 setFormData((prev) => ({
                   ...prev,
                   location_id: locationResponse.location.location_id,
                 }));
+              } else {
+                throw new Error("Failed to add location.");
               }
-
-              toast.success("Location added successfully");
             }
           } catch (error) {
             console.error("Error creating location:", error);
-            toast.error("Failed to create location");
+            toast.error("Failed to add location.");
           }
-
-          setIsNewLocationModalOpen(false);
         }}
       />
       <ConfirmationDialog
@@ -1588,8 +1443,8 @@ const RentalFormPage: React.FC = () => {
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Delete Rental"
-        message="Are you sure you want to delete this rental? This action cannot be undone."
-        confirmButtonText="Delete"
+        message={`Are you sure you want to delete Rental #${formData.rental_id}? This action cannot be undone.`}
+        confirmButtonText={isDeleting ? "Deleting..." : "Delete"}
         variant="danger"
       />
       <ConfirmationDialog
@@ -1597,7 +1452,7 @@ const RentalFormPage: React.FC = () => {
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
         title="Discard Changes"
-        message="Are you sure you want to go back? All unsaved changes will be lost."
+        message="Are you sure you want to leave? Unsaved changes will be lost."
         confirmButtonText="Discard"
         variant="danger"
       />
