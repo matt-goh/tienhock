@@ -27,6 +27,7 @@ import toast from "react-hot-toast";
 import { debounce } from "lodash";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
+import { api } from "../../routes/utils/api";
 
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -125,15 +126,17 @@ const InvoiceFormPage: React.FC = () => {
   const fetchCustomerProducts = useCallback(async (customerId: string) => {
     if (!customerId) {
       setCustomerProducts([]);
-      return;
+      return [];
     }
     try {
-      console.log("Fetching custom products for (mock):", customerId);
-      setCustomerProducts([]); // Mock
+      const response = await api.get(`/api/customer-products/${customerId}`);
+      setCustomerProducts(response);
+      return response;
     } catch (error) {
       console.error("Error fetching customer products:", error);
       toast.error("Could not load custom product prices.");
       setCustomerProducts([]);
+      return [];
     }
   }, []);
   useEffect(() => {

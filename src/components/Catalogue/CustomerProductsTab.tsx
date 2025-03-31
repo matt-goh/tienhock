@@ -1,3 +1,4 @@
+//src/components/Catalogue/CustomerProductsTab.tsx
 import React, { useState, useEffect } from "react";
 import { api } from "../../routes/utils/api";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";

@@ -1,3 +1,4 @@
+//src/pages/Catalogue/CustomerAddPage.tsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
