@@ -6,13 +6,10 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import {
-  FormInput,
-  FormListbox,
-  FormCombobox,
-} from "../../components/FormComponents";
+import { StaffListbox } from "../../components/Catalogue/StaffListbox";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { FormCombobox, FormInput } from "../../components/FormComponents";
 
 interface SelectOption {
   id: string;
@@ -121,7 +118,7 @@ const StaffFormPage: React.FC = () => {
     }
     fetchOptions("nationalities", setNationalities);
     fetchOptions("races", setRaces);
-    fetchOptions("agamas", setAgamas);
+    fetchOptions("agama", setAgamas);
     fetchOptions("jobs", setJobs);
     fetchOptions("locations", setLocations);
   }, []);
@@ -284,15 +281,22 @@ const StaffFormPage: React.FC = () => {
     name: keyof Employee,
     label: string,
     options: SelectOption[]
-  ) => (
-    <FormListbox
-      name={name}
-      label={label}
-      value={formData[name].toString()}
-      onChange={(value) => handleListboxChange(name, value)}
-      options={options}
-    />
-  );
+  ) => {
+    // Value can be name or ID, StaffListbox handles it
+    const currentValue = formData[name];
+
+    return (
+      <StaffListbox // Use the new component
+        key={name}
+        name={name}
+        label={label}
+        value={currentValue} // Pass the raw value from formData
+        onChange={(value) => handleListboxChange(name, value)} // Receives string ID
+        options={options}
+        placeholder={`Select ${label}...`}
+      />
+    );
+  };
 
   const renderCombobox = (
     name: "job" | "location",

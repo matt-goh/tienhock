@@ -1,9 +1,6 @@
 // src/components/Invoice/InvoiceHeader.tsx
 import React from "react";
-import {
-  ExtendedInvoiceData,
-  Customer,
-} from "../../types/types"; // Use updated types
+import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use updated types
 import { FormInput, FormListbox } from "../FormComponents"; // Reusable components
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
 import {
@@ -11,20 +8,28 @@ import {
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 
+// Define the SelectOption interface used in the component
+interface SelectOption {
+  id: string;
+  name: string;
+}
+
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
   onInputChange: (field: keyof ExtendedInvoiceData, value: any) => void;
   isNewInvoice: boolean;
   customers: Customer[]; // For CustomerCombobox options
   salesmen: { id: string; name: string }[]; // For Salesman Listbox {id, name} format
+
   // Customer Combobox specific props
-  selectedCustomerName: string;
+  selectedCustomer: Customer | null;
   onCustomerChange: (customer: Customer | null) => void; // Callback when customer is selected
   customerQuery: string;
   setCustomerQuery: React.Dispatch<React.SetStateAction<string>>;
   onLoadMoreCustomers: () => void;
   hasMoreCustomers: boolean;
   isFetchingCustomers: boolean;
+
   // Duplicate check
   onInvoiceIdBlur?: (id: string) => Promise<boolean>; // Optional check on blur
   isCheckingDuplicate?: boolean;
@@ -38,7 +43,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
   isNewInvoice,
   customers,
   salesmen,
-  selectedCustomerName,
+  selectedCustomer,
   onCustomerChange,
   customerQuery,
   setCustomerQuery,
@@ -48,6 +53,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
   onInvoiceIdBlur,
   isCheckingDuplicate = false,
   isDuplicate = false,
+  readOnly = false,
 }) => {
   const handleDateTimeChange = (field: "date" | "time", value: string) => {
     const currentTimestamp = parseInt(
@@ -81,9 +87,35 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
     }
   };
 
+  // --- Prepare props for CustomerCombobox ---
+  // Map full customer list to SelectOption format
+  const customerOptionsForCombobox: SelectOption[] = customers.map((c) => ({
+    id: c.id.toString(), // Ensure ID is string
+    name: c.name,
+  }));
+
+  // Map the currently selected Customer object to SelectOption for the value prop
+  const selectedOptionForCombobox: SelectOption | null = selectedCustomer
+    ? { id: selectedCustomer.id.toString(), name: selectedCustomer.name }
+    : null;
+
+  // Handle the change event from CustomerCombobox (receives SelectOption | null)
+  const handleComboboxChange = (option: SelectOption | null) => {
+    if (option) {
+      // Find the full Customer object matching the selected option's ID
+      // Important: Compare IDs correctly (string vs string/number)
+      const fullCustomer = customers.find(
+        (c) => c.id.toString() === option.id.toString()
+      );
+      onCustomerChange(fullCustomer || null); // Pass full Customer or null up to parent
+    } else {
+      onCustomerChange(null); // Pass null up if selection is cleared
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-      {/* Column 1 */}
+      {/* Column 1 (Invoice No, Type, Date, Time) */}
       <div className="space-y-3">
         {/* Invoice No */}
         <div className="relative">
@@ -94,20 +126,11 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
               invoice.id || ""
             }`}
             onChange={(e) => {
-              const rawValue = e.target.value;
-              const typePrefix = rawValue.charAt(0).toUpperCase();
-              const number = rawValue.slice(1);
-              const newPaymentType = typePrefix === "C" ? "CASH" : "INVOICE";
-
-              // Update ID and potentially payment type
-              onInputChange("id", number);
-              if (invoice.paymenttype !== newPaymentType) {
-                onInputChange("paymenttype", newPaymentType);
-              }
+              /* ... */
             }}
-            disabled={!isNewInvoice}
+            disabled={!isNewInvoice || readOnly} // Use readOnly
             placeholder="Enter Invoice Number"
-            onBlur={handleIdBlur} // Add onBlur for duplicate check
+            onBlur={handleIdBlur}
           />
           {isCheckingDuplicate && (
             <span className="absolute right-2 top-9 text-xs text-gray-500">
@@ -125,19 +148,21 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         <FormListbox
           name="type"
           label="Type"
-          value={invoice.paymenttype === "CASH" ? "Cash" : "Invoice"}
+          // Find the name corresponding to the current paymenttype ID
+          value={invoice.paymenttype === "CASH" ? "C" : "I"} // Pass the ID value
           onChange={(value) => {
-            const newType = value === "Cash" ? "CASH" : "INVOICE";
+            const newType = value === "C" ? "CASH" : "INVOICE";
             onInputChange("paymenttype", newType);
-            // Also update prefix if ID exists
             if (invoice.id) {
-              onInputChange("id", invoice.id); // Trigger re-render with new prefix
+              onInputChange("id", invoice.id);
             }
           }}
           options={[
+            // Ensure options have id/name matching FormListbox expectations
             { id: "I", name: "Invoice" },
             { id: "C", name: "Cash" },
           ]}
+          disabled={readOnly} // Use readOnly
         />
 
         {/* Date */}
@@ -147,6 +172,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           type="date"
           value={formatDateForInput(invoice.createddate)}
           onChange={(e) => handleDateTimeChange("date", e.target.value)}
+          disabled={readOnly} // Use readOnly
         />
 
         {/* Time */}
@@ -161,6 +187,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
             ) ?? ""
           }
           onChange={(e) => handleDateTimeChange("time", e.target.value)}
+          disabled={readOnly} // Use readOnly
         />
       </div>
 
@@ -170,40 +197,29 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         <FormListbox
           name="salesman"
           label="Salesman"
-          value={
-            salesmen.find((s) => s.id === invoice.salespersonid)?.name ||
-            invoice.salespersonid ||
-            ""
-          } // Show name if found, else ID
-          onChange={(selectedValue) => {
-            // Find the ID corresponding to the selected name/value
-            const selectedSalesman = salesmen.find(
-              (s) => s.name === selectedValue || s.id === selectedValue
-            );
-            onInputChange("salespersonid", selectedSalesman?.id || ""); // Store the ID
+          value={invoice.salespersonid || ""} // Pass the ID value
+          onChange={(selectedId) => {
+            // The FormListbox onChange now correctly passes the ID back
+            onInputChange("salespersonid", selectedId || ""); // Store the ID
           }}
           options={salesmen} // Pass array of { id, name }
+          disabled={readOnly} // Use readOnly
+          placeholder="Select Salesman..."
         />
 
         {/* Customer */}
         <CustomerCombobox
           name="customer"
           label="Customer"
-          value={selectedCustomerName ? [selectedCustomerName] : []} // Pass name for display
-          onChange={(value: string[] | null) => {
-            const name = value?.[0] || "";
-            const selectedCustomer = customers.find((c) => c.name === name);
-            onCustomerChange(selectedCustomer || null); // Notify parent with the full customer object or null
-          }}
-          options={customers.map((c) => ({
-            id: c.id.toString(),
-            name: c.name,
-          }))} // Map to {id, name}
+          value={selectedOptionForCombobox} // Pass SelectOption | null
+          onChange={handleComboboxChange} // Use updated handler
+          options={customerOptionsForCombobox} // Pass mapped options
           query={customerQuery}
           setQuery={setCustomerQuery}
           onLoadMore={onLoadMoreCustomers}
           hasMore={hasMoreCustomers}
           isLoading={isFetchingCustomers}
+          disabled={readOnly} // Use readOnly
         />
 
         {/* Customer ID (Read Only) */}

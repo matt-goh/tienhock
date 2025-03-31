@@ -82,7 +82,7 @@ const CustomerFormPage: React.FC = () => {
   ];
 
   const idTypeOptions = [
-    { id: "Select", name: "Select" },
+    { id: "Select...", name: "Select..." },
     { id: "BRN", name: "BRN" },
     { id: "NRIC", name: "NRIC" },
     { id: "PASSPORT", name: "PASSPORT" },
@@ -460,39 +460,22 @@ const CustomerFormPage: React.FC = () => {
   const renderListbox = (
     name: keyof Customer,
     label: string,
-    options: SelectOption[]
+    options: SelectOption[] // Pass the specific options array (e.g., stateOptions, closenessOptions)
   ) => {
+    // Get the current ID value from formData
     const value = formData[name]?.toString() || "";
 
-    // For state field, we want to show the name but save the code
-    if (name === "state") {
-      const selectedState = stateOptions.find((opt) => opt.id === value);
-      return (
-        <FormListbox
-          name={name}
-          label={label}
-          value={selectedState ? selectedState.name : value}
-          onChange={(selectedName) => {
-            const selectedOption = stateOptions.find(
-              (opt) => opt.name === selectedName
-            );
-            handleListboxChange(
-              name,
-              selectedOption ? selectedOption.id : selectedName
-            );
-          }}
-          options={options}
-        />
-      );
-    }
-
-    // For other fields, normal behavior
+    // Directly use FormListbox without special state handling
+    // FormListbox now handles displaying the 'name' based on the 'id' value
     return (
       <FormListbox
         name={name}
         label={label}
-        value={value}
-        onChange={(value) => handleListboxChange(name, value)}
+        value={value} // Pass the ID value (e.g., "12", "Local")
+        onChange={(selectedId) => {
+          // onChange now correctly receives the ID
+          handleListboxChange(name, selectedId); // Update formData with the ID
+        }}
         options={options}
       />
     );
@@ -571,7 +554,20 @@ const CustomerFormPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderListbox("id_type", "ID Type", idTypeOptions)}
+                  <div>
+                    <FormListbox
+                      name="id_type"
+                      label="ID Type"
+                      value={formData.id_type || ""}
+                      onChange={(selectedId) => {
+                        // When "Select..." is chosen, set id_type to empty string
+                        const newValue =
+                          selectedId === "Select..." ? "" : selectedId;
+                        handleListboxChange("id_type", newValue);
+                      }}
+                      options={idTypeOptions}
+                    />
+                  </div>
                   {renderInput(
                     "id_number",
                     "ID Number",
