@@ -518,7 +518,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
               icon={IconCash}
-              variant={showPaymentForm ? "outline" : "filled"}
+              variant="outline"
               color="sky"
             >
               {showPaymentForm ? "Cancel" : "Record Payment"}

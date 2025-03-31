@@ -481,7 +481,7 @@ const InvoiceDetailsPage: React.FC = () => {
   ];
 
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-full relative">
+    <div className="px-4 md:px-12 pb-8 w-full relative">
       {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-30">
@@ -525,7 +525,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
               icon={IconCash}
-              variant={showPaymentForm ? "outline" : "filled"}
+              variant="outline"
               color="sky"
               size="md"
               disabled={isLoading}
@@ -788,58 +788,66 @@ const InvoiceDetailsPage: React.FC = () => {
               No payments recorded yet.
             </p>
           ) : (
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Date
                     </th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Method
                     </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[20%]">
                       Reference
                     </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
                       Notes
                     </th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      Amount
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[10%]">
                       Action
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {payments.map((p) => (
-                    <tr key={p.payment_id}>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                    <tr
+                      key={p.payment_id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
                         {formatDisplayDate(new Date(p.payment_date))}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-green-600">
-                        {formatCurrency(p.amount_paid)}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                          {p.payment_method.replace("_", " ")}
+                        </span>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap capitalize">
-                        {p.payment_method.replace("_", " ")}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-gray-600">
                         {p.payment_reference || "-"}
                       </td>
-                      <td className="px-3 py-2">{p.notes || "-"}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-center">
+                      <td className="px-4 py-3 text-gray-600 truncate max-w-xs">
+                        {p.notes || "-"}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-green-600">
+                        {formatCurrency(p.amount_paid)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
                         <Button
                           size="sm"
                           variant="outline"
                           color="rose"
                           onClick={() => handleDeletePaymentClick(p)}
-                          disabled={isDeletingPayment || isCancelled} // Disable if already cancelled
+                          disabled={isDeletingPayment || isCancelled}
                           title={
                             isCancelled
                               ? "Cannot delete payment for cancelled invoice"
                               : "Delete Payment"
                           }
+                          className="ml-auto"
                         >
                           <IconTrash size={16} />
                         </Button>
