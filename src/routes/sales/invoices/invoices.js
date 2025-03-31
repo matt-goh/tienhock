@@ -414,17 +414,20 @@ export default function (pool, config) {
         throw new Error(`Invoice with ID ${invoice.id} already exists`);
       }
 
+      // Set balance_due equal to totalamountpayable initially
+      const balance_due = parseFloat(invoice.totalamountpayable || 0);
+
       // Insert invoice using new schema
       const insertInvoiceQuery = `
-        INSERT INTO invoices (
-          id, salespersonid, customerid, createddate, paymenttype,
-          total_excluding_tax, tax_amount, rounding, totalamountpayable,
-          invoice_status, einvoice_status
-          -- uuid, submission_uid etc. are usually set later by e-invoice process
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *
-      `;
+      INSERT INTO invoices (
+        id, salespersonid, customerid, createddate, paymenttype,
+        total_excluding_tax, tax_amount, rounding, totalamountpayable,
+        invoice_status, einvoice_status, balance_due
+        -- uuid, submission_uid etc. are usually set later by e-invoice process
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING *
+    `;
 
       // Prepare values, ensuring correct types and defaults
       const values = [
@@ -437,8 +440,9 @@ export default function (pool, config) {
         parseFloat(invoice.tax_amount || 0),
         parseFloat(invoice.rounding || 0),
         parseFloat(invoice.totalamountpayable || 0),
-        invoice.invoice_status || "active", // Default status
+        "Unpaid", // Default is Unpaid now
         invoice.einvoice_status || null, // Usually null on creation
+        balance_due, // Add the balance_due value
       ];
 
       const invoiceResult = await client.query(insertInvoiceQuery, values);
@@ -535,11 +539,11 @@ export default function (pool, config) {
         );
       }
 
-      // 1. Get Original Invoice for credit comparison
+      // 1. Get Original Invoice for comparison
       const originalInvoiceQuery = `
-        SELECT customerid, paymenttype, totalamountpayable
-        FROM invoices
-        WHERE id = $1 FOR UPDATE`; // Lock the row
+      SELECT customerid, paymenttype, totalamountpayable, balance_due, invoice_status
+      FROM invoices
+      WHERE id = $1 FOR UPDATE`; // Lock the row
       const originalInvoiceResult = await client.query(originalInvoiceQuery, [
         invoice.id,
       ]);
@@ -568,22 +572,36 @@ export default function (pool, config) {
         await updateCustomerCredit(client, newCustomerId, newAmount);
       }
 
+      // Calculate new balance_due
+      // If totalamountpayable changes, we need to adjust balance_due by the difference
+      const originalTotal = parseFloat(originalInvoice.totalamountpayable || 0);
+      const newTotal = parseFloat(invoice.totalamountpayable || 0);
+      const currentBalance = parseFloat(originalInvoice.balance_due || 0);
+
+      // Adjust balance by the difference in total
+      let newBalance = currentBalance + (newTotal - originalTotal);
+      newBalance = Math.max(0, parseFloat(newBalance.toFixed(2))); // Ensure positive and round to 2 decimal places
+
+      // Determine invoice status based on balance_due
+      const newStatus = newBalance <= 0 ? "paid" : "Unpaid";
+
       // 3. Update the Invoice Record (ID is NOT updated)
       const updateInvoiceQuery = `
-        UPDATE invoices SET
-          salespersonid = $1,
-          customerid = $2,
-          createddate = $3,
-          paymenttype = $4,
-          total_excluding_tax = $5,
-          tax_amount = $6,
-          rounding = $7,
-          totalamountpayable = $8,
-          invoice_status = $9
-          -- einvoice_status, uuid etc. are typically not updated here
-        WHERE id = $10 -- Use ID in WHERE clause
-        RETURNING *
-      `;
+      UPDATE invoices SET
+        salespersonid = $1,
+        customerid = $2,
+        createddate = $3,
+        paymenttype = $4,
+        total_excluding_tax = $5,
+        tax_amount = $6,
+        rounding = $7,
+        totalamountpayable = $8,
+        invoice_status = $9,
+        balance_due = $10
+        -- einvoice_status, uuid etc. are typically not updated here
+      WHERE id = $11 -- Use ID in WHERE clause
+      RETURNING *
+    `;
       const updateValues = [
         invoice.salespersonid,
         invoice.customerid,
@@ -593,7 +611,8 @@ export default function (pool, config) {
         parseFloat(invoice.tax_amount || 0),
         parseFloat(invoice.rounding || 0),
         parseFloat(invoice.totalamountpayable || 0),
-        invoice.invoice_status || "active",
+        newStatus, // Update status based on balance
+        newBalance, // Update the balance_due
         invoice.id, // For WHERE clause
       ];
 
