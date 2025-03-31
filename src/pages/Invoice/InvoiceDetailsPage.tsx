@@ -25,8 +25,6 @@ import {
   IconBan,
   IconCash,
   IconTrash,
-  IconCheck,
-  IconChevronDown,
   IconCircleCheck,
   IconClockHour4,
   IconAlertTriangle,
