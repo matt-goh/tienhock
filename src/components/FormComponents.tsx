@@ -1,24 +1,26 @@
 // src/components/FormComponents.tsx
-import React, { Fragment } from "react";
+import React, { Fragment, useState, useEffect } from "react"; // Added useState, useEffect
 import {
   Listbox,
   Transition,
   Combobox,
   ComboboxInput,
-  ComboboxButton as HeadlessComboboxButton, // Rename for clarity
+  ComboboxButton as HeadlessComboboxButton,
   ComboboxOptions,
   ComboboxOption,
   ListboxOption,
   ListboxOptions,
   ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconPhone } from "@tabler/icons-react";
 import clsx from "clsx";
 import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
+// Exporting for reuse, includes optional phone_number
 export interface SelectOption {
-  id: string | number; // Allow number IDs too
+  id: string | number;
   name: string;
+  phone_number?: string | null;
 }
 
 // --- FormInput ---
@@ -53,7 +55,6 @@ export const FormInput: React.FC<InputProps> = ({
 }) => (
   <div className={`${label ? "space-y-2" : ""}`}>
     {" "}
-    {/* Use space-y-2 */}
     {label && (
       <label
         htmlFor={name}
@@ -76,7 +77,7 @@ export const FormInput: React.FC<InputProps> = ({
       max={max?.toString()}
       required={required}
       className={clsx(
-        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm", // Standard input style
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
         "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
       )}
@@ -104,7 +105,6 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
 }) => (
   <div className={`${label ? "space-y-2" : ""}`}>
     {" "}
-    {/* Use space-y-2 */}
     <div className="flex items-center justify-between">
       {label && (
         <label
@@ -128,7 +128,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
       placeholder={placeholder}
       required={required}
       className={clsx(
-        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm", // Standard input style
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
         "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
       )}
@@ -136,24 +136,29 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   </div>
 );
 
-// --- FormListbox (Updated Comparison logic) ---
+// --- FormListbox ---
 interface ListboxProps {
   name: string;
   label: string;
-  value: string | number | undefined; // The actual ID/value being stored in state
-  onChange: (value: string) => void; // Should receive the ID/value back (as string)
-  options: SelectOption[]; // Array of { id: string | number, name: string }
+  value: string | number | undefined;
+  onChange: (value: string) => void;
+  options: SelectOption[];
   disabled?: boolean;
   required?: boolean;
   placeholder?: string;
   optionsPosition?: "top" | "bottom";
-  className?: string; // Optional className for additional styling
+  className?: string;
+  renderOption?: (
+    option: SelectOption,
+    selected: boolean,
+    active: boolean
+  ) => React.ReactElement;
 }
 
 export const FormListbox: React.FC<ListboxProps> = ({
   name,
   label,
-  value, // This is the ID (e.g., 'male', 1, '1')
+  value,
   onChange,
   options,
   disabled = false,
@@ -161,18 +166,13 @@ export const FormListbox: React.FC<ListboxProps> = ({
   placeholder = "Select...",
   optionsPosition = "bottom",
   className = "",
+  renderOption,
 }) => {
-  // Find the option object that matches the current value (ID), comparing as strings
-  const valueAsString = value?.toString() ?? ""; // Ensure value is a string for comparison
+  const valueAsString = value?.toString() ?? "";
   const selectedOption = options.find(
     (option) => option.id.toString() === valueAsString
   );
-  // Display name if found, otherwise show placeholder or the raw value if options might still be loading
-  const displayValue = selectedOption
-    ? selectedOption.name
-    : valueAsString && options.length > 0
-    ? `Invalid (${valueAsString})`
-    : placeholder; // Only show invalid if options ARE loaded
+  const displayValue = selectedOption?.name ?? placeholder;
 
   return (
     <div className={`${label ? "space-y-2" : ""} ${className}`}>
@@ -184,7 +184,6 @@ export const FormListbox: React.FC<ListboxProps> = ({
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
-      {/* Pass valueAsString to Listbox value prop */}
       <Listbox
         value={valueAsString}
         onChange={onChange}
@@ -200,6 +199,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
               disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
             )}
           >
+            {/* Allow custom rendering for the button display value too if needed, using selectedOption */}
             <span className="block truncate">{displayValue}</span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
@@ -221,41 +221,37 @@ export const FormListbox: React.FC<ListboxProps> = ({
                 optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
               )}
             >
-              {/* Optional Placeholder - might be useful if !required */}
-              {/* {!required && placeholder && (
-                 <ListboxOption value="" className="text-gray-500 italic py-2 pl-3 pr-10" disabled>
-                   {placeholder}
-                 </ListboxOption>
-               )} */}
               {options.map((option) => (
                 <ListboxOption
                   key={option.id}
                   className={({ active }) =>
-                    `relative cursor-default select-none py-2 pl-3 pr-10 ${
+                    clsx(
+                      "relative cursor-default select-none py-2 pl-3 pr-10",
                       active ? "bg-sky-100 text-sky-900" : "text-gray-900"
-                    }`
+                    )
                   }
-                  // Pass back the ID as a string
                   value={option.id.toString()}
                 >
-                  {(
-                    { selected } // selected is determined by Listbox comparing its value with option value
-                  ) => (
-                    <>
-                      <span
-                        className={`block truncate ${
-                          selected ? "font-medium" : "font-normal"
-                        }`}
-                      >
-                        {option.name}
-                      </span>
-                      {selected ? (
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                          <IconCheck size={20} aria-hidden="true" />
+                  {({ selected, active }) =>
+                    renderOption ? (
+                      renderOption(option, selected, active)
+                    ) : (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          {option.name}
                         </span>
-                      ) : null}
-                    </>
-                  )}
+                        {selected ? (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                            <IconCheck size={20} aria-hidden="true" />
+                          </span>
+                        ) : null}
+                      </>
+                    )
+                  }
                 </ListboxOption>
               ))}
             </ListboxOptions>
@@ -266,32 +262,57 @@ export const FormListbox: React.FC<ListboxProps> = ({
   );
 };
 
-// --- FormCombobox (Updated string conversion) ---
+// --- FormCombobox (Supports single/multiple modes) ---
 interface ComboboxProps {
   name: string;
   label: string;
-  value: string[]; // Keep as string array for multi-select IDs
-  onChange: (value: string[] | null) => void;
+  value: string | string[] | undefined; // Accept single string, array, or undefined
+  onChange: (value: string | string[] | null) => void; // Return type matches mode
   options: SelectOption[];
   query: string;
   setQuery: React.Dispatch<React.SetStateAction<string>>;
+  mode?: "single" | "multiple"; // Added mode prop
   disabled?: boolean;
   required?: boolean;
   placeholder?: string;
+  optionsPosition?: "top" | "bottom";
 }
 
 export const FormCombobox: React.FC<ComboboxProps> = ({
   name,
   label,
-  value, // Array of string IDs
+  value,
   onChange,
   options,
   query,
   setQuery,
+  mode = "multiple", // Default to multiple for backward compatibility
   disabled = false,
   required = false,
   placeholder = "Search...",
+  optionsPosition = "bottom",
 }) => {
+  const isMultiple = mode === "multiple";
+
+  // Normalize value for internal Headless UI state
+  // For single mode, Headless UI expects the selected object or null/undefined
+  // For multiple mode, it expects an array of selected objects
+  // We'll manage the value internally as the selected *option object(s)* for Headless UI
+  // and convert back to ID(s) in onChange.
+
+  // Find selected option(s) based on incoming ID(s)
+  const selectedOptions = React.useMemo(() => {
+    if (isMultiple) {
+      const valuesArray = Array.isArray(value)
+        ? value.map((v) => v?.toString())
+        : [];
+      return options.filter((opt) => valuesArray.includes(opt.id.toString()));
+    } else {
+      const stringValue = value?.toString();
+      return options.find((opt) => opt.id.toString() === stringValue) ?? null;
+    }
+  }, [value, options, isMultiple]);
+
   const filteredOptions =
     query === ""
       ? options
@@ -302,13 +323,41 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             .includes(query.toLowerCase().replace(/\s+/g, ""))
         );
 
-  // Display function remains the same, relies on string ID matching
-  const getDisplayValue = (selectedIds: string[]) => {
-    if (!selectedIds || selectedIds.length === 0) return "";
-    return selectedIds
-      .map((id) => options.find((opt) => opt.id.toString() === id)?.name) // Compare as string
-      .filter(Boolean)
-      .join(", ");
+  // Handle change from Headless UI, converting option object(s) back to ID(s)
+  const handleChange = (selected: SelectOption | SelectOption[] | null) => {
+    if (isMultiple) {
+      // `selected` will be SelectOption[]
+      const selectedIds = Array.isArray(selected)
+        ? selected.map((opt) => opt.id.toString())
+        : [];
+      onChange(selectedIds.length > 0 ? selectedIds : null);
+    } else {
+      // `selected` will be SelectOption or null
+      const selectedId =
+        selected && "id" in selected ? selected.id.toString() : null;
+      onChange(selectedId);
+    }
+  };
+
+  // Display function for the input field
+  const getDisplayValue = (
+    selected: SelectOption | SelectOption[] | null
+  ): string => {
+    if (isMultiple) {
+      // For multiple, show comma-separated names
+      const items = Array.isArray(selected) ? selected : [];
+      return items.map((opt) => opt.name).join(", ");
+    } else {
+      // For single, show name and potentially phone number
+      const item = selected as SelectOption | null; // Cast for single mode
+      if (!item) return "";
+      let display = item.name;
+      // Append phone number if available and different from name
+      if (item.phone_number && item.phone_number !== item.name) {
+        display += ` (${item.phone_number})`;
+      }
+      return display;
+    }
   };
 
   return (
@@ -321,33 +370,36 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
-      {/* Ensure Combobox value is array of strings */}
+      {/* Conditionally set 'multiple' prop */}
       <Combobox
-        multiple
-        value={value.map((v) => v?.toString() ?? "")}
-        onChange={onChange}
+        value={selectedOptions} // Pass selected option object(s)
+        onChange={handleChange} // Use internal handler
         disabled={disabled}
         name={name}
+        multiple={isMultiple} // Set based on mode
+        nullable={!isMultiple} // Allow null selection in single mode
       >
         <div className="relative">
+          {/* Input area */}
           <div
             className={clsx(
               "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
-              "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500", // Focus ring on wrapper
+              "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500",
               disabled ? "bg-gray-50" : ""
             )}
           >
             <ComboboxInput
-              as="input" // Explicitly render as input
-              id={`${name}-input`}
+              // Render as input for typing/searching
               className={clsx(
-                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0", // Remove input border/ring
+                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0",
                 disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
               )}
+              // displayValue tells Headless UI how to render the selected item(s) in the input
               displayValue={getDisplayValue}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={placeholder}
               disabled={disabled}
+              id={`${name}-input`}
             />
             <HeadlessComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
@@ -357,6 +409,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
               />
             </HeadlessComboboxButton>
           </div>
+          {/* Options dropdown */}
           <Transition
             as={Fragment}
             leave="transition ease-in duration-100"
@@ -364,7 +417,12 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             leaveTo="opacity-0"
             afterLeave={() => setQuery("")}
           >
-            <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+            <ComboboxOptions
+              className={clsx(
+                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+              )}
+            >
               {filteredOptions.length === 0 && query !== "" ? (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
                   Nothing found.
@@ -374,27 +432,51 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                   <ComboboxOption
                     key={option.id}
                     className={({ active }) =>
-                      `relative cursor-default select-none py-2 pl-3 pr-10 ${
+                      clsx(
+                        "relative cursor-default select-none py-2 pl-3 pr-10",
                         active ? "bg-sky-100 text-sky-900" : "text-gray-900"
-                      }`
+                      )
                     }
-                    // Value passed back should be string ID
-                    value={option.id.toString()}
+                    value={option} // Pass the whole option object as value
                   >
-                    {({ selected, active }) => (
+                    {/* Use render prop `active` which indicates focus/hover */}
+                    {(
+                      { active, selected } // `selected` indicates if the option matches the Combobox's value
+                    ) => (
                       <>
-                        <span
-                          className={`block truncate ${
-                            selected ? "font-medium" : "font-normal"
-                          }`}
-                        >
-                          {option.name}
-                        </span>
+                        <div className="flex justify-between items-center w-full mr-5">
+                          {/* Name */}
+                          <span
+                            className={clsx(
+                              "block truncate",
+                              selected ? "font-medium" : "font-normal"
+                            )}
+                          >
+                            {option.name}
+                          </span>
+                          {/* Phone number (conditional) */}
+                          {option.phone_number && (
+                            <span
+                              className={clsx(
+                                "text-xs ml-2 flex-shrink-0 flex items-center",
+                                active ? "text-sky-700" : "text-gray-500"
+                              )}
+                            >
+                              <IconPhone
+                                size={14}
+                                className="inline mr-1 relative -top-[1px]"
+                              />
+                              {option.phone_number}
+                            </span>
+                          )}
+                        </div>
+                        {/* Checkmark */}
                         {selected ? (
                           <span
-                            className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
+                            className={clsx(
+                              "absolute inset-y-0 right-0 flex items-center pr-3",
                               active ? "text-sky-600" : "text-sky-600"
-                            }`}
+                            )}
                           >
                             <IconCheck size={20} aria-hidden="true" />
                           </span>
