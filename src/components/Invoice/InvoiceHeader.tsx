@@ -126,7 +126,10 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
               invoice.id || ""
             }`}
             onChange={(e) => {
-              /* ... */
+              // Extract numeric part (remove the prefix 'C' or 'I')
+              const value = e.target.value;
+              const numericPart = value.substring(1);
+              onInputChange("id", numericPart);
             }}
             disabled={!isNewInvoice || readOnly} // Use readOnly
             placeholder="Enter Invoice Number"

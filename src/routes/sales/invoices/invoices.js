@@ -412,10 +412,11 @@ export default function (pool, config) {
           .json({ message: `Invoice with ID ${invoice.id} already exists` });
       }
 
-      // Initial balance and status
+      // Initial balance and status - Check for CASH type
       const totalPayable = parseFloat(invoice.totalamountpayable || 0);
-      const balance_due = totalPayable;
-      const invoice_status = "Unpaid"; // Default status for new invoices
+      const isCash = invoice.paymenttype === "CASH";
+      const balance_due = isCash ? 0 : totalPayable; // Zero balance for CASH
+      const invoice_status = isCash ? "paid" : "Unpaid"; // "paid" for CASH, "Unpaid" for others
 
       // Insert invoice
       const insertInvoiceQuery = `
@@ -467,6 +468,24 @@ export default function (pool, config) {
             product.issubtotal || false,
           ]);
         }
+      }
+
+      // If it's a CASH invoice, create automatic payment record
+      if (isCash && totalPayable > 0) {
+        const paymentQuery = `
+          INSERT INTO payments (
+            invoice_id, payment_date, amount_paid, payment_method,
+            payment_reference, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6)
+        `;
+        await client.query(paymentQuery, [
+          createdInvoice.id,
+          new Date().toISOString(),
+          totalPayable,
+          "cash", // Default payment method for CASH invoices
+          null,
+          "Automatic payment for CASH invoice",
+        ]);
       }
 
       // Update customer credit if INVOICE type - NO CHANGE HERE
@@ -536,6 +555,11 @@ export default function (pool, config) {
 
       for (const invoice of invoicePayloads) {
         // Transform input (Map mobile fields to NEW schema fields)
+
+        // Check if the invoice is CASH type
+        const isCash = (invoice.paymentType || "INVOICE") === "CASH";
+        const totalPayable = Number(invoice.totalAmountPayable || 0);
+
         const transformedInvoice = {
           id: String(invoice.billNumber),
           salespersonid: invoice.salespersonId,
@@ -546,7 +570,8 @@ export default function (pool, config) {
           tax_amount: 0, // <<< Hardcoded to 0 as per requirement
           rounding: Number(invoice.rounding || 0),
           totalamountpayable: Number(invoice.totalAmountPayable || 0),
-          invoice_status: "active",
+          invoice_status: isCash ? "paid" : "active", // Mark CASH as paid immediately
+          balance_due: isCash ? 0 : totalPayable, // Zero balance for CASH
           // Initialize e-invoice fields as null
           uuid: null,
           submission_uid: null,
@@ -658,6 +683,41 @@ export default function (pool, config) {
                 returnProduct,
               });
             }
+          }
+
+          // If it's a CASH invoice, create automatic payment record
+          if (isCash && totalPayable > 0) {
+            try {
+              const paymentQuery = `
+                INSERT INTO payments (
+                  invoice_id, payment_date, amount_paid, payment_method,
+                  payment_reference, notes
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+              `;
+              await client.query(paymentQuery, [
+                savedInvoice.id,
+                new Date().toISOString(),
+                totalPayable,
+                "cash", // Default payment method for CASH invoices
+                null,
+                "Automatic payment for CASH invoice",
+              ]);
+            } catch (paymentError) {
+              console.error(
+                `Failed to create automatic payment for CASH invoice ${savedInvoice.id}:`,
+                paymentError
+              );
+              // Continue processing - the invoice is still marked as paid even if payment record fails
+            }
+          }
+
+          // Update customer credit if INVOICE type - NO CHANGE HERE
+          if (savedInvoice.paymenttype === "INVOICE") {
+            await updateCustomerCredit(
+              client,
+              savedInvoice.customerid,
+              savedInvoice.totalamountpayable // Add full amount to credit used
+            );
           }
 
           // Prepare data for the subsequent e-invoice step
