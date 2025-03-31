@@ -605,6 +605,7 @@ const CustomerFormPage: React.FC = () => {
                       color="sky"
                       size="sm"
                       className="w-[15%]"
+                      title="Add Location"
                     >
                       Add Location
                     </Button>
