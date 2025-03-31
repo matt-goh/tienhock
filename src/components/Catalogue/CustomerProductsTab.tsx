@@ -264,10 +264,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           {/* <Button onClick={handleAddProduct} icon={IconPlus} variant="outline">Add First Product</Button> */}
         </div>
       ) : (
-        <div
-          className="overflow-x-auto overflow-y-visible"
-          style={{ position: "relative" }}
-        >
+        <div>
           <table className="min-w-full divide-y divide-default-200 border border-default-200 rounded-lg">
             <thead className="bg-default-100">
               <tr>
