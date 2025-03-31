@@ -34,6 +34,9 @@ interface Payment {
   payment_method: string;
   payment_reference?: string;
   internal_reference?: string;
+  status?: "active" | "cancelled";
+  cancellation_date?: string;
+  cancellation_reason?: string;
 }
 
 interface Invoice {
@@ -97,10 +100,10 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: "",
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] =
+  const [isCancelPaymentDialogOpen, setIsCancelPaymentDialogOpen] =
     useState(false);
-  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
-  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
+  const [isCancellingPayment, setIsCancellingPayment] = useState(false);
   const [isDeleteInvoiceDialogOpen, setIsDeleteInvoiceDialogOpen] =
     useState(false);
   const [isDeletingInvoice, setIsDeletingInvoice] = useState(false);
@@ -308,25 +311,37 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handleDeletePayment = async () => {
-    if (!paymentToDelete || !invoice) return;
+  const handleCancelPayment = async () => {
+    if (!paymentToCancel || !invoice) return;
 
-    setIsDeletingPayment(true);
+    setIsCancellingPayment(true);
     try {
-      await greenTargetApi.deletePayment(paymentToDelete.payment_id);
+      // Call the new cancelPayment method
+      await greenTargetApi.cancelPayment(paymentToCancel.payment_id);
 
-      toast.success("Payment deleted successfully");
+      toast.success("Payment cancelled successfully");
 
       // Refresh the invoice details to update balances
       fetchInvoiceDetails(invoice.invoice_id);
     } catch (error) {
-      console.error("Error deleting payment:", error);
-      toast.error("Failed to delete payment");
+      console.error("Error cancelling payment:", error);
+      toast.error("Failed to cancel payment");
     } finally {
-      setIsDeletingPayment(false);
-      setIsDeletePaymentDialogOpen(false);
-      setPaymentToDelete(null);
+      setIsCancellingPayment(false);
+      setIsCancelPaymentDialogOpen(false);
+      setPaymentToCancel(null);
     }
+  };
+
+  const handleCancelPaymentClick = (payment: Payment) => {
+    // Don't allow cancelling already cancelled payments
+    if (payment.status === "cancelled") {
+      toast.error("This payment is already cancelled");
+      return;
+    }
+
+    setPaymentToCancel(payment);
+    setIsCancelPaymentDialogOpen(true);
   };
 
   const handleSubmitEInvoice = async () => {
@@ -1050,27 +1065,46 @@ const InvoiceDetailsPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-default-200">
                   {payments.map((payment) => (
-                    <tr key={payment.payment_id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                    <tr
+                      key={payment.payment_id}
+                      className={`hover:bg-default-50 transition-colors ${
+                        payment.status === "cancelled"
+                          ? "bg-default-50 text-default-400"
+                          : ""
+                      }`}
+                      title={
+                        payment.status === "cancelled"
+                          ? `Payment cancelled on ${
+                              payment.cancellation_date
+                                ? formatDate(payment.cancellation_date)
+                                : "unknown date"
+                            }`
+                          : "Paid"
+                      }
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {formatDate(payment.payment_date)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                          payment.status === "cancelled"
+                            ? "text-default-400 line-through"
+                            : "text-green-600"
+                        }`}
+                      >
                         {formatCurrency(
                           parseFloat(payment.amount_paid.toString())
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
-                        {payment.payment_method === "cash" && "Cash"}
-                        {payment.payment_method === "cheque" && "Cheque"}
-                        {payment.payment_method === "bank_transfer" &&
-                          "Bank Transfer"}
-                        {payment.payment_method === "online" &&
-                          "Online Payment"}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-default-700 capitalize">
+                          {payment.payment_method.replace("_", " ")}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600 font-mono">
                         {payment.payment_reference || "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
                         {payment.internal_reference || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -1080,13 +1114,25 @@ const InvoiceDetailsPage: React.FC = () => {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPaymentToDelete(payment);
-                            setIsDeletePaymentDialogOpen(true);
+                            handleCancelPaymentClick(payment);
                           }}
-                          icon={IconTrash} // Add icon for consistency
-                          className="px-2" // Adjust padding if needed
+                          disabled={payment.status === "cancelled"}
+                          title={
+                            payment.status === "cancelled"
+                              ? `Payment cancelled on ${
+                                  payment.cancellation_date
+                                    ? formatDate(payment.cancellation_date)
+                                    : "unknown date"
+                                }`
+                              : "Cancel Payment"
+                          }
+                          className="px-2"
                         >
-                          Delete
+                          {payment.status === "cancelled" ? (
+                            <span className="text-xs italic">Cancelled</span>
+                          ) : (
+                            <IconTrash size={16} />
+                          )}
                         </Button>
                       </td>
                     </tr>
@@ -1098,16 +1144,18 @@ const InvoiceDetailsPage: React.FC = () => {
         )}
       </div>
       <ConfirmationDialog
-        isOpen={isDeletePaymentDialogOpen}
-        onClose={() => setIsDeletePaymentDialogOpen(false)}
-        onConfirm={handleDeletePayment}
-        title="Delete Payment"
-        message={`Are you sure you want to delete this payment of ${
-          paymentToDelete
-            ? formatCurrency(parseFloat(paymentToDelete.amount_paid.toString()))
+        isOpen={isCancelPaymentDialogOpen}
+        onClose={() => setIsCancelPaymentDialogOpen(false)}
+        onConfirm={handleCancelPayment}
+        title="Cancel Payment"
+        message={`Are you sure you want to cancel this payment of ${
+          paymentToCancel
+            ? formatCurrency(parseFloat(paymentToCancel.amount_paid.toString()))
             : ""
-        }? This will affect the invoice balance.`}
-        confirmButtonText={isDeletingPayment ? "Deleting..." : "Delete"}
+        }? This will increase the invoice balance.`}
+        confirmButtonText={
+          isCancellingPayment ? "Cancelling..." : "Cancel Payment"
+        }
         variant="danger"
       />
       <ConfirmationDialog
