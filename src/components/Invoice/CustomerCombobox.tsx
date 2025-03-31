@@ -84,7 +84,7 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
         htmlFor={`${name}-input`}
         className="block text-sm font-medium text-default-700"
       >
-        {label} <span className="text-red-500">*</span>
+        {label}
       </label>
       {/* The Combobox 'value' prop now correctly matches 'selectedOption' type */}
       <Combobox
