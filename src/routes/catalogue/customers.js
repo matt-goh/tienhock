@@ -319,6 +319,89 @@ export default function (pool) {
     }
   });
 
+  // Get customer details AND their custom products for the form page
+  router.get("/:id/details", async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN"); // Start transaction
+
+      // Fetch customer details
+      const customerQuery = "SELECT * FROM customers WHERE id = $1";
+      const customerResult = await client.query(customerQuery, [id]);
+
+      if (customerResult.rows.length === 0) {
+        await client.query("ROLLBACK"); // Rollback if customer not found
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const customerData = customerResult.rows[0];
+
+      // Convert money-related fields in customer data to numbers
+      const formattedCustomerData = {
+        ...customerData,
+        credit_used:
+          customerData.credit_used !== null
+            ? Number(customerData.credit_used)
+            : null,
+        credit_limit:
+          customerData.credit_limit !== null
+            ? Number(customerData.credit_limit)
+            : null,
+        // Ensure empty strings are handled if needed, though SELECT * usually returns null
+        tin_number: customerData.tin_number || "",
+        phone_number: customerData.phone_number || "",
+        email: customerData.email || "",
+        address: customerData.address || "",
+        city: customerData.city || "KOTA KINABALU", // Default if needed
+        state: customerData.state || "12", // Default if needed
+        id_number: customerData.id_number || "",
+        id_type: customerData.id_type || "",
+      };
+
+      // Fetch associated custom products
+      const productsQuery = `
+      SELECT 
+        cp.id, 
+        cp.customer_id, 
+        cp.product_id, 
+        cp.custom_price, 
+        cp.is_available,
+        p.description -- Get product description too
+      FROM customer_products cp
+      JOIN products p ON cp.product_id = p.id
+      WHERE cp.customer_id = $1
+      ORDER BY p.description -- Or however you want to sort them
+    `;
+      const productsResult = await client.query(productsQuery, [id]);
+
+      // Convert custom_price to a number for products
+      const customProducts = productsResult.rows.map((cp) => ({
+        ...cp,
+        custom_price: cp.custom_price !== null ? Number(cp.custom_price) : 0, // Default to 0 or handle as needed
+        is_available: cp.is_available !== undefined ? cp.is_available : true, // Default to true
+      }));
+
+      await client.query("COMMIT"); // Commit transaction
+
+      // Combine results
+      res.json({
+        customer: formattedCustomerData,
+        customProducts: customProducts,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK"); // Rollback on any error
+      console.error("Error fetching customer details and products:", error);
+      res.status(500).json({
+        message: "Error fetching customer details and products",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // Get customer by ID
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
