@@ -724,7 +724,7 @@ const InvoiceListPage: React.FC = () => {
           </span>
         ) : (
           <span className="text-default-500 text-sm">
-            Select invoices to perform batch actions
+            Select invoices to perform actions
           </span>
         )}
 

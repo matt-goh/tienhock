@@ -422,9 +422,9 @@ const InvoiceDetailsPage: React.FC = () => {
           </button>
           <h1 className="text-2xl font-bold text-default-900 flex items-center">
             <IconFileInvoice size={28} className="mr-2 text-default-600" />
-            Invoice{" "}
+            Invoice
             <span
-              className="truncate max-w-[150px] md:max-w-[300px] inline-block"
+              className="pl-1.5 truncate max-w-[150px] md:max-w-[300px] inline-block"
               title={invoice.invoice_number}
             >
               {invoice.invoice_number}
@@ -747,7 +747,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     : "bg-green-100 text-green-800"
                 }`}
               >
-                {invoice.current_balance > 0 ? "Outstanding" : "Paid"}
+                {invoice.current_balance > 0 ? "Unpaid" : "Paid"}
               </span>
             </div>
             <div className="text-right">
