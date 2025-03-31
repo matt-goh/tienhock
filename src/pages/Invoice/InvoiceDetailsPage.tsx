@@ -12,7 +12,7 @@ import {
   getPaymentsForInvoice,
   cancelInvoice,
   createPayment,
-  deletePayment,
+  cancelPayment,
 } from "../../utils/invoice/InvoiceUtils";
 import {
   parseDatabaseTimestamp,
@@ -158,10 +158,10 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: undefined, // Not managed by frontend
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [showDeletePaymentConfirm, setShowDeletePaymentConfirm] =
-    useState(false);
-  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
-  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [showCancelPaymentConfirm, setShowCancelPaymentConfirm] =
+    useState(false); // Rename from showDeletePaymentConfirm
+  const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null); // Rename from paymentToDelete
+  const [isCancellingPayment, setIsCancellingPayment] = useState(false); // Rename from isDeletingPayment
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -177,7 +177,7 @@ const InvoiceDetailsPage: React.FC = () => {
       // Fetch concurrently
       const [invoiceRes, paymentsRes] = await Promise.allSettled([
         getInvoiceById(invoiceId),
-        getPaymentsForInvoice(invoiceId),
+        getPaymentsForInvoice(invoiceId, true),
       ]);
 
       // Process Invoice Response
@@ -350,32 +350,40 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   // --- Delete Payment Handling ---
-  const handleDeletePaymentClick = (payment: Payment) => {
-    // Prevent deletion if invoice is cancelled
+  const handleCancelPaymentClick = (payment: Payment) => {
+    // Rename from handleDeletePaymentClick
+    // Prevent cancellation if invoice is cancelled
     if (invoiceData?.invoice_status === "cancelled") {
-      toast.error("Cannot delete payment for a cancelled invoice.");
+      toast.error("Cannot cancel payment for a cancelled invoice.");
       return;
     }
-    setPaymentToDelete(payment);
-    setShowDeletePaymentConfirm(true);
+
+    // Also prevent cancellation if payment is already cancelled
+    if (payment.status === "cancelled") {
+      toast.error("This payment is already cancelled.");
+      return;
+    }
+
+    setPaymentToCancel(payment);
+    setShowCancelPaymentConfirm(true);
   };
 
-  const handleConfirmDeletePayment = async () => {
-    if (!paymentToDelete || isDeletingPayment) return;
+  const handleConfirmCancelPayment = async () => {
+    if (!paymentToCancel || isCancellingPayment) return;
 
-    setIsDeletingPayment(true);
-    setShowDeletePaymentConfirm(false);
-    const toastId = toast.loading("Deleting payment...");
+    setIsCancellingPayment(true);
+    setShowCancelPaymentConfirm(false);
+    const toastId = toast.loading("Cancelling payment...");
 
     try {
-      await deletePayment(paymentToDelete.payment_id);
-      toast.success("Payment deleted successfully.", { id: toastId });
+      await cancelPayment(paymentToCancel.payment_id);
+      toast.success("Payment cancelled successfully.", { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
     } catch (error) {
-      toast.error("Failed to delete payment.", { id: toastId });
+      toast.error("Failed to cancel payment.", { id: toastId });
     } finally {
-      setIsDeletingPayment(false);
-      setPaymentToDelete(null);
+      setIsCancellingPayment(false);
+      setPaymentToCancel(null);
     }
   };
 
@@ -826,7 +834,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   {payments.map((p) => (
                     <tr
                       key={p.payment_id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className={`hover:bg-gray-50 transition-colors ${
+                        p.status === "cancelled"
+                          ? "bg-gray-50 text-gray-400 line-through"
+                          : ""
+                      }`}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         {formatDisplayDate(new Date(p.payment_date))}
@@ -850,16 +862,27 @@ const InvoiceDetailsPage: React.FC = () => {
                           size="sm"
                           variant="outline"
                           color="rose"
-                          onClick={() => handleDeletePaymentClick(p)}
-                          disabled={isDeletingPayment || isCancelled}
+                          onClick={() => handleCancelPaymentClick(p)}
+                          disabled={
+                            isCancellingPayment ||
+                            isCancelled ||
+                            p.status === "cancelled"
+                          }
                           title={
                             isCancelled
-                              ? "Cannot delete payment for cancelled invoice"
-                              : "Delete Payment"
+                              ? "Cannot cancel payment for cancelled invoice"
+                              : p.status === "cancelled"
+                              ? "Payment already cancelled"
+                              : "Cancel Payment"
                           }
                           className="ml-auto"
                         >
-                          <IconTrash size={16} />
+                          {p.status === "cancelled" ? (
+                            // Show a disabled 'Cancelled' indicator if the payment is already cancelled
+                            <span className="text-xs italic">Cancelled</span>
+                          ) : (
+                            <IconTrash size={16} />
+                          )}
                         </Button>
                       </td>
                     </tr>
@@ -882,14 +905,16 @@ const InvoiceDetailsPage: React.FC = () => {
         variant="danger"
       />
       <ConfirmationDialog
-        isOpen={showDeletePaymentConfirm}
-        onClose={() => setShowDeletePaymentConfirm(false)}
-        onConfirm={handleConfirmDeletePayment}
-        title="Delete Payment"
-        message={`Are you sure you want to delete this payment of ${formatCurrency(
-          paymentToDelete?.amount_paid
+        isOpen={showCancelPaymentConfirm}
+        onClose={() => setShowCancelPaymentConfirm(false)}
+        onConfirm={handleConfirmCancelPayment}
+        title="Cancel Payment"
+        message={`Are you sure you want to cancel this payment of ${formatCurrency(
+          paymentToCancel?.amount_paid
         )}? This will increase the invoice balance due.`}
-        confirmButtonText={isDeletingPayment ? "Deleting..." : "Delete Payment"}
+        confirmButtonText={
+          isCancellingPayment ? "Cancelling..." : "Cancel Payment"
+        }
         variant="danger"
       />
     </div>

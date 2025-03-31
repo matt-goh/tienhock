@@ -28,18 +28,15 @@ export default function (pool) {
   // --- GET /api/payments (Get Payments) ---
   // Added filtering by invoice_id
   router.get("/", async (req, res) => {
-    const { invoice_id } = req.query; // Filter parameter
+    const { invoice_id, include_cancelled } = req.query; // Add new parameter
 
     try {
       let query = `
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
           p.payment_method, p.payment_reference, p.internal_reference,
-          p.notes, p.created_at
-          -- Optionally join other tables if needed, but keep it simple for now
-          -- , i.id as invoice_number -- Example join
+          p.notes, p.created_at, p.status, p.cancellation_date
         FROM payments p
-        -- LEFT JOIN invoices i ON p.invoice_id = i.id -- Example join
         WHERE 1=1
       `;
       const queryParams = [];
@@ -50,7 +47,12 @@ export default function (pool) {
         query += ` AND p.invoice_id = $${paramCounter++}`;
       }
 
-      query += " ORDER BY p.payment_date DESC, p.created_at DESC"; // Order by date, then creation time
+      // Only include active payments by default
+      if (include_cancelled !== "true") {
+        query += ` AND (p.status IS NULL OR p.status = 'active')`;
+      }
+
+      query += " ORDER BY p.payment_date DESC, p.created_at DESC";
 
       const result = await pool.query(query, queryParams);
 
@@ -89,11 +91,9 @@ export default function (pool) {
       });
     }
     if (isNaN(parseFloat(amount_paid)) || parseFloat(amount_paid) <= 0) {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid payment amount. Must be a positive number.",
-        });
+      return res.status(400).json({
+        message: "Invalid payment amount. Must be a positive number.",
+      });
     }
 
     const client = await pool.connect();
@@ -198,9 +198,10 @@ export default function (pool) {
     }
   });
 
-  // --- DELETE /api/payments/:payment_id (Delete Payment) ---
-  router.delete("/:payment_id", async (req, res) => {
+  // --- PUT /api/payments/:payment_id/cancel (Cancel Payment) ---
+  router.put("/:payment_id/cancel", async (req, res) => {
     const { payment_id } = req.params;
+    const { reason } = req.body; // Optional cancellation reason
     const paymentIdNum = parseInt(payment_id);
 
     if (isNaN(paymentIdNum)) {
@@ -216,12 +217,16 @@ export default function (pool) {
         SELECT p.*, i.customerid, i.paymenttype, i.invoice_status
         FROM payments p
         JOIN invoices i ON p.invoice_id = i.id
-        WHERE p.payment_id = $1 FOR UPDATE OF i -- Lock the associated invoice row
+        WHERE p.payment_id = $1 
+          AND (p.status IS NULL OR p.status = 'active')
+        FOR UPDATE OF i -- Lock the associated invoice row
       `;
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
 
       if (paymentResult.rows.length === 0) {
-        throw new Error(`Payment ${paymentIdNum} not found.`);
+        throw new Error(
+          `Payment ${paymentIdNum} not found or already cancelled.`
+        );
       }
       const payment = paymentResult.rows[0];
       const {
@@ -233,18 +238,27 @@ export default function (pool) {
       } = payment;
       const paidAmount = parseFloat(amount_paid || 0);
 
-      // Optional: Prevent deleting payment if invoice is cancelled?
+      // Optional: Prevent canceling payment if invoice is cancelled?
       if (invoice_status === "cancelled") {
         throw new Error(
-          `Cannot delete payment for a cancelled invoice (${invoice_id}).`
+          `Cannot cancel payment for a cancelled invoice (${invoice_id}).`
         );
       }
 
-      // 2. Delete the payment
-      const deleteQuery =
-        "DELETE FROM payments WHERE payment_id = $1 RETURNING *";
-      const deleteResult = await client.query(deleteQuery, [paymentIdNum]);
-      const deletedPayment = deleteResult.rows[0];
+      // 2. Update payment status to cancelled
+      const updateQuery = `
+        UPDATE payments 
+        SET status = 'cancelled', 
+            cancellation_date = NOW(),
+            cancellation_reason = $1
+        WHERE payment_id = $2
+        RETURNING *
+      `;
+      const updateResult = await client.query(updateQuery, [
+        reason || null,
+        paymentIdNum,
+      ]);
+      const cancelledPayment = updateResult.rows[0];
 
       // 3. Update Invoice balance and status
       // Get current balance *after* locking
@@ -273,32 +287,46 @@ export default function (pool) {
 
       // 4. Update Customer Credit if it was an INVOICE payment
       if (paymenttype === "INVOICE") {
-        await updateCustomerCredit(
-          client,
-          customerid,
-          paidAmount // Add back the amount to credit used
-        );
+        await updateCustomerCredit(client, customerid, paidAmount); // Add back the amount to credit used
       }
 
       await client.query("COMMIT");
 
       res.json({
-        message: "Payment deleted successfully",
+        message: "Payment cancelled successfully",
         // Parse amount back to float
         payment: {
-          ...deletedPayment,
-          amount_paid: parseFloat(deletedPayment.amount_paid || 0),
+          ...cancelledPayment,
+          amount_paid: parseFloat(cancelledPayment.amount_paid || 0),
         },
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error deleting payment:", error);
+      console.error("Error cancelling payment:", error);
       res
         .status(500)
-        .json({ message: "Error deleting payment", error: error.message });
+        .json({ message: "Error cancelling payment", error: error.message });
     } finally {
       client.release();
     }
+  });
+
+  // Keep the DELETE endpoint for backward compatibility but mark as deprecated
+  router.delete("/:payment_id", async (req, res) => {
+    const { payment_id } = req.params;
+
+    // Forward the request to the new cancel endpoint
+    req.method = "PUT";
+    req.url = `/${payment_id}/cancel`;
+
+    // Add deprecation warning header
+    res.setHeader(
+      "X-Deprecated-API",
+      "Use PUT /api/payments/:payment_id/cancel instead"
+    );
+
+    // Pass to the cancel endpoint handler
+    router.handle(req, res);
   });
 
   return router;
