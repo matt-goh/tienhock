@@ -83,8 +83,10 @@ const Layout: React.FC = () => {
       {/* Only show sidebar if authenticated and not on PDF route */}
       {isAuthenticated && !isPDFRoute && (
         <div
-          className="fixed z-50 top-0 left-0 h-screen sidebar-hidden"
-          style={{ width: isVisible ? "254px" : "6rem" }}
+          className={`fixed z-50 top-0 left-0 h-screen sidebar-hidden ${
+            isMobile ? "w-0 overflow-hidden" : ""
+          }`}
+          style={{ width: isMobile ? 0 : isVisible ? "254px" : "6rem" }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -100,8 +102,12 @@ const Layout: React.FC = () => {
         className={`
     flex justify-center w-full transition-all duration-300 ease-in-out
     ${!isPDFRoute && location.pathname !== "/login" ? "mt-[84px]" : ""} 
-    ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
-  `}
+    ${
+      isAuthenticated && isVisible && !isPDFRoute && !isMobile
+        ? "ml-[254px]"
+        : ""
+    }
+    `}
       >
         <Routes>
           {/* Login route */}
