@@ -48,7 +48,7 @@ const LOCATION_MAP: { [key: string]: string } = {
   "21": "COMM-FORKLIFT/CASE",
   "22": "KILANG HABUK",
   "23": "CUTI TAHUNAN",
-  "24": "SPECIAL OT"
+  "24": "SPECIAL OT",
 };
 
 const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
