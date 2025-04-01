@@ -264,9 +264,10 @@ export default function (pool) {
     }
   });
 
-  // Delete an invoice
-  router.delete("/:invoice_id", async (req, res) => {
+  // Cancel an invoice
+  router.put("/:invoice_id/cancel", async (req, res) => {
     const { invoice_id } = req.params;
+    const { reason } = req.body; // Optional cancellation reason
     const client = await pool.connect();
 
     try {
@@ -274,17 +275,17 @@ export default function (pool) {
 
       // First check if there are any payments for this invoice
       const paymentsCheck = await client.query(
-        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1",
+        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')",
         [invoice_id]
       );
 
       if (parseInt(paymentsCheck.rows[0].count) > 0) {
         throw new Error(
-          "Cannot delete invoice: it has associated payments. Delete the payments first."
+          "Cannot cancel invoice: it has associated payments. Cancel the payments first."
         );
       }
 
-      // Get invoice details before deletion
+      // Get invoice details before cancellation
       const invoiceQuery =
         "SELECT * FROM greentarget.invoices WHERE invoice_id = $1";
       const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
@@ -293,27 +294,61 @@ export default function (pool) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
-      // Delete the invoice
-      const deleteQuery =
-        "DELETE FROM greentarget.invoices WHERE invoice_id = $1 RETURNING *";
-      const deleteResult = await client.query(deleteQuery, [invoice_id]);
+      // Check if already cancelled
+      if (invoiceResult.rows[0].status === "cancelled") {
+        return res
+          .status(400)
+          .json({ message: "Invoice is already cancelled" });
+      }
+
+      // Update the invoice status to cancelled
+      const updateQuery = `
+        UPDATE greentarget.invoices 
+        SET status = 'cancelled', 
+            cancellation_date = CURRENT_TIMESTAMP,
+            cancellation_reason = $1
+        WHERE invoice_id = $2
+        RETURNING *
+      `;
+      const updateResult = await client.query(updateQuery, [
+        reason || null,
+        invoice_id,
+      ]);
 
       await client.query("COMMIT");
 
       res.json({
-        message: "Invoice deleted successfully",
-        invoice: deleteResult.rows[0],
+        message: "Invoice cancelled successfully",
+        invoice: updateResult.rows[0],
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error deleting Green Target invoice:", error);
+      console.error("Error cancelling Green Target invoice:", error);
       res.status(500).json({
-        message: error.message || "Error deleting invoice",
+        message: error.message || "Error cancelling invoice",
         error: error.message,
       });
     } finally {
       client.release();
     }
+  });
+
+  // Replace the DELETE endpoint with a redirect to the cancel endpoint
+  router.delete("/:invoice_id", async (req, res) => {
+    const { invoice_id } = req.params;
+
+    // Forward to the cancel endpoint
+    req.method = "PUT";
+    req.url = `/${invoice_id}/cancel`;
+
+    // Add deprecation warning header
+    res.setHeader(
+      "X-Deprecated-API",
+      "Use PUT /greentarget/api/invoices/:invoice_id/cancel instead"
+    );
+
+    // Pass the request to the cancel handler
+    router.handle(req, res);
   });
 
   return router;

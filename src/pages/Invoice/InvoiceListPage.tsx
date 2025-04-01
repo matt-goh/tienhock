@@ -424,7 +424,7 @@ const InvoiceListPage: React.FC = () => {
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (must be Active, non-Cash, not already submitted).",
+        "No selected invoices are eligible for e-invoice submission (must be Active and not already submitted).",
         { duration: 5000 }
       );
       return;
