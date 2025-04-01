@@ -673,13 +673,16 @@ const InvoiceDetailsPage: React.FC = () => {
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Date / Time
               </span>
-              <span className="text-gray-900 font-medium">
-                {formatDisplayDate(createdDate)}{" "}
+              <span className="flex text-gray-900 font-medium gap-2">
+                <span>{formatDisplayDate(createdDate)}</span>
                 <span className="text-gray-600">
-                  {
-                    parseDatabaseTimestamp(invoiceData.createddate)
-                      .formattedTime
-                  }
+                  {parseDatabaseTimestamp(
+                    invoiceData.createddate
+                  ).date?.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  }) || ""}
                 </span>
               </span>
             </div>

@@ -54,11 +54,12 @@ interface Invoice {
   statement_period_start?: string;
   statement_period_end?: string;
   einvoice_status?: "submitted" | "pending" | null;
+  status: "paid" | "unpaid" | "cancelled";
 }
 
 interface InvoiceCardProps {
   invoice: Invoice;
-  onDeleteClick: (invoice: Invoice) => void;
+  onCancelClick: (invoice: Invoice) => void;
   onSubmitEInvoiceClick: (invoice: Invoice) => void;
 }
 
@@ -66,7 +67,7 @@ const STORAGE_KEY = "greentarget_invoice_filters";
 
 const InvoiceCard = ({
   invoice,
-  onDeleteClick,
+  onCancelClick,
   onSubmitEInvoiceClick,
 }: InvoiceCardProps) => {
   const navigate = useNavigate();
@@ -76,10 +77,10 @@ const InvoiceCard = ({
     navigate(`/greentarget/invoices/${invoice.invoice_id}`);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
+  const handleCancelClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDeleteClick(invoice);
+    onCancelClick(invoice);
   };
 
   // Format date for display
@@ -102,12 +103,19 @@ const InvoiceCard = ({
   };
 
   const isPaid = invoice.current_balance <= 0;
+  const isCancelled = invoice.status === "cancelled";
 
   return (
     <div
       className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer ${
         isCardHovered ? "shadow-md" : "shadow-sm"
-      } ${isPaid ? "border-green-400" : "border-amber-400"}`}
+      } ${
+        isCancelled
+          ? "border-default-400"
+          : isPaid
+          ? "border-green-400"
+          : "border-amber-400"
+      }`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -115,13 +123,17 @@ const InvoiceCard = ({
       {/* Status banner */}
       <div
         className={`w-full py-1.5 px-4 text-sm font-medium text-white ${
-          isPaid ? "bg-green-500" : "bg-amber-500"
+          isCancelled
+            ? "bg-default-500"
+            : isPaid
+            ? "bg-green-500"
+            : "bg-amber-500"
         }`}
       >
         <div className="flex justify-between items-center">
           <span>{invoice.invoice_number}</span>
           <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
-            {isPaid ? "Paid" : "Unpaid"}
+            {isCancelled ? "Cancelled" : isPaid ? "Paid" : "Unpaid"}
           </span>
         </div>
       </div>
@@ -287,8 +299,13 @@ const InvoiceCard = ({
                   e.stopPropagation();
                   onSubmitEInvoiceClick(invoice);
                 }}
-                className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors"
+                className={`p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors ${
+                  invoice.status === "cancelled"
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
+                }`}
                 title="Submit as e-Invoice"
+                disabled={invoice.status === "cancelled"}
               >
                 <IconFileInvoice size={18} stroke={1.5} />
               </button>
@@ -313,20 +330,38 @@ const InvoiceCard = ({
                   state: { showPaymentForm: true },
                 });
               }}
-              className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-full transition-colors"
+              className={`p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-full transition-colors ${
+                invoice.status === "cancelled"
+                  ? "cursor-not-allowed opacity-50"
+                  : ""
+              }`}
               title="Record Payment"
+              disabled={invoice.status === "cancelled"}
             >
               <IconCash size={18} stroke={1.5} />
             </button>
           )}
 
-          <button
-            onClick={handleDeleteClick}
-            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
-            title="Delete Invoice"
-          >
-            <IconTrash size={18} stroke={1.5} />
-          </button>
+          {/* Only show cancel button if the invoice is not already cancelled */}
+          {!isCancelled && (
+            <button
+              onClick={handleCancelClick}
+              className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+              title="Cancel Invoice"
+            >
+              <IconTrash size={18} stroke={1.5} />
+            </button>
+          )}
+
+          {/* Show cancelled indicator if already cancelled */}
+          {isCancelled && (
+            <div
+              className="p-1.5 bg-default-100 text-default-500 rounded-full cursor-not-allowed"
+              title="Invoice is cancelled"
+            >
+              <IconCheck size={18} stroke={1.5} />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -380,8 +415,8 @@ const InvoiceListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [invoiceToCancel, setInvoiceToCancel] = useState<Invoice | null>(null);
   const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
   const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
   const [processingEInvoice, setProcessingEInvoice] = useState(false);
@@ -471,50 +506,54 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleDeleteClick = (invoice: Invoice) => {
-    setInvoiceToDelete(invoice);
-    setIsDeleteDialogOpen(true);
+  const handleCancelClick = (invoice: Invoice) => {
+    setInvoiceToCancel(invoice);
+    setIsCancelDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (invoiceToDelete) {
+  const handleConfirmCancel = async () => {
+    if (invoiceToCancel) {
       try {
-        // Get the response from the API call
-        const response = await greenTargetApi.deleteInvoice(
-          invoiceToDelete.invoice_id
+        // Use the new cancelInvoice method instead of CancelInvoice
+        const response = await greenTargetApi.cancelInvoice(
+          invoiceToCancel.invoice_id
         );
 
         // Check if the response contains an error message
         if (
           response.error ||
-          (response.message && response.message.includes("Cannot delete"))
+          (response.message && response.message.includes("Cannot cancel"))
         ) {
           // Show error toast with the server's message
           toast.error(
-            response.message || "Cannot delete invoice: unknown error occurred"
+            response.message || "Cannot cancel invoice: unknown error occurred"
           );
         } else {
           // Only show success and update state if there's no error
-          toast.success("Invoice deleted successfully");
+          toast.success("Invoice cancelled successfully");
 
-          // Remove deleted invoice from state
+          // Update the invoice status in the list
           setInvoices(
-            invoices.filter((i) => i.invoice_id !== invoiceToDelete.invoice_id)
+            invoices.map((i) =>
+              i.invoice_id === invoiceToCancel.invoice_id
+                ? { ...i, status: "cancelled" }
+                : i
+            )
           );
         }
       } catch (error: any) {
         // This will catch network errors or other exceptions
         if (error.message && error.message.includes("associated payments")) {
           toast.error(
-            "Cannot delete invoice: it has associated payments. Delete the payments first."
+            "Cannot cancel invoice: it has associated payments. Cancel the payments first."
           );
         } else {
-          toast.error("Failed to delete invoice");
-          console.error("Error deleting invoice:", error);
+          toast.error("Failed to cancel invoice");
+          console.error("Error cancelling invoice:", error);
         }
       } finally {
-        setIsDeleteDialogOpen(false);
-        setInvoiceToDelete(null);
+        setIsCancelDialogOpen(false);
+        setInvoiceToCancel(null);
       }
     }
   };
@@ -835,7 +874,7 @@ const InvoiceListPage: React.FC = () => {
             <InvoiceCard
               key={invoice.invoice_id}
               invoice={invoice}
-              onDeleteClick={handleDeleteClick}
+              onCancelClick={handleCancelClick}
               onSubmitEInvoiceClick={handleSubmitEInvoice}
             />
           ))}
@@ -863,12 +902,12 @@ const InvoiceListPage: React.FC = () => {
       )}
 
       <ConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Invoice"
-        message={`Are you sure you want to delete invoice ${invoiceToDelete?.invoice_number}? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        isOpen={isCancelDialogOpen}
+        onClose={() => setIsCancelDialogOpen(false)}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Invoice"
+        message={`Are you sure you want to cancel invoice ${invoiceToCancel?.invoice_number}? This action cannot be undone.`}
+        confirmButtonText="Cancel Invoice"
         variant="danger"
       />
       <ConfirmationDialog
