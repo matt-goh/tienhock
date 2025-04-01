@@ -529,6 +529,15 @@ const InvoiceDetailsPage: React.FC = () => {
         </h1>
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
+          <Button
+            onClick={handlePrint}
+            icon={IconPrinter}
+            variant="outline"
+            size="md"
+            disabled={isLoading}
+          >
+            Print
+          </Button>
           {!isCancelled && !isPaid && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -541,15 +550,6 @@ const InvoiceDetailsPage: React.FC = () => {
               {showPaymentForm ? "Cancel Payment" : "Record Payment"}
             </Button>
           )}
-          <Button
-            onClick={handlePrint}
-            icon={IconPrinter}
-            variant="outline"
-            size="md"
-            disabled={isLoading}
-          >
-            Print
-          </Button>
           {!isCancelled && (
             <Button
               onClick={handleCancelInvoiceClick}
@@ -894,9 +894,13 @@ const InvoiceDetailsPage: React.FC = () => {
                         >
                           {p.status === "cancelled" ? (
                             // Show a disabled 'Cancelled' indicator if the payment is already cancelled
-                            <span className="text-xs italic">Cancelled</span>
+                            <button className="italic cursor-not-allowed">
+                              Cancelled
+                            </button>
                           ) : (
-                            <IconTrash size={16} />
+                            <button className="flex items-center gap-1">
+                              <IconTrash size={16} /> Delete
+                            </button>
                           )}
                         </Button>
                       </td>

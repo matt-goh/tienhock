@@ -529,6 +529,14 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
               </Button>
             )}
+          <Button
+            onClick={handlePrintInvoice}
+            icon={IconPrinter}
+            variant="outline"
+            className="hidden md:block"
+          >
+            Print
+          </Button>
           {invoice.current_balance > 0 && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -539,14 +547,6 @@ const InvoiceDetailsPage: React.FC = () => {
               {showPaymentForm ? "Cancel" : "Record Payment"}
             </Button>
           )}
-          <Button
-            onClick={handlePrintInvoice}
-            icon={IconPrinter}
-            variant="outline"
-            className="hidden md:block"
-          >
-            Print
-          </Button>
           <Button
             onClick={() => setIsDeleteInvoiceDialogOpen(true)}
             icon={IconTrash}
@@ -1129,9 +1129,13 @@ const InvoiceDetailsPage: React.FC = () => {
                           className="px-2"
                         >
                           {payment.status === "cancelled" ? (
-                            <span className="text-xs italic">Cancelled</span>
+                            <button className="italic cursor-not-allowed">
+                              Cancelled
+                            </button>
                           ) : (
-                            <IconTrash size={16} />
+                            <button className="flex items-center gap-1">
+                              <IconTrash size={16} /> Delete
+                            </button>
                           )}
                         </Button>
                       </td>
