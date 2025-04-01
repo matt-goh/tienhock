@@ -18,7 +18,7 @@ export default function (pool) {
              l.address as location_address,
              l.phone_number as location_phone_number,
              r.driver, 
-             COALESCE(SUM(p.amount_paid), 0) as amount_paid
+             COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END), 0) as amount_paid
       FROM greentarget.invoices i
       JOIN greentarget.customers c ON i.customer_id = c.customer_id
       LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
@@ -97,65 +97,67 @@ export default function (pool) {
     }
   }
 
-  // Get invoice details with payments
+  // Get invoice by ID
   router.get("/:invoice_id", async (req, res) => {
     const { invoice_id } = req.params;
 
     try {
-      // Get invoice details
-      const invoiceQuery = `
-        SELECT i.*, 
-               c.name as customer_name,
-               c.tin_number,
-               c.id_number,
-               r.rental_id,
-               r.tong_no,
-               r.date_placed,
-               r.date_picked,
-               r.driver
-        FROM greentarget.invoices i
-        JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
-        WHERE i.invoice_id = $1
-      `;
+      // Get invoice details with customer, rental, and payment info
+      // Filtering out cancelled payments from the amount_paid calculation
+      const query = `
+      SELECT i.*,
+             c.name as customer_name,
+             c.phone_number as customer_phone_number,
+             c.tin_number,
+             c.id_number,
+             r.rental_id,
+             r.tong_no,
+             r.date_placed,
+             r.date_picked,
+             r.driver,
+             l.address as location_address,
+             l.phone_number as location_phone_number,
+             COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END), 0) as amount_paid
+      FROM greentarget.invoices i
+      JOIN greentarget.customers c ON i.customer_id = c.customer_id
+      LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+      LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
+      LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
+      WHERE i.invoice_id = $1
+      GROUP BY i.invoice_id, c.name, c.phone_number, c.tin_number, c.id_number, 
+               r.rental_id, r.tong_no, r.date_placed, r.date_picked, r.driver,
+               l.address, l.phone_number
+    `;
 
-      const invoiceResult = await pool.query(invoiceQuery, [invoice_id]);
+      const result = await pool.query(query, [invoice_id]);
 
-      if (invoiceResult.rows.length === 0) {
+      if (result.rows.length === 0) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
-      const invoice = invoiceResult.rows[0];
-
-      // Get payments for this invoice
+      // Get payments for this invoice (include status information)
       const paymentsQuery = `
-        SELECT * FROM greentarget.payments
-        WHERE invoice_id = $1
-        ORDER BY payment_date
-      `;
+      SELECT *
+      FROM greentarget.payments
+      WHERE invoice_id = $1
+      ORDER BY payment_date DESC, payment_id DESC
+    `;
 
       const paymentsResult = await pool.query(paymentsQuery, [invoice_id]);
 
-      // Calculate amount paid and current balance
-      const amountPaid = paymentsResult.rows.reduce(
-        (sum, payment) => sum + parseFloat(payment.amount_paid),
-        0
-      );
-
-      const currentBalance = parseFloat(invoice.total_amount) - amountPaid;
+      // Calculate current balance as total_amount minus active payments
+      const invoice = result.rows[0];
+      invoice.current_balance =
+        parseFloat(invoice.total_amount) - parseFloat(invoice.amount_paid);
 
       res.json({
-        invoice: {
-          ...invoice,
-          amount_paid: amountPaid,
-          current_balance: currentBalance,
-        },
+        invoice: invoice,
         payments: paymentsResult.rows,
       });
     } catch (error) {
-      console.error("Error fetching invoice details:", error);
+      console.error("Error fetching Green Target invoice:", error);
       res.status(500).json({
-        message: "Error fetching invoice details",
+        message: "Error fetching invoice",
         error: error.message,
       });
     }
