@@ -41,6 +41,7 @@ import { useCustomerNames } from "../../hooks/useCustomerNames";
 // Import the specific utilities needed
 import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
 import PaginationControls from "../../components/Invoice/PaginationControls";
+import FilterSummary from "../../components/Invoice/FilterSummary";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -113,18 +114,18 @@ const InvoiceListPage: React.FC = () => {
     () => ({
       dateRange: getInitialDates(),
       salespersonId: null,
-      applySalespersonFilter: false, // Default to false unless you want it always on
+      applySalespersonFilter: true, // Default to true
       customerId: null,
-      applyCustomerFilter: false,
+      applyCustomerFilter: true, // Default to true
       paymentType: null,
-      applyPaymentTypeFilter: false,
+      applyPaymentTypeFilter: true, // Default to true
       invoiceStatus: [], // Empty array for multi-select
-      applyInvoiceStatusFilter: false,
+      applyInvoiceStatusFilter: true, // Default to true
       eInvoiceStatus: [], // Empty array for multi-select
-      applyEInvoiceStatusFilter: false,
+      applyEInvoiceStatusFilter: true, // Default to true
     }),
     []
-  ); // Calculate initial filters once
+  );
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
 
   // Month Selector State
@@ -149,6 +150,28 @@ const InvoiceListPage: React.FC = () => {
   );
   const { customerNames /*, isLoading: namesLoading */ } =
     useCustomerNames(customerIds);
+  const getFilteredInvoices = useMemo(() => {
+    // Only apply customer filtering if enabled and has values
+    if (
+      filters.applyCustomerFilter &&
+      filters.customerId &&
+      filters.customerId.length > 0
+    ) {
+      return invoices.filter(
+        (invoice) =>
+          filters.customerId?.includes(invoice.customerid) ||
+          // Also check against customer names if needed
+          filters.customerId?.includes(customerNames[invoice.customerid] || "")
+      );
+    }
+    // Otherwise return all invoices from the API
+    return invoices;
+  }, [
+    invoices,
+    filters.applyCustomerFilter,
+    filters.customerId,
+    customerNames,
+  ]);
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -179,6 +202,45 @@ const InvoiceListPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
+        // Convert filters to request params
+        const params: any = {
+          page: pageToFetch,
+          limit: ITEMS_PER_PAGE,
+        };
+
+        // Date range
+        if (
+          filters.applySalespersonFilter &&
+          filters.salespersonId &&
+          filters.salespersonId.length > 0
+        ) {
+          params.salesman = filters.salespersonId.join(",");
+        }
+
+        // Payment type filter
+        if (filters.applyPaymentTypeFilter && filters.paymentType) {
+          params.paymentType = filters.paymentType;
+        }
+
+        // Invoice status filter
+        if (filters.applyInvoiceStatusFilter && filters.invoiceStatus?.length) {
+          params.invoiceStatus = filters.invoiceStatus.join(",");
+        }
+
+        // E-Invoice status filter
+        if (
+          filters.applyEInvoiceStatusFilter &&
+          filters.eInvoiceStatus?.length
+        ) {
+          params.eInvoiceStatus = filters.eInvoiceStatus.join(",");
+        }
+
+        // Search term
+        if (searchTerm.trim()) {
+          params.search = searchTerm;
+        }
+
+        // Call the API with properly formatted parameters
         const response = await getInvoices(
           filters,
           pageToFetch,
@@ -217,6 +279,7 @@ const InvoiceListPage: React.FC = () => {
     (newFilters: Partial<InvoiceFilters>) => {
       setFilters((prev) => {
         const updated = { ...prev, ...newFilters };
+
         // Special handling for date range saving
         if (
           newFilters.dateRange &&
@@ -227,17 +290,78 @@ const InvoiceListPage: React.FC = () => {
             newFilters.dateRange.start,
             newFilters.dateRange.end
           );
-          updated.dateRange = newFilters.dateRange; // Ensure it's updated
         }
+
         return updated;
       });
-      if (currentPage !== 1) setCurrentPage(1); // Reset to page 1
-      else setIsFetchTriggered(true); // If already on page 1, trigger directly
-      // Clear selection on filter change
+
+      // Determine if this is ONLY a customer filter change
+      const isOnlyCustomerFilterChange =
+        (Object.keys(newFilters).length === 1 && "customerId" in newFilters) ||
+        (Object.keys(newFilters).length === 1 &&
+          "applyCustomerFilter" in newFilters);
+
+      // Only skip API fetch if it's ONLY a customer filter change
+      if (!isOnlyCustomerFilterChange) {
+        if (currentPage !== 1) setCurrentPage(1); // Reset to page 1
+        else setIsFetchTriggered(true); // If already on page 1, trigger directly
+      }
+
+      // Clear selection on any filter change
       setSelectedInvoiceIds(new Set());
     },
     [currentPage]
-  ); // Dependency on currentPage to decide reset vs trigger
+  );
+
+  const handleRemoveFilter = (
+    filterKey: keyof InvoiceFilters,
+    specificValue?: string
+  ) => {
+    // Handle removing specific filter values
+    if (specificValue) {
+      const currentValues = filters[filterKey] as string[];
+      if (Array.isArray(currentValues)) {
+        handleFilterChange({
+          [filterKey]: currentValues.filter((val) => val !== specificValue),
+        });
+      }
+      return;
+    }
+
+    // Handle removing entire filter types
+    switch (filterKey) {
+      case "salespersonId":
+        handleFilterChange({
+          salespersonId: null,
+          applySalespersonFilter: false,
+        });
+        break;
+      case "customerId":
+        handleFilterChange({ customerId: null, applyCustomerFilter: false });
+        break;
+      case "paymentType":
+        handleFilterChange({
+          paymentType: null,
+          applyPaymentTypeFilter: false,
+        });
+        break;
+      case "invoiceStatus":
+        handleFilterChange({
+          invoiceStatus: [],
+          applyInvoiceStatusFilter: false,
+        });
+        break;
+      case "eInvoiceStatus":
+        handleFilterChange({
+          eInvoiceStatus: [],
+          applyEInvoiceStatusFilter: false,
+        });
+        break;
+      default:
+        // For any other filter type
+        handleFilterChange({ [filterKey]: null });
+    }
+  };
 
   // Month Change Handler
   const handleMonthChange = useCallback(
@@ -676,14 +800,20 @@ const InvoiceListPage: React.FC = () => {
           <InvoiceFilterMenu
             currentFilters={filters}
             onFilterChange={handleFilterChange}
-            salesmanOptions={salesmen.map((s) => s.name || s.id)}
-            customerOptions={[]} // Populate if filter menu needs customers
-            today={new Date()} // Current date
-            tomorrow={new Date(new Date().setDate(new Date().getDate() + 1))} // Tomorrow's date
+            salesmanOptions={salesmen.map((s) => ({
+              id: s.id,
+              name: s.name || s.id,
+            }))}
+            customerOptions={
+              // Convert customerNames object to an array of {id, name} objects
+              Object.entries(customerNames || {}).map(([id, name]) => ({
+                id,
+                name: name || id, // Fallback to ID if name is missing
+              }))
+            }
           />
         </div>
       </div>
-      {/* <FilterSummary filters={filters} /> */}
 
       {/* --- Batch Action Bar --- */}
       <div
@@ -794,6 +924,8 @@ const InvoiceListPage: React.FC = () => {
         </div>
       </div>
 
+      <FilterSummary filters={filters} onRemoveFilter={handleRemoveFilter} />
+
       {/* --- Invoice Grid --- */}
       <div className="flex-1 min-h-[400px] relative">
         {" "}
@@ -812,13 +944,13 @@ const InvoiceListPage: React.FC = () => {
         )}
         {!isLoading && !error && (
           <InvoiceGrid
-            invoices={invoices}
+            invoices={getFilteredInvoices}
             selectedInvoiceIds={selectedInvoiceIds}
             onSelectInvoice={handleSelectInvoice}
             onViewDetails={handleViewDetails}
             isLoading={false}
             error={null}
-            customerNames={customerNames} // Pass names down
+            customerNames={customerNames}
           />
         )}
       </div>

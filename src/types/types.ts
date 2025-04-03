@@ -455,10 +455,10 @@ export interface InvoiceFilters {
   applyCustomerFilter: boolean;
   paymentType: string | null;
   applyPaymentTypeFilter?: boolean;
-  invoiceStatus: string[] | InvoiceStatus[];
-  applyInvoiceStatusFilter?: boolean;
-  eInvoiceStatus: string[] | EInvoiceStatus[];
-  applyEInvoiceStatusFilter?: boolean;
+  invoiceStatus: string[];
+  applyInvoiceStatusFilter: boolean;
+  eInvoiceStatus: string[];
+  applyEInvoiceStatusFilter: boolean;
 }
 
 export interface CustomerList {
