@@ -870,10 +870,14 @@ const InvoiceListPage: React.FC = () => {
               size="sm"
               variant="outline"
               color="rose"
-              onClick={handleBulkCancel}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBulkCancel();
+              }}
               icon={IconBan}
               disabled={isLoading}
               aria-label="Cancel Selected Invoices"
+              title="Cancel"
             >
               Cancel
             </Button>
@@ -881,30 +885,42 @@ const InvoiceListPage: React.FC = () => {
               size="sm"
               variant="outline"
               color="amber"
-              onClick={handleBulkSubmitEInvoice}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBulkSubmitEInvoice();
+              }}
               icon={IconSend}
               disabled={isLoading}
               aria-label="Submit Selected for E-Invoice"
+              title="Submit e-Invoice"
             >
               Submit e-Invoice
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={handleBulkDownload}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBulkDownload();
+              }}
               icon={IconFileDownload}
               disabled={isLoading}
               aria-label="Download Selected Invoices"
+              title="Download PDF"
             >
               Download
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={handleBulkPrint}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBulkPrint();
+              }}
               icon={IconPrinter}
               disabled={isLoading}
               aria-label="Print Selected Invoices"
+              title="Print PDF"
             >
               Print
             </Button>
@@ -912,7 +928,7 @@ const InvoiceListPage: React.FC = () => {
         )}
       </div>
       {/* --- Invoice Grid Area --- */}
-      <div className="flex-1 min-h-[400px] relative overflow-y-auto">
+      <div className="flex-1 min-h-[400px] relative">
         {" "}
         {/* Allow vertical scroll */}
         {/* Loading Overlay */}
