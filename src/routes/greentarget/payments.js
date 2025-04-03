@@ -114,17 +114,21 @@ export default function (pool) {
         0,
         parseFloat(invoice.balance_due) - parseFloat(amount_paid)
       );
-
-      // Update invoice balance_due and status if balance is 0
+      const currentStatus = invoice.status;
+      
       if (newBalanceDue === 0) {
+        // If fully paid, always set to paid
         await client.query(
           `UPDATE greentarget.invoices SET balance_due = $1, status = 'paid' WHERE invoice_id = $2`,
           [newBalanceDue, invoice_id]
         );
       } else {
+        // If partially paid, maintain overdue status if already overdue
+        const newStatus = currentStatus === "overdue" ? "overdue" : "active";
+
         await client.query(
-          `UPDATE greentarget.invoices SET balance_due = $1 WHERE invoice_id = $2`,
-          [newBalanceDue, invoice_id]
+          `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
+          [newBalanceDue, newStatus, invoice_id]
         );
       }
 
@@ -236,14 +240,24 @@ export default function (pool) {
         throw new Error(`Invoice with ID ${invoice_id} not found`);
       }
 
-      // Calculate the new balance (add the cancelled payment amount back to the balance)
+      // Get both the balance and status
       const currentBalance = parseFloat(invoiceResult.rows[0].balance_due);
+      const currentStatus = invoiceResult.rows[0].status;
       const newBalance = currentBalance + parseFloat(amount_paid);
 
-      // Update the invoice balance
+      // Determine the new status based on balance and current status
+      let newStatus;
+      if (newBalance === 0) {
+        newStatus = "paid";
+      } else {
+        // Maintain overdue status if already overdue
+        newStatus = currentStatus === "overdue" ? "overdue" : "active";
+      }
+
+      // Update both balance and status
       await client.query(
-        "UPDATE greentarget.invoices SET balance_due = $1 WHERE invoice_id = $2",
-        [newBalance, invoice_id]
+        "UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3",
+        [newBalance, newStatus, invoice_id]
       );
 
       await client.query("COMMIT");
