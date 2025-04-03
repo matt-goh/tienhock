@@ -19,6 +19,7 @@ import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { useCustomerData } from "../../hooks/useCustomerData";
 import {
+  checkDuplicateInvoiceNo,
   createInvoice,
   createPayment,
 } from "../../utils/invoice/InvoiceUtils";
@@ -377,62 +378,78 @@ const InvoiceFormPage: React.FC = () => {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
       return;
     }
-    // --- End Validation ---
 
+    // Start saving process with duplicate check
     setIsSaving(true);
-    const toastId = toast.loading("Creating Invoice...");
-
-    const dataToSend = { ...invoiceData };
+    const toastId = toast.loading("Checking invoice number...");
 
     try {
-      // Step 1: Create the invoice
-      const savedInvoice = await createInvoice(dataToSend);
-      const invoiceIdForPayment = savedInvoice.id; // Use ID returned from backend
+      // Check for duplicates
+      const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.id);
+
+      if (isDuplicate) {
+        toast.error(`Invoice ${invoiceData.id} already exists in the system`, {
+          id: toastId,
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Update loading message for invoice creation
+      toast.loading("Creating invoice...", { id: toastId });
+
+      // Create the invoice
+      const savedInvoice = await createInvoice({ ...invoiceData });
+      const invoiceIdForPayment = savedInvoice.id;
 
       // Step 2: If 'Paid' is checked, create the payment
       if (isPaid) {
         toast.loading("Recording payment...", { id: toastId });
         const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
-          invoice_id: invoiceIdForPayment, // Link to the created invoice
-          payment_date: new Date().toISOString(), // Use current date/time for payment
-          amount_paid: savedInvoice.totalamountpayable, // Pay the full amount
+          invoice_id: invoiceIdForPayment,
+          payment_date: new Date().toISOString(),
+          amount_paid: savedInvoice.totalamountpayable,
           payment_method: paymentMethod,
           payment_reference:
             paymentMethod === "cash" || paymentMethod === "online"
               ? undefined
-              : paymentReference || undefined, // Only send if applicable and exists
-          // internal_reference is handled by backend now
+              : paymentReference || undefined,
         };
+
         try {
           await createPayment(paymentData);
           toast.success(`Invoice ${invoiceIdForPayment} created and paid!`, {
             id: toastId,
           });
-        } catch (paymentError) {
-          // If payment fails, invoice is still created but unpaid. Show warning.
+        } catch (paymentError: any) {
           toast.error(
-            `Invoice ${invoiceIdForPayment} created, but payment failed: ${
-              (paymentError as Error).message
-            }`,
+            `Invoice ${invoiceIdForPayment} created, but payment failed: ${paymentError.message}`,
             { id: toastId, duration: 5000 }
           );
-          // Navigate to details page anyway, but it will show as unpaid
         }
       } else {
-        // Invoice created, not marked as paid
         toast.success(`Invoice ${invoiceIdForPayment} created!`, {
           id: toastId,
         });
       }
 
-      // Step 3: Navigate to the NEW details page
+      // Navigate to the details page
       navigate(`/sales/invoice/${invoiceIdForPayment}`, {
         replace: true,
         state: { previousPath: "/sales/invoice" },
       });
     } catch (error: any) {
-      // Error handled in createInvoice utility, toastId will be updated there
-      // Just ensure saving state is reset
+      // Check if this is a duplicate error caught by the server
+      if (error.message && error.message.includes("already exists")) {
+        toast.error(`Invoice ${invoiceData.id} already exists`, {
+          id: toastId,
+        });
+      } else {
+        toast.error(
+          `Error creating invoice: ${error.message || "Unknown error"}`,
+          { id: toastId }
+        );
+      }
     } finally {
       setIsSaving(false);
     }

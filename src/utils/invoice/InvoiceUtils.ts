@@ -275,13 +275,24 @@ export const checkDuplicateInvoiceNo = async (
 ): Promise<boolean> => {
   try {
     if (!invoiceNo) return false; // Don't check empty string
-    const response = await api.get(
-      `/api/invoices/check-duplicate?invoiceNo=${invoiceNo}`
-    );
-    return response?.isDuplicate || false;
+
+    // Fallback: Try to fetch the invoice directly - if it exists, it's a duplicate
+    try {
+      await api.get(`/api/invoices/${invoiceNo}`);
+      return true; // Invoice exists, so it's a duplicate
+    } catch (fetchError: any) {
+      // If we get a 404, the invoice doesn't exist
+      if (fetchError.status === 404) {
+        return false;
+      }
+      // For other errors, log but don't block submission
+      console.error("Fallback duplicate check failed:", fetchError);
+    }
+
+    // If both checks fail, err on the side of caution and let the server validate
+    return false;
   } catch (error) {
-    console.error("Error checking duplicate invoice number:", error);
-    // Don't necessarily throw, maybe return false and let backend handle final check
+    console.error("Error in duplicate invoice check:", error);
     return false;
   }
 };
