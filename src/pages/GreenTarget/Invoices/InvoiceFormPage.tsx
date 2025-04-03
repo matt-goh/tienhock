@@ -486,32 +486,6 @@ const InvoiceFormPage: React.FC = () => {
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
     try {
-      // For regular invoices with a rental_id, check if the rental already has an active invoice
-      if (formData.type === "regular" && formData.rental_id) {
-        try {
-          // Make a direct API call to check if this rental already has an active invoice
-          const rentalCheckResponse = await greenTargetApi.getRental(
-            formData.rental_id
-          );
-
-          // If rental has invoice_info and it's not the current invoice being edited, show error
-          if (
-            rentalCheckResponse.invoice_info?.status === "active" &&
-            (!isEditMode ||
-              rentalCheckResponse.invoice_info.invoice_id !==
-                formData.invoice_id)
-          ) {
-            toast.error(
-              `Cannot create invoice: Rental #${formData.rental_id} already has Invoice #${rentalCheckResponse.invoice_info.invoice_number}`
-            );
-            setIsSaving(false);
-            return;
-          }
-        } catch (error) {
-          console.error("Error checking rental status:", error);
-          // Continue with submission if we can't check (fail open)
-        }
-      }
       const invData: Omit<Invoice, "invoice_id" | "invoice_number"> & {
         total_amount: number;
         invoice_id?: number;
@@ -604,7 +578,11 @@ const InvoiceFormPage: React.FC = () => {
               toast.error("Invoice created, payment failed.", { id: pTid });
             }
           }
-          if (navId) navigate(`/greentarget/invoices/${navId}`);
+          if (navId)
+            navigate(`/greentarget/invoices/${navId}`, {
+              replace: true,
+              state: { previousPath: "/greentarget/invoices" },
+            });
         } else {
           throw new Error(response.message || "Failed create invoice");
         }
