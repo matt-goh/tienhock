@@ -34,17 +34,16 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
 
   if (invoices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200 mt-4">
-        <IconFileInvoice
-          size={64}
-          className="text-default-300 mb-5"
-          stroke={1.2}
-        />
-        <h3 className="text-xl font-semibold text-default-700 mb-2">
+      <div className="flex flex-col items-center justify-center p-10 bg-gradient-to-b from-slate-50 to-slate-100 rounded-xl border border-dashed border-slate-200 mt-6 shadow-sm transition-all">
+        <div className="bg-slate-100 p-5 rounded-full transform transition-transform hover:scale-105">
+          <IconFileInvoice size={64} stroke={1.5} />
+        </div>
+        <h3 className="text-2xl font-semibold text-slate-700 mb-3">
           No Invoices Found
         </h3>
-        <p className="text-default-500 text-center max-w-md">
-          No invoices match the current filters or search term.
+        <p className="text-slate-500 text-center max-w-md leading-relaxed">
+          No invoices match your current filters or search criteria. Try
+          adjusting the filters to see more results.
         </p>
       </div>
     );
