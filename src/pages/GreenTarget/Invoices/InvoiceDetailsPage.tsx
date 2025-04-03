@@ -408,6 +408,22 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const getGTStatusBadgeStyle = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case "paid": // Assuming you derive 'paid' from balance
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-default-200 text-default-800";
+      case "overdue":
+        return "bg-red-100 text-red-800"; // Example: Red style
+      case "active":
+      default: // Treat active/default as Unpaid visually if balance > 0
+        return invoice && invoice.current_balance > 0
+          ? "bg-amber-100 text-amber-800" // Unpaid style
+          : "bg-gray-100 text-gray-800"; // Default/Unknown style
+    }
+  };
+
   // Format currency
   const formatCurrency = (amount: number | string) => {
     // Allow string input
@@ -750,19 +766,20 @@ const InvoiceDetailsPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <div>
               <span
-                className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  invoice.status === "cancelled"
-                    ? "bg-default-200 text-default-800"
-                    : invoice.current_balance > 0
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-green-100 text-green-800"
-                }`}
+                className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getGTStatusBadgeStyle(
+                  invoice?.status
+                )}`}
               >
-                {invoice.status === "cancelled"
-                  ? "Cancelled"
-                  : invoice.current_balance > 0
-                  ? "Unpaid"
-                  : "Paid"}
+                {/* Display logic - might need refinement based on how 'paid' is determined */}
+                {
+                  invoice?.status === "cancelled"
+                    ? "Cancelled"
+                    : invoice?.status === "overdue"
+                    ? "Overdue"
+                    : invoice?.current_balance <= 0 // Check balance for paid status
+                    ? "Paid"
+                    : "Active" /* Or 'Unpaid' */
+                }
               </span>
               {invoice.status === "cancelled" && invoice.cancellation_date && (
                 <span className="ml-2 text-xs text-default-500">
