@@ -36,57 +36,6 @@ async function fetchCustomerData(pool, customerId) {
   }
 }
 
-// Helper function to insert accepted documents
-const insertAcceptedDocuments = async (
-  pool,
-  documents,
-  originalInvoices = {}
-) => {
-  const query = `
-    INSERT INTO einvoices (
-      uuid, submission_uid, long_id, internal_id, type_name, 
-      receiver_id, receiver_name, datetime_validated,
-      total_payable_amount, total_excluding_tax, total_net_amount, total_rounding
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-  `;
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    for (const doc of documents) {
-      // Convert internalId to string to ensure consistent key lookup
-      const internalIdKey = String(doc.internalId);
-
-      // Get rounding from original invoice - ensure it's a number
-      const rounding = parseFloat(originalInvoices[internalIdKey] || 0);
-
-      // Add a default datetime_validated if missing
-      const datetime_validated =
-        doc.dateTimeValidated || new Date().toISOString();
-
-      await client.query(query, [
-        doc.uuid,
-        doc.submissionUid,
-        doc.longId,
-        doc.internalId,
-        doc.typeName,
-        doc.receiverId,
-        doc.receiverName,
-        datetime_validated,
-        doc.totalPayableAmount,
-        doc.totalExcludingTax,
-        doc.totalNetAmount,
-        rounding, // Explicitly converted rounding value
-      ]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
 // Helper function to fetch invoice from database
 const getInvoices = async (pool, invoiceId) => {
   const client = await pool.connect();
@@ -198,107 +147,7 @@ export default function (pool, config) {
     }
   });
 
-  router.get("/eligible-for-submission", async (req, res) => {
-    try {
-      const { startDate, endDate } = req.query;
-
-      // Default to last 3 days if dates aren't provided
-      if (!startDate || !endDate) {
-        const endDateTime = new Date();
-        endDateTime.setHours(23, 59, 59, 999);
-
-        const startDateTime = new Date();
-        startDateTime.setDate(startDateTime.getDate() - 2); // Last 3 days (including today)
-        startDateTime.setHours(0, 0, 0, 0);
-
-        endDate = endDateTime.getTime().toString();
-        startDate = startDateTime.getTime().toString();
-      }
-
-      let query = `
-        SELECT 
-          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-          i.amount, i.rounding, i.totalamountpayable,
-          COALESCE(
-            json_agg(
-              CASE WHEN od.id IS NOT NULL THEN 
-                json_build_object(
-                  'code', od.code,
-                  'quantity', od.quantity,
-                  'price', od.price,
-                  'freeProduct', od.freeproduct,
-                  'returnProduct', od.returnproduct,
-                  'description', od.description,
-                  'tax', od.tax,
-                  'total', od.total,
-                  'issubtotal', od.issubtotal
-                )
-              ELSE NULL END
-              ORDER BY od.id  -- Maintain order of products and subtotals
-            ) FILTER (WHERE od.id IS NOT NULL),
-            '[]'::json
-          ) as products
-        FROM invoices i
-        LEFT JOIN order_details od ON i.id = od.invoiceid
-        LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
-        WHERE 1=1
-        AND e.internal_id IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM einvoices e2, jsonb_array_elements_text(e2.consolidated_invoices::jsonb) AS invoice_id
-          WHERE e2.consolidated_invoices IS NOT NULL 
-          AND invoice_id = i.id::text
-        )
-      `;
-
-      const queryParams = [];
-      let paramCounter = 1;
-
-      if (startDate && endDate) {
-        queryParams.push(startDate, endDate);
-        query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
-          paramCounter + 1
-        } AS bigint)`;
-        paramCounter += 2;
-      }
-
-      query += ` GROUP BY i.id ORDER BY i.createddate DESC`;
-
-      const result = await pool.query(query, queryParams);
-
-      // Transform results and ensure proper data types
-      const transformedResults = result.rows.map((row) => ({
-        ...row,
-        products: (row.products || []).map((product) => ({
-          ...product,
-          uid: crypto.randomUUID(),
-          price: parseFloat(product.price) || 0,
-          quantity: parseInt(product.quantity) || 0,
-          freeProduct: parseInt(product.freeProduct) || 0,
-          returnProduct: parseInt(product.returnProduct) || 0,
-          tax: parseFloat(product.tax) || 0,
-          total: parseFloat(product.total) || 0,
-          issubtotal: Boolean(product.issubtotal),
-        })),
-        amount: parseFloat(row.amount) || 0,
-        rounding: parseFloat(row.rounding) || 0,
-        totalamountpayable: parseFloat(row.totalamountpayable) || 0,
-      }));
-
-      res.json({
-        success: true,
-        data: transformedResults,
-      });
-    } catch (error) {
-      console.error("Error fetching eligible invoices:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch eligible invoices",
-        error: error.message,
-      });
-    }
-  });
-
-  // Submit invoice to MyInvois from system
+  // POST /api/invoices/submit-system - Submit Invoice to MyInvois (Updated with pending check)
   router.post("/submit-system", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
@@ -312,31 +161,126 @@ export default function (pool, config) {
         });
       }
 
+      // STEP 1: Identify and process any pending invoices first
+      const pendingQuery = `
+      SELECT id, uuid, submission_uid 
+      FROM invoices 
+      WHERE id = ANY($1) AND einvoice_status = 'pending' AND uuid IS NOT NULL
+    `;
+      const pendingResult = await pool.query(pendingQuery, [invoiceIds]);
+      const pendingInvoices = pendingResult.rows;
+
+      // Track results of status updates for pending invoices
+      const statusUpdateResults = {
+        updated: [],
+        failed: [],
+      };
+
+      // Process each pending invoice to check current status
+      for (const invoice of pendingInvoices) {
+        try {
+          // Call MyInvois API to check current status (similar to /submission/:uuid endpoint)
+          const documentDetails = await apiClient.makeApiCall(
+            "GET",
+            `/api/v1.0/documents/${invoice.uuid}/details`
+          );
+
+          // Determine new status based on response
+          let newStatus = invoice.einvoice_status; // Default to keep current status
+
+          if (documentDetails.longId) {
+            newStatus = "valid";
+          } else if (
+            documentDetails.status === "Invalid" ||
+            documentDetails.status === "Rejected"
+          ) {
+            newStatus = "invalid";
+          }
+
+          // Update in database if status changed
+          if (
+            newStatus !== invoice.einvoice_status ||
+            (newStatus === "valid" &&
+              !invoice.long_id &&
+              documentDetails.longId)
+          ) {
+            await pool.query(
+              `UPDATE invoices SET 
+              einvoice_status = $1, 
+              long_id = $2, 
+              datetime_validated = $3 
+            WHERE id = $4`,
+              [
+                newStatus,
+                documentDetails.longId || null,
+                documentDetails.dateTimeValidated || null,
+                invoice.id,
+              ]
+            );
+          }
+
+          statusUpdateResults.updated.push({
+            id: invoice.id,
+            status: newStatus,
+            longId: documentDetails.longId,
+          });
+        } catch (error) {
+          console.error(
+            `Error checking status for pending invoice ${invoice.id}:`,
+            error
+          );
+          statusUpdateResults.failed.push({
+            id: invoice.id,
+            error: error.message,
+          });
+        }
+      }
+
+      // STEP 2: Filter out already processed pending invoices
+      const invoiceIdsToProcess = invoiceIds.filter(
+        (id) =>
+          !statusUpdateResults.updated.some((updated) => updated.id === id)
+      );
+
+      // If all invoices were pending and have been processed, return early with results
+      if (invoiceIdsToProcess.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: "All invoices were in pending status and have been updated",
+          pendingUpdated: statusUpdateResults.updated,
+          pendingFailed: statusUpdateResults.failed,
+          overallStatus:
+            statusUpdateResults.failed.length > 0 ? "Partial" : "Valid",
+        });
+      }
+
+      // STEP 3: Process non-pending invoices (original flow)
       const transformedInvoices = [];
       const validationErrors = [];
       const invoiceRoundings = {};
 
       // Check for duplicates first
-      for (const invoiceId of invoiceIds) {
+      for (const invoiceId of invoiceIdsToProcess) {
         try {
-          // Make a direct query to check for duplicates
+          // Make a direct query to check for duplicates in e-invoice system
           const duplicateCheckResult = await pool.query(
-            "SELECT COUNT(*) FROM einvoices WHERE internal_id = $1",
+            "SELECT uuid FROM invoices WHERE id = $1 AND einvoice_status IN ('valid', 'pending')",
             [invoiceId]
           );
-          const isDuplicate = parseInt(duplicateCheckResult.rows[0].count) > 0;
+          const isDuplicate = duplicateCheckResult.rows.length > 0;
 
           if (isDuplicate) {
             validationErrors.push({
               internalId: invoiceId,
               error: {
                 code: "DUPLICATE",
-                message: `Invoice number ${invoiceId} already exists in the system`,
+                message: `Invoice number ${invoiceId} already exists in the e-invoice system`,
                 target: invoiceId,
                 details: [
                   {
                     code: "DUPLICATE_INVOICE",
-                    message: "Duplicate invoice number found",
+                    message:
+                      "Invoice has already been submitted to e-invoice system",
                     target: "document",
                   },
                 ],
@@ -410,7 +354,7 @@ export default function (pool, config) {
             },
           });
         }
-      }
+      } // End loop through incoming invoices
 
       // If there are any validation errors, but we still have valid invoices, continue processing
       if (validationErrors.length > 0 && transformedInvoices.length === 0) {
@@ -449,16 +393,71 @@ export default function (pool, config) {
         submissionResult.overallStatus = "Partial";
       }
 
-      // Add accepted documents to database
+      // STEP 4: Update invoices table directly based on submission results
       if (
         submissionResult.success &&
         submissionResult.acceptedDocuments?.length > 0
       ) {
-        await insertAcceptedDocuments(
-          pool,
-          submissionResult.acceptedDocuments,
-          invoiceRoundings
-        );
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+
+          // Update each accepted document in the invoices table
+          for (const doc of submissionResult.acceptedDocuments) {
+            const status = doc.longId ? "valid" : "pending";
+            try {
+              await client.query(
+                `UPDATE invoices SET 
+                uuid = $1,
+                submission_uid = $2,
+                long_id = $3, 
+                datetime_validated = $4,
+                einvoice_status = $5
+              WHERE id = $6`,
+                [
+                  doc.uuid,
+                  doc.submissionUid,
+                  doc.longId || null,
+                  doc.dateTimeValidated || null,
+                  status,
+                  doc.internalId,
+                ]
+              );
+            } catch (error) {
+              console.error(
+                `Failed to update invoice ${doc.internalId}:`,
+                error
+              );
+            }
+          }
+
+          // Update each rejected document to mark as 'invalid'
+          if (submissionResult.rejectedDocuments?.length > 0) {
+            for (const doc of submissionResult.rejectedDocuments) {
+              const invoiceId = doc.internalId || doc.invoiceCodeNumber;
+              if (!invoiceId) continue;
+
+              try {
+                await client.query(
+                  `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
+                  [invoiceId]
+                );
+              } catch (error) {
+                console.error(
+                  `Failed to mark invoice ${invoiceId} as invalid:`,
+                  error
+                );
+              }
+            }
+          }
+
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK");
+          console.error("Error updating invoices with e-invoice data:", error);
+        } finally {
+          client.release();
+        }
       }
 
       // Determine appropriate status code
@@ -519,6 +518,16 @@ export default function (pool, config) {
           }
         }
 
+        // Include updated pending invoices in minimal response
+        for (const updated of statusUpdateResults.updated) {
+          invoices.push({
+            id: updated.id,
+            uuid: updated.uuid,
+            longId: updated.longId || "",
+            einvoiceStatus: updated.status === "valid" ? 0 : 100,
+          });
+        }
+
         return res.status(statusCode).json({
           message: "Invoice processing completed",
           invoices: invoices,
@@ -526,8 +535,12 @@ export default function (pool, config) {
         });
       }
 
-      // Return full response
-      return res.status(statusCode).json(submissionResult);
+      // Return full response with pending results included
+      return res.status(statusCode).json({
+        ...submissionResult,
+        pendingUpdated: statusUpdateResults.updated,
+        pendingFailed: statusUpdateResults.failed,
+      });
     } catch (error) {
       console.error("Submission error:", error);
       // Check specifically for 422 error code (duplicate payload)
@@ -608,16 +621,21 @@ export default function (pool, config) {
       if (documentDetails.longId) {
         try {
           const dbResult = await pool.query(
-            `UPDATE einvoices 
-             SET long_id = $1, datetime_validated = $2
-             WHERE uuid = $3 AND (long_id IS NULL OR long_id = '')
-             RETURNING *`,
-            [documentDetails.longId, documentDetails.dateTimeValidated, uuid]
+            `UPDATE invoices 
+           SET long_id = $1, datetime_validated = $2, einvoice_status = $3
+           WHERE uuid = $4 AND (long_id IS NULL OR long_id = '')
+           RETURNING *`,
+            [
+              documentDetails.longId,
+              documentDetails.dateTimeValidated,
+              "valid",
+              uuid,
+            ]
           );
 
-          console.log(`Updated einvoice record for UUID ${uuid}`);
+          console.log(`Updated invoice record for UUID ${uuid}`);
         } catch (dbError) {
-          console.error("Error updating einvoice record:", dbError);
+          console.error("Error updating invoice record:", dbError);
           // Continue with the response even if DB update fails
         }
       }
@@ -644,49 +662,6 @@ export default function (pool, config) {
         message: "Failed to fetch document details",
         error: error.message,
       });
-    }
-  });
-
-  // Get all submitted e-invoices
-  router.get("/list", async (req, res) => {
-    try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 25;
-      const offset = (page - 1) * limit;
-      const startDate = req.query.startDate;
-      const endDate = req.query.endDate;
-
-      let query = "SELECT * FROM einvoices WHERE 1=1";
-      const params = [];
-
-      if (startDate) {
-        params.push(new Date(startDate));
-        query += ` AND datetime_validated >= $${params.length}`;
-      }
-
-      if (endDate) {
-        params.push(new Date(endDate));
-        query += ` AND datetime_validated < $${params.length}`;
-      }
-
-      const countQuery = query.replace("SELECT *", "SELECT COUNT(*)");
-      query += ` ORDER BY datetime_validated DESC LIMIT $${
-        params.length + 1
-      } OFFSET $${params.length + 2}`;
-      params.push(limit, offset);
-
-      const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, params.slice(0, -2)),
-        pool.query(query, params),
-      ]);
-
-      res.json({
-        data: dataResult.rows,
-        total: parseInt(countResult.rows[0].count),
-      });
-    } catch (error) {
-      console.error("Failed to fetch e-invoices:", error);
-      res.status(500).json({ error: "Failed to fetch e-invoices" });
     }
   });
 
@@ -967,73 +942,6 @@ export default function (pool, config) {
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to process consolidated submission",
-      });
-    }
-  });
-
-  // Delete e-invoice by UUID
-  router.delete("/:uuid", async (req, res) => {
-    const { uuid } = req.params;
-
-    try {
-      // Check if the e-invoice exists before attempting to delete
-      const checkQuery = "SELECT uuid, status FROM einvoices WHERE uuid = $1";
-      const checkResult = await pool.query(checkQuery, [uuid]);
-
-      if (checkResult.rows.length === 0) {
-        return res.status(404).json({ message: "E-invoice not found" });
-      }
-
-      // Check if already cancelled
-      if (checkResult.rows[0].status === "Cancelled") {
-        return res.status(400).json({
-          message: "This e-invoice is already cancelled",
-        });
-      }
-
-      // First, try to cancel the invoice in MyInvois
-      try {
-        await apiClient.makeApiCall(
-          "PUT",
-          `/api/v1.0/documents/state/${uuid}/state`,
-          {
-            status: "cancelled",
-            reason: "Wrong submission",
-          }
-        );
-      } catch (cancelError) {
-        console.error("Error cancelling e-invoice in MyInvois:", cancelError);
-
-        // Handle specific error cases from MyInvois API
-        if (
-          cancelError.status === 400 &&
-          cancelError.response?.error?.code === "OperationPeriodOver"
-        ) {
-          return res.status(400).json({
-            message: "The time limit for cancellation has expired",
-          });
-        }
-
-        return res.status(500).json({
-          message: "Failed to cancel e-invoice in MyInvois",
-          error: cancelError.message,
-        });
-      }
-
-      // If cancellation was successful, update status locally instead of deleting
-      const updateQuery =
-        "UPDATE einvoices SET status = 'Cancelled', cancellation_date = NOW() WHERE uuid = $1 RETURNING *";
-      const result = await pool.query(updateQuery, [uuid]);
-
-      res.status(200).json({
-        message: "E-invoice cancelled successfully",
-        einvoice: result.rows[0],
-      });
-    } catch (error) {
-      console.error("Error cancelling e-invoice:", error);
-      res.status(500).json({
-        message: "Error cancelling e-invoice",
-        error: error.message,
       });
     }
   });
