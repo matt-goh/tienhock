@@ -137,21 +137,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
       const invoice = data.invoice;
 
-      // If this is a regular invoice with a rental_id, get the rental details to access location
-      let locationAddress = null;
-      if (invoice.type === "regular" && invoice.rental_id) {
-        try {
-          const rentalData = await greenTargetApi.getRental(invoice.rental_id);
-          locationAddress = rentalData.location_address || null;
-        } catch (error) {
-          console.error("Error fetching rental location:", error);
-        }
-      }
-
-      setInvoice({
-        ...invoice,
-        location_address: locationAddress,
-      });
+      setInvoice(invoice);
 
       setPayments(data.payments || []);
 
