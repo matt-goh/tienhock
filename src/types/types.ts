@@ -341,6 +341,8 @@ export interface InvoiceData {
   datetime_validated: string | null; // ISO timestamp string or null
   is_consolidated: boolean;
   consolidated_invoices: string[] | null; // Array of invoice IDs or null
+  customerTin?: string;
+  customerIdNumber?: number;
 
   // Status fields
   invoice_status: InvoiceStatus;

@@ -29,11 +29,6 @@ interface InvoiceHeaderProps {
   onLoadMoreCustomers: () => void;
   hasMoreCustomers: boolean;
   isFetchingCustomers: boolean;
-
-  // Duplicate check
-  onInvoiceIdBlur?: (id: string) => Promise<boolean>; // Optional check on blur
-  isCheckingDuplicate?: boolean;
-  isDuplicate?: boolean;
   readOnly?: boolean;
 }
 
@@ -50,9 +45,6 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
   onLoadMoreCustomers,
   hasMoreCustomers,
   isFetchingCustomers,
-  onInvoiceIdBlur,
-  isCheckingDuplicate = false,
-  isDuplicate = false,
   readOnly = false,
 }) => {
   const handleDateTimeChange = (field: "date" | "time", value: string) => {
@@ -79,12 +71,6 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
       }
     }
     onInputChange("createddate", newDate.getTime().toString());
-  };
-
-  const handleIdBlur = async () => {
-    if (isNewInvoice && invoice.id && onInvoiceIdBlur) {
-      await onInvoiceIdBlur(invoice.id);
-    }
   };
 
   // --- Prepare props for CustomerCombobox ---
@@ -133,18 +119,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
             }}
             disabled={!isNewInvoice || readOnly} // Use readOnly
             placeholder="Enter Invoice Number"
-            onBlur={handleIdBlur}
           />
-          {isCheckingDuplicate && (
-            <span className="absolute right-2 top-9 text-xs text-gray-500">
-              Checking...
-            </span>
-          )}
-          {isDuplicate && (
-            <span className="absolute right-2 top-9 text-xs text-red-500">
-              Duplicate!
-            </span>
-          )}
         </div>
 
         {/* Type */}
