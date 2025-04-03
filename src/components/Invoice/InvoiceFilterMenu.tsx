@@ -61,12 +61,12 @@ const CustomerFilterTags: React.FC<FilterTags> = ({
 );
 
 type InvoiceFilterMenuProps = {
-  onFilterChange: (filters: InvoiceFilters) => void;
+  onFilterChange: (filters: Partial<InvoiceFilters>) => void;
   currentFilters: InvoiceFilters;
-  salesmanOptions: string[];
-  customerOptions: string[];
-  today: Date | null;
-  tomorrow: Date | null;
+  salesmanOptions: Array<{ id: string; name: string }>;
+  customerOptions?: Array<{ id: string; name: string }>;
+  invoiceStatusOptions?: Array<{ id: string; name: string }>;
+  eInvoiceStatusOptions?: Array<{ id: string; name: string }>;
 };
 
 const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
@@ -87,27 +87,37 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   const invoiceStatusOptions = [
     { id: "active", name: "Active" },
     { id: "paid", name: "Paid" },
+    { id: "Unpaid", name: "Unpaid" },
     { id: "cancelled", name: "Cancelled" },
     { id: "overdue", name: "Overdue" },
   ];
 
+  const eInvoiceStatusOptions = [
+    { id: "valid", name: "Valid" },
+    { id: "pending", name: "Pending" },
+    { id: "invalid", name: "Invalid" },
+    { id: "cancelled", name: "Cancelled" },
+    { id: "null", name: "Not Submitted" }, // Special case for filtering null values
+  ];
+
   useEffect(() => {
-    const uniqueSalesmen = Array.from(new Set(salesmanOptions)).map(
-      (salesman, index) => ({
-        id: index.toString(),
-        name: salesman,
-      })
+    // Since salesmanOptions already has the correct structure, we just need to ensure uniqueness
+    const uniqueSalesmen = salesmanOptions.filter(
+      (salesman, index, self) =>
+        index === self.findIndex((s) => s.id === salesman.id)
     );
     setCachedSalesmanOptions(uniqueSalesmen);
   }, [salesmanOptions]);
 
   useEffect(() => {
-    const uniqueCustomers = Array.from(new Set(customerOptions)).map(
-      (customer, index) => ({
-        id: index.toString(),
-        name: customer,
-      })
+    if (!customerOptions) return;
+
+    // Filter out duplicates based on customer id
+    const uniqueCustomers = customerOptions.filter(
+      (customer, index, self) =>
+        index === self.findIndex((c) => c.id === customer.id)
     );
+
     setCachedCustomerOptions(uniqueCustomers);
   }, [customerOptions]);
 
@@ -116,18 +126,18 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   };
 
   const clearAllFilters = () => {
-    const clearedFilters: InvoiceFilters = {
-      dateRange: currentFilters.dateRange,
+    const clearedFilters: Partial<InvoiceFilters> = {
+      // Keep date range but clear everything else
       salespersonId: null,
-      applySalespersonFilter: true,
+      applySalespersonFilter: true, // Keep enabled
       customerId: null,
-      applyCustomerFilter: true,
+      applyCustomerFilter: true, // Keep enabled
       paymentType: null,
-      applyPaymentTypeFilter: true,
+      applyPaymentTypeFilter: true, // Keep enabled
       invoiceStatus: [],
-      applyInvoiceStatusFilter: true,
+      applyInvoiceStatusFilter: true, // Keep enabled
       eInvoiceStatus: [],
-      applyEInvoiceStatusFilter: true,
+      applyEInvoiceStatusFilter: true, // Keep enabled
     };
     onFilterChange(clearedFilters);
   };
@@ -534,6 +544,218 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 </div>
               )}
             </Listbox>
+          </div>
+
+          {/* Invoice Status Filter */}
+          <div className="px-1">
+            <Combobox
+              multiple
+              value={
+                Array.isArray(currentFilters.invoiceStatus)
+                  ? currentFilters.invoiceStatus
+                  : []
+              }
+              onChange={(value: string[]) =>
+                handleFilterChange("invoiceStatus", value)
+              }
+              disabled={!currentFilters.applyInvoiceStatusFilter}
+            >
+              {({ open }) => (
+                <div className="relative">
+                  <div
+                    className={`flex px-2.5 py-2.5 items-center justify-between rounded-md ${
+                      !currentFilters.applyInvoiceStatusFilter
+                        ? ""
+                        : "hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+                    }`}
+                  >
+                    <ComboboxButton
+                      className={`w-full text-left text-default-900 focus:outline-none ${
+                        !currentFilters.applyInvoiceStatusFilter
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      } flex items-center`}
+                    >
+                      <span className="block truncate">Invoice Status</span>
+                      <IconChevronDown
+                        stroke={2}
+                        size={18}
+                        className="ml-2 text-default-500"
+                      />
+                    </ComboboxButton>
+                    <button
+                      className="flex items-center ml-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFilterChange(
+                          "applyInvoiceStatusFilter",
+                          !currentFilters.applyInvoiceStatusFilter
+                        );
+                      }}
+                    >
+                      {currentFilters.applyInvoiceStatusFilter ? (
+                        <IconSquareCheckFilled
+                          width={18}
+                          height={18}
+                          className="text-blue-600"
+                        />
+                      ) : (
+                        <IconSquare
+                          width={18}
+                          height={18}
+                          stroke={2}
+                          className="text-default-400"
+                        />
+                      )}
+                    </button>
+                  </div>
+                  <Transition
+                    show={open && currentFilters.applyInvoiceStatusFilter}
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                      {invoiceStatusOptions.map((option) => (
+                        <ComboboxOption
+                          key={option.id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 px-4 ${
+                              active ? "bg-default-100" : "text-default-900"
+                            }`
+                          }
+                          value={option.id}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {option.name}
+                              </span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck stroke={2} size={22} />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </ComboboxOption>
+                      ))}
+                    </ComboboxOptions>
+                  </Transition>
+                </div>
+              )}
+            </Combobox>
+          </div>
+
+          {/* E-Invoice Status Filter */}
+          <div className="px-1">
+            <Combobox
+              multiple
+              value={
+                Array.isArray(currentFilters.eInvoiceStatus)
+                  ? currentFilters.eInvoiceStatus
+                  : []
+              }
+              onChange={(value: string[]) =>
+                handleFilterChange("eInvoiceStatus", value)
+              }
+              disabled={!currentFilters.applyEInvoiceStatusFilter}
+            >
+              {({ open }) => (
+                <div className="relative">
+                  <div
+                    className={`flex px-2.5 py-2.5 items-center justify-between rounded-md ${
+                      !currentFilters.applyEInvoiceStatusFilter
+                        ? ""
+                        : "hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+                    }`}
+                  >
+                    <ComboboxButton
+                      className={`w-full text-left text-default-900 focus:outline-none ${
+                        !currentFilters.applyEInvoiceStatusFilter
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      } flex items-center`}
+                    >
+                      <span className="block truncate">E-Invoice Status</span>
+                      <IconChevronDown
+                        stroke={2}
+                        size={18}
+                        className="ml-2 text-default-500"
+                      />
+                    </ComboboxButton>
+                    <button
+                      className="flex items-center ml-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFilterChange(
+                          "applyEInvoiceStatusFilter",
+                          !currentFilters.applyEInvoiceStatusFilter
+                        );
+                      }}
+                    >
+                      {currentFilters.applyEInvoiceStatusFilter ? (
+                        <IconSquareCheckFilled
+                          width={18}
+                          height={18}
+                          className="text-blue-600"
+                        />
+                      ) : (
+                        <IconSquare
+                          width={18}
+                          height={18}
+                          stroke={2}
+                          className="text-default-400"
+                        />
+                      )}
+                    </button>
+                  </div>
+                  <Transition
+                    show={open && currentFilters.applyEInvoiceStatusFilter}
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                      {eInvoiceStatusOptions.map((option) => (
+                        <ComboboxOption
+                          key={option.id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 px-4 ${
+                              active ? "bg-default-100" : "text-default-900"
+                            }`
+                          }
+                          value={option.id}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {option.name}
+                              </span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <IconCheck stroke={2} size={22} />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </ComboboxOption>
+                      ))}
+                    </ComboboxOptions>
+                  </Transition>
+                </div>
+              )}
+            </Combobox>
           </div>
 
           {/* Clear Filters Button */}

@@ -115,7 +115,6 @@ export default function (pool, config) {
         startDate,
         endDate,
         salesman,
-        customer,
         paymentType,
         invoiceStatus,
         eInvoiceStatus,
@@ -158,14 +157,10 @@ export default function (pool, config) {
         filterParams.push(salesman.split(","));
         whereClause += ` AND i.salespersonid = ANY(${salesmanParam})`;
       }
-      if (customer) {
-        const customerParam = `$${filterParamCounter++}`;
-        filterParams.push(customer.split(","));
-        whereClause += ` AND i.customerid = ANY(${customerParam})`;
-      }
       if (paymentType) {
         const paymentTypeParam = `$${filterParamCounter++}`;
-        filterParams.push(paymentType);
+        // Convert to uppercase to match database values (CASH, INVOICE)
+        filterParams.push(paymentType.toUpperCase());
         whereClause += ` AND i.paymenttype = ${paymentTypeParam}`;
       }
       if (invoiceStatus) {
