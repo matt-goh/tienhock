@@ -35,22 +35,6 @@ const FilterSummary: React.FC<FilterSummaryProps> = ({
     });
   }
 
-  // Customer filter
-  if (
-    filters.applyCustomerFilter &&
-    filters.customerId &&
-    filters.customerId.length > 0
-  ) {
-    filters.customerId.forEach((customer) => {
-      summaries.push({
-        label: "Customer",
-        value: customer,
-        key: "customerId",
-        specificValue: customer,
-      });
-    });
-  }
-
   // Payment type filter
   if (filters.applyPaymentTypeFilter && filters.paymentType) {
     summaries.push({

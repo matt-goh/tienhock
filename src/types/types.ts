@@ -451,8 +451,6 @@ export interface InvoiceFilters {
   };
   salespersonId: string[] | null;
   applySalespersonFilter: boolean;
-  customerId: string[] | null;
-  applyCustomerFilter: boolean;
   paymentType: string | null;
   applyPaymentTypeFilter?: boolean;
   invoiceStatus: string[];
