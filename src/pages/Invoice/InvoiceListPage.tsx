@@ -38,9 +38,9 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { useCustomerNames } from "../../hooks/useCustomerNames";
-import PaginationControls from "../../components/Invoice/PaginationControls";
 // Import the specific utilities needed
 import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
+import PaginationControls from "../../components/Invoice/PaginationControls";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key

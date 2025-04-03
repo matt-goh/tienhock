@@ -17,7 +17,8 @@ export default function (pool) {
              c.id_number,
              l.address as location_address,
              l.phone_number as location_phone_number,
-             r.driver, 
+             r.driver,
+             r.tong_no,
              COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END), 0) as amount_paid
       FROM greentarget.invoices i
       JOIN greentarget.customers c ON i.customer_id = c.customer_id
@@ -54,7 +55,7 @@ export default function (pool) {
         paramCounter++;
       }
 
-      query += ` GROUP BY i.invoice_id, c.name, r.driver, c.phone_number, c.tin_number, c.id_number, l.address, l.phone_number`;
+      query += ` GROUP BY i.invoice_id, c.name, r.driver, r.tong_no, c.phone_number, c.tin_number, c.id_number, l.address, l.phone_number`;
 
       query += " ORDER BY i.date_issued DESC";
 

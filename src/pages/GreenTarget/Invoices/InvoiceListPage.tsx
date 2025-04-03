@@ -44,6 +44,7 @@ interface Invoice {
   location_phone_number?: string;
   rental_id?: number;
   driver?: string;
+  tong_no?: string;
   amount_before_tax: number;
   tax_amount: number;
   total_amount: number;
@@ -219,7 +220,7 @@ const InvoiceCard = ({
                 size={14}
                 className="inline mr-1 mt-[3px] align-top flex-shrink-0"
               />
-              {invoice.driver}
+              {invoice.driver}, {invoice.tong_no}
             </p>
           )}
         </div>

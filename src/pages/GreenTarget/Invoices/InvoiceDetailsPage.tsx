@@ -247,7 +247,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     try {
       // Fetch all payments to find unused reference numbers for the current month and year
-      const allPayments = await greenTargetApi.getPayments();
+      const allPayments = await greenTargetApi.getPayments(true);
 
       // Get current year (last 2 digits) and month (padded with zero)
       const currentYear = new Date().getFullYear().toString().slice(-2);
@@ -258,23 +258,23 @@ const InvoiceDetailsPage: React.FC = () => {
       // Regular expression to match the format RV{year}/{month}/{number}
       const regex = new RegExp(`^RV${currentYear}/${currentMonth}/(\\d+)$`);
 
-      // Extract all used numbers for the current month and year
-      const usedNumbers = new Set<number>(); // Use Set<number>
+      // Find the highest used number for the current month and year
+      let highestNumber = 0;
       allPayments.forEach((payment: { internal_reference: string | null }) => {
         // Handle potential null
         if (payment.internal_reference) {
           const match = payment.internal_reference.match(regex);
           if (match) {
-            usedNumbers.add(parseInt(match[1], 10)); // Specify radix 10
+            const currentNumber = parseInt(match[1], 10);
+            if (currentNumber > highestNumber) {
+              highestNumber = currentNumber;
+            }
           }
         }
       });
 
-      // Find the first unused number starting from 1
-      let nextNumber = 1;
-      while (usedNumbers.has(nextNumber)) {
-        nextNumber++;
-      }
+      // Increment by 1 to get the next number
+      const nextNumber = highestNumber + 1;
 
       // Format the reference number
       const paddedNumber = nextNumber.toString().padStart(2, "0");
