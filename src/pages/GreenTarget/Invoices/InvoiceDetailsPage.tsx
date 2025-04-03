@@ -275,7 +275,7 @@ const InvoiceDetailsPage: React.FC = () => {
         internal_reference: referenceNumber,
       };
 
-      const response = await greenTargetApi.createPayment(paymentData);
+      await greenTargetApi.createPayment(paymentData);
 
       toast.success("Payment processed successfully");
       fetchInvoiceDetails(invoice.invoice_id); // Refresh details

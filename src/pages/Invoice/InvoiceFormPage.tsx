@@ -474,8 +474,9 @@ const InvoiceFormPage: React.FC = () => {
       }
 
       // Step 3: Navigate to the NEW details page
-      navigate(`/sales/invoice/details/${invoiceIdForPayment}`, {
+      navigate(`/sales/invoice/${invoiceIdForPayment}`, {
         replace: true,
+        state: { previousPath: "/sales/invoice" },
       });
     } catch (error: any) {
       // Error handled in createInvoice utility, toastId will be updated there
