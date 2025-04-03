@@ -155,7 +155,19 @@ export default function (pool) {
       const newBalance = Math.max(0, currentBalance - parseFloat(amount_paid));
       // Round to 2 decimal places to avoid floating point issues
       const finalNewBalance = parseFloat(newBalance.toFixed(2));
-      const newStatus = finalNewBalance <= 0 ? "paid" : "Unpaid"; // Update status based on new balance
+
+      // Get current invoice status to maintain overdue status for partial payments
+      let newStatus;
+      if (finalNewBalance <= 0) {
+        newStatus = "paid"; // Always paid if balance is 0
+      } else {
+        // If still has balance, maintain "overdue" status if it was already overdue
+        if (invoice.invoice_status === "overdue") {
+          newStatus = "overdue"; // Maintain overdue status for partial payments
+        } else {
+          newStatus = "Unpaid"; // Otherwise use normal unpaid status
+        }
+      }
 
       const updateInvoiceQuery = `
         UPDATE invoices
@@ -263,17 +275,31 @@ export default function (pool) {
       // 3. Update Invoice balance and status
       // Get current balance *after* locking
       const currentInvoiceState = await client.query(
-        "SELECT balance_due FROM invoices WHERE id = $1",
+        "SELECT balance_due, invoice_status FROM invoices WHERE id = $1",
         [invoice_id]
       );
       const currentBalance = parseFloat(
         currentInvoiceState.rows[0].balance_due || 0
       );
+      const currentStatus = currentInvoiceState.rows[0].invoice_status;
 
       const newBalance = currentBalance + paidAmount;
       // Round to 2 decimal places
       const finalNewBalance = parseFloat(newBalance.toFixed(2));
-      const newStatus = finalNewBalance <= 0 ? "paid" : "Unpaid"; // Status might revert to Unpaid
+
+      // Determine the new status
+      let newStatus;
+      if (finalNewBalance <= 0) {
+        newStatus = "paid"; // Fully paid
+      } else {
+        // If invoice was overdue before, keep it overdue
+        if (currentStatus === "overdue") {
+          newStatus = "overdue";
+        } else {
+          // Otherwise use normal unpaid status
+          newStatus = "Unpaid";
+        }
+      }
 
       const updateInvoiceQuery = `
         UPDATE invoices SET balance_due = $1, invoice_status = $2
