@@ -307,7 +307,13 @@ export interface TableProps<T> {
   onCancel?: () => void;
   tableKey?: string;
 }
-export type InvoiceStatus = "active" | "paid" | "cancelled" | "Unpaid";
+
+export type InvoiceStatus =
+  | "active"
+  | "paid"
+  | "cancelled"
+  | "Unpaid"
+  | "overdue";
 export type EInvoiceStatus =
   | "valid"
   | "invalid"

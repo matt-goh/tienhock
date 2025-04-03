@@ -47,7 +47,7 @@ const getInvoiceStatusStyles = (status: InvoiceStatus | undefined) => {
       };
     case "overdue":
       return {
-        bg: "bg-red-100", // Example: Red style
+        bg: "bg-red-100",
         text: "text-red-800",
         border: "border-red-200",
         label: "Overdue",

@@ -705,7 +705,11 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="flex items-center">
                 <span
                   className={`font-semibold text-base ${
-                    isPaid || isCancelled ? "text-green-600" : "text-amber-600"
+                    isPaid || isCancelled
+                      ? "text-green-600"
+                      : invoiceData.invoice_status === "overdue"
+                      ? "text-red-600"
+                      : "text-amber-600"
                   }`}
                 >
                   {formatCurrency(invoiceData.balance_due)}

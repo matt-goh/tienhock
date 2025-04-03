@@ -84,6 +84,13 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     Array<{ id: string; name: string }>
   >([]);
 
+  const invoiceStatusOptions = [
+    { id: "active", name: "Active" },
+    { id: "paid", name: "Paid" },
+    { id: "cancelled", name: "Cancelled" },
+    { id: "overdue", name: "Overdue" },
+  ];
+
   useEffect(() => {
     const uniqueSalesmen = Array.from(new Set(salesmanOptions)).map(
       (salesman, index) => ({
