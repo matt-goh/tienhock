@@ -1,104 +1,17 @@
 // src/components/Invoice/EInvoiceMenu.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Button from "../Button";
 import toast from "react-hot-toast";
-import { IconFileInvoice, IconInfoCircle } from "@tabler/icons-react";
-import {
-  DocumentStatus,
-  InvoiceData,
-  LoginResponse,
-  SubmissionState,
-} from "../../types/types";
+import { IconFileInvoice, IconInfoCircle, IconSend } from "@tabler/icons-react";
+import { ExtendedInvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
-import InvoisModalContainer from "./InvoisModalContainer";
-import { SubmissionDisplay } from "./SubmissionDisplay";
 import {
   formatDisplayDate,
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 
-const formatDateTime = (timestamp: string | number) => {
-  const { date, formattedTime } = parseDatabaseTimestamp(timestamp);
-
-  // Convert time from 24-hour to 12-hour format
-  let formattedTime12Hour = "";
-  if (formattedTime) {
-    const [hours, minutes] = formattedTime.split(":").map(Number);
-    const period = hours >= 12 ? "PM" : "AM";
-    const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
-    formattedTime12Hour = `${hours12}:${minutes
-      .toString()
-      .padStart(2, "0")} ${period}`;
-  }
-
-  return `${formatDisplayDate(date)} ${formattedTime12Hour}`;
-};
-
-// Extracted info component for better organization
-const SelectedInvoicesInfo: React.FC<{ selectedInvoices: InvoiceData[] }> = ({
-  selectedInvoices,
-}) => (
-  <div className="bg-default-50 border border-default-200 rounded-lg">
-    <div
-      className={`${
-        selectedInvoices.length > 0 ? "border-b border-default-200" : ""
-      } p-4`}
-    >
-      <h3 className="font-medium text-default-800">
-        Selected Invoices ({selectedInvoices.length})
-      </h3>
-    </div>
-    <div className="divide-y divide-default-200 max-h-60 overflow-y-auto">
-      {selectedInvoices.map((invoice) => (
-        <div key={invoice.id} className="p-4 bg-white rounded-lg">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="font-medium text-default-800">#{invoice.id}</p>
-              <p className="text-sm text-default-600 mt-1">
-                {invoice.customerid || "N/A"}
-              </p>
-            </div>
-
-            <p className="text-sm text-default-500">
-              {formatDateTime(invoice.createddate)}
-            </p>
-          </div>
-          <div className="mt-1 flex gap-2 text-xs">
-            <span className="text-default-500">Order: {invoice.id}</span>
-            <span className="text-default-500">
-              Type: {invoice.paymenttype === "INVOICE" ? "Invoice" : "Cash"}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-// Empty state info box
-const InfoBox: React.FC = () => (
-  <div className="p-4 mt-3 bg-amber-50 border border-amber-200 rounded-lg">
-    <div className="flex items-start gap-3">
-      <IconInfoCircle
-        size={20}
-        className="flex-shrink-0 mt-0.5 text-amber-500"
-      />
-      <div className="space-y-1">
-        <p className="font-medium text-amber-800">
-          Please select invoices to submit to MyInvois
-        </p>
-        <p className="text-sm text-amber-700">
-          1. TIN number and ID Number must be assigned to the involved
-          customer(s) in catalogue. <br />
-          2. Only Invoices within the last 2 days can be submitted.
-        </p>
-      </div>
-    </div>
-  </div>
-);
-
 interface EInvoiceMenuProps {
-  selectedInvoices: InvoiceData[];
+  selectedInvoices: ExtendedInvoiceData[];
   onSubmissionComplete?: () => void;
   clearSelection?: (() => void) | null;
 }
@@ -108,221 +21,112 @@ const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
   onSubmissionComplete,
   clearSelection,
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(
-    null
-  );
-  const [submissionState, setSubmissionState] =
-    useState<SubmissionState | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Token validation
-  const isTokenValid = useCallback((loginData: LoginResponse): boolean => {
-    if (!loginData.tokenInfo || !loginData.tokenCreationTime) return false;
-    return (
-      Date.now() <
-      loginData.tokenCreationTime + loginData.tokenInfo.expiresIn * 1000
-    );
-  }, []);
+  // Format date for display
+  const formatDateTime = (timestamp: string | number) => {
+    const { date } = parseDatabaseTimestamp(timestamp);
+    return formatDisplayDate(date);
+  };
 
-  // Handle login
-  const connectToMyInvois = useCallback(async () => {
-    const storedLoginData = localStorage.getItem("myInvoisLoginData");
-    if (storedLoginData) {
-      const parsedData = JSON.parse(storedLoginData);
-      if (isTokenValid(parsedData)) {
-        setLoginResponse(parsedData);
-        return;
-      }
+  // Check connection to MyInvois API when menu opens
+  useEffect(() => {
+    if (isOpen) {
+      checkApiConnection();
     }
+  }, [isOpen]);
 
+  // Check MyInvois API connection
+  const checkApiConnection = async () => {
     try {
-      const data = await api.post("/api/einvoice/login");
-      if (data.success && data.tokenInfo) {
-        const loginDataWithTime = { ...data, tokenCreationTime: Date.now() };
-        localStorage.setItem(
-          "myInvoisLoginData",
-          JSON.stringify(loginDataWithTime)
-        );
-        setLoginResponse(loginDataWithTime);
-      } else {
-        setLoginResponse(data);
+      const response = await api.post("/api/einvoice/login");
+      setIsConnected(response.success);
+      if (!response.success) {
+        toast.error("Could not connect to MyInvois API");
       }
     } catch (err) {
-      setLoginResponse({
-        success: false,
-        message: "An error occurred while connecting to MyInvois API.",
-        apiEndpoint: "Unknown",
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
-  }, [isTokenValid]);
-
-  // Connect on open
-  useEffect(() => {
-    if (isOpen) connectToMyInvois();
-  }, [isOpen, connectToMyInvois]);
-
-  // Handle token expiration
-  useEffect(() => {
-    if (loginResponse && !isTokenValid(loginResponse)) {
-      toast.error("Your session has expired. Please refresh the page.");
-      setLoginResponse(null);
-      localStorage.removeItem("myInvoisLoginData");
-    }
-  }, [loginResponse, isTokenValid]);
-
-  const handleSubmitInvoice = async () => {
-    if (!loginResponse?.success || !isTokenValid(loginResponse)) {
-      toast.error("Your session has expired. Please refresh the page.");
-      return;
-    }
-
-    if (selectedInvoices.length === 0) {
-      toast.error("Please select at least one invoice to submit");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-
-      // Set initial submission state with documents
-      const initialDocuments: Record<string, DocumentStatus> = {};
-      selectedInvoices.forEach((invoice) => {
-        initialDocuments[invoice.id] = {
-          invoiceNo: invoice.id,
-          currentStatus: "PROCESSING",
-          summary: {
-            status: "Submitted",
-            receiverName: invoice.customerid,
-          },
-        };
-      });
-
-      setSubmissionState({
-        phase: "SUBMISSION",
-        tracker: {
-          submissionUid: "pending",
-          batchInfo: {
-            size: selectedInvoices.length,
-            submittedAt: new Date().toISOString(),
-          },
-          statistics: {
-            totalDocuments: selectedInvoices.length,
-            processed: 0,
-            accepted: 0,
-            rejected: 0,
-            processing: selectedInvoices.length,
-            completed: 0,
-          },
-          documents: initialDocuments,
-          processingUpdates: [],
-          overallStatus: "InProgress",
-        },
-      });
-
-      const response = await api.post("/api/einvoice/submit-system", {
-        invoiceIds: selectedInvoices.map((invoice) => invoice.id),
-      });
-
-      const documents: Record<string, DocumentStatus> = {};
-
-      // Handle accepted documents
-      response.acceptedDocuments?.forEach((doc: any) => {
-        if (doc.internalId) {
-          // Make sure we have a valid ID
-          documents[doc.internalId] = {
-            invoiceNo: doc.internalId,
-            currentStatus: "COMPLETED",
-            summary: {
-              status: doc.status || "Valid",
-              receiverName: doc.receiverName,
-            },
-          };
-        }
-      });
-
-      // Handle rejected documents
-      response.rejectedDocuments?.forEach((doc: any) => {
-        if (doc.internalId) {
-          // Make sure we have a valid ID
-          documents[doc.internalId] = {
-            invoiceNo: doc.internalId,
-            currentStatus: "REJECTED",
-            errors: [
-              {
-                code: doc.error.code,
-                message: doc.error.message,
-                details: doc.error.details || [],
-              },
-            ],
-          };
-        }
-      });
-
-      // Ensure all selected invoices are accounted for in documents
-      selectedInvoices.forEach((invoice) => {
-        if (!documents[invoice.id]) {
-          // Add any missing invoices as rejected with unknown status
-          documents[invoice.id] = {
-            invoiceNo: invoice.id,
-            currentStatus: "REJECTED",
-            errors: [
-              {
-                code: "UNKNOWN",
-                message: "Processing failed",
-                details: [],
-              },
-            ],
-          };
-        }
-      });
-
-      const acceptedCount = response.acceptedDocuments?.length || 0;
-      const rejectedCount = response.rejectedDocuments?.length || 0;
-
-      setSubmissionState({
-        phase: "COMPLETED",
-        tracker: {
-          submissionUid: response.submissionUid || "VALIDATION_FAILED",
-          batchInfo: {
-            size: selectedInvoices.length,
-            submittedAt: new Date().toISOString(),
-            completedAt: new Date().toISOString(),
-          },
-          statistics: {
-            totalDocuments: selectedInvoices.length,
-            processed: acceptedCount + rejectedCount,
-            accepted: acceptedCount,
-            rejected: rejectedCount,
-            processing: 0,
-            completed: acceptedCount,
-          },
-          documents,
-          processingUpdates: [],
-          overallStatus:
-            response.overallStatus ||
-            (acceptedCount > 0 && rejectedCount > 0
-              ? "Partial"
-              : acceptedCount > 0
-              ? "Valid"
-              : "Invalid"),
-        },
-      });
-    } catch (error: any) {
-      console.error("Submission Error:", error);
-      toast.error(`Submission failed: ${error.message}`);
-      setSubmissionState(null);
-    } finally {
-      setIsSubmitting(false);
+      console.error("Failed to check API connection:", err);
+      setIsConnected(false);
     }
   };
 
-  const handleClose = () => {
-    setIsOpen(false);
-    setSubmissionState(null);
-    if (clearSelection) clearSelection();
-    if (onSubmissionComplete) onSubmissionComplete();
+  // Filter eligible invoices
+  const eligibleInvoices = selectedInvoices.filter(
+    (invoice) =>
+      invoice.invoice_status !== "cancelled" &&
+      invoice.paymenttype !== "CASH" &&
+      (invoice.einvoice_status === null ||
+        invoice.einvoice_status === "invalid")
+  );
+
+  // Handle submit
+  const handleSubmitInvoices = async () => {
+    if (eligibleInvoices.length === 0) {
+      toast.error("No eligible invoices to submit");
+      return;
+    }
+
+    if (!isConnected) {
+      toast.error("Cannot submit without connection to MyInvois API");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const toastId = toast.loading(
+      `Submitting ${eligibleInvoices.length} invoice(s)...`
+    );
+
+    try {
+      const response = await api.post("/api/einvoice/submit-system", {
+        invoiceIds: eligibleInvoices.map((inv) => inv.id),
+      });
+
+      // Process response
+      if (response.success) {
+        const acceptedCount = response.acceptedDocuments?.length || 0;
+        const rejectedCount = response.rejectedDocuments?.length || 0;
+
+        if (acceptedCount > 0 && rejectedCount === 0) {
+          toast.success(`Successfully submitted ${acceptedCount} invoice(s)`, {
+            id: toastId,
+          });
+        } else if (acceptedCount > 0 && rejectedCount > 0) {
+          toast.success(
+            `Partially successful: ${acceptedCount} accepted, ${rejectedCount} rejected`,
+            { id: toastId }
+          );
+        } else if (rejectedCount > 0) {
+          toast.error(`All ${rejectedCount} invoice(s) were rejected`, {
+            id: toastId,
+          });
+        }
+
+        // Show rejection reasons if any
+        response.rejectedDocuments?.slice(0, 3).forEach((doc: any) => {
+          if (doc.error?.message) {
+            toast.error(`Invoice ${doc.internalId}: ${doc.error.message}`, {
+              duration: 4000,
+            });
+          }
+        });
+      } else {
+        toast.error(response.message || "Submission failed", { id: toastId });
+      }
+
+      // Close menu and run completion handler
+      setIsOpen(false);
+      if (clearSelection) clearSelection();
+      if (onSubmissionComplete) onSubmissionComplete();
+    } catch (error: any) {
+      console.error("Error submitting e-invoices:", error);
+      toast.error(`Submission failed: ${error.message || "Unknown error"}`, {
+        id: toastId,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -335,33 +139,169 @@ const EInvoiceMenu: React.FC<EInvoiceMenuProps> = ({
         e-Invoice
       </Button>
 
-      <InvoisModalContainer
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        loginResponse={loginResponse}
-      >
-        {submissionState ? (
-          <SubmissionDisplay state={submissionState} onClose={handleClose} />
-        ) : (
-          <>
-            <SelectedInvoicesInfo selectedInvoices={selectedInvoices} />
+      {isOpen && (
+        <div className="absolute right-0 top-14 w-[450px] bg-white rounded-xl shadow-xl border border-default-200 z-50">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-default-200">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-default-900">
+                Submit to MyInvois
+              </h2>
+              <div
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium 
+                ${
+                  isConnected
+                    ? "bg-green-50 text-green-600"
+                    : "bg-red-50 text-red-600"
+                }`}
+              >
+                {isConnected ? "Connected" : "Disconnected"}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-default-500 hover:text-default-700 transition-colors"
+            >
+              <IconInfoCircle size={20} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+            {/* Selected Invoices */}
+            <div className="bg-default-50 border border-default-200 rounded-lg">
+              <div
+                className={`${
+                  selectedInvoices.length > 0
+                    ? "border-b border-default-200"
+                    : ""
+                } p-4`}
+              >
+                <h3 className="font-medium text-default-800">
+                  Selected Invoices ({selectedInvoices.length})
+                </h3>
+                <p className="text-sm text-default-600 mt-1">
+                  Eligible for e-Invoice:{" "}
+                  <span className="font-semibold">
+                    {eligibleInvoices.length}
+                  </span>
+                </p>
+              </div>
+
+              {selectedInvoices.length > 0 ? (
+                <div className="divide-y divide-default-200 max-h-60 overflow-y-auto">
+                  {selectedInvoices.map((invoice) => {
+                    const isEligible = eligibleInvoices.includes(invoice);
+
+                    return (
+                      <div
+                        key={invoice.id}
+                        className={`p-4 ${
+                          isEligible ? "bg-white" : "bg-default-50"
+                        } rounded-lg`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p
+                              className={`font-medium ${
+                                isEligible
+                                  ? "text-default-800"
+                                  : "text-default-400"
+                              }`}
+                            >
+                              #{invoice.id}
+                              {!isEligible && (
+                                <span className="ml-2 text-xs text-rose-500">
+                                  {invoice.invoice_status === "cancelled"
+                                    ? "Cancelled"
+                                    : invoice.paymenttype === "CASH"
+                                    ? "Cash invoice"
+                                    : invoice.einvoice_status === "valid" ||
+                                      invoice.einvoice_status === "pending"
+                                    ? `Already ${invoice.einvoice_status}`
+                                    : "Not eligible"}
+                                </span>
+                              )}
+                            </p>
+                            <p
+                              className={`text-sm ${
+                                isEligible
+                                  ? "text-default-600"
+                                  : "text-default-400"
+                              } mt-1`}
+                            >
+                              {invoice.customerid || "N/A"}
+                            </p>
+                          </div>
+                          <p
+                            className={`text-sm ${
+                              isEligible
+                                ? "text-default-500"
+                                : "text-default-400"
+                            }`}
+                          >
+                            {formatDateTime(invoice.createddate)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-default-500">
+                  No invoices selected
+                </div>
+              )}
+            </div>
+
+            {/* Info Box or Submit Button */}
             {selectedInvoices.length === 0 ? (
-              <InfoBox />
+              <div className="p-4 mt-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <IconInfoCircle
+                    size={20}
+                    className="flex-shrink-0 mt-0.5 text-amber-500"
+                  />
+                  <div className="space-y-1">
+                    <p className="font-medium text-amber-800">
+                      Please select invoices to submit to MyInvois
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      Only invoice-type (not cash) and non-cancelled invoices
+                      that haven't been submitted before are eligible for
+                      e-invoicing.
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="mt-4">
                 <Button
-                  onClick={handleSubmitInvoice}
-                  disabled={isSubmitting || !loginResponse?.success}
+                  onClick={handleSubmitInvoices}
+                  disabled={
+                    isSubmitting ||
+                    !isConnected ||
+                    eligibleInvoices.length === 0
+                  }
                   className="w-full justify-center"
-                  variant={loginResponse?.success ? "default" : "outline"}
+                  variant={
+                    isConnected && eligibleInvoices.length > 0
+                      ? "default"
+                      : "outline"
+                  }
+                  icon={IconSend}
                 >
-                  {isSubmitting ? "Submitting..." : "Submit Selected Invoices"}
+                  {isSubmitting
+                    ? "Submitting..."
+                    : eligibleInvoices.length === 0
+                    ? "No Eligible Invoices"
+                    : `Submit ${eligibleInvoices.length} Invoice(s)`}
                 </Button>
               </div>
             )}
-          </>
-        )}
-      </InvoisModalContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -28,8 +28,10 @@ import {
   IconCircleCheck,
   IconClockHour4,
   IconAlertTriangle,
+  IconSend,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
+import { api } from "../../routes/utils/api";
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -162,6 +164,7 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false); // Rename from showDeletePaymentConfirm
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null); // Rename from paymentToDelete
   const [isCancellingPayment, setIsCancellingPayment] = useState(false); // Rename from isDeletingPayment
+  const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -241,6 +244,72 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error(error.message || "Failed to cancel invoice", { id: toastId });
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  // E-Invoice submission handler
+  const handleSubmitEInvoice = async () => {
+    if (!invoiceData || isSubmittingEInvoice) return;
+
+    // Validation checks
+    if (invoiceData.invoice_status === "cancelled") {
+      toast.error("Cannot submit cancelled invoice for e-invoicing");
+      return;
+    }
+
+    if (invoiceData.paymenttype === "CASH") {
+      toast.error("Cash invoices cannot be submitted for e-invoicing");
+      return;
+    }
+
+    if (
+      invoiceData.einvoice_status === "valid" ||
+      invoiceData.einvoice_status === "pending"
+    ) {
+      toast.error("This invoice has already been submitted for e-invoicing");
+      return;
+    }
+
+    setIsSubmittingEInvoice(true);
+    const toastId = toast.loading("Submitting e-invoice...");
+
+    try {
+      // Call the backend e-invoice submission endpoint with the current invoice ID
+      const response = await api.post("/api/einvoice/submit-system", {
+        invoiceIds: [invoiceData.id],
+      });
+
+      // Process response
+      if (response.success) {
+        toast.success("e-Invoice submitted successfully", { id: toastId });
+        // Refresh invoice data to show updated status
+        await fetchDetails();
+      } else {
+        // Handle validation or other errors
+        const errorMessage = response.message || "Failed to submit e-invoice";
+        toast.error(errorMessage, { id: toastId });
+
+        // Check for specific validation errors
+        if (response.rejectedDocuments?.length > 0) {
+          const rejection = response.rejectedDocuments[0];
+          if (rejection.error?.details?.length > 0) {
+            // Show first few validation errors
+            rejection.error.details.slice(0, 3).forEach((detail: any) => {
+              toast.error(detail.message || "Validation error", {
+                duration: 5000,
+              });
+            });
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error("Error submitting e-invoice:", error);
+      toast.error(
+        `Failed to submit e-invoice: ${error.message || "Unknown error"}`,
+        { id: toastId }
+      );
+    } finally {
+      setIsSubmittingEInvoice(false);
     }
   };
 
@@ -533,6 +602,21 @@ const InvoiceDetailsPage: React.FC = () => {
         </h1>
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
+          {!isCancelled &&
+            invoiceData.paymenttype !== "CASH" &&
+            (invoiceData.einvoice_status === null ||
+              invoiceData.einvoice_status === "invalid") && (
+              <Button
+                onClick={handleSubmitEInvoice}
+                icon={IconSend}
+                variant="outline"
+                color="amber"
+                size="md"
+                disabled={isLoading || isSubmittingEInvoice}
+              >
+                {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
+              </Button>
+            )}
           <Button
             onClick={handlePrint}
             icon={IconPrinter}
@@ -750,20 +834,22 @@ const InvoiceDetailsPage: React.FC = () => {
         </section>
 
         {/* E-Invoice Details */}
-        {invoiceData.uuid && (
+        {(invoiceData.uuid || invoiceData.einvoice_status) && (
           <section className="p-4 border rounded-lg bg-white shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800">
               E-Invoice Details
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <p>
-                <strong className="text-gray-500 font-medium w-24 inline-block">
-                  UUID:
-                </strong>{" "}
-                <span className="font-mono text-sm break-all">
-                  {invoiceData.uuid}
-                </span>
-              </p>
+              {invoiceData.uuid && (
+                <p>
+                  <strong className="text-gray-500 font-medium w-24 inline-block">
+                    UUID:
+                  </strong>{" "}
+                  <span className="font-mono text-sm break-all">
+                    {invoiceData.uuid}
+                  </span>
+                </p>
+              )}
               {invoiceData.long_id && (
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
@@ -789,20 +875,23 @@ const InvoiceDetailsPage: React.FC = () => {
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Validated:
                   </strong>{" "}
+                  {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
                   {parseDatabaseTimestamp(invoiceData.datetime_validated)
-                    .formattedTime || "N/A"}
+                    .formattedTime || ""}
                 </p>
               )}
-              {eInvoiceStatusInfo && (
-                <p>
-                  <strong className="text-gray-500 font-medium w-24 inline-block">
-                    Status:
-                  </strong>{" "}
+              <p>
+                <strong className="text-gray-500 font-medium w-24 inline-block">
+                  Status:
+                </strong>{" "}
+                {eInvoiceStatusInfo ? (
                   <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
                     {eInvoiceStatusInfo.text}
                   </span>
-                </p>
-              )}
+                ) : (
+                  <span className="text-gray-500">Not Submitted</span>
+                )}
+              </p>
             </div>
           </section>
         )}

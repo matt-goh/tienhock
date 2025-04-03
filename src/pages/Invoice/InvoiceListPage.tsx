@@ -1,5 +1,4 @@
 // src/pages/Invoice/InvoiceListPage.tsx
-
 import React, {
   useState,
   useEffect,
@@ -546,8 +545,9 @@ const InvoiceListPage: React.FC = () => {
       (inv) =>
         selectedInvoiceIds.has(inv.id) &&
         inv.invoice_status !== "cancelled" && // Cannot submit cancelled
-        inv.paymenttype !== "CASH" && // Cannot submit CASH (usually)
-        (inv.einvoice_status === null || inv.einvoice_status === "invalid") // Not already valid/pending/cancelled
+        (inv.einvoice_status === null ||
+          inv.einvoice_status === "invalid" ||
+          inv.einvoice_status === "pending") // Not already valid/cancelled
     );
 
     if (eligibleInvoices.length === 0) {
@@ -593,63 +593,54 @@ const InvoiceListPage: React.FC = () => {
     );
 
     try {
-      // Call backend endpoint responsible for fetching full data and submitting
-      // This endpoint should return a structured response indicating success/failure per invoice
+      // Call backend endpoint responsible for submitting
       const response = await api.post("/api/einvoice/submit-system", {
         invoiceIds: idsToSubmit,
       });
 
-      // --- Process Backend Response (Adapt based on your API's actual response structure) ---
-      const {
-        message = "E-invoice submission processed.",
-        overallStatus = "Unknown",
-        results = [],
-      } = response; // Assuming a 'results' array
+      // Process response from the updated endpoint
+      if (response.success) {
+        // Count accepted and rejected documents
+        const acceptedCount = response.acceptedDocuments?.length || 0;
+        const rejectedCount = response.rejectedDocuments?.length || 0;
 
-      const acceptedCount = results.filter(
-        (r: any) => r.status === "accepted" || r.status === "pending"
-      ).length;
-      const rejectedCount = results.filter(
-        (r: any) => r.status === "rejected"
-      ).length;
-      const errorCount = results.filter(
-        (r: any) => r.status === "error"
-      ).length;
+        if (acceptedCount > 0 && rejectedCount === 0) {
+          toast.success(
+            `Successfully submitted ${acceptedCount} invoice(s) for e-invoicing.`,
+            { id: toastId }
+          );
+        } else if (acceptedCount > 0 && rejectedCount > 0) {
+          toast.success(
+            `Partially successful: ${acceptedCount} accepted, ${rejectedCount} rejected.`,
+            { id: toastId }
+          );
 
-      // Display summary toast
-      if (overallStatus === "Success" && acceptedCount > 0) {
-        toast.success(`${message} Submitted: ${acceptedCount}.`, {
-          id: toastId,
-        });
-      } else if (
-        overallStatus === "Partial" ||
-        rejectedCount > 0 ||
-        errorCount > 0
-      ) {
-        toast.error(
-          `${message} Accepted/Pending: ${acceptedCount}, Rejected: ${rejectedCount}, Errors: ${errorCount}. See console.`,
-          { id: toastId, duration: 6000 }
-        );
-      } else if (overallStatus === "Failed" || overallStatus === "Invalid") {
-        toast.error(`${message} All submissions failed or were rejected.`, {
-          id: toastId,
-          duration: 6000,
-        });
+          // Show first few rejection reasons
+          response.rejectedDocuments?.slice(0, 3).forEach((doc: any) => {
+            if (doc.error?.message) {
+              toast.error(`Invoice ${doc.internalId}: ${doc.error.message}`, {
+                duration: 4000,
+              });
+            }
+          });
+        } else if (acceptedCount === 0 && rejectedCount > 0) {
+          toast.error(`All ${rejectedCount} invoice(s) were rejected.`, {
+            id: toastId,
+          });
+
+          // Show first few rejection reasons
+          response.rejectedDocuments?.slice(0, 3).forEach((doc: any) => {
+            if (doc.error?.message) {
+              toast.error(`Invoice ${doc.internalId}: ${doc.error.message}`, {
+                duration: 4000,
+              });
+            }
+          });
+        }
       } else {
-        // Default/Unknown status
-        toast.success(message, { id: toastId });
-      }
-
-      // Log detailed results for debugging
-      if (results.length > 0) {
-        console.log("E-invoice Submission Results:", results);
-        results.forEach((res: any) => {
-          if (res.status === "rejected" || res.status === "error") {
-            toast.error(
-              `Inv ${res.id || "N/A"}: ${res.message || "Failed/Rejected"}`,
-              { duration: 4000 }
-            );
-          }
+        // Handle overall failure
+        toast.error(response.message || "E-invoice submission failed", {
+          id: toastId,
         });
       }
 
@@ -993,10 +984,19 @@ const InvoiceListPage: React.FC = () => {
         isOpen={showEInvoiceConfirm}
         onClose={() => setShowEInvoiceConfirm(false)}
         onConfirm={confirmBulkSubmitEInvoice}
-        title={`Submit E-Invoice(s)`}
-        message={`Proceed to submit the selected eligible invoice(s) for e-invoicing? Please ensure customer details are correct.`}
-        confirmButtonText="Submit Now"
-        variant="default" // Or 'info'/'primary'
+        title={`Submit Selected Invoices for e-Invoicing`}
+        message={`You are about to submit ${
+          invoices.filter(
+            (inv) =>
+              selectedInvoiceIds.has(inv.id) &&
+              inv.invoice_status !== "cancelled" &&
+              (inv.einvoice_status === null ||
+                inv.einvoice_status === "invalid" ||
+                inv.einvoice_status === "pending")
+          ).length
+        } eligible invoice(s) to the Malaysian MyInvois e-invoicing system. This action sends your invoice data to the tax authority. Continue?`}
+        confirmButtonText="Submit e-Invoices"
+        variant="default"
       />
     </div>
   );
