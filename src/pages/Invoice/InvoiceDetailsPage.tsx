@@ -401,13 +401,17 @@ const InvoiceDetailsPage: React.FC = () => {
   const getStatusBadgeClass = (
     status: ExtendedInvoiceData["invoice_status"]
   ) => {
-    switch (status) {
+    switch (
+      status?.toLowerCase() // Use toLowerCase for safety
+    ) {
       case "paid":
         return "bg-green-100 text-green-700";
       case "cancelled":
         return "bg-rose-100 text-rose-700";
-      case "active": // Treat 'active' like 'Unpaid' if balance > 0
-      case "Unpaid":
+      case "overdue":
+        return "bg-red-100 text-red-700";
+      case "active":
+      case "unpaid":
       default:
         return "bg-amber-100 text-amber-700";
     }

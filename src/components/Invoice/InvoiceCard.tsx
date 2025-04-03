@@ -23,30 +23,43 @@ interface InvoiceCardProps {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onViewDetails: (id: string) => void;
-  salesmanName?: string | null; // <-- Add salesmanName prop
+  salesmanName?: string | null;
 }
 
-// Helper to get status styles (no changes)
-const getInvoiceStatusStyles = (status: InvoiceStatus) => {
-  switch (status) {
+// Helper to get status styles
+const getInvoiceStatusStyles = (status: InvoiceStatus | undefined) => {
+  // Added undefined check
+  // Use toLowerCase() for case-insensitive matching
+  switch (status?.toLowerCase()) {
     case "paid":
       return {
         bg: "bg-green-100",
         text: "text-green-800",
         border: "border-green-200",
+        label: "Paid",
       };
     case "cancelled":
       return {
         bg: "bg-rose-100",
         text: "text-rose-800",
         border: "border-rose-200",
+        label: "Cancelled",
+      };
+    case "overdue":
+      return {
+        bg: "bg-red-100", // Example: Red style
+        text: "text-red-800",
+        border: "border-red-200",
+        label: "Overdue",
       };
     case "active":
-    default:
+    case "unpaid": // Treat 'active' and 'unpaid' the same visually
+    default: // Default to Unpaid style
       return {
         bg: "bg-amber-100",
         text: "text-amber-800",
         border: "border-amber-200",
+        label: status === "active" ? "Active" : "Unpaid", // Keep original label if needed
       };
   }
 };
@@ -185,8 +198,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${invoiceStatusStyle.bg} ${invoiceStatusStyle.text}`}
         >
-          {invoice.invoice_status.charAt(0).toUpperCase() +
-            invoice.invoice_status.slice(1)}
+          {invoiceStatusStyle.label}
         </span>
         {/* E-Invoice Status */}
         {eInvoiceStatusInfo && EInvoiceIcon && (
