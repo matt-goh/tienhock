@@ -20,7 +20,6 @@ import {
   IconCheck,
   IconSquareCheckFilled,
   IconSquare,
-  IconPhone, // Ensure IconPhone is imported if used for rentals/locations
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents"; // Use FormCombobox and SelectOption
@@ -46,7 +45,7 @@ interface Rental {
   invoice_info?: {
     invoice_id: number;
     invoice_number: string;
-    has_payments: boolean;
+    status: string;
   } | null;
 }
 
@@ -242,8 +241,12 @@ const InvoiceFormPage: React.FC = () => {
       );
       const available = data.filter(
         (r) =>
+          // Include rentals with no invoice info
           !r.invoice_info ||
-          (isEditMode && r.rental_id === initialFormData?.rental_id)
+          // OR include the rental being edited in edit mode
+          (isEditMode && r.rental_id === initialFormData?.rental_id) ||
+          // OR include rentals with cancelled invoices (not active)
+          (r.invoice_info && r.invoice_info.status === "cancelled")
       );
       setAvailableRentals(available);
       // Reset selection if current is no longer valid
@@ -426,16 +429,6 @@ const InvoiceFormPage: React.FC = () => {
       return false;
     }
     if (
-      formData.type === "regular" &&
-      selectedRental?.invoice_info &&
-      selectedRental.invoice_info.invoice_id !== formData.invoice_id
-    ) {
-      toast.error(
-        `Rental #${selectedRental.rental_id} has Invoice #${selectedRental.invoice_info.invoice_number}.`
-      );
-      return false;
-    }
-    if (
       formData.type === "statement" &&
       (!formData.statement_period_start || !formData.statement_period_end)
     ) {
@@ -488,11 +481,37 @@ const InvoiceFormPage: React.FC = () => {
     return true;
   };
   const handleSubmit = async (e: React.FormEvent) => {
-    /* ... same submit logic ... */ e.preventDefault();
+    e.preventDefault();
     if (!validateForm()) return;
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
     try {
+      // For regular invoices with a rental_id, check if the rental already has an active invoice
+      if (formData.type === "regular" && formData.rental_id) {
+        try {
+          // Make a direct API call to check if this rental already has an active invoice
+          const rentalCheckResponse = await greenTargetApi.getRental(
+            formData.rental_id
+          );
+
+          // If rental has invoice_info and it's not the current invoice being edited, show error
+          if (
+            rentalCheckResponse.invoice_info?.status === "active" &&
+            (!isEditMode ||
+              rentalCheckResponse.invoice_info.invoice_id !==
+                formData.invoice_id)
+          ) {
+            toast.error(
+              `Cannot create invoice: Rental #${formData.rental_id} already has Invoice #${rentalCheckResponse.invoice_info.invoice_number}`
+            );
+            setIsSaving(false);
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking rental status:", error);
+          // Continue with submission if we can't check (fail open)
+        }
+      }
       const invData: Omit<Invoice, "invoice_id" | "invoice_number"> & {
         total_amount: number;
         invoice_id?: number;
@@ -914,14 +933,6 @@ const InvoiceFormPage: React.FC = () => {
                         {isRentalActive(selectedRental.date_picked)
                           ? "Ongoing"
                           : "Completed"}{" "}
-                        {selectedRental.invoice_info &&
-                          selectedRental.invoice_info.invoice_id !==
-                            formData.invoice_id && (
-                            <span className="ml-2 text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">
-                              (Has Invoice #
-                              {selectedRental.invoice_info.invoice_number})
-                            </span>
-                          )}
                       </span>
                     </div>
                   </div>

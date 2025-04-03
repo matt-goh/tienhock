@@ -64,21 +64,29 @@ export default function (pool) {
 
     try {
       let query = `
-        SELECT r.*, 
-               c.name as customer_name, 
-               c.phone_number as customer_phone_number,
-               l.address as location_address,
-               l.phone_number as location_phone_number,
-               d.status as dumpster_status,
-               (SELECT json_build_object(
-                  'invoice_id', i.invoice_id,
-                  'status', i.status
-                ) FROM greentarget.invoices i WHERE i.rental_id = r.rental_id LIMIT 1) as invoice_info
-        FROM greentarget.rentals r
-        JOIN greentarget.customers c ON r.customer_id = c.customer_id
-        LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-        JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
-        WHERE 1=1
+                    SELECT r.*, 
+            c.name as customer_name, 
+            c.phone_number as customer_phone_number,
+            l.address as location_address,
+            l.phone_number as location_phone_number,
+            d.status as dumpster_status,
+            (SELECT json_build_object(
+                'invoice_id', i.invoice_id,
+                'invoice_number', i.invoice_number,
+                'status', i.status
+              ) FROM greentarget.invoices i 
+              WHERE i.rental_id = r.rental_id 
+              ORDER BY 
+                CASE 
+                  WHEN i.status IS NULL OR i.status = 'active' THEN 0
+                  ELSE 1
+                END
+              LIMIT 1) as invoice_info
+      FROM greentarget.rentals r
+      JOIN greentarget.customers c ON r.customer_id = c.customer_id
+      LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
+      JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+      WHERE 1=1
       `;
 
       const queryParams = [];
@@ -554,6 +562,7 @@ export default function (pool) {
                (SELECT json_build_object(
                   'invoice_id', i.invoice_id,
                   'invoice_number', i.invoice_number,
+                  'status', i.status,
                   'amount', i.total_amount,
                   'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id)
                 ) FROM greentarget.invoices i WHERE i.rental_id = r.rental_id LIMIT 1) as invoice_info
