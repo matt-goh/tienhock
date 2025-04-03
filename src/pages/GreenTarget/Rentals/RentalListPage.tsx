@@ -281,7 +281,8 @@ const RentalCard = ({
           )}
 
           {/* Show "View Invoice" or "Create Invoice" based on invoice status */}
-          {rental?.invoice_info?.status === "active" ? (
+          {rental?.invoice_info?.status === "active" ||
+          rental?.invoice_info?.status === "overdue" ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
