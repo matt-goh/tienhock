@@ -1128,30 +1128,6 @@ export default function (pool, config) {
     }
   }); // End POST /submit-invoices
 
-  // Check for duplicate invoice numbers
-  router.get("/check-duplicate", async (req, res) => {
-    const { invoiceNo } = req.query;
-
-    if (!invoiceNo) {
-      return res.status(400).json({ message: "Invoice number is required" });
-    }
-
-    try {
-      // Query both id and invoiceno columns
-      const query = "SELECT COUNT(*) FROM invoices WHERE id = $1";
-      const result = await pool.query(query, [invoiceNo]);
-      const count = parseInt(result.rows[0].count);
-
-      return res.json({ isDuplicate: count > 0 });
-    } catch (error) {
-      console.error("Error checking for duplicate invoice number:", error);
-      return res.status(500).json({
-        message: "Error checking for duplicate invoice number",
-        error: error.message,
-      });
-    }
-  });
-
   // Get order details for a specific invoice
   router.get("/details/:id/items", async (req, res) => {
     const { id } = req.params;
