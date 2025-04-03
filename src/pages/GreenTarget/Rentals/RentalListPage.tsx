@@ -38,8 +38,7 @@ interface Rental {
   remarks: string | null;
   invoice_info?: {
     invoice_id: number;
-    invoice_number: string;
-    has_payments: boolean;
+    status: string;
   } | null;
 }
 
@@ -282,7 +281,7 @@ const RentalCard = ({
           )}
 
           {/* Show "View Invoice" or "Create Invoice" based on invoice status */}
-          {rental.invoice_info ? (
+          {rental?.invoice_info?.status === "active" ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -294,11 +293,7 @@ const RentalCard = ({
                 }
               }}
               className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
-              title={
-                rental.invoice_info.has_payments
-                  ? "View Invoice"
-                  : "View Invoice"
-              }
+              title="View Invoice"
             >
               <IconFileInvoice size={18} stroke={1.5} />
             </button>
@@ -353,7 +348,6 @@ const RentalListPage = () => {
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
   const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
   const [rentalToPickup, setRentalToPickup] = useState<Rental | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -467,7 +461,6 @@ const RentalListPage = () => {
       return;
     }
 
-    setIsUpdating(true);
     try {
       // Update the rental with today as pickup date
       await greenTargetApi.updateRental(rentalToPickup.rental_id, {
@@ -488,7 +481,6 @@ const RentalListPage = () => {
       console.error("Error updating rental:", error);
       toast.error("Failed to mark rental as picked up");
     } finally {
-      setIsUpdating(false);
       setIsPickupDialogOpen(false);
       setRentalToPickup(null);
     }
