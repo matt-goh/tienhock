@@ -758,6 +758,8 @@ const InvoiceDetailsPage: React.FC = () => {
           className={`px-6 py-4 ${
             invoice.status === "cancelled"
               ? "bg-default-50 border-b border-default-200"
+              : invoice.status === "overdue"
+              ? "bg-red-50 border-b border-red-200"
               : invoice.current_balance > 0
               ? "bg-amber-50 border-b border-amber-200"
               : "bg-green-50 border-b border-green-200"
@@ -770,16 +772,13 @@ const InvoiceDetailsPage: React.FC = () => {
                   invoice?.status
                 )}`}
               >
-                {/* Display logic - might need refinement based on how 'paid' is determined */}
-                {
-                  invoice?.status === "cancelled"
-                    ? "Cancelled"
-                    : invoice?.status === "overdue"
-                    ? "Overdue"
-                    : invoice?.current_balance <= 0 // Check balance for paid status
-                    ? "Paid"
-                    : "Active" /* Or 'Unpaid' */
-                }
+                {invoice?.status === "cancelled"
+                  ? "Cancelled"
+                  : invoice?.status === "overdue"
+                  ? "Overdue"
+                  : invoice?.current_balance <= 0
+                  ? "Paid"
+                  : "Unpaid"}
               </span>
               {invoice.status === "cancelled" && invoice.cancellation_date && (
                 <span className="ml-2 text-xs text-default-500">
@@ -797,6 +796,8 @@ const InvoiceDetailsPage: React.FC = () => {
                 className={`text-lg font-bold ${
                   invoice.status === "cancelled"
                     ? "text-default-600"
+                    : invoice.status === "overdue"
+                    ? "text-red-600"
                     : invoice.current_balance > 0
                     ? "text-amber-600"
                     : "text-green-600"
