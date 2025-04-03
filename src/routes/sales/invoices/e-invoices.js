@@ -49,7 +49,7 @@ const getInvoices = async (pool, invoiceId) => {
           i.customerid,
           i.createddate,
           i.paymenttype,
-          i.amount,
+          i.total_excluding_tax,
           i.rounding,
           i.totalamountpayable
         FROM 
@@ -697,42 +697,42 @@ export default function (pool, config) {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      // REPLACE this query with the modified version:
       const query = `
-        SELECT 
-          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-          i.amount, i.rounding, i.totalamountpayable,
-          COALESCE(
-            json_agg(
-              CASE WHEN od.id IS NOT NULL THEN 
-                json_build_object(
-                  'code', od.code,
-                  'quantity', od.quantity,
-                  'price', od.price,
-                  'freeProduct', od.freeproduct,
-                  'returnProduct', od.returnproduct,
-                  'description', od.description,
-                  'tax', od.tax,
-                  'total', od.total,
-                  'issubtotal', od.issubtotal
-                )
-              ELSE NULL END
-              ORDER BY od.id  -- Maintain order of products and subtotals
-            ) FILTER (WHERE od.id IS NOT NULL),
-            '[]'::json
-          ) as products
-        FROM invoices i
-        LEFT JOIN order_details od ON i.id = od.invoiceid
-        LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
-        WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
-        AND e.internal_id IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM einvoices e2, jsonb_array_elements_text(e2.consolidated_invoices::jsonb) AS invoice_id
-          WHERE e2.consolidated_invoices IS NOT NULL 
-          AND invoice_id = i.id::text
-        )
-        GROUP BY i.id
-        ORDER BY CAST(i.createddate AS bigint) ASC
+      SELECT 
+        i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+        i.total_excluding_tax as amount, i.rounding, i.totalamountpayable,
+        COALESCE(
+          json_agg(
+            CASE WHEN od.id IS NOT NULL THEN 
+              json_build_object(
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+            ELSE NULL END
+            ORDER BY od.id
+          ) FILTER (WHERE od.id IS NOT NULL),
+          '[]'::json
+        ) as products
+      FROM invoices i
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+      AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+      AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM invoices consolidated 
+        WHERE consolidated.is_consolidated = true
+        AND consolidated.consolidated_invoices IS NOT NULL
+        AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+      )
+      GROUP BY i.id
+      ORDER BY CAST(i.createddate AS bigint) ASC
       `;
 
       const result = await pool.query(query, [startTimestamp, endTimestamp]);
@@ -885,27 +885,32 @@ export default function (pool, config) {
 
           // Insert consolidated record
           await client.query(
-            `INSERT INTO einvoices (
-              uuid, submission_uid, long_id, internal_id, type_name, 
-              receiver_id, receiver_name, datetime_validated,
-              total_payable_amount, total_excluding_tax, total_net_amount,
-              is_consolidated, consolidated_invoices, total_rounding
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            `INSERT INTO invoices (
+              id, uuid, submission_uid, long_id, datetime_validated,
+              total_excluding_tax, tax_amount, rounding, totalamountpayable,
+              invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
+              customerid, salespersonid, createddate, paymenttype
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
             [
+              consolidatedId,
               consolidatedData.uuid,
               submissionResponse.submissionUid,
               consolidatedData.longId,
-              consolidatedId,
-              consolidatedData.typeName || "Consolidated Invoice",
-              "EI00000000010",
-              "Consolidated Buyers",
               consolidatedData.dateTimeValidated || new Date().toISOString(),
-              consolidatedData.totalPayableAmount,
-              consolidatedData.totalExcludingTax,
-              consolidatedData.totalNetAmount,
+              consolidatedData.totalExcludingTax || 0,
+              consolidatedData.totalPayableAmount -
+                consolidatedData.totalExcludingTax -
+                totalRounding || 0,
+              totalRounding,
+              consolidatedData.totalPayableAmount || 0,
+              "paid", // Consolidated invoices are typically marked as paid
+              consolidatedData.longId ? "valid" : "pending",
               true,
               JSON.stringify(invoiceIds),
-              totalRounding,
+              "EI00000000010", // Default consolidated customer ID
+              "SYSTEM", // System-generated invoice
+              new Date().getTime().toString(), // Current timestamp
+              "INVOICE", // Consolidated invoices are always INVOICE type
             ]
           );
 

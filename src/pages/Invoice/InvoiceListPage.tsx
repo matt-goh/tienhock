@@ -545,14 +545,18 @@ const InvoiceListPage: React.FC = () => {
       (inv) =>
         selectedInvoiceIds.has(inv.id) &&
         inv.invoice_status !== "cancelled" && // Cannot submit cancelled
+        inv.paymenttype !== "CASH" && // Cannot submit CASH invoices
         (inv.einvoice_status === null ||
           inv.einvoice_status === "invalid" ||
-          inv.einvoice_status === "pending") // Not already valid/cancelled
+          inv.einvoice_status === "pending") && // Not already valid/cancelled
+        // Validate customer has necessary identification
+        inv.customerTin &&
+        inv.customerIdNumber // Ensure both TIN and ID number are present
     );
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (must be non-Cash, Active/Paid/Overdue, and not already Valid/Pending).",
+        "No selected invoices are eligible for e-invoice submission (Customer must have TIN and ID Number saved, and Invoice must be Active/Paid/Overdue, and not already Valid).",
         { duration: 5000 }
       );
       return;
@@ -578,8 +582,9 @@ const InvoiceListPage: React.FC = () => {
         (inv) =>
           selectedInvoiceIds.has(inv.id) &&
           inv.invoice_status !== "cancelled" &&
-          inv.paymenttype !== "CASH" &&
-          (inv.einvoice_status === null || inv.einvoice_status === "invalid")
+          (inv.einvoice_status === null || inv.einvoice_status === "invalid") &&
+          inv.customerTin &&
+          inv.customerIdNumber // Ensure both TIN and ID number are present
       )
       .map((inv) => inv.id);
 

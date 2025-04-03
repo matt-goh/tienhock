@@ -20,11 +20,9 @@ import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { useCustomerData } from "../../hooks/useCustomerData";
 import {
   createInvoice,
-  checkDuplicateInvoiceNo,
   createPayment,
 } from "../../utils/invoice/InvoiceUtils";
 import toast from "react-hot-toast";
-import { debounce } from "lodash";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
@@ -40,8 +38,6 @@ const InvoiceFormPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false); // Saving state (Create)
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
-  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
-  const [isDuplicate, setIsDuplicate] = useState(false);
 
   // Payment State (only relevant if 'Paid' is checked)
   const [isPaid, setIsPaid] = useState(false);
@@ -188,44 +184,6 @@ const InvoiceFormPage: React.FC = () => {
       );
     }
   }, [invoiceData?.products, invoiceData?.rounding]);
-
-  // Debounced Duplicate Check Function (Modified dependency)
-  const checkDuplicateDebounced = useCallback(
-    debounce(async (invoiceIdToCheck: string) => {
-      // Only perform check when an ID is entered
-      if (!invoiceIdToCheck) {
-        setIsDuplicate(false);
-        setIsCheckingDuplicate(false);
-        return;
-      }
-
-      setIsCheckingDuplicate(true);
-      try {
-        const numberPart =
-          invoiceIdToCheck.startsWith("I") || invoiceIdToCheck.startsWith("C")
-            ? invoiceIdToCheck.slice(1)
-            : invoiceIdToCheck;
-
-        if (!numberPart) {
-          setIsDuplicate(false);
-          setIsCheckingDuplicate(false);
-          return;
-        }
-
-        const isDup = await checkDuplicateInvoiceNo(numberPart);
-        setIsDuplicate(isDup);
-        if (isDup) {
-          toast.error(`Invoice number ${numberPart} already exists!`);
-        }
-      } catch (error) {
-        console.error("Duplicate check failed:", error);
-        setIsDuplicate(false);
-      } finally {
-        setIsCheckingDuplicate(false);
-      }
-    }, 500),
-    [] // No dependencies needed as it always checks
-  );
 
   // --- Input & Action Handlers ---
 
@@ -381,12 +339,6 @@ const InvoiceFormPage: React.FC = () => {
     const numberPartId = invoiceData.id;
 
     if (!numberPartId) errors.push("Invoice Number is required.");
-    if (numberPartId && isCheckingDuplicate) {
-      toast.error("Please wait for duplicate check.");
-      return;
-    }
-    if (numberPartId && isDuplicate)
-      errors.push(`Invoice Number ${numberPartId} is already taken.`);
     if (!invoiceData.customerid) errors.push("Customer is required.");
     if (!invoiceData.salespersonid) errors.push("Salesman is required.");
     if (!invoiceData.createddate || isNaN(parseInt(invoiceData.createddate)))
@@ -537,7 +489,7 @@ const InvoiceFormPage: React.FC = () => {
             variant="filled"
             color="sky"
             size="md"
-            disabled={isSaving || isCheckingDuplicate} // Disable if checking duplicate
+            disabled={isSaving}
           >
             {isSaving
               ? "Saving..."
@@ -565,12 +517,6 @@ const InvoiceFormPage: React.FC = () => {
             onLoadMoreCustomers={loadMoreCustomers}
             hasMoreCustomers={hasMoreCustomers}
             isFetchingCustomers={isFetchingCustomers}
-            onInvoiceIdBlur={async (invIdInput) => {
-              await checkDuplicateDebounced(invIdInput);
-              return isDuplicate;
-            }}
-            isCheckingDuplicate={isCheckingDuplicate}
-            isDuplicate={isDuplicate}
             readOnly={false} // Always editable
           />
         </section>

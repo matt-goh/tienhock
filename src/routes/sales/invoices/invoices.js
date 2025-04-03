@@ -131,16 +131,14 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName
+          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType
       `;
       let fromClause = `
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
       `;
       let whereClause = ` WHERE 1=1 `;
-      let groupByClause = `
-        GROUP BY i.id, c.name
-      `; // Grouping by primary key is sufficient if using aggregates or joins correctly
+      let groupByClause = `GROUP BY i.id, c.name, c.tin_number, c.id_number, c.id_type`; // Grouping by primary key is sufficient if using aggregates or joins correctly
 
       const filterParams = []; // Parameters ONLY for filtering (WHERE clause)
       let filterParamCounter = 1;
@@ -251,6 +249,9 @@ export default function (pool, config) {
         is_consolidated: row.is_consolidated || false,
         consolidated_invoices: row.consolidated_invoices,
         customerName: row.customername || row.customerid,
+        customerTin: row.customertin,
+        customerIdNumber: row.customeridnumber,
+        customerIdType: row.customeridtype,
       }));
 
       res.json({
@@ -494,11 +495,6 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
 
-      // Fetch customer name for the response
-      const customer = await fetchCustomerDataWithCache(
-        createdInvoice.customerid
-      );
-
       // Format response (Match ExtendedInvoiceData, include balance_due)
       res.status(201).json({
         message: "Invoice created successfully",
@@ -513,7 +509,6 @@ export default function (pool, config) {
             createdInvoice.totalamountpayable || 0
           ),
           balance_due: parseFloat(createdInvoice.balance_due || 0), // Include parsed balance
-          customerName: customer?.name || createdInvoice.customerid,
           products: invoice.products || [],
         },
       });
@@ -1277,12 +1272,6 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
 
-      // Fetch customer name for response
-      const customer = await fetchCustomerData(
-        pool,
-        updateResult.rows[0].customerid
-      );
-
       res.status(200).json({
         message: "Invoice cancelled successfully",
         invoice: {
@@ -1297,8 +1286,6 @@ export default function (pool, config) {
             updateResult.rows[0].totalamountpayable || 0
           ),
           balance_due: parseFloat(updateResult.rows[0].balance_due || 0),
-          customerName: customer?.name || updateResult.rows[0].customerid,
-          // products are not typically returned on cancel, but could be queried if needed
         },
       });
     } catch (error) {
