@@ -441,6 +441,16 @@ const InvoiceListPage: React.FC = () => {
     );
   };
 
+  // Helper function to format a Date object into 'YYYY-MM-DD' string in local time
+  const formatDateForAPI = (date: Date): string => {
+    const year = date.getFullYear();
+    // getMonth() is 0-indexed, add 1
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    // getDate() returns the day of the month
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Handle month selection
   const handleMonthChange = (month: { id: number; name: string }) => {
     setSelectedMonth(month);
@@ -475,22 +485,23 @@ const InvoiceListPage: React.FC = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      // Initialize with empty query params
       let queryParams = "";
 
-      // Build query string if we have any active filters
       if (dateRange.start || dateRange.end) {
         const params = new URLSearchParams();
 
         if (dateRange.start) {
           params.append(
             "start_date",
-            dateRange.start.toISOString().split("T")[0]
+            formatDateForAPI(dateRange.start) // Use local date formatting
           );
         }
 
         if (dateRange.end) {
-          params.append("end_date", dateRange.end.toISOString().split("T")[0]);
+          params.append(
+            "end_date",
+            formatDateForAPI(dateRange.end) // Use local date formatting
+          );
         }
 
         queryParams = `?${params.toString()}`;
