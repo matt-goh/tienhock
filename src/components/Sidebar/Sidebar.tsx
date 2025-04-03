@@ -126,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       (item) => item.name
     );
     setOpenItems(defaultOpenItems);
-  }, []);
+  }, [SidebarData]);
 
   useEffect(() => {
     const currentPath = location.pathname;
