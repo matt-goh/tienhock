@@ -55,7 +55,7 @@ interface Invoice {
   statement_period_start?: string;
   statement_period_end?: string;
   einvoice_status?: "submitted" | "pending" | null;
-  status: "paid" | "unpaid" | "cancelled";
+  status: "paid" | "unpaid" | "cancelled" | "overdue";
 }
 
 interface InvoiceCardProps {
@@ -115,6 +115,8 @@ const InvoiceCard = ({
           ? "border-default-400"
           : isPaid
           ? "border-green-400"
+          : invoice.status === "overdue"
+          ? "border-red-400"
           : "border-amber-400"
       }`}
       onClick={handleClick}
@@ -128,13 +130,21 @@ const InvoiceCard = ({
             ? "bg-default-500"
             : isPaid
             ? "bg-green-500"
+            : invoice.status === "overdue"
+            ? "bg-red-500"
             : "bg-amber-500"
         }`}
       >
         <div className="flex justify-between items-center">
           <span>{invoice.invoice_number}</span>
           <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
-            {isCancelled ? "Cancelled" : isPaid ? "Paid" : "Unpaid"}
+            {isCancelled
+              ? "Cancelled"
+              : isPaid
+              ? "Paid"
+              : invoice.status === "overdue"
+              ? "Overdue"
+              : "Unpaid"}
           </span>
         </div>
       </div>
@@ -247,13 +257,19 @@ const InvoiceCard = ({
             className={`p-2 border rounded-md ${
               isPaid
                 ? "bg-green-50 border-green-100"
+                : invoice.status === "overdue"
+                ? "bg-red-50 border-red-100"
                 : "bg-amber-50 border-amber-100"
             }`}
           >
             <p className="text-xs text-default-500 mb-1">Balance</p>
             <p
               className={`font-medium ${
-                isPaid ? "text-green-700" : "text-amber-700"
+                isPaid
+                  ? "text-green-700"
+                  : invoice.status === "overdue"
+                  ? "text-red-700"
+                  : "text-amber-700"
               }`}
             >
               {formatCurrency(invoice.current_balance)}
