@@ -151,8 +151,6 @@ export const getInvoices = async (
     // Other Filters (check backend expects comma-separated strings)
     if (filters.applySalespersonFilter && filters.salespersonId?.length)
       params.append("salesman", filters.salespersonId.join(","));
-    if (filters.applyCustomerFilter && filters.customerId?.length)
-      params.append("customer", filters.customerId.join(","));
     if (filters.applyPaymentTypeFilter && filters.paymentType)
       params.append("paymentType", filters.paymentType); // CASH or INVOICE
     if (filters.applyInvoiceStatusFilter && filters.invoiceStatus?.length)
