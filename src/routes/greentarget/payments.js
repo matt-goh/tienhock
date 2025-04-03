@@ -115,10 +115,18 @@ export default function (pool) {
         parseFloat(invoice.balance_due) - parseFloat(amount_paid)
       );
 
-      await client.query(
-        `UPDATE greentarget.invoices SET balance_due = $1 WHERE invoice_id = $2`,
-        [newBalanceDue, invoice_id]
-      );
+      // Update invoice balance_due and status if balance is 0
+      if (newBalanceDue === 0) {
+        await client.query(
+          `UPDATE greentarget.invoices SET balance_due = $1, status = 'paid' WHERE invoice_id = $2`,
+          [newBalanceDue, invoice_id]
+        );
+      } else {
+        await client.query(
+          `UPDATE greentarget.invoices SET balance_due = $1 WHERE invoice_id = $2`,
+          [newBalanceDue, invoice_id]
+        );
+      }
 
       // Update customer last_activity_date
       await client.query(
