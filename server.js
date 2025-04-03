@@ -32,26 +32,6 @@ export const pool = createDatabasePool({
   port: process.env.DB_PORT,
 });
 
-// Log pool connection events
-pool.pool.on("connect", (client) => {
-  console.log("Database pool: Client connected");
-  // You could potentially set application_name here if not done in pool config
-  // client.query('SET application_name = "YourAppName";');
-});
-pool.pool.on("acquire", (client) => {
-  console.log("Database pool: Client acquired");
-});
-pool.pool.on("error", (err, client) => {
-  console.error("Database pool: Idle client error", err.message, err.stack);
-});
-pool.pool.on("remove", (client) => {
-  console.log("Database pool: Client removed");
-});
-
-console.log(
-  `Database pool configured for ${process.env.DB_USER}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`
-);
-
 // Middleware to handle database maintenance mode
 app.use(async (req, res, next) => {
   // Check if the pool object itself exists and has the maintenanceMode property
@@ -147,12 +127,12 @@ const server = app.listen(port, "0.0.0.0", () => {
       ? `localhost:${port}`
       : `${SERVER_HOST || "0.0.0.0"}:${port}`;
 
-  console.log(`\n🚀 Server running on http://${displayHost}`);
-  console.log(`   Environment: ${NODE_ENV}`);
+  console.log(`🚀Server running on http://${displayHost}`);
+  console.log(`Environment: ${NODE_ENV}`);
   if (MYINVOIS_API_BASE_URL) {
-    console.log(`   MyInvois API: ${MYINVOIS_API_BASE_URL}`);
+    console.log(`MyInvois API: ${MYINVOIS_API_BASE_URL}`);
   } else {
-    console.warn("   MyInvois API URL not configured.");
+    console.warn("MyInvois API URL not configured.");
   }
 });
 

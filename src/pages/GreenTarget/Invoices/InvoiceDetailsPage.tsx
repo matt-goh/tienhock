@@ -947,7 +947,9 @@ const InvoiceDetailsPage: React.FC = () => {
                   </td>
                   <td
                     className={`py-2 font-bold text-right ${
-                      invoice.current_balance > 0
+                      invoice.status === "overdue"
+                        ? "text-red-600"
+                        : invoice.current_balance > 0
                         ? "text-amber-600"
                         : "text-green-600"
                     }`}

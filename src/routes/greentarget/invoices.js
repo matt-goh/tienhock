@@ -271,7 +271,6 @@ export default function (pool) {
       if (isNaN(numTaxAmount) || numTaxAmount < 0) {
         throw new Error("Invalid tax_amount provided.");
       }
-      // Add date validation if necessary (e.g., using moment or date-fns)
 
       // --- Logic ---
       const invoice_number = await generateInvoiceNumber(client, type);
@@ -282,8 +281,7 @@ export default function (pool) {
           invoice_number, type, customer_id, rental_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
           balance_due, -- Initially balance equals total
-          statement_period_start, statement_period_end,
-          status -- Default is 'active' from schema
+          statement_period_start, statement_period_end
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *;
