@@ -14,7 +14,6 @@ class EInvoiceSubmissionHandler {
         ? transformedInvoices
         : [transformedInvoices];
       const requestBody = this.prepareRequestBody(invoices);
-      await this.wait(300); // Add 0.3 second delay
       const submissionResponse = await this.apiClient.makeApiCall(
         "POST",
         "/api/v1.0/documentsubmissions",
@@ -139,7 +138,7 @@ class EInvoiceSubmissionHandler {
   async pollSubmissionStatus(submissionUid) {
     let attempts = 0;
     let lastResponse = null;
-
+    await this.wait(300); // Add 0.3 second delay before starting the first polling
     while (attempts < this.MAX_POLLING_ATTEMPTS) {
       try {
         const response = await this.apiClient.makeApiCall(

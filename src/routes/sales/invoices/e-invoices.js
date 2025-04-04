@@ -147,7 +147,7 @@ export default function (pool, config) {
     }
   });
 
-  // POST /api/invoices/submit - Submit Invoice to MyInvois (Updated with pending check)
+  // POST /api/einvoice/submit - Submit Invoice to MyInvois (Updated with pending check)
   router.post("/submit", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
@@ -302,7 +302,7 @@ export default function (pool, config) {
 
           return res.status(200).json({
             message: "All invoices were already processed or have been updated",
-            ...minimalInvoices,
+            invoices: [...minimalInvoices],
             overallStatus: "Success",
           });
         } else {
@@ -329,9 +329,6 @@ export default function (pool, config) {
           if (!invoiceData) {
             throw new Error(`Invoice with ID ${invoiceId} not found`);
           }
-
-          // Store the rounding value for this invoice
-          invoiceRoundings[invoiceId] = invoiceData.rounding || 0;
 
           const customerData = await fetchCustomerData(
             pool,
@@ -488,7 +485,7 @@ export default function (pool, config) {
 
           return res.status(400).json({
             message: "No valid invoices to process",
-            ...alreadyHandled, 
+            ...alreadyHandled,
             ...minimalResponse,
             overallStatus: "Invalid",
           });
