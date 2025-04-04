@@ -41,7 +41,7 @@ import {
 import { useCustomerNames } from "../../hooks/useCustomerNames";
 // Import the specific utilities needed
 import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
-import PaginationControls from "../../components/Invoice/PaginationControls";
+import Pagination from "../../components/Invoice/Pagination";
 import FilterSummary from "../../components/Invoice/FilterSummary";
 
 // --- Constants ---
@@ -972,7 +972,7 @@ const InvoiceListPage: React.FC = () => {
         <div className="flex-shrink-0 mt-auto pb-4">
           {/* Stick to bottom */}
           {!isLoading && totalItems > 0 && totalPages > 1 && (
-            <PaginationControls
+            <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={(page) => {
