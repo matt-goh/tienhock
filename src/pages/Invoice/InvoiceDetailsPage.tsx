@@ -267,20 +267,19 @@ const InvoiceDetailsPage: React.FC = () => {
   const handleSubmitEInvoiceClick = () => {
     if (!invoiceData) return;
 
-    // Validation checks
-    if (invoiceData.invoice_status === "cancelled") {
-      toast.error("Cannot submit cancelled invoice for e-invoicing");
-      return;
-    }
-
-    if (invoiceData.einvoice_status === "valid") {
-      toast.error("This invoice has already been submitted for e-invoicing");
-      return;
-    }
-
     // Check for TIN and ID
     if (!invoiceData.customerTin || !invoiceData.customerIdNumber) {
       toast.error("Customer must have TIN Number and ID Number defined");
+      return;
+    }
+
+    const isEligibleDate = isInvoiceDateEligibleForEinvoice(
+      invoiceData.createddate
+    );
+    if (!isEligibleDate) {
+      toast.error(
+        "Cannot submit e-invoice: Invoice must be created within the last 3 days."
+      );
       return;
     }
 
@@ -473,6 +472,18 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  // --- Helper function for date check ---
+  const isInvoiceDateEligibleForEinvoice = (
+    createdDateString: string | undefined | null
+  ): boolean => {
+    if (!createdDateString) return false;
+    const now = Date.now();
+    const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+    const cutoffTimestamp = now - threeDaysInMillis;
+    const invoiceTimestamp = parseInt(createdDateString, 10);
+    return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
+  };
+
   // --- Render Helper ---
   const formatCurrency = (amount: number | string | undefined): string => {
     const num = Number(amount);
@@ -571,6 +582,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const isCancelled = invoiceData.invoice_status === "cancelled";
   const isPaid = !isCancelled && invoiceData.balance_due <= 0; // Check balance only if not cancelled
+  const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
+    invoiceData.createddate
+  );
   const paymentMethodOptions = [
     { id: "cash", name: "Cash" },
     { id: "cheque", name: "Cheque" },
@@ -628,7 +642,16 @@ const InvoiceDetailsPage: React.FC = () => {
                 variant="outline"
                 color="amber"
                 size="md"
-                disabled={isLoading || isSubmittingEInvoice}
+                disabled={
+                  isLoading ||
+                  isSubmittingEInvoice ||
+                  !isEligibleForEinvoiceByDate
+                }
+                title={
+                  !isEligibleForEinvoiceByDate
+                    ? "Invoice must be within the last 3 days to submit"
+                    : "Submit for e-Invoicing"
+                }
               >
                 {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
               </Button>

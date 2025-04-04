@@ -113,7 +113,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-default-200">
           <h2 className="text-lg font-semibold text-default-900">
-            Submission Results
+            e-Invoice Submission Results
           </h2>
           {/* Hide Close button when loading */}
           {!isLoading && (
@@ -347,10 +347,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         {/* Footer - Hide when loading, show only Done button otherwise */}
         {!isLoading && (
           <div className="p-4 border-t border-default-200 bg-white">
-            <Button
-              onClick={onClose}
-              className="w-full justify-center py-2.5"
-            >
+            <Button onClick={onClose} className="w-full justify-center py-2.5">
               Done
             </Button>
           </div>
