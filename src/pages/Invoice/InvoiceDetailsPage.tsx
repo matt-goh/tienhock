@@ -6,6 +6,7 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import {
   getInvoiceById,
@@ -165,6 +166,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null); // Rename from paymentToDelete
   const [isCancellingPayment, setIsCancellingPayment] = useState(false); // Rename from isDeletingPayment
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
+  const [showSubmissionResults, setShowSubmissionResults] = useState(false);
+  const [submissionResults, setSubmissionResults] = useState(null);
+  const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -249,7 +253,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
   // E-Invoice submission handler
   const handleSubmitEInvoice = async () => {
-    if (!invoiceData || isSubmittingEInvoice) return;
+    if (!invoiceData || isSubmittingInvoice) return;
 
     // Validation checks
     if (invoiceData.invoice_status === "cancelled") {
@@ -270,8 +274,17 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
+    // Check for TIN and ID
+    if (!invoiceData.customerTin || !invoiceData.customerIdNumber) {
+      toast.error("Customer must have TIN Number and ID Number defined");
+      return;
+    }
+
+    // Show the submission results modal with loading state
+    setSubmissionResults(null);
+    setIsSubmittingInvoice(true);
     setIsSubmittingEInvoice(true);
-    const toastId = toast.loading("Submitting e-invoice...");
+    setShowSubmissionResults(true);
 
     try {
       // Call the backend e-invoice submission endpoint with the current invoice ID
@@ -279,36 +292,26 @@ const InvoiceDetailsPage: React.FC = () => {
         invoiceIds: [invoiceData.id],
       });
 
-      // Process response
+      // Save the result for the modal
+      setSubmissionResults(response);
+
+      // Process response - still show toast for quick feedback
       if (response.success) {
-        toast.success("e-Invoice submitted successfully", { id: toastId });
+        toast.success("e-Invoice submitted successfully");
         // Refresh invoice data to show updated status
         await fetchDetails();
       } else {
-        // Handle validation or other errors
         const errorMessage = response.message || "Failed to submit e-invoice";
-        toast.error(errorMessage, { id: toastId });
-
-        // Check for specific validation errors
-        if (response.rejectedDocuments?.length > 0) {
-          const rejection = response.rejectedDocuments[0];
-          if (rejection.error?.details?.length > 0) {
-            // Show first few validation errors
-            rejection.error.details.slice(0, 3).forEach((detail: any) => {
-              toast.error(detail.message || "Validation error", {
-                duration: 5000,
-              });
-            });
-          }
-        }
+        toast.error(errorMessage);
       }
     } catch (error: any) {
       console.error("Error submitting e-invoice:", error);
       toast.error(
-        `Failed to submit e-invoice: ${error.message || "Unknown error"}`,
-        { id: toastId }
+        `Failed to submit e-invoice: ${error.message || "Unknown error"}`
       );
+      setShowSubmissionResults(false); // Hide modal on network error
     } finally {
+      setIsSubmittingInvoice(false);
       setIsSubmittingEInvoice(false);
     }
   };
@@ -1012,7 +1015,13 @@ const InvoiceDetailsPage: React.FC = () => {
           )}
         </section>
       </div>
-
+      {/* --- Submission Results Modal --- */}
+      <SubmissionResultsModal
+        isOpen={showSubmissionResults}
+        onClose={() => setShowSubmissionResults(false)}
+        results={submissionResults}
+        isLoading={isSubmittingInvoice}
+      />
       {/* Confirmation Dialogs */}
       <ConfirmationDialog
         isOpen={showCancelConfirm}
