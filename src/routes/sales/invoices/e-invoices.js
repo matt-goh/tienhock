@@ -939,6 +939,8 @@ export default function (pool, config) {
           WHERE consolidated.is_consolidated = true
           AND consolidated.consolidated_invoices IS NOT NULL
           AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+          AND consolidated.invoice_status != 'cancelled' 
+          AND consolidated.einvoice_status != 'cancelled'
         )
         GROUP BY i.id
         ORDER BY CAST(i.createddate AS bigint) ASC
