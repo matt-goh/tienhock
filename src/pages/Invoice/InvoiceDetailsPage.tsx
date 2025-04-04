@@ -301,7 +301,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     try {
       // Call the backend e-invoice submission endpoint with the current invoice ID
-      const response = await api.post("/api/einvoice/submit-system", {
+      const response = await api.post("/api/einvoice/submit", {
         invoiceIds: [invoiceData.id],
       });
 
