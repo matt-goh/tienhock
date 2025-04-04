@@ -439,7 +439,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-grow p-5 bg-gray-50/30">
+        <div className="flex-grow p-5 bg-gray-50/30 rounded-b-xl overflow-hidden">
           {activeTab === "eligible" ? (
             // Eligible invoices tab content (remains largely the same)
             <div className="space-y-4">
@@ -566,10 +566,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     </div>
                   </div>
                   {/* Table Container */}
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[400px] overflow-auto">
                     <table className="min-w-full divide-y divide-default-200">
                       {/* thead remains the same */}
-                      <thead className="bg-default-50">
+                      <thead className="bg-default-50 sticky top-0 z-10">
                         <tr>
                           <th className="w-12 px-4 py-2.5 text-center"></th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -670,7 +670,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         leaveFrom="opacity-100"
                         leaveTo="opacity-0"
                       >
-                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                           {Array.from({ length: 10 }, (_, i) => {
                             const year = new Date().getFullYear() - i;
                             return (
@@ -763,9 +763,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               {/* History Table */}
               {consolidationHistory.length > 0 && (
                 <div className="border border-default-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[400px] overflow-auto">
                     <table className="min-w-full divide-y divide-default-200">
-                      <thead className="bg-default-50">
+                      <thead className="bg-default-50 sticky top-0 z-10">
                         <tr>
                           {/* Headers remain the same */}
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
