@@ -1,8 +1,8 @@
-// src/components/Invoice/PaginationControls.tsx
+// src/components/Invoice/Pagination.tsx
 import React from "react";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
-interface PaginationControlsProps {
+interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -11,7 +11,7 @@ interface PaginationControlsProps {
   pageSize: number;
 }
 
-const PaginationControls: React.FC<PaginationControlsProps> = ({
+const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   onPageChange,
@@ -110,4 +110,4 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   );
 };
 
-export default PaginationControls;
+export default Pagination;
