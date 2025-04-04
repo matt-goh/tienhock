@@ -7,16 +7,17 @@ import React, {
   useMemo,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types"; // Adjust path if needed
-import Button from "../../components/Button"; // Adjust path if needed
-import LoadingSpinner from "../../components/LoadingSpinner"; // Adjust path if needed
-import DateRangePicker from "../../components/DateRangePicker"; // Adjust path if needed
-import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu"; // Adjust path if needed
-import InvoiceGrid from "../../components/Invoice/InvoiceGrid"; // Adjust path if needed
-import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache"; // Adjust path if needed
-import ConfirmationDialog from "../../components/ConfirmationDialog"; // Adjust path if needed
+import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
+import Button from "../../components/Button";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import DateRangePicker from "../../components/DateRangePicker";
+import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
+import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import toast from "react-hot-toast";
-import { api } from "../../routes/utils/api"; // Adjust path if needed
+import { api } from "../../routes/utils/api";
 import {
   IconPlus,
   IconRefresh,
@@ -37,11 +38,11 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { useCustomerNames } from "../../hooks/useCustomerNames"; // Adjust path if needed
+import { useCustomerNames } from "../../hooks/useCustomerNames";
 // Import the specific utilities needed
-import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils"; // Adjust path if needed
-import PaginationControls from "../../components/Invoice/PaginationControls"; // Adjust path if needed
-import FilterSummary from "../../components/Invoice/FilterSummary"; // Adjust path if needed
+import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
+import PaginationControls from "../../components/Invoice/PaginationControls";
+import FilterSummary from "../../components/Invoice/FilterSummary";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -113,6 +114,9 @@ const InvoiceListPage: React.FC = () => {
   const [isFetchTriggered, setIsFetchTriggered] = useState(true); // Trigger fetch on load/change
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showEInvoiceConfirm, setShowEInvoiceConfirm] = useState(false);
+  const [showSubmissionResults, setShowSubmissionResults] = useState(false);
+  const [submissionResults, setSubmissionResults] = useState(null);
+  const [isSubmittingInvoices, setIsSubmittingInvoices] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
@@ -545,7 +549,6 @@ const InvoiceListPage: React.FC = () => {
       (inv) =>
         selectedInvoiceIds.has(inv.id) &&
         inv.invoice_status !== "cancelled" && // Cannot submit cancelled
-        inv.paymenttype !== "CASH" && // Cannot submit CASH invoices
         (inv.einvoice_status === null ||
           inv.einvoice_status === "invalid" ||
           inv.einvoice_status === "pending") && // Not already valid/cancelled
@@ -593,9 +596,10 @@ const InvoiceListPage: React.FC = () => {
       return;
     }
 
-    const toastId = toast.loading(
-      `Submitting ${idsToSubmit.length} invoice(s) for e-invoicing...`
-    );
+    // Show the submission results modal with loading state
+    setSubmissionResults(null);
+    setIsSubmittingInvoices(true);
+    setShowSubmissionResults(true);
 
     try {
       // Call backend endpoint responsible for submitting
@@ -603,50 +607,25 @@ const InvoiceListPage: React.FC = () => {
         invoiceIds: idsToSubmit,
       });
 
-      // Process response from the updated endpoint
+      // Save the full response for the modal to display
+      setSubmissionResults(response);
+
+      // Still show quick toast notification
       if (response.success) {
-        // Count accepted and rejected documents
         const acceptedCount = response.acceptedDocuments?.length || 0;
         const rejectedCount = response.rejectedDocuments?.length || 0;
 
         if (acceptedCount > 0 && rejectedCount === 0) {
-          toast.success(
-            `Successfully submitted ${acceptedCount} invoice(s) for e-invoicing.`,
-            { id: toastId }
-          );
+          toast.success(`Successfully submitted ${acceptedCount} invoice(s)`);
         } else if (acceptedCount > 0 && rejectedCount > 0) {
           toast.success(
-            `Partially successful: ${acceptedCount} accepted, ${rejectedCount} rejected.`,
-            { id: toastId }
+            `Partial success: ${acceptedCount} accepted, ${rejectedCount} rejected`
           );
-
-          // Show first few rejection reasons
-          response.rejectedDocuments?.slice(0, 3).forEach((doc: any) => {
-            if (doc.error?.message) {
-              toast.error(`Invoice ${doc.internalId}: ${doc.error.message}`, {
-                duration: 4000,
-              });
-            }
-          });
-        } else if (acceptedCount === 0 && rejectedCount > 0) {
-          toast.error(`All ${rejectedCount} invoice(s) were rejected.`, {
-            id: toastId,
-          });
-
-          // Show first few rejection reasons
-          response.rejectedDocuments?.slice(0, 3).forEach((doc: any) => {
-            if (doc.error?.message) {
-              toast.error(`Invoice ${doc.internalId}: ${doc.error.message}`, {
-                duration: 4000,
-              });
-            }
-          });
+        } else {
+          toast.error(`All ${rejectedCount} invoice(s) were rejected`);
         }
       } else {
-        // Handle overall failure
-        toast.error(response.message || "E-invoice submission failed", {
-          id: toastId,
-        });
+        toast.error(response.message || "E-invoice submission failed");
       }
 
       setSelectedInvoiceIds(new Set()); // Clear selection
@@ -658,9 +637,11 @@ const InvoiceListPage: React.FC = () => {
           error.response?.data?.message ||
           error.message ||
           "Network or server error"
-        }`,
-        { id: toastId }
+        }`
       );
+      setShowSubmissionResults(false); // Hide modal on network error
+    } finally {
+      setIsSubmittingInvoices(false);
     }
   };
 
@@ -671,326 +652,335 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="flex flex-col h-full px-4 md:px-12 space-y-4">
-      {/* --- Header --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
-        <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
-          Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
-        </h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            onClick={handleRefresh}
-            icon={IconRefresh}
-            variant="outline"
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
-          <Button
-            onClick={handleCreateNewInvoice}
-            icon={IconPlus}
-            variant="filled"
-            color="sky"
-          >
-            Create New
-          </Button>
+    <div className="flex flex-col h-full px-4 md:px-12">
+      <div className="space-y-4">
+        {/* --- Header --- */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
+          <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
+            Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
+          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              onClick={handleRefresh}
+              icon={IconRefresh}
+              variant="outline"
+              disabled={isLoading}
+            >
+              Refresh
+            </Button>
+            <Button
+              onClick={handleCreateNewInvoice}
+              icon={IconPlus}
+              variant="filled"
+              color="sky"
+            >
+              Create New
+            </Button>
+          </div>
         </div>
-      </div>
-      {/* --- Filters Row --- */}
-      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center flex-wrap flex-shrink-0">
-        {/* Date Range Picker */}
-        <div className="flex-grow lg:flex-grow-0">
-          <DateRangePicker
-            dateRange={{
-              start: filters.dateRange.start || new Date(),
-              end: filters.dateRange.end || new Date(),
-            }}
-            onDateChange={handleDateChange} // Applies immediately
-          />
-        </div>
-        {/* Month Selector */}
-        <div className="w-full sm:w-auto lg:w-40">
-          {" "}
-          {/* Adjusted width */}
-          <Listbox value={selectedMonth} onChange={handleMonthChange}>
+        {/* --- Filters Row --- */}
+        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center flex-wrap flex-shrink-0">
+          {/* Date Range Picker */}
+          <div className="flex-grow lg:flex-grow-0">
+            <DateRangePicker
+              dateRange={{
+                start: filters.dateRange.start || new Date(),
+                end: filters.dateRange.end || new Date(),
+              }}
+              onDateChange={handleDateChange} // Applies immediately
+            />
+          </div>
+          {/* Month Selector */}
+          <div className="w-full sm:w-auto lg:w-40">
             {" "}
-            {/* Applies immediately */}
-            <div className="relative">
-              <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                <span className="block truncate pl-1">
-                  {selectedMonth.name}
-                </span>
-                <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <IconChevronDown
-                    className="h-5 w-5 text-default-400"
-                    aria-hidden="true"
-                  />
-                </span>
-              </ListboxButton>
-              <Transition
-                leave="transition ease-in duration-100"
-                leaveFrom="opacity-100"
-                leaveTo="opacity-0"
-              >
-                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                  {monthOptions.map((month) => (
-                    <ListboxOption
-                      key={month.id}
-                      value={month}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                          active
-                            ? "bg-default-100 text-default-900"
-                            : "text-gray-900"
-                        }`
-                      }
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-medium" : "font-normal"
-                            }`}
-                          >
-                            {month.name}
-                          </span>
-                          {selected && (
-                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                              <IconCheck
-                                className="h-5 w-5"
-                                aria-hidden="true"
-                                stroke={2.5}
-                              />
+            {/* Adjusted width */}
+            <Listbox value={selectedMonth} onChange={handleMonthChange}>
+              {" "}
+              {/* Applies immediately */}
+              <div className="relative">
+                <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                  <span className="block truncate pl-1">
+                    {selectedMonth.name}
+                  </span>
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <IconChevronDown
+                      className="h-5 w-5 text-default-400"
+                      aria-hidden="true"
+                    />
+                  </span>
+                </ListboxButton>
+                <Transition
+                  leave="transition ease-in duration-100"
+                  leaveFrom="opacity-100"
+                  leaveTo="opacity-0"
+                >
+                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                    {monthOptions.map((month) => (
+                      <ListboxOption
+                        key={month.id}
+                        value={month}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
+                            active
+                              ? "bg-default-100 text-default-900"
+                              : "text-gray-900"
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-medium" : "font-normal"
+                              }`}
+                            >
+                              {month.name}
                             </span>
-                          )}
-                        </>
-                      )}
-                    </ListboxOption>
-                  ))}
-                </ListboxOptions>
-              </Transition>
-            </div>
-          </Listbox>
+                            {selected && (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                <IconCheck
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                  stroke={2.5}
+                                />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ListboxOption>
+                    ))}
+                  </ListboxOptions>
+                </Transition>
+              </div>
+            </Listbox>
+          </div>
+          {/* Search Input */}
+          <div className="flex-grow relative min-w-[250px]">
+            {" "}
+            {/* Ensure minimum width */}
+            <IconSearch
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Search by invoice, product, amount, customer, salesman, status, payment type..."
+              className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onBlur={handleSearchBlur} // Triggers fetch
+              onKeyDown={handleSearchKeyDown} // Triggers fetch on Enter
+            />
+          </div>
+          {/* Filter Menu Button */}
+          <div className="flex-shrink-0">
+            <InvoiceFilterMenu
+              currentFilters={filters} // Pass currently applied filters
+              onFilterChange={handleApplyFilters} // Pass the main apply function
+              salesmanOptions={salesmen.map((s) => ({
+                // Pass salesmen options
+                id: s.id,
+                name: s.name || s.id,
+              }))}
+            />
+          </div>
         </div>
-        {/* Search Input */}
-        <div className="flex-grow relative min-w-[250px]">
-          {" "}
-          {/* Ensure minimum width */}
-          <IconSearch
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
-            size={18}
-          />
-          <input
-            type="text"
-            placeholder="Search by invoice, product, amount, customer, salesman, status, payment type..."
-            className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            onBlur={handleSearchBlur} // Triggers fetch
-            onKeyDown={handleSearchKeyDown} // Triggers fetch on Enter
-          />
-        </div>
-        {/* Filter Menu Button */}
-        <div className="flex-shrink-0">
-          <InvoiceFilterMenu
-            currentFilters={filters} // Pass currently applied filters
-            onFilterChange={handleApplyFilters} // Pass the main apply function
-            salesmanOptions={salesmen.map((s) => ({
-              // Pass salesmen options
-              id: s.id,
-              name: s.name || s.id,
-            }))}
-          />
-        </div>
-      </div>
-      <FilterSummary filters={filters} onRemoveFilter={handleRemoveFilter} />
-      {/* --- Batch Action Bar --- */}
-      <div
-        className={`p-3 ${
-          selectedInvoiceIds.size > 0
-            ? "bg-sky-50 border border-sky-200"
-            : "bg-white border border-dashed border-default-200"
-        } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
-        onClick={handleSelectAllOnPage}
-        title={
-          selectionState.isAllSelectedOnPage
-            ? "Deselect All on Page"
-            : "Select All on Page"
-        }
-      >
-        {/* Selection checkbox - always visible */}
-        <button className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
-          {selectionState.isAllSelectedOnPage ? (
-            <IconSquareMinusFilled className="text-sky-600" size={20} />
-          ) : selectionState.isIndeterminate ? (
-            <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
-          ) : (
-            <IconSelectAll className="text-default-400" size={20} />
-          )}
-        </button>
+        <FilterSummary filters={filters} onRemoveFilter={handleRemoveFilter} />
+        {/* --- Batch Action Bar --- */}
+        <div
+          className={`p-3 ${
+            selectedInvoiceIds.size > 0
+              ? "bg-sky-50 border border-sky-200"
+              : "bg-white border border-dashed border-default-200"
+          } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
+          onClick={handleSelectAllOnPage}
+          title={
+            selectionState.isAllSelectedOnPage
+              ? "Deselect All on Page"
+              : "Select All on Page"
+          }
+        >
+          {/* Selection checkbox - always visible */}
+          <button className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
+            {selectionState.isAllSelectedOnPage ? (
+              <IconSquareMinusFilled className="text-sky-600" size={20} />
+            ) : selectionState.isIndeterminate ? (
+              <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
+            ) : (
+              <IconSelectAll className="text-default-400" size={20} />
+            )}
+          </button>
 
-        {/* Selection Count and Total */}
-        <div className="flex-grow min-w-[150px]">
-          {" "}
-          {/* Allow text to wrap */}
-          {selectedInvoiceIds.size > 0 ? (
-            <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
-              <span>{selectedInvoiceIds.size} selected</span>
-              <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
-              <span className="whitespace-nowrap">
-                Total:{" "}
-                {new Intl.NumberFormat("en-MY", {
-                  style: "currency",
-                  currency: "MYR",
-                }).format(
-                  invoices
-                    .filter((inv) => selectedInvoiceIds.has(inv.id))
-                    .reduce(
-                      (sum, inv) => sum + (inv.totalamountpayable || 0),
-                      0
-                    )
-                )}
+          {/* Selection Count and Total */}
+          <div className="flex-grow min-w-[150px]">
+            {" "}
+            {/* Allow text to wrap */}
+            {selectedInvoiceIds.size > 0 ? (
+              <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
+                <span>{selectedInvoiceIds.size} selected</span>
+                <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
+                <span className="whitespace-nowrap">
+                  Total:{" "}
+                  {new Intl.NumberFormat("en-MY", {
+                    style: "currency",
+                    currency: "MYR",
+                  }).format(
+                    invoices
+                      .filter((inv) => selectedInvoiceIds.has(inv.id))
+                      .reduce(
+                        (sum, inv) => sum + (inv.totalamountpayable || 0),
+                        0
+                      )
+                  )}
+                </span>
               </span>
-            </span>
-          ) : (
-            <span
-              className="text-default-500 text-sm cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSelectAllOnPage();
-              }}
+            ) : (
+              <span
+                className="text-default-500 text-sm cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectAllOnPage();
+                }}
+              >
+                Select invoices to perform actions
+              </span>
+            )}
+          </div>
+
+          {/* Action Buttons (Show only when items are selected) */}
+          {selectedInvoiceIds.size > 0 && (
+            <div
+              className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
+              onClick={(e) => e.stopPropagation()} // Prevent row selection click
             >
-              Select invoices to perform actions
-            </span>
+              <Button
+                size="sm"
+                variant="outline"
+                color="rose"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBulkCancel();
+                }}
+                icon={IconBan}
+                disabled={isLoading}
+                aria-label="Cancel Selected Invoices"
+                title="Cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                color="amber"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBulkSubmitEInvoice();
+                }}
+                icon={IconSend}
+                disabled={isLoading}
+                aria-label="Submit Selected for E-Invoice"
+                title="Submit e-Invoice"
+              >
+                Submit e-Invoice
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBulkDownload();
+                }}
+                icon={IconFileDownload}
+                disabled={isLoading}
+                aria-label="Download Selected Invoices"
+                title="Download PDF"
+              >
+                Download
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBulkPrint();
+                }}
+                icon={IconPrinter}
+                disabled={isLoading}
+                aria-label="Print Selected Invoices"
+                title="Print PDF"
+              >
+                Print
+              </Button>
+            </div>
           )}
         </div>
-
-        {/* Action Buttons (Show only when items are selected) */}
-        {selectedInvoiceIds.size > 0 && (
-          <div
-            className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
-            onClick={(e) => e.stopPropagation()} // Prevent row selection click
-          >
-            <Button
-              size="sm"
-              variant="outline"
-              color="rose"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleBulkCancel();
+        {/* --- Invoice Grid Area --- */}
+        <div className="flex-1 min-h-[400px] relative">
+          {" "}
+          {/* Allow vertical scroll */}
+          {/* Loading Overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
+              <LoadingSpinner />
+            </div>
+          )}
+          {/* Error Message */}
+          {error && !isLoading && (
+            <div className="p-4 text-center text-rose-600 bg-rose-50 rounded-lg border border-rose-200">
+              Error fetching invoices: {error}
+            </div>
+          )}
+          {/* No Results Message */}
+          {!isLoading && !error && invoices.length === 0 && (
+            <div className="p-6 text-center text-default-500 bg-default-50 rounded-lg border border-dashed border-default-200">
+              No invoices found matching your criteria.
+            </div>
+          )}
+          {/* Invoice Grid */}
+          {!isLoading && !error && invoices.length > 0 && (
+            <InvoiceGrid
+              // Pass only the invoices data, filtering happens during fetch
+              invoices={invoices}
+              selectedInvoiceIds={selectedInvoiceIds}
+              onSelectInvoice={handleSelectInvoice}
+              onViewDetails={handleViewDetails}
+              isLoading={false} // Grid itself isn't loading, page is
+              error={null}
+              customerNames={customerNames} // Pass customer names for display
+            />
+          )}
+        </div>
+        {/* --- Pagination --- */}
+        <div className="flex-shrink-0 mt-auto pb-4">
+          {" "}
+          {/* Stick to bottom */}
+          {!isLoading && totalItems > 0 && totalPages > 1 && (
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => {
+                if (page !== currentPage) {
+                  // Set page and trigger fetch via useEffect
+                  setCurrentPage(page);
+                  setIsFetchTriggered(true);
+                  // Scroll to top might be good here
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
               }}
-              icon={IconBan}
-              disabled={isLoading}
-              aria-label="Cancel Selected Invoices"
-              title="Cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              color="amber"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleBulkSubmitEInvoice();
-              }}
-              icon={IconSend}
-              disabled={isLoading}
-              aria-label="Submit Selected for E-Invoice"
-              title="Submit e-Invoice"
-            >
-              Submit e-Invoice
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleBulkDownload();
-              }}
-              icon={IconFileDownload}
-              disabled={isLoading}
-              aria-label="Download Selected Invoices"
-              title="Download PDF"
-            >
-              Download
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleBulkPrint();
-              }}
-              icon={IconPrinter}
-              disabled={isLoading}
-              aria-label="Print Selected Invoices"
-              title="Print PDF"
-            >
-              Print
-            </Button>
-          </div>
-        )}
+              itemsCount={invoices.length} // Items on current page
+              totalItems={totalItems} // Total matching items
+              pageSize={ITEMS_PER_PAGE}
+            />
+          )}
+        </div>
       </div>
-      {/* --- Invoice Grid Area --- */}
-      <div className="flex-1 min-h-[400px] relative">
-        {" "}
-        {/* Allow vertical scroll */}
-        {/* Loading Overlay */}
-        {isLoading && (
-          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
-            <LoadingSpinner />
-          </div>
-        )}
-        {/* Error Message */}
-        {error && !isLoading && (
-          <div className="p-4 text-center text-rose-600 bg-rose-50 rounded-lg border border-rose-200">
-            Error fetching invoices: {error}
-          </div>
-        )}
-        {/* No Results Message */}
-        {!isLoading && !error && invoices.length === 0 && (
-          <div className="p-6 text-center text-default-500 bg-default-50 rounded-lg border border-dashed border-default-200">
-            No invoices found matching your criteria.
-          </div>
-        )}
-        {/* Invoice Grid */}
-        {!isLoading && !error && invoices.length > 0 && (
-          <InvoiceGrid
-            // Pass only the invoices data, filtering happens during fetch
-            invoices={invoices}
-            selectedInvoiceIds={selectedInvoiceIds}
-            onSelectInvoice={handleSelectInvoice}
-            onViewDetails={handleViewDetails}
-            isLoading={false} // Grid itself isn't loading, page is
-            error={null}
-            customerNames={customerNames} // Pass customer names for display
-          />
-        )}
-      </div>
-      {/* --- Pagination --- */}
-      <div className="flex-shrink-0 mt-auto pb-4">
-        {" "}
-        {/* Stick to bottom */}
-        {!isLoading && totalItems > 0 && totalPages > 1 && (
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => {
-              if (page !== currentPage) {
-                // Set page and trigger fetch via useEffect
-                setCurrentPage(page);
-                setIsFetchTriggered(true);
-                // Scroll to top might be good here
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-            itemsCount={invoices.length} // Items on current page
-            totalItems={totalItems} // Total matching items
-            pageSize={ITEMS_PER_PAGE}
-          />
-        )}
-      </div>
+      {/* --- Submission Results Modal --- */}
+      <SubmissionResultsModal
+        isOpen={showSubmissionResults}
+        onClose={() => setShowSubmissionResults(false)}
+        results={submissionResults}
+        isLoading={isSubmittingInvoices}
+      />
       {/* --- Confirmation Dialogs --- */}
       <ConfirmationDialog
         isOpen={showCancelConfirm}
@@ -1013,9 +1003,12 @@ const InvoiceListPage: React.FC = () => {
               inv.invoice_status !== "cancelled" &&
               (inv.einvoice_status === null ||
                 inv.einvoice_status === "invalid" ||
-                inv.einvoice_status === "pending")
+                inv.einvoice_status === "pending") && // Not already valid/cancelled
+              // Validate customer has necessary identification
+              inv.customerTin &&
+              inv.customerIdNumber // Ensure both TIN and ID number are present
           ).length
-        } eligible invoice(s) to the Malaysian MyInvois e-invoicing system. This action sends your invoice data to the tax authority. Continue?`}
+        } invoice(s) to MyInvois e-invoicing system. Continue?`}
         confirmButtonText="Submit e-Invoices"
         variant="default"
       />

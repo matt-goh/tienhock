@@ -151,8 +151,6 @@ export default function (pool, config) {
   router.post("/submit-system", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
-      const fieldsParam = req.query.fields;
-      const isMinimal = fieldsParam === "minimal";
 
       if (!invoiceIds?.length) {
         return res.status(400).json({
@@ -262,33 +260,6 @@ export default function (pool, config) {
       // Check for duplicates first
       for (const invoiceId of invoiceIdsToProcess) {
         try {
-          // Make a direct query to check for duplicates in e-invoice system
-          const duplicateCheckResult = await pool.query(
-            "SELECT uuid FROM invoices WHERE id = $1 AND einvoice_status IN ('valid', 'pending')",
-            [invoiceId]
-          );
-          const isDuplicate = duplicateCheckResult.rows.length > 0;
-
-          if (isDuplicate) {
-            validationErrors.push({
-              internalId: invoiceId,
-              error: {
-                code: "DUPLICATE",
-                message: `Invoice number ${invoiceId} already exists in the e-invoice system`,
-                target: invoiceId,
-                details: [
-                  {
-                    code: "DUPLICATE_INVOICE",
-                    message:
-                      "Invoice has already been submitted to e-invoice system",
-                    target: "document",
-                  },
-                ],
-              },
-            });
-            continue; // Skip processing this invoice
-          }
-
           // If not a duplicate, process the invoice
           const invoiceData = await getInvoices(pool, invoiceId);
           if (!invoiceData) {
@@ -302,29 +273,6 @@ export default function (pool, config) {
             pool,
             invoiceData.customerid
           );
-
-          if (!customerData.tin_number || !customerData.id_number) {
-            validationErrors.push({
-              internalId: invoiceId,
-              error: {
-                code: "MISSING_REQUIRED_ID",
-                message: `Missing TIN Number or ID Number for customer ${
-                  customerData.name || "unknown"
-                }`,
-                target: invoiceId,
-                details: [
-                  {
-                    code: "MISSING_REQUIRED_ID",
-                    message: `Customer ${
-                      customerData.name || "unknown"
-                    } must have both TIN Number and ID Number defined in the system.`,
-                    target: "document",
-                  },
-                ],
-              },
-            });
-            continue; // Skip processing this invoice
-          }
 
           const transformedInvoice = await EInvoiceTemplate(
             invoiceData,
@@ -471,68 +419,6 @@ export default function (pool, config) {
           submissionResult.acceptedDocuments?.length === 0)
       ) {
         statusCode = 422; // Unprocessable Entity for validation failures
-      }
-
-      // If minimal response is requested, transform the result
-      if (isMinimal) {
-        const invoices = [];
-
-        // Process accepted documents
-        if (
-          submissionResult.acceptedDocuments &&
-          submissionResult.acceptedDocuments.length > 0
-        ) {
-          for (const doc of submissionResult.acceptedDocuments) {
-            const invoiceData = {
-              id: doc.internalId,
-              uuid: doc.uuid,
-              longId: doc.longId || "",
-              dateTimeValidated: doc.dateTimeValidated || null,
-            };
-
-            // If longId is missing, mark status as Pending
-            if (!doc.longId) {
-              invoiceData.einvoiceStatus = 10; // Pending = 10 (success variant)
-            } else {
-              invoiceData.einvoiceStatus = 0; // Valid = 0 (complete success)
-            }
-
-            invoices.push(invoiceData);
-          }
-        }
-
-        // Process rejected documents
-        if (
-          submissionResult.rejectedDocuments &&
-          submissionResult.rejectedDocuments.length > 0
-        ) {
-          for (const doc of submissionResult.rejectedDocuments) {
-            invoices.push({
-              id: doc.internalId || doc.invoiceCodeNumber,
-              einvoiceStatus: 100, // Invalid = 100 (error)
-              error: {
-                code: doc.error?.code || "ERROR",
-                message: doc.error?.message || "Unknown error",
-              },
-            });
-          }
-        }
-
-        // Include updated pending invoices in minimal response
-        for (const updated of statusUpdateResults.updated) {
-          invoices.push({
-            id: updated.id,
-            uuid: updated.uuid,
-            longId: updated.longId || "",
-            einvoiceStatus: updated.status === "valid" ? 0 : 100,
-          });
-        }
-
-        return res.status(statusCode).json({
-          message: "Invoice processing completed",
-          invoices: invoices,
-          overallStatus: submissionResult.overallStatus || "Unknown",
-        });
       }
 
       // Return full response with pending results included

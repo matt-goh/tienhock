@@ -191,14 +191,6 @@ export interface SubmissionState {
     details?: any;
   };
 }
-
-// Display component props
-export interface SubmissionDisplayProps {
-  state: SubmissionState;
-  onClose: () => void;
-  showDetails?: boolean;
-}
-
 export interface BatchStatusDisplayProps {
   statistics: BatchStatistics;
   phase: SubmissionPhase;
