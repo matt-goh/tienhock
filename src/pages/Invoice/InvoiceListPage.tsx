@@ -95,6 +95,17 @@ const saveDatesToStorage = (startDate: Date | null, endDate: Date | null) => {
   }
 };
 
+const isInvoiceDateEligibleForEinvoice = (
+  createdDateString: string | undefined | null
+): boolean => {
+  if (!createdDateString) return false;
+  const now = Date.now();
+  const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+  const cutoffTimestamp = now - threeDaysInMillis;
+  const invoiceTimestamp = parseInt(createdDateString, 10);
+  return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
+};
+
 // --- Component ---
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -554,23 +565,23 @@ const InvoiceListPage: React.FC = () => {
           inv.einvoice_status === "pending") && // Not already valid/cancelled
         // Validate customer has necessary identification
         inv.customerTin &&
-        inv.customerIdNumber // Ensure both TIN and ID number are present
+        inv.customerIdNumber && // Ensure both TIN and ID number are present
+        isInvoiceDateEligibleForEinvoice(inv.createddate)
     );
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (Customer must have TIN and ID Number saved, and Invoice must be Active/Paid/Overdue, and not already Valid).",
+        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Active/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
         { duration: 8000 }
       );
       return;
     }
     if (eligibleInvoices.length < selectedInvoiceIds.size) {
-      toast(
-        `Only ${eligibleInvoices.length} of the selected invoices are eligible for submission. Proceeding with those.`,
-        { duration: 5000 }
+      const ineligibleCount = selectedInvoiceIds.size - eligibleInvoices.length;
+      toast.error(
+        `${ineligibleCount} selected invoice(s) are ineligible (check date, status, customer info). Proceeding with ${eligibleInvoices.length} eligible invoice(s).`,
+        { duration: 6000 }
       );
-      // Update selection visually to only eligible ones (optional UX)
-      // setSelectedInvoiceIds(new Set(eligibleInvoices.map(inv => inv.id)));
     }
 
     setShowEInvoiceConfirm(true);
@@ -587,7 +598,8 @@ const InvoiceListPage: React.FC = () => {
           inv.invoice_status !== "cancelled" &&
           (inv.einvoice_status === null || inv.einvoice_status === "invalid") &&
           inv.customerTin &&
-          inv.customerIdNumber // Ensure both TIN and ID number are present
+          inv.customerIdNumber && // Ensure both TIN and ID number are present
+          isInvoiceDateEligibleForEinvoice(inv.createddate)
       )
       .map((inv) => inv.id);
 
@@ -998,17 +1010,18 @@ const InvoiceListPage: React.FC = () => {
         title={`Submit Selected Invoices for e-Invoicing`}
         message={`You are about to submit ${
           invoices.filter(
+            // Recalculate count here for the message
             (inv) =>
               selectedInvoiceIds.has(inv.id) &&
               inv.invoice_status !== "cancelled" &&
               (inv.einvoice_status === null ||
                 inv.einvoice_status === "invalid" ||
-                inv.einvoice_status === "pending") && // Not already valid/cancelled
-              // Validate customer has necessary identification
+                inv.einvoice_status === "pending") &&
               inv.customerTin &&
-              inv.customerIdNumber // Ensure both TIN and ID number are present
+              inv.customerIdNumber &&
+              isInvoiceDateEligibleForEinvoice(inv.createddate)
           ).length
-        } invoice(s) to MyInvois e-invoicing system. Continue?`}
+        } eligible invoice(s) to MyInvois e-invoicing system. Continue?`}
         confirmButtonText="Submit e-Invoices"
         variant="default"
       />
