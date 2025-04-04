@@ -333,7 +333,7 @@ export default function (pool, config) {
       const result = await pool.query(query, [id]);
 
       if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Invoice not found" });
+        return res.status(204).json({ message: "Invoice not found" }); // No content - neutral status code
       }
 
       const invoice = result.rows[0];

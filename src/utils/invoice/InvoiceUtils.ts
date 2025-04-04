@@ -30,12 +30,6 @@ export const createInvoice = async (
   invoiceData: ExtendedInvoiceData
 ): Promise<ExtendedInvoiceData> => {
   try {
-    // Frontend duplicate check (optional, backend enforces)
-    // const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.id);
-    // if (isDuplicate) {
-    //   throw new Error("Duplicate invoice number detected by frontend check.");
-    // }
-
     // Prepare data for backend (map frontend state to backend expected structure)
     const dataToSubmit = {
       ...invoiceData,
@@ -273,27 +267,26 @@ export const getInvoiceById = async (
 export const checkDuplicateInvoiceNo = async (
   invoiceNo: string
 ): Promise<boolean> => {
-  try {
-    if (!invoiceNo) return false; // Don't check empty string
+  if (!invoiceNo) return false; // Don't check empty string
 
-    // Fallback: Try to fetch the invoice directly - if it exists, it's a duplicate
-    try {
-      await api.get(`/api/invoices/${invoiceNo}`);
-      return true; // Invoice exists, so it's a duplicate
-    } catch (fetchError: any) {
-      // If we get a 404, the invoice doesn't exist
-      if (fetchError.status === 404) {
-        return false;
-      }
-      // For other errors, log but don't block submission
-      console.error("Fallback duplicate check failed:", fetchError);
+  try {
+    const response = await api.get(`/api/invoices/${invoiceNo}`);
+    if (response.message === "Invoice not found") {
+      return false; // Not a duplicate
+    } else if (response.id) {
+      // If we get an ID back, it means the invoice exists
+      return true; // Duplicate found
     }
 
-    // If both checks fail, err on the side of caution and let the server validate
-    return false;
-  } catch (error) {
+    return false; // Default case if response is unexpected
+  } catch (error: any) {
+    // If we get a 404, the invoice doesn't exist
+    if (error.status === 404) {
+      return false;
+    }
+
     console.error("Error in duplicate invoice check:", error);
-    return false;
+    return false; // Err on the side of caution and let the server validate
   }
 };
 
