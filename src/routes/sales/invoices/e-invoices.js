@@ -801,6 +801,65 @@ export default function (pool, config) {
     }
   });
 
+  // Get consolidated invoice history
+  router.get("/consolidated-history", async (req, res) => {
+    try {
+      // Query to get consolidated invoices with their details
+      const query = `
+      SELECT 
+        id, 
+        uuid, 
+        long_id, 
+        submission_uid, 
+        datetime_validated, 
+        einvoice_status,
+        total_excluding_tax,
+        tax_amount,
+        rounding,
+        totalamountpayable,
+        createddate AS created_at,
+        consolidated_invoices
+      FROM 
+        invoices
+      WHERE 
+        is_consolidated = true
+      ORDER BY 
+        createddate DESC
+    `;
+
+      const result = await pool.query(query);
+
+      // Transform the results to ensure proper types and formats
+      const transformedHistory = result.rows.map((row) => ({
+        id: row.id,
+        uuid: row.uuid,
+        long_id: row.long_id,
+        submission_uid: row.submission_uid,
+        datetime_validated: row.datetime_validated,
+        einvoice_status: row.einvoice_status,
+        total_excluding_tax: parseFloat(row.total_excluding_tax || 0),
+        tax_amount: parseFloat(row.tax_amount || 0),
+        rounding: parseFloat(row.rounding || 0),
+        totalamountpayable: parseFloat(row.totalamountpayable || 0),
+        created_at: row.created_at,
+        // Parse JSON array if it's stored as a string
+        consolidated_invoices:
+          typeof row.consolidated_invoices === "string"
+            ? JSON.parse(row.consolidated_invoices)
+            : row.consolidated_invoices || [],
+      }));
+
+      res.json(transformedHistory);
+    } catch (error) {
+      console.error("Error fetching consolidated invoice history:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch consolidated invoice history",
+        error: error.message,
+      });
+    }
+  });
+
   // Get all invoices eligible for consolidation
   router.get("/eligible-for-consolidation", async (req, res) => {
     try {
@@ -833,43 +892,46 @@ export default function (pool, config) {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
+      // Updated query to use the new schema fields and exclude invoices that are already in consolidated invoices
       const query = `
-      SELECT 
-        i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-        i.total_excluding_tax as amount, i.rounding, i.totalamountpayable,
-        COALESCE(
-          json_agg(
-            CASE WHEN od.id IS NOT NULL THEN 
-              json_build_object(
-                'code', od.code,
-                'quantity', od.quantity,
-                'price', od.price,
-                'freeProduct', od.freeproduct,
-                'returnProduct', od.returnproduct,
-                'description', od.description,
-                'tax', od.tax,
-                'total', od.total,
-                'issubtotal', od.issubtotal
-              )
-            ELSE NULL END
-            ORDER BY od.id
-          ) FILTER (WHERE od.id IS NOT NULL),
-          '[]'::json
-        ) as products
-      FROM invoices i
-      LEFT JOIN order_details od ON i.id = od.invoiceid
-      WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
-      AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
-      AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-      AND NOT EXISTS (
-        SELECT 1 FROM invoices consolidated 
-        WHERE consolidated.is_consolidated = true
-        AND consolidated.consolidated_invoices IS NOT NULL
-        AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
-      )
-      GROUP BY i.id
-      ORDER BY CAST(i.createddate AS bigint) ASC
-      `;
+        SELECT 
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+          i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+          i.balance_due, i.invoice_status,
+          COALESCE(
+            json_agg(
+              CASE WHEN od.id IS NOT NULL THEN 
+                json_build_object(
+                  'code', od.code,
+                  'quantity', od.quantity,
+                  'price', od.price,
+                  'freeProduct', od.freeproduct,
+                  'returnProduct', od.returnproduct,
+                  'description', od.description,
+                  'tax', od.tax,
+                  'total', od.total,
+                  'issubtotal', od.issubtotal
+                )
+              ELSE NULL END
+              ORDER BY od.id
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
+          ) as products
+        FROM invoices i
+        LEFT JOIN order_details od ON i.id = od.invoiceid
+        WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+        AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+        AND (i.invoice_status != 'cancelled')
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM invoices consolidated 
+          WHERE consolidated.is_consolidated = true
+          AND consolidated.consolidated_invoices IS NOT NULL
+          AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+        )
+        GROUP BY i.id
+        ORDER BY CAST(i.createddate AS bigint) ASC
+        `;
 
       const result = await pool.query(query, [startTimestamp, endTimestamp]);
 
@@ -888,8 +950,10 @@ export default function (pool, config) {
           issubtotal: Boolean(product.issubtotal),
         })),
         amount: parseFloat(row.amount) || 0,
+        tax_amount: parseFloat(row.tax_amount) || 0,
         rounding: parseFloat(row.rounding) || 0,
         totalamountpayable: parseFloat(row.totalamountpayable) || 0,
+        balance_due: parseFloat(row.balance_due) || 0,
       }));
 
       res.json({
@@ -928,12 +992,14 @@ export default function (pool, config) {
       // Fetch all invoice data
       const invoiceData = [];
       let totalRounding = 0;
+      let totalTaxAmount = 0;
       for (const invoiceId of invoiceIds) {
         try {
           const invoice = await getInvoices(pool, invoiceId);
           if (invoice) {
             invoiceData.push(invoice);
             totalRounding += Number(invoice.rounding || 0);
+            totalTaxAmount += Number(invoice.tax_amount || 0);
           }
         } catch (error) {
           console.warn(`Failed to fetch invoice ${invoiceId}:`, error);
@@ -1014,6 +1080,17 @@ export default function (pool, config) {
           consolidatedData.status === "Submitted" ||
           !consolidatedData.longId;
 
+        // Calculate totals from all invoices
+        const totalExcludingTax = invoiceData.reduce(
+          (sum, inv) => sum + parseFloat(inv.total_excluding_tax || 0),
+          0
+        );
+
+        const totalPayable = invoiceData.reduce(
+          (sum, inv) => sum + parseFloat(inv.totalamountpayable || 0),
+          0
+        );
+
         // Mark the original invoices as consolidated
         const client = await pool.connect();
         try {
@@ -1025,28 +1102,27 @@ export default function (pool, config) {
               id, uuid, submission_uid, long_id, datetime_validated,
               total_excluding_tax, tax_amount, rounding, totalamountpayable,
               invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
-              customerid, salespersonid, createddate, paymenttype
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+              customerid, salespersonid, createddate, paymenttype, balance_due
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
             [
               consolidatedId,
               consolidatedData.uuid,
               submissionResponse.submissionUid,
               consolidatedData.longId,
               consolidatedData.dateTimeValidated || new Date().toISOString(),
-              consolidatedData.totalExcludingTax || 0,
-              consolidatedData.totalPayableAmount -
-                consolidatedData.totalExcludingTax -
-                totalRounding || 0,
+              totalExcludingTax,
+              totalTaxAmount,
               totalRounding,
-              consolidatedData.totalPayableAmount || 0,
+              totalPayable,
               "paid", // Consolidated invoices are typically marked as paid
               consolidatedData.longId ? "valid" : "pending",
               true,
               JSON.stringify(invoiceIds),
-              "EI00000000010", // Default consolidated customer ID
+              "Consolidated customers", // Default consolidated customer ID
               "SYSTEM", // System-generated invoice
               new Date().getTime().toString(), // Current timestamp
               "INVOICE", // Consolidated invoices are always INVOICE type
+              0, // No balance due for consolidated invoices
             ]
           );
 
@@ -1054,28 +1130,40 @@ export default function (pool, config) {
         } catch (error) {
           await client.query("ROLLBACK");
           console.error("Failed to record consolidated invoice:", error);
+          throw error; // Let the outer catch handle this
         } finally {
           client.release();
         }
 
-        // Return success with details, including pending status
-        return res.json({
+        // Format for SubmissionResultsModal compatibility
+        const formattedResponse = {
           success: true,
           message: isPending
-            ? "Consolidated invoice submitted, but is still pending"
+            ? "Consolidated invoice submitted, but is still pending validation"
             : "Consolidated invoice submitted successfully",
+          acceptedDocuments: [
+            {
+              internalId: consolidatedId,
+              uuid: consolidatedData.uuid,
+              longId: consolidatedData.longId || null,
+              status: consolidatedData.status,
+              dateTimeReceived: finalStatus.dateTimeReceived,
+              dateTimeValidated: consolidatedData.dateTimeValidated,
+            },
+          ],
+          rejectedDocuments: [],
+          overallStatus: isPending ? "Pending" : "Valid",
           submissionUid: submissionResponse.submissionUid,
-          consolidatedId,
-          uuid: consolidatedData.uuid,
-          longId: consolidatedData.longId || "",
-          isPending,
-          status: consolidatedData.status,
-        });
+          documentCount: 1,
+        };
+
+        return res.json(formattedResponse);
       } else {
         return res.status(400).json({
           success: false,
           message: "Submission failed",
-          errors: submissionResponse.rejectedDocuments,
+          rejectedDocuments: submissionResponse.rejectedDocuments,
+          overallStatus: "Invalid",
         });
       }
     } catch (error) {
@@ -1083,6 +1171,7 @@ export default function (pool, config) {
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to process consolidated submission",
+        overallStatus: "Error",
       });
     }
   });
