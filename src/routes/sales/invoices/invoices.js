@@ -293,6 +293,37 @@ export default function (pool, config) {
     }
   });
 
+  // Get order details for a specific invoice
+  router.get("/details/:id/items", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const orderDetailsQuery = `
+      SELECT 
+        description,
+        quantity as qty,
+        price,
+        total,
+        tax
+      FROM 
+        order_details
+      WHERE 
+        invoiceid = $1
+      ORDER BY 
+        id
+    `;
+
+      const result = await pool.query(orderDetailsQuery, [id]);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      res.status(500).json({
+        message: "Error fetching order details",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/invoices/:id - Get Single Invoice (Updated Schema)
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
@@ -1127,37 +1158,6 @@ export default function (pool, config) {
       });
     }
   }); // End POST /submit-invoices
-
-  // Get order details for a specific invoice
-  router.get("/details/:id/items", async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      const orderDetailsQuery = `
-      SELECT 
-        description,
-        quantity as qty,
-        price,
-        total,
-        tax
-      FROM 
-        order_details
-      WHERE 
-        invoiceid = $1
-      ORDER BY 
-        id
-    `;
-
-      const result = await pool.query(orderDetailsQuery, [id]);
-      res.json(result.rows);
-    } catch (error) {
-      console.error("Error fetching order details:", error);
-      res.status(500).json({
-        message: "Error fetching order details",
-        error: error.message,
-      });
-    }
-  });
 
   // DELETE /api/invoices/:id - Cancel Invoice (Update Status)
   router.delete("/:id", async (req, res) => {
