@@ -30,6 +30,7 @@ import {
   IconPrinter,
   IconBan,
   IconSelectAll,
+  IconFiles,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -43,6 +44,7 @@ import { useCustomerNames } from "../../hooks/useCustomerNames";
 import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
 import FilterSummary from "../../components/Invoice/FilterSummary";
 import Pagination from "../../components/Invoice/Pagination";
+import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -128,6 +130,7 @@ const InvoiceListPage: React.FC = () => {
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoices, setIsSubmittingInvoices] = useState(false);
+  const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
@@ -683,6 +686,15 @@ const InvoiceListPage: React.FC = () => {
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
             <Button
+              onClick={() => setShowConsolidatedModal(true)}
+              icon={IconFiles}
+              variant="outline"
+              color="amber"
+              disabled={isLoading}
+            >
+              Consolidated
+            </Button>
+            <Button
               onClick={handleRefresh}
               icon={IconRefresh}
               variant="outline"
@@ -991,6 +1003,13 @@ const InvoiceListPage: React.FC = () => {
           )}
         </div>
       </div>
+      {/* Consolidated Invoice Modal */}
+      <ConsolidatedInvoiceModal
+        isOpen={showConsolidatedModal}
+        onClose={() => setShowConsolidatedModal(false)}
+        month={selectedMonth.id}
+        year={new Date().getFullYear()}
+      />
       {/* --- Submission Results Modal --- */}
       <SubmissionResultsModal
         isOpen={showSubmissionResults}
