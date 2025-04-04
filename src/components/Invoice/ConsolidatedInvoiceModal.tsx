@@ -19,8 +19,17 @@ import {
   IconX,
   IconRotateClockwise,
   IconTrash,
-  IconBan, // Using Ban icon for cancelled status badge
+  IconBan,
+  IconChevronDown,
+  IconCheck, // Using Ban icon for cancelled status badge
 } from "@tabler/icons-react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
 import {
   parseDatabaseTimestamp,
   formatDisplayDate,
@@ -351,7 +360,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex justify-center items-center p-4 backdrop-blur-sm">
       {/* Modal Container */}
-      <div className="bg-white w-full max-w-6xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale overflow-hidden">
+      <div className="bg-white w-full max-w-6xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-default-200 flex-shrink-0">
           <h2 className="text-lg font-semibold text-default-800 flex items-center">
@@ -429,8 +438,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           </div>
         </div>
 
-        {/* Main Content Area (Scrollable) */}
-        <div className="flex-grow overflow-y-auto p-5 bg-gray-50/30">
+        {/* Main Content Area */}
+        <div className="flex-grow p-5 bg-gray-50/30">
           {activeTab === "eligible" ? (
             // Eligible invoices tab content (remains largely the same)
             <div className="space-y-4">
@@ -642,19 +651,72 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   Consolidation History
                 </h3>
                 <div className="flex items-center gap-2">
-                  {/* Year Selector */}
-                  <select
-                    className="rounded-lg border border-default-300 py-1 px-2 text-sm"
+                  {/* Year Selector - Using Listbox */}
+                  <Listbox
                     value={historyYear}
-                    onChange={(e) => setHistoryYear(Number(e.target.value))}
+                    onChange={setHistoryYear}
                     disabled={isLoadingHistory || !!processingHistoryId}
                   >
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <option key={i} value={new Date().getFullYear() - i}>
-                        {new Date().getFullYear() - i}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="relative">
+                      <ListboxButton className="rounded-lg border border-default-300 py-1 px-2 text-sm bg-white w-28 text-left flex items-center justify-between">
+                        <span className="block truncate">{historyYear}</span>
+                        <IconChevronDown
+                          className="h-4 w-4 text-default-400"
+                          aria-hidden="true"
+                        />
+                      </ListboxButton>
+                      <Transition
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          {Array.from({ length: 10 }, (_, i) => {
+                            const year = new Date().getFullYear() - i;
+                            return (
+                              <ListboxOption
+                                key={i}
+                                value={year}
+                                className={({ active }) =>
+                                  `relative cursor-default select-none py-2 pl-3 pr-9 ${
+                                    active
+                                      ? "bg-sky-100 text-sky-900"
+                                      : "text-default-900"
+                                  }`
+                                }
+                              >
+                                {({ selected, active }) => (
+                                  <>
+                                    <span
+                                      className={`block truncate ${
+                                        selected ? "font-medium" : "font-normal"
+                                      }`}
+                                    >
+                                      {year}
+                                    </span>
+                                    {selected ? (
+                                      <span
+                                        className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
+                                          active
+                                            ? "text-sky-600"
+                                            : "text-sky-600"
+                                        }`}
+                                      >
+                                        <IconCheck
+                                          className="h-5 w-5"
+                                          aria-hidden="true"
+                                        />
+                                      </span>
+                                    ) : null}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            );
+                          })}
+                        </ListboxOptions>
+                      </Transition>
+                    </div>
+                  </Listbox>
                   <Button
                     onClick={fetchConsolidationHistory}
                     variant="outline"
