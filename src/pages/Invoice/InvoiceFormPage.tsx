@@ -678,109 +678,115 @@ const InvoiceFormPage: React.FC = () => {
 
         {/* Totals & Payment Section */}
         <section className="p-4 border rounded-lg bg-white shadow-sm flex flex-col md:flex-row justify-between items-start gap-6">
-          {/* Left Side: Paid Checkbox & Payment Details */}
-          <div className="w-full md:w-1/3 space-y-4">
-            <div className="flex items-center pt-1">
-              {/* Paid Checkbox Logic (remains same) */}
+          <div className="flex w-full gap-4">
+            {/* Invoice Number & Date Fields */}
+            {/* Left Side: Paid Checkbox & Payment Details */}
+            <div className="w-full md:w-2/5 space-y-4">
+              <div className="flex items-center pt-1">
+                {/* Paid Checkbox Logic */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      !isSaving &&
+                      (invoiceData?.paymenttype !== "CASH" || !isPaid)
+                    ) {
+                      setIsPaid(!isPaid);
+                    }
+                  }}
+                  className={`flex items-center ${
+                    invoiceData?.paymenttype === "CASH"
+                      ? "cursor-not-allowed opacity-70"
+                      : ""
+                  } ${isSaving ? "cursor-not-allowed opacity-50" : ""}`} // Disable interaction when saving
+                  disabled={isSaving || invoiceData?.paymenttype === "CASH"}
+                  title={
+                    invoiceData?.paymenttype === "CASH"
+                      ? "Cash invoices are always paid"
+                      : ""
+                  }
+                >
+                  {isPaid ? (
+                    <IconSquareCheckFilled
+                      className="text-blue-600"
+                      size={20}
+                    />
+                  ) : (
+                    <IconSquare className="text-default-400" size={20} />
+                  )}
+                  <span className="ml-2 font-medium text-sm">
+                    {invoiceData?.paymenttype === "CASH"
+                      ? "Cash Payment"
+                      : "Mark as Paid"}
+                  </span>
+                </button>
+              </div>
+              {isPaid && (
+                <div className="flex items-center gap-3 w-full">
+                  {/* Payment Method & Reference */}
+                  <FormListbox
+                    name="paymentMethod"
+                    label="Payment Method"
+                    value={paymentMethod}
+                    onChange={(value) =>
+                      setPaymentMethod(value as Payment["payment_method"])
+                    }
+                    options={paymentMethodOptions}
+                    disabled={isSaving}
+                    placeholder="Select Method..."
+                    optionsPosition="top"
+                    className="w-2/3"
+                  />
+                  {(paymentMethod === "cheque" ||
+                    paymentMethod === "bank_transfer") && (
+                    <FormInput
+                      name="paymentReference"
+                      label={
+                        paymentMethod === "cheque"
+                          ? "Cheque Number"
+                          : "Transaction Ref"
+                      }
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      placeholder="Enter reference"
+                      disabled={isSaving}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Middle: e-Invoice Checkbox */}
+            <div className="flex items-start pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  if (
-                    !isSaving &&
-                    (invoiceData?.paymenttype !== "CASH" || !isPaid)
-                  ) {
-                    setIsPaid(!isPaid);
-                  }
-                }}
+                onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
                 className={`flex items-center ${
-                  invoiceData?.paymenttype === "CASH"
-                    ? "cursor-not-allowed opacity-70"
+                  !canSubmitEinvoice || isSaving
+                    ? "cursor-not-allowed opacity-50"
                     : ""
-                } ${isSaving ? "cursor-not-allowed opacity-50" : ""}`} // Disable interaction when saving
-                disabled={isSaving || invoiceData?.paymenttype === "CASH"}
+                }`}
+                disabled={!canSubmitEinvoice || isSaving}
                 title={
-                  invoiceData?.paymenttype === "CASH"
-                    ? "Cash invoices are always paid"
+                  !canSubmitEinvoice
+                    ? "Customer must have TIN and ID number for e-invoicing"
                     : ""
                 }
               >
-                {isPaid ? (
+                {submitAsEinvoice ? (
                   <IconSquareCheckFilled className="text-blue-600" size={20} />
                 ) : (
                   <IconSquare className="text-default-400" size={20} />
                 )}
-                <span className="ml-2 font-medium text-sm">
-                  {invoiceData?.paymenttype === "CASH"
-                    ? "Cash Payment"
-                    : "Mark as Paid"}
+                <span className="ml-2 font-medium text-sm truncate">
+                  Submit e-Invoice upon saving
                 </span>
               </button>
             </div>
-            {isPaid && (
-              <div className="flex items-center gap-3 w-full">
-                {/* Payment Method & Reference (remains same, ensure disabled state works) */}
-                <FormListbox
-                  name="paymentMethod"
-                  label="Payment Method"
-                  value={paymentMethod}
-                  onChange={(value) =>
-                    setPaymentMethod(value as Payment["payment_method"])
-                  }
-                  options={paymentMethodOptions}
-                  disabled={isSaving}
-                  placeholder="Select Method..."
-                  optionsPosition="top"
-                  className="w-full"
-                />
-                {(paymentMethod === "cheque" ||
-                  paymentMethod === "bank_transfer") && (
-                  <FormInput
-                    name="paymentReference"
-                    label={
-                      paymentMethod === "cheque"
-                        ? "Cheque Number"
-                        : "Transaction Ref"
-                    }
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    placeholder="Enter reference"
-                    disabled={isSaving}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Middle: e-Invoice Checkbox */}
-          <div className="flex items-center pt-1">
-            <button
-              type="button"
-              onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
-              className={`flex items-center ${
-                !canSubmitEinvoice || isSaving
-                  ? "cursor-not-allowed opacity-50"
-                  : ""
-              }`}
-              disabled={!canSubmitEinvoice || isSaving}
-              title={
-                !canSubmitEinvoice
-                  ? "Customer must have TIN and ID number for e-invoicing"
-                  : ""
-              }
-            >
-              {submitAsEinvoice ? (
-                <IconSquareCheckFilled className="text-blue-600" size={20} />
-              ) : (
-                <IconSquare className="text-default-400" size={20} />
-              )}
-              <span className="ml-2 font-medium text-sm">
-                Submit e-Invoice upon saving
-              </span>
-            </button>
           </div>
 
           {/* Right Side: Invoice Totals */}
-          <div className="w-full md:w-auto">
+          <div className="w-full md:w-80">
             <InvoiceTotals
               subtotal={invoiceData.total_excluding_tax}
               taxTotal={invoiceData.tax_amount}
@@ -793,7 +799,7 @@ const InvoiceFormPage: React.FC = () => {
         </section>
       </div>
 
-      {/* Confirmation Dialogs (remain the same) */}
+      {/* Confirmation Dialogs */}
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
