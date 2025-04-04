@@ -5,38 +5,54 @@ import {
   IconCheck,
   IconAlertTriangle,
   IconClockHour4,
-  IconNotes,
   IconInfoCircle, // For general info/error messages
+  IconRefreshAlert, // For pending failures
+  IconRefresh, // For pending successes
 } from "@tabler/icons-react";
 import Button from "../Button"; // Assuming Button component exists and works
 
-// Updated submission response structure to match example
+// --- Updated Submission Response Interface ---
 interface SubmissionResponse {
   success: boolean;
   message: string;
-  shouldStopAtValidation?: boolean; // Optional field from example
+  shouldStopAtValidation?: boolean;
   acceptedDocuments?: Array<{
-    // Make acceptedDocuments optional
     internalId: string;
     uuid: string;
     longId?: string;
-    status?: string;
+    status?: string; // e.g., "Submitted", "Valid"
+    dateTimeReceived?: string;
+    dateTimeValidated?: string;
+    // Add other fields from example if needed for display
   }>;
   rejectedDocuments?: Array<{
-    // Make rejectedDocuments optional
     internalId: string;
     error: {
       code: string;
       message: string;
-      target?: string; // Optional field from example
+      target?: string;
       details?: Array<{
-        code?: string; // Optional field from example
+        code?: string;
         message: string;
-        target?: string; // Optional field from example
+        target?: string;
       }>;
     };
   }>;
-  overallStatus: string; // e.g., "Valid", "Invalid", "Pending"
+  // --- Added fields for pending update response ---
+  pendingUpdated?: Array<{
+    id: string;
+    status: "valid" | "invalid" | string; // Can be other statuses too
+    longId?: string;
+  }>;
+  pendingFailed?: Array<{
+    id: string;
+    error: string;
+  }>;
+  // --- End added fields ---
+  overallStatus: string; // e.g., "Valid", "Invalid", "Pending", "Partial"
+  submissionUid?: string;
+  documentCount?: number;
+  dateTimeReceived?: string;
 }
 
 interface SubmissionResultsModalProps {
@@ -55,55 +71,118 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
   if (!isOpen) return null;
 
   // --- Safely calculate statistics ---
-  // Use optional chaining (?.) and nullish coalescing (?? 0)
   const acceptedDocs = results?.acceptedDocuments ?? [];
   const rejectedDocs = results?.rejectedDocuments ?? [];
+  const pendingUpdated = results?.pendingUpdated ?? [];
+  const pendingFailed = results?.pendingFailed ?? [];
 
-  const stats = results
-    ? {
-        totalDocuments: acceptedDocs.length + rejectedDocs.length,
-        valid: acceptedDocs.filter(
-          (doc) =>
-            doc.status === "Valid" || (doc.status !== "Pending" && doc.longId)
-        ).length,
-        pending: acceptedDocs.filter(
-          (doc) => doc.status === "Pending" || (!doc.status && !doc.longId)
-        ).length,
-        rejected: rejectedDocs.length,
-      }
-    : null; // Keep stats null if no results
+  // Check if this is primarily a pending update response
+  const isPendingUpdateResponse =
+    (pendingUpdated.length > 0 || pendingFailed.length > 0) &&
+    acceptedDocs.length === 0 &&
+    rejectedDocs.length === 0;
+
+  // Calculate stats for standard/mixed responses
+  const stats =
+    results && !isPendingUpdateResponse
+      ? {
+          totalDocuments: acceptedDocs.length + rejectedDocs.length,
+          // Count as 'valid' only if longId is present
+          valid: acceptedDocs.filter((doc) => !!doc.longId).length,
+          // Count as 'pending' if no longId (even if status is 'Submitted' or overall is 'Valid')
+          pending: acceptedDocs.filter((doc) => !doc.longId).length,
+          rejected: rejectedDocs.length,
+        }
+      : null;
 
   // Determine overall theme based on success/status
+  // Treat pending update successes as 'emerald'
   const isOverallSuccess = results?.success ?? false;
   const overallStatusLower = results?.overallStatus?.toLowerCase();
-  const themeColor = isOverallSuccess
-    ? "emerald"
-    : overallStatusLower === "pending"
-    ? "sky"
-    : "rose";
-  const ThemeIcon = isOverallSuccess
-    ? IconCheck
-    : overallStatusLower === "pending"
-    ? IconClockHour4
-    : IconAlertTriangle;
+  let themeColor = "default";
+  let ThemeIcon = IconInfoCircle;
 
-  const getStatusIcon = (status: string | undefined, size = 16) => {
-    switch (status?.toLowerCase()) {
+  if (results) {
+    if (isPendingUpdateResponse) {
+      themeColor =
+        results.overallStatus === "Valid"
+          ? "emerald"
+          : results.overallStatus === "Partial"
+          ? "amber"
+          : "rose";
+      ThemeIcon =
+        results.overallStatus === "Valid"
+          ? IconCheck
+          : results.overallStatus === "Partial"
+          ? IconRefreshAlert
+          : IconAlertTriangle;
+    } else {
+      // Use combined logic: Check overallStatus first, then results.success for fallback
+      if (overallStatusLower === "valid" && stats?.pending === 0) {
+        themeColor = "emerald";
+        ThemeIcon = IconCheck;
+      } else if (overallStatusLower === "valid" && (stats?.pending ?? 0) > 0) {
+        themeColor = "sky";
+        ThemeIcon = IconClockHour4; // Treat as pending if some are pending
+      } else if (overallStatusLower === "pending") {
+        themeColor = "sky";
+        ThemeIcon = IconClockHour4;
+      } else if (overallStatusLower === "partial") {
+        themeColor = "amber";
+        ThemeIcon = IconAlertTriangle;
+      } else if (overallStatusLower === "invalid") {
+        themeColor = "rose";
+        ThemeIcon = IconAlertTriangle;
+      } else {
+        // Fallback based on success boolean if status is unexpected
+        themeColor = isOverallSuccess ? "emerald" : "rose";
+        ThemeIcon = isOverallSuccess ? IconCheck : IconAlertTriangle;
+      }
+    }
+  }
+
+  // Determine individual document status icon & text
+  const getDocInfo = (
+    doc: NonNullable<SubmissionResponse["acceptedDocuments"]>[number]
+  ) => {
+    if (doc.longId) {
+      return {
+        statusText: "Valid",
+        statusColorClass: "text-emerald-600",
+        Icon: IconCheck,
+      };
+    } else {
+      // If no longId, it's pending regardless of doc.status ('Submitted' etc)
+      return {
+        statusText: "Pending Validation",
+        statusColorClass: "text-sky-600",
+        Icon: IconClockHour4,
+      };
+    }
+  };
+
+  const getPendingUpdateStatusInfo = (
+    item: NonNullable<SubmissionResponse["pendingUpdated"]>[0]
+  ) => {
+    switch (item.status?.toLowerCase()) {
       case "valid":
-        return <IconCheck size={size} className="text-emerald-600" />;
-      case "pending":
-        return <IconClockHour4 size={size} className="text-sky-600" />;
+        return {
+          text: "Valid",
+          color: "text-emerald-600",
+          Icon: IconRefresh,
+        };
       case "invalid":
-      case "rejected":
-        return <IconAlertTriangle size={size} className="text-rose-600" />;
+        return {
+          text: "Invalid",
+          color: "text-red-600",
+          Icon: IconAlertTriangle,
+        };
       default:
-        // Handle derived status for accepted documents without explicit status
-        if (status === "DerivedValid")
-          return <IconCheck size={size} className="text-emerald-600" />;
-        if (status === "DerivedPending")
-          return <IconClockHour4 size={size} className="text-sky-600" />;
-        // Default icon if status is unknown/unexpected (should ideally not happen)
-        return <IconInfoCircle size={size} className="text-default-500" />;
+        return {
+          text: item.status || "Unknown",
+          color: "text-gray-500",
+          Icon: IconInfoCircle,
+        };
     }
   };
 
@@ -115,7 +194,6 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
           <h2 className="text-lg font-semibold text-default-900">
             e-Invoice Submission Results
           </h2>
-          {/* Hide Close button when loading */}
           {!isLoading && (
             <button
               onClick={onClose}
@@ -139,7 +217,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                 Please wait a moment...
               </p>
             </div>
-          ) : results && stats ? ( // Ensure we have results AND stats
+          ) : results ? ( // Only need results to exist now
             <div className="space-y-6">
               {/* ----- Overall Status Message ----- */}
               <div
@@ -153,6 +231,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                   <h3
                     className={`text-base font-semibold text-${themeColor}-800`}
                   >
+                    {/* Use overallStatus if available, otherwise derive from success */}
                     {results.overallStatus ||
                       (isOverallSuccess ? "Success" : "Failed")}
                   </h3>
@@ -161,179 +240,259 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                       {results.message}
                     </p>
                   )}
+                  {results.submissionUid && (
+                    <p className="text-xs text-gray-500 mt-1 font-mono">
+                      Submission UID: {results.submissionUid}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* ----- Updated Summary Section (No Icons) ----- */}
-              {stats.totalDocuments > 0 && ( // Only show summary if there are docs
-                <div>
-                  <h3 className="text-base font-medium text-default-600 mb-3">
-                    Document Summary
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {/* Total */}
-                    <div className="bg-default-100 p-3 rounded-lg border border-default-200 text-center">
-                      <div className="text-xl font-bold text-default-800">
-                        {stats.totalDocuments}
-                      </div>
-                      <div className="text-xs font-medium text-default-500 uppercase tracking-wide mt-1">
-                        Total
-                      </div>
+              {/* ----- Conditional Rendering for Pending Update Response ----- */}
+              {
+                isPendingUpdateResponse ? (
+                  <div className="bg-white border border-default-200 rounded-lg shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-default-200 bg-default-50">
+                      <h3 className="text-base font-semibold text-default-700">
+                        Pending Invoice Status Updates
+                      </h3>
                     </div>
-                    {/* Valid */}
-                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-center">
-                      <div className="text-xl font-bold text-emerald-700">
-                        {stats.valid}
-                      </div>
-                      <div className="text-xs font-medium text-emerald-600 uppercase tracking-wide mt-1">
-                        Valid
-                      </div>
-                    </div>
-                    {/* Pending */}
-                    <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 text-center">
-                      <div className="text-xl font-bold text-sky-700">
-                        {stats.pending}
-                      </div>
-                      <div className="text-xs font-medium text-sky-600 uppercase tracking-wide mt-1">
-                        Pending
-                      </div>
-                    </div>
-                    {/* Rejected */}
-                    <div className="bg-rose-50 p-3 rounded-lg border border-rose-200 text-center">
-                      <div className="text-xl font-bold text-rose-700">
-                        {stats.rejected}
-                      </div>
-                      <div className="text-xs font-medium text-rose-600 uppercase tracking-wide mt-1">
-                        Rejected
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ----- Document list (Handles potentially missing arrays) ----- */}
-              {stats.totalDocuments > 0 ? (
-                <div className="bg-white border border-default-200 rounded-lg shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-default-200 bg-default-50">
-                    <h3 className="text-base font-semibold text-default-700">
-                      Document Details
-                    </h3>
-                  </div>
-                  <div className="divide-y divide-default-200 max-h-[calc(90vh-450px)] overflow-y-auto">
-                    {" "}
-                    {/* Adjusted max-height */}
-                    {/* Accepted Documents (Safe Mapping) */}
-                    {acceptedDocs.map((doc) => {
-                      const status = doc.status
-                        ? doc.status
-                        : doc.longId
-                        ? "DerivedValid"
-                        : "DerivedPending";
-                      const statusText = doc.status
-                        ? doc.status
-                        : doc.longId
-                        ? "Valid"
-                        : "Pending Validation";
-                      const statusColorClass = status
-                        .toLowerCase()
-                        .includes("valid")
-                        ? "text-emerald-600"
-                        : "text-sky-600";
-
-                      return (
+                    <div className="divide-y divide-default-200 max-h-[calc(90vh-300px)] overflow-y-auto">
+                      {/* Updated Pending Invoices */}
+                      {pendingUpdated.map((item) => {
+                        const statusInfo = getPendingUpdateStatusInfo(item);
+                        const StatusIcon = statusInfo.Icon;
+                        return (
+                          <div
+                            key={item.id}
+                            className="px-4 py-3 hover:bg-default-50/70 transition-colors duration-150"
+                          >
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 mr-3">
+                                <StatusIcon
+                                  size={20}
+                                  className={statusInfo.color}
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-baseline">
+                                  <p className="font-medium text-default-800 truncate pr-2">
+                                    #{item.id}
+                                  </p>
+                                  <p
+                                    className={`text-sm font-medium ${statusInfo.color} flex-shrink-0`}
+                                  >
+                                    Updated to {statusInfo.text}
+                                  </p>
+                                </div>
+                                {item.longId && (
+                                  <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
+                                    Long ID: {item.longId}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {/* Failed Pending Updates */}
+                      {pendingFailed.map((item) => (
                         <div
-                          key={doc.internalId}
-                          className="px-4 py-3 hover:bg-default-50/70 transition-colors duration-150"
+                          key={item.id}
+                          className="px-4 py-3 bg-rose-50/50 hover:bg-rose-50/80 transition-colors duration-150"
                         >
-                          {/* ... (rest of accepted doc rendering remains same) ... */}
                           <div className="flex items-center">
                             <div className="flex-shrink-0 mr-3">
-                              {getStatusIcon(status, 20)}
+                              <IconRefreshAlert
+                                size={20}
+                                className="text-rose-600"
+                              />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-baseline">
                                 <p className="font-medium text-default-800 truncate pr-2">
-                                  #{doc.internalId}
+                                  #{item.id}
                                 </p>
-                                <p
-                                  className={`text-sm font-medium ${statusColorClass} flex-shrink-0`}
-                                >
-                                  {statusText}
+                                <p className="text-sm font-medium text-rose-600 flex-shrink-0">
+                                  Update Check Failed
                                 </p>
                               </div>
-                              {doc.uuid && (
-                                <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
-                                  UUID: {doc.uuid}
-                                </p>
-                              )}
+                              <p className="text-xs text-rose-700 mt-0.5 truncate">
+                                Error: {item.error}
+                              </p>
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                    {/* Rejected Documents (Safe Mapping) */}
-                    {rejectedDocs.map((doc) => (
-                      <div
-                        key={doc.internalId}
-                        className="px-4 py-3 bg-rose-50/50 hover:bg-rose-50/80 transition-colors duration-150"
-                      >
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0 mr-3 mt-0.5">
-                            {getStatusIcon("Rejected", 20)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-baseline">
-                              <p className="font-medium text-default-800 truncate pr-2">
-                                #{doc.internalId}
-                              </p>
-                              <p className="text-sm font-medium text-rose-600 flex-shrink-0">
-                                Rejected
-                              </p>
+                      ))}
+                    </div>
+                  </div>
+                ) : stats ? (
+                  /* ----- Standard Rendering (Summary + Document List) ----- */
+                  <>
+                    {/* ----- Summary Section (Adjusted logic for pending) ----- */}
+                    {stats.totalDocuments > 0 && (
+                      <div>
+                        <h3 className="text-base font-medium text-default-600 mb-3">
+                          Document Summary
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          <div className="bg-default-100 p-3 rounded-lg border border-default-200 text-center">
+                            <div className="text-xl font-bold text-default-800">
+                              {stats.totalDocuments}
                             </div>
-                            <p className="text-sm text-rose-700 mt-1 font-medium">
-                              {doc.error?.message ||
-                                "Rejection reason not specified"}
-                            </p>
-                            {doc.error?.details &&
-                              doc.error.details.length > 0 && (
-                                <div className="mt-1.5 space-y-1 border-rose-200 pl-2">
-                                  {doc.error.details
-                                    .slice(0, 5) // Show a few more details if available
-                                    .map((detail, idx) => (
-                                      <p
-                                        key={idx}
-                                        className="text-xs text-rose-600"
-                                      >
-                                        • {detail.message}{" "}
-                                        {detail.target && `(${detail.target})`}
-                                      </p>
-                                    ))}
-                                  {doc.error.details.length > 5 && (
-                                    <p className="text-xs text-default-500 italic mt-1">
-                                      ({doc.error.details.length - 5} more issue
-                                      {doc.error.details.length - 5 > 1
-                                        ? "s"
-                                        : ""}
-                                      )
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                            <div className="text-xs font-medium text-default-500 uppercase tracking-wide mt-1">
+                              Total
+                            </div>
+                          </div>
+                          <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-center">
+                            <div className="text-xl font-bold text-emerald-700">
+                              {stats.valid}
+                            </div>
+                            <div className="text-xs font-medium text-emerald-600 uppercase tracking-wide mt-1">
+                              Valid
+                            </div>
+                          </div>
+                          <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 text-center">
+                            <div className="text-xl font-bold text-sky-700">
+                              {stats.pending}
+                            </div>
+                            <div className="text-xs font-medium text-sky-600 uppercase tracking-wide mt-1">
+                              Pending
+                            </div>
+                          </div>
+                          <div className="bg-rose-50 p-3 rounded-lg border border-rose-200 text-center">
+                            <div className="text-xl font-bold text-rose-700">
+                              {stats.rejected}
+                            </div>
+                            <div className="text-xs font-medium text-rose-600 uppercase tracking-wide mt-1">
+                              Rejected
+                            </div>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                // Message if results exist but contain NO documents at all
-                <div className="text-center py-6 text-default-500">
-                  No documents were found in the submission results.
-                </div>
-              )}
-            </div>
+                    )}
+
+                    {/* ----- Document list (Adjusted status display) ----- */}
+                    {stats.totalDocuments > 0 ? (
+                      <div className="bg-white border border-default-200 rounded-lg shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 border-b border-default-200 bg-default-50">
+                          <h3 className="text-base font-semibold text-default-700">
+                            Document Details
+                          </h3>
+                        </div>
+                        <div className="divide-y divide-default-200 max-h-[calc(90vh-450px)] overflow-y-auto">
+                          {/* Accepted Documents (Handles Pending) */}
+                          {acceptedDocs.map((doc) => {
+                            const { statusText, statusColorClass, Icon } =
+                              getDocInfo(doc);
+                            return (
+                              <div
+                                key={doc.internalId}
+                                className="px-4 py-3 hover:bg-default-50/70 transition-colors duration-150"
+                              >
+                                <div className="flex items-center">
+                                  <div className="flex-shrink-0 mr-3">
+                                    <Icon
+                                      size={20}
+                                      className={statusColorClass}
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-baseline">
+                                      <p className="font-medium text-default-800 truncate pr-2">
+                                        #{doc.internalId}
+                                      </p>
+                                      <p
+                                        className={`text-sm font-medium ${statusColorClass} flex-shrink-0`}
+                                      >
+                                        {statusText}
+                                      </p>
+                                    </div>
+                                    {doc.uuid && (
+                                      <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
+                                        UUID: {doc.uuid}
+                                      </p>
+                                    )}
+                                    {doc.longId && (
+                                      <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
+                                        Long ID: {doc.longId}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {/* Rejected Documents */}
+                          {rejectedDocs.map((doc) => (
+                            <div
+                              key={doc.internalId}
+                              className="px-4 py-3 bg-rose-50/50 hover:bg-rose-50/80 transition-colors duration-150"
+                            >
+                              <div className="flex items-start">
+                                <div className="flex-shrink-0 mr-3 mt-0.5">
+                                  <IconAlertTriangle
+                                    size={20}
+                                    className="text-rose-600"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-baseline">
+                                    <p className="font-medium text-default-800 truncate pr-2">
+                                      #{doc.internalId}
+                                    </p>
+                                    <p className="text-sm font-medium text-rose-600 flex-shrink-0">
+                                      Rejected
+                                    </p>
+                                  </div>
+                                  <p className="text-sm text-rose-700 mt-1 font-medium">
+                                    {doc.error?.message ||
+                                      "Rejection reason not specified"}
+                                  </p>
+                                  {doc.error?.details &&
+                                    doc.error.details.length > 0 && (
+                                      <div className="mt-1.5 space-y-1 border-l-2 border-rose-200 pl-2">
+                                        {doc.error.details
+                                          .slice(0, 5)
+                                          .map((detail, idx) => (
+                                            <p
+                                              key={idx}
+                                              className="text-xs text-rose-600"
+                                            >
+                                              • {detail.message}{" "}
+                                              {detail.target &&
+                                                `(${detail.target})`}
+                                            </p>
+                                          ))}
+                                        {doc.error.details.length > 5 && (
+                                          <p className="text-xs text-default-500 italic mt-1">
+                                            ({doc.error.details.length - 5} more
+                                            issue
+                                            {doc.error.details.length - 5 > 1
+                                              ? "s"
+                                              : ""}
+                                            )
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-default-500">
+                        No documents were found in the submission results.
+                      </div>
+                    )}
+                  </>
+                ) : null /* End Standard Rendering Block */
+              }
+            </div> /* End Main Content Space */
           ) : (
-            // Fallback for no results (and not loading)
+            // Fallback for null results and not loading
             <div className="flex flex-col items-center justify-center py-16 text-center text-default-500">
               <IconAlertTriangle size={32} className="mb-3 text-amber-500" />
               <p className="text-lg font-medium">No Results Available</p>
@@ -344,7 +503,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
           )}
         </div>
 
-        {/* Footer - Hide when loading, show only Done button otherwise */}
+        {/* Footer */}
         {!isLoading && (
           <div className="p-4 border-t border-default-200 bg-white">
             <Button onClick={onClose} className="w-full justify-center py-2.5">
@@ -353,7 +512,8 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+      {/* End Modal Body */}
+    </div> /* End Modal Backdrop */
   );
 };
 

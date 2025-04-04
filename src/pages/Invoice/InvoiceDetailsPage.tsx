@@ -633,7 +633,8 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
-              invoiceData.einvoice_status === "invalid") &&
+              invoiceData.einvoice_status === "invalid" ||
+              invoiceData.einvoice_status === "pending") &&
             invoiceData.customerid &&
             invoiceData.customerTin && (
               <Button
