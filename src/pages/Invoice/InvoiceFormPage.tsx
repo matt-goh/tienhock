@@ -1,6 +1,7 @@
 // src/pages/Invoice/InvoiceFormPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+// --- Other imports ---
 import {
   ExtendedInvoiceData,
   ProductItem,
@@ -27,6 +28,8 @@ import toast from "react-hot-toast";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
+// --- MODAL IMPORT ---
+import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal"; // Adjust path if needed
 
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -35,8 +38,8 @@ const InvoiceFormPage: React.FC = () => {
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData | null>(
     null
   );
-  const [isLoadingPage, setIsLoadingPage] = useState(true); // Loading supporting data
-  const [isSaving, setIsSaving] = useState(false); // Saving state (Create)
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
+  const [isSaving, setIsSaving] = useState(false); // Overall saving state
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
@@ -44,19 +47,31 @@ const InvoiceFormPage: React.FC = () => {
     null
   );
   const [customerIdNumber, setCustomerIdNumber] = useState<string | null>(null);
-
-  // Payment State (only relevant if 'Paid' is checked)
   const [isPaid, setIsPaid] = useState(false);
   const [paymentMethod, setPaymentMethod] =
     useState<Payment["payment_method"]>("cash");
   const [paymentReference, setPaymentReference] = useState("");
 
-  // --- Hooks ---
+  // --- MODAL STATE ---
+  const [isEinvoiceSubmitting, setIsEinvoiceSubmitting] = useState(false); // Specific loading state for e-invoice API call
+  interface EinvoiceResult {
+    success: boolean;
+    message: string;
+    rejectedDocuments: any[];
+    acceptedDocuments: any[];
+    overallStatus: string;
+  }
+
+  const [einvoiceResults, setEinvoiceResults] = useState<EinvoiceResult | null>(
+    null
+  );
+  const [isEinvoiceModalOpen, setIsEinvoiceModalOpen] = useState(false);
+
+  // --- Hooks (remain the same) ---
   const { products: productsCache, isLoading: productsLoading } =
     useProductsCache();
   const { salesmen: salesmenCache, isLoading: salesmenLoading } =
     useSalesmanCache();
-  // Customer hook needs careful handling as invoiceData.customerid won't exist initially
   const {
     customers,
     selectedCustomer,
@@ -66,24 +81,22 @@ const InvoiceFormPage: React.FC = () => {
     loadMoreCustomers,
     hasMoreCustomers,
     isFetchingCustomers,
-  } = useCustomerData(invoiceData?.customerid); // Pass null initially, updates when customer selected
+  } = useCustomerData(invoiceData?.customerid);
 
-  // --- Memoized Values ---
+  // --- Memoized Values (remain the same) ---
   const lineItems = useMemo(
     () => invoiceData?.products || [],
     [invoiceData?.products]
   );
 
   // --- Effects ---
-
-  // Overall page loading state
   useEffect(() => {
     setIsLoadingPage(productsLoading || salesmenLoading);
   }, [productsLoading, salesmenLoading]);
 
-  // Initialize new invoice data once supporting data is loaded
   useEffect(() => {
     if (!isLoadingPage && !invoiceData) {
+      // Initialize new invoice data (logic remains the same)
       const newInv: ExtendedInvoiceData = {
         id: "", // User must input
         salespersonid: salesmenCache.length > 0 ? salesmenCache[0].id : "", // Default salesman
@@ -122,41 +135,44 @@ const InvoiceFormPage: React.FC = () => {
       };
       setInvoiceData(newInv);
     }
-  }, [isLoadingPage, salesmenCache, invoiceData]); // invoiceData added to prevent re-init
+  }, [isLoadingPage, salesmenCache, invoiceData]);
 
   useEffect(() => {
-    // Auto-check "Mark as Paid" when CASH type is selected
     if (invoiceData?.paymenttype === "CASH" && !isPaid) {
       setIsPaid(true);
     }
   }, [invoiceData?.paymenttype, isPaid]);
 
-  // Fetch custom product prices when customer changes
   const fetchCustomerProducts = useCallback(async (customerId: string) => {
     if (!customerId) {
       setCustomerProducts([]);
       setCustomerTinNumber(null);
       setCustomerIdNumber(null);
+      setSubmitAsEinvoice(false); // Reset e-invoice flag if customer cleared
       return [];
     }
     try {
       const response = await api.get(`/api/customer-products/${customerId}`);
-
-      // Handle the new response format
       if (response.products) {
-        // New format with customer and products
         setCustomerProducts(response.products);
-
-        // Store customer TIN and ID for e-invoice eligibility check
         if (response.customer) {
-          setCustomerTinNumber(response.customer.tin_number);
-          setCustomerIdNumber(response.customer.id_number);
+          const hasTin = !!response.customer.tin_number;
+          const hasId = !!response.customer.id_number;
+          setCustomerTinNumber(hasTin ? response.customer.tin_number : null);
+          setCustomerIdNumber(hasId ? response.customer.id_number : null);
+          // Only keep e-invoice checked if both are present after fetch
+          setSubmitAsEinvoice(hasTin && hasId);
+        } else {
+          setCustomerTinNumber(null);
+          setCustomerIdNumber(null);
+          setSubmitAsEinvoice(false); // Disable if customer data structure is wrong
         }
-
         return response.products;
       } else {
-        // Handle legacy format (just in case)
         setCustomerProducts(response);
+        setCustomerTinNumber(null); // Legacy handling, assume no TIN/ID
+        setCustomerIdNumber(null);
+        setSubmitAsEinvoice(false);
         return response;
       }
     } catch (error) {
@@ -165,18 +181,23 @@ const InvoiceFormPage: React.FC = () => {
       setCustomerProducts([]);
       setCustomerTinNumber(null);
       setCustomerIdNumber(null);
+      setSubmitAsEinvoice(false); // Disable on error
       return [];
     }
-  }, []);
+  }, []); // No dependencies needed if api is stable
+
   useEffect(() => {
     if (invoiceData?.customerid) {
       fetchCustomerProducts(invoiceData.customerid);
     } else {
       setCustomerProducts([]);
+      setCustomerTinNumber(null);
+      setCustomerIdNumber(null);
+      setSubmitAsEinvoice(false); // Reset when no customer ID
     }
   }, [invoiceData?.customerid, fetchCustomerProducts]);
 
-  // Effect to recalculate totals (No change needed)
+  // Recalculate totals effect (remains the same)
   useEffect(() => {
     if (!invoiceData) return;
 
@@ -211,10 +232,10 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [invoiceData?.products, invoiceData?.rounding]);
 
-  // --- Input & Action Handlers ---
+  // --- Input & Action Handlers (mostly same) ---
 
   const handleBackClick = () => {
-    // Check if any significant field has been touched (simple check for now)
+    // Logic remains the same
     const isFormDirty =
       !!invoiceData?.id ||
       !!invoiceData?.customerid ||
@@ -225,16 +246,17 @@ const InvoiceFormPage: React.FC = () => {
     if (isFormDirty && !isSaving) {
       setShowBackConfirmation(true);
     } else if (!isSaving) {
-      navigate("/sales/invoice"); // Go back to list
+      navigate("/sales/invoice");
     }
   };
   const handleConfirmBack = () => {
+    // Logic remains the same
     setShowBackConfirmation(false);
-    navigate("/sales/invoice"); // Go back to list
+    navigate("/sales/invoice");
   };
 
-  // Update header fields (No change needed, readOnly removed)
   const handleHeaderInputChange = useCallback(
+    // Logic remains the same
     (field: keyof ExtendedInvoiceData, value: any) => {
       setInvoiceData((prev) => {
         if (!prev) return null;
@@ -247,20 +269,21 @@ const InvoiceFormPage: React.FC = () => {
           return { ...prev, id: numberPart };
         }
         if (field === "paymenttype") {
-          // If switching to CASH, ensure isPaid is true
           if (value === "CASH") {
             setIsPaid(true);
           }
+          // If switching away from CASH, allow unchecking paid status
+          // (Optional: could automatically set isPaid to false here too)
           return { ...prev, paymenttype: value };
         }
         return { ...prev, [field]: value };
       });
     },
-    [setIsPaid] // Add setIsPaid as a dependency
+    [setIsPaid] // Include setIsPaid
   );
 
-  // Customer selection (No change needed, readOnly removed)
   const handleCustomerSelectionChange = useCallback(
+    // Logic remains the same
     (customer: Customer | null) => {
       setSelectedCustomer(customer);
       setInvoiceData((prev) =>
@@ -272,48 +295,50 @@ const InvoiceFormPage: React.FC = () => {
             }
           : null
       );
-      if (customer) {
-        fetchCustomerProducts(customer.id);
-      } else {
-        setCustomerProducts([]);
-      }
+      // fetchCustomerProducts is called by the useEffect watching customerid
     },
-    [setSelectedCustomer, fetchCustomerProducts]
+    [setSelectedCustomer]
   );
 
-  // Line item changes (No change needed, readOnly removed)
-  const handleLineItemsChange = useCallback((updatedItems: ProductItem[]) => {
-    const itemsWithUid = updatedItems.map((item) => ({
-      ...item,
-      uid: item.uid || crypto.randomUUID(),
-    }));
+  const handleLineItemsChange = useCallback(
+    // Logic remains the same
+    (updatedItems: ProductItem[]) => {
+      const itemsWithUid = updatedItems.map((item) => ({
+        ...item,
+        uid: item.uid || crypto.randomUUID(),
+      }));
 
-    let runningTotal = 0;
-    const recalculatedItems = itemsWithUid.map((item) => {
-      if (!item.issubtotal && !item.istotal) {
-        const itemTotal = parseFloat(item.total || "0");
-        runningTotal += itemTotal;
+      let runningTotal = 0;
+      const recalculatedItems = itemsWithUid.map((item) => {
+        if (!item.issubtotal && !item.istotal) {
+          const itemTotal = parseFloat(item.total || "0");
+          runningTotal += itemTotal;
+          return item;
+        } else if (item.issubtotal) {
+          return { ...item, total: runningTotal.toFixed(2) };
+        }
         return item;
-      } else if (item.issubtotal) {
-        return { ...item, total: runningTotal.toFixed(2) };
-      }
-      return item;
-    });
+      });
 
-    setInvoiceData((prev) =>
-      prev ? { ...prev, products: recalculatedItems } : null
-    );
-  }, []);
+      setInvoiceData((prev) =>
+        prev ? { ...prev, products: recalculatedItems } : null
+      );
+    },
+    []
+  );
 
-  // Rounding change (No change needed, readOnly removed)
-  const handleRoundingChange = useCallback((newRounding: number) => {
-    setInvoiceData((prev) =>
-      prev ? { ...prev, rounding: parseFloat(newRounding.toFixed(2)) } : null
-    );
-  }, []);
+  const handleRoundingChange = useCallback(
+    // Logic remains the same
+    (newRounding: number) => {
+      setInvoiceData((prev) =>
+        prev ? { ...prev, rounding: parseFloat(newRounding.toFixed(2)) } : null
+      );
+    },
+    []
+  );
 
-  // Add new row (No change needed, readOnly removed)
   const handleAddRow = () => {
+    // Logic remains the same
     if (!invoiceData) return;
     const newRow: ProductItem = {
       uid: crypto.randomUUID(),
@@ -330,8 +355,8 @@ const InvoiceFormPage: React.FC = () => {
     handleLineItemsChange([...invoiceData.products, newRow]);
   };
 
-  // Add subtotal row (No change needed, readOnly removed)
   const handleAddSubtotal = () => {
+    // Logic remains the same
     if (!invoiceData) return;
     let runningTotal = 0;
     for (let i = invoiceData.products.length - 1; i >= 0; i--) {
@@ -356,20 +381,33 @@ const InvoiceFormPage: React.FC = () => {
     handleLineItemsChange([...invoiceData.products, subtotalRow]);
   };
 
-  // CREATE INVOICE
-  const handleCreateInvoice = async () => {
-    if (!invoiceData || isSaving) return;
+  // --- MODAL CLOSE HANDLER ---
+  const handleCloseEinvoiceModal = () => {
+    setIsEinvoiceModalOpen(false);
+    // Navigate *after* closing the modal
+    if (invoiceData?.id) {
+      // Only navigate if we have an ID (creation was successful)
+      navigate(`/sales/invoice/${invoiceData.id}`, {
+        replace: true,
+        state: { previousPath: "/sales/invoice" },
+      });
+    }
+    // Optionally clear results after closing
+    // setEinvoiceResults(null);
+  };
 
-    // --- Validation ---
+  // --- UPDATED CREATE INVOICE ---
+  const handleCreateInvoice = async () => {
+    if (!invoiceData || isSaving) return; // Use overall isSaving for initial block
+
+    // --- Validation (remains the same) ---
     let errors: string[] = [];
     const numberPartId = invoiceData.id;
-
     if (!numberPartId) errors.push("Invoice Number is required.");
     if (!invoiceData.customerid) errors.push("Customer is required.");
     if (!invoiceData.salespersonid) errors.push("Salesman is required.");
     if (!invoiceData.createddate || isNaN(parseInt(invoiceData.createddate)))
       errors.push("Valid Date/Time is required.");
-
     const itemsToValidate = lineItems.filter(
       (li) => !li.issubtotal && !li.istotal
     );
@@ -387,8 +425,6 @@ const InvoiceFormPage: React.FC = () => {
           errors.push(`Item #${index + 1}: Price cannot be negative.`);
       });
     }
-
-    // Payment Validation (if paid)
     if (isPaid) {
       if (!paymentMethod) errors.push("Payment Method is required.");
       if (
@@ -398,39 +434,36 @@ const InvoiceFormPage: React.FC = () => {
         errors.push("Payment Reference is required for Cheque/Bank Transfer.");
       }
     }
-
     if (errors.length > 0) {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
       return;
     }
 
-    // Start saving process with duplicate check
-    setIsSaving(true);
+    // --- Start Saving Process ---
+    setIsSaving(true); // Set overall saving state
+    let invoiceIdForNavigation: string | null = null; // To store the ID for potential navigation later
     const toastId = toast.loading("Checking invoice number...");
 
     try {
-      // Check for duplicates
+      // 1. Check for duplicates
       const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.id);
       if (isDuplicate) {
-        toast.error(`Invoice ${invoiceData.id} already exists in the system`, {
-          id: toastId,
-        });
-        setIsSaving(false);
-        return;
+        throw new Error(`Invoice ${invoiceData.id} already exists`);
       }
 
-      // Update loading message for invoice creation
+      // 2. Create Invoice
       toast.loading("Creating invoice...", { id: toastId });
-
-      // Create the invoice
       const savedInvoice = await createInvoice({ ...invoiceData });
-      const invoiceIdForPayment = savedInvoice.id;
+      invoiceIdForNavigation = savedInvoice.id; // Store the successfully created ID
+      toast.success(`Invoice ${invoiceIdForNavigation} created!`, {
+        id: toastId,
+      }); // Initial success toast
 
-      // Step 2: If 'Paid' is checked, create the payment
+      // 3. Create Payment (if needed)
       if (isPaid) {
         toast.loading("Recording payment...", { id: toastId });
         const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
-          invoice_id: invoiceIdForPayment,
+          invoice_id: invoiceIdForNavigation, // Use the saved ID
           payment_date: new Date().toISOString(),
           amount_paid: savedInvoice.totalamountpayable,
           payment_method: paymentMethod,
@@ -439,91 +472,97 @@ const InvoiceFormPage: React.FC = () => {
               ? undefined
               : paymentReference || undefined,
         };
-
         try {
           await createPayment(paymentData);
-          toast.success(`Invoice ${invoiceIdForPayment} created and paid!`, {
+          toast.success(`Invoice ${invoiceIdForNavigation} created and paid!`, {
             id: toastId,
-          });
+          }); // Update toast
         } catch (paymentError: any) {
+          // Payment failed, but invoice created. Show error, but proceed maybe?
           toast.error(
-            `Invoice ${invoiceIdForPayment} created, but payment failed: ${paymentError.message}`,
-            { id: toastId, duration: 5000 }
+            `Invoice ${invoiceIdForNavigation} created, but payment failed: ${paymentError.message}. E-invoice submission skipped.`,
+            { id: toastId, duration: 6000 }
           );
+          // Decide if you want to stop here or still attempt e-invoice if checked?
+          // For safety, let's stop if payment fails when expected.
+          setIsSaving(false); // Stop saving process
+          return; // Exit the function
         }
-      } else {
-        toast.success(`Invoice ${invoiceIdForPayment} created!`, {
-          id: toastId,
-        });
       }
 
-      // Step 3: If 'Submit e-Invoice' is checked, submit for e-invoicing
-      if (submitAsEinvoice && customerTinNumber && customerIdNumber) {
-        toast.loading("Submitting e-invoice...", { id: toastId });
+      // 4. Submit e-Invoice (if checked and eligible)
+      const shouldSubmitEinvoice =
+        submitAsEinvoice && customerTinNumber && customerIdNumber;
+
+      if (shouldSubmitEinvoice) {
+        // --- TRIGGER MODAL ---
+        setIsEinvoiceSubmitting(true);
+        setEinvoiceResults(null);
+        setIsEinvoiceModalOpen(true);
+        toast.dismiss(toastId); // Dismiss previous toasts, modal shows progress/result
+
         try {
           const einvoiceResponse = await api.post(
             "/api/einvoice/submit-system",
             {
-              invoiceIds: [invoiceIdForPayment],
+              invoiceIds: [invoiceIdForNavigation], // Use the saved ID
             }
           );
-
-          if (einvoiceResponse.success) {
-            toast.success(
-              `Invoice ${invoiceIdForPayment} created and submitted for e-invoicing!`,
-              {
-                id: toastId,
-              }
-            );
-          } else {
-            toast.error(
-              `Invoice created, but e-invoice submission failed: ${
-                einvoiceResponse.message || "Unknown error"
-              }`,
-              { id: toastId, duration: 5000 }
-            );
-          }
+          setEinvoiceResults(einvoiceResponse); // Set results for the modal
+          // Modal will display success/failure based on einvoiceResponse.success
         } catch (einvoiceError: any) {
-          toast.error(
-            `Invoice created, but e-invoice submission failed: ${
-              einvoiceError.message || "Unknown error"
+          console.error("E-invoice submission API error:", einvoiceError);
+          // Create a synthetic error response for the modal
+          setEinvoiceResults({
+            success: false,
+            message: `E-invoice submission failed: ${
+              einvoiceError?.response?.data?.message ||
+              einvoiceError.message ||
+              "Network error"
             }`,
-            { id: toastId, duration: 5000 }
-          );
+            rejectedDocuments: [], // Ensure arrays exist
+            acceptedDocuments: [],
+            overallStatus: "Error",
+          });
+        } finally {
+          setIsEinvoiceSubmitting(false); // Signal modal to show results
+          // DO NOT NAVIGATE YET - user closes modal first
         }
       } else {
-        // Normal success message if not submitting e-invoice
-        toast.success(`Invoice ${invoiceIdForPayment} created!`, {
-          id: toastId,
+        // If not submitting e-invoice, navigate immediately
+        navigate(`/sales/invoice/${invoiceIdForNavigation}`, {
+          replace: true,
+          state: { previousPath: "/sales/invoice" },
         });
       }
-
-      // Navigate to the details page
-      navigate(`/sales/invoice/${invoiceIdForPayment}`, {
-        replace: true,
-        state: { previousPath: "/sales/invoice" },
-      });
     } catch (error: any) {
-      // Check if this is a duplicate error caught by the server
-      if (error.message && error.message.includes("already exists")) {
-        toast.error(`Invoice ${invoiceData.id} already exists`, {
-          id: toastId,
-        });
-      } else {
-        toast.error(
-          `Error creating invoice: ${error.message || "Unknown error"}`,
-          { id: toastId }
-        );
-      }
+      // Handle errors from duplicate check or createInvoice
+      toast.error(`${error.message || "Error creating invoice"}`, {
+        id: toastId,
+        duration: 5000,
+      });
+      setIsSaving(false); // Ensure saving stops on critical errors
+      // Don't navigate
     } finally {
-      setIsSaving(false);
+      // Only set isSaving false here if NOT submitting e-invoice
+      // If submitting e-invoice, the modal flow handles the end state.
+      if (!submitAsEinvoice || !customerTinNumber || !customerIdNumber) {
+        setIsSaving(false);
+      }
+      // Note: If e-invoice submission was triggered, isSaving remains true
+      // until the modal is closed and navigation happens, or if submission fails critically.
+      // We might want finer control, but let's keep isSaving true while modal is potentially active.
+      // Let's refine: Set isSaving false here UNLESS the modal is now open
+      if (!isEinvoiceModalOpen) {
+        setIsSaving(false);
+      }
     }
   };
 
   // --- Render Logic ---
 
   if (isLoadingPage || !invoiceData) {
-    // Show loading spinner until supporting data AND initial invoice structure are ready
+    // Loading spinner logic (remains the same)
     return (
       <div className="mt-40 flex justify-center">
         <LoadingSpinner />
@@ -531,6 +570,7 @@ const InvoiceFormPage: React.FC = () => {
     );
   }
 
+  // Options for dropdowns (remains the same)
   const salesmenOptions = salesmenCache.map((s) => ({
     id: s.id,
     name: s.name || s.id,
@@ -555,6 +595,9 @@ const InvoiceFormPage: React.FC = () => {
     { id: "online", name: "Online" },
   ];
 
+  // Determine if e-invoice checkbox should be enabled
+  const canSubmitEinvoice = !!customerTinNumber && !!customerIdNumber;
+
   // --- JSX Output ---
   return (
     <div className="px-4 md:px-6 pb-8 max-w-full">
@@ -571,9 +614,9 @@ const InvoiceFormPage: React.FC = () => {
             variant="filled"
             color="sky"
             size="md"
-            disabled={isSaving}
+            disabled={isSaving} // Disable button during the entire save process
           >
-            {isSaving
+            {isSaving // Show generic saving text
               ? "Saving..."
               : isPaid
               ? "Create & Mark Paid"
@@ -589,7 +632,7 @@ const InvoiceFormPage: React.FC = () => {
           <InvoiceHeader
             invoice={invoiceData}
             onInputChange={handleHeaderInputChange}
-            isNewInvoice={true} // Always true
+            isNewInvoice={true}
             customers={customers}
             salesmen={salesmenOptions}
             selectedCustomer={selectedCustomer}
@@ -599,7 +642,7 @@ const InvoiceFormPage: React.FC = () => {
             onLoadMoreCustomers={loadMoreCustomers}
             hasMoreCustomers={hasMoreCustomers}
             isFetchingCustomers={isFetchingCustomers}
-            readOnly={false} // Always editable
+            readOnly={isSaving} // Make header read-only while saving
           />
         </section>
 
@@ -632,15 +675,16 @@ const InvoiceFormPage: React.FC = () => {
             onItemsChange={handleLineItemsChange}
             customerProducts={customerProducts}
             productsCache={productsForTable}
-            readOnly={false} // Always editable
+            readOnly={isSaving} // Make table read-only while saving
           />
         </section>
 
         {/* Totals & Payment Section */}
         <section className="p-4 border rounded-lg bg-white shadow-sm flex flex-col md:flex-row justify-between items-start gap-6">
-          {/* Left Side: Paid Checkbox & Payment Details (if paid) */}
+          {/* Left Side: Paid Checkbox & Payment Details */}
           <div className="w-full md:w-1/3 space-y-4">
             <div className="flex items-center pt-1">
+              {/* Paid Checkbox Logic (remains same) */}
               <button
                 type="button"
                 onClick={() => {
@@ -655,8 +699,8 @@ const InvoiceFormPage: React.FC = () => {
                   invoiceData?.paymenttype === "CASH"
                     ? "cursor-not-allowed opacity-70"
                     : ""
-                } disabled:opacity-50`}
-                disabled={isSaving}
+                } ${isSaving ? "cursor-not-allowed opacity-50" : ""}`} // Disable interaction when saving
+                disabled={isSaving || invoiceData?.paymenttype === "CASH"}
                 title={
                   invoiceData?.paymenttype === "CASH"
                     ? "Cash invoices are always paid"
@@ -675,23 +719,22 @@ const InvoiceFormPage: React.FC = () => {
                 </span>
               </button>
             </div>
-
             {isPaid && (
               <div className="flex items-center gap-3 w-full">
+                {/* Payment Method & Reference (remains same, ensure disabled state works) */}
                 <FormListbox
                   name="paymentMethod"
                   label="Payment Method"
-                  value={paymentMethod} // Pass the ID state ('cash')
+                  value={paymentMethod}
                   onChange={(value) =>
                     setPaymentMethod(value as Payment["payment_method"])
-                  } // Receives ID ('cash')
-                  options={paymentMethodOptions} // Pass options with {id, name}
+                  }
+                  options={paymentMethodOptions}
                   disabled={isSaving}
                   placeholder="Select Method..."
                   optionsPosition="top"
                   className="w-full"
                 />
-
                 {(paymentMethod === "cheque" ||
                   paymentMethod === "bank_transfer") && (
                   <FormInput
@@ -711,28 +754,33 @@ const InvoiceFormPage: React.FC = () => {
             )}
           </div>
 
-          {/* e-Invoice Checkbox - only show if customer has TIN and ID */}
-          {customerTinNumber && customerIdNumber && (
-            <div className="flex items-center pt-1">
-              <button
-                type="button"
-                onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
-                className={`flex items-center ${
-                  isSaving ? "cursor-not-allowed opacity-70" : ""
-                } disabled:opacity-50`}
-                disabled={isSaving}
-              >
-                {submitAsEinvoice ? (
-                  <IconSquareCheckFilled className="text-blue-600" size={20} />
-                ) : (
-                  <IconSquare className="text-default-400" size={20} />
-                )}
-                <span className="ml-2 font-medium text-sm">
-                  Submit e-Invoice upon saving
-                </span>
-              </button>
-            </div>
-          )}
+          {/* Middle: e-Invoice Checkbox */}
+          <div className="flex items-center pt-1">
+            <button
+              type="button"
+              onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
+              className={`flex items-center ${
+                !canSubmitEinvoice || isSaving
+                  ? "cursor-not-allowed opacity-50"
+                  : ""
+              }`}
+              disabled={!canSubmitEinvoice || isSaving}
+              title={
+                !canSubmitEinvoice
+                  ? "Customer must have TIN and ID number for e-invoicing"
+                  : ""
+              }
+            >
+              {submitAsEinvoice ? (
+                <IconSquareCheckFilled className="text-blue-600" size={20} />
+              ) : (
+                <IconSquare className="text-default-400" size={20} />
+              )}
+              <span className="ml-2 font-medium text-sm">
+                Submit e-Invoice upon saving
+              </span>
+            </button>
+          </div>
 
           {/* Right Side: Invoice Totals */}
           <div className="w-full md:w-auto">
@@ -742,13 +790,13 @@ const InvoiceFormPage: React.FC = () => {
               rounding={invoiceData.rounding}
               grandTotal={invoiceData.totalamountpayable}
               onRoundingChange={handleRoundingChange}
-              readOnly={false}
+              readOnly={isSaving} // Make totals read-only while saving
             />
           </div>
         </section>
       </div>
 
-      {/* Confirmation Dialogs */}
+      {/* Confirmation Dialogs (remain the same) */}
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
@@ -757,6 +805,14 @@ const InvoiceFormPage: React.FC = () => {
         message="Are you sure you want to leave? This new invoice will be discarded."
         confirmButtonText="Discard"
         variant="danger"
+      />
+
+      {/* --- RENDER THE MODAL --- */}
+      <SubmissionResultsModal
+        isOpen={isEinvoiceModalOpen}
+        onClose={handleCloseEinvoiceModal}
+        results={einvoiceResults}
+        isLoading={isEinvoiceSubmitting} // Use the specific e-invoice loading state
       />
     </div>
   );
