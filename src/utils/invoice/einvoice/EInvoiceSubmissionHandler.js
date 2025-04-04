@@ -14,7 +14,7 @@ class EInvoiceSubmissionHandler {
         ? transformedInvoices
         : [transformedInvoices];
       const requestBody = this.prepareRequestBody(invoices);
-      await this.wait(300); // Add 0.5 second delay
+      await this.wait(300); // Add 0.3 second delay
       const submissionResponse = await this.apiClient.makeApiCall(
         "POST",
         "/api/v1.0/documentsubmissions",
