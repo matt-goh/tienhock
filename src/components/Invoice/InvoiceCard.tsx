@@ -179,13 +179,15 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
       {/* Body - Uses parent's horizontal padding */}
       <div className="space-y-2">
         <p
-          className="font-medium text-default-800 truncate"
+          className="flex flex-col font-medium"
           title={invoice.customerName || invoice.customerid}
         >
-          {invoice.customerName || invoice.customerid}
-          <p className="text-xs text-default-500 truncate">
+          <span className="truncate text-default-800">
+            {invoice.customerName || invoice.customerid}
+          </span>
+          <span className="text-xs text-default-500 truncate">
             {invoice.salespersonid}
-          </p>
+          </span>
         </p>
         <p className="text-lg font-semibold text-default-900">
           {`RM ${invoice.totalamountpayable.toFixed(2)}`}
