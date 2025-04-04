@@ -197,7 +197,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             {invoice.customerName || invoice.customerid}
           </span>
           <span
-            className="text-xs text-default-500 truncate hover:underline cursor-pointer"
+            className="w-fit text-xs text-default-500 truncate hover:underline cursor-pointer"
             title={invoice.salespersonid}
             onClick={(e) => {
               e.stopPropagation();
