@@ -298,10 +298,20 @@ const InvoiceListPage: React.FC = () => {
     (month: MonthOption) => {
       setSelectedMonth(month); // Update local state for the dropdown display
 
-      const year = new Date().getFullYear(); // Use current year
-      const startDate = new Date(year, month.id, 1);
+      // --- Determine the target year ---
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonthIndex = now.getMonth(); // 0-11
+
+      // If selected month is *after* the current month, use the previous year.
+      // Otherwise, use the current year.
+      const targetYear =
+        month.id > currentMonthIndex ? currentYear - 1 : currentYear;
+
+      // Calculate start and end dates using the targetYear
+      const startDate = new Date(targetYear, month.id, 1); // Day 1 of selected month in targetYear
       startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(year, month.id + 1, 0); // Day 0 of next month = last day of current
+      const endDate = new Date(targetYear, month.id + 1, 0); // Day 0 of *next* month = last day of selected month
       endDate.setHours(23, 59, 59, 999);
 
       // Construct the new *full* filter state
@@ -704,11 +714,7 @@ const InvoiceListPage: React.FC = () => {
           </div>
           {/* Month Selector */}
           <div className="w-full sm:w-auto lg:w-40">
-            {" "}
-            {/* Adjusted width */}
             <Listbox value={selectedMonth} onChange={handleMonthChange}>
-              {" "}
-              {/* Applies immediately */}
               <div className="relative">
                 <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
                   <span className="block truncate pl-1">
@@ -726,7 +732,7 @@ const InvoiceListPage: React.FC = () => {
                   leaveFrom="opacity-100"
                   leaveTo="opacity-0"
                 >
-                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                  <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
                     {monthOptions.map((month) => (
                       <ListboxOption
                         key={month.id}
