@@ -17,6 +17,7 @@ import {
   formatDisplayDate,
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
+import { useNavigate } from "react-router-dom";
 
 interface InvoiceCardProps {
   invoice: ExtendedInvoiceData;
@@ -98,6 +99,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const invoiceStatusStyle = getInvoiceStatusStyles(invoice.invoice_status);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoice.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
+  const navigate = useNavigate();
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent navigation if clicking specifically on the checkbox icon/wrapper
@@ -140,52 +142,68 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     >
       {/* Header - Now includes checkbox and is clickable for selection */}
       <div
-        className={`invoice-card-header flex items-center gap-3 border-b ${invoiceStatusStyle.border} ${invoiceStatusStyle.bg} -mx-4 -mt-4 px-4 py-2 rounded-t-lg cursor-pointer`} // Negative margins, re-add padding, ADD cursor-pointer
+        className={`invoice-card-header flex justify-between items-center gap-3 border-b ${invoiceStatusStyle.border} ${invoiceStatusStyle.bg} -mx-4 -mt-4 px-4 py-2 rounded-t-lg cursor-pointer`} // Negative margins, re-add padding, ADD cursor-pointer
         onClick={handleHeaderClick} // <-- Add header click handler
       >
         {/* Invoice ID - Takes available space */}
         <span
-          className={`font-semibold ${invoiceStatusStyle.text} flex-grow truncate`}
+          className={`font-semibold ${invoiceStatusStyle.text} w-fit truncate hover:underline cursor-pointer`}
           title={`${invoice.paymenttype === "CASH" ? "C" : "I"}${invoice.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewDetails(invoice.id);
+          }}
         >
           {invoice.paymenttype === "CASH" ? "C" : "I"}
           {invoice.id}
         </span>
+        <div className="flex items-center gap-2">
+          {/* Date - Has natural space due to gap */}
+          <span className={`text-sm ${invoiceStatusStyle.text} flex-shrink-0`}>
+            {formatDisplayDate(date)}
+          </span>
 
-        {/* Date - Has natural space due to gap */}
-        <span className={`text-sm ${invoiceStatusStyle.text} flex-shrink-0`}>
-          {formatDisplayDate(date)}
-        </span>
-
-        {/* Selection Checkbox Area - Still clickable individually */}
-        <div
-          className="invoice-card-select-action flex-shrink-0 z-0" // Add z-index just in case, ensure it's above header click area conceptually
-          onClick={handleSelectIconClick} // <-- Use specific handler for icon
-        >
-          {isSelected ? (
-            <IconSquareCheckFilled
-              className="text-blue-600 cursor-pointer"
-              size={22}
-            />
-          ) : (
-            <IconSquare
-              className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer" // Show selection intent color on hover
-              size={22}
-            />
-          )}
+          {/* Selection Checkbox Area - Still clickable individually */}
+          <div
+            className="invoice-card-select-action flex-shrink-0 z-0" // Add z-index just in case, ensure it's above header click area conceptually
+            onClick={handleSelectIconClick} // <-- Use specific handler for icon
+          >
+            {isSelected ? (
+              <IconSquareCheckFilled
+                className="text-blue-600 cursor-pointer"
+                size={22}
+              />
+            ) : (
+              <IconSquare
+                className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer" // Show selection intent color on hover
+                size={22}
+              />
+            )}
+          </div>
         </div>
       </div>
 
       {/* Body - Uses parent's horizontal padding */}
       <div className="space-y-2">
-        <p
-          className="flex flex-col font-medium"
-          title={invoice.customerName || invoice.customerid}
-        >
-          <span className="truncate text-default-800">
+        <p className="flex flex-col w-fit font-medium">
+          <span
+            className="truncate text-default-800 hover:underline cursor-pointer"
+            title={invoice.customerName || invoice.customerid}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/catalogue/customer/${invoice.customerid}`);
+            }}
+          >
             {invoice.customerName || invoice.customerid}
           </span>
-          <span className="text-xs text-default-500 truncate">
+          <span
+            className="text-xs text-default-500 truncate hover:underline cursor-pointer"
+            title={invoice.salespersonid}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/catalogue/staff/${invoice.salespersonid}`);
+            }}
+          >
             {invoice.salespersonid}
           </span>
         </p>
