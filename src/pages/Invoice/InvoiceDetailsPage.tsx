@@ -890,8 +890,15 @@ const InvoiceDetailsPage: React.FC = () => {
                     Validated:
                   </strong>{" "}
                   {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
-                  {parseDatabaseTimestamp(invoiceData.datetime_validated)
-                    .formattedTime || ""}
+                  {new Date(invoiceData.datetime_validated).toLocaleTimeString(
+                    "en-US",
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                    }
+                  )}
                 </p>
               )}
               <p>
