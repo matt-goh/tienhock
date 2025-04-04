@@ -1176,5 +1176,310 @@ export default function (pool, config) {
     }
   });
 
+  // --- NEW: Update Status for a Pending Consolidated Invoice ---
+  router.post("/consolidated/:id/update-status", async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect(); // Use client for potential update
+
+    try {
+      // Fetch the consolidated invoice record
+      const invoiceQuery = `
+        SELECT uuid, einvoice_status, long_id, datetime_validated
+        FROM invoices
+        WHERE id = $1 AND is_consolidated = true
+      `;
+      const invoiceResult = await client.query(invoiceQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Consolidated invoice not found." });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // We can only update status if we have a UUID
+      if (!invoice.uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "Invoice has no MyInvois UUID, cannot check status.",
+        });
+      }
+
+      // Don't need to re-check if already valid or invalid
+      // Allow re-checking invalid? Maybe. Allow re-checking pending is the main goal.
+      if (invoice.einvoice_status === "valid") {
+        console.log(
+          `Skipping status check for already valid consolidated invoice: ${id}`
+        );
+        return res.json({
+          success: true,
+          message: "Invoice is already valid.",
+          status: invoice.einvoice_status,
+          longId: invoice.long_id,
+          dateTimeValidated: invoice.datetime_validated,
+          updated: false, // Indicate no change was made now
+        });
+      }
+
+      // Call MyInvois API to check current status
+      console.log(
+        `Checking MyInvois status for consolidated document UUID: ${invoice.uuid}`
+      );
+      const documentDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${invoice.uuid}/details`
+      );
+
+      // Determine new status based on response
+      let newStatus = "pending"; // Default assumption
+      let newLongId = invoice.long_id;
+      let newDateTimeValidated = invoice.datetime_validated;
+      let updated = false;
+
+      // MyInvois uses title-case Status
+      const remoteStatus = documentDetails.status?.toLowerCase();
+
+      if (documentDetails.longId) {
+        newStatus = "valid";
+        newLongId = documentDetails.longId;
+        // Use validation time from API if available, otherwise keep existing if any
+        newDateTimeValidated = documentDetails.dateTimeValidation
+          ? new Date(documentDetails.dateTimeValidation).toISOString()
+          : newDateTimeValidated;
+      } else if (remoteStatus === "invalid" || remoteStatus === "rejected") {
+        newStatus = "invalid";
+        // Clear longId and validation date if it becomes invalid
+        newLongId = null;
+        newDateTimeValidated = null;
+      } else if (
+        remoteStatus === "submitted" ||
+        remoteStatus === "inprogress"
+      ) {
+        newStatus = "pending";
+      }
+      // else: Keep 'pending' if status is Submitted, InProgress, or unknown
+
+      // Update database only if status, longId, or validation date changed
+      if (
+        newStatus !== invoice.einvoice_status ||
+        newLongId !== invoice.long_id ||
+        newDateTimeValidated !== invoice.datetime_validated
+      ) {
+        console.log(
+          `Updating consolidated invoice ${id} status from ${invoice.einvoice_status} to ${newStatus}`
+        );
+        await client.query(
+          `UPDATE invoices SET
+                einvoice_status = $1,
+                long_id = $2,
+                datetime_validated = $3
+              WHERE id = $4`,
+          [newStatus, newLongId, newDateTimeValidated, id]
+        );
+        updated = true;
+        console.log(`Consolidated invoice ${id} successfully updated in DB.`);
+      } else {
+        console.log(
+          `No status change detected for consolidated invoice ${id}. Current: ${invoice.einvoice_status}, Remote: ${remoteStatus}`
+        );
+      }
+
+      res.json({
+        success: true,
+        message: updated
+          ? `Status updated to ${newStatus}.`
+          : `Status remains ${newStatus}.`,
+        status: newStatus,
+        longId: newLongId,
+        dateTimeValidated: newDateTimeValidated,
+        updated: updated, // Send flag indicating if DB was updated
+      });
+    } catch (error) {
+      console.error(
+        `Error updating status for consolidated invoice ${id}:`,
+        error.response?.data || error.message || error
+      );
+      res.status(500).json({
+        success: false,
+        message: "Failed to update consolidated invoice status.",
+        error:
+          error.response?.data?.error?.message ||
+          error.message ||
+          "An unexpected error occurred",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- UPDATED: Cancel a Valid or Invalid Consolidated Invoice ---
+  router.post("/consolidated/:id/cancel", async (req, res) => {
+    const { id } = req.params;
+    const cancellationReason = req.body.reason || "Cancelled via system"; // Allow providing a reason
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN"); // Start transaction
+
+      // Fetch the consolidated invoice, ensuring it exists and is consolidated
+      const invoiceQuery = `
+        SELECT uuid, einvoice_status, consolidated_invoices
+        FROM invoices
+        WHERE id = $1 AND is_consolidated = true
+        FOR UPDATE -- Lock the row
+      `;
+      const invoiceResult = await client.query(invoiceQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res
+          .status(404)
+          .json({ success: false, message: "Consolidated invoice not found." });
+      }
+
+      const invoice = invoiceResult.rows[0];
+      const originalInvoiceIds = invoice.consolidated_invoices; // JSON array string or native array
+      const currentStatus = invoice.einvoice_status?.toLowerCase();
+
+      // --- Gatekeeping: Only allow cancelling 'valid' or 'invalid' ---
+      if (currentStatus !== "valid" && currentStatus !== "invalid") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: `Cannot cancel invoice with status: ${invoice.einvoice_status}. Only 'valid' or 'invalid' invoices can be cancelled.`,
+        });
+      }
+
+      // --- Step 1: Attempt to cancel with MyInvois API (if UUID exists) ---
+      let apiCancellationSuccess = false;
+      let apiResponseMessage =
+        "MyInvois cancellation not attempted (no UUID or skipped).";
+
+      if (invoice.uuid) {
+        try {
+          console.log(
+            `Attempting to cancel MyInvois document UUID: ${invoice.uuid} for consolidated invoice ${id}`
+          );
+          // Use the correct PUT endpoint for cancellation
+          const apiResponse = await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${invoice.uuid}/state`,
+            { status: "cancelled", reason: cancellationReason } // Send payload
+          );
+          console.log(
+            `MyInvois document ${invoice.uuid} cancellation request sent. Response:`,
+            apiResponse
+          );
+          // Assuming success if no error is thrown. Check response if needed.
+          apiCancellationSuccess = true;
+          apiResponseMessage = `MyInvois document status set to cancelled.`;
+        } catch (apiError) {
+          // Log the error but continue with DB cleanup.
+          console.warn(
+            `Failed to cancel MyInvois document ${invoice.uuid} for invoice ${id}:`,
+            apiError.response?.data || apiError.message
+          );
+          apiResponseMessage = `Failed to set MyInvois document status to cancelled: ${
+            apiError.response?.data?.error?.message || apiError.message
+          }. Proceeding with local cancellation.`;
+          // Do not automatically set apiCancellationSuccess to false here,
+          // as the API *might* have processed it despite an error response in some cases.
+          // The primary goal is local cleanup.
+        }
+      } else {
+        console.log(
+          `No MyInvois UUID found for consolidated invoice ${id}, skipping API cancellation.`
+        );
+        apiResponseMessage = "Skipped MyInvois cancellation (no UUID).";
+      }
+      // --- End API Cancellation ---
+
+      // --- Step 2: Local Database Cleanup ---
+
+      // 2a. Delete the consolidated invoice record
+      console.log(`Deleting consolidated invoice record: ${id}`);
+      const deleteResult = await client.query(
+        "DELETE FROM invoices WHERE id = $1",
+        [id]
+      );
+      if (deleteResult.rowCount === 0) {
+        // Should not happen due to FOR UPDATE lock, but safety check
+        throw new Error(
+          `Consolidated invoice ${id} vanished during transaction.`
+        );
+      }
+
+      // 2b. Mark original invoices as no longer consolidated
+      let parsedOriginalIds = [];
+      if (typeof originalInvoiceIds === "string") {
+        try {
+          parsedOriginalIds = JSON.parse(originalInvoiceIds);
+        } catch (parseError) {
+          console.error(
+            `Failed to parse consolidated_invoices JSON for ${id}:`,
+            originalInvoiceIds
+          );
+          // Don't throw error here, just log it, maybe originals can still be found some other way if needed.
+          // For now, proceed without updating originals if parse fails.
+        }
+      } else if (Array.isArray(originalInvoiceIds)) {
+        parsedOriginalIds = originalInvoiceIds;
+      }
+
+      if (parsedOriginalIds.length > 0) {
+        console.log(
+          `Updating original invoices (${parsedOriginalIds.join(
+            ", "
+          )}) to remove consolidation flag.`
+        );
+        // Reset flags. Reset einvoice_status to null, allowing them to be picked up again.
+        const updateOriginalsQuery = `
+            UPDATE invoices
+            SET is_consolidated = false,
+                einvoice_status = null, -- Reset status to allow reprocessing/re-consolidation
+                -- Clear other e-invoice related fields tied to the *consolidated* submission
+                uuid = null,
+                long_id = null,
+                submission_uid = null,
+                datetime_validated = null
+            WHERE id = ANY($1::text[])
+            -- Maybe add: AND is_consolidated = true (extra safety?)
+          `;
+        const updateResult = await client.query(updateOriginalsQuery, [
+          parsedOriginalIds,
+        ]);
+        console.log(
+          `Successfully updated ${updateResult.rowCount} original invoices.`
+        );
+      } else {
+        console.warn(
+          `Consolidated invoice ${id} had no original invoice IDs listed or failed to parse.`
+        );
+      }
+
+      // --- End DB Cleanup ---
+
+      await client.query("COMMIT"); // Commit transaction
+
+      res.json({
+        success: true,
+        message: `Consolidated invoice ${id} cancelled successfully.`,
+        apiCancellationAttempted: !!invoice.uuid, // True if we tried
+        apiCancellationSuccess: apiCancellationSuccess, // True only if API call didn't throw error
+      });
+    } catch (error) {
+      await client.query("ROLLBACK"); // Rollback on error
+      console.error(`Error cancelling consolidated invoice ${id}:`, error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to cancel consolidated invoice.",
+        error: error.message || "An unexpected error occurred",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }
