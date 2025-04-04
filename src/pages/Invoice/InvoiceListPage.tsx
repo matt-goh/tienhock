@@ -41,8 +41,8 @@ import {
 import { useCustomerNames } from "../../hooks/useCustomerNames";
 // Import the specific utilities needed
 import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
-import Pagination from "../../components/Invoice/Pagination";
 import FilterSummary from "../../components/Invoice/FilterSummary";
+import Pagination from "../../components/Invoice/Pagination";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
