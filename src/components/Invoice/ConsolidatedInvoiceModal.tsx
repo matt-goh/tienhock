@@ -439,7 +439,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-grow p-5 bg-gray-50/30 rounded-b-xl overflow-hidden">
+        <div className="flex-grow p-5 bg-gray-50/30 rounded-b-xl">
           {activeTab === "eligible" ? (
             // Eligible invoices tab content (remains largely the same)
             <div className="space-y-4">
