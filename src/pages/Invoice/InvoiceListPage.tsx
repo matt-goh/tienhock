@@ -970,7 +970,6 @@ const InvoiceListPage: React.FC = () => {
         </div>
         {/* --- Pagination --- */}
         <div className="flex-shrink-0 mt-auto pb-4">
-          {" "}
           {/* Stick to bottom */}
           {!isLoading && totalItems > 0 && totalPages > 1 && (
             <PaginationControls
