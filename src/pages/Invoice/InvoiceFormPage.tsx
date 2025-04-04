@@ -502,12 +502,9 @@ const InvoiceFormPage: React.FC = () => {
         toast.dismiss(toastId); // Dismiss previous toasts, modal shows progress/result
 
         try {
-          const einvoiceResponse = await api.post(
-            "/api/einvoice/submit-system",
-            {
-              invoiceIds: [invoiceIdForNavigation], // Use the saved ID
-            }
-          );
+          const einvoiceResponse = await api.post("/api/einvoice/submit", {
+            invoiceIds: [invoiceIdForNavigation], // Use the saved ID
+          });
           setEinvoiceResults(einvoiceResponse); // Set results for the modal
           // Modal will display success/failure based on einvoiceResponse.success
         } catch (einvoiceError: any) {

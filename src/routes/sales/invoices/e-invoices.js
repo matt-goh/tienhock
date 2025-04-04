@@ -147,8 +147,8 @@ export default function (pool, config) {
     }
   });
 
-  // POST /api/invoices/submit-system - Submit Invoice to MyInvois (Updated with pending check)
-  router.post("/submit-system", async (req, res) => {
+  // POST /api/invoices/submit - Submit Invoice to MyInvois (Updated with pending check)
+  router.post("/submit", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
 

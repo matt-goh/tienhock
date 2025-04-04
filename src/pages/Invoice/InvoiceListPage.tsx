@@ -625,7 +625,7 @@ const InvoiceListPage: React.FC = () => {
 
     try {
       // Call backend endpoint responsible for submitting
-      const response = await api.post("/api/einvoice/submit-system", {
+      const response = await api.post("/api/einvoice/submit", {
         invoiceIds: idsToSubmit,
       });
 

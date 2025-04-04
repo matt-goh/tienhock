@@ -1023,9 +1023,6 @@ export default function (pool, config) {
         const einvRejected = einvoiceResults?.rejectedDocuments?.find(
           (d) => d.internalId === billNo || d.invoiceCodeNumber === billNo
         );
-        const updateError = einvoiceUpdateErrors.find(
-          (e) => e.invoiceId === billNo
-        );
 
         if (dbSuccess) systemStatus = 0; // DB Success
         if (dbError) error = { code: "DB_ERROR", message: dbError.message };
@@ -1037,39 +1034,42 @@ export default function (pool, config) {
           if (einvAccepted) {
             einvoiceStatus = einvAccepted.longId ? 0 : 10; // 0=Valid, 10=Pending
           } else if (einvRejected) {
-            einvoiceStatus = 100; // 100=Invalid
+            // Determine the appropriate error code based on the error details
+            const errorCode = einvRejected.error?.code || "";
+            const errorMessage = einvRejected.error?.message || "";
+
+            if (
+              errorMessage.toLowerCase().includes("tin") ||
+              errorCode.toLowerCase().includes("tin") ||
+              errorMessage.toLowerCase().includes("id number")
+            ) {
+              einvoiceStatus = 101; // Missing TIN/ID
+            } else if (
+              errorMessage.toLowerCase().includes("duplicate") ||
+              errorCode.toLowerCase().includes("duplicate")
+            ) {
+              einvoiceStatus = 102; // Duplicate e-invoice
+            } else {
+              einvoiceStatus = 100; // Default e-invoice error
+            }
+
             error = {
-              code: einvRejected.error?.code || "EINVOICE_REJECTED",
-              message: einvRejected.error?.message || "E-invoice rejected",
+              code: errorCode || "EINVOICE_REJECTED",
+              message: errorMessage || "E-invoice rejected",
             };
           } else if (didEInvoiceFailCompletely) {
-            einvoiceStatus = 110; // Indicate system error for e-invoice
+            einvoiceStatus = 103; // Other error (system error)
             error = {
               code: "EINVOICE_API_ERROR",
               message: einvoiceResults?.error || "E-invoice submission failed",
             };
-          } else if (updateError) {
-            // If DB update failed after API call, keep status as attempted but maybe flag error?
-            einvoiceStatus = 20; // Keep as Not Processed if DB update failed? Or maybe Pending (10)? Needs decision.
-            error = {
-              code: "DB_UPDATE_ERROR",
-              message: `Failed to update local e-invoice status: ${updateError.error}`,
-            };
-          } else if (einvoiceResults) {
-            // E-invoice was attempted but this specific one wasn't accepted/rejected (shouldn't happen ideally)
-            einvoiceStatus = 20; // Stay as Not Processed
           }
-          // If einvoiceResults is null (meaning submission wasn't attempted for this batch), status remains 20.
-        } else {
-          // If DB failed, e-invoice status is irrelevant/Not Processed
-          einvoiceStatus = 20;
         }
 
-        // OLD Minimal format expected: { id, systemStatus, einvoiceStatus, error?, uuid?, longId? }
         return {
           id: billNo,
-          systemStatus, // 0 or 100
-          einvoiceStatus, // 0, 10, 20, 100, 110
+          systemStatus,
+          einvoiceStatus,
           error: error || undefined, // Omit if no error
           // Include UUID/LongID ONLY if accepted (status 0 or 10)
           uuid:
