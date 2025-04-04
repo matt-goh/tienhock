@@ -1260,14 +1260,18 @@ const SalesByProductsPage: React.FC = () => {
 
                       // Limit selection to prevent chart overcrowding
                       if (values.length <= maxChartProducts) {
-                        setSelectedChartProducts(values);
+                        setSelectedChartProducts(
+                          Array.isArray(values) ? values : values ? [values] : []
+                        );
                       } else {
                         toast.error(
                           `Maximum ${maxChartProducts} products can be selected for the chart`
                         );
                         // Keep the first max number of selections
                         setSelectedChartProducts(
-                          values.slice(0, maxChartProducts)
+                          Array.isArray(values) 
+                            ? values.slice(0, maxChartProducts) 
+                            : values ? [values] : []
                         );
                       }
                     }}

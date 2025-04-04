@@ -7,14 +7,12 @@ import React, {
   useCallback,
 } from "react";
 import {
-  getCompanySidebarData,
   SidebarItem,
   PopoverOption,
   getCompanyRoutes,
 } from "../../pages/pagesRoute";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import SidebarButton from "./SidebarButton";
-import SidebarSubButton from "./SidebarSubButton";
 import SidebarOption from "./SidebarOption";
 import SidebarPopover from "./SidebarPopover";
 import "../../index.css";
@@ -45,10 +43,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [SidebarData, setSidebarData] = useState<SidebarItem[]>([]);
   const [openItems, setOpenItems] = useState<string[]>([]);
-  const [openPayrollOptions, setOpenPayrollOptions] = useState<string[]>([
-    "production",
-    "pinjam",
-  ]);
   const [hoveredRegularOption, setHoveredRegularOption] = useState<
     string | null
   >(null);
@@ -71,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     new Set()
   );
   const sidebarHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const { user, isLoading } = useAuth();
   const { activeCompany } = useCompany();
   const location = useLocation();
@@ -131,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       (item) => item.name
     );
     setOpenItems(defaultOpenItems);
-  }, []);
+  }, [SidebarData]);
 
   useEffect(() => {
     const currentPath = location.pathname;
@@ -269,14 +264,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const handlePayrollToggle = (option: string) => {
-    setOpenPayrollOptions((prevOptions) =>
-      prevOptions.includes(option)
-        ? prevOptions.filter((i) => i !== option)
-        : [...prevOptions, option]
-    );
-  };
-
   const clearAllTimeouts = () => {
     if (regularHoverTimeout.current) {
       clearTimeout(regularHoverTimeout.current);
@@ -367,6 +354,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (!isPinned) {
       setIsHovered(true);
     }
+    setIsSidebarHovered(true);
   };
 
   const handleSidebarMouseLeave = () => {
@@ -375,6 +363,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         setIsHovered(false);
       }, 300);
     }
+    setIsSidebarHovered(false);
   };
 
   const renderIcon = (IconComponent?: SidebarItem["icon"]) => {
@@ -439,6 +428,29 @@ const Sidebar: React.FC<SidebarProps> = ({
         );
       }
 
+      // Check if the top-level item has both a path and component
+      if (item.path && item.component) {
+        // Render as a clickable button
+        return (
+          <SidebarButton
+            key={item.name}
+            name={item.name}
+            icon={renderIcon(item.icon)}
+            onClick={() => handleToggle(item.name)}
+            isOpen={openItems.includes(item.name)}
+            path={item.path} // Add the path
+            onNavigate={() => setLastClickedSource("regular")} // Add navigation callback
+          >
+            {openItems.includes(item.name) && item.subItems && (
+              <ul className="mt-1.5 space-y-1.5">
+                {item.subItems.map(renderSidebarOption)}
+              </ul>
+            )}
+          </SidebarButton>
+        );
+      }
+
+      // For traditional dropdown categories (no path/component)
       if (item.subItems) {
         return (
           <SidebarButton
@@ -450,9 +462,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             {openItems.includes(item.name) && (
               <ul className="mt-1.5 space-y-1.5">
-                {item.name === "Payroll"
-                  ? renderPayrollItems(item.subItems)
-                  : renderSubItems(item.subItems)}
+                {renderSubItems(item.subItems)}
               </ul>
             )}
           </SidebarButton>
@@ -461,25 +471,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         return renderSidebarOption(item);
       }
     });
-  };
-
-  const renderPayrollItems = (items: SidebarItem[]) => {
-    return items.map((item) => (
-      <SidebarSubButton
-        key={item.name}
-        name={item.name}
-        icon={renderIcon(item.icon)}
-        isOpen={openPayrollOptions.includes(item.name.toLowerCase())}
-        onToggle={() => handlePayrollToggle(item.name.toLowerCase())}
-      >
-        {openPayrollOptions.includes(item.name.toLowerCase()) &&
-          item.subItems && (
-            <ul className="mt-1.5 space-y-1">
-              {item.subItems.map(renderSidebarOption)}
-            </ul>
-          )}
-      </SidebarSubButton>
-    ));
   };
 
   const renderSubItems = (items: SidebarItem[]) => {
@@ -539,16 +530,28 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="flex justify-end pr-3">
-          <button
-            onClick={() => setIsPinned(!isPinned)}
-            className="flex items-center justify-center p-2 h-[34px] w-[34px] rounded-lg hover:bg-default-200/90 active:bg-default-300/90 transition-colors duration-200"
-          >
-            {isPinned ? (
-              <IconArrowBarToLeft stroke={1.75} size={20} />
-            ) : (
-              <IconArrowBarToRight stroke={1.75} size={20} />
-            )}
-          </button>
+          <div className="flex justify-end pr-3">
+            <button
+              onClick={() => setIsPinned(!isPinned)}
+              className="flex items-center justify-center p-2 h-[34px] w-[34px] rounded-lg hover:bg-default-200/90 active:bg-default-300/90 transition-all duration-300 ease-in-out hover:scale-105 active:scale-95"
+            >
+              {isPinned ? (
+                <IconArrowBarToLeft
+                  stroke={1.75}
+                  size={20}
+                  className={`transition-opacity duration-200 ${
+                    isSidebarHovered ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+              ) : (
+                <IconArrowBarToRight
+                  stroke={1.75}
+                  size={20}
+                  className="transition-opacity duration-200"
+                />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

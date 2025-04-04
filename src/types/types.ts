@@ -1,3 +1,4 @@
+// src/types/types.ts
 export interface DeviceInfo {
   userAgent: string;
   deviceType: "Mobile" | "Desktop";
@@ -190,14 +191,6 @@ export interface SubmissionState {
     details?: any;
   };
 }
-
-// Display component props
-export interface SubmissionDisplayProps {
-  state: SubmissionState;
-  onClose: () => void;
-  showDetails?: boolean;
-}
-
 export interface BatchStatusDisplayProps {
   statistics: BatchStatistics;
   phase: SubmissionPhase;
@@ -307,14 +300,73 @@ export interface TableProps<T> {
   tableKey?: string;
 }
 
-export interface CustomProduct {
-  uid?: string;
-  id?: string;
-  customer_id: string;
-  product_id: string;
+export type InvoiceStatus =
+  | "active"
+  | "paid"
+  | "cancelled"
+  | "Unpaid"
+  | "overdue";
+export type EInvoiceStatus =
+  | "valid"
+  | "invalid"
+  | "pending"
+  | "cancelled"
+  | null;
+
+export interface InvoiceData {
+  id: string; // PRIMARY KEY, Invoice Number (e.g., "12345")
+  salespersonid: string;
+  customerid: string;
+  createddate: string; // Still storing as string (timestamp)
+  paymenttype: "CASH" | "INVOICE"; // Keep consistent with backend
+
+  total_excluding_tax: number;
+  rounding: number;
+  totalamountpayable: number;
+  tax_amount: number;
+  balance_due: number;
+
+  // E-invoice fields
+  uuid: string | null; // UUID from e-invoice system
+  submission_uid: string | null;
+  long_id: string | null;
+  datetime_validated: string | null; // ISO timestamp string or null
+  is_consolidated: boolean;
+  consolidated_invoices: string[] | null; // Array of invoice IDs or null
+  customerTin?: string;
+  customerIdNumber?: number;
+
+  // Status fields
+  invoice_status: InvoiceStatus;
+  einvoice_status: EInvoiceStatus; // Keep EInvoiceStatus type separate
+
+  products: ProductItem[];
+}
+
+// Extended invoice for UI purposes
+export interface ExtendedInvoiceData extends InvoiceData {
+  customerName?: string; // For UI display
+  isEditing?: boolean; // UI state flag
+  originalId?: string; // Used when invoice ID itself is changed during edit
+  cancellation_date?: string | null; // ISO date string of cancellation (might come from cancelled_invoices table)
+  invoice?: string;
+}
+
+export interface ProductItem {
+  uid?: string; // Unique ID for front-end list rendering (not in DB)
+  id?: string; // Corresponds to order_details.id in DB
+  code: string;
+  price: number;
+  quantity: number;
   description?: string;
-  custom_price: number;
-  is_available: boolean;
+  freeProduct: number;
+  returnProduct: number;
+  tax: number;
+  total: string; // Keep as string for display consistency, parse when needed
+  issubtotal?: boolean;
+  istotal?: boolean; // Only used in frontend calculation display, not stored in DB
+  rounding?: number; // Only used in frontend 'total' row calculation display
+  amount?: string; // Only used in frontend 'total' row display (subtotal)
 }
 
 // Product row interface for UI with all possible states
@@ -325,39 +377,29 @@ export interface ExtendedProductItem extends ProductItem {
   isTotal: boolean;
 }
 
-export interface InvoiceData {
-  id: string;
-  salespersonid: string;
-  customerid: string;
-  customername?: string;
-  createddate: string;
-  paymenttype: string;
-  products: ProductItem[];
-  amount: number;
-  rounding: number;
-  totalamountpayable: number;
-}
-
-// Extended invoice for UI
-export interface ExtendedInvoiceData extends InvoiceData {
-  customerName?: string; // For UI display
-  isEditing?: boolean; // UI state
-  originalId?: string;
-}
-
-export interface ProductItem {
+export interface CustomProduct {
   uid?: string;
-  code: string;
-  price: number;
-  quantity: number;
+  id?: string;
+  customer_id: string;
+  product_id: string;
   description?: string;
-  freeProduct: number;
-  returnProduct: number;
-  tax: number;
-  rounding?: number;
-  total?: string;
-  issubtotal?: boolean;
-  istotal?: boolean;
+  custom_price: number;
+  is_available: boolean;
+}
+
+export interface Payment {
+  payment_id: number;
+  invoice_id: string;
+  payment_date: string;
+  amount_paid: number;
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  payment_reference?: string;
+  internal_reference?: string;
+  notes?: string;
+  created_at?: string;
+  status?: "active" | "cancelled";
+  cancellation_date?: string;
+  cancellation_reason?: string;
 }
 
 export interface Employee {
@@ -404,10 +446,12 @@ export interface InvoiceFilters {
   };
   salespersonId: string[] | null;
   applySalespersonFilter: boolean;
-  customerId: string[] | null;
-  applyCustomerFilter: boolean;
-  paymentType: "Cash" | "Invoice" | null;
-  applyPaymentTypeFilter: boolean;
+  paymentType: string | null;
+  applyPaymentTypeFilter?: boolean;
+  invoiceStatus: string[];
+  applyInvoiceStatusFilter: boolean;
+  eInvoiceStatus: string[];
+  applyEInvoiceStatusFilter: boolean;
 }
 
 export interface CustomerList {

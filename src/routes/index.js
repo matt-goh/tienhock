@@ -32,15 +32,26 @@ import agamaRouter from "./catalogue/entities/agama.js";
 
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
+import paymentsRouter from "./sales/invoices/payments.js";
 import eInvoiceRouter from "./sales/invoices/e-invoices.js";
 
+// Green Target routes
+import greenTargetCustomerRouter from "./greentarget/customers.js";
+import greenTargetLocationRouter from "./greentarget/locations.js";
+import greenTargetDumpsterRouter from "./greentarget/dumpsters.js";
+import greenTargetRentalRouter from "./greentarget/rentals.js";
+import greenTargetInvoiceRouter from "./greentarget/invoices.js";
+import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
+import greenTargetPaymentRouter from "./greentarget/payments.js";
+
 // Jellypolly routes
-import jellypollyInvoiceRouter from "./sales/invoices/invoicesJP.js";
 
 import {
   MYINVOIS_API_BASE_URL,
   MYINVOIS_CLIENT_ID,
   MYINVOIS_CLIENT_SECRET,
+  MYINVOIS_GT_CLIENT_ID,
+  MYINVOIS_GT_CLIENT_SECRET,
 } from "../configs/config.js";
 
 const checkRestoreState = (req, res, next) => {
@@ -83,13 +94,26 @@ export default function setupRoutes(app, pool) {
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
+  app.use("/api/payments", paymentsRouter(pool));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
 
-  // Jellypolly routes
+  // Green Target routes
+  app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));
+  app.use("/greentarget/api/locations", greenTargetLocationRouter(pool));
+  app.use("/greentarget/api/dumpsters", greenTargetDumpsterRouter(pool));
+  app.use("/greentarget/api/rentals", greenTargetRentalRouter(pool));
+  app.use("/greentarget/api/invoices", greenTargetInvoiceRouter(pool));
+  app.use("/greentarget/api/payments", greenTargetPaymentRouter(pool));
   app.use(
-    "/jellypolly/api/invoices",
-    jellypollyInvoiceRouter(pool, myInvoisConfig)
+    "/greentarget/api/einvoice",
+    greenTargetEInvoiceRouter(pool, {
+      MYINVOIS_API_BASE_URL,
+      MYINVOIS_GT_CLIENT_ID,
+      MYINVOIS_GT_CLIENT_SECRET,
+    })
   );
+
+  // Jellypolly routes
 
   // Catalogue - Main routes
   app.use("/api/staffs", staffRouter(pool));

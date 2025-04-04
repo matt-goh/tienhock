@@ -53,7 +53,13 @@ export default function authRouter(pool) {
     
         // Create new session
         await pool.query(
-          'INSERT INTO active_sessions (session_id, staff_id, last_active) VALUES ($1, $2, CURRENT_TIMESTAMP)',
+          `INSERT INTO active_sessions (session_id, staff_id, last_active) 
+           VALUES ($1, $2, CURRENT_TIMESTAMP)
+           ON CONFLICT (session_id) 
+           DO UPDATE SET
+             staff_id = EXCLUDED.staff_id,
+             last_active = CURRENT_TIMESTAMP,
+             status = 'active'`,
           [sessionId, staff.id]
         );
         

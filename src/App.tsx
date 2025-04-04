@@ -5,50 +5,33 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Toaster } from "react-hot-toast";
 import { routes } from "./pages/pagesRoute";
 import { IconDeviceDesktop } from "@tabler/icons-react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
+import { CompanyProvider } from "./contexts/CompanyContext";
 import Login from "./pages/Auth/Login";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 import LoadingSpinner from "./components/LoadingSpinner";
+import Button from "./components/Button";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  const { activeCompany, getCompanyFromPath } = useCompany();
   const [isPinned, setIsPinned] = useState<boolean>(() => {
     const pinnedState = localStorage.getItem("sidebarPinned");
     return pinnedState ? JSON.parse(pinnedState) : true;
   });
   const [isHovered, setIsHovered] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
+  const [dismissedMobileWarning, setDismissedMobileWarning] =
+    useState<boolean>(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isVisible = isPinned || isHovered;
-
-  // Get routes based on current company
-  const companyRoutes = useMemo(() => {
-    // Import both functions from pagesRoute.tsx
-    const {
-      SidebarData,
-      getCompanyRoutes,
-      flattenRoutes,
-    } = require("./pages/pagesRoute");
-
-    const routesForCompany = getCompanyRoutes(activeCompany, SidebarData);
-    return flattenRoutes(routesForCompany);
-  }, [activeCompany]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -87,31 +70,6 @@ const Layout: React.FC = () => {
     }
   }, []);
 
-  if (isMobile) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-default-50 p-4">
-        <div className="max-w-md w-full text-center space-y-6 p-6 bg-white rounded-lg shadow-lg">
-          <IconDeviceDesktop
-            className="h-16 w-16 mx-auto text-sky-500"
-            stroke={1.5}
-          />
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold text-default-900">
-              Desktop View Recommended
-            </h2>
-            <p className="text-default-500">
-              This application is optimized for desktop use. Please open it on a
-              larger screen.
-            </p>
-            <p className="text-sm text-default-400">
-              Minimum recommended width: 768px
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center">
@@ -125,8 +83,10 @@ const Layout: React.FC = () => {
       {/* Only show sidebar if authenticated and not on PDF route */}
       {isAuthenticated && !isPDFRoute && (
         <div
-          className="fixed z-50 top-0 left-0 h-screen sidebar-hidden"
-          style={{ width: isVisible ? "254px" : "6rem" }}
+          className={`fixed z-50 top-0 left-0 h-screen sidebar-hidden ${
+            isMobile ? "w-0 overflow-hidden" : ""
+          }`}
+          style={{ width: isMobile ? 0 : isVisible ? "254px" : "6rem" }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -142,8 +102,12 @@ const Layout: React.FC = () => {
         className={`
     flex justify-center w-full transition-all duration-300 ease-in-out
     ${!isPDFRoute && location.pathname !== "/login" ? "mt-[84px]" : ""} 
-    ${isAuthenticated && isVisible && !isPDFRoute ? "ml-[254px]" : ""}
-  `}
+    ${
+      isAuthenticated && isVisible && !isPDFRoute && !isMobile
+        ? "ml-[254px]"
+        : ""
+    }
+    `}
       >
         <Routes>
           {/* Login route */}
@@ -195,6 +159,37 @@ const Layout: React.FC = () => {
           ))}
         </Routes>
       </main>
+
+      {/* Mobile Warning Overlay */}
+      {isMobile && !dismissedMobileWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="max-w-md w-full text-center space-y-6 p-6 bg-white rounded-lg shadow-lg">
+            <IconDeviceDesktop
+              className="h-16 w-16 mx-auto text-sky-500"
+              stroke={1.5}
+            />
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-default-900">
+                Desktop View Recommended
+              </h2>
+              <p className="text-default-500">
+                This application is optimized for desktop use. Some features may
+                not display properly on smaller screens.
+              </p>
+              <p className="text-sm text-default-400">
+                Minimum recommended width: 768px
+              </p>
+            </div>
+            <Button
+              onClick={() => setDismissedMobileWarning(true)}
+              className="mt-4 w-full"
+              color="sky"
+            >
+              Continue Anyway
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

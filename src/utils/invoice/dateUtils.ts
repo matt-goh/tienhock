@@ -1,6 +1,5 @@
-// dateUtils.ts
+// src/utils/invoice/dateUtils.ts
 
-// Keep the existing formatDateForAPI function
 export const formatDateForAPI = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
     2,

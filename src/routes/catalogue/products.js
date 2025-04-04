@@ -1,4 +1,4 @@
-// src/routes/products.js
+// src/routes/catalogue/products.js
 import { Router } from "express";
 
 export default function (pool) {
@@ -35,7 +35,7 @@ export default function (pool) {
             ? Number(product.price_per_unit)
             : null,
       }));
-      res.json(productsWithNumberValues);
+      res.status(200).json(productsWithNumberValues); // Explicitly use 200 OK
     } catch (error) {
       console.error("Error fetching products:", error);
       res
