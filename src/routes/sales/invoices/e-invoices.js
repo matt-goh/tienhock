@@ -804,32 +804,43 @@ export default function (pool, config) {
   // Get consolidated invoice history
   router.get("/consolidated-history", async (req, res) => {
     try {
-      // Query to get consolidated invoices with their details
-      const query = `
-      SELECT 
-        id, 
-        uuid, 
-        long_id, 
-        submission_uid, 
-        datetime_validated, 
-        einvoice_status,
-        total_excluding_tax,
-        tax_amount,
-        rounding,
-        totalamountpayable,
-        createddate AS created_at,
-        consolidated_invoices
-      FROM 
-        invoices
-      WHERE 
-        is_consolidated = true
-      ORDER BY 
-        createddate DESC
-    `;
+      const { year } = req.query;
+      let query = `
+        SELECT 
+          id, 
+          uuid, 
+          long_id, 
+          submission_uid, 
+          datetime_validated, 
+          einvoice_status,
+          total_excluding_tax,
+          tax_amount,
+          rounding,
+          totalamountpayable,
+          createddate AS created_at,
+          consolidated_invoices
+        FROM 
+          invoices
+        WHERE 
+          is_consolidated = true
+      `;
 
-      const result = await pool.query(query);
+      // Add year filtering if provided
+      const queryParams = [];
+      if (year) {
+        // Filter where createddate is within the specified year
+        const startDate = new Date(parseInt(year), 0, 1).getTime(); // Jan 1st of year
+        const endDate = new Date(parseInt(year) + 1, 0, 1).getTime(); // Jan 1st of next year
 
-      // Transform the results to ensure proper types and formats
+        query += ` AND CAST(createddate AS bigint) >= $1 AND CAST(createddate AS bigint) < $2`;
+        queryParams.push(startDate.toString(), endDate.toString());
+      }
+
+      query += ` ORDER BY createddate DESC`;
+
+      const result = await pool.query(query, queryParams);
+
+      // Transform the results (keep the existing transformation logic)
       const transformedHistory = result.rows.map((row) => ({
         id: row.id,
         uuid: row.uuid,
@@ -842,7 +853,7 @@ export default function (pool, config) {
         rounding: parseFloat(row.rounding || 0),
         totalamountpayable: parseFloat(row.totalamountpayable || 0),
         created_at: row.created_at,
-        // Parse JSON array if it's stored as a string
+        // Parse JSON array if stored as string
         consolidated_invoices:
           typeof row.consolidated_invoices === "string"
             ? JSON.parse(row.consolidated_invoices)
