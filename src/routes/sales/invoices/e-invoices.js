@@ -36,57 +36,6 @@ async function fetchCustomerData(pool, customerId) {
   }
 }
 
-// Helper function to insert accepted documents
-const insertAcceptedDocuments = async (
-  pool,
-  documents,
-  originalInvoices = {}
-) => {
-  const query = `
-    INSERT INTO einvoices (
-      uuid, submission_uid, long_id, internal_id, type_name, 
-      receiver_id, receiver_name, datetime_validated,
-      total_payable_amount, total_excluding_tax, total_net_amount, total_rounding
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-  `;
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    for (const doc of documents) {
-      // Convert internalId to string to ensure consistent key lookup
-      const internalIdKey = String(doc.internalId);
-
-      // Get rounding from original invoice - ensure it's a number
-      const rounding = parseFloat(originalInvoices[internalIdKey] || 0);
-
-      // Add a default datetime_validated if missing
-      const datetime_validated =
-        doc.dateTimeValidated || new Date().toISOString();
-
-      await client.query(query, [
-        doc.uuid,
-        doc.submissionUid,
-        doc.longId,
-        doc.internalId,
-        doc.typeName,
-        doc.receiverId,
-        doc.receiverName,
-        datetime_validated,
-        doc.totalPayableAmount,
-        doc.totalExcludingTax,
-        doc.totalNetAmount,
-        rounding, // Explicitly converted rounding value
-      ]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
 // Helper function to fetch invoice from database
 const getInvoices = async (pool, invoiceId) => {
   const client = await pool.connect();
@@ -100,7 +49,7 @@ const getInvoices = async (pool, invoiceId) => {
           i.customerid,
           i.createddate,
           i.paymenttype,
-          i.amount,
+          i.total_excluding_tax,
           i.rounding,
           i.totalamountpayable
         FROM 
@@ -198,75 +147,11 @@ export default function (pool, config) {
     }
   });
 
-  router.get("/eligible-for-submission", async (req, res) => {
-    try {
-      const { startDate, endDate } = req.query;
-
-      // Default to last 3 days if dates aren't provided
-      if (!startDate || !endDate) {
-        const endDateTime = new Date();
-        endDateTime.setHours(23, 59, 59, 999);
-
-        const startDateTime = new Date();
-        startDateTime.setDate(startDateTime.getDate() - 2); // Last 3 days (including today)
-        startDateTime.setHours(0, 0, 0, 0);
-
-        endDate = endDateTime.getTime().toString();
-        startDate = startDateTime.getTime().toString();
-      }
-
-      let query = `
-        SELECT 
-          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-          i.amount, i.rounding, i.totalamountpayable
-        FROM invoices i
-        LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
-        WHERE 1=1
-        AND e.internal_id IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM einvoices e2, jsonb_array_elements_text(e2.consolidated_invoices::jsonb) AS invoice_id
-          WHERE e2.consolidated_invoices IS NOT NULL 
-          AND invoice_id = i.id::text
-        )
-      `;
-
-      const queryParams = [];
-      let paramCounter = 1;
-
-      if (startDate && endDate) {
-        queryParams.push(startDate, endDate);
-        query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
-          paramCounter + 1
-        } AS bigint)`;
-        paramCounter += 2;
-      }
-
-      query += ` ORDER BY i.createddate DESC`;
-
-      const result = await pool.query(query, queryParams);
-
-      res.json({
-        success: true,
-        data: result.rows,
-      });
-    } catch (error) {
-      console.error("Error fetching eligible invoices:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch eligible invoices",
-        error: error.message,
-      });
-    }
-  });
-
-  // Submit invoice to MyInvois
+  // POST /api/einvoice/submit - Submit Invoice to MyInvois (Updated with pending check)
   router.post("/submit", async (req, res) => {
-    // Extract fields query parameter
-    const fieldsParam = req.query.fields;
-    const isMinimal = fieldsParam === "minimal";
-
     try {
       const { invoiceIds } = req.body;
+      const isMinimal = req.query.fields === "minimal";
 
       if (!invoiceIds?.length) {
         return res.status(400).json({
@@ -275,75 +160,180 @@ export default function (pool, config) {
         });
       }
 
-      const transformedInvoices = [];
-      const validationErrors = [];
-      const invoiceRoundings = {};
+      // STEP 1: Check for invoices that already have a long_id (already processed successfully)
+      const validatedQuery = `
+      SELECT id, uuid, long_id, einvoice_status 
+      FROM invoices 
+      WHERE id = ANY($1) AND long_id IS NOT NULL AND long_id != ''
+      `;
+      const validatedResult = await pool.query(validatedQuery, [invoiceIds]);
+      const alreadyValidatedInvoices = validatedResult.rows;
 
-      // Check for duplicates first
-      for (const invoiceId of invoiceIds) {
+      // Track already processed invoices to skip
+      const alreadyProcessed = alreadyValidatedInvoices.map((invoice) => ({
+        id: invoice.id,
+        uuid: invoice.uuid,
+        longId: invoice.long_id,
+        status: invoice.einvoice_status,
+      }));
+
+      // STEP 2: Identify and process any pending invoices next
+      const pendingQuery = `
+      SELECT id, uuid, submission_uid 
+      FROM invoices 
+      WHERE id = ANY($1) AND einvoice_status = 'pending' AND uuid IS NOT NULL
+      AND (long_id IS NULL OR long_id = '')
+      `;
+      const pendingResult = await pool.query(pendingQuery, [invoiceIds]);
+      const pendingInvoices = pendingResult.rows;
+
+      // Track results of status updates for pending invoices
+      const statusUpdateResults = {
+        updated: [],
+        failed: [],
+      };
+
+      // Process each pending invoice to check current status
+      for (const invoice of pendingInvoices) {
         try {
-          // Make a direct query to check for duplicates
-          const duplicateCheckResult = await pool.query(
-            "SELECT COUNT(*) FROM einvoices WHERE internal_id = $1",
-            [invoiceId]
+          // Call MyInvois API to check current status
+          const documentDetails = await apiClient.makeApiCall(
+            "GET",
+            `/api/v1.0/documents/${invoice.uuid}/details`
           );
-          const isDuplicate = parseInt(duplicateCheckResult.rows[0].count) > 0;
 
-          if (isDuplicate) {
-            validationErrors.push({
-              internalId: invoiceId,
-              error: {
-                code: "DUPLICATE",
-                message: `Invoice number ${invoiceId} already exists in the system`,
-                target: invoiceId,
-                details: [
-                  {
-                    code: "DUPLICATE_INVOICE",
-                    message: "Duplicate invoice number found",
-                    target: "document",
-                  },
-                ],
-              },
-            });
-            continue; // Skip processing this invoice
+          // Determine new status based on response
+          let newStatus = "pending"; // Default to keep current status
+
+          if (documentDetails.longId) {
+            newStatus = "valid";
+          } else if (
+            documentDetails.status === "Invalid" ||
+            documentDetails.status === "Rejected"
+          ) {
+            newStatus = "invalid";
           }
 
+          // Update in database if status changed
+          if (
+            newStatus !== "pending" ||
+            (newStatus === "valid" && documentDetails.longId)
+          ) {
+            await pool.query(
+              `UPDATE invoices SET 
+              einvoice_status = $1, 
+              long_id = $2, 
+              datetime_validated = $3 
+            WHERE id = $4`,
+              [
+                newStatus,
+                documentDetails.longId || null,
+                documentDetails.dateTimeValidated || null,
+                invoice.id,
+              ]
+            );
+          }
+
+          statusUpdateResults.updated.push({
+            id: invoice.id,
+            status: newStatus,
+            longId: documentDetails.longId || null,
+            uuid: invoice.uuid,
+          });
+        } catch (error) {
+          console.error(
+            `Error checking status for pending invoice ${invoice.id}:`,
+            error
+          );
+          statusUpdateResults.failed.push({
+            id: invoice.id,
+            error: error.message,
+          });
+        }
+      }
+
+      // STEP 3: Filter out already processed pending and validated invoices
+      const processedIds = [
+        ...alreadyValidatedInvoices.map((inv) => inv.id),
+        ...statusUpdateResults.updated.map((upd) => upd.id),
+      ];
+
+      const invoiceIdsToProcess = invoiceIds.filter(
+        (id) => !processedIds.includes(id)
+      );
+
+      // If all invoices were already processed, return early with results
+      if (invoiceIdsToProcess.length === 0) {
+        if (isMinimal) {
+          // Construct minimal format response
+          const minimalInvoices = [
+            ...alreadyProcessed,
+            ...statusUpdateResults.updated,
+          ].map((invoice) => {
+            let einvoiceStatus = 20; // Default: Not Processed
+
+            if (invoice.status === "valid" || invoice.longId) {
+              einvoiceStatus = 0; // Valid
+            } else if (invoice.status === "pending") {
+              einvoiceStatus = 10; // Pending
+            }
+
+            return {
+              id: invoice.id,
+              systemStatus: 0, // Success
+              einvoiceStatus,
+              uuid: invoice.uuid,
+              longId: invoice.longId || undefined,
+            };
+          });
+
+          // Add failed updates with error code 103
+          statusUpdateResults.failed.forEach((failed) => {
+            minimalInvoices.push({
+              id: failed.id,
+              systemStatus: 0, // DB success
+              einvoiceStatus: 103, // Other error
+              error: {
+                code: "STATUS_CHECK_ERROR",
+                message: failed.error || "Failed to check e-invoice status",
+              },
+            });
+          });
+
+          return res.status(200).json({
+            message: "All invoices were already processed or have been updated",
+            invoices: [...minimalInvoices],
+            overallStatus: "Success",
+          });
+        } else {
+          // Standard format
+          return res.status(200).json({
+            success: true,
+            message: "All invoices were already processed or have been updated",
+            pendingUpdated: statusUpdateResults.updated,
+            pendingFailed: statusUpdateResults.failed,
+            overallStatus: "Success",
+          });
+        }
+      }
+
+      // STEP 4: Process new/invalid invoices (original flow)
+      const transformedInvoices = [];
+      const validationErrors = [];
+
+      // Check for duplicates first
+      for (const invoiceId of invoiceIdsToProcess) {
+        try {
           // If not a duplicate, process the invoice
           const invoiceData = await getInvoices(pool, invoiceId);
           if (!invoiceData) {
             throw new Error(`Invoice with ID ${invoiceId} not found`);
           }
 
-          // Store the rounding value for this invoice
-          invoiceRoundings[invoiceId] = invoiceData.rounding || 0;
-
           const customerData = await fetchCustomerData(
             pool,
             invoiceData.customerid
           );
-
-          if (!customerData.tin_number || !customerData.id_number) {
-            validationErrors.push({
-              internalId: invoiceId,
-              error: {
-                code: "MISSING_REQUIRED_ID",
-                message: `Missing TIN Number or ID Number for customer ${
-                  customerData.name || "unknown"
-                }`,
-                target: invoiceId,
-                details: [
-                  {
-                    code: "MISSING_REQUIRED_ID",
-                    message: `Customer ${
-                      customerData.name || "unknown"
-                    } must have both TIN Number and ID Number defined in the system.`,
-                    target: "document",
-                  },
-                ],
-              },
-            });
-            continue; // Skip processing this invoice
-          }
 
           const transformedInvoice = await EInvoiceTemplate(
             invoiceData,
@@ -351,20 +341,30 @@ export default function (pool, config) {
           );
           transformedInvoices.push(transformedInvoice);
         } catch (error) {
-          // Handle validation errors as before
+          // Handle validation errors
           const errorDetails = error.details || [];
+          const errorType = error.message ? error.message.toLowerCase() : "";
+
+          // Determine error code based on error message
+          let errorCode = "CF001";
+          if (errorType.includes("tin") || errorType.includes("id number")) {
+            errorCode = "MISSING_TIN";
+          } else if (errorType.includes("duplicate")) {
+            errorCode = "DUPLICATE_INVOICE";
+          }
+
           validationErrors.push({
             internalId: error.id || invoiceId,
             error: {
-              code: error.code || "2",
-              message: "Validation Error",
+              code: error.code || errorCode,
+              message: error.message || "Validation Error",
               target: error.id || invoiceId,
               details:
                 errorDetails.length > 0
                   ? errorDetails
                   : [
                       {
-                        code: error.code || "CF001",
+                        code: errorCode,
                         message: error.message,
                         target: "document",
                         propertyPath: error.propertyPath,
@@ -377,24 +377,128 @@ export default function (pool, config) {
 
       // If there are any validation errors, but we still have valid invoices, continue processing
       if (validationErrors.length > 0 && transformedInvoices.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed for submitted documents",
-          shouldStopAtValidation: true,
-          rejectedDocuments: validationErrors,
-          overallStatus: "Invalid",
-        });
+        if (isMinimal) {
+          // Construct minimal response for validation errors
+          const minimalResponse = validationErrors.map((err) => {
+            // Determine error status code
+            let einvoiceStatus = 100; // Default error
+            const errorMessage = err.error.message.toLowerCase();
+            const errorCode = err.error.code.toLowerCase();
+
+            if (
+              errorMessage.includes("tin") ||
+              errorCode.includes("tin") ||
+              errorMessage.includes("id number")
+            ) {
+              einvoiceStatus = 101; // Missing TIN/ID
+            } else if (
+              errorMessage.includes("duplicate") ||
+              errorCode.includes("duplicate")
+            ) {
+              einvoiceStatus = 102; // Duplicate
+            }
+
+            return {
+              id: err.internalId,
+              systemStatus: 100, // Error
+              einvoiceStatus,
+              error: {
+                code: err.error.code,
+                message: err.error.message,
+              },
+            };
+          });
+
+          // Include any already processed and updated invoices
+          const alreadyHandled = [
+            ...alreadyProcessed,
+            ...statusUpdateResults.updated,
+          ].map((inv) => ({
+            id: inv.id,
+            systemStatus: 0,
+            einvoiceStatus: inv.status === "valid" || inv.longId ? 0 : 10,
+            uuid: inv.uuid,
+            longId: inv.longId || undefined,
+          }));
+
+          return res.status(422).json({
+            message: "Validation failed for submitted documents",
+            ...alreadyHandled,
+            ...minimalResponse,
+            overallStatus: "Invalid",
+          });
+        } else {
+          return res.status(422).json({
+            success: false,
+            message: "Validation failed for submitted documents",
+            shouldStopAtValidation: true,
+            rejectedDocuments: validationErrors,
+            pendingUpdated: statusUpdateResults.updated,
+            overallStatus: "Invalid",
+          });
+        }
       }
 
       // Handle no valid invoices
       if (transformedInvoices.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "No valid invoices to process",
-          shouldStopAtValidation: true,
-          rejectedDocuments: validationErrors,
-          overallStatus: "Invalid",
-        });
+        if (isMinimal) {
+          // Similar to above, but different status code
+          const minimalResponse = validationErrors.map((err) => {
+            let einvoiceStatus = 100;
+            const errorMessage = err.error.message.toLowerCase();
+            const errorCode = err.error.code.toLowerCase();
+
+            if (
+              errorMessage.includes("tin") ||
+              errorCode.includes("tin") ||
+              errorMessage.includes("id number")
+            ) {
+              einvoiceStatus = 101;
+            } else if (
+              errorMessage.includes("duplicate") ||
+              errorCode.includes("duplicate")
+            ) {
+              einvoiceStatus = 102;
+            }
+
+            return {
+              id: err.internalId,
+              systemStatus: 100,
+              einvoiceStatus,
+              error: {
+                code: err.error.code,
+                message: err.error.message,
+              },
+            };
+          });
+
+          const alreadyHandled = [
+            ...alreadyProcessed,
+            ...statusUpdateResults.updated,
+          ].map((inv) => ({
+            id: inv.id,
+            systemStatus: 0,
+            einvoiceStatus: inv.status === "valid" || inv.longId ? 0 : 10,
+            uuid: inv.uuid,
+            longId: inv.longId || undefined,
+          }));
+
+          return res.status(400).json({
+            message: "No valid invoices to process",
+            ...alreadyHandled,
+            ...minimalResponse,
+            overallStatus: "Invalid",
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "No valid invoices to process",
+            shouldStopAtValidation: true,
+            rejectedDocuments: validationErrors,
+            pendingUpdated: statusUpdateResults.updated,
+            overallStatus: "Invalid",
+          });
+        }
       }
 
       // Submit valid invoices
@@ -411,232 +515,289 @@ export default function (pool, config) {
         submissionResult.overallStatus = "Partial";
       }
 
-      // Add accepted documents to database
+      // STEP 5: Update invoices table directly based on submission results
       if (
         submissionResult.success &&
         submissionResult.acceptedDocuments?.length > 0
       ) {
-        await insertAcceptedDocuments(
-          pool,
-          submissionResult.acceptedDocuments,
-          invoiceRoundings
-        );
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+
+          // Update each accepted document in the invoices table
+          for (const doc of submissionResult.acceptedDocuments) {
+            const status = doc.longId ? "valid" : "pending";
+            try {
+              await client.query(
+                `UPDATE invoices SET 
+                uuid = $1,
+                submission_uid = $2,
+                long_id = $3, 
+                datetime_validated = $4,
+                einvoice_status = $5
+              WHERE id = $6`,
+                [
+                  doc.uuid,
+                  doc.submissionUid,
+                  doc.longId || null,
+                  doc.dateTimeValidated || null,
+                  status,
+                  doc.internalId,
+                ]
+              );
+            } catch (error) {
+              console.error(
+                `Failed to update invoice ${doc.internalId}:`,
+                error
+              );
+            }
+          }
+
+          // Update each rejected document to mark as 'invalid'
+          if (submissionResult.rejectedDocuments?.length > 0) {
+            for (const doc of submissionResult.rejectedDocuments) {
+              const invoiceId = doc.internalId || doc.invoiceCodeNumber;
+              if (!invoiceId) continue;
+
+              try {
+                await client.query(
+                  `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
+                  [invoiceId]
+                );
+              } catch (error) {
+                console.error(
+                  `Failed to mark invoice ${invoiceId} as invalid:`,
+                  error
+                );
+              }
+            }
+          }
+
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK");
+          console.error("Error updating invoices with e-invoice data:", error);
+        } finally {
+          client.release();
+        }
       }
 
-      // If minimal response is requested, transform the result
+      // Determine appropriate status code
+      let statusCode = 201; // Default to Created for complete success
+
+      if (submissionResult.overallStatus === "Partial") {
+        statusCode = 202; // Accepted for partial success
+      } else if (
+        submissionResult.overallStatus === "Invalid" ||
+        (submissionResult.rejectedDocuments?.length > 0 &&
+          submissionResult.acceptedDocuments?.length === 0)
+      ) {
+        statusCode = 422; // Unprocessable Entity for validation failures
+      }
+
+      // Prepare response based on format requested
       if (isMinimal) {
-        const invoices = [];
+        // Map submitted invoice results to minimal format
+        const allInvoices = [
+          ...invoiceIdsToProcess,
+          ...alreadyValidatedInvoices.map((inv) => inv.id),
+          ...statusUpdateResults.updated.map((upd) => upd.id),
+        ];
 
-        // Process accepted documents
-        if (
-          submissionResult.acceptedDocuments &&
-          submissionResult.acceptedDocuments.length > 0
-        ) {
-          for (const doc of submissionResult.acceptedDocuments) {
-            const invoiceData = {
-              id: doc.internalId,
-              uuid: doc.uuid,
-              longId: doc.longId || "",
-              dateTimeValidated: doc.dateTimeValidated || null,
+        const minimalInvoices = allInvoices.map((id) => {
+          // First check if it was an already validated invoice
+          const alreadyValid = alreadyValidatedInvoices.find(
+            (inv) => inv.id === id
+          );
+          if (alreadyValid) {
+            return {
+              id,
+              systemStatus: 0, // Success
+              einvoiceStatus: 0, // Valid
+              uuid: alreadyValid.uuid,
+              longId: alreadyValid.long_id,
             };
+          }
 
-            // If longId is missing, mark status as Pending
-            if (!doc.longId) {
-              invoiceData.einvoiceStatus = 10; // Pending = 10 (success variant)
-            } else {
-              invoiceData.einvoiceStatus = 0; // Valid = 0 (complete success)
+          // Check if it was a pending invoice that got updated
+          const updatedPending = statusUpdateResults.updated.find(
+            (upd) => upd.id === id
+          );
+          if (updatedPending) {
+            return {
+              id,
+              systemStatus: 0, // Success
+              einvoiceStatus: updatedPending.status === "valid" ? 0 : 10,
+              uuid: updatedPending.uuid,
+              longId: updatedPending.longId,
+            };
+          }
+
+          // Check if it was a failed pending check
+          const failedPending = statusUpdateResults.failed.find(
+            (fail) => fail.id === id
+          );
+          if (failedPending) {
+            return {
+              id,
+              systemStatus: 0, // DB success
+              einvoiceStatus: 103, // Other error
+              error: {
+                code: "STATUS_CHECK_ERROR",
+                message: failedPending.error,
+              },
+            };
+          }
+
+          // Check if it was newly accepted
+          const accepted = submissionResult.acceptedDocuments?.find(
+            (doc) => doc.internalId === id
+          );
+          if (accepted) {
+            return {
+              id,
+              systemStatus: 0, // Success
+              einvoiceStatus: accepted.longId ? 0 : 10, // Valid or Pending
+              uuid: accepted.uuid,
+              longId: accepted.longId || undefined,
+            };
+          }
+
+          // Check if it was rejected
+          const rejected = submissionResult.rejectedDocuments?.find(
+            (doc) => doc.internalId === id || doc.invoiceCodeNumber === id
+          );
+          if (rejected) {
+            let einvoiceStatus = 100; // Default error
+            const errorMessage = (rejected.error?.message || "").toLowerCase();
+            const errorCode = (rejected.error?.code || "").toLowerCase();
+
+            if (
+              errorMessage.includes("tin") ||
+              errorCode.includes("tin") ||
+              errorMessage.includes("id number")
+            ) {
+              einvoiceStatus = 101; // Missing TIN
+            } else if (
+              errorMessage.includes("duplicate") ||
+              errorCode.includes("duplicate")
+            ) {
+              einvoiceStatus = 102; // Duplicate
             }
 
-            invoices.push(invoiceData);
-          }
-        }
-
-        // Process rejected documents
-        if (
-          submissionResult.rejectedDocuments &&
-          submissionResult.rejectedDocuments.length > 0
-        ) {
-          for (const doc of submissionResult.rejectedDocuments) {
-            invoices.push({
-              id: doc.internalId || doc.invoiceCodeNumber,
-              einvoiceStatus: 100, // Invalid = 100 (error)
+            return {
+              id,
+              systemStatus: 0, // DB success
+              einvoiceStatus,
               error: {
-                code: doc.error?.code || "ERROR",
-                message: doc.error?.message || "Unknown error",
+                code: rejected.error?.code || "EINVOICE_ERROR",
+                message: rejected.error?.message || "E-invoice error",
               },
-            });
+            };
           }
-        }
 
-        return res.json({
-          message: "Invoice processing completed",
-          invoices: invoices,
-          overallStatus: submissionResult.overallStatus || "Unknown",
+          // Default case - shouldn't happen but handle gracefully
+          return {
+            id,
+            systemStatus: 100, // Error
+            einvoiceStatus: 20, // Not processed
+            error: {
+              code: "UNKNOWN_ERROR",
+              message: "Invoice processing status unknown",
+            },
+          };
+        });
+
+        return res.status(statusCode).json({
+          message: submissionResult.message || "E-invoice processing completed",
+          invoices: minimalInvoices,
+          overallStatus: submissionResult.overallStatus,
+        });
+      } else {
+        // Standard response format
+        return res.status(statusCode).json({
+          ...submissionResult,
+          pendingUpdated: statusUpdateResults.updated,
+          pendingFailed: statusUpdateResults.failed,
         });
       }
-
-      // Return full response
-      return res.json(submissionResult);
     } catch (error) {
       console.error("Submission error:", error);
-      // Check specifically for 422 error code (duplicate payload)
+
+      // Check for specific error codes like 422 (duplicate payload)
       if (error.status === 422) {
-        return res.status(422).json({
+        if (req.query.fields === "minimal") {
+          return res.status(422).json({
+            message: "Duplicate submission detected",
+            invoices: invoiceIds.map((id) => ({
+              id,
+              systemStatus: 100, // Error
+              einvoiceStatus: 102, // Duplicate
+              error: {
+                code: "DUPLICATE_PAYLOAD",
+                message: "Duplicated submission",
+              },
+            })),
+            overallStatus: "Invalid",
+          });
+        } else {
+          return res.status(422).json({
+            success: false,
+            message: "Duplicate submission detected",
+            shouldStopAtValidation: true,
+            rejectedDocuments: [
+              {
+                internalId: "Failed",
+                error: {
+                  code: "DUPLICATE_PAYLOAD",
+                  message: "Duplicated Submission",
+                  details: [
+                    {
+                      message: error.response?.error || "Duplicate submission",
+                    },
+                  ],
+                },
+              },
+            ],
+            overallStatus: "Invalid",
+          });
+        }
+      }
+
+      // Original error handling
+      if (req.query.fields === "minimal") {
+        return res.status(500).json({
+          message: error.message || "Failed to process batch submission",
+          invoices: (req.body.invoiceIds || []).map((id) => ({
+            id,
+            systemStatus: 100, // Error
+            einvoiceStatus: 103, // Other error
+            error: {
+              code: error.code || "SYSTEM_ERROR",
+              message: error.message || "Unknown error occurred",
+            },
+          })),
+          overallStatus: "Error",
+        });
+      } else {
+        return res.status(500).json({
           success: false,
-          message: "Duplicate submission detected",
+          message: error.message || "Failed to process batch submission",
           shouldStopAtValidation: true,
           rejectedDocuments: [
             {
-              internalId: "Failed",
+              internalId:
+                error.id || (error.invoiceNo ? error.invoiceNo : "unknown"),
               error: {
-                code: "DUPLICATE_PAYLOAD",
-                message: "Duplicated Submission",
-                details: [
-                  {
-                    message: error.response.error,
-                  },
-                ],
+                code: error.code || "Unknown",
+                message: error.message || "Unknown error occurred",
+                details: error.details || [],
               },
             },
           ],
           overallStatus: "Invalid",
         });
       }
-
-      // Original error handling
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to process batch submission",
-        shouldStopAtValidation: true,
-        rejectedDocuments: [
-          {
-            internalId:
-              error.id || (error.invoiceNo ? error.invoiceNo : "unknown"),
-            error: {
-              code: error.code || "Unknown",
-              message: error.message || "Unknown error occurred",
-              details: error.details || [],
-            },
-          },
-        ],
-        overallStatus: "Invalid",
-      });
-    }
-  });
-
-  // Fetch submission details by UUID and update missing longId
-  router.get("/submission/:uuid", async (req, res) => {
-    const { uuid } = req.params;
-
-    if (!uuid) {
-      return res.status(400).json({
-        success: false,
-        message: "UUID is required",
-      });
-    }
-
-    try {
-      // Call the MyInvois API to get document details
-      const documentDetails = await apiClient.makeApiCall(
-        "GET",
-        `/api/v1.0/documents/${uuid}/details`
-      );
-
-      // Filter down to only the fields we need
-      const filteredResponse = {
-        uuid: documentDetails.uuid,
-        longId: documentDetails.longId || "",
-        dateTimeValidated: documentDetails.dateTimeValidated || null,
-        status:
-          documentDetails.status === "Submitted"
-            ? "Valid"
-            : documentDetails.status,
-      };
-
-      // Update our database if we have new information (particularly the longId)
-      if (documentDetails.longId) {
-        try {
-          const dbResult = await pool.query(
-            `UPDATE einvoices 
-             SET long_id = $1, datetime_validated = $2
-             WHERE uuid = $3 AND (long_id IS NULL OR long_id = '')
-             RETURNING *`,
-            [documentDetails.longId, documentDetails.dateTimeValidated, uuid]
-          );
-
-          console.log(
-            `Updated einvoice record for UUID ${uuid}: ${dbResult.rowCount} rows affected`
-          );
-        } catch (dbError) {
-          console.error("Error updating einvoice record:", dbError);
-          // Continue with the response even if DB update fails
-        }
-      }
-
-      return res.json({
-        success: true,
-        data: filteredResponse,
-      });
-    } catch (error) {
-      console.error("Error fetching document details:", error);
-
-      // Check for specific error responses from the MyInvois API
-      if (error.status === 404) {
-        return res.status(404).json({
-          success: false,
-          message: "Document not found",
-          error: "The requested document does not exist or is not accessible",
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        message: "Failed to fetch document details",
-        error: error.message,
-      });
-    }
-  });
-
-  // Get all submitted e-invoices
-  router.get("/list", async (req, res) => {
-    try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 25;
-      const offset = (page - 1) * limit;
-      const startDate = req.query.startDate;
-      const endDate = req.query.endDate;
-
-      let query = "SELECT * FROM einvoices WHERE 1=1";
-      const params = [];
-
-      if (startDate) {
-        params.push(new Date(startDate));
-        query += ` AND datetime_validated >= $${params.length}`;
-      }
-
-      if (endDate) {
-        params.push(new Date(endDate));
-        query += ` AND datetime_validated < $${params.length}`;
-      }
-
-      const countQuery = query.replace("SELECT *", "SELECT COUNT(*)");
-      query += ` ORDER BY datetime_validated DESC LIMIT $${
-        params.length + 1
-      } OFFSET $${params.length + 2}`;
-      params.push(limit, offset);
-
-      const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, params.slice(0, -2)),
-        pool.query(query, params),
-      ]);
-
-      res.json({
-        data: dataResult.rows,
-        total: parseInt(countResult.rows[0].count),
-      });
-    } catch (error) {
-      console.error("Failed to fetch e-invoices:", error);
-      res.status(500).json({ error: "Failed to fetch e-invoices" });
     }
   });
 
@@ -672,42 +833,42 @@ export default function (pool, config) {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      // REPLACE this query with the modified version:
       const query = `
-        SELECT 
-          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-          i.amount, i.rounding, i.totalamountpayable,
-          COALESCE(
-            json_agg(
-              CASE WHEN od.id IS NOT NULL THEN 
-                json_build_object(
-                  'code', od.code,
-                  'quantity', od.quantity,
-                  'price', od.price,
-                  'freeProduct', od.freeproduct,
-                  'returnProduct', od.returnproduct,
-                  'description', od.description,
-                  'tax', od.tax,
-                  'total', od.total,
-                  'issubtotal', od.issubtotal
-                )
-              ELSE NULL END
-              ORDER BY od.id  -- Maintain order of products and subtotals
-            ) FILTER (WHERE od.id IS NOT NULL),
-            '[]'::json
-          ) as products
-        FROM invoices i
-        LEFT JOIN order_details od ON i.id = od.invoiceid
-        LEFT JOIN einvoices e ON CAST(i.id AS TEXT) = e.internal_id
-        WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
-        AND e.internal_id IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM einvoices e2, jsonb_array_elements_text(e2.consolidated_invoices::jsonb) AS invoice_id
-          WHERE e2.consolidated_invoices IS NOT NULL 
-          AND invoice_id = i.id::text
-        )
-        GROUP BY i.id
-        ORDER BY CAST(i.createddate AS bigint) ASC
+      SELECT 
+        i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+        i.total_excluding_tax as amount, i.rounding, i.totalamountpayable,
+        COALESCE(
+          json_agg(
+            CASE WHEN od.id IS NOT NULL THEN 
+              json_build_object(
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+            ELSE NULL END
+            ORDER BY od.id
+          ) FILTER (WHERE od.id IS NOT NULL),
+          '[]'::json
+        ) as products
+      FROM invoices i
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+      AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+      AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM invoices consolidated 
+        WHERE consolidated.is_consolidated = true
+        AND consolidated.consolidated_invoices IS NOT NULL
+        AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+      )
+      GROUP BY i.id
+      ORDER BY CAST(i.createddate AS bigint) ASC
       `;
 
       const result = await pool.query(query, [startTimestamp, endTimestamp]);
@@ -827,6 +988,32 @@ export default function (pool, config) {
         );
         const consolidatedData = finalStatus.documentSummary[0];
 
+        if (
+          finalStatus.overallStatus === "Invalid" ||
+          consolidatedData.status === "Invalid"
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Consolidated invoice submission was rejected",
+            submissionUid: submissionResponse.submissionUid,
+            consolidatedId,
+            uuid: consolidatedData.uuid,
+            status: consolidatedData.status,
+            errors: [
+              {
+                code: "INVALID_SUBMISSION",
+                message: "The submission was marked as invalid by MyInvois",
+              },
+            ],
+          });
+        }
+
+        // Check if the submission is still pending
+        const isPending =
+          finalStatus.overallStatus === "InProgress" ||
+          consolidatedData.status === "Submitted" ||
+          !consolidatedData.longId;
+
         // Mark the original invoices as consolidated
         const client = await pool.connect();
         try {
@@ -834,27 +1021,32 @@ export default function (pool, config) {
 
           // Insert consolidated record
           await client.query(
-            `INSERT INTO einvoices (
-              uuid, submission_uid, long_id, internal_id, type_name, 
-              receiver_id, receiver_name, datetime_validated,
-              total_payable_amount, total_excluding_tax, total_net_amount,
-              is_consolidated, consolidated_invoices, total_rounding
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            `INSERT INTO invoices (
+              id, uuid, submission_uid, long_id, datetime_validated,
+              total_excluding_tax, tax_amount, rounding, totalamountpayable,
+              invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
+              customerid, salespersonid, createddate, paymenttype
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
             [
+              consolidatedId,
               consolidatedData.uuid,
               submissionResponse.submissionUid,
               consolidatedData.longId,
-              consolidatedId,
-              consolidatedData.typeName || "Consolidated Invoice",
-              "EI00000000010",
-              "Consolidated Buyers",
               consolidatedData.dateTimeValidated || new Date().toISOString(),
-              consolidatedData.totalPayableAmount,
-              consolidatedData.totalExcludingTax,
-              consolidatedData.totalNetAmount,
+              consolidatedData.totalExcludingTax || 0,
+              consolidatedData.totalPayableAmount -
+                consolidatedData.totalExcludingTax -
+                totalRounding || 0,
+              totalRounding,
+              consolidatedData.totalPayableAmount || 0,
+              "paid", // Consolidated invoices are typically marked as paid
+              consolidatedData.longId ? "valid" : "pending",
               true,
               JSON.stringify(invoiceIds),
-              totalRounding,
+              "EI00000000010", // Default consolidated customer ID
+              "SYSTEM", // System-generated invoice
+              new Date().getTime().toString(), // Current timestamp
+              "INVOICE", // Consolidated invoices are always INVOICE type
             ]
           );
 
@@ -866,14 +1058,18 @@ export default function (pool, config) {
           client.release();
         }
 
-        // Return success with details
+        // Return success with details, including pending status
         return res.json({
           success: true,
-          message: "Consolidated invoice submitted successfully",
+          message: isPending
+            ? "Consolidated invoice submitted, but is still pending"
+            : "Consolidated invoice submitted successfully",
           submissionUid: submissionResponse.submissionUid,
           consolidatedId,
           uuid: consolidatedData.uuid,
-          longId: consolidatedData.longId,
+          longId: consolidatedData.longId || "",
+          isPending,
+          status: consolidatedData.status,
         });
       } else {
         return res.status(400).json({
@@ -887,65 +1083,6 @@ export default function (pool, config) {
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to process consolidated submission",
-      });
-    }
-  });
-
-  // Delete e-invoice by UUID
-  router.delete("/:uuid", async (req, res) => {
-    const { uuid } = req.params;
-
-    try {
-      // Check if the e-invoice exists before attempting to delete
-      const checkQuery = "SELECT uuid FROM einvoices WHERE uuid = $1";
-      const checkResult = await pool.query(checkQuery, [uuid]);
-
-      if (checkResult.rows.length === 0) {
-        return res.status(404).json({ message: "E-invoice not found" });
-      }
-
-      // First, try to cancel the invoice in MyInvois
-      try {
-        await apiClient.makeApiCall(
-          "PUT",
-          `/api/v1.0/documents/state/${uuid}/state`,
-          {
-            status: "cancelled",
-            reason: "Wrong submission",
-          }
-        );
-      } catch (cancelError) {
-        console.error("Error cancelling e-invoice in MyInvois:", cancelError);
-
-        // Handle specific error cases from MyInvois API
-        if (
-          cancelError.status === 400 &&
-          cancelError.response?.error?.code === "OperationPeriodOver"
-        ) {
-          return res.status(400).json({
-            message: "The time limit for cancellation has expired",
-          });
-        }
-
-        return res.status(500).json({
-          message: "Failed to cancel e-invoice in MyInvois",
-          error: cancelError.message,
-        });
-      }
-
-      // If cancellation was successful, delete locally
-      const deleteQuery = "DELETE FROM einvoices WHERE uuid = $1 RETURNING *";
-      const result = await pool.query(deleteQuery, [uuid]);
-
-      res.json({
-        message: "E-invoice cancelled and deleted successfully",
-        einvoice: result.rows[0],
-      });
-    } catch (error) {
-      console.error("Error deleting e-invoice:", error);
-      res.status(500).json({
-        message: "Error deleting e-invoice",
-        error: error.message,
       });
     }
   });

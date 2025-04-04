@@ -1,38 +1,42 @@
-import React, { Fragment } from "react";
+// src/components/FormComponents.tsx
+import React, { Fragment, useState, useEffect } from "react"; // Added useState, useEffect
 import {
   Listbox,
   Transition,
   Combobox,
   ComboboxInput,
-  ComboboxButton,
+  ComboboxButton as HeadlessComboboxButton,
   ComboboxOptions,
   ComboboxOption,
   ListboxOption,
   ListboxOptions,
-  ListboxButton,
+  ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconPhone } from "@tabler/icons-react";
 import clsx from "clsx";
-import { StatusIndicator } from "./StatusIndicator";
+import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
-interface SelectOption {
-  id: string;
+// Exporting for reuse, includes optional phone_number
+export interface SelectOption {
+  id: string | number;
   name: string;
+  phone_number?: string | null;
 }
 
+// --- FormInput ---
 interface InputProps {
   name: string;
   label: string;
-  value: string | undefined;
+  value: string | number | undefined;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
   type?: string;
   placeholder?: string;
-}
-
-interface ExtendedInputProps extends InputProps {
-  showStatus?: boolean;
-  isVerified?: boolean;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  step?: string;
+  min?: string;
+  max?: number;
+  required?: boolean;
 }
 
 export const FormInput: React.FC<InputProps> = ({
@@ -43,11 +47,22 @@ export const FormInput: React.FC<InputProps> = ({
   disabled = false,
   type = "text",
   placeholder = "",
+  onBlur,
+  step,
+  min,
+  max,
+  required = false,
 }) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label htmlFor={name} className="text-sm font-medium text-default-700">
-      {label}
-    </label>
+  <div className={`${label ? "space-y-2" : ""}`}>
+    {" "}
+    {label && (
+      <label
+        htmlFor={name}
+        className="block text-sm font-medium text-default-700"
+      >
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+    )}
     <input
       type={type}
       id={name}
@@ -56,10 +71,25 @@ export const FormInput: React.FC<InputProps> = ({
       onChange={onChange}
       disabled={disabled}
       placeholder={placeholder}
-      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+      onBlur={onBlur}
+      step={step}
+      min={min}
+      max={max?.toString()}
+      required={required}
+      className={clsx(
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+      )}
     />
   </div>
 );
+
+// --- FormInputWithStatus ---
+interface ExtendedInputProps extends InputProps {
+  showStatus?: boolean;
+  isVerified?: boolean;
+}
 
 export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   name,
@@ -71,12 +101,19 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   placeholder = "",
   showStatus = false,
   isVerified = false,
+  required = false,
 }) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <div className="flex items-center gap-2">
-      <label htmlFor={name} className="text-sm font-medium text-default-700">
-        {label}
-      </label>
+  <div className={`${label ? "space-y-2" : ""}`}>
+    {" "}
+    <div className="flex items-center justify-between">
+      {label && (
+        <label
+          htmlFor={name}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
       {showStatus && isVerified && (
         <StatusIndicator success={true} type="verification" />
       )}
@@ -85,21 +122,37 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
       type={type}
       id={name}
       name={name}
-      value={value}
+      value={value?.toString() ?? ""}
       onChange={onChange}
       disabled={disabled}
       placeholder={placeholder}
-      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+      required={required}
+      className={clsx(
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+      )}
     />
   </div>
 );
 
+// --- FormListbox ---
 interface ListboxProps {
   name: string;
   label: string;
-  value: string;
+  value: string | number | undefined;
   onChange: (value: string) => void;
   options: SelectOption[];
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+  optionsPosition?: "top" | "bottom";
+  className?: string;
+  renderOption?: (
+    option: SelectOption,
+    selected: boolean,
+    active: boolean
+  ) => React.ReactElement;
 }
 
 export const FormListbox: React.FC<ListboxProps> = ({
@@ -108,74 +161,121 @@ export const FormListbox: React.FC<ListboxProps> = ({
   value,
   onChange,
   options,
-}) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label htmlFor={name} className="text-sm font-medium text-default-700">
-      {label}
-    </label>
-    <Listbox value={value} onChange={onChange}>
-      <div className="relative">
-        <ListboxButton
-          className={clsx(
-            "relative w-full rounded-lg border border-default-300 bg-white py-[8.85px] pl-3 pr-10 text-left",
-            "focus:outline-none focus:border-default-500"
-          )}
-        >
-          <span className="block truncate">{value || "Select"}</span>
-          <span className="absolute inset-y-0 right-1.5 flex items-center pr-2 pointer-events-none">
-            <IconChevronDown size={20} className="text-default-500" />
-          </span>
-        </ListboxButton>
-        <Transition
-          as={Fragment}
-          leave="transition ease-in duration-100"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-            {options.map((option) => (
-              <ListboxOption
-                key={option.id}
-                className={({ active }) =>
-                  `relative cursor-pointer select-none rounded py-2 px-4 ${
-                    active ? "bg-default-100" : "text-default-900"
-                  }`
-                }
-                value={option.name}
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${
-                        selected ? "font-medium" : "font-normal"
-                      }`}
-                    >
-                      {option.name}
-                    </span>
-                    {selected ? (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                        <IconCheck stroke={2} size={22} />
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </ListboxOption>
-            ))}
-          </ListboxOptions>
-        </Transition>
-      </div>
-    </Listbox>
-  </div>
-);
+  disabled = false,
+  required = false,
+  placeholder = "Select...",
+  optionsPosition = "bottom",
+  className = "",
+  renderOption,
+}) => {
+  const valueAsString = value?.toString() ?? "";
+  const selectedOption = options.find(
+    (option) => option.id.toString() === valueAsString
+  );
+  const displayValue = selectedOption?.name ?? placeholder;
 
+  return (
+    <div className={`${label ? "space-y-2" : ""} ${className}`}>
+      {label && (
+        <label
+          htmlFor={`${name}-button`}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      <Listbox
+        value={valueAsString}
+        onChange={onChange}
+        disabled={disabled}
+        name={name}
+      >
+        <div className="relative">
+          <HeadlessListboxButton
+            id={`${name}-button`}
+            className={clsx(
+              "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+              "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+              disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+            )}
+          >
+            {/* Allow custom rendering for the button display value too if needed, using selectedOption */}
+            <span className="block truncate">{displayValue}</span>
+            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+              <IconChevronDown
+                size={20}
+                className="text-gray-400"
+                aria-hidden="true"
+              />
+            </span>
+          </HeadlessListboxButton>
+          <Transition
+            as={Fragment}
+            leave="transition ease-in duration-100"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <ListboxOptions
+              className={clsx(
+                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+              )}
+            >
+              {options.map((option) => (
+                <ListboxOption
+                  key={option.id}
+                  className={({ active }) =>
+                    clsx(
+                      "relative cursor-default select-none py-2 pl-3 pr-10",
+                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                    )
+                  }
+                  value={option.id.toString()}
+                >
+                  {({ selected, active }) =>
+                    renderOption ? (
+                      renderOption(option, selected, active)
+                    ) : (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          {option.name}
+                        </span>
+                        {selected ? (
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                            <IconCheck size={20} aria-hidden="true" />
+                          </span>
+                        ) : null}
+                      </>
+                    )
+                  }
+                </ListboxOption>
+              ))}
+            </ListboxOptions>
+          </Transition>
+        </div>
+      </Listbox>
+    </div>
+  );
+};
+
+// --- FormCombobox (Supports single/multiple modes) ---
 interface ComboboxProps {
   name: string;
   label: string;
-  value: string[];
-  onChange: (value: string[] | null) => void;
+  value: string | string[] | undefined; // Accept single string, array, or undefined
+  onChange: (value: string | string[] | null) => void; // Return type matches mode
   options: SelectOption[];
   query: string;
   setQuery: React.Dispatch<React.SetStateAction<string>>;
+  mode?: "single" | "multiple"; // Added mode prop
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+  optionsPosition?: "top" | "bottom";
 }
 
 export const FormCombobox: React.FC<ComboboxProps> = ({
@@ -186,84 +286,210 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   options,
   query,
   setQuery,
-}) => (
-  <div className={`${label === "" ? "" : "space-y-2"}`}>
-    <label htmlFor={name} className="text-sm font-medium text-default-700">
-      {label}
-    </label>
-    <Combobox multiple value={value} onChange={onChange}>
-      {({ open }) => (
+  mode = "multiple", // Default to multiple for backward compatibility
+  disabled = false,
+  required = false,
+  placeholder = "Search...",
+  optionsPosition = "bottom",
+}) => {
+  const isMultiple = mode === "multiple";
+
+  // Normalize value for internal Headless UI state
+  // For single mode, Headless UI expects the selected object or null/undefined
+  // For multiple mode, it expects an array of selected objects
+  // We'll manage the value internally as the selected *option object(s)* for Headless UI
+  // and convert back to ID(s) in onChange.
+
+  // Find selected option(s) based on incoming ID(s)
+  const selectedOptions = React.useMemo(() => {
+    if (isMultiple) {
+      const valuesArray = Array.isArray(value)
+        ? value.map((v) => v?.toString())
+        : [];
+      return options.filter((opt) => valuesArray.includes(opt.id.toString()));
+    } else {
+      const stringValue = value?.toString();
+      return options.find((opt) => opt.id.toString() === stringValue) ?? null;
+    }
+  }, [value, options, isMultiple]);
+
+  const filteredOptions =
+    query === ""
+      ? options
+      : options.filter((option) =>
+          option.name
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .includes(query.toLowerCase().replace(/\s+/g, ""))
+        );
+
+  // Handle change from Headless UI, converting option object(s) back to ID(s)
+  const handleChange = (selected: SelectOption | SelectOption[] | null) => {
+    if (isMultiple) {
+      // `selected` will be SelectOption[]
+      const selectedIds = Array.isArray(selected)
+        ? selected.map((opt) => opt.id.toString())
+        : [];
+      onChange(selectedIds.length > 0 ? selectedIds : null);
+    } else {
+      // `selected` will be SelectOption or null
+      const selectedId =
+        selected && "id" in selected ? selected.id.toString() : null;
+      onChange(selectedId);
+    }
+  };
+
+  // Display function for the input field
+  const getDisplayValue = (
+    selected: SelectOption | SelectOption[] | null
+  ): string => {
+    if (isMultiple) {
+      // For multiple, show comma-separated names
+      const items = Array.isArray(selected) ? selected : [];
+      return items.map((opt) => opt.name).join(", ");
+    } else {
+      // For single, show name and potentially phone number
+      const item = selected as SelectOption | null; // Cast for single mode
+      if (!item) return "";
+      let display = item.name;
+      // Append phone number if available and different from name
+      if (item.phone_number && item.phone_number !== item.name) {
+        display += ` (${item.phone_number})`;
+      }
+      return display;
+    }
+  };
+
+  return (
+    <div className={`${label ? "space-y-2" : ""}`}>
+      {label && (
+        <label
+          htmlFor={`${name}-input`}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      {/* Conditionally set 'multiple' prop */}
+      <Combobox
+        value={selectedOptions} // Pass selected option object(s)
+        onChange={handleChange} // Use internal handler
+        disabled={disabled}
+        name={name}
+        multiple={isMultiple} // Set based on mode
+        nullable={!isMultiple} // Allow null selection in single mode
+      >
         <div className="relative">
-          <ComboboxInput
+          {/* Input area */}
+          <div
             className={clsx(
-              "w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-default-900",
-              "focus:outline-none focus:border-default-500"
+              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
+              "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500",
+              disabled ? "bg-gray-50" : ""
             )}
-            displayValue={(selected: string[]) =>
-              selected
-                .map((id) => options.find((option) => option.id === id)?.name)
-                .join(", ")
-            }
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <ComboboxButton className="absolute inset-y-0 right-1.5 flex items-center pr-2 text-default-500">
-            <IconChevronDown stroke={2} size={20} />
-          </ComboboxButton>
+          >
+            <ComboboxInput
+              // Render as input for typing/searching
+              className={clsx(
+                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0",
+                disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+              )}
+              // displayValue tells Headless UI how to render the selected item(s) in the input
+              displayValue={getDisplayValue}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={placeholder}
+              disabled={disabled}
+              id={`${name}-input`}
+            />
+            <HeadlessComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+              <IconChevronDown
+                size={20}
+                className="text-gray-400"
+                aria-hidden="true"
+              />
+            </HeadlessComboboxButton>
+          </div>
+          {/* Options dropdown */}
           <Transition
-            show={open}
             as={Fragment}
             leave="transition ease-in duration-100"
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
+            afterLeave={() => setQuery("")}
           >
-            <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
-              {options.length === 0 ||
-              (options.length > 0 &&
-                query !== "" &&
-                options.filter((option) =>
-                  option.name.toLowerCase().includes(query.toLowerCase())
-                ).length === 0) ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-default-700">
-                  No {name}s found.
+            <ComboboxOptions
+              className={clsx(
+                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
+              )}
+            >
+              {filteredOptions.length === 0 && query !== "" ? (
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                  Nothing found.
                 </div>
               ) : (
-                options
-                  .filter((option) =>
-                    option.name.toLowerCase().includes(query.toLowerCase())
-                  )
-                  .map((option) => (
-                    <ComboboxOption
-                      key={option.id}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none rounded py-2 px-4 ${
-                          active ? "bg-default-100" : "text-default-900"
-                        }`
-                      }
-                      value={option.id}
-                    >
-                      {({ selected }) => (
-                        <>
+                filteredOptions.map((option) => (
+                  <ComboboxOption
+                    key={option.id}
+                    className={({ active }) =>
+                      clsx(
+                        "relative cursor-default select-none py-2 pl-3 pr-10",
+                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                      )
+                    }
+                    value={option} // Pass the whole option object as value
+                  >
+                    {/* Use render prop `active` which indicates focus/hover */}
+                    {(
+                      { active, selected } // `selected` indicates if the option matches the Combobox's value
+                    ) => (
+                      <>
+                        <div className="flex justify-between items-center w-full mr-5">
+                          {/* Name */}
                           <span
-                            className={`block truncate ${
+                            className={clsx(
+                              "block truncate",
                               selected ? "font-medium" : "font-normal"
-                            }`}
+                            )}
                           >
                             {option.name}
                           </span>
-                          {selected ? (
-                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                              <IconCheck stroke={2} size={22} />
+                          {/* Phone number (conditional) */}
+                          {option.phone_number && (
+                            <span
+                              className={clsx(
+                                "text-xs ml-2 flex-shrink-0 flex items-center",
+                                active ? "text-sky-700" : "text-gray-500"
+                              )}
+                            >
+                              <IconPhone
+                                size={14}
+                                className="inline mr-1 relative -top-[1px]"
+                              />
+                              {option.phone_number}
                             </span>
-                          ) : null}
-                        </>
-                      )}
-                    </ComboboxOption>
-                  ))
+                          )}
+                        </div>
+                        {/* Checkmark */}
+                        {selected ? (
+                          <span
+                            className={clsx(
+                              "absolute inset-y-0 right-0 flex items-center pr-3",
+                              active ? "text-sky-600" : "text-sky-600"
+                            )}
+                          >
+                            <IconCheck size={20} aria-hidden="true" />
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </ComboboxOption>
+                ))
               )}
             </ComboboxOptions>
           </Transition>
         </div>
-      )}
-    </Combobox>
-  </div>
-);
+      </Combobox>
+    </div>
+  );
+};

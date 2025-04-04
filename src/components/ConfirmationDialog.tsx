@@ -1,3 +1,4 @@
+// src/components/ConfirmationDialog.tsx
 import React from "react";
 import {
   Dialog,
@@ -15,6 +16,7 @@ interface ConfirmationDialogProps {
   message: string;
   confirmButtonText?: string;
   variant?: "danger" | "success" | "default";
+  hideCancelButton?: boolean;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -25,6 +27,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   message,
   confirmButtonText = "Confirm",
   variant = "danger",
+  hideCancelButton = false,
 }) => {
   // Define button styles based on variant
   const buttonStyles = {
@@ -85,13 +88,15 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
               </div>
 
               <div className="mt-4 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 bg-default-100 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
-                  onClick={onClose}
-                >
-                  Cancel
-                </button>
+                {!hideCancelButton && (
+                  <button
+                    type="button"
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 bg-default-100 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
+                    onClick={onClose}
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`inline-flex justify-center px-4 py-2 text-sm font-medium border border-transparent rounded-full focus:outline-none ${buttonStyles[variant]}`}

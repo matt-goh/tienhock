@@ -97,7 +97,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
   <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;
 
-    // Add supplier party (company info)
+    // Supplier party (company info)
     xml += `
   <cac:AccountingSupplierParty>
     <cac:Party>
@@ -145,7 +145,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
     </cac:Party>
   </cac:AccountingSupplierParty>`;
 
-    // Add generic customer party for consolidated invoices
+    // Customer party for consolidated invoices
     xml += `
   <cac:AccountingCustomerParty>
     <cac:Party>
@@ -153,26 +153,26 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
         <cbc:ID schemeID="TIN">EI00000000010</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="BRN">-</cbc:ID>
+        <cbc:ID schemeID="BRN">NA</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="SST">-</cbc:ID>
+        <cbc:ID schemeID="SST">NA</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="TTX">-</cbc:ID>
+        <cbc:ID schemeID="TTX">NA</cbc:ID>
       </cac:PartyIdentification>
       <cac:PostalAddress>
-        <cbc:CityName></cbc:CityName>
-        <cbc:PostalZone></cbc:PostalZone>
-        <cbc:CountrySubentityCode></cbc:CountrySubentityCode>
+        <cbc:CityName/>
+        <cbc:PostalZone/>
+        <cbc:CountrySubentityCode/>
         <cac:AddressLine>
           <cbc:Line>NA</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line/>
         </cac:AddressLine>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line/>
         </cac:AddressLine>
         <cac:Country>
           <cbc:IdentificationCode listID="ISO3166-1" listAgencyID="6"></cbc:IdentificationCode>
@@ -210,10 +210,10 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
     <cbc:LineExtensionAmount currencyID="MYR">${totalExcludingTax}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="MYR">${totalExcludingTax}</cbc:TaxExclusiveAmount>
     <cbc:TaxInclusiveAmount currencyID="MYR">${totalInclusiveTax}</cbc:TaxInclusiveAmount>
-    <cbc:AllowanceTotalAmount currencyID="MYR">0.00</cbc:AllowanceTotalAmount>
-    <cbc:ChargeTotalAmount currencyID="MYR">0.00</cbc:ChargeTotalAmount>
+    <cbc:AllowanceTotalAmount currencyID="MYR">0</cbc:AllowanceTotalAmount>
+    <cbc:ChargeTotalAmount currencyID="MYR">0</cbc:ChargeTotalAmount>
     <cbc:PayableRoundingAmount currencyID="MYR">${
-      totalRounding || "0.00"
+      totalRounding || "0"
     }</cbc:PayableRoundingAmount>
     <cbc:PayableAmount currencyID="MYR">${totalPayableAmount}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>`;
@@ -249,7 +249,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
         <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
       </cac:OriginCountry>
       <cac:CommodityClassification>
-        <cbc:ItemClassificationCode listID="PTC"></cbc:ItemClassificationCode>
+        <cbc:ItemClassificationCode listID="PTC"/>
       </cac:CommodityClassification>
       <cac:CommodityClassification>
         <cbc:ItemClassificationCode listID="CLASS">004</cbc:ItemClassificationCode>

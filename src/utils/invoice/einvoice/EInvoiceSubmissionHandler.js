@@ -1,11 +1,11 @@
-// EInvoiceSubmissionHandler.js
+//src/utils/invoice/einvoice/EInvoiceSubmissionHandler.js
 import { createHash } from "crypto";
 
 class EInvoiceSubmissionHandler {
   constructor(apiClient) {
     this.apiClient = apiClient;
     this.MAX_POLLING_ATTEMPTS = 10;
-    this.POLLING_INTERVAL = 5000; // 6 seconds
+    this.POLLING_INTERVAL = 5000; // 5 seconds
   }
 
   async submitAndPollDocuments(transformedInvoices) {
@@ -138,7 +138,7 @@ class EInvoiceSubmissionHandler {
   async pollSubmissionStatus(submissionUid) {
     let attempts = 0;
     let lastResponse = null;
-
+    await this.wait(300); // Add 0.3 second delay before starting the first polling
     while (attempts < this.MAX_POLLING_ATTEMPTS) {
       try {
         const response = await this.apiClient.makeApiCall(

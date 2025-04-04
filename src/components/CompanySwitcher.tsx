@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useCompany, Company } from "../contexts/CompanyContext";
 import { Transition } from "@headlessui/react";
 import TienHockLogo from "../utils/TienHockLogo";
+import GreenTargetLogo from "../utils/GreenTargetLogo";
 
 interface CompanySwitcherProps {
   onNavigate?: () => void;
@@ -35,7 +36,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
   const getCompanyLogo = (companyId: string) => {
     switch (companyId) {
       case "greentarget":
-        return <img src="/greentarget.ico" width={24} height={24} />;
+        return <GreenTargetLogo width={24} height={24} />;
       case "tienhock":
       case "jellypolly":
       default:

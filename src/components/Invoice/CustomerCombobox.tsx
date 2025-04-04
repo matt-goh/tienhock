@@ -1,138 +1,161 @@
+// src/components/Invoice/CustomerCombobox.tsx
 import {
   Combobox,
   ComboboxInput,
   ComboboxButton,
   ComboboxOptions,
   ComboboxOption,
+  Transition,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
+import clsx from "clsx";
 
 interface SelectOption {
   id: string;
   name: string;
 }
 
+// --- UPDATED INTERFACE ---
 interface ComboboxProps {
   name: string;
   label: string;
-  value: string[];
-  onChange: (value: string[] | null) => void;
+  value: SelectOption | null; // <-- Changed from string[] to SelectOption | null
+  onChange: (value: SelectOption | null) => void; // Pass back the selected object or null
   options: SelectOption[];
   query: string;
   setQuery: React.Dispatch<React.SetStateAction<string>>;
   onLoadMore: () => void;
   hasMore: boolean;
   isLoading: boolean;
+  placeholder?: string;
+  disabled?: boolean;
 }
 
 export const CustomerCombobox: React.FC<ComboboxProps> = ({
   name,
   label,
-  value,
+  value, // Now receives SelectOption | null
   onChange,
   options,
+  query,
   setQuery,
   onLoadMore,
   hasMore,
   isLoading,
+  placeholder = "Search or select customer...",
+  disabled = false,
 }) => {
-  const [selectedCustomer, setSelectedCustomer] = useState<SelectOption | null>(
-    value.length > 0 ? { id: "", name: value[0] } : null
+  // Internal state to manage the selected option object for the Combobox component
+  // Initialize directly from the prop 'value'
+  const [selectedOption, setSelectedOption] = useState<SelectOption | null>(
+    value
   );
-  const [searchValue, setSearchValue] = useState("");
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const handleSearch = (searchText: string) => {
-    setSearchValue(searchText);
-
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // Set new timeout for debouncing
-    searchTimeoutRef.current = setTimeout(() => {
-      // Reset to first page when searching
-      setQuery(searchText);
-    }, 300);
-  };
-
-  const handleCustomerSelection = (customer: SelectOption | null) => {
-    setSelectedCustomer(customer);
-    onChange(customer ? [customer.name] : null);
-    // Clear search value after selection
-    setSearchValue("");
-  };
-
-  // Update selected customer when value changes externally
+  // Sync internal selection with external value if it changes
   useEffect(() => {
+    // Only update if the prop value is different from the internal state
     if (
-      value.length > 0 &&
-      (!selectedCustomer || selectedCustomer.name !== value[0])
+      value?.id !== selectedOption?.id ||
+      value?.name !== selectedOption?.name
     ) {
-      setSelectedCustomer({ id: "", name: value[0] });
+      setSelectedOption(value);
     }
-  }, [value]);
+  }, [value, selectedOption]); // Depend on prop 'value'
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
+  const handleSelectionChange = (option: SelectOption | null) => {
+    setSelectedOption(option); // Update internal state
+    onChange(option); // Pass the full selected option object back
+    // setQuery(option ? option.name : ''); // Optional: update parent query state on selection
+  };
 
-  // Filter options based on search value
   const filteredOptions =
-    searchValue === ""
+    query === ""
       ? options
       : options.filter(
           (option) =>
-            option.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-            option.id.toLowerCase().includes(searchValue.toLowerCase())
+            option.name.toLowerCase().includes(query.toLowerCase()) ||
+            option.id.toLowerCase().includes(query.toLowerCase())
         );
 
   return (
-    <div className="my-2 space-y-2">
-      <label htmlFor={name} className="text-sm font-medium text-default-700">
+    <div className="space-y-2">
+      <label
+        htmlFor={`${name}-input`}
+        className="block text-sm font-medium text-default-700"
+      >
         {label}
       </label>
-      <Combobox value={selectedCustomer} onChange={handleCustomerSelection}>
+      {/* The Combobox 'value' prop now correctly matches 'selectedOption' type */}
+      <Combobox
+        value={selectedOption}
+        onChange={handleSelectionChange}
+        disabled={disabled}
+        name={name}
+      >
         <div className="relative">
-          <ComboboxInput
-            className="w-full cursor-input rounded-lg border border-default-300 bg-white py-2 pl-4 pr-10 text-left focus:outline-none focus:border-default-500"
-            displayValue={(customer: SelectOption | null) =>
-              customer?.name || ""
-            }
-            onChange={(event) => handleSearch(event.target.value)}
-            placeholder="Search customers..."
-          />
-          <ComboboxButton className="absolute inset-y-0 right-2 flex items-center pr-2">
-            <IconChevronDown
-              className="h-5 w-5 text-default-400"
-              aria-hidden="true"
+          <div
+            className={clsx(
+              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
+              "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500",
+              disabled ? "bg-gray-50" : ""
+            )}
+          >
+            <ComboboxInput
+              as="input"
+              id={`${name}-input`}
+              className={clsx(
+                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0",
+                disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+              )}
+              // Display value based on the internal selectedOption state
+              displayValue={(option: SelectOption | null) => option?.name ?? ""}
+              onChange={(event) => setQuery(event.target.value)} // Update parent query state on input change
+              placeholder={placeholder}
+              disabled={disabled}
             />
-          </ComboboxButton>
-          <ComboboxOptions className="absolute z-20 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-            {filteredOptions.length === 0 ? (
-              <div className="relative cursor-default select-none py-2 px-4 text-default-700">
-                {isLoading ? "Loading..." : "No customers found."}
-              </div>
-            ) : (
-              <>
-                {filteredOptions.map((customer) => (
+            <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+              <IconChevronDown
+                size={20}
+                className="text-gray-400"
+                aria-hidden="true"
+              />
+            </ComboboxButton>
+          </div>
+          <Transition
+            as={Fragment}
+            leave="transition ease-in duration-100"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+            afterLeave={() => {
+              // Clear query only if the input text doesn't match the selected name
+              // This prevents clearing the query when clicking away after selecting
+              // if (query !== (selectedOption?.name ?? '')) {
+              //     setQuery('');
+              // }
+            }}
+          >
+            <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+              {/* ... (Loading and No results logic remains the same) ... */}
+              {isLoading && query !== "" && (
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                  Loading...
+                </div>
+              )}
+              {!isLoading && filteredOptions.length === 0 && query !== "" ? (
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                  Nothing found.
+                </div>
+              ) : (
+                filteredOptions.map((option) => (
                   <ComboboxOption
-                    key={customer.id}
-                    value={customer}
+                    key={option.id}
                     className={({ active }) =>
-                      `relative cursor-pointer select-none rounded py-2 pl-4 pr-12 ${
-                        active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
+                      `relative cursor-default select-none py-2 pl-3 pr-10 ${
+                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                       }`
                     }
+                    value={option} // Pass the whole option object
                   >
                     {({ selected, active }) => (
                       <>
@@ -141,38 +164,37 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          {customer.name}
-                          <span className="ml-2 text-default-400">
-                            ({customer.id})
-                          </span>
+                          {option.name}
                         </span>
-                        {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3">
-                            <IconCheck
-                              className="h-5 w-5 text-default-600"
-                              aria-hidden="true"
-                            />
+                        {selected ? (
+                          <span
+                            className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
+                              active ? "text-sky-600" : "text-sky-600"
+                            }`}
+                          >
+                            <IconCheck size={20} aria-hidden="true" />
                           </span>
-                        )}
+                        ) : null}
                       </>
                     )}
                   </ComboboxOption>
-                ))}
-                {hasMore && (
+                ))
+              )}
+              {/* Load More Button */}
+              {!isLoading && hasMore && (
+                <div className="border-t border-gray-200 px-4 py-2">
                   <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onLoadMore();
-                    }}
-                    className="w-full py-2 text-center text-sm rounded text-sky-500 hover:text-sky-600 hover:bg-default-100 focus:outline-none"
+                    type="button"
+                    onClick={onLoadMore}
+                    className="w-full text-center text-sm text-sky-600 hover:text-sky-700 disabled:opacity-50"
                     disabled={isLoading}
                   >
-                    {isLoading ? "Loading more..." : "Load More"}
+                    Load More...
                   </button>
-                )}
-              </>
-            )}
-          </ComboboxOptions>
+                </div>
+              )}
+            </ComboboxOptions>
+          </Transition>
         </div>
       </Combobox>
     </div>

@@ -1,4 +1,4 @@
-// EInvoiceTemplate.js
+//src/utils/invoice/einvoice/EInvoiceTemplate.js
 import { TIENHOCK_INFO } from "./companyInfo.js";
 
 // Helper function to format phone number
@@ -462,7 +462,7 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
     </cac:Party>
   </cac:AccountingSupplierParty>`;
 
-    // Add customer party
+    // Customer party
     xml += `
   <cac:AccountingCustomerParty>
     <cac:Party>
@@ -517,7 +517,7 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
     </cac:Party>
   </cac:AccountingCustomerParty>`;
 
-    // Add allowance charges
+    // Tax information
     xml += `
   <cac:AllowanceCharge>
     <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
@@ -530,7 +530,7 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
     <cbc:Amount currencyID="MYR">0.00</cbc:Amount>
   </cac:AllowanceCharge>`;
 
-    // Add tax information
+    // Tax information
     xml += `
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="MYR">${totals.tax.toFixed(2)}</cbc:TaxAmount>

@@ -94,7 +94,7 @@ const StaffAddPage: React.FC = () => {
       await Promise.all([
         fetchOptions("nationalities", setNationalities),
         fetchOptions("races", setRaces),
-        fetchOptions("agamas", setAgamas),
+        fetchOptions("agama", setAgamas),
         fetchOptions("jobs", setJobs),
         fetchOptions("locations", setLocations),
       ]);
@@ -256,7 +256,13 @@ const StaffAddPage: React.FC = () => {
       name={name}
       label={label}
       value={formData[name] as string[]}
-      onChange={(value) => handleComboboxChange(name, value)}
+      onChange={(value) => {
+        if (typeof value === "string") {
+          handleComboboxChange(name, [value]);
+        } else {
+          handleComboboxChange(name, value);
+        }
+      }}
       options={options}
       query={query}
       setQuery={setQuery}

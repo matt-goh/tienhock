@@ -15,62 +15,6 @@ const myInvoisConfig = {
   MYINVOIS_CLIENT_SECRET,
 };
 
-// Helper function to insert accepted documents
-const insertAcceptedDocuments = async (
-  pool,
-  documents,
-  originalInvoices = {}
-) => {
-  const query = `
-    INSERT INTO einvoices (
-      uuid, submission_uid, long_id, internal_id, type_name, 
-      receiver_id, receiver_name, datetime_validated,
-      total_payable_amount, total_excluding_tax, total_net_amount, total_rounding
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-  `;
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    for (const doc of documents) {
-      // Convert internalId to string to ensure consistent key lookup
-      const internalIdKey = String(doc.internalId);
-
-      // Get rounding - ensure it's a number and try multiple ways to access it
-      let rounding = 0;
-      if (originalInvoices[internalIdKey] !== undefined) {
-        rounding = parseFloat(originalInvoices[internalIdKey]);
-      } else if (typeof originalInvoices[internalIdKey] === "object") {
-        rounding = parseFloat(originalInvoices[internalIdKey].rounding || 0);
-      }
-
-      // Add a default datetime_validated if missing
-      const datetime_validated =
-        doc.dateTimeValidated || new Date().toISOString();
-
-      await client.query(query, [
-        doc.uuid,
-        doc.submissionUid,
-        doc.longId,
-        doc.internalId,
-        doc.typeName,
-        doc.receiverId,
-        doc.receiverName,
-        datetime_validated,
-        doc.totalPayableAmount,
-        doc.totalExcludingTax,
-        doc.totalNetAmount,
-        rounding, // Explicitly processed rounding value
-      ]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
 const fetchCustomerData = async (pool, customerId) => {
   try {
     const query = `
@@ -145,6 +89,7 @@ export default function (pool, config) {
 
     // Not in cache or expired, fetch from database
     try {
+      // Use pool directly here
       const data = await fetchCustomerData(pool, customerId);
 
       // Store in cache if found
@@ -162,827 +107,190 @@ export default function (pool, config) {
     }
   };
 
-  // Get invoices with filters
+  // GET /api/invoices - List Invoices (Updated Schema)
   router.get("/", async (req, res) => {
     try {
-      const { startDate, endDate, invoiceId, salesman, products } = req.query;
+      const {
+        page = 1,
+        limit = 15, // Use consistent limit (e.g., 15 to match FE)
+        startDate,
+        endDate,
+        salesman,
+        paymentType,
+        invoiceStatus,
+        eInvoiceStatus,
+        search,
+      } = req.query;
 
-      let query = `
-        SELECT 
-          i.id,
-          i.salespersonid,
-          i.customerid,
-          i.createddate,
-          i.paymenttype,
-          i.amount,
-          i.rounding,
-          i.totalamountpayable,
-          COALESCE(
-            json_agg(
-              CASE WHEN od.id IS NOT NULL THEN 
-                json_build_object(
-                  'code', od.code,
-                  'quantity', od.quantity,
-                  'price', od.price,
-                  'freeProduct', od.freeproduct,
-                  'returnProduct', od.returnproduct,
-                  'description', od.description,
-                  'tax', od.tax,
-                  'total', od.total,
-                  'issubtotal', od.issubtotal
-                )
-              ELSE NULL END
-              ORDER BY od.id  -- Maintain order of products and subtotals
-            ) FILTER (WHERE od.id IS NOT NULL),
-            '[]'::json
-          ) as products
-        FROM invoices i
-        LEFT JOIN order_details od ON i.id = od.invoiceid
-        WHERE 1=1
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+
+      // Base queries
+      let selectClause = `
+        SELECT
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+          i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+          i.invoice_status, i.einvoice_status, i.balance_due,
+          i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
+          i.is_consolidated, i.consolidated_invoices,
+          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType
       `;
+      let fromClause = `
+        FROM invoices i
+        LEFT JOIN customers c ON i.customerid = c.id
+      `;
+      let whereClause = ` WHERE 1=1 `;
+      let groupByClause = `GROUP BY i.id, c.name, c.tin_number, c.id_number, c.id_type`; // Grouping by primary key is sufficient if using aggregates or joins correctly
 
-      const queryParams = [];
-      let paramCounter = 1;
+      const filterParams = []; // Parameters ONLY for filtering (WHERE clause)
+      let filterParamCounter = 1;
 
-      // Filter by invoiceId
-      if (invoiceId) {
-        queryParams.push(invoiceId);
-        query += ` AND i.id = $${paramCounter}`;
-        paramCounter++;
-      }
-      // Filter by date range
+      // Apply Filters and build WHERE clause + filterParams
       if (startDate && endDate) {
-        queryParams.push(startDate, endDate);
-        query += ` AND CAST(i.createddate AS bigint) BETWEEN CAST($${paramCounter} AS bigint) AND CAST($${
-          paramCounter + 1
-        } AS bigint)`;
-        paramCounter += 2;
+        const start = `$${filterParamCounter++}`;
+        const end = `$${filterParamCounter++}`;
+        filterParams.push(startDate, endDate);
+        whereClause += ` AND CAST(i.createddate AS bigint) BETWEEN ${start} AND ${end}`;
       }
-      // Filter by salesman
       if (salesman) {
-        const salesmanList = req.query.salesman.split(",");
-        queryParams.push(salesmanList);
-        query += ` AND i.salespersonid = ANY($${paramCounter})`;
-        paramCounter++;
+        const salesmanParam = `$${filterParamCounter++}`;
+        filterParams.push(salesman.split(","));
+        whereClause += ` AND i.salespersonid = ANY(${salesmanParam})`;
       }
-      // Filter by products
-      if (products) {
-        const productList = req.query.products.split(",");
-        queryParams.push(productList);
-        query += ` AND EXISTS (
-          SELECT 1 FROM order_details od
-          LEFT JOIN products p ON od.code = p.id
-          WHERE od.invoiceid = i.id 
-          AND (od.code = ANY($${paramCounter}) OR p.type = ANY($${paramCounter}))
+      if (paymentType) {
+        const paymentTypeParam = `$${filterParamCounter++}`;
+        // Convert to uppercase to match database values (CASH, INVOICE)
+        filterParams.push(paymentType.toUpperCase());
+        whereClause += ` AND i.paymenttype = ${paymentTypeParam}`;
+      }
+      if (invoiceStatus) {
+        const statusParam = `$${filterParamCounter++}`;
+        filterParams.push(invoiceStatus.split(","));
+        whereClause += ` AND i.invoice_status = ANY(${statusParam})`;
+      }
+      if (eInvoiceStatus) {
+        const eStatusParam = `$${filterParamCounter++}`;
+        const statuses = eInvoiceStatus.split(",");
+        if (statuses.includes("null")) {
+          // Handle 'null' specifically if needed, ensure parameter matches
+          filterParams.push(statuses.filter((s) => s !== "null"));
+          whereClause += ` AND (i.einvoice_status = ANY(${eStatusParam}) OR i.einvoice_status IS NULL)`;
+        } else {
+          filterParams.push(statuses);
+          whereClause += ` AND i.einvoice_status = ANY(${eStatusParam})`;
+        }
+      }
+      if (search) {
+        const searchParam = `$${filterParamCounter++}`;
+        filterParams.push(`%${search}%`);
+        whereClause += ` AND (
+          i.id ILIKE ${searchParam} OR
+          c.name ILIKE ${searchParam} OR
+          CAST(i.customerid AS TEXT) ILIKE ${searchParam} OR
+          CAST(i.salespersonid AS TEXT) ILIKE ${searchParam} OR
+          i.paymenttype ILIKE ${searchParam} OR
+          i.invoice_status ILIKE ${searchParam} OR
+          COALESCE(i.einvoice_status, '') ILIKE ${searchParam} OR
+          CAST(i.totalamountpayable AS TEXT) ILIKE ${searchParam} OR
+          EXISTS (
+            SELECT 1 FROM order_details od
+            WHERE od.invoiceid = i.id AND (
+              od.code ILIKE ${searchParam} OR
+              od.description ILIKE ${searchParam}
+            )
+          )
         )`;
-        paramCounter++;
       }
 
-      query += ` GROUP BY i.id ORDER BY i.createddate DESC`;
+      // Construct Count Query
+      const countQuery = `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
 
-      const result = await pool.query(query, queryParams);
+      // Construct Data Query
+      let dataQuery = `${selectClause} ${fromClause} ${whereClause} ${groupByClause}`;
+      dataQuery += ` ORDER BY CAST(i.createddate AS bigint) DESC`;
 
-      // Transform results and ensure numeric values
-      const transformedResults = result.rows.map((row) => ({
-        ...row,
-        products: (row.products || []).map((product) => ({
-          ...product,
-          uid: crypto.randomUUID(),
-          price: parseFloat(product.price) || 0,
-          quantity: parseInt(product.quantity) || 0,
-          freeProduct: parseInt(product.freeProduct) || 0,
-          returnProduct: parseInt(product.returnProduct) || 0,
-          tax: parseFloat(product.tax) || 0,
-          total: parseFloat(product.total) || 0,
-          issubtotal: Boolean(product.issubtotal),
-        })),
-        // Ensure numeric values for new fields
-        amount: parseFloat(row.amount) || 0,
-        rounding: parseFloat(row.rounding) || 0,
-        totalamountpayable: parseFloat(row.totalamountpayable) || 0,
+      // Add Pagination to Data Query parameters
+      const paginationParams = [];
+      paginationParams.push(parseInt(limit));
+      paginationParams.push(offset);
+      dataQuery += ` LIMIT $${filterParamCounter++} OFFSET $${filterParamCounter++}`;
+
+      // Combine filter and pagination params for the main data query
+      const dataQueryParams = [...filterParams, ...paginationParams];
+
+      // --- Execute Queries ---
+      // Execute count query with ONLY filter parameters
+      // Execute data query with filter AND pagination parameters
+      const [countResult, dataResult] = await Promise.all([
+        pool.query(countQuery, filterParams), // Use filterParams for count
+        pool.query(dataQuery, dataQueryParams), // Use combined params for data
+      ]);
+      // --- End Execute Queries ---
+
+      const total = parseInt(countResult.rows[0].count);
+      const totalPages = Math.ceil(total / parseInt(limit));
+
+      // Format results (Match ExtendedInvoiceData)
+      const invoices = dataResult.rows.map((row) => ({
+        id: row.id,
+        salespersonid: row.salespersonid,
+        customerid: row.customerid,
+        createddate: row.createddate,
+        paymenttype: row.paymenttype,
+        total_excluding_tax: parseFloat(row.total_excluding_tax || 0),
+        tax_amount: parseFloat(row.tax_amount || 0),
+        rounding: parseFloat(row.rounding || 0),
+        totalamountpayable: parseFloat(row.totalamountpayable || 0),
+        balance_due: parseFloat(row.balance_due || 0),
+        invoice_status: row.invoice_status,
+        einvoice_status: row.einvoice_status,
+        uuid: row.uuid,
+        submission_uid: row.submission_uid,
+        long_id: row.long_id,
+        datetime_validated: row.datetime_validated,
+        is_consolidated: row.is_consolidated || false,
+        consolidated_invoices: row.consolidated_invoices,
+        customerName: row.customername || row.customerid,
+        customerTin: row.customertin,
+        customerIdNumber: row.customeridnumber,
+        customerIdType: row.customeridtype,
       }));
 
-      res.json(transformedResults);
+      res.json({
+        data: invoices,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages,
+        },
+      });
     } catch (error) {
       console.error("Error fetching invoices:", error);
-      res.status(500).json({
-        message: "Error fetching invoices",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error fetching invoices", error: error.message });
     }
   });
 
-  // Submit invoice (single)
-  router.post("/submit", async (req, res) => {
-    const client = await pool.connect();
-
+  // Get all invoice IDs from the last year
+  router.get("/ids", async (req, res) => {
     try {
-      await client.query("BEGIN");
-
-      const invoice = req.body;
-
-      // Validate required fields
-      if (
-        !invoice.id ||
-        !invoice.salespersonid ||
-        !invoice.customerid ||
-        !invoice.createddate
-      ) {
-        throw new Error(
-          "Missing required fields: id, salespersonid, customerid, createddate"
-        );
-      }
-
-      // Check for duplicate invoice
-      const checkQuery = "SELECT id FROM invoices WHERE id = $1";
-      const checkResult = await client.query(checkQuery, [invoice.id]);
-
-      if (checkResult.rows.length > 0) {
-        throw new Error(`Invoice with ID ${invoice.id} already exists`);
-      }
-
-      // Insert invoice with new fields
-      const insertInvoiceQuery = `
-        INSERT INTO invoices (
-          id,
-          salespersonid,
-          customerid,
-          createddate,
-          paymenttype,
-          amount,
-          rounding,
-          totalamountpayable
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
-      `;
-
-      const invoiceResult = await client.query(insertInvoiceQuery, [
-        invoice.id,
-        invoice.salespersonid,
-        invoice.customerid,
-        invoice.createddate,
-        invoice.paymenttype || "INVOICE",
-        invoice.amount || 0,
-        invoice.rounding || 0,
-        invoice.totalamountpayable || 0,
+      const currentDate = Date.now();
+      const oneYearAgo = currentDate - 365 * 24 * 60 * 60 * 1000;
+      const query = `
+       SELECT id FROM invoices
+       WHERE CAST(createddate AS bigint) BETWEEN $1 AND $2
+       ORDER BY CAST(createddate AS bigint) DESC`;
+      const result = await pool.query(query, [
+        oneYearAgo.toString(),
+        currentDate.toString(),
       ]);
-
-      // Insert all products including subtotal rows
-      if (invoice.products && invoice.products.length > 0) {
-        const productQuery = `
-          INSERT INTO order_details (
-            invoiceid,
-            code,
-            price,
-            quantity,
-            freeproduct,
-            returnproduct,
-            description,
-            tax,
-            total,
-            issubtotal
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `;
-
-        for (const product of invoice.products) {
-          if (product.issubtotal) {
-            // For subtotal rows, store as is
-            await client.query(productQuery, [
-              invoice.id,
-              product.code || "SUBTOTAL",
-              0,
-              0,
-              0,
-              0,
-              product.description || "Subtotal",
-              0,
-              product.total || "0",
-              true,
-            ]);
-          } else {
-            // For regular products, calculate total if not provided
-            const quantity = product.quantity || 0;
-            const price = product.price || 0;
-            const freeProduct = product.freeProduct || 0;
-            const returnProduct = product.returnProduct || 0;
-            const tax = product.tax || 0;
-
-            const regularTotal = quantity * price;
-            const total = regularTotal + tax;
-
-            await client.query(productQuery, [
-              invoice.id,
-              product.code,
-              price,
-              quantity,
-              freeProduct,
-              returnProduct,
-              product.description || "",
-              tax,
-              total,
-              false,
-            ]);
-          }
-        }
-      }
-
-      // Only update credit for INVOICE type
-      if (invoice.paymenttype === "INVOICE") {
-        await updateCustomerCredit(
-          client,
-          invoice.customerid,
-          invoice.totalamountpayable || 0
-        );
-      }
-
-      await client.query("COMMIT");
-
-      // Return the complete invoice with all products
-      const completeInvoice = {
-        ...invoiceResult.rows[0],
-        products: invoice.products,
-      };
-
-      res.status(201).json({
-        message: "Invoice created successfully",
-        invoice: completeInvoice,
-      });
+      res.json(result.rows.map((row) => row.id));
     } catch (error) {
-      await client.query("ROLLBACK");
-      console.error("Error submitting invoice:", error);
-      res.status(500).json({
-        message: "Error submitting invoice",
-        error: error.message,
-      });
-    } finally {
-      client.release();
-    }
-  });
-
-  // Submit invoices (single or batch)
-  router.post("/submit-invoices", async (req, res) => {
-    // Extract fields query parameter to determine response format
-    const fieldsParam = req.query.fields;
-    const isMinimal = fieldsParam === "minimal";
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      // Convert input to array if single invoice
-      const invoices = Array.isArray(req.body) ? req.body : [req.body];
-
-      const results = [];
-      const errors = [];
-      const savedInvoiceData = [];
-
-      // Process each invoice for database save
-      for (const invoice of invoices) {
-        try {
-          // Transform data to match database columns
-          const transformedInvoice = {
-            id: String(invoice.billNumber),
-            salespersonid: invoice.salespersonId,
-            customerid: invoice.customerId,
-            createddate: invoice.createdDate || Date.now().toString(),
-            paymenttype: invoice.paymentType,
-            amount: Number(invoice.amount) || 0,
-            rounding: Number(invoice.rounding) || 0,
-            totalamountpayable: Number(invoice.totalAmountPayable) || 0,
-          };
-
-          // Validate required fields
-          if (!transformedInvoice.id || !transformedInvoice.customerid) {
-            throw new Error(
-              `Invoice ${transformedInvoice.id}: Missing required fields`
-            );
-          }
-
-          // Check for duplicate invoice
-          const checkQuery = "SELECT id FROM invoices WHERE id = $1";
-          const checkResult = await client.query(checkQuery, [
-            transformedInvoice.id,
-          ]);
-          if (checkResult.rows.length > 0) {
-            throw new Error(`Invoice ${transformedInvoice.id} already exists`);
-          }
-
-          // Fetch product descriptions first if needed
-          let productDescriptions = {};
-          if (invoice.products && invoice.products.length > 0) {
-            // Get all product codes that need descriptions
-            const productCodes = invoice.products
-              .filter((p) => !p.description && p.code)
-              .map((p) => p.code);
-
-            if (productCodes.length > 0) {
-              // Fetch descriptions for all products at once
-              const descQuery =
-                "SELECT id, description FROM products WHERE id = ANY($1)";
-              const descResult = await client.query(descQuery, [productCodes]);
-
-              // Create a lookup map for product descriptions
-              productDescriptions = descResult.rows.reduce((map, row) => {
-                map[row.id] = row.description;
-                return map;
-              }, {});
-            }
-          }
-
-          // Build insert query
-          const columns = Object.keys(transformedInvoice);
-          const placeholders = columns
-            .map((_, idx) => `$${idx + 1}`)
-            .join(", ");
-          const values = columns.map((col) => transformedInvoice[col]);
-
-          const insertInvoiceQuery = `
-          INSERT INTO invoices (${columns.join(", ")})
-          VALUES (${placeholders})
-          RETURNING *
-        `;
-
-          const invoiceResult = await client.query(insertInvoiceQuery, values);
-          const savedInvoice = invoiceResult.rows[0];
-
-          // Prepare order details for both database and MyInvois
-          const orderDetails = [];
-
-          // Process products to save in database and track for MyInvois
-          if (invoice.products && invoice.products.length > 0) {
-            for (const product of invoice.products) {
-              // Skip products with zero quantity and price
-              if (product.quantity === 0 && product.price === 0) continue;
-
-              const quantity = Number(product.quantity) || 0;
-              const price = Number(product.price) || 0;
-              const freeProduct = Number(product.freeProduct) || 0;
-              const returnProduct = Number(product.returnProduct) || 0;
-              const tax = Number(product.tax) || 0;
-
-              // Get description from our lookup map or use provided description or empty string
-              const description =
-                product.description || productDescriptions[product.code] || "";
-
-              // Calculate total
-              const total = (quantity * price + tax).toFixed(2);
-
-              const productData = {
-                invoiceid: transformedInvoice.id,
-                code: product.code,
-                price: price,
-                quantity: quantity,
-                freeproduct: freeProduct,
-                returnproduct: returnProduct,
-                description: description,
-                tax: tax,
-                total: total,
-                issubtotal: false,
-              };
-
-              // Store product data for MyInvois
-              orderDetails.push({
-                code: product.code,
-                price: price,
-                quantity: quantity,
-                freeProduct: freeProduct,
-                returnProduct: returnProduct,
-                tax: tax,
-                total: total.toString(),
-                description: description, // Capture this for MyInvois
-              });
-
-              // Build insert query for product
-              const productColumns = Object.keys(productData);
-              const productPlaceholders = productColumns
-                .map((_, idx) => `$${idx + 1}`)
-                .join(", ");
-              const productValues = productColumns.map(
-                (col) => productData[col]
-              );
-
-              const insertProductQuery = `
-              INSERT INTO order_details (${productColumns.join(", ")})
-              VALUES (${productPlaceholders})
-            `;
-
-              await client.query(insertProductQuery, productValues);
-            }
-          }
-
-          results.push({
-            billNumber: transformedInvoice.id,
-            status: "success",
-            message: "Invoice created successfully",
-          });
-
-          // After inserting the invoice and products, update credit used
-          if (transformedInvoice.paymenttype === "INVOICE") {
-            await updateCustomerCredit(
-              client,
-              transformedInvoice.customerid,
-              transformedInvoice.totalamountpayable || 0
-            );
-          }
-
-          // Store the data needed for MyInvois submission
-          savedInvoiceData.push({
-            id: savedInvoice.id,
-            salespersonid: savedInvoice.salespersonid,
-            customerid: savedInvoice.customerid,
-            createddate: savedInvoice.createddate,
-            paymenttype: savedInvoice.paymenttype,
-            amount: Number(savedInvoice.amount) || 0,
-            rounding: Number(savedInvoice.rounding) || 0,
-            totalamountpayable: Number(savedInvoice.totalamountpayable) || 0,
-            orderDetails: orderDetails,
-          });
-        } catch (error) {
-          errors.push({
-            billNumber: invoice.billNumber,
-            status: "error",
-            message: error.message,
-          });
-        }
-      }
-
-      // If all invoices failed, rollback and return error
-      if (errors.length === invoices.length) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "All invoices failed to process",
-          errors,
-        });
-      }
-
-      // Otherwise commit successful transactions
-      await client.query("COMMIT");
-
-      // After successful database save, attempt MyInvois submission
-      let einvoiceResults = null;
-      if (savedInvoiceData.length > 0) {
-        try {
-          // Create a map of invoice IDs to rounding values
-          const invoiceRoundings = {};
-          savedInvoiceData.forEach((invoice) => {
-            // Ensure ID is a string and rounding is explicitly a number
-            const id = String(invoice.id);
-            const rounding = parseFloat(invoice.rounding || 0);
-            invoiceRoundings[id] = rounding;
-          });
-
-          einvoiceResults = await submitInvoicesToMyInvois(
-            myInvoisConfig,
-            savedInvoiceData,
-            fetchCustomerDataWithCache
-          );
-
-          // Add this block to store accepted documents in the einvoices table
-          if (
-            einvoiceResults.success &&
-            einvoiceResults.acceptedDocuments?.length > 0
-          ) {
-            try {
-              await insertAcceptedDocuments(
-                pool,
-                einvoiceResults.acceptedDocuments,
-                invoiceRoundings
-              );
-            } catch (storageError) {
-              console.error("Error storing accepted documents:", storageError);
-              // Don't fail the whole operation if storing documents fails
-            }
-          }
-        } catch (einvoiceError) {
-          console.error("Error during submission to MyInvois:", einvoiceError);
-          einvoiceResults = {
-            success: false,
-            message: "Failed to submit to MyInvois API",
-            error: einvoiceError.message || "Unknown error",
-          };
-        }
-      }
-
-      // Prepare response based on fields parameter
-      if (isMinimal) {
-        // Create merged invoice results with combined status
-        const invoices = [];
-
-        // Create a lookup map for einvoice results
-        const acceptedDocMap = {};
-        const rejectedDocMap = {};
-
-        if (einvoiceResults) {
-          // Map accepted documents by internalId
-          if (
-            einvoiceResults.acceptedDocuments &&
-            einvoiceResults.acceptedDocuments.length > 0
-          ) {
-            einvoiceResults.acceptedDocuments.forEach((doc) => {
-              acceptedDocMap[doc.internalId] = doc;
-            });
-          }
-
-          // Map rejected documents by internalId
-          if (
-            einvoiceResults.rejectedDocuments &&
-            einvoiceResults.rejectedDocuments.length > 0
-          ) {
-            einvoiceResults.rejectedDocuments.forEach((doc) => {
-              rejectedDocMap[doc.internalId || doc.invoiceCodeNumber] = doc;
-            });
-          }
-        }
-
-        // Process results and merge with einvoice data
-        for (const result of results) {
-          const invoiceId = result.billNumber;
-          const invoiceData = {
-            id: invoiceId,
-            systemStatus: result.status === "success" ? 0 : 100, // 0=success, 100=error
-          };
-
-          // If invoice was accepted in MyInvois
-          if (acceptedDocMap[invoiceId]) {
-            const doc = acceptedDocMap[invoiceId];
-
-            // If longId is missing, mark status as Pending instead of Valid
-            if (!doc.longId) {
-              invoiceData.einvoiceStatus = 10; // Pending = 10 (success variant)
-            } else {
-              invoiceData.einvoiceStatus = 0; // Valid = 0 (complete success)
-            }
-
-            invoiceData.uuid = doc.uuid;
-            invoiceData.longId = doc.longId || "";
-            invoiceData.dateTimeValidated = doc.dateTimeValidated || null;
-          }
-          // If invoice was rejected in MyInvois
-          else if (rejectedDocMap[invoiceId]) {
-            const doc = rejectedDocMap[invoiceId];
-            invoiceData.einvoiceStatus = 100; // Invalid = 100 (error)
-            invoiceData.error = {
-              code: doc.error?.code || "ERROR",
-              message: doc.error?.message || "Unknown error",
-            };
-          }
-          // If invoice wasn't processed by MyInvois at all
-          else if (einvoiceResults) {
-            invoiceData.einvoiceStatus = 20; // Not Processed = 20 (partial success)
-          }
-
-          invoices.push(invoiceData);
-        }
-
-        // Add any errors from system processing
-        if (errors && errors.length > 0) {
-          for (const error of errors) {
-            invoices.push({
-              id: error.billNumber,
-              systemStatus: 100, // Error = 100
-              einvoiceStatus: 20, // Not Processed = 20
-              error: {
-                message: error.message,
-              },
-            });
-          }
-        }
-
-        return res.status(207).json({
-          message: "Invoice processing completed",
-          invoices: invoices,
-          overallStatus: einvoiceResults
-            ? einvoiceResults.overallStatus
-            : "SystemOnly",
-        });
-      }
-
-      // Return full response for ERP system (default)
-      res.status(207).json({
-        message: "Invoice processing completed",
-        results,
-        errors: errors.length > 0 ? errors : undefined,
-        einvoice: einvoiceResults,
-      });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      res.status(500).json({
-        message: "Error processing invoices",
-        error: error.message,
-      });
-    } finally {
-      client.release();
-    }
-  });
-
-  // Update existing invoice
-  router.post("/update", async (req, res) => {
-    const client = await pool.connect();
-
-    try {
-      await client.query("BEGIN");
-
-      const invoice = req.body;
-
-      // Check which ID to use for finding the invoice
-      const lookupId = invoice.originalId || invoice.id;
-
-      // Validate required fields
-      if (
-        !invoice.id ||
-        !invoice.salespersonid ||
-        !invoice.customerid ||
-        !invoice.createddate
-      ) {
-        throw new Error(
-          "Missing required fields: id, salespersonid, customerid, createddate"
-        );
-      }
-
-      // Check if invoice exists before attempting update
-      const checkQuery = "SELECT id FROM invoices WHERE id = $1";
-      const checkResult = await client.query(checkQuery, [lookupId]);
-
-      if (checkResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${lookupId} not found`);
-      }
-
-      // First, get the original invoice to check payment type, customer and amount
-      const originalInvoiceQuery =
-        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
-      const originalInvoiceResult = await client.query(originalInvoiceQuery, [
-        lookupId,
-      ]);
-      const originalInvoice = originalInvoiceResult.rows[0];
-
-      // Normalize payment types to ensure consistent comparison
-      const originalType = (originalInvoice.paymenttype || "")
-        .trim()
-        .toUpperCase();
-      const newType = (invoice.paymenttype || "INVOICE").trim().toUpperCase();
-      const originalAmount = parseFloat(
-        originalInvoice.totalamountpayable || 0
-      );
-      const newAmount = parseFloat(invoice.totalamountpayable || 0);
-      const originalCustomerId = originalInvoice.customerid;
-      const newCustomerId = invoice.customerid;
-
-      // Handle credit adjustments based on payment type changes
-      if (originalType === "INVOICE") {
-        // Original was INVOICE - need to remove original credit
-        await updateCustomerCredit(client, originalCustomerId, -originalAmount);
-      }
-
-      if (newType === "INVOICE") {
-        // New is INVOICE - need to add new credit
-        await updateCustomerCredit(client, newCustomerId, newAmount);
-      }
-
-      // The update logic specifically handles:
-      // - INVOICE → CASH: Original credit removed, no new credit added
-      // - CASH → INVOICE: No original credit to remove, new credit added
-      // - INVOICE → INVOICE (same customer): Original credit removed, new credit added
-      // - INVOICE → INVOICE (different customer): Original credit removed from original customer, new credit added to new customer
-
-      // First, delete existing products
-      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
-        lookupId,
-      ]);
-
-      // Now update the invoice
-      const updateInvoiceQuery = `
-        UPDATE invoices SET
-          id = $1,
-          salespersonid = $2,
-          customerid = $3,
-          createddate = $4,
-          paymenttype = $5,
-          amount = $6,
-          rounding = $7,
-          totalamountpayable = $8
-        WHERE id = $9
-        RETURNING *
-      `;
-
-      const invoiceResult = await client.query(updateInvoiceQuery, [
-        invoice.id,
-        invoice.salespersonid,
-        invoice.customerid,
-        invoice.createddate,
-        invoice.paymenttype || "INVOICE",
-        invoice.amount || 0,
-        invoice.rounding || 0,
-        invoice.totalamountpayable || 0,
-        lookupId,
-      ]);
-
-      if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${lookupId} not found`);
-      }
-
-      // Get the new invoice ID after the update
-      const actualInvoiceId = invoiceResult.rows[0].id;
-
-      // Insert updated products using the new invoice ID
-      if (invoice.products && invoice.products.length > 0) {
-        const productQuery = `
-          INSERT INTO order_details (
-            invoiceid,
-            code,
-            price,
-            quantity,
-            freeproduct,
-            returnproduct,
-            description,
-            tax,
-            total,
-            issubtotal
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `;
-
-        for (const product of invoice.products) {
-          if (product.issubtotal) {
-            // Insert subtotal row
-            await client.query(productQuery, [
-              actualInvoiceId,
-              product.code || "SUBTOTAL",
-              0, // price
-              0, // quantity
-              0, // freeProduct
-              0, // returnProduct
-              product.description || "Subtotal",
-              0, // tax
-              product.total || "0",
-              true, // issubtotal
-            ]);
-          } else {
-            // Insert regular product
-            const quantity = product.quantity || 0;
-            const price = product.price || 0;
-            const freeProduct = product.freeProduct || 0;
-            const returnProduct = product.returnProduct || 0;
-            const tax = product.tax || 0;
-
-            const regularTotal = quantity * price;
-            const total = regularTotal + tax;
-
-            await client.query(productQuery, [
-              actualInvoiceId,
-              product.code,
-              price,
-              quantity,
-              freeProduct,
-              returnProduct,
-              product.description || "",
-              tax,
-              total,
-              false, // issubtotal
-            ]);
-          }
-        }
-      }
-
-      await client.query("COMMIT");
-      res.json({
-        message: "Invoice updated successfully",
-        invoice: invoiceResult.rows[0],
-      });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      console.error("Error updating invoice:", error);
-      res.status(500).json({
-        message: "Error updating invoice",
-        error: error.message,
-      });
-    } finally {
-      client.release();
-    }
-  });
-
-  // Check for duplicate invoice numbers
-  router.get("/check-duplicate", async (req, res) => {
-    const { invoiceNo } = req.query;
-
-    if (!invoiceNo) {
-      return res.status(400).json({ message: "Invoice number is required" });
-    }
-
-    try {
-      // Query both id and invoiceno columns
-      const query = "SELECT COUNT(*) FROM invoices WHERE id = $1";
-      const result = await pool.query(query, [invoiceNo]);
-      const count = parseInt(result.rows[0].count);
-
-      return res.json({ isDuplicate: count > 0 });
-    } catch (error) {
-      console.error("Error checking for duplicate invoice number:", error);
-      return res.status(500).json({
-        message: "Error checking for duplicate invoice number",
-        error: error.message,
-      });
+      console.error("Error fetching invoice IDs:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching invoice IDs", error: error.message });
     }
   });
 
@@ -1017,92 +325,953 @@ export default function (pool, config) {
     }
   });
 
-  // Delete invoice from database and cancel/delete e-invoice if found too
-  router.delete("/:id", async (req, res) => {
+  // GET /api/invoices/:id - Get Single Invoice (Updated Schema)
+  router.get("/:id", async (req, res) => {
     const { id } = req.params;
-    const client = await pool.connect();
+    try {
+      const query = `
+        SELECT
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+          i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+          i.invoice_status, i.einvoice_status, i.balance_due,
+          i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
+          i.is_consolidated, i.consolidated_invoices,
+          c.name as customerName, c.tin_number, c.id_number,
+          COALESCE(
+        json_agg(
+          json_build_object(
+             'id', od.id,
+             'code', od.code,
+             'quantity', od.quantity,
+             'price', od.price,
+             'freeProduct', od.freeproduct,
+             'returnProduct', od.returnproduct,
+             'description', od.description,
+             'tax', od.tax,
+             'total', od.total,
+             'issubtotal', od.issubtotal
+          )
+          ORDER BY od.id
+        ) FILTER (WHERE od.id IS NOT NULL),
+        '[]'::json
+          ) as products
+        FROM invoices i
+        LEFT JOIN customers c ON i.customerid = c.id
+        LEFT JOIN order_details od ON i.id = od.invoiceid
+        WHERE i.id = $1
+        GROUP BY i.id, c.name, c.tin_number, c.id_number
+      `;
 
+      const result = await pool.query(query, [id]);
+
+      if (result.rows.length === 0) {
+        return res.status(204).json({ message: "Invoice not found" }); // No content - neutral status code
+      }
+
+      const invoice = result.rows[0];
+
+      // Format response (Match ExtendedInvoiceData)
+      res.json({
+        id: invoice.id,
+        salespersonid: invoice.salespersonid,
+        customerid: invoice.customerid,
+        createddate: invoice.createddate,
+        paymenttype: invoice.paymenttype,
+        total_excluding_tax: parseFloat(invoice.total_excluding_tax || 0),
+        tax_amount: parseFloat(invoice.tax_amount || 0),
+        rounding: parseFloat(invoice.rounding || 0),
+        totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
+        balance_due: parseFloat(invoice.balance_due || 0),
+        invoice_status: invoice.invoice_status,
+        einvoice_status: invoice.einvoice_status,
+        uuid: invoice.uuid,
+        submission_uid: invoice.submission_uid,
+        long_id: invoice.long_id,
+        datetime_validated: invoice.datetime_validated,
+        is_consolidated: invoice.is_consolidated || false,
+        consolidated_invoices: invoice.consolidated_invoices,
+        customerName: invoice.customername || invoice.customerid,
+        customerTin: invoice.tin_number,
+        customerIdNumber: invoice.id_number,
+        products: (invoice.products || []).map((product) => ({
+          id: product.id, // order_details.id
+          code: product.code,
+          price: parseFloat(product.price || 0),
+          quantity: parseInt(product.quantity || 0),
+          freeProduct: parseInt(product.freeProduct || 0),
+          returnProduct: parseInt(product.returnProduct || 0),
+          tax: parseFloat(product.tax || 0),
+          description: product.description,
+          total: String(product.total || "0.00"),
+          issubtotal: product.issubtotal || false,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching invoice:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching invoice", error: error.message });
+    }
+  });
+
+  // POST /api/invoices/submit - Create Invoice (Updated Schema, ID immutable after this)
+  router.post("/submit", async (req, res) => {
+    const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // Check if invoice exists
+      const invoice = req.body; // Frontend sends data matching ExtendedInvoiceData
+
+      // Validation
+      if (
+        !invoice.id ||
+        !invoice.salespersonid ||
+        !invoice.customerid ||
+        !invoice.createddate
+      ) {
+        throw new Error(
+          "Missing required fields: id, salespersonid, customerid, createddate"
+        );
+      }
+
       const checkQuery = "SELECT id FROM invoices WHERE id = $1";
-      const checkResult = await client.query(checkQuery, [id]);
-
-      if (checkResult.rows.length === 0) {
-        return res.status(404).json({ message: "Invoice not found" });
+      const checkResult = await client.query(checkQuery, [invoice.id]);
+      if (checkResult.rows.length > 0) {
+        return res
+          .status(409) // Conflict
+          .json({ message: `Invoice with ID ${invoice.id} already exists` });
       }
 
-      // First check if the invoice is of type INVOICE
-      const invoiceTypeQuery =
-        "SELECT customerid, paymenttype, totalamountpayable FROM invoices WHERE id = $1";
-      const invoiceTypeResult = await client.query(invoiceTypeQuery, [id]);
+      // Initial balance and status - Check for CASH type
+      const totalPayable = parseFloat(invoice.totalamountpayable || 0);
+      const isCash = invoice.paymenttype === "CASH";
+      const balance_due = isCash ? 0 : totalPayable; // Zero balance for CASH
+      const invoice_status = isCash ? "paid" : "Unpaid"; // "paid" for CASH, "Unpaid" for others
 
-      if (invoiceTypeResult.rows.length > 0) {
-        const invoiceDetails = invoiceTypeResult.rows[0];
+      // Insert invoice
+      const insertInvoiceQuery = `
+        INSERT INTO invoices (
+          id, salespersonid, customerid, createddate, paymenttype,
+          total_excluding_tax, tax_amount, rounding, totalamountpayable,
+          invoice_status, einvoice_status, balance_due
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING *
+      `;
+      const values = [
+        invoice.id,
+        invoice.salespersonid,
+        invoice.customerid,
+        invoice.createddate,
+        invoice.paymenttype || "INVOICE",
+        parseFloat(invoice.total_excluding_tax || 0),
+        parseFloat(invoice.tax_amount || 0),
+        parseFloat(invoice.rounding || 0),
+        totalPayable,
+        invoice_status, // Use 'Unpaid'
+        null, // einvoice_status starts as null
+        balance_due, // balance_due equals total payable initially
+      ];
 
-        // If it's an INVOICE type, reduce the customer's credit used
-        if (invoiceDetails.paymenttype === "INVOICE") {
-          await updateCustomerCredit(
-            client,
-            invoiceDetails.customerid,
-            -parseFloat(invoiceDetails.totalamountpayable || 0)
-          );
+      const invoiceResult = await client.query(insertInvoiceQuery, values);
+      const createdInvoice = invoiceResult.rows[0];
+
+      // Insert products (order_details) - NO CHANGE HERE
+      if (invoice.products && invoice.products.length > 0) {
+        const productQuery = `
+          INSERT INTO order_details (
+            invoiceid, code, price, quantity, freeproduct,
+            returnproduct, description, tax, total, issubtotal
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `;
+        for (const product of invoice.products) {
+          if (product.istotal) continue;
+          await client.query(productQuery, [
+            createdInvoice.id,
+            product.code || (product.issubtotal ? "SUBTOTAL" : ""),
+            parseFloat(product.price || 0),
+            parseInt(product.quantity || 0),
+            parseInt(product.freeProduct || 0),
+            parseInt(product.returnProduct || 0),
+            product.description || (product.issubtotal ? "Subtotal" : ""),
+            parseFloat(product.tax || 0),
+            String(product.total || "0.00"),
+            product.issubtotal || false,
+          ]);
         }
       }
 
-      // Check if there's also an e-invoice for this invoice
-      const eInvoiceQuery = "SELECT uuid FROM einvoices WHERE internal_id = $1";
-      const eInvoiceResult = await pool.query(eInvoiceQuery, [id]);
-
-      if (eInvoiceResult.rows.length > 0 && apiClient) {
-        const uuid = eInvoiceResult.rows[0].uuid;
-
-        // Try to cancel the e-invoice in MyInvois
-        try {
-          await apiClient.makeApiCall(
-            "PUT",
-            `/api/v1.0/documents/state/${uuid}/state`,
-            {
-              status: "cancelled",
-              reason: "Invoice deleted",
-            }
-          );
-
-          // Delete the e-invoice from local database
-          await pool.query("DELETE FROM einvoices WHERE uuid = $1", [uuid]);
-          console.log(
-            `Cancelled and deleted e-invoice with UUID ${uuid} for invoice ID ${id}`
-          );
-        } catch (cancelError) {
-          console.error("Error cancelling e-invoice in MyInvois:", cancelError);
-          // We continue with invoice deletion even if e-invoice cancellation fails
-        }
+      // If it's a CASH invoice, create automatic payment record
+      if (isCash && totalPayable > 0) {
+        const paymentQuery = `
+          INSERT INTO payments (
+            invoice_id, payment_date, amount_paid, payment_method,
+            payment_reference, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6)
+        `;
+        await client.query(paymentQuery, [
+          createdInvoice.id,
+          new Date().toISOString(),
+          totalPayable,
+          "cash", // Default payment method for CASH invoices
+          null,
+          "Automatic payment for CASH invoice",
+        ]);
       }
 
-      // Delete order details first
-      await client.query("DELETE FROM order_details WHERE invoiceid = $1", [
-        id,
-      ]);
-
-      // Then delete the invoice
-      const result = await client.query(
-        "DELETE FROM invoices WHERE id = $1 RETURNING *",
-        [id]
-      );
+      // Update customer credit if INVOICE type - NO CHANGE HERE
+      if (createdInvoice.paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          createdInvoice.customerid,
+          createdInvoice.totalamountpayable // Add full amount to credit used
+        );
+      }
 
       await client.query("COMMIT");
-      res.status(200).json({
-        message: "Invoice deleted successfully",
-        deletedInvoice: result.rows[0],
+
+      // Format response (Match ExtendedInvoiceData, include balance_due)
+      res.status(201).json({
+        message: "Invoice created successfully",
+        invoice: {
+          ...createdInvoice,
+          total_excluding_tax: parseFloat(
+            createdInvoice.total_excluding_tax || 0
+          ),
+          tax_amount: parseFloat(createdInvoice.tax_amount || 0),
+          rounding: parseFloat(createdInvoice.rounding || 0),
+          totalamountpayable: parseFloat(
+            createdInvoice.totalamountpayable || 0
+          ),
+          balance_due: parseFloat(createdInvoice.balance_due || 0), // Include parsed balance
+          products: invoice.products || [],
+        },
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error deleting invoice:", error);
-      res.status(500).json({
-        message: "Error deleting invoice",
-        error: error.message,
+      console.error("Error submitting invoice:", error);
+      // Send specific duplicate error if applicable
+      if (error.message && error.message.includes("already exists")) {
+        res.status(409).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Error submitting invoice", error: error.message });
+      }
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/invoices/submit-invoices - Batch Submission (Revised for Response Consistency)
+  router.post("/submit-invoices", async (req, res) => {
+    const fieldsParam = req.query.fields;
+    const isMinimal = fieldsParam === "minimal";
+    const client = await pool.connect(); // DB client for initial inserts
+
+    // Arrays to track outcomes
+    const dbResults = { success: [], errors: [], duplicates: [] };
+    const savedInvoiceDataForEInvoice = []; // Data for MyInvois API call
+    const invoicePayloads = Array.isArray(req.body) ? req.body : [req.body]; // Original payloads
+
+    try {
+      // --- Step 1: Process and Save Invoices to Database ---
+      await client.query("BEGIN");
+
+      for (const invoice of invoicePayloads) {
+        // Transform input (Map mobile fields to NEW schema fields)
+
+        // Check if the invoice is CASH type
+        const isCash = (invoice.paymentType || "INVOICE") === "CASH";
+        const totalPayable = Number(invoice.totalAmountPayable || 0);
+
+        const transformedInvoice = {
+          id: String(invoice.billNumber),
+          salespersonid: invoice.salespersonId,
+          customerid: invoice.customerId,
+          createddate: invoice.createdDate || Date.now().toString(),
+          paymenttype: invoice.paymentType || "INVOICE",
+          total_excluding_tax: Number(invoice.amount || 0), // Use 'amount' from mobile
+          tax_amount: 0, // <<< Hardcoded to 0 as per requirement
+          rounding: Number(invoice.rounding || 0),
+          totalamountpayable: Number(invoice.totalAmountPayable || 0),
+          invoice_status: isCash ? "paid" : "active", // Mark CASH as paid immediately
+          balance_due: isCash ? 0 : totalPayable, // Zero balance for CASH
+          // Initialize e-invoice fields as null
+          uuid: null,
+          submission_uid: null,
+          long_id: null,
+          datetime_validated: null,
+          is_consolidated: false,
+          consolidated_invoices: null,
+          einvoice_status: null,
+        };
+
+        try {
+          const checkQuery = "SELECT id FROM invoices WHERE id = $1";
+          const checkResult = await client.query(checkQuery, [
+            transformedInvoice.id,
+          ]);
+          if (checkResult.rows.length > 0) {
+            throw {
+              code: "DUPLICATE_DB",
+              message: `Invoice ${transformedInvoice.id} already exists in database`,
+            };
+          }
+
+          // --- Fetch Product Descriptions (Keep if needed) ---
+          let productDescriptions = {};
+          if (invoice.products && invoice.products.length > 0) {
+            const productCodes = invoice.products
+              .filter((p) => !p.description && p.code)
+              .map((p) => p.code);
+            if (productCodes.length > 0) {
+              const descQuery =
+                "SELECT id, description FROM products WHERE id = ANY($1)";
+              const descResult = await client.query(descQuery, [productCodes]);
+              productDescriptions = descResult.rows.reduce((map, row) => {
+                map[row.id] = row.description;
+                return map;
+              }, {});
+            }
+          }
+          // --- End Fetch Product Descriptions ---
+
+          // Insert Invoice Record (using NEW schema columns)
+          const insertInvoiceQuery = `
+            INSERT INTO invoices (
+              id, salespersonid, customerid, createddate, paymenttype,
+              total_excluding_tax, tax_amount, rounding, totalamountpayable, invoice_status,
+              uuid, submission_uid, long_id, datetime_validated, is_consolidated,
+              consolidated_invoices, einvoice_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            RETURNING *`;
+          const invoiceResult = await client.query(insertInvoiceQuery, [
+            transformedInvoice.id,
+            transformedInvoice.salespersonid,
+            transformedInvoice.customerid,
+            transformedInvoice.createddate,
+            transformedInvoice.paymenttype,
+            transformedInvoice.total_excluding_tax,
+            transformedInvoice.tax_amount, // tax_amount is 0
+            transformedInvoice.rounding,
+            transformedInvoice.totalamountpayable,
+            transformedInvoice.invoice_status,
+            transformedInvoice.uuid,
+            transformedInvoice.submission_uid,
+            transformedInvoice.long_id,
+            transformedInvoice.datetime_validated,
+            transformedInvoice.is_consolidated,
+            transformedInvoice.consolidated_invoices,
+            transformedInvoice.einvoice_status,
+          ]);
+          const savedInvoice = invoiceResult.rows[0];
+
+          // Prepare and Insert Products (Order Details)
+          const orderDetailsForEInvoice = [];
+          if (invoice.products && invoice.products.length > 0) {
+            const productQuery = `
+              INSERT INTO order_details (invoiceid, code, price, quantity, freeproduct, returnproduct, description, tax, total, issubtotal)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`;
+
+            for (const product of invoice.products) {
+              const quantity = Number(product.quantity) || 0;
+              const price = Number(product.price) || 0;
+              const tax = 0; // <<< Hardcoded to 0
+              const freeProduct = Number(product.freeProduct || 0);
+              const returnProduct = Number(product.returnProduct || 0);
+              const total = (quantity * price).toFixed(2); // Calculate total without tax
+              const description =
+                product.description || productDescriptions[product.code] || "";
+
+              await client.query(productQuery, [
+                savedInvoice.id,
+                product.code,
+                price,
+                quantity,
+                freeProduct,
+                returnProduct,
+                description,
+                tax,
+                total,
+                false, // Assume mobile doesn't send subtotals
+              ]);
+
+              orderDetailsForEInvoice.push({
+                code: product.code,
+                price,
+                quantity,
+                tax,
+                total,
+                description,
+                freeProduct,
+                returnProduct,
+              });
+            }
+          }
+
+          // If it's a CASH invoice, create automatic payment record
+          if (isCash && totalPayable > 0) {
+            try {
+              const paymentQuery = `
+                INSERT INTO payments (
+                  invoice_id, payment_date, amount_paid, payment_method,
+                  payment_reference, notes
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+              `;
+              await client.query(paymentQuery, [
+                savedInvoice.id,
+                new Date().toISOString(),
+                totalPayable,
+                "cash", // Default payment method for CASH invoices
+                null,
+                "Automatic payment for CASH invoice",
+              ]);
+            } catch (paymentError) {
+              console.error(
+                `Failed to create automatic payment for CASH invoice ${savedInvoice.id}:`,
+                paymentError
+              );
+              // Continue processing - the invoice is still marked as paid even if payment record fails
+            }
+          }
+
+          // Update customer credit if INVOICE type - NO CHANGE HERE
+          if (savedInvoice.paymenttype === "INVOICE") {
+            await updateCustomerCredit(
+              client,
+              savedInvoice.customerid,
+              savedInvoice.totalamountpayable // Add full amount to credit used
+            );
+          }
+
+          // Prepare data for the subsequent e-invoice step
+          savedInvoiceDataForEInvoice.push({
+            ...savedInvoice, // Use the actual data saved to DB
+            orderDetails: orderDetailsForEInvoice,
+            // Add derived fields if needed by EInvoiceTemplate
+            date: new Date(Number(savedInvoice.createddate)),
+            time: new Date(Number(savedInvoice.createddate))
+              .toTimeString()
+              .substring(0, 5),
+            type: savedInvoice.paymenttype,
+          });
+          dbResults.success.push({ billNumber: savedInvoice.id }); // Minimal success info for DB step
+        } catch (error) {
+          if (error.code === "DUPLICATE_DB") {
+            dbResults.duplicates.push({
+              billNumber: invoice.billNumber,
+              message: error.message,
+            });
+          } else {
+            console.error(
+              `Error processing invoice ${invoice.billNumber} for DB save:`,
+              error
+            );
+            dbResults.errors.push({
+              billNumber: invoice.billNumber,
+              message: error.message || "Unknown DB error",
+            });
+          }
+        }
+      } // End loop through incoming invoices
+
+      // --- Handle DB Save Outcomes ---
+      // (Same logic as before to check if all failed, rollback if needed)
+      if (dbResults.success.length === 0) {
+        await client.query("ROLLBACK");
+        const statusCode = dbResults.errors.length > 0 ? 400 : 409;
+        const message =
+          dbResults.errors.length > 0
+            ? "All invoices failed database processing."
+            : "All invoices already exist in the database.";
+        // *** RESPONSE CONSISTENCY: Mimic old error format if possible ***
+        if (isMinimal) {
+          // Try to match the old minimal failure response
+          const minimalErrors = [
+            ...dbResults.errors,
+            ...dbResults.duplicates,
+          ].map((err) => ({
+            id: err.billNumber,
+            systemStatus: 100, // Error
+            einvoiceStatus: 20, // Not Processed
+            error: { code: err.code || "DB_ERROR", message: err.message },
+          }));
+          return res.status(statusCode).json({
+            message: message,
+            invoices: minimalErrors,
+            overallStatus: "Invalid",
+          });
+        } else {
+          // Try to match the old standard failure response
+          return res.status(statusCode).json({
+            message: message,
+            errors: [...dbResults.errors, ...dbResults.duplicates],
+            overallStatus: "Invalid",
+          });
+        }
+      }
+
+      // Commit successful DB inserts/updates
+      await client.query("COMMIT");
+    } catch (dbError) {
+      await client.query("ROLLBACK");
+      console.error("Critical error during database processing:", dbError);
+      // *** RESPONSE CONSISTENCY: Mimic old error format ***
+      if (isMinimal) {
+        return res.status(500).json({
+          message: "Database transaction failed",
+          invoices: [],
+          overallStatus: "SystemError",
+        });
+      } else {
+        return res.status(500).json({
+          message: "Database transaction failed",
+          error: dbError.message,
+          overallStatus: "SystemError",
+        });
+      }
+    } finally {
+      client.release();
+    }
+
+    // --- Step 2: Submit Successfully Saved Invoices to MyInvois ---
+    let einvoiceResults = null; // Raw result from the utility
+    let einvoiceUpdateErrors = []; // DB update errors for e-invoice status
+
+    if (savedInvoiceDataForEInvoice.length > 0) {
+      try {
+        console.log(
+          `Attempting to submit ${savedInvoiceDataForEInvoice.length} invoices to MyInvois...`
+        );
+        einvoiceResults = await submitInvoicesToMyInvois(
+          config, // Pass the main config object
+          savedInvoiceDataForEInvoice,
+          fetchCustomerDataWithCache
+        );
+        console.log("MyInvois submission response received.");
+
+        // --- Step 3: Update Database with E-Invoice Results ---
+        if (
+          einvoiceResults &&
+          (einvoiceResults.acceptedDocuments?.length > 0 ||
+            einvoiceResults.rejectedDocuments?.length > 0)
+        ) {
+          const updateClient = await pool.connect();
+          try {
+            await updateClient.query("BEGIN");
+
+            // Update Accepted
+            if (einvoiceResults.acceptedDocuments?.length > 0) {
+              const updateAcceptedQuery = `
+                UPDATE invoices SET uuid = $1, submission_uid = $2, long_id = $3,
+                       datetime_validated = $4, einvoice_status = $5
+                WHERE id = $6`;
+              for (const doc of einvoiceResults.acceptedDocuments) {
+                const status = doc.longId ? "valid" : "pending";
+                const validatedTime = doc.dateTimeValidated
+                  ? new Date(doc.dateTimeValidated)
+                  : null;
+                try {
+                  await updateClient.query(updateAcceptedQuery, [
+                    doc.uuid,
+                    doc.submissionUid,
+                    doc.longId || null,
+                    validatedTime,
+                    status,
+                    doc.internalId,
+                  ]);
+                } catch (updateError) {
+                  einvoiceUpdateErrors.push({
+                    invoiceId: doc.internalId,
+                    type: "accepted",
+                    error: updateError.message,
+                  });
+                }
+              }
+            }
+            // Update Rejected
+            if (einvoiceResults.rejectedDocuments?.length > 0) {
+              const updateRejectedQuery = `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`;
+              for (const doc of einvoiceResults.rejectedDocuments) {
+                const invoiceId = doc.internalId || doc.invoiceCodeNumber;
+                if (!invoiceId) continue;
+                try {
+                  await updateClient.query(updateRejectedQuery, [invoiceId]);
+                } catch (updateError) {
+                  einvoiceUpdateErrors.push({
+                    invoiceId: invoiceId,
+                    type: "rejected",
+                    error: updateError.message,
+                  });
+                }
+              }
+            }
+            await updateClient.query("COMMIT");
+          } catch (error) {
+            await updateClient.query("ROLLBACK");
+            einvoiceUpdateErrors.push({
+              invoiceId: " general",
+              type: "transaction",
+              error: error.message,
+            });
+          } finally {
+            updateClient.release();
+          }
+        }
+      } catch (einvoiceError) {
+        console.error(
+          "Error submitting to or processing response from MyInvois:",
+          einvoiceError
+        );
+        if (!einvoiceResults)
+          einvoiceResults = {
+            success: false,
+            message: "MyInvois submission failed",
+            error: einvoiceError.message || "Unknown API error",
+            acceptedDocuments: [],
+            rejectedDocuments: [],
+          };
+        else {
+          einvoiceResults.success = false;
+          einvoiceResults.message =
+            einvoiceResults.message || "MyInvois processing failed";
+          einvoiceResults.error = einvoiceError.message || "Unknown API error";
+        }
+      }
+    } else {
+      console.log(
+        "No invoices were successfully saved to DB, skipping MyInvois submission."
+      );
+    }
+
+    // --- Step 4: Construct Final Response (Prioritizing Consistency) ---
+
+    let statusCode = 200; // Default OK
+    let overallStatus = "Success"; // Assume success unless proven otherwise
+    let responseMessage = "Invoice processing completed.";
+
+    // Determine final status based on DB and E-invoice outcomes
+    const dbFailedCount = dbResults.errors.length + dbResults.duplicates.length;
+    const einvoiceRejectedCount =
+      einvoiceResults?.rejectedDocuments?.length || 0;
+    const einvoiceAcceptedCount =
+      einvoiceResults?.acceptedDocuments?.length || 0;
+    const einvoiceAttemptedCount = savedInvoiceDataForEInvoice.length;
+    const didEInvoiceFailCompletely =
+      einvoiceResults &&
+      !einvoiceResults.success &&
+      einvoiceAcceptedCount === 0 &&
+      einvoiceRejectedCount === 0;
+
+    if (dbFailedCount === invoicePayloads.length) {
+      // All failed DB
+      statusCode = dbResults.errors.length > 0 ? 400 : 409;
+      overallStatus = "Invalid";
+      responseMessage =
+        dbResults.errors.length > 0
+          ? "All invoices failed database processing."
+          : "All invoices already exist in the database.";
+    } else if (
+      dbFailedCount > 0 ||
+      einvoiceRejectedCount > 0 ||
+      didEInvoiceFailCompletely ||
+      einvoiceUpdateErrors.length > 0
+    ) {
+      statusCode = 207; // Multi-status for partial success/failures
+      overallStatus = "Partial";
+      if (
+        einvoiceRejectedCount === einvoiceAttemptedCount &&
+        einvoiceAttemptedCount > 0
+      ) {
+        statusCode = 422; // All e-invoices rejected
+        overallStatus = "EInvoiceInvalid";
+        responseMessage =
+          "Invoices saved to DB, but all failed e-invoice submission.";
+      } else if (didEInvoiceFailCompletely) {
+        overallStatus = "EInvoiceSystemError";
+        responseMessage = "Invoices saved to DB, but e-invoice system failed.";
+      } else {
+        responseMessage = "Invoice processing completed with some issues.";
+      }
+    } else if (
+      dbResults.success.length === invoicePayloads.length &&
+      einvoiceAcceptedCount === einvoiceAttemptedCount
+    ) {
+      statusCode = 201; // All created successfully
+      overallStatus = "Success";
+    }
+
+    // *** RESPONSE CONSISTENCY LOGIC ***
+    if (isMinimal) {
+      // Construct the minimal response, aiming for the old format
+      const minimalInvoices = invoicePayloads.map((inv) => {
+        const billNo = String(inv.billNumber); // Original ID from payload
+        let systemStatus = 100; // Default error
+        let einvoiceStatus = 20; // Default Not Processed
+        let error = null;
+
+        const dbSuccess = dbResults.success.find(
+          (r) => r.billNumber === billNo
+        );
+        const dbError = dbResults.errors.find((r) => r.billNumber === billNo);
+        const dbDuplicate = dbResults.duplicates.find(
+          (r) => r.billNumber === billNo
+        );
+        const einvAccepted = einvoiceResults?.acceptedDocuments?.find(
+          (d) => d.internalId === billNo
+        );
+        const einvRejected = einvoiceResults?.rejectedDocuments?.find(
+          (d) => d.internalId === billNo || d.invoiceCodeNumber === billNo
+        );
+
+        if (dbSuccess) systemStatus = 0; // DB Success
+        if (dbError) error = { code: "DB_ERROR", message: dbError.message };
+        if (dbDuplicate)
+          error = { code: "DUPLICATE_DB", message: dbDuplicate.message };
+
+        // E-invoice status overrides (only if DB save was successful)
+        if (systemStatus === 0) {
+          if (einvAccepted) {
+            einvoiceStatus = einvAccepted.longId ? 0 : 10; // 0=Valid, 10=Pending
+          } else if (einvRejected) {
+            // Determine the appropriate error code based on the error details
+            const errorCode = einvRejected.error?.code || "";
+            const errorMessage = einvRejected.error?.message || "";
+
+            if (
+              errorMessage.toLowerCase().includes("tin") ||
+              errorCode.toLowerCase().includes("tin") ||
+              errorMessage.toLowerCase().includes("id number")
+            ) {
+              einvoiceStatus = 101; // Missing TIN/ID
+            } else if (
+              errorMessage.toLowerCase().includes("duplicate") ||
+              errorCode.toLowerCase().includes("duplicate")
+            ) {
+              einvoiceStatus = 102; // Duplicate e-invoice
+            } else {
+              einvoiceStatus = 100; // Default e-invoice error
+            }
+
+            error = {
+              code: errorCode || "EINVOICE_REJECTED",
+              message: errorMessage || "E-invoice rejected",
+            };
+          } else if (didEInvoiceFailCompletely) {
+            einvoiceStatus = 103; // Other error (system error)
+            error = {
+              code: "EINVOICE_API_ERROR",
+              message: einvoiceResults?.error || "E-invoice submission failed",
+            };
+          }
+        }
+
+        return {
+          id: billNo,
+          systemStatus,
+          einvoiceStatus,
+          error: error || undefined, // Omit if no error
+          // Include UUID/LongID ONLY if accepted (status 0 or 10)
+          uuid:
+            einvoiceStatus === 0 || einvoiceStatus === 10
+              ? einvAccepted?.uuid
+              : undefined,
+          longId: einvoiceStatus === 0 ? einvAccepted?.longId : undefined, // Only if 'valid' (status 0)
+        };
       });
+
+      return res.status(statusCode).json({
+        message: responseMessage,
+        invoices: minimalInvoices,
+        overallStatus: overallStatus, // Provide overall summary
+      });
+    } else {
+      // Construct the STANDARD response, aiming for the old format
+      // OLD Standard format expected: { message, results[], errors[]?, einvoice? }
+
+      // 'results' array should only contain successfully saved DB invoices
+      const standardResults = dbResults.success.map((s) => ({
+        billNumber: s.billNumber,
+        status: "success", // Old format might just have this simple status
+        message: "Invoice created successfully", // Old generic message
+        // Don't include detailed e-invoice status here directly, put in separate 'einvoice' key
+      }));
+
+      // 'errors' array contains DB duplicates and other DB errors
+      const standardErrors = [...dbResults.duplicates, ...dbResults.errors].map(
+        (e) => ({
+          billNumber: e.billNumber,
+          status: "error",
+          message: e.message,
+        })
+      );
+
+      // 'einvoice' object contains the results of the e-invoice attempt
+      // Mimic the structure the old frontend might expect from the e-invoice utility
+      const standardEInvoice = einvoiceResults
+        ? {
+            success: einvoiceResults.success,
+            message: einvoiceResults.message,
+            error: einvoiceResults.error, // Raw error message if API failed
+            acceptedDocuments: einvoiceResults.acceptedDocuments?.map(
+              (doc) => ({
+                // Map to fields the old frontend might have used
+                internalId: doc.internalId,
+                uuid: doc.uuid,
+                longId: doc.longId,
+                status: doc.longId ? "Valid" : "Pending", // Translate status
+                // ... other relevant fields like dateTimeValidated?
+              })
+            ),
+            rejectedDocuments: einvoiceResults.rejectedDocuments?.map(
+              (doc) => ({
+                internalId: doc.internalId || doc.invoiceCodeNumber,
+                status: "Rejected",
+                error: {
+                  // Try to match old error structure
+                  code: doc.error?.code || "REJECTED",
+                  message:
+                    doc.error?.message || "E-invoice submission rejected",
+                  // maybe details: doc.error?.details
+                },
+              })
+            ),
+            // Add overall status if the old frontend used it
+            overallStatus: einvoiceResults.overallStatus,
+          }
+        : null; // Set to null if e-invoice wasn't attempted
+
+      // Add DB update errors to the main error list? Or separate key?
+      // For consistency with older format, maybe just log them server-side
+      if (einvoiceUpdateErrors.length > 0) {
+        console.error(
+          "E-invoice DB update errors occurred:",
+          einvoiceUpdateErrors
+        );
+        // Optionally add a generic note to the main message if consistency allows
+        // responseMessage += " Note: Some local e-invoice status updates failed.";
+      }
+
+      return res.status(statusCode).json({
+        message: responseMessage,
+        results: standardResults.length > 0 ? standardResults : undefined, // Omit if empty
+        errors: standardErrors.length > 0 ? standardErrors : undefined, // Omit if empty
+        einvoice: standardEInvoice, // Include e-invoice results separately
+      });
+    }
+  }); // End POST /submit-invoices
+
+  // DELETE /api/invoices/:id - Cancel Invoice (Update Status)
+  router.delete("/:id", async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. Get Invoice details for credit adjustment and e-invoice check
+      const invoiceQuery = `
+        SELECT id, customerid, paymenttype, totalamountpayable, uuid, einvoice_status
+        FROM invoices
+        WHERE id = $1 FOR UPDATE`; // Lock row
+      const invoiceResult = await client.query(invoiceQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      const invoice = invoiceResult.rows[0];
+
+      // If already cancelled, do nothing
+      if (invoice.invoice_status === "cancelled") {
+        await client.query("ROLLBACK"); // Release lock
+        return res
+          .status(400)
+          .json({ message: "Invoice is already cancelled" });
+      }
+
+      // 2. Adjust Customer Credit if it was an INVOICE
+      if (
+        invoice.paymenttype === "INVOICE" &&
+        parseFloat(invoice.totalamountpayable || 0) !== 0
+      ) {
+        await updateCustomerCredit(
+          client,
+          invoice.customerid,
+          -parseFloat(invoice.totalamountpayable || 0)
+        );
+      }
+
+      // 3. Attempt to Cancel E-Invoice via API if it exists and isn't already cancelled
+      let einvoiceCancelledApi = false;
+      if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+        try {
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${invoice.uuid}/state`,
+            { status: "cancelled", reason: "Invoice cancelled" }
+          );
+          einvoiceCancelledApi = true;
+          console.log(
+            `Successfully cancelled e-invoice ${invoice.uuid} via API.`
+          );
+        } catch (cancelError) {
+          console.error(
+            `Error cancelling e-invoice ${invoice.uuid} via API:`,
+            cancelError
+          );
+          // Log error but continue - local status should still be updated
+          // Potentially check error code (e.g., if already cancelled or time limit expired)
+          if (cancelError.status === 400) {
+            // Example: Bad request might mean it's already cancelled or invalid state
+            console.warn(
+              `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
+            );
+            // Optionally force local status update if API confirms cancellation happened previously
+            einvoiceCancelledApi = true; // Assume cancelled if API fails in a way suggesting it's done
+          }
+        }
+      }
+
+      // 4. Update Invoice Status in DB
+      const newEInvoiceStatus = einvoiceCancelledApi
+        ? "cancelled"
+        : invoice.einvoice_status; // Update if API call succeeded or implied success
+      const updateQuery = `
+        UPDATE invoices
+        SET invoice_status = 'cancelled',
+            einvoice_status = $1
+            -- Optionally add a cancellation_timestamp column
+        WHERE id = $2
+        RETURNING *`;
+
+      const updateResult = await client.query(updateQuery, [
+        newEInvoiceStatus,
+        id,
+      ]);
+
+      await client.query("COMMIT");
+
+      res.status(200).json({
+        message: "Invoice cancelled successfully",
+        invoice: {
+          // Return the updated invoice record
+          ...updateResult.rows[0],
+          total_excluding_tax: parseFloat(
+            updateResult.rows[0].total_excluding_tax || 0
+          ),
+          tax_amount: parseFloat(updateResult.rows[0].tax_amount || 0),
+          rounding: parseFloat(updateResult.rows[0].rounding || 0),
+          totalamountpayable: parseFloat(
+            updateResult.rows[0].totalamountpayable || 0
+          ),
+          balance_due: parseFloat(updateResult.rows[0].balance_due || 0),
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error cancelling invoice:", error);
+      res
+        .status(500)
+        .json({ message: "Error cancelling invoice", error: error.message });
     } finally {
       client.release();
     }

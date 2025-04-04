@@ -1,95 +1,110 @@
-import React from 'react';
-import Button from '../Button';
+// src/components/Invoice/PaginationControls.tsx
+import React from "react";
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
 interface PaginationControlsProps {
   currentPage: number;
   totalPages: number;
-  itemsCount: number;
   onPageChange: (page: number) => void;
+  itemsCount: number; // Items on the current page
+  totalItems: number; // Total items matching filters
+  pageSize: number;
 }
 
-const PaginationControls = ({ currentPage, totalPages, itemsCount, onPageChange }: PaginationControlsProps) => {
-  const getVisiblePages = () => {
-    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-    const showAllPages = totalPages <= 7;
+const PaginationControls: React.FC<PaginationControlsProps> = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  itemsCount,
+  totalItems,
+  pageSize,
+}) => {
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = startItem + itemsCount - 1;
 
-    if (showAllPages) return pages;
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5; // Adjust as needed
 
-    if (currentPage <= 4) {
-      return [...pages.slice(0, 5), '...', totalPages];
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      pageNumbers.push(1);
+      let start = Math.max(2, currentPage - 1);
+      let end = Math.min(totalPages - 1, currentPage + 1);
+
+      if (currentPage > 3) {
+        pageNumbers.push("...");
+      }
+
+      for (let i = start; i <= end; i++) {
+        pageNumbers.push(i);
+      }
+
+      if (currentPage < totalPages - 2) {
+        pageNumbers.push("...");
+      }
+      pageNumbers.push(totalPages);
     }
-    
-    if (currentPage >= totalPages - 3) {
-      return [1, '...', ...pages.slice(-5)];
-    }
 
-    return [
-      1,
-      '...',
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      '...',
-      totalPages
-    ];
+    return pageNumbers.map((num, index) =>
+      typeof num === "number" ? (
+        <button
+          key={index}
+          onClick={() => onPageChange(num)}
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 h-9 w-9 hover:bg-default-100 active:bg-default-200 ${
+            num === currentPage
+              ? "border border-default-300 font-semibold bg-default-100"
+              : "font-medium"
+          }`}
+          disabled={num === currentPage}
+        >
+          {num}
+        </button>
+      ) : (
+        <span
+          key={index}
+          className="flex items-center justify-center h-9 w-9 text-default-500"
+        >
+          ...
+        </span>
+      )
+    );
   };
 
-  if (itemsCount === 0) {
-    return (
-      <div className="flex items-center justify-between border-t border-default-200 bg-white px-4 py-3">
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" disabled>Previous</Button>
-          <Button variant="outline" size="sm" disabled>Next</Button>
-        </div>
-        <div className="text-sm text-default-600">No items to display</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center justify-between border-t border-default-200 bg-white px-4 py-3">
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage === 1}
-          onClick={() => onPageChange(currentPage - 1)}
-        >
-          Previous
-        </Button>
-
-        {getVisiblePages().map((page, idx) => 
-          page === '...' ? (
-            <span key={`ellipsis-${idx}`} className="px-2">...</span>
-          ) : (
-            <button
-              key={page}
-              onClick={() => onPageChange(page as number)}
-              className={`px-3 py-1 rounded-md text-sm font-medium ${
-                page === currentPage
-                  ? 'bg-default-100 text-default-700'
-                  : 'text-default-600 hover:bg-default-50'
-              }`}
-            >
-              {page}
-            </button>
-          )
-        )}
-
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage === totalPages}
-          onClick={() => onPageChange(currentPage + 1)}
-        >
-          Next
-        </Button>
+    <div className="flex justify-between items-center text-sm text-default-600 py-3 border-t border-default-200">
+      {/* Items Info */}
+      <div>
+        Showing{" "}
+        <span className="font-semibold">{itemsCount > 0 ? startItem : 0}</span>-{" "}
+        <span className="font-semibold">{endItem}</span> of{" "}
+        <span className="font-semibold">{totalItems}</span> results
       </div>
-      <div className="text-sm text-default-600">
-        {totalPages > 0 
-          ? `Showing page ${currentPage} of ${totalPages}`
-          : 'No pages available'
-        }
+
+      {/* Pagination Buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          className="px-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 hover:bg-default-100 active:bg-default-200 disabled:opacity-50 disabled:pointer-events-none"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          aria-label="Previous page"
+        >
+          <IconChevronLeft size={18} />
+        </button>
+
+        <div className="flex gap-1">{renderPageNumbers()}</div>
+
+        <button
+          className="px-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 hover:bg-default-100 active:bg-default-200 disabled:opacity-50 disabled:pointer-events-none"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          aria-label="Next page"
+        >
+          <IconChevronRight size={18} />
+        </button>
       </div>
     </div>
   );

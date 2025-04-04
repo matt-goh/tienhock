@@ -837,16 +837,20 @@ const SalesBySalesmanPage: React.FC = () => {
                   label=""
                   value={selectedChartSalesmen}
                   onChange={(values) => {
+                    // Ensure values is always treated as an array and filter out nulls
+                    const valueArray = (
+                      Array.isArray(values) ? values : [values].filter(Boolean)
+                    ).filter((value): value is string => value !== null);
                     // Limit selection to prevent chart overcrowding
-                    if (values && values.length <= maxChartSalesmen) {
-                      setSelectedChartSalesmen(values);
-                    } else if (values && values.length > maxChartSalesmen) {
+                    if (valueArray.length <= maxChartSalesmen) {
+                      setSelectedChartSalesmen(valueArray);
+                    } else if (valueArray.length > maxChartSalesmen) {
                       toast.error(
                         `Maximum ${maxChartSalesmen} salesmen can be selected for the chart`
                       );
                       // Keep the first max number of selections
                       setSelectedChartSalesmen(
-                        values.slice(0, maxChartSalesmen)
+                        valueArray.slice(0, maxChartSalesmen)
                       );
                     }
                   }}
