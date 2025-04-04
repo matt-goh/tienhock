@@ -284,8 +284,6 @@ export const checkDuplicateInvoiceNo = async (
     if (error.status === 404) {
       return false;
     }
-
-    console.error("Error in duplicate invoice check:", error);
     return false; // Err on the side of caution and let the server validate
   }
 };
