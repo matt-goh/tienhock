@@ -93,6 +93,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState(""); // State for cancellation reason input
+  const [historyYear, setHistoryYear] = useState<number>(
+    new Date().getFullYear()
+  );
 
   // Date formatting remains the same
   const monthName = new Date(year, month).toLocaleString("default", {
@@ -123,9 +126,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       fetchConsolidationHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year, isOpen]);
+  }, [month, year, historyYear, isOpen]);
 
-  // Core functions (fetchEligible, fetchHistory, selection, submit, formatCurrency, getTotal) remain the same
+  // Core functions (fetchEligible, fetchHistory, selection, submit, formatCurrency, getTotal)
   const fetchEligibleInvoices = async () => {
     if (!isOpen) return;
     setIsLoadingEligible(true);
@@ -154,7 +157,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     if (!isOpen) return;
     setIsLoadingHistory(true);
     try {
-      const response = await api.get("/api/einvoice/consolidated-history");
+      const response = await api.get(
+        `/api/einvoice/consolidated-history?year=${historyYear}`
+      );
       setConsolidationHistory(response?.data || response || []);
     } catch (error: any) {
       console.error("Error fetching consolidation history:", error);
@@ -635,21 +640,36 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                 <h3 className="text-base font-semibold text-default-800">
                   Consolidation History
                 </h3>
-                <Button
-                  onClick={fetchConsolidationHistory}
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoadingHistory || !!processingHistoryId}
-                  className="flex items-center gap-1.5"
-                  icon={
-                    !isLoadingHistory || processingHistoryId
-                      ? IconRefresh
-                      : undefined
-                  }
-                  aria-label="Refresh consolidation history"
-                >
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* Year Selector */}
+                  <select
+                    className="rounded-lg border border-default-300 py-1 px-2 text-sm"
+                    value={historyYear}
+                    onChange={(e) => setHistoryYear(Number(e.target.value))}
+                    disabled={isLoadingHistory || !!processingHistoryId}
+                  >
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <option key={i} value={new Date().getFullYear() - i}>
+                        {new Date().getFullYear() - i}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    onClick={fetchConsolidationHistory}
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoadingHistory || !!processingHistoryId}
+                    className="flex items-center gap-1.5"
+                    icon={
+                      !isLoadingHistory || processingHistoryId
+                        ? IconRefresh
+                        : undefined
+                    }
+                    aria-label="Refresh consolidation history"
+                  >
+                    Refresh
+                  </Button>
+                </div>
               </div>
 
               {/* Loading State */}
