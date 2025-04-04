@@ -138,7 +138,7 @@ export default function (pool, config) {
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
       `;
-      let whereClause = ` WHERE 1=1 `;
+      let whereClause = ` WHERE 1=1 AND (i.is_consolidated = false OR i.is_consolidated IS NULL) `; // Add filter for non-consolidated invoices
       let groupByClause = `GROUP BY i.id, c.name, c.tin_number, c.id_number, c.id_type`; // Grouping by primary key is sufficient if using aggregates or joins correctly
 
       const filterParams = []; // Parameters ONLY for filtering (WHERE clause)

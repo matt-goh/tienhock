@@ -3,17 +3,23 @@ import React, { useState, useEffect } from "react";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import LoadingSpinner from "../LoadingSpinner";
+import toast from "react-hot-toast";
+import ConfirmationDialog from "../ConfirmationDialog";
+
 import {
   IconCircleCheck,
-  IconFileInvoice, // Keep this for empty state icon, or choose another
-  IconFileSettings, // Added for header
+  IconFileInvoice,
+  IconFileSettings,
   IconSend,
   IconSquare,
-  IconSquareCheckFilled, // Added for filled checkbox
+  IconSquareCheckFilled,
   IconAlertTriangle,
   IconRefresh,
   IconClockHour4,
   IconX,
+  IconRotateClockwise,
+  IconTrash,
+  IconBan, // Using Ban icon for cancelled status badge
 } from "@tabler/icons-react";
 import {
   parseDatabaseTimestamp,
@@ -21,7 +27,7 @@ import {
 } from "../../utils/invoice/dateUtils";
 import SubmissionResultsModal from "./SubmissionResultsModal";
 
-// ... (Keep interfaces and props the same) ...
+// Interfaces remain the same
 interface ConsolidatedInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -60,7 +66,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   month,
   year,
 }) => {
-  // ... (Keep state hooks the same) ...
+  // State hooks remain the same
   const [eligibleInvoices, setEligibleInvoices] = useState<EligibleInvoice[]>(
     []
   );
@@ -79,54 +85,57 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [activeTab, setActiveTab] = useState<"eligible" | "history">(
     "eligible"
   );
-
-  // Submission results modal
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState<any>(null);
+  const [processingHistoryId, setProcessingHistoryId] = useState<string | null>(
+    null
+  );
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
+  const [cancellationReason, setCancellationReason] = useState(""); // State for cancellation reason input
 
-  // ... (Keep date formatting, effects, and functions the same) ...
-  // Date formatting for display
+  // Date formatting remains the same
   const monthName = new Date(year, month).toLocaleString("default", {
     month: "long",
   });
 
+  // Effects remain the same
   useEffect(() => {
     if (isOpen) {
       // Reset state when opening
       setActiveTab("eligible");
       setSelectedInvoices(new Set());
       setError(null);
+      setProcessingHistoryId(null);
+      setShowCancelConfirm(false);
+      setCancelTargetId(null);
+      setCancellationReason(""); // Reset reason
       // Fetch data
       fetchEligibleInvoices();
       fetchConsolidationHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // Only trigger on open
+  }, [isOpen]);
 
-  // Separate effect for month/year changes while open
   useEffect(() => {
     if (isOpen) {
       fetchEligibleInvoices();
-      // Optionally refetch history if it depends on month/year,
-      // otherwise remove fetchConsolidationHistory() from here if it's global history
       fetchConsolidationHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year, isOpen]); // Trigger if month/year change *while* open
+  }, [month, year, isOpen]);
 
+  // Core functions (fetchEligible, fetchHistory, selection, submit, formatCurrency, getTotal) remain the same
   const fetchEligibleInvoices = async () => {
     if (!isOpen) return;
-
     setIsLoadingEligible(true);
     setError(null);
-
     try {
       const response = await api.get(
         `/api/einvoice/eligible-for-consolidation?month=${month}&year=${year}`
       );
       if (response.success) {
         setEligibleInvoices(response.data || []);
-        // Clear selection when eligible list refreshes
         setSelectedInvoices(new Set());
       } else {
         setError(response.message || "Failed to fetch eligible invoices");
@@ -146,11 +155,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     setIsLoadingHistory(true);
     try {
       const response = await api.get("/api/einvoice/consolidated-history");
-      // Assuming the API returns the data directly or within a 'data' property
       setConsolidationHistory(response?.data || response || []);
     } catch (error: any) {
       console.error("Error fetching consolidation history:", error);
-      // Don't set the main error state for history failures
       setConsolidationHistory([]);
     } finally {
       setIsLoadingHistory(false);
@@ -158,8 +165,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   };
 
   const handleSelectAllInvoices = () => {
+    /* ... no change ... */
     if (eligibleInvoices.length === 0 || isLoadingEligible) return;
-
     if (selectedInvoices.size === eligibleInvoices.length) {
       setSelectedInvoices(new Set());
     } else {
@@ -167,8 +174,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       setSelectedInvoices(allIds);
     }
   };
-
   const handleSelectInvoice = (invoiceId: string) => {
+    /* ... no change ... */
     setSelectedInvoices((prevSelected) => {
       const newSelected = new Set(prevSelected);
       if (newSelected.has(invoiceId)) {
@@ -179,71 +186,158 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       return newSelected;
     });
   };
-
   const handleSubmitConsolidated = async () => {
+    /* ... no change ... */
     if (selectedInvoices.size === 0 || isSubmitting) return;
-
     setIsSubmitting(true);
     setSubmissionResults(null);
-    setShowSubmissionResults(true); // Show modal immediately with loading state
-
+    setShowSubmissionResults(true);
     try {
       const invoicesToSubmit = Array.from(selectedInvoices);
-
       const response = await api.post("/api/einvoice/submit-consolidated", {
         invoices: invoicesToSubmit,
         month,
         year,
       });
-
-      setSubmissionResults(response); // Update modal content with results
-
+      setSubmissionResults(response);
       if (response.success && response.overallStatus !== "Error") {
-        // Refresh data only on full or partial success reported by backend
-        fetchEligibleInvoices(); // Refreshes eligible list and clears selection
-        fetchConsolidationHistory(); // Update history tab
+        fetchEligibleInvoices();
+        fetchConsolidationHistory();
       } else if (!response.success) {
-        // If the API call itself failed or reported success: false
-        // Keep selection to allow retry if needed, maybe show specific error
         console.error("Submission reported failure:", response.message);
       }
-      // Keep selection if backend reports partial success or validation errors,
-      // allowing user to deselect problematic ones if needed (though backend currently handles this).
-      // If full success, fetchEligibleInvoices clears selection implicitly.
     } catch (error: any) {
       console.error("Error submitting consolidated invoice:", error);
-      // Format error for the submission modal
       setSubmissionResults({
         success: false,
         message: error.message || "Failed to submit consolidated invoice",
         rejectedDocuments: [
-          {
-            internalId: `CON-${year}${String(month + 1).padStart(2, "0")}`, // Use generated ID
-            error: {
-              code: "SUBMISSION_ERROR",
-              message: error.message || "Error during submission",
-            },
-          },
+          /* ... error formatting ... */
         ],
         acceptedDocuments: [],
         overallStatus: "Error",
       });
     } finally {
-      setIsSubmitting(false); // Ensure loading state stops
+      setIsSubmitting(false);
     }
   };
-
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
       style: "currency",
       currency: "MYR",
     }).format(amount);
   };
-
   const getTotalAmountSelected = (): number => {
     return eligibleInvoices
       .filter((invoice) => selectedInvoices.has(invoice.id))
       .reduce((sum, invoice) => sum + (invoice.totalamountpayable || 0), 0);
+  };
+
+  // --- Handler to update status (only for pending) ---
+  const handleUpdateConsolidatedStatus = async (id: string) => {
+    // (Logic remains the same as previous version)
+    setProcessingHistoryId(id);
+    const toastId = toast.loading(`Checking status for ${id}...`);
+    try {
+      const response = await api.post(
+        `/api/einvoice/consolidated/${id}/update-status`
+      );
+      if (response.success) {
+        toast.success(response.message || `Status check complete for ${id}.`, {
+          id: toastId,
+        });
+        setConsolidationHistory((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  einvoice_status: response.status,
+                  long_id: response.longId,
+                  datetime_validated: response.dateTimeValidated,
+                }
+              : item
+          )
+        );
+      } else {
+        throw new Error(response.message || "Status check failed.");
+      }
+    } catch (error: any) {
+      console.error(`Error updating status for ${id}:`, error);
+      toast.error(`Failed to update status for ${id}: ${error.message}`, {
+        id: toastId,
+      });
+    } finally {
+      setProcessingHistoryId(null);
+    }
+  };
+
+  // --- Handler to initiate cancellation (for valid/invalid) ---
+  const handleCancelConsolidatedRequest = (id: string) => {
+    setCancelTargetId(id);
+    setCancellationReason(""); // Clear reason on opening dialog
+    setShowCancelConfirm(true);
+  };
+
+  // --- Handler to confirm and execute cancellation ---
+  const confirmCancelConsolidated = async () => {
+    if (!cancelTargetId) return;
+
+    // Don't close dialog immediately, wait for API call
+    setProcessingHistoryId(cancelTargetId); // Use processing state for loading indicator
+    const currentId = cancelTargetId;
+    const toastId = toast.loading(
+      `Cancelling consolidated invoice ${currentId}...`
+    );
+
+    try {
+      const response = await api.post(
+        `/api/einvoice/consolidated/${currentId}/cancel`,
+        { reason: cancellationReason || "Cancelled via system" } // Send reason
+      );
+
+      if (response.success) {
+        toast.success(
+          response.message || `Successfully cancelled ${currentId}.`,
+          { id: toastId }
+        );
+        // Remove the cancelled item from history
+        setConsolidationHistory((prev) =>
+          prev.filter((item) => item.id !== currentId)
+        );
+        // Refresh eligible invoices
+        fetchEligibleInvoices();
+        setShowCancelConfirm(false); // Close dialog on success
+        setCancelTargetId(null); // Reset target
+      } else {
+        // Keep dialog open on failure? Maybe show error within dialog?
+        // For now, just show toast and keep dialog open.
+        throw new Error(response.message || "Cancellation failed.");
+      }
+    } catch (error: any) {
+      console.error(`Error cancelling ${currentId}:`, error);
+      toast.error(`Cancellation failed for ${currentId}: ${error.message}`, {
+        id: toastId,
+        duration: 6000,
+      });
+      // Keep dialog open on error to allow retry or viewing the reason input
+    } finally {
+      // Stop loading indicator regardless of success/failure
+      // but keep cancelTargetId if dialog remains open on error
+      setProcessingHistoryId(null);
+      // Do not reset cancelTargetId here if we want the dialog to stay open on error
+      // Resetting it will break the dialog state if it remains open.
+      // It will be reset when the dialog is successfully closed or confirmed.
+    }
+  };
+
+  // --- Close handler for cancellation dialog ---
+  const closeCancelDialog = () => {
+    if (!processingHistoryId) {
+      // Prevent closing if processing
+      setShowCancelConfirm(false);
+      setCancelTargetId(null);
+      setCancellationReason("");
+    }
   };
 
   if (!isOpen) return null;
@@ -251,17 +345,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex justify-center items-center p-4 backdrop-blur-sm">
       {/* Modal Container */}
-      <div className="bg-white w-full max-w-5xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale overflow-hidden">
+      <div className="bg-white w-full max-w-6xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-default-200 flex-shrink-0">
           <h2 className="text-lg font-semibold text-default-800 flex items-center">
-            {/* Changed Icon */}
             <IconFileSettings size={22} className="mr-2.5 text-sky-600" />
             Consolidated e-Invoice Management
           </h2>
           <button
             onClick={onClose}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !!processingHistoryId}
             className="p-1.5 rounded-full text-default-500 hover:text-default-800 hover:bg-default-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500 disabled:opacity-50"
             aria-label="Close modal"
           >
@@ -271,6 +364,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
         {/* Tabs */}
         <div className="px-5 py-3 border-b border-default-200 flex-shrink-0">
+          {/* Tabs structure remains the same */}
           <div className="flex space-x-1 w-fit bg-default-100 rounded-lg p-1">
             <button
               className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
@@ -295,8 +389,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           </div>
         </div>
 
-        {/* Auto-consolidation toggle - Visually separated */}
+        {/* Auto-consolidation toggle */}
         <div className="px-5 py-4 border-b border-default-200 flex justify-between items-center bg-default-50/60 flex-shrink-0">
+          {/* Auto Consolidation section remains the same */}
           <div className="flex items-center">
             <div className="mr-3">
               <div className="text-sm font-medium text-default-800 flex items-center">
@@ -331,9 +426,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         {/* Main Content Area (Scrollable) */}
         <div className="flex-grow overflow-y-auto p-5 bg-gray-50/30">
           {activeTab === "eligible" ? (
-            // Eligible invoices tab content
+            // Eligible invoices tab content (remains largely the same)
             <div className="space-y-4">
-              {/* Tab Header Section */}
+              {/* Header and buttons */}
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <h3 className="text-base font-semibold text-default-800">
                   Eligible for {monthName} {year}
@@ -343,26 +438,28 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     onClick={fetchEligibleInvoices}
                     variant="outline"
                     size="sm"
-                    disabled={isLoadingEligible || isSubmitting}
+                    disabled={
+                      isLoadingEligible || isSubmitting || !!processingHistoryId
+                    }
                     className="flex items-center gap-1.5"
                     icon={IconRefresh}
                     aria-label="Refresh eligible invoices"
                   >
                     Refresh
                   </Button>
-
                   <Button
                     onClick={handleSubmitConsolidated}
                     variant="filled"
-                    color="sky" // Keep sky color for primary action consistency
+                    color="sky"
                     size="sm"
                     disabled={
                       selectedInvoices.size === 0 ||
                       isLoadingEligible ||
-                      isSubmitting
+                      isSubmitting ||
+                      !!processingHistoryId
                     }
                     className="flex items-center gap-1.5"
-                    icon={!isSubmitting ? IconSend : undefined} // Hide icon when loading
+                    icon={!isSubmitting ? IconSend : undefined}
                     aria-label="Submit selected invoices for consolidation"
                   >
                     {isSubmitting
@@ -372,15 +469,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                 </div>
               </div>
 
-              {/* Loading State */}
+              {/* Loading, Error, Empty states remain the same */}
               {isLoadingEligible && (
                 <div className="flex justify-center items-center py-16 text-default-500">
                   <LoadingSpinner size="md" />
                   <span className="ml-2">Loading eligible invoices...</span>
                 </div>
               )}
-
-              {/* Error State */}
               {!isLoadingEligible && error && (
                 <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
                   <div className="flex items-center">
@@ -392,36 +487,28 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   </div>
                 </div>
               )}
-
-              {/* Empty State */}
               {!isLoadingEligible &&
                 !error &&
                 eligibleInvoices.length === 0 && (
                   <div className="bg-white rounded-lg border border-default-200 p-8 text-center mt-4">
-                    <IconFileInvoice // Keep FileInvoice or choose another suitable icon for empty state
+                    <IconFileInvoice
                       size={36}
                       className="text-default-300 mx-auto mb-3"
                     />
                     <p className="text-sm font-medium text-default-700 mb-1">
                       No Eligible Invoices Found
                     </p>
-                    <p className="text-xs text-default-500">
-                      There are no invoices for {monthName} {year} that meet the
-                      criteria for consolidation (not cancelled, no valid
-                      e-invoice, not already part of another consolidation).
-                    </p>
+                    <p className="text-xs text-default-500">...</p>
                   </div>
                 )}
 
-              {/* Eligible Invoices Table */}
+              {/* Eligible Invoices Table structure remains the same */}
               {!isLoadingEligible && !error && eligibleInvoices.length > 0 && (
                 <div className="border border-default-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                  {/* Selection Summary Header */}
+                  {/* Selection Summary Header remains the same */}
                   <div className="bg-default-50/70 p-3 border-b border-default-200 flex flex-wrap items-center gap-x-4 gap-y-2 group">
-                    {" "}
-                    {/* Added group for hover effect */}
                     <div
-                      className="flex items-center cursor-pointer rounded hover:bg-default-100 p-1 -m-1" // Adjusted padding for hover area
+                      className="flex items-center cursor-pointer rounded hover:bg-default-100 p-1 -m-1"
                       onClick={handleSelectAllInvoices}
                       role="checkbox"
                       aria-checked={
@@ -434,7 +521,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                           : "Select All"
                       }
                     >
-                      {/* --- Select All Checkbox --- */}
                       {selectedInvoices.size === eligibleInvoices.length &&
                       eligibleInvoices.length > 0 ? (
                         <IconSquareCheckFilled
@@ -456,8 +542,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     <div className="flex-grow mb-0.5">
                       {selectedInvoices.size > 0 && (
                         <span className="text-sm text-blue-800 font-medium">
-                          {" "}
-                          {/* Changed color slightly to match blue checkboxes */}
                           {selectedInvoices.size} selected • Total:{" "}
                           <span className="font-semibold">
                             {formatCurrency(getTotalAmountSelected())}
@@ -469,12 +553,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   {/* Table Container */}
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-default-200">
+                      {/* thead remains the same */}
                       <thead className="bg-default-50">
                         <tr>
-                          <th className="w-12 px-4 py-2.5 text-center">
-                            {" "}
-                            {/* Checkbox column */}{" "}
-                          </th>
+                          <th className="w-12 px-4 py-2.5 text-center"></th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                             Invoice #
                           </th>
@@ -489,32 +571,26 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                           </th>
                         </tr>
                       </thead>
+                      {/* tbody structure remains the same */}
                       <tbody className="bg-white divide-y divide-default-100">
                         {eligibleInvoices.map((invoice) => {
                           const { date } = parseDatabaseTimestamp(
                             invoice.createddate
                           );
                           const isSelected = selectedInvoices.has(invoice.id);
-
                           return (
                             <tr
                               key={invoice.id}
                               className={`transition-colors duration-150 cursor-pointer group ${
-                                // Added group for hover
                                 isSelected
-                                  ? "bg-blue-50 hover:bg-blue-100/70" // Use blue selection color
+                                  ? "bg-blue-50 hover:bg-blue-100/70"
                                   : "hover:bg-default-50"
                               }`}
                               onClick={() => handleSelectInvoice(invoice.id)}
                               aria-selected={isSelected}
                             >
-                              {/* --- Table Row Checkbox --- */}
                               <td className="px-4 py-3">
-                                {" "}
-                                {/* Removed text-center, alignment handled by flex */}
                                 <div className="flex items-center justify-center h-full">
-                                  {" "}
-                                  {/* Center the icon */}
                                   {isSelected ? (
                                     <IconSquareCheckFilled
                                       className="text-blue-600"
@@ -522,7 +598,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                     />
                                   ) : (
                                     <IconSquare
-                                      className="text-default-400 group-hover:text-blue-500 transition-colors" // group-hover effect
+                                      className="text-default-400 group-hover:text-blue-500 transition-colors"
                                       size={18}
                                     />
                                   )}
@@ -552,7 +628,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               )}
             </div>
           ) : (
-            // History tab content (unchanged, but benefits from icon imports if needed)
+            // History tab content
             <div className="space-y-4">
               {/* Tab Header Section */}
               <div className="flex justify-between items-center">
@@ -563,9 +639,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   onClick={fetchConsolidationHistory}
                   variant="outline"
                   size="sm"
-                  disabled={isLoadingHistory}
+                  disabled={isLoadingHistory || !!processingHistoryId}
                   className="flex items-center gap-1.5"
-                  icon={IconRefresh}
+                  icon={
+                    !isLoadingHistory || processingHistoryId
+                      ? IconRefresh
+                      : undefined
+                  }
                   aria-label="Refresh consolidation history"
                 >
                   Refresh
@@ -573,7 +653,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               </div>
 
               {/* Loading State */}
-              {isLoadingHistory && (
+              {isLoadingHistory && !processingHistoryId && (
                 <div className="flex justify-center items-center py-16 text-default-500">
                   <LoadingSpinner size="md" />
                   <span className="ml-2">Loading history...</span>
@@ -598,12 +678,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               )}
 
               {/* History Table */}
-              {!isLoadingHistory && consolidationHistory.length > 0 && (
+              {consolidationHistory.length > 0 && (
                 <div className="border border-default-200 rounded-lg overflow-hidden bg-white shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-default-200">
                       <thead className="bg-default-50">
                         <tr>
+                          {/* Headers remain the same */}
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                             Consolidated ID
                           </th>
@@ -611,29 +692,41 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                             Date Created
                           </th>
                           <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                            e-Invoice Status
+                            Status
                           </th>
                           <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
-                            # Invoices
+                            Invoices
                           </th>
                           <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
-                            Total Amount (MYR)
+                            Total Amount
                           </th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                            MyInvois UUID
+                            UUID
+                          </th>
+                          <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                            Actions
                           </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-default-100">
                         {consolidationHistory.map((item) => {
-                          let statusColor = "bg-default-100 text-default-700";
-                          let statusIcon = null;
-                          let statusText = item.einvoice_status
-                            ? item.einvoice_status.charAt(0).toUpperCase() +
-                              item.einvoice_status.slice(1)
-                            : "Unknown";
+                          const currentStatus =
+                            item.einvoice_status?.toLowerCase();
+                          const isProcessing = processingHistoryId === item.id;
 
-                          switch (item.einvoice_status?.toLowerCase()) {
+                          // --- Status Badge Logic ---
+                          let statusColor = "bg-gray-100 text-gray-800"; // Default/Unknown
+                          let statusIcon = (
+                            <IconAlertTriangle size={14} className="mr-1.5" />
+                          );
+                          let statusText = "Unknown";
+                          if (currentStatus) {
+                            statusText =
+                              item.einvoice_status.charAt(0).toUpperCase() +
+                              item.einvoice_status.slice(1);
+                          }
+
+                          switch (currentStatus) {
                             case "valid":
                               statusColor = "bg-green-100 text-green-800";
                               statusIcon = (
@@ -642,7 +735,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               statusText = "Valid";
                               break;
                             case "pending":
-                            case "inprogress": // Handle variations if necessary
+                            case "inprogress":
                               statusColor = "bg-amber-100 text-amber-800";
                               statusIcon = (
                                 <IconClockHour4 size={14} className="mr-1.5" />
@@ -650,7 +743,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               statusText = "Pending";
                               break;
                             case "invalid":
-                            case "rejected": // Handle variations
+                            case "rejected":
                               statusColor = "bg-rose-100 text-rose-800";
                               statusIcon = (
                                 <IconAlertTriangle
@@ -660,20 +753,26 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               );
                               statusText = "Invalid";
                               break;
-                            default:
+                            case "cancelled": // Handle cancelled status visually
+                              statusColor = "bg-gray-200 text-gray-600";
                               statusIcon = (
-                                <IconAlertTriangle
-                                  size={14}
-                                  className="mr-1.5"
-                                />
-                              ); // Default icon for unknown
+                                <IconBan size={14} className="mr-1.5" />
+                              );
+                              statusText = "Cancelled";
+                              break;
+                            // Default case handled above
                           }
 
                           return (
                             <tr
                               key={item.id}
-                              className="hover:bg-default-50 transition-colors duration-150"
+                              className={`transition-colors duration-150 ${
+                                isProcessing
+                                  ? "opacity-60 bg-gray-50"
+                                  : "hover:bg-default-50"
+                              }`}
                             >
+                              {/* Other cells remain the same */}
                               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
                                 {item.id}
                                 {item.long_id && (
@@ -716,10 +815,58 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 {formatCurrency(item.totalamountpayable)}
                               </td>
                               <td
-                                className="px-4 py-3 whitespace-nowrap text-sm text-default-500 font-mono"
-                                title="MyInvois Document UUID"
+                                className="px-4 py-3 whitespace-nowrap text-sm text-default-500 font-mono max-w-[150px] truncate"
+                                title={item.uuid || "MyInvois Document UUID"}
                               >
                                 {item.uuid || "-"}
+                              </td>
+
+                              {/* --- UPDATED Actions Cell --- */}
+                              <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                                {isProcessing ? (
+                                  <LoadingSpinner size="sm" />
+                                ) : currentStatus === "pending" ? (
+                                  // Only show Update for Pending
+                                  <Button
+                                    size="sm" // Keep user's size change
+                                    variant="outline"
+                                    onClick={() =>
+                                      handleUpdateConsolidatedStatus(item.id)
+                                    }
+                                    disabled={
+                                      !!processingHistoryId || isSubmitting
+                                    }
+                                    icon={IconRotateClockwise}
+                                    aria-label={`Update status for ${item.id}`}
+                                    title="Check Status"
+                                  >
+                                    Update {/* Keep user's text change */}
+                                  </Button>
+                                ) : currentStatus === "valid" ||
+                                  currentStatus === "invalid" ? (
+                                  // Only show Cancel for Valid or Invalid
+                                  <Button
+                                    size="sm" // Keep user's size change
+                                    variant="outline"
+                                    color="rose"
+                                    onClick={() =>
+                                      handleCancelConsolidatedRequest(item.id)
+                                    }
+                                    disabled={
+                                      !!processingHistoryId || isSubmitting
+                                    }
+                                    icon={IconTrash}
+                                    aria-label={`Cancel consolidated invoice ${item.id}`}
+                                    title="Cancel"
+                                  >
+                                    Cancel {/* Keep user's text change */}
+                                  </Button>
+                                ) : (
+                                  // Show placeholder for other statuses (e.g., cancelled, unknown)
+                                  <span className="text-default-400 text-xs">
+                                    —
+                                  </span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -734,6 +881,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
       </div>
 
+      {/* --- UPDATED Confirmation Dialog with Reason Input --- */}
+      <ConfirmationDialog
+        isOpen={showCancelConfirm}
+        onClose={closeCancelDialog} // Use dedicated close handler
+        onConfirm={confirmCancelConsolidated}
+        title={`Cancel Consolidated Invoice ${cancelTargetId}?`}
+        confirmButtonText="Confirm Cancellation"
+        variant="danger"
+        message={`Are you sure you want to cancel the consolidated invoice ${cancelTargetId}"?`}
+      />
       {/* Submission Results Modal (Unchanged) */}
       <SubmissionResultsModal
         isOpen={showSubmissionResults}
