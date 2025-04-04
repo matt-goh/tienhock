@@ -26,6 +26,7 @@ import {
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
 import SubmissionResultsModal from "./SubmissionResultsModal";
+import ConsolidatedInfoTooltip from "./ConsolidatedInfoTooltip";
 
 // Interfaces remain the same
 interface ConsolidatedInvoiceModalProps {
@@ -794,7 +795,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                             >
                               {/* Other cells remain the same */}
                               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
-                                {item.id}
+                                <div className="flex items-center">
+                                  <span>{item.id}</span>
+                                  {item.consolidated_invoices &&
+                                    item.consolidated_invoices.length > 0 && (
+                                      <ConsolidatedInfoTooltip
+                                        invoices={item.consolidated_invoices}
+                                        className="ml-1.5"
+                                      />
+                                    )}
+                                </div>
                                 {item.long_id && (
                                   <span
                                     className="block text-xs text-default-400 truncate"
