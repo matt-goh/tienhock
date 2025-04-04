@@ -89,6 +89,7 @@ export default function (pool, config) {
 
     // Not in cache or expired, fetch from database
     try {
+      // Use pool directly here
       const data = await fetchCustomerData(pool, customerId);
 
       // Store in cache if found
@@ -845,8 +846,7 @@ export default function (pool, config) {
         einvoiceResults = await submitInvoicesToMyInvois(
           config, // Pass the main config object
           savedInvoiceDataForEInvoice,
-          (customerId) =>
-            fetchCustomerDataWithCache(pool, customerId, customerCache) // Pass bound cache helper
+          fetchCustomerDataWithCache
         );
         console.log("MyInvois submission response received.");
 
