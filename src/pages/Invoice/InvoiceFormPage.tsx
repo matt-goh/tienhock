@@ -386,7 +386,6 @@ const InvoiceFormPage: React.FC = () => {
     try {
       // Check for duplicates
       const isDuplicate = await checkDuplicateInvoiceNo(invoiceData.id);
-
       if (isDuplicate) {
         toast.error(`Invoice ${invoiceData.id} already exists in the system`, {
           id: toastId,
