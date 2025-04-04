@@ -560,7 +560,7 @@ const InvoiceListPage: React.FC = () => {
     if (eligibleInvoices.length === 0) {
       toast.error(
         "No selected invoices are eligible for e-invoice submission (Customer must have TIN and ID Number saved, and Invoice must be Active/Paid/Overdue, and not already Valid).",
-        { duration: 5000 }
+        { duration: 8000 }
       );
       return;
     }
@@ -987,7 +987,7 @@ const InvoiceListPage: React.FC = () => {
         onClose={() => setShowCancelConfirm(false)}
         onConfirm={confirmBulkCancel}
         title={`Cancel Selected Invoice(s)`}
-        message={`Are you sure you want to cancel the selected eligible invoice(s)? This action might be irreversible and may attempt to cancel submitted e-invoices.`}
+        message={`Are you sure you want to cancel the selected eligible invoice(s)? This action is and may attempt to cancel submitted e-invoices.`}
         confirmButtonText="Confirm Cancellation"
         variant="danger"
       />
