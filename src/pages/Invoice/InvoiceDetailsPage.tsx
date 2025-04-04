@@ -169,6 +169,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
+  // E-Invoice submission handler
+  const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
+    useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -241,7 +244,17 @@ const InvoiceDetailsPage: React.FC = () => {
 
     try {
       const cancelledInvoiceData = await cancelInvoice(invoiceData.id);
-      setInvoiceData(cancelledInvoiceData); // Update state with cancelled data
+
+      // Preserve the products array when updating the state
+      setInvoiceData((prevData) => {
+        if (!prevData) return cancelledInvoiceData;
+
+        return {
+          ...cancelledInvoiceData,
+          products: prevData.products, // Keep the existing products array
+        };
+      });
+
       toast.success("Invoice cancelled successfully.", { id: toastId });
       setShowPaymentForm(false); // Hide payment form
     } catch (error: any) {
@@ -251,9 +264,8 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  // E-Invoice submission handler
-  const handleSubmitEInvoice = async () => {
-    if (!invoiceData || isSubmittingInvoice) return;
+  const handleSubmitEInvoiceClick = () => {
+    if (!invoiceData) return;
 
     // Validation checks
     if (invoiceData.invoice_status === "cancelled") {
@@ -261,15 +273,7 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
-    if (invoiceData.paymenttype === "CASH") {
-      toast.error("Cash invoices cannot be submitted for e-invoicing");
-      return;
-    }
-
-    if (
-      invoiceData.einvoice_status === "valid" ||
-      invoiceData.einvoice_status === "pending"
-    ) {
+    if (invoiceData.einvoice_status === "valid") {
       toast.error("This invoice has already been submitted for e-invoicing");
       return;
     }
@@ -279,6 +283,16 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error("Customer must have TIN Number and ID Number defined");
       return;
     }
+
+    // Show confirmation dialog
+    setShowSubmitEInvoiceConfirm(true);
+  };
+
+  const handleConfirmSubmitEInvoice = async () => {
+    if (!invoiceData || isSubmittingInvoice) return;
+
+    // Close the confirmation dialog
+    setShowSubmitEInvoiceConfirm(false);
 
     // Show the submission results modal with loading state
     setSubmissionResults(null);
@@ -572,12 +586,10 @@ const InvoiceDetailsPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       )}
-
       <BackButton
         onClick={() => navigate("/sales/invoice")}
         disabled={isLoading}
       />
-
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
         <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4 flex-wrap">
@@ -606,11 +618,12 @@ const InvoiceDetailsPage: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
           {!isCancelled &&
-            invoiceData.paymenttype !== "CASH" &&
             (invoiceData.einvoice_status === null ||
-              invoiceData.einvoice_status === "invalid") && (
+              invoiceData.einvoice_status === "invalid") &&
+            invoiceData.customerid &&
+            invoiceData.customerTin && (
               <Button
-                onClick={handleSubmitEInvoice}
+                onClick={handleSubmitEInvoiceClick}
                 icon={IconSend}
                 variant="outline"
                 color="amber"
@@ -655,7 +668,6 @@ const InvoiceDetailsPage: React.FC = () => {
           )}
         </div>
       </div>
-
       {/* Payment form */}
       {showPaymentForm && !isCancelled && !isPaid && (
         <div className="bg-sky-50 p-4 md:p-6 rounded-lg mb-6 border border-sky-200 shadow-sm transition-all duration-300 ease-out">
@@ -735,7 +747,6 @@ const InvoiceDetailsPage: React.FC = () => {
           </form>
         </div>
       )}
-
       {/* Main Content Sections */}
       <div className="space-y-5">
         {/* Invoice Header Display */}
@@ -1023,6 +1034,15 @@ const InvoiceDetailsPage: React.FC = () => {
         isLoading={isSubmittingInvoice}
       />
       {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={showSubmitEInvoiceConfirm}
+        onClose={() => setShowSubmitEInvoiceConfirm(false)}
+        onConfirm={handleConfirmSubmitEInvoice}
+        title="Submit Invoice for e-Invoicing"
+        message={`You are about to submit this invoice to the MyInvois e-invoicing system. Continue?`}
+        confirmButtonText="Submit e-Invoice"
+        variant="default"
+      />
       <ConfirmationDialog
         isOpen={showCancelConfirm}
         onClose={() => setShowCancelConfirm(false)}

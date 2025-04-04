@@ -335,30 +335,30 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName,
+          c.name as customerName, c.tin_number, c.id_number,
           COALESCE(
-            json_agg(
-              json_build_object(
-                 'id', od.id,
-                 'code', od.code,
-                 'quantity', od.quantity,
-                 'price', od.price,
-                 'freeProduct', od.freeproduct,
-                 'returnProduct', od.returnproduct,
-                 'description', od.description,
-                 'tax', od.tax,
-                 'total', od.total,
-                 'issubtotal', od.issubtotal
-              )
-              ORDER BY od.id
-            ) FILTER (WHERE od.id IS NOT NULL),
-            '[]'::json
+        json_agg(
+          json_build_object(
+             'id', od.id,
+             'code', od.code,
+             'quantity', od.quantity,
+             'price', od.price,
+             'freeProduct', od.freeproduct,
+             'returnProduct', od.returnproduct,
+             'description', od.description,
+             'tax', od.tax,
+             'total', od.total,
+             'issubtotal', od.issubtotal
+          )
+          ORDER BY od.id
+        ) FILTER (WHERE od.id IS NOT NULL),
+        '[]'::json
           ) as products
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
         LEFT JOIN order_details od ON i.id = od.invoiceid
         WHERE i.id = $1
-        GROUP BY i.id, c.name
+        GROUP BY i.id, c.name, c.tin_number, c.id_number
       `;
 
       const result = await pool.query(query, [id]);
@@ -390,6 +390,8 @@ export default function (pool, config) {
         is_consolidated: invoice.is_consolidated || false,
         consolidated_invoices: invoice.consolidated_invoices,
         customerName: invoice.customername || invoice.customerid,
+        customerTin: invoice.tin_number,
+        customerIdNumber: invoice.id_number,
         products: (invoice.products || []).map((product) => ({
           id: product.id, // order_details.id
           code: product.code,

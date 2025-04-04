@@ -1103,7 +1103,7 @@ const InvoiceFormPage: React.FC = () => {
 
           {/* Payment Method Section */}
           {!isEditMode &&
-            isPaid /* ... Payment method listbox and inputs ... */ && (
+            isPaid && (
               <div className="mt-6 border-t pt-6">
                 <h2 className="text-lg font-medium mb-4">
                   Payment Info (Optional)

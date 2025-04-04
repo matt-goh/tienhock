@@ -23,7 +23,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
   items,
   onItemsChange,
   customerProducts,
-  productsCache, // Receives Product[]
+  productsCache,
   readOnly = false,
 }) => {
   const handleItemChange = useCallback(
@@ -176,8 +176,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
           />
           {!readOnly && (
             <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
-              {" "}
-              <IconChevronDown size={16} className="text-gray-400" />{" "}
+              <IconChevronDown size={16} className="text-gray-400" />
             </ComboboxButton>
           )}
           <ComboboxOptions className="absolute z-30 mt-1 w-full min-w-[350px] max-h-60 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm border border-default-200">
@@ -198,21 +197,18 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                 >
                   {({ selected }) => (
                     <>
-                      {" "}
                       <span
                         className={`block truncate ${
                           selected ? "font-medium" : "font-normal"
                         }`}
                       >
-                        {" "}
-                        {prod.description} ({prod.id}){" "}
-                      </span>{" "}
+                        {prod.description} ({prod.id})
+                      </span>
                       {selected && (
                         <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                          {" "}
-                          <IconCheck size={16} />{" "}
+                          <IconCheck size={16} />
                         </span>
-                      )}{" "}
+                      )}
                     </>
                   )}
                 </ComboboxOption>
@@ -229,15 +225,15 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
     <div>
       <table className="min-w-full divide-y divide-gray-200 border border-default-200 rounded-lg table-fixed">
         <colgroup>
-          <col className="w-[10%]" /> {/* Code */}
-          <col className="w-[35%]" /> {/* Product */}
-          <col className="w-[8%]" /> {/* QTY */}
-          <col className="w-[10%]" /> {/* Price */}
-          <col className="w-[8%]" /> {/* FOC */}
-          <col className="w-[8%]" /> {/* RTN */}
-          <col className="w-[10%]" /> {/* Tax */}
-          <col className="w-[11%]" /> {/* Total */}
-          {!readOnly && <col className="w-[40px]" />} {/* Delete */}
+          <col className="w-[10%]" />{/* Code */}
+          <col className="w-[35%]" />{/* Product */}
+          <col className="w-[8%]" />{/* QTY */}
+          <col className="w-[10%]" />{/* Price */}
+          <col className="w-[8%]" />{/* FOC */}
+          <col className="w-[8%]" />{/* RTN */}
+          <col className="w-[10%]" />{/* Tax */}
+          <col className="w-[11%]" />{/* Total */}
+          {!readOnly && <col className="w-[40px]" />}{/* Delete */}
         </colgroup>
         <thead className="bg-gray-50">
           <tr>
@@ -281,16 +277,13 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                   colSpan={7}
                   className="px-3 py-1.5 text-right text-sm text-gray-700"
                 >
-                  {" "}
-                  Subtotal:{" "}
+                  Subtotal:
                 </td>
                 <td className="px-3 py-1.5 text-right text-sm text-gray-900">
-                  {" "}
-                  {parseFloat(item.total || "0").toFixed(2)}{" "}
+                  {parseFloat(item.total || "0").toFixed(2)}
                 </td>
                 {!readOnly && (
                   <td className="px-2 py-1.5 text-center">
-                    {" "}
                     <button
                       type="button"
                       onClick={() => handleDeleteRow(index)}
@@ -298,9 +291,8 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                       title="Delete Subtotal Row"
                       disabled={readOnly}
                     >
-                      {" "}
-                      <IconTrash size={16} />{" "}
-                    </button>{" "}
+                      <IconTrash size={16} />
+                    </button>
                   </td>
                 )}
               </tr>
@@ -308,67 +300,58 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
               <tr key={item.uid || index} className="hover:bg-gray-50 group">
                 <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-500 align-middle">
                   {item.code}
-                </td>{" "}
-                {/* Ensure alignment */}
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  {" "}
-                  <ProductComboboxCell rowIndex={index} item={item} />{" "}
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  {" "}
+                  <ProductComboboxCell rowIndex={index} item={item} />
+                </td>
+                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="quantity"
                     value={item.quantity}
-                  />{" "}
+                  />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  {" "}
                   <NumericInputCell
                     rowIndex={index}
                     field="price"
                     value={item.price}
-                  />{" "}
+                  />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  {" "}
                   <NumericInputCell
                     rowIndex={index}
                     field="freeProduct"
                     value={item.freeProduct}
-                  />{" "}
+                  />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  {" "}
                   <NumericInputCell
                     rowIndex={index}
                     field="returnProduct"
                     value={item.returnProduct}
-                  />{" "}
+                  />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  {" "}
                   <NumericInputCell
                     rowIndex={index}
                     field="tax"
                     value={item.tax}
-                  />{" "}
+                  />
                 </td>
                 <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900 text-right align-middle">
                   {parseFloat(item.total || "0").toFixed(2)}
                 </td>
                 {!readOnly && (
                   <td className="px-2 py-1 text-center align-middle">
-                    {" "}
                     <button
                       type="button"
                       onClick={() => handleDeleteRow(index)}
                       className="flex items-center justify-center text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Delete Row"
                     >
-                      {" "}
-                      <IconTrash size={16} />{" "}
-                    </button>{" "}
+                      <IconTrash size={16} />
+                    </button>
                   </td>
                 )}
               </tr>

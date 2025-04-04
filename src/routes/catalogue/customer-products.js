@@ -55,13 +55,13 @@ export default function (pool) {
     try {
       const { customerId } = req.params;
 
-      // First check if customer exists
+      // First check if customer exists and get customer details
       const customerCheck = await pool.query(
-        "SELECT COUNT(*) FROM customers WHERE id = $1",
+        "SELECT id, tin_number, id_number FROM customers WHERE id = $1",
         [customerId]
       );
 
-      if (parseInt(customerCheck.rows[0].count) === 0) {
+      if (customerCheck.rows.length === 0) {
         return res.status(404).json({
           // Not Found instead of continuing with empty results
           message: "Customer not found",
@@ -69,21 +69,32 @@ export default function (pool) {
         });
       }
 
+      const customerDetails = customerCheck.rows[0];
+
       const query = `
-        SELECT 
-          cp.id,
-          cp.customer_id,
-          cp.product_id,
-          cp.custom_price,
-          cp.is_available,
-          p.description
-        FROM customer_products cp
-        JOIN products p ON cp.product_id = p.id
-        WHERE cp.customer_id = $1
-      `;
+      SELECT 
+        cp.id,
+        cp.customer_id,
+        cp.product_id,
+        cp.custom_price,
+        cp.is_available,
+        p.description
+      FROM customer_products cp
+      JOIN products p ON cp.product_id = p.id
+      WHERE cp.customer_id = $1
+    `;
 
       const result = await pool.query(query, [customerId]);
-      res.status(200).json(result.rows); // Explicitly use 200 OK
+
+      // Return both customer details and products
+      res.status(200).json({
+        customer: {
+          id: customerDetails.id,
+          tin_number: customerDetails.tin_number,
+          id_number: customerDetails.id_number,
+        },
+        products: result.rows,
+      });
     } catch (error) {
       console.error("Error fetching custom products:", error);
       res.status(500).json({

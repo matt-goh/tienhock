@@ -39,6 +39,11 @@ const InvoiceFormPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false); // Saving state (Create)
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [customerProducts, setCustomerProducts] = useState<CustomProduct[]>([]);
+  const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
+  const [customerTinNumber, setCustomerTinNumber] = useState<string | null>(
+    null
+  );
+  const [customerIdNumber, setCustomerIdNumber] = useState<string | null>(null);
 
   // Payment State (only relevant if 'Paid' is checked)
   const [isPaid, setIsPaid] = useState(false);
@@ -126,20 +131,40 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [invoiceData?.paymenttype, isPaid]);
 
-  // Fetch custom product prices when customer changes (No change needed)
+  // Fetch custom product prices when customer changes
   const fetchCustomerProducts = useCallback(async (customerId: string) => {
     if (!customerId) {
       setCustomerProducts([]);
+      setCustomerTinNumber(null);
+      setCustomerIdNumber(null);
       return [];
     }
     try {
       const response = await api.get(`/api/customer-products/${customerId}`);
-      setCustomerProducts(response);
-      return response;
+
+      // Handle the new response format
+      if (response.products) {
+        // New format with customer and products
+        setCustomerProducts(response.products);
+
+        // Store customer TIN and ID for e-invoice eligibility check
+        if (response.customer) {
+          setCustomerTinNumber(response.customer.tin_number);
+          setCustomerIdNumber(response.customer.id_number);
+        }
+
+        return response.products;
+      } else {
+        // Handle legacy format (just in case)
+        setCustomerProducts(response);
+        return response;
+      }
     } catch (error) {
       console.error("Error fetching customer products:", error);
       toast.error("Could not load custom product prices.");
       setCustomerProducts([]);
+      setCustomerTinNumber(null);
+      setCustomerIdNumber(null);
       return [];
     }
   }, []);
@@ -331,7 +356,7 @@ const InvoiceFormPage: React.FC = () => {
     handleLineItemsChange([...invoiceData.products, subtotalRow]);
   };
 
-  // CREATE INVOICE (Renamed and simplified)
+  // CREATE INVOICE
   const handleCreateInvoice = async () => {
     if (!invoiceData || isSaving) return;
 
@@ -427,6 +452,47 @@ const InvoiceFormPage: React.FC = () => {
           );
         }
       } else {
+        toast.success(`Invoice ${invoiceIdForPayment} created!`, {
+          id: toastId,
+        });
+      }
+
+      // Step 3: If 'Submit e-Invoice' is checked, submit for e-invoicing
+      if (submitAsEinvoice && customerTinNumber && customerIdNumber) {
+        toast.loading("Submitting e-invoice...", { id: toastId });
+        try {
+          const einvoiceResponse = await api.post(
+            "/api/einvoice/submit-system",
+            {
+              invoiceIds: [invoiceIdForPayment],
+            }
+          );
+
+          if (einvoiceResponse.success) {
+            toast.success(
+              `Invoice ${invoiceIdForPayment} created and submitted for e-invoicing!`,
+              {
+                id: toastId,
+              }
+            );
+          } else {
+            toast.error(
+              `Invoice created, but e-invoice submission failed: ${
+                einvoiceResponse.message || "Unknown error"
+              }`,
+              { id: toastId, duration: 5000 }
+            );
+          }
+        } catch (einvoiceError: any) {
+          toast.error(
+            `Invoice created, but e-invoice submission failed: ${
+              einvoiceError.message || "Unknown error"
+            }`,
+            { id: toastId, duration: 5000 }
+          );
+        }
+      } else {
+        // Normal success message if not submitting e-invoice
         toast.success(`Invoice ${invoiceIdForPayment} created!`, {
           id: toastId,
         });
@@ -644,6 +710,29 @@ const InvoiceFormPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* e-Invoice Checkbox - only show if customer has TIN and ID */}
+          {customerTinNumber && customerIdNumber && (
+            <div className="flex items-center pt-1">
+              <button
+                type="button"
+                onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
+                className={`flex items-center ${
+                  isSaving ? "cursor-not-allowed opacity-70" : ""
+                } disabled:opacity-50`}
+                disabled={isSaving}
+              >
+                {submitAsEinvoice ? (
+                  <IconSquareCheckFilled className="text-blue-600" size={20} />
+                ) : (
+                  <IconSquare className="text-default-400" size={20} />
+                )}
+                <span className="ml-2 font-medium text-sm">
+                  Submit e-Invoice upon saving
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Right Side: Invoice Totals */}
           <div className="w-full md:w-auto">
