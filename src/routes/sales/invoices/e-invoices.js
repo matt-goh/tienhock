@@ -1034,11 +1034,44 @@ export default function (pool, config) {
         year
       );
 
-      // Create a consolidated invoice document for submission
-      const consolidatedId = `CON-${year}${String(parseInt(month) + 1).padStart(
-        2,
-        "0"
-      )}`;
+      // Generate base consolidated ID
+      const baseConsolidatedId = `CON-${year}${String(
+        parseInt(month) + 1
+      ).padStart(2, "0")}`;
+
+      // Check for existing consolidated invoices with the same base ID pattern
+      const existingIdsQuery = `
+      SELECT id FROM invoices 
+      WHERE id LIKE $1 
+      ORDER BY id DESC
+    `;
+      const existingIdsResult = await pool.query(existingIdsQuery, [
+        `${baseConsolidatedId}%`,
+      ]);
+
+      let consolidatedId;
+      if (existingIdsResult.rows.length === 0) {
+        // No existing IDs, use the base ID
+        consolidatedId = baseConsolidatedId;
+      } else {
+        // Find the highest suffix number and increment
+        let maxSuffix = 0;
+        for (const row of existingIdsResult.rows) {
+          const id = row.id;
+          // Extract suffix number if present (e.g., "CON-202504-1" -> 1)
+          const match = id.match(new RegExp(`^${baseConsolidatedId}-?(\\d+)$`));
+          if (match && match[1]) {
+            const suffix = parseInt(match[1]);
+            if (suffix > maxSuffix) {
+              maxSuffix = suffix;
+            }
+          }
+        }
+        // Increment the highest suffix or start with 1 if no suffixed versions exist
+        consolidatedId = `${baseConsolidatedId}-${
+          maxSuffix > 0 ? maxSuffix + 1 : 1
+        }`;
+      }
 
       const requestBody = {
         documents: [
@@ -1112,11 +1145,11 @@ export default function (pool, config) {
           // Insert consolidated record
           await client.query(
             `INSERT INTO invoices (
-              id, uuid, submission_uid, long_id, datetime_validated,
-              total_excluding_tax, tax_amount, rounding, totalamountpayable,
-              invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
-              customerid, salespersonid, createddate, paymenttype, balance_due
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+            id, uuid, submission_uid, long_id, datetime_validated,
+            total_excluding_tax, tax_amount, rounding, totalamountpayable,
+            invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
+            customerid, salespersonid, createddate, paymenttype, balance_due
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
             [
               consolidatedId,
               consolidatedData.uuid,
@@ -1410,13 +1443,13 @@ export default function (pool, config) {
 
       // --- Step 2: Local Database Cleanup ---
 
-      // 2a. Delete the consolidated invoice record
-      console.log(`Deleting consolidated invoice record: ${id}`);
-      const deleteResult = await client.query(
-        "DELETE FROM invoices WHERE id = $1",
+      // 2a. Update the consolidated invoice status to cancelled
+      console.log(`Updating consolidated invoice ${id} to cancelled status`);
+      const updateResult = await client.query(
+        "UPDATE invoices SET invoice_status = 'cancelled', einvoice_status = 'cancelled' WHERE id = $1",
         [id]
       );
-      if (deleteResult.rowCount === 0) {
+      if (updateResult.rowCount === 0) {
         // Should not happen due to FOR UPDATE lock, but safety check
         throw new Error(
           `Consolidated invoice ${id} vanished during transaction.`
