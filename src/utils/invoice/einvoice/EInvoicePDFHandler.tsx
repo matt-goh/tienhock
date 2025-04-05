@@ -17,12 +17,14 @@ interface PDFDownloadHandlerProps {
   einvoice?: any; // Single einvoice in original format
   invoices?: ExtendedInvoiceData[]; // Multiple invoices in ExtendedInvoiceData format
   disabled?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
   einvoice,
   invoices,
   disabled,
+  size = "sm",
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -176,7 +178,7 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       iconSize={16}
       iconStroke={2}
       variant="outline"
-      size="sm"
+      size={size}
       data-einvoice-download="true"
     >
       {isGenerating ? "Generating..." : "Download"}
