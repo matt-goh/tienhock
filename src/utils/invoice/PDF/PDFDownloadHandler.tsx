@@ -22,19 +22,21 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownload = async () => {
-    if (isGenerating) return;
+    if (isGenerating || disabled) return;
 
     setIsGenerating(true);
-    const toastId = toast.loading("Generating PDF...");
+    const isBatchDownload = invoices.length > 1;
+    const toastId = toast.loading(
+      isBatchDownload
+        ? `Generating PDFs for ${invoices.length} invoices...`
+        : "Generating PDF..."
+    );
 
     try {
       // First render the PDF component
       const pdfComponent = (
         <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-          <InvoicePDF
-            invoices={invoices}
-            customerNames={customerNames} // Use the passed-in customerNames directly
-          />
+          <InvoicePDF invoices={invoices} customerNames={customerNames} />
         </Document>
       );
 
@@ -66,6 +68,13 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
     }
   };
 
+  // Determine button label based on invoice count
+  const buttonLabel = isGenerating
+    ? "Generating..."
+    : invoices.length > 1
+    ? `Download ${invoices.length} PDFs`
+    : "Download";
+
   if (!invoices || invoices.length === 0) {
     return null;
   }
@@ -79,7 +88,7 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       iconStroke={2}
       variant="outline"
     >
-      {isGenerating ? "Generating..." : "Download"}
+      {buttonLabel}
     </Button>
   );
 };

@@ -18,6 +18,7 @@ const PrintPDFOverlay = ({
   const [isPrinting, setIsPrinting] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const hasPrintedRef = useRef(false);
   const resourcesRef = useRef<{
     printFrame: HTMLIFrameElement | null;
@@ -91,8 +92,11 @@ const PrintPDFOverlay = ({
         printFrame.onload = () => {
           if (!hasPrintedRef.current && printFrame?.contentWindow) {
             hasPrintedRef.current = true;
-            printFrame.contentWindow.print();
-            cleanup(); // Hide loading dialog only
+            // Use a slight delay to ensure content is fully loaded
+            setTimeout(() => {
+              printFrame.contentWindow?.print();
+              cleanup(); // Hide loading dialog only
+            }, 500);
 
             const onFocus = () => {
               window.removeEventListener("focus", onFocus);
@@ -111,6 +115,7 @@ const PrintPDFOverlay = ({
         printFrame.src = pdfUrl;
       } catch (error) {
         console.error("Error generating PDF:", error);
+        setError(error instanceof Error ? error.message : "Unknown error");
         toast.error("Error preparing document for print. Please try again.");
         cleanup(true);
       }
@@ -201,6 +206,9 @@ const PrintPDFOverlay = ({
               : "Opening print dialog..."}
           </p>
           <p className="text-sm text-default-500">Please wait a moment</p>
+          {error && (
+            <p className="text-sm text-rose-600 mt-2 text-center">{error}</p>
+          )}
           <button
             onClick={() => {
               cleanup(true);

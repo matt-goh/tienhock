@@ -584,7 +584,7 @@ const InvoiceListPage: React.FC = () => {
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Active/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
+        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
         { duration: 8000 }
       );
       return;
