@@ -1,5 +1,5 @@
 // src/components/Invoice/ConsolidatedInvoiceModal.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import LoadingSpinner from "../LoadingSpinner";
@@ -44,6 +44,7 @@ interface ConsolidatedInvoiceModalProps {
   onClose: () => void;
   month: number; // 0-11 (Jan-Dec)
   year: number;
+  onMonthYearChange?: (month: number, year: number) => void;
 }
 
 interface EligibleInvoice {
@@ -76,6 +77,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   onClose,
   month,
   year,
+  onMonthYearChange,
 }) => {
   // State hooks remain the same
   const [eligibleInvoices, setEligibleInvoices] = useState<EligibleInvoice[]>(
@@ -104,16 +106,25 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState(""); // State for cancellation reason input
+  const [selectedMonth, setSelectedMonth] = useState<number>(month);
   const [historyYear, setHistoryYear] = useState<number>(
     new Date().getFullYear()
   );
 
-  // Date formatting remains the same
   const monthName = new Date(year, month).toLocaleString("default", {
     month: "long",
   });
 
-  // Effects remain the same
+  // Create an array of month options (similar to how historyYear works)
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => ({
+        id: i,
+        name: new Date(0, i).toLocaleString("default", { month: "long" }),
+      })),
+    []
+  );
+
   useEffect(() => {
     if (isOpen) {
       // Reset state when opening
@@ -137,7 +148,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       fetchConsolidationHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year, historyYear, isOpen]);
+  }, [selectedMonth, year, historyYear, isOpen]);
 
   // Core functions (fetchEligible, fetchHistory, selection, submit, formatCurrency, getTotal)
   const fetchEligibleInvoices = async () => {
@@ -145,8 +156,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     setIsLoadingEligible(true);
     setError(null);
     try {
+      // Use selectedMonth instead of month if we're managing state locally
+      const monthToUse = selectedMonth !== undefined ? selectedMonth : month;
       const response = await api.get(
-        `/api/einvoice/eligible-for-consolidation?month=${month}&year=${year}`
+        `/api/einvoice/eligible-for-consolidation?month=${monthToUse}&year=${year}`
       );
       if (response.success) {
         setEligibleInvoices(response.data || []);
@@ -284,6 +297,27 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       });
     } finally {
       setProcessingHistoryId(null);
+    }
+  };
+
+  const handleMonthChange = (newMonth: number) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Determine the appropriate year
+    let targetYear = currentYear;
+
+    // If selected month is later than current month, use previous year
+    if (newMonth > currentMonth) {
+      targetYear = currentYear - 1;
+    }
+
+    setSelectedMonth(newMonth);
+    // Update the parent component's state if needed or trigger a refetch
+    // Assuming onMonthYearChange is a new prop to handle changes
+    if (typeof onMonthYearChange === "function") {
+      onMonthYearChange(newMonth, targetYear);
     }
   };
 
@@ -446,9 +480,81 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
             <div className="space-y-4">
               {/* Header and buttons */}
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <h3 className="text-base font-semibold text-default-800">
-                  Eligible for {monthName} {year}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-default-800 mr-2">
+                    Eligible for
+                  </h3>
+
+                  {/* Month Selector */}
+                  <Listbox
+                    value={selectedMonth}
+                    onChange={handleMonthChange}
+                    disabled={
+                      isLoadingEligible || isSubmitting || !!processingHistoryId
+                    }
+                  >
+                    <div className="relative">
+                      <ListboxButton className="rounded-lg border border-default-300 py-1 px-2 text-sm bg-white w-32 text-left flex items-center justify-between">
+                        <span className="block truncate">
+                          {monthOptions[selectedMonth].name}
+                        </span>
+                        <IconChevronDown
+                          className="h-4 w-4 text-default-400"
+                          aria-hidden="true"
+                        />
+                      </ListboxButton>
+                      <Transition
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          {monthOptions.map((month) => (
+                            <ListboxOption
+                              key={month.id}
+                              value={month.id}
+                              className={({ active }) =>
+                                `relative cursor-default select-none py-2 pl-3 pr-9 ${
+                                  active
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "text-default-900"
+                                }`
+                              }
+                            >
+                              {({ selected, active }) => (
+                                <>
+                                  <span
+                                    className={`block truncate ${
+                                      selected ? "font-medium" : "font-normal"
+                                    }`}
+                                  >
+                                    {month.name}
+                                  </span>
+                                  {selected ? (
+                                    <span
+                                      className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
+                                        active ? "text-sky-600" : "text-sky-600"
+                                      }`}
+                                    >
+                                      <IconCheck
+                                        className="h-5 w-5"
+                                        aria-hidden="true"
+                                      />
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </ListboxOption>
+                          ))}
+                        </ListboxOptions>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  <span className="text-base font-semibold text-default-800 mx-1">
+                    {year}
+                  </span>
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Button
                     onClick={fetchEligibleInvoices}

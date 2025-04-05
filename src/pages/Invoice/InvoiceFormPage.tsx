@@ -427,12 +427,6 @@ const InvoiceFormPage: React.FC = () => {
     }
     if (isPaid) {
       if (!paymentMethod) errors.push("Payment Method is required.");
-      if (
-        (paymentMethod === "cheque" || paymentMethod === "bank_transfer") &&
-        !paymentReference
-      ) {
-        errors.push("Payment Reference is required for Cheque/Bank Transfer.");
-      }
     }
     if (errors.length > 0) {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
@@ -453,7 +447,22 @@ const InvoiceFormPage: React.FC = () => {
 
       // 2. Create Invoice
       toast.loading("Creating invoice...", { id: toastId });
-      const savedInvoice = await createInvoice({ ...invoiceData });
+
+      // UPDATED: Prepare invoice data with payment information for CASH invoices
+      let invoiceDataToSubmit = { ...invoiceData };
+      if (invoiceData.paymenttype === "CASH" && isPaid) {
+        invoiceDataToSubmit = {
+          ...invoiceDataToSubmit,
+          payment_method: paymentMethod,
+          payment_reference:
+            paymentMethod === "cheque" || paymentMethod === "bank_transfer"
+              ? paymentReference
+              : undefined,
+          payment_notes: "Payment automatically recorded for CASH invoices",
+        };
+      }
+
+      const savedInvoice = await createInvoice(invoiceDataToSubmit);
       invoiceIdForNavigation = savedInvoice.id; // Store the successfully created ID
       toast.success(`Invoice ${invoiceIdForNavigation} created!`, {
         id: toastId,
@@ -495,7 +504,7 @@ const InvoiceFormPage: React.FC = () => {
             return; // Exit the function
           }
         } else {
-          // For CASH invoices, they are already paid by backend
+          // For CASH invoices, they are already paid by backend with our specified payment method
           toast.success(`CASH Invoice ${invoiceIdForNavigation} created!`, {
             id: toastId,
           });

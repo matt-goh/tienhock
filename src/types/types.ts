@@ -350,6 +350,9 @@ export interface ExtendedInvoiceData extends InvoiceData {
   originalId?: string; // Used when invoice ID itself is changed during edit
   cancellation_date?: string | null; // ISO date string of cancellation (might come from cancelled_invoices table)
   invoice?: string;
+  payment_method?: Payment["payment_method"];
+  payment_reference?: string;
+  payment_notes?: string;
 }
 
 export interface ProductItem {

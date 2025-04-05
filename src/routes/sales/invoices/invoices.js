@@ -502,6 +502,12 @@ export default function (pool, config) {
 
       // If it's a CASH invoice, create automatic payment record
       if (isCash && totalPayable > 0) {
+        // Check if payment details were provided in the request
+        const paymentMethod = invoice.payment_method || "cash";
+        const paymentReference = invoice.payment_reference || null;
+        const paymentNotes =
+          invoice.payment_notes || "Automatic payment for CASH invoice";
+
         const paymentQuery = `
           INSERT INTO payments (
             invoice_id, payment_date, amount_paid, payment_method,
@@ -512,9 +518,9 @@ export default function (pool, config) {
           createdInvoice.id,
           new Date().toISOString(),
           totalPayable,
-          "cash", // Default payment method for CASH invoices
-          null,
-          "Automatic payment for CASH invoice",
+          paymentMethod, // Use provided payment method
+          paymentReference, // Use provided reference
+          paymentNotes, // Use provided notes or default
         ]);
       }
 
