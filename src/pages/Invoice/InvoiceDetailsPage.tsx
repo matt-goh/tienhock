@@ -678,7 +678,7 @@ const InvoiceDetailsPage: React.FC = () => {
               {showPaymentForm ? "Cancel Payment" : "Record Payment"}
             </Button>
           )}
-          {!isCancelled && (
+          {!isCancelled && (  
             <Button
               onClick={handleCancelInvoiceClick}
               variant="outline"
@@ -687,7 +687,7 @@ const InvoiceDetailsPage: React.FC = () => {
               disabled={isCancelling || isLoading}
               icon={IconBan}
             >
-              {isCancelling ? "Cancelling..." : "Cancel Invoice"}
+              {isCancelling ? "Cancelling..." : "Cancel"}
             </Button>
           )}
         </div>
@@ -882,7 +882,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     UUID:
-                  </strong>{" "}
+                  </strong>
                   <span className="font-mono text-sm break-all">
                     {invoiceData.uuid}
                   </span>
@@ -892,7 +892,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Long ID:
-                  </strong>{" "}
+                  </strong>
                   <span className="font-mono text-sm break-all">
                     {invoiceData.long_id}
                   </span>
@@ -902,7 +902,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Submission:
-                  </strong>{" "}
+                  </strong>
                   <span className="font-mono text-sm break-all">
                     {invoiceData.submission_uid}
                   </span>
@@ -912,8 +912,8 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Validated:
-                  </strong>{" "}
-                  {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
+                  </strong>
+                  {formatDisplayDate(new Date(invoiceData.datetime_validated))}
                   {new Date(invoiceData.datetime_validated).toLocaleTimeString(
                     "en-US",
                     {
@@ -928,7 +928,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <p>
                 <strong className="text-gray-500 font-medium w-24 inline-block">
                   Status:
-                </strong>{" "}
+                </strong>
                 {eInvoiceStatusInfo ? (
                   <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
                     {eInvoiceStatusInfo.text}

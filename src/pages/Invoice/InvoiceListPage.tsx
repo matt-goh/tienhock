@@ -45,6 +45,7 @@ import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
 import FilterSummary from "../../components/Invoice/FilterSummary";
 import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
+import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -131,6 +132,10 @@ const InvoiceListPage: React.FC = () => {
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoices, setIsSubmittingInvoices] = useState(false);
   const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
+  const [showEInvoiceDownloader, setShowEInvoiceDownloader] = useState(false);
+  const [eInvoicesToDownload, setEInvoicesToDownload] = useState<
+    ExtendedInvoiceData[]
+  >([]);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
@@ -198,6 +203,12 @@ const InvoiceListPage: React.FC = () => {
     };
   }, [selectedInvoiceIds, invoices]);
 
+  const hasValidEInvoices = useCallback(() => {
+    return invoices.some(
+      (inv) => selectedInvoiceIds.has(inv.id) && inv.einvoice_status === "valid"
+    );
+  }, [invoices, selectedInvoiceIds]);
+
   // --- Callbacks ---
 
   // Fetch Invoices using the utility (No changes needed here)
@@ -247,6 +258,24 @@ const InvoiceListPage: React.FC = () => {
     // and we explicitly pass the dependencies (filters, searchTerm) when calling it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFetchTriggered, currentPage]); // Only re-run when page changes or triggered manually
+
+  useEffect(() => {
+    if (showEInvoiceDownloader && eInvoicesToDownload.length > 0) {
+      // The component is now in the DOM, but we need to programmatically click its button
+      // Find the button and click it
+      const downloadButton = document.querySelector(
+        '[data-einvoice-download="true"]'
+      );
+      if (downloadButton && downloadButton instanceof HTMLButtonElement) {
+        downloadButton.click();
+      }
+      // Reset the state after a delay
+      setTimeout(() => {
+        setShowEInvoiceDownloader(false);
+        setEInvoicesToDownload([]);
+      }, 500);
+    }
+  }, [showEInvoiceDownloader, eInvoicesToDownload]);
 
   // Filter Change Handler - Receives the COMPLETE, new filter state to apply
   const handleApplyFilters = useCallback(
@@ -670,6 +699,22 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const handleDownloadValidEInvoices = () => {
+    // Get only the invoices with valid e-invoice status
+    const validEInvoices = invoices.filter(
+      (inv) => selectedInvoiceIds.has(inv.id) && inv.einvoice_status === "valid"
+    );
+
+    if (validEInvoices.length === 0) {
+      toast.error("No valid e-invoices found in selection");
+      return;
+    }
+
+    // Pass the filtered invoices directly to the downloader
+    setEInvoicesToDownload(validEInvoices);
+    setShowEInvoiceDownloader(true);
+  };
+
   // Placeholder actions (implement actual logic or remove)
   const handleBulkDownload = () =>
     toast.error("Bulk Download PDF (Not Implemented)");
@@ -843,7 +888,6 @@ const InvoiceListPage: React.FC = () => {
 
           {/* Selection Count and Total */}
           <div className="flex-grow min-w-[150px]">
-            {" "}
             {/* Allow text to wrap */}
             {selectedInvoiceIds.size > 0 ? (
               <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
@@ -913,6 +957,23 @@ const InvoiceListPage: React.FC = () => {
               >
                 Submit e-Invoice
               </Button>
+              {hasValidEInvoices() && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="sky"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadValidEInvoices();
+                  }}
+                  icon={IconFileDownload}
+                  disabled={isLoading}
+                  aria-label="e-Invoice"
+                  title="Download e-Invoice"
+                >
+                  Download e-Invoice
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -1049,6 +1110,15 @@ const InvoiceListPage: React.FC = () => {
         confirmButtonText="Submit e-Invoices"
         variant="default"
       />
+      {/* E-Invoice PDF Downloader (invisible, triggered by state) */}
+      {showEInvoiceDownloader && eInvoicesToDownload.length > 0 && (
+        <div style={{ display: "none" }}>
+          <EInvoicePDFHandler
+            invoices={eInvoicesToDownload} // Changed from einvoices to invoices
+            disabled={false}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -4,17 +4,23 @@ import { pdf, Document } from "@react-pdf/renderer";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import toast from "react-hot-toast";
-import { preparePDFData } from "../../../services/einvoice-pdf.service";
+import {
+  preparePDFData,
+  prepareBatchPDFData,
+} from "../../../services/einvoice-pdf.service";
 import { generateQRDataUrl } from "./generateQRCode";
 import EInvoicePDF from "./EInvoicePDF";
+import { ExtendedInvoiceData } from "../../../types/types";
 
 interface PDFDownloadHandlerProps {
-  einvoice: any; // We'll type this properly once we have the exact type
+  einvoice?: any; // Single einvoice in original format
+  invoices?: ExtendedInvoiceData[]; // Multiple invoices in ExtendedInvoiceData format
   disabled?: boolean;
 }
 
 const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
   einvoice,
+  invoices,
   disabled,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -22,49 +28,108 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
   const handleDownload = async () => {
     if (isGenerating) return;
 
+    const isBatch = invoices && invoices.length > 0;
+    const toastId = toast.loading(
+      `Generating ${isBatch ? "e-invoices" : "e-invoice"} PDF...`
+    );
     setIsGenerating(true);
-    const toastId = toast.loading("Generating e-invoice PDF...");
 
     try {
-      // Check if this is a consolidated invoice
-      const isConsolidated =
-        einvoice.is_consolidated || einvoice.internal_id.startsWith("CON-");
+      if (isBatch) {
+        // Process batch of invoices using the service function
+        const preparedData = await prepareBatchPDFData(invoices);
 
-      // Generate QR code first
-      const qrDataUrl = await generateQRDataUrl(
-        einvoice.uuid,
-        einvoice.long_id
-      );
+        if (preparedData.length === 0) {
+          throw new Error("No valid invoices could be processed");
+        }
 
-      // Prepare the data
-      const pdfData = await preparePDFData(einvoice);
+        // Create PDF pages
+        const pdfPages = [];
+        for (const { pdfData, invoice } of preparedData) {
+          try {
+            // Generate QR code only for valid e-invoices
+            const qrDataUrl =
+              invoice.uuid && invoice.long_id
+                ? await generateQRDataUrl(invoice.uuid, invoice.long_id)
+                : null;
 
-      // Create PDF
-      const pdfComponent = (
-        <Document title={`einvoice-${einvoice.internal_id}`}>
-          <EInvoicePDF
-            data={pdfData}
-            qrCodeData={qrDataUrl}
-            isConsolidated={isConsolidated}
-          />
-        </Document>
-      );
+            const isConsolidated: boolean =
+              Boolean(invoice.is_consolidated) ||
+              (invoice.id ? invoice.id.startsWith("CON-") : false);
 
-      // Generate PDF blob
-      const pdfBlob = await pdf(pdfComponent).toBlob();
-      const pdfUrl = URL.createObjectURL(pdfBlob);
+            pdfPages.push(
+              <EInvoicePDF
+                key={invoice.id}
+                data={pdfData}
+                qrCodeData={qrDataUrl || ""}
+                isConsolidated={isConsolidated}
+              />
+            );
+          } catch (innerError) {
+            console.error(
+              `Error creating PDF page for invoice ${invoice.id}:`,
+              innerError
+            );
+            // Continue with other invoices
+          }
+        }
 
-      // Create and trigger download
-      const link = document.createElement("a");
-      link.href = pdfUrl;
-      link.download = `einvoice-${einvoice.internal_id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        // Generate combined PDF
+        const pdfComponent = <Document title="e-invoices">{pdfPages}</Document>;
 
-      // Cleanup
-      URL.revokeObjectURL(pdfUrl);
-      toast.success("E-invoice PDF downloaded successfully", { id: toastId });
+        // Download logic
+        const pdfBlob = await pdf(pdfComponent).toBlob();
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+
+        const filename =
+          preparedData.length === 1
+            ? `einvoice-${preparedData[0].invoice.id}.pdf`
+            : `einvoices-batch-${new Date().toISOString().slice(0, 10)}.pdf`;
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(pdfUrl);
+        toast.success(
+          `${preparedData.length} e-invoice${
+            preparedData.length > 1 ? "s" : ""
+          } PDF downloaded successfully`,
+          { id: toastId }
+        );
+      } else if (einvoice) {
+        // Handle single einvoice (original logic)
+        const isConsolidated =
+          einvoice.is_consolidated || einvoice.internal_id.startsWith("CON-");
+        const qrDataUrl = await generateQRDataUrl(
+          einvoice.uuid,
+          einvoice.long_id
+        );
+        const pdfData = await preparePDFData(einvoice);
+        const pdfComponent = (
+          <Document title={`einvoice-${einvoice.internal_id}`}>
+            <EInvoicePDF
+              data={pdfData}
+              qrCodeData={qrDataUrl}
+              isConsolidated={isConsolidated}
+            />
+          </Document>
+        );
+        const pdfBlob = await pdf(pdfComponent).toBlob();
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.download = `einvoice-${einvoice.internal_id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("E-invoice PDF downloaded successfully", { id: toastId });
+      } else {
+        throw new Error("No invoice data provided");
+      }
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error(
@@ -87,6 +152,7 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       iconStroke={2}
       variant="outline"
       size="sm"
+      data-einvoice-download="true"
     >
       {isGenerating ? "Generating..." : "Download"}
     </Button>
