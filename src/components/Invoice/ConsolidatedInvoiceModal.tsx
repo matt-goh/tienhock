@@ -241,7 +241,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         success: false,
         message: error.message || "Failed to submit consolidated invoice",
         rejectedDocuments: [
-          /* ... error formatting ... */
+          {
+            internalId: `CON-${year}${String(month + 1).padStart(2, "0")}`, // Use generated ID
+            error: {
+              code: "SUBMISSION_ERROR",
+              message: error.message || "Error during submission",
+            },
+          },
         ],
         acceptedDocuments: [],
         overallStatus: "Error",
@@ -350,15 +356,18 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           response.message || `Successfully cancelled ${currentId}.`,
           { id: toastId }
         );
-        // Remove the cancelled item from history
+        // Update the cancelled item's status instead of removing it
         setConsolidationHistory((prev) =>
-          prev.filter((item) => item.id !== currentId)
+          prev.map((item) =>
+            item.id === currentId
+              ? { ...item, einvoice_status: "cancelled" }
+              : item
+          )
         );
         // Refresh eligible invoices
         fetchEligibleInvoices();
         setShowCancelConfirm(false); // Close dialog on success
-        setCancelTargetId(null); // Reset target
-      } else {
+        setCancelTargetId(null); // Reset target} else {
         // Keep dialog open on failure? Maybe show error within dialog?
         // For now, just show toast and keep dialog open.
         throw new Error(response.message || "Cancellation failed.");
