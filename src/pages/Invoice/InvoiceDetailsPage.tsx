@@ -378,14 +378,6 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error("Payment method is required");
       return false;
     }
-    if (
-      (paymentFormData.payment_method === "cheque" ||
-        paymentFormData.payment_method === "bank_transfer") &&
-      !paymentFormData.payment_reference?.trim() // Check trimmed value
-    ) {
-      toast.error("Payment Reference is required for Cheque/Bank Transfer.");
-      return false;
-    }
     return true;
   };
 
