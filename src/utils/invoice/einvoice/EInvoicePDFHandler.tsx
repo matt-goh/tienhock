@@ -11,6 +11,7 @@ import {
 import { generateQRDataUrl } from "./generateQRCode";
 import EInvoicePDF from "./EInvoicePDF";
 import { ExtendedInvoiceData } from "../../../types/types";
+import { api } from "../../../routes/utils/api";
 
 interface PDFDownloadHandlerProps {
   einvoice?: any; // Single einvoice in original format
@@ -36,9 +37,33 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
 
     try {
       if (isBatch) {
-        // Process batch of invoices using the service function
-        const preparedData = await prepareBatchPDFData(invoices);
+        // For each invoice, manually fetch order details to ensure we have them
+        const processedInvoices = [];
 
+        for (const invoice of invoices) {
+          try {
+            // Fetch complete invoice details including products
+            const fullInvoiceData = await api.get(
+              `/api/invoices/${invoice.id}`
+            );
+
+            if (fullInvoiceData) {
+              processedInvoices.push({
+                ...invoice,
+                products: fullInvoiceData.products || [],
+              });
+            }
+          } catch (error) {
+            console.error(
+              `Failed to fetch details for invoice ${invoice.id}:`,
+              error
+            );
+            processedInvoices.push(invoice); // Use original if fetch fails
+          }
+        }
+
+        // Now process with complete data
+        const preparedData = await prepareBatchPDFData(processedInvoices);
         if (preparedData.length === 0) {
           throw new Error("No valid invoices could be processed");
         }

@@ -367,27 +367,50 @@ const EInvoicePDF: React.FC<Props> = ({
         </View>
 
         {/* Table Rows */}
-        {data.orderDetails.map((item, index) => (
-          <View key={index} style={styles.tableRow}>
-            <Text style={[styles.classCol, styles.cellText]}>022</Text>
-            <Text style={[styles.itemNameCol, styles.cellText]}>
-              {item.description}
+        {/* Table Rows */}
+        {data.orderDetails && data.orderDetails.length > 0 ? (
+          data.orderDetails.map((item, index) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.classCol, styles.cellText]}>022</Text>
+              <Text style={[styles.itemNameCol, styles.cellText]}>
+                {item.description}
+              </Text>
+              <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
+              <Text style={[styles.priceCol, styles.cellText]}>
+                {Number(item.price).toFixed(2)}
+              </Text>
+              <Text style={[styles.subtotalCol, styles.cellText]}>
+                {(item.qty * Number(item.price)).toFixed(2)}
+              </Text>
+              <Text style={[styles.taxCol, styles.cellText]}>
+                {Number(item.tax || 0).toFixed(2)}
+              </Text>
+              <Text style={[styles.totalCol, styles.cellText]}>
+                {typeof item.total === "string"
+                  ? Number(item.total).toFixed(2)
+                  : Number(item.total).toFixed(2)}
+              </Text>
+            </View>
+          ))
+        ) : (
+          // Render a placeholder or error message if no order details
+          <View style={styles.tableRow}>
+            <Text
+              style={[
+                styles.itemNameCol,
+                styles.cellText,
+                { textAlign: "center" },
+              ]}
+            >
+              No item details available
             </Text>
-            <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
-            <Text style={[styles.priceCol, styles.cellText]}>
-              {Number(item.price).toFixed(2)}
-            </Text>
-            <Text style={[styles.subtotalCol, styles.cellText]}>
-              {(item.qty * Number(item.price)).toFixed(2)}
-            </Text>
-            <Text style={[styles.taxCol, styles.cellText]}>
-              {Number(item.tax || 0).toFixed(2)}
-            </Text>
-            <Text style={[styles.totalCol, styles.cellText]}>
-              {Number(item.total).toFixed(2)}
-            </Text>
+            <Text style={[styles.qtyCol, styles.cellText]}></Text>
+            <Text style={[styles.priceCol, styles.cellText]}></Text>
+            <Text style={[styles.subtotalCol, styles.cellText]}></Text>
+            <Text style={[styles.taxCol, styles.cellText]}></Text>
+            <Text style={[styles.totalCol, styles.cellText]}></Text>
           </View>
-        ))}
+        )}
       </View>
 
       {/* Summary Section */}
