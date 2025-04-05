@@ -462,31 +462,43 @@ const InvoiceFormPage: React.FC = () => {
       // 3. Create Payment (if needed)
       if (isPaid) {
         toast.loading("Recording payment...", { id: toastId });
-        const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
-          invoice_id: invoiceIdForNavigation, // Use the saved ID
-          payment_date: new Date().toISOString(),
-          amount_paid: savedInvoice.totalamountpayable,
-          payment_method: paymentMethod,
-          payment_reference:
-            paymentMethod === "cash" || paymentMethod === "online"
-              ? undefined
-              : paymentReference || undefined,
-        };
-        try {
-          await createPayment(paymentData);
-          toast.success(`Invoice ${invoiceIdForNavigation} created and paid!`, {
+
+        // Don't attempt to create a payment for CASH invoices - they are automatically paid by the backend
+        if (invoiceData.paymenttype !== "CASH") {
+          const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
+            invoice_id: invoiceIdForNavigation, // Use the saved ID
+            payment_date: new Date().toISOString(),
+            amount_paid: savedInvoice.totalamountpayable,
+            payment_method: paymentMethod,
+            payment_reference:
+              paymentMethod === "cash" || paymentMethod === "online"
+                ? undefined
+                : paymentReference || undefined,
+          };
+          try {
+            await createPayment(paymentData);
+            toast.success(
+              `Invoice ${invoiceIdForNavigation} created and paid!`,
+              {
+                id: toastId,
+              }
+            ); // Update toast
+          } catch (paymentError: any) {
+            // Payment failed, but invoice created. Show error, but proceed maybe?
+            toast.error(
+              `Invoice ${invoiceIdForNavigation} created, but payment failed: ${paymentError.message}. E-invoice submission skipped.`,
+              { id: toastId, duration: 6000 }
+            );
+            // Decide if you want to stop here or still attempt e-invoice if checked?
+            // For safety, let's stop if payment fails when expected.
+            setIsSaving(false); // Stop saving process
+            return; // Exit the function
+          }
+        } else {
+          // For CASH invoices, they are already paid by backend
+          toast.success(`CASH Invoice ${invoiceIdForNavigation} created!`, {
             id: toastId,
-          }); // Update toast
-        } catch (paymentError: any) {
-          // Payment failed, but invoice created. Show error, but proceed maybe?
-          toast.error(
-            `Invoice ${invoiceIdForNavigation} created, but payment failed: ${paymentError.message}. E-invoice submission skipped.`,
-            { id: toastId, duration: 6000 }
-          );
-          // Decide if you want to stop here or still attempt e-invoice if checked?
-          // For safety, let's stop if payment fails when expected.
-          setIsSaving(false); // Stop saving process
-          return; // Exit the function
+          });
         }
       }
 
