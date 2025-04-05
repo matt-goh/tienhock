@@ -32,6 +32,7 @@ import {
   IconSend,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
+import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
 
 // --- Helper: Read-only Line Items Table ---
@@ -327,13 +328,6 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsSubmittingInvoice(false);
       setIsSubmittingEInvoice(false);
     }
-  };
-
-  const handlePrint = () => {
-    toast("Print function placeholder. Use browser print or PDF generation.", {
-      icon: "🖨️",
-    });
-    // Example: window.print();
   };
 
   // --- Payment Form Handling ---
@@ -657,15 +651,15 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
               </Button>
             )}
-          <Button
-            onClick={handlePrint}
-            icon={IconPrinter}
-            variant="outline"
-            size="md"
-            disabled={isLoading}
-          >
-            Print
-          </Button>
+          {invoiceData.einvoice_status === "valid" && (
+            <div className="inline-block">
+              <EInvoicePDFHandler
+                invoices={invoiceData ? [invoiceData] : []}
+                disabled={isLoading}
+                size="md"
+              />
+            </div>
+          )}
           {!isCancelled && !isPaid && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -678,7 +672,7 @@ const InvoiceDetailsPage: React.FC = () => {
               {showPaymentForm ? "Cancel Payment" : "Record Payment"}
             </Button>
           )}
-          {!isCancelled && (  
+          {!isCancelled && (
             <Button
               onClick={handleCancelInvoiceClick}
               variant="outline"
