@@ -1161,7 +1161,7 @@ export default function (pool, config) {
     }
   }); // End POST /submit-invoices
 
-  // DELETE /api/invoices/:id - Cancel Invoice (Update Status)
+  // DELETE /api/invoices/:id - Cancel Invoice (Update Status and Cancel Payments)
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
@@ -1170,15 +1170,17 @@ export default function (pool, config) {
 
       // 1. Get Invoice details for credit adjustment and e-invoice check
       const invoiceQuery = `
-        SELECT id, customerid, paymenttype, totalamountpayable, uuid, einvoice_status
+        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, uuid, einvoice_status, invoice_status
         FROM invoices
         WHERE id = $1 FOR UPDATE`; // Lock row
       const invoiceResult = await client.query(invoiceQuery, [id]);
 
       if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK"); // Release lock early
         return res.status(404).json({ message: "Invoice not found" });
       }
       const invoice = invoiceResult.rows[0];
+      const invoiceTotal = parseFloat(invoice.totalamountpayable || 0);
 
       // If already cancelled, do nothing
       if (invoice.invoice_status === "cancelled") {
@@ -1188,19 +1190,76 @@ export default function (pool, config) {
           .json({ message: "Invoice is already cancelled" });
       }
 
-      // 2. Adjust Customer Credit if it was an INVOICE
-      if (
-        invoice.paymenttype === "INVOICE" &&
-        parseFloat(invoice.totalamountpayable || 0) !== 0
-      ) {
+      // 2. Find and cancel ACTIVE payments associated with this invoice
+      const activePaymentsQuery = `
+        SELECT payment_id, amount_paid
+        FROM payments 
+        WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')
+        FOR UPDATE -- Lock payment rows as well
+      `;
+      const activePaymentsResult = await client.query(activePaymentsQuery, [
+        id,
+      ]);
+      const activePayments = activePaymentsResult.rows;
+
+      if (activePayments.length > 0) {
+        console.log(
+          `Found ${activePayments.length} active payment(s) for invoice ${id}. Cancelling...`
+        );
+        const cancelPaymentQuery = `
+          UPDATE payments 
+          SET status = 'cancelled', 
+              cancellation_date = NOW(),
+              cancellation_reason = $1 
+          WHERE payment_id = $2
+        `;
+        const cancellationReason = `Invoice ${id} cancelled`;
+
+        for (const payment of activePayments) {
+          const paidAmount = parseFloat(payment.amount_paid || 0);
+
+          // Cancel the payment record
+          await client.query(cancelPaymentQuery, [
+            cancellationReason,
+            payment.payment_id,
+          ]);
+          console.log(`Payment ${payment.payment_id} cancelled.`);
+
+          // Reverse customer credit adjustment ONLY if the original invoice was an INVOICE type
+          if (invoice.paymenttype === "INVOICE" && paidAmount !== 0) {
+            console.log(
+              `Reversing credit for cancelled payment ${payment.payment_id} (Amount: ${paidAmount}) for customer ${invoice.customerid}`
+            );
+            // Add the paid amount BACK to credit_used (reversing the payment's effect)
+            await updateCustomerCredit(
+              client,
+              invoice.customerid,
+              paidAmount // Positive amount increases credit_used
+            );
+          }
+        }
+      } else {
+        console.log(`No active payments found for invoice ${id}.`);
+      }
+
+      // --- END: Added Logic for Cancelling Payments ---
+
+      // 3. Adjust Customer Credit for the INVOICE TOTAL (This reverses the initial credit impact of creating the invoice)
+      // This logic remains the same as before.
+      if (invoice.paymenttype === "INVOICE" && invoiceTotal !== 0) {
+        console.log(
+          `Adjusting invoice total credit for cancelled invoice ${id} (Amount: ${-invoiceTotal}) for customer ${
+            invoice.customerid
+          }`
+        );
         await updateCustomerCredit(
           client,
           invoice.customerid,
-          -parseFloat(invoice.totalamountpayable || 0)
+          -invoiceTotal // Negative amount decreases credit_used
         );
       }
 
-      // 3. Attempt to Cancel E-Invoice via API if it exists and isn't already cancelled
+      // 4. Attempt to Cancel E-Invoice via API (Existing logic)
       let einvoiceCancelledApi = false;
       if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
         try {
@@ -1219,59 +1278,60 @@ export default function (pool, config) {
             cancelError
           );
           // Log error but continue - local status should still be updated
-          // Potentially check error code (e.g., if already cancelled or time limit expired)
           if (cancelError.status === 400) {
-            // Example: Bad request might mean it's already cancelled or invalid state
             console.warn(
               `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
             );
-            // Optionally force local status update if API confirms cancellation happened previously
             einvoiceCancelledApi = true; // Assume cancelled if API fails in a way suggesting it's done
           }
         }
       }
 
-      // 4. Update Invoice Status in DB
+      // 5. Update Invoice Status in DB
       const newEInvoiceStatus = einvoiceCancelledApi
         ? "cancelled"
-        : invoice.einvoice_status; // Update if API call succeeded or implied success
-      const updateQuery = `
-        UPDATE invoices
-        SET invoice_status = 'cancelled',
-            einvoice_status = $1
+        : invoice.einvoice_status;
+      const updateInvoiceQuery = `
+        UPDATE invoices 
+        SET invoice_status = 'cancelled', 
+            einvoice_status = $1,
+            balance_due = 0 -- Set balance to 0 when cancelling
             -- Optionally add a cancellation_timestamp column
         WHERE id = $2
-        RETURNING *`;
+        RETURNING *`; // Fetch the updated row
 
-      const updateResult = await client.query(updateQuery, [
+      const updateResult = await client.query(updateInvoiceQuery, [
         newEInvoiceStatus,
         id,
       ]);
 
       await client.query("COMMIT");
 
+      // Format and return the final cancelled invoice data
+      const finalCancelledInvoice = updateResult.rows[0];
       res.status(200).json({
-        message: "Invoice cancelled successfully",
+        message:
+          "Invoice and associated active payments cancelled successfully",
         invoice: {
-          // Return the updated invoice record
-          ...updateResult.rows[0],
+          ...finalCancelledInvoice,
           total_excluding_tax: parseFloat(
-            updateResult.rows[0].total_excluding_tax || 0
+            finalCancelledInvoice.total_excluding_tax || 0
           ),
-          tax_amount: parseFloat(updateResult.rows[0].tax_amount || 0),
-          rounding: parseFloat(updateResult.rows[0].rounding || 0),
+          tax_amount: parseFloat(finalCancelledInvoice.tax_amount || 0),
+          rounding: parseFloat(finalCancelledInvoice.rounding || 0),
           totalamountpayable: parseFloat(
-            updateResult.rows[0].totalamountpayable || 0
+            finalCancelledInvoice.totalamountpayable || 0
           ),
-          balance_due: parseFloat(updateResult.rows[0].balance_due || 0),
+          balance_due: parseFloat(finalCancelledInvoice.balance_due || 0), // Should be 0 now
         },
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error cancelling invoice:", error);
-      res
-        .status(500)
-        .json({ message: "Error cancelling invoice", error: error.message });
+      console.error("Error cancelling invoice and payments:", error); // Updated log message
+      res.status(500).json({
+        message: "Error cancelling invoice and payments",
+        error: error.message,
+      }); // Updated error message
     } finally {
       client.release();
     }
