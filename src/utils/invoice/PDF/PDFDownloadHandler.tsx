@@ -12,12 +12,14 @@ interface PDFDownloadHandlerProps {
   invoices: InvoiceData[];
   disabled?: boolean;
   customerNames: Record<string, string>;
+  onComplete?: () => void;
 }
 
 const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
   invoices,
   disabled,
   customerNames = {},
+  onComplete,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -55,6 +57,7 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Cleanup
       URL.revokeObjectURL(pdfUrl);
       toast.success("PDF downloaded successfully", { id: toastId });
+      if (onComplete) onComplete();
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error(
@@ -87,6 +90,7 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       iconSize={16}
       iconStroke={2}
       variant="outline"
+      data-pdf-download="true"
     >
       {buttonLabel}
     </Button>

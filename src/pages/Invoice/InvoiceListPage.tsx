@@ -16,6 +16,8 @@ import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
+import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
+import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
@@ -41,7 +43,11 @@ import {
 } from "@headlessui/react";
 import { useCustomerNames } from "../../hooks/useCustomerNames";
 // Import the specific utilities needed
-import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
+import {
+  getInvoices,
+  cancelInvoice,
+  getInvoiceById,
+} from "../../utils/invoice/InvoiceUtils";
 import FilterSummary from "../../components/Invoice/FilterSummary";
 import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
@@ -134,6 +140,11 @@ const InvoiceListPage: React.FC = () => {
   const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
   const [showEInvoiceDownloader, setShowEInvoiceDownloader] = useState(false);
   const [eInvoicesToDownload, setEInvoicesToDownload] = useState<
+    ExtendedInvoiceData[]
+  >([]);
+  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [selectedInvoicesForPDF, setSelectedInvoicesForPDF] = useState<
     ExtendedInvoiceData[]
   >([]);
 
@@ -715,10 +726,120 @@ const InvoiceListPage: React.FC = () => {
     setShowEInvoiceDownloader(true);
   };
 
-  // Placeholder actions (implement actual logic or remove)
-  const handleBulkDownload = () =>
-    toast.error("Bulk Download PDF (Not Implemented)");
-  const handleBulkPrint = () => toast.error("Bulk Print PDF (Not Implemented)");
+  // Bulk Download PDF Handler
+  const handleBulkDownload = async () => {
+    if (selectedInvoiceIds.size === 0) {
+      toast.error("No invoices selected for download");
+      return;
+    }
+
+    const toastId = toast.loading("Preparing invoice PDF...");
+
+    try {
+      // Get selected invoices data
+      const selectedInvoicesData = invoices.filter((inv) =>
+        selectedInvoiceIds.has(inv.id)
+      );
+      if (selectedInvoicesData.length === 0) {
+        throw new Error("Failed to retrieve selected invoice data");
+      }
+
+      // We need complete invoice data with products
+      const completeInvoices = [];
+      for (const invoice of selectedInvoicesData) {
+        // Fetch complete invoice with products
+        try {
+          const fullInvoice = await getInvoiceById(invoice.id);
+          completeInvoices.push(fullInvoice);
+        } catch (error) {
+          console.error(
+            `Failed to fetch complete data for invoice ${invoice.id}:`,
+            error
+          );
+          // Continue with other invoices
+        }
+      }
+
+      if (completeInvoices.length === 0) {
+        throw new Error("Could not fetch required invoice details");
+      }
+
+      setSelectedInvoicesForPDF(completeInvoices);
+      setIsGeneratingPDF(true);
+
+      // This will create PDFDownloadHandler but we need to programmatically click its button
+      // Give it time to render
+      setTimeout(() => {
+        const downloadButton = document.querySelector(
+          '[data-pdf-download="true"]'
+        );
+        if (downloadButton && downloadButton instanceof HTMLButtonElement) {
+          downloadButton.click();
+          toast.success("Generating PDF download...", { id: toastId });
+        } else {
+          throw new Error("Download button not found");
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Error preparing PDF download:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to prepare PDF",
+        { id: toastId }
+      );
+      setIsGeneratingPDF(false);
+      setSelectedInvoicesForPDF([]);
+    }
+  };
+
+  // Bulk Print PDF Handler
+  const handleBulkPrint = async () => {
+    if (selectedInvoiceIds.size === 0) {
+      toast.error("No invoices selected for printing");
+      return;
+    }
+
+    const toastId = toast.loading("Preparing invoice for printing...");
+
+    try {
+      // Get selected invoices data
+      const selectedInvoicesData = invoices.filter((inv) =>
+        selectedInvoiceIds.has(inv.id)
+      );
+      if (selectedInvoicesData.length === 0) {
+        throw new Error("Failed to retrieve selected invoice data");
+      }
+
+      // We need complete invoice data with products
+      const completeInvoices = [];
+      for (const invoice of selectedInvoicesData) {
+        // Fetch complete invoice with products
+        try {
+          const fullInvoice = await getInvoiceById(invoice.id);
+          completeInvoices.push(fullInvoice);
+        } catch (error) {
+          console.error(
+            `Failed to fetch complete data for invoice ${invoice.id}:`,
+            error
+          );
+          // Continue with other invoices
+        }
+      }
+
+      if (completeInvoices.length === 0) {
+        throw new Error("Could not fetch required invoice details");
+      }
+
+      toast.success("Opening print dialog...", { id: toastId });
+      setSelectedInvoicesForPDF(completeInvoices);
+      setShowPrintOverlay(true);
+    } catch (error) {
+      console.error("Error preparing for print:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to prepare print view",
+        { id: toastId }
+      );
+    }
+  };
 
   // --- Render ---
   return (
@@ -1118,6 +1239,31 @@ const InvoiceListPage: React.FC = () => {
             disabled={false}
           />
         </div>
+      )}
+      {/* PDF Download Handler - Hidden but functional */}
+      {isGeneratingPDF && selectedInvoicesForPDF.length > 0 && (
+        <div style={{ display: "none" }}>
+          <PDFDownloadHandler
+            invoices={selectedInvoicesForPDF}
+            disabled={false}
+            customerNames={customerNames}
+            onComplete={() => {
+              setIsGeneratingPDF(false);
+              setSelectedInvoicesForPDF([]);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Print Overlay */}
+      {showPrintOverlay && selectedInvoicesForPDF.length > 0 && (
+        <PrintPDFOverlay
+          invoices={selectedInvoicesForPDF}
+          onComplete={() => {
+            setShowPrintOverlay(false);
+            setSelectedInvoicesForPDF([]);
+          }}
+        />
       )}
     </div>
   );
