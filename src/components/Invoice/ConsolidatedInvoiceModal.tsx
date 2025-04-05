@@ -21,7 +21,7 @@ import {
   IconTrash,
   IconBan,
   IconChevronDown,
-  IconCheck, // Using Ban icon for cancelled status badge
+  IconCheck,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -36,6 +36,7 @@ import {
 } from "../../utils/invoice/dateUtils";
 import SubmissionResultsModal from "./SubmissionResultsModal";
 import ConsolidatedInfoTooltip from "./ConsolidatedInfoTooltip";
+import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 
 // Interfaces remain the same
 interface ConsolidatedInvoiceModalProps {
@@ -360,7 +361,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex justify-center items-center p-4 backdrop-blur-sm">
       {/* Modal Container */}
-      <div className="bg-white w-full max-w-6xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale">
+      <div className="bg-white w-full max-w-7xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-default-200 flex-shrink-0">
           <h2 className="text-lg font-semibold text-default-800 flex items-center">
@@ -920,7 +921,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 ) : currentStatus === "pending" ? (
                                   // Only show Update for Pending
                                   <Button
-                                    size="sm" // Keep user's size change
+                                    size="sm"
                                     variant="outline"
                                     onClick={() =>
                                       handleUpdateConsolidatedStatus(item.id)
@@ -932,27 +933,58 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                     aria-label={`Update status for ${item.id}`}
                                     title="Check Status"
                                   >
-                                    Update {/* Keep user's text change */}
+                                    Update
                                   </Button>
                                 ) : currentStatus === "valid" ||
                                   currentStatus === "invalid" ? (
-                                  // Only show Cancel for Valid or Invalid
-                                  <Button
-                                    size="sm" // Keep user's size change
-                                    variant="outline"
-                                    color="rose"
-                                    onClick={() =>
-                                      handleCancelConsolidatedRequest(item.id)
-                                    }
-                                    disabled={
-                                      !!processingHistoryId || isSubmitting
-                                    }
-                                    icon={IconTrash}
-                                    aria-label={`Cancel consolidated invoice ${item.id}`}
-                                    title="Cancel"
-                                  >
-                                    Cancel {/* Keep user's text change */}
-                                  </Button>
+                                  // Show multiple buttons for Valid or Invalid
+                                  <div className="flex gap-2 justify-center">
+                                    {/* Add Download button for valid status only */}
+                                    {currentStatus === "valid" && (
+                                      <EInvoicePDFHandler
+                                        invoices={[
+                                          {
+                                            ...item,
+                                            customerid:
+                                              "Consolidated customers",
+                                            products: [],
+                                            salespersonid: "",
+                                            createddate: item.created_at,
+                                            paymenttype: "CASH",
+                                            balance_due: 0,
+                                            is_consolidated: true,
+                                            invoice_status: "paid",
+                                            einvoice_status:
+                                              item.einvoice_status as
+                                                | "valid"
+                                                | "pending"
+                                                | "invalid"
+                                                | "cancelled",
+                                          },
+                                        ]}
+                                        disabled={
+                                          !!processingHistoryId || isSubmitting
+                                        }
+                                      />
+                                    )}
+                                    {/* Existing Cancel button */}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      color="rose"
+                                      onClick={() =>
+                                        handleCancelConsolidatedRequest(item.id)
+                                      }
+                                      disabled={
+                                        !!processingHistoryId || isSubmitting
+                                      }
+                                      icon={IconTrash}
+                                      aria-label={`Cancel consolidated invoice ${item.id}`}
+                                      title="Cancel"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
                                 ) : (
                                   // Show placeholder for other statuses (e.g., cancelled, unknown)
                                   <span className="text-default-400 text-xs">

@@ -171,7 +171,7 @@ class GTEInvoiceSubmissionHandler {
     }
 
     throw new Error(
-      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`
+      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts, Please check the submission status manually or try again later.`
     );
   }
 
