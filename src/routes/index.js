@@ -77,6 +77,11 @@ export default function setupRoutes(app, pool) {
     MYINVOIS_CLIENT_ID,
     MYINVOIS_CLIENT_SECRET,
   };
+  const myInvoisGTConfig = {
+    MYINVOIS_API_BASE_URL,
+    MYINVOIS_GT_CLIENT_ID,
+    MYINVOIS_GT_CLIENT_SECRET,
+  };
 
   // Auth routes
   app.use("/api/auth", authRouter(pool));
@@ -102,15 +107,14 @@ export default function setupRoutes(app, pool) {
   app.use("/greentarget/api/locations", greenTargetLocationRouter(pool));
   app.use("/greentarget/api/dumpsters", greenTargetDumpsterRouter(pool));
   app.use("/greentarget/api/rentals", greenTargetRentalRouter(pool));
-  app.use("/greentarget/api/invoices", greenTargetInvoiceRouter(pool));
+  app.use(
+    "/greentarget/api/invoices",
+    greenTargetInvoiceRouter(pool, myInvoisGTConfig)
+  );
   app.use("/greentarget/api/payments", greenTargetPaymentRouter(pool));
   app.use(
     "/greentarget/api/einvoice",
-    greenTargetEInvoiceRouter(pool, {
-      MYINVOIS_API_BASE_URL,
-      MYINVOIS_GT_CLIENT_ID,
-      MYINVOIS_GT_CLIENT_SECRET,
-    })
+    greenTargetEInvoiceRouter(pool, myInvoisGTConfig)
   );
 
   // Jellypolly routes

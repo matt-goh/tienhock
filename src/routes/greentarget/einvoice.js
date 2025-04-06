@@ -8,10 +8,9 @@ export default function (pool, defaultConfig) {
   // Submit e-Invoice for a specific invoice
   router.post("/submit/:invoiceId", async (req, res) => {
     const { invoiceId } = req.params;
-    const { clientConfig } = req.body;
 
-    // Use provided config or fall back to default config
-    const config = clientConfig || defaultConfig;
+    // Always use the defaultConfig which is passed when initializing the router
+    const config = defaultConfig;
 
     try {
       // 1. Get invoice details
@@ -190,12 +189,7 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Create API client to check status
-      const config = {
-        MYINVOIS_API_BASE_URL: process.env.MYINVOIS_API_BASE_URL,
-        MYINVOIS_GT_CLIENT_ID: process.env.MYINVOIS_GT_CLIENT_ID,
-        MYINVOIS_GT_CLIENT_SECRET: process.env.MYINVOIS_GT_CLIENT_SECRET,
-      };
+      const config = defaultConfig;
 
       const apiClient =
         require("../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js").default.getInstance(
