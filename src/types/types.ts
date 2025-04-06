@@ -542,3 +542,18 @@ export interface InvoiceGT {
   cancellation_date?: string | null;
   cancellation_reason?: string;
 }
+
+// Define the type for submission results
+export interface EInvoiceSubmissionResult {
+  success: boolean;
+  message?: string;
+  overallStatus?: string;
+  error?: string;
+  rejectedDocuments?: Array<{
+    internalId: string;
+    error: {
+      code: string;
+      message: string;
+    };
+  }>;
+}
