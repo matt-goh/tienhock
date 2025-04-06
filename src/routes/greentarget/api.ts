@@ -82,14 +82,7 @@ export const greenTargetApi = {
   submitEInvoice: async (invoiceId: number) => {
     try {
       const response = await api.post(
-        `/greentarget/api/einvoice/submit/${invoiceId}`,
-        {
-          clientConfig: {
-            MYINVOIS_API_BASE_URL,
-            MYINVOIS_GT_CLIENT_ID,
-            MYINVOIS_GT_CLIENT_SECRET,
-          },
-        }
+        `/greentarget/api/einvoice/submit/${invoiceId}`
       );
       return response;
     } catch (error) {
@@ -98,7 +91,7 @@ export const greenTargetApi = {
     }
   },
   checkEInvoiceStatus: (invoiceId: number) =>
-    api.put(`/greentarget/api/invoices/${invoiceId}/check-einvoice-status`),
+    api.put(`/greentarget/api/einvoice/${invoiceId}/check-einvoice-status`),
 
   // Payment endpoints
   getPayments: (includeCancelled = false) =>
