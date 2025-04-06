@@ -532,8 +532,47 @@ const InvoiceFormPage: React.FC = () => {
               // Dismiss loading toast
               toast.dismiss(eTid);
 
-              // Store the full response for the modal
-              setSubmissionResults(eRes);
+              // Transform the response to match the expected format
+              const transformedResponse = {
+                success: eRes.success,
+                message: eRes.message || "e-Invoice submitted successfully",
+                overallStatus:
+                  eRes.einvoice?.einvoice_status === "valid"
+                    ? "Valid"
+                    : eRes.einvoice?.einvoice_status === "pending"
+                    ? "Pending"
+                    : "Unknown",
+                acceptedDocuments: eRes.einvoice
+                  ? [
+                      {
+                        internalId: eRes.einvoice.invoice_number,
+                        uuid: eRes.einvoice.uuid,
+                        longId: eRes.einvoice.long_id,
+                        status:
+                          eRes.einvoice.einvoice_status === "valid"
+                            ? "ACCEPTED"
+                            : "Submitted",
+                        dateTimeValidated: eRes.einvoice.datetime_validated,
+                      },
+                    ]
+                  : [],
+                rejectedDocuments:
+                  !eRes.success && eRes.error
+                    ? [
+                        {
+                          internalId: navId.toString(),
+                          error: {
+                            code: "ERROR",
+                            message: eRes.error.message || "Unknown error",
+                            details: eRes.error.details,
+                          },
+                        },
+                      ]
+                    : [],
+              };
+
+              // Store the transformed response for the modal
+              setSubmissionResults(transformedResponse);
 
               // Show the results modal
               setShowSubmissionResultsModal(true);
@@ -551,7 +590,7 @@ const InvoiceFormPage: React.FC = () => {
               console.error("e-Invoice submission error:", eErr);
               toast.error("e-Invoice submission failed", { id: eTid });
 
-              // Format error for modal
+              // Format error for modal with the expected structure
               const errorMessage =
                 eErr instanceof Error ? eErr.message : "Unknown error";
               setSubmissionResults({
