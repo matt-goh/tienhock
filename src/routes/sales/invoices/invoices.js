@@ -1,19 +1,7 @@
 // src/routes/sales/invoices/invoices.js
 import { Router } from "express";
 import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
-import {
-  MYINVOIS_API_BASE_URL,
-  MYINVOIS_CLIENT_ID,
-  MYINVOIS_CLIENT_SECRET,
-} from "../../../configs/config.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
-
-// Define the MyInvois configuration object
-const myInvoisConfig = {
-  MYINVOIS_API_BASE_URL,
-  MYINVOIS_CLIENT_ID,
-  MYINVOIS_CLIENT_SECRET,
-};
 
 const fetchCustomerData = async (pool, customerId) => {
   try {
@@ -71,7 +59,7 @@ const updateCustomerCredit = async (client, customerId, amount) => {
 export default function (pool, config) {
   const router = Router();
 
-  const apiClient = EInvoiceApiClientFactory.getInstance(myInvoisConfig);
+  const apiClient = EInvoiceApiClientFactory.getInstance(config);
 
   // Customer data cache
   const customerCache = new Map();

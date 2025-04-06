@@ -1,8 +1,11 @@
 // src/routes/greentarget/invoices.js
 import { Router } from "express";
+import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 
 export default function (pool, defaultConfig) {
   const router = Router();
+
+  const apiClient = GTEInvoiceApiClientFactory.getInstance(defaultConfig);
 
   // Generate a unique invoice number
   async function generateInvoiceNumber(client, type) {
@@ -393,14 +396,6 @@ export default function (pool, defaultConfig) {
 
       if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
         try {
-          // Get MyInvois API client
-          const config = defaultConfig;
-
-          const apiClient =
-            require("../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js").default.getInstance(
-              config
-            );
-
           // Call MyInvois API to cancel e-invoice
           console.log(
             `Attempting to cancel e-invoice ${invoice.uuid} for invoice ${invoice_id}`
