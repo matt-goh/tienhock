@@ -7,11 +7,9 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
-  IconTrash,
   IconFileInvoice,
   IconPrinter,
   IconCash,
-  IconFileDownload,
   IconChevronDown,
   IconCheck,
   IconTruck,
@@ -19,6 +17,7 @@ import {
   IconMapPin,
   IconClock,
   IconAlertTriangle,
+  IconCancel,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -206,6 +205,11 @@ const InvoiceCard = ({
                       <IconAlertTriangle size={14} className="mr-1" />
                       e-Invoice Invalid
                     </span>
+                  ) : invoice.einvoice_status === "cancelled" ? (
+                    <span className="inline-flex items-center text-xs font-medium text-default-700">
+                      <IconCheck size={14} className="mr-1" />
+                      e-Invoice Cancelled
+                    </span>
                   ) : null}
                 </div>
               )}
@@ -334,23 +338,6 @@ const InvoiceCard = ({
             </button>
           )}
 
-          {/* Show submitted indicator if already submitted */}
-          {invoice.einvoice_status === "valid" && (
-            <button
-              className="p-1.5 bg-green-100 text-green-700 rounded-full cursor-default"
-              title="e-Invoice Submitted"
-            >
-              <IconCheck size={18} stroke={1.5} />
-            </button>
-          )}
-
-          {invoice.einvoice_status && invoice.status === "cancelled" && (
-            <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-default-100 text-default-500">
-              <IconCheck size={14} className="mr-1" />
-              e-Invoice Cancelled
-            </span>
-          )}
-
           {!isPaid && (
             <button
               onClick={(e) => {
@@ -379,7 +366,7 @@ const InvoiceCard = ({
               className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
               title="Cancel Invoice"
             >
-              <IconTrash size={18} stroke={1.5} />
+              <IconCancel size={18} stroke={1.5} />
             </button>
           )}
 
@@ -389,7 +376,7 @@ const InvoiceCard = ({
               className="p-1.5 bg-default-100 text-default-500 rounded-full cursor-not-allowed"
               title="Invoice is cancelled"
             >
-              <IconCheck size={18} stroke={1.5} />
+              <IconCancel size={18} stroke={1.5} />
             </div>
           )}
         </div>
