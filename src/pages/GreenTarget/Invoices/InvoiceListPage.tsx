@@ -17,6 +17,8 @@ import {
   IconTruck,
   IconPhone,
   IconMapPin,
+  IconClock,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -30,38 +32,13 @@ import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import { greenTargetApi } from "../../../routes/greentarget/api";
-
-interface Invoice {
-  invoice_id: number;
-  invoice_number: string;
-  type: "regular" | "statement";
-  customer_id: number;
-  customer_name: string;
-  customer_phone_number?: string;
-  tin_number?: string;
-  id_number?: string;
-  location_address?: string;
-  location_phone_number?: string;
-  rental_id?: number;
-  driver?: string;
-  tong_no?: string;
-  amount_before_tax: number;
-  tax_amount: number;
-  total_amount: number;
-  amount_paid: number;
-  current_balance: number;
-  date_issued: string;
-  balance_due: number;
-  statement_period_start?: string;
-  statement_period_end?: string;
-  einvoice_status?: "submitted" | "pending" | null;
-  status: "paid" | "unpaid" | "cancelled" | "overdue";
-}
+import { InvoiceGT } from "../../../types/types";
 
 interface InvoiceCardProps {
-  invoice: Invoice;
-  onCancelClick: (invoice: Invoice) => void;
-  onSubmitEInvoiceClick: (invoice: Invoice) => void;
+  invoice: InvoiceGT;
+  onCancelClick: (invoice: InvoiceGT) => void;
+  onSubmitEInvoiceClick: (invoice: InvoiceGT) => void;
+  onCheckEInvoiceStatus: (invoice: InvoiceGT) => void;
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -70,6 +47,7 @@ const InvoiceCard = ({
   invoice,
   onCancelClick,
   onSubmitEInvoiceClick,
+  onCheckEInvoiceStatus,
 }: InvoiceCardProps) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
@@ -193,21 +171,44 @@ const InvoiceCard = ({
                 </p>
               )}
             </div>
-            {/* Add rental ID and driver info in the right side */}
-            {invoice.rental_id && (
-              <div className="text-right truncate">
-                <h3
-                  className="font-medium text-default-700 cursor-pointer hover:underline truncate"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/greentarget/rentals/${invoice.rental_id}`);
-                  }}
-                  title="View Rental"
-                >
-                  Rental #{invoice.rental_id}
-                </h3>
-              </div>
-            )}
+            <div>
+              {/* Add rental ID and driver info in the right side */}
+              {invoice.rental_id && (
+                <div className="text-right truncate">
+                  <h3
+                    className="font-medium text-default-700 cursor-pointer hover:underline truncate"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/greentarget/rentals/${invoice.rental_id}`);
+                    }}
+                    title="View Rental"
+                  >
+                    Rental #{invoice.rental_id}
+                  </h3>
+                </div>
+              )}
+              {/* e-Invoice Status Badge (if applicable) */}
+              {invoice.einvoice_status && (
+                <div className="truncate overflow-auto">
+                  {invoice.einvoice_status === "valid" ? (
+                    <span className="inline-flex items-center text-xs font-medium text-green-700">
+                      <IconCheck size={14} className="mr-1" />
+                      e-Invoice Valid
+                    </span>
+                  ) : invoice.einvoice_status === "pending" ? (
+                    <span className="inline-flex items-center text-xs font-medium text-sky-700">
+                      <IconClock size={14} className="mr-1" />
+                      e-Invoice Pending
+                    </span>
+                  ) : invoice.einvoice_status === "invalid" ? (
+                    <span className="inline-flex items-center text-xs font-medium text-rose-700">
+                      <IconAlertTriangle size={14} className="mr-1" />
+                      e-Invoice Invalid
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
           {invoice.location_address && (
             <p
@@ -307,10 +308,11 @@ const InvoiceCard = ({
 
           {/* Only show e-Invoice button if: 
     1. Customer has tin_number and id_number 
-    2. Invoice is not already submitted as e-Invoice */}
+    2. Invoice is not already submitted as e-Invoice or submitted but invalid */}
           {invoice.tin_number &&
             invoice.id_number &&
-            !invoice.einvoice_status && (
+            (!invoice.einvoice_status ||
+              invoice.einvoice_status === "invalid") && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -328,14 +330,35 @@ const InvoiceCard = ({
               </button>
             )}
 
+          {/* Show pending badge with option to check status */}
+          {invoice.einvoice_status === "pending" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCheckEInvoiceStatus(invoice);
+              }}
+              className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
+              title="Check e-Invoice Status"
+            >
+              <IconClock size={18} stroke={1.5} />
+            </button>
+          )}
+
           {/* Show submitted indicator if already submitted */}
-          {invoice.einvoice_status === "submitted" && (
+          {invoice.einvoice_status === "valid" && (
             <button
               className="p-1.5 bg-green-100 text-green-700 rounded-full cursor-default"
               title="e-Invoice Submitted"
             >
               <IconCheck size={18} stroke={1.5} />
             </button>
+          )}
+
+          {invoice.einvoice_status && invoice.status === "cancelled" && (
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-default-100 text-default-500">
+              <IconCheck size={14} className="mr-1" />
+              e-Invoice Cancelled
+            </span>
           )}
 
           {!isPaid && (
@@ -427,16 +450,17 @@ const InvoiceListPage: React.FC = () => {
     monthOptions[currentMonth]
   );
   const [dateRange, setDateRange] = useState(getInitialDates());
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceGT[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
-  const [invoiceToCancel, setInvoiceToCancel] = useState<Invoice | null>(null);
+  const [invoiceToCancel, setInvoiceToCancel] = useState<InvoiceGT | null>(
+    null
+  );
   const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
   const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
-  const [processingEInvoice, setProcessingEInvoice] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
@@ -534,7 +558,7 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleCancelClick = (invoice: Invoice) => {
+  const handleCancelClick = (invoice: InvoiceGT) => {
     setInvoiceToCancel(invoice);
     setIsCancelDialogOpen(true);
   };
@@ -586,9 +610,8 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleSubmitEInvoice = async (invoice: Invoice) => {
+  const handleSubmitEInvoice = async (invoice: InvoiceGT) => {
     try {
-      setProcessingEInvoice(true);
       const toastId = toast.loading("Submitting e-Invoice...");
 
       // Call the actual e-Invoice submission API
@@ -620,8 +643,37 @@ const InvoiceListPage: React.FC = () => {
           : "Failed to submit e-Invoice due to an unknown error"
       );
       setShowEInvoiceErrorDialog(true);
-    } finally {
-      setProcessingEInvoice(false);
+    }
+  };
+
+  const handleCheckEInvoiceStatus = async (invoice: InvoiceGT) => {
+    try {
+      const toastId = toast.loading("Checking e-Invoice status...");
+
+      // Call the API to check e-invoice status
+      const response = await greenTargetApi.checkEInvoiceStatus(
+        invoice.invoice_id
+      );
+
+      if (response.success) {
+        if (response.updated) {
+          toast.success(`Status updated to ${response.status}`, {
+            id: toastId,
+          });
+        } else {
+          toast.success(`Status remains ${response.status}`, { id: toastId });
+        }
+
+        // Refresh invoices list to update the status
+        fetchInvoices();
+      } else {
+        toast.error(response.message || "Failed to check e-Invoice status", {
+          id: toastId,
+        });
+      }
+    } catch (error) {
+      console.error("Error checking e-Invoice status:", error);
+      toast.error("Failed to check e-Invoice status");
     }
   };
 
@@ -904,6 +956,7 @@ const InvoiceListPage: React.FC = () => {
               invoice={invoice}
               onCancelClick={handleCancelClick}
               onSubmitEInvoiceClick={handleSubmitEInvoice}
+              onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
             />
           ))}
         </div>

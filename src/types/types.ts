@@ -503,3 +503,42 @@ export interface JobCategory {
   jv: string;
   [key: string]: string | undefined;
 }
+
+export interface InvoiceGT {
+  invoice_id: number;
+  invoice_number: string;
+  type: "regular" | "statement";
+  customer_id: number;
+  customer_name: string;
+  customer_phone_number?: string;
+  tin_number?: string;
+  id_number?: string;
+  location_address?: string;
+  location_phone_number?: string;
+  date_placed?: string;
+  date_picked?: string;
+  rental_id?: number;
+  driver?: string;
+  tong_no?: string;
+  amount_before_tax: number;
+  tax_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  current_balance: number;
+  date_issued: string;
+  balance_due: number;
+  statement_period_start?: string;
+  statement_period_end?: string;
+  status: "paid" | "unpaid" | "cancelled" | "overdue";
+
+  // E-invoice fields
+  einvoice_status?: "valid" | "invalid" | "pending" | null;
+  uuid: string | null; // UUID from e-invoice system
+  submission_uid: string | null;
+  long_id: string | null;
+  datetime_validated: string | null; // ISO timestamp string or null
+  is_consolidated: boolean;
+  consolidated_invoices: string[] | null; // Array of invoice IDs or null
+  cancellation_date?: string | null;
+  cancellation_reason?: string;
+}

@@ -9,6 +9,8 @@ import {
   IconTrash,
   IconCheck,
   IconChevronDown,
+  IconClock,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -16,15 +18,15 @@ import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   Listbox,
-  // ListboxButton, // Use renamed HeadlessListboxButton
   ListboxOption,
   ListboxOptions,
   Transition, // Added Transition
-  ListboxButton as HeadlessListboxButton, // Renamed import
+  ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import clsx from "clsx"; // Added clsx
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import { SelectOption } from "../../../components/FormComponents"; // Import SelectOption if needed for payment methods
+import { SelectOption } from "../../../components/FormComponents";
+import { InvoiceGT } from "../../../types/types";
 
 interface Payment {
   payment_id: number;
@@ -35,35 +37,6 @@ interface Payment {
   payment_reference?: string;
   internal_reference?: string;
   status?: "active" | "cancelled";
-  cancellation_date?: string;
-  cancellation_reason?: string;
-}
-
-interface Invoice {
-  invoice_id: number;
-  invoice_number: string;
-  type: "regular" | "statement";
-  customer_id: number;
-  customer_name: string;
-  tin_number?: string;
-  id_number?: string;
-  rental_id?: number;
-  location_address?: string;
-  tong_no?: string;
-  date_placed?: string;
-  date_picked?: string;
-  driver?: string;
-  amount_before_tax: number;
-  tax_amount: number;
-  total_amount: number;
-  amount_paid: number;
-  current_balance: number;
-  date_issued: string;
-  balance_due: number;
-  statement_period_start?: string;
-  statement_period_end?: string;
-  einvoice_status?: "submitted" | "pending" | null;
-  status?: string;
   cancellation_date?: string;
   cancellation_reason?: string;
 }
@@ -87,7 +60,7 @@ const paymentMethodOptions: SelectOption[] = [
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [invoice, setInvoice] = useState<InvoiceGT | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +86,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
   const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
   const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
+  const [isCheckingEInvoice, setIsCheckingEInvoice] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -371,6 +345,45 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const handleCheckEInvoiceStatus = async () => {
+    if (!invoice?.invoice_id) return;
+
+    try {
+      setIsCheckingEInvoice(true);
+      const toastId = toast.loading("Checking e-Invoice status...");
+
+      // Call API to check status
+      const response = await greenTargetApi.checkEInvoiceStatus(
+        invoice.invoice_id
+      );
+
+      if (response.success) {
+        if (response.updated) {
+          toast.success(`e-Invoice status updated to ${response.status}`, {
+            id: toastId,
+          });
+          // Refresh invoice details
+          fetchInvoiceDetails(invoice.invoice_id);
+        } else {
+          // No change in status
+          toast.success(
+            `e-Invoice status check complete. Status remains ${response.status}`,
+            { id: toastId }
+          );
+        }
+      } else {
+        toast.error(response.message || "Failed to check e-Invoice status", {
+          id: toastId,
+        });
+      }
+    } catch (error) {
+      console.error("Error checking e-Invoice status:", error);
+      toast.error("Failed to check e-Invoice status");
+    } finally {
+      setIsCheckingEInvoice(false);
+    }
+  };
+
   const handlePrintInvoice = () => {
     // Placeholder for print functionality
     toast.success("Invoice printing functionality would go here");
@@ -509,13 +522,31 @@ const InvoiceDetailsPage: React.FC = () => {
             >
               {invoice.invoice_number}
             </span>
-            {invoice.einvoice_status === "submitted" && (
+            {invoice.einvoice_status === "valid" && (
               <button
                 className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 border border-green-300 text-green-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
-                title="e-Invoice Submitted"
+                title="e-Invoice Valid"
               >
                 <IconCheck size={18} stroke={1.5} />
-                <span className="truncate">e-Invoice Submitted</span>
+                <span className="truncate">e-Invoice Valid</span>
+              </button>
+            )}
+            {invoice.einvoice_status === "pending" && (
+              <button
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 border border-sky-300 text-sky-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                title="e-Invoice Pending"
+              >
+                <IconClock size={18} stroke={1.5} />
+                <span className="truncate">e-Invoice Pending</span>
+              </button>
+            )}
+            {invoice.einvoice_status === "invalid" && (
+              <button
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-rose-100 border border-rose-300 text-rose-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                title="e-Invoice Invalid"
+              >
+                <IconAlertTriangle size={18} stroke={1.5} />
+                <span className="truncate">e-Invoice Invalid</span>
               </button>
             )}
           </h1>
@@ -523,19 +554,36 @@ const InvoiceDetailsPage: React.FC = () => {
 
         <div className="flex space-x-3 mt-4 md:mt-0 md:self-end">
           {/* e-Invoice button - only show if customer has required fields */}
-          {invoice.tin_number &&
-            invoice.id_number &&
-            !invoice.einvoice_status && (
-              <Button
-                onClick={handleSubmitEInvoice}
-                icon={IconFileInvoice}
-                variant="outline"
-                color="amber"
-                disabled={isSubmittingEInvoice}
-              >
-                {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
-              </Button>
-            )}
+          {invoice.tin_number && invoice.id_number && (
+            <>
+              {!invoice.einvoice_status ||
+              invoice.einvoice_status === "invalid" ? (
+                <Button
+                  onClick={handleSubmitEInvoice}
+                  icon={IconFileInvoice}
+                  variant="outline"
+                  color="amber"
+                  disabled={
+                    isSubmittingEInvoice || invoice.status === "cancelled"
+                  }
+                >
+                  {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
+                </Button>
+              ) : invoice.einvoice_status === "pending" ? (
+                <Button
+                  onClick={handleCheckEInvoiceStatus}
+                  icon={IconClock}
+                  variant="outline"
+                  color="sky"
+                  disabled={isCheckingEInvoice}
+                >
+                  {isCheckingEInvoice
+                    ? "Checking..."
+                    : "Check e-Invoice Status"}
+                </Button>
+              ) : null}
+            </>
+          )}
           <Button
             onClick={handlePrintInvoice}
             icon={IconPrinter}
@@ -1177,6 +1225,153 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* e-Invoice Details Section */}
+      {invoice.einvoice_status && (
+        <div className="mt-8">
+          <h2 className="text-xl font-medium mb-4">e-Invoice Information</h2>
+          <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+            <div
+              className={`p-4 ${
+                invoice.einvoice_status === "valid"
+                  ? "bg-green-50 border-b border-green-200"
+                  : invoice.einvoice_status === "pending"
+                  ? "bg-sky-50 border-b border-sky-200"
+                  : invoice.einvoice_status === "invalid"
+                  ? "bg-rose-50 border-b border-rose-200"
+                  : "bg-default-50 border-b border-default-200"
+              }`}
+            >
+              <div className="flex items-center">
+                {invoice.einvoice_status === "valid" ? (
+                  <IconCheck size={22} className="text-green-600 mr-3" />
+                ) : invoice.einvoice_status === "pending" ? (
+                  <IconClock size={22} className="text-sky-600 mr-3" />
+                ) : invoice.einvoice_status === "invalid" ? (
+                  <IconAlertTriangle size={22} className="text-rose-600 mr-3" />
+                ) : null}
+                <div>
+                  <h3 className="text-lg font-medium">
+                    {invoice.einvoice_status === "valid"
+                      ? "Valid e-Invoice"
+                      : invoice.einvoice_status === "pending"
+                      ? "Pending Validation"
+                      : invoice.einvoice_status === "invalid"
+                      ? "Invalid e-Invoice"
+                      : "e-Invoice Status"}
+                  </h3>
+                  {invoice.einvoice_status === "pending" && (
+                    <p className="text-sm text-sky-600 mt-1">
+                      This e-invoice has been submitted but is still pending
+                      validation.
+                    </p>
+                  )}
+                  {invoice.einvoice_status === "invalid" && (
+                    <p className="text-sm text-rose-600 mt-1">
+                      This e-invoice has been rejected or marked as invalid.
+                    </p>
+                  )}
+                </div>
+                {/* Show check status button for pending */}
+                {invoice.einvoice_status === "pending" && (
+                  <Button
+                    onClick={handleCheckEInvoiceStatus}
+                    variant="outline"
+                    color="sky"
+                    className="ml-auto"
+                    disabled={isCheckingEInvoice}
+                  >
+                    {isCheckingEInvoice ? "Checking..." : "Check Status"}
+                  </Button>
+                )}
+                {/* Show re-submit button for invalid */}
+                {invoice.einvoice_status === "invalid" &&
+                  invoice.tin_number &&
+                  invoice.id_number && (
+                    <Button
+                      onClick={handleSubmitEInvoice}
+                      variant="outline"
+                      color="amber"
+                      className="ml-auto"
+                      disabled={isSubmittingEInvoice}
+                    >
+                      {isSubmittingEInvoice
+                        ? "Submitting..."
+                        : "Re-submit e-Invoice"}
+                    </Button>
+                  )}
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {invoice.uuid && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      UUID
+                    </label>
+                    <div
+                      className="font-mono text-sm truncate"
+                      title={invoice.uuid}
+                    >
+                      {invoice.uuid}
+                    </div>
+                  </div>
+                )}
+                {invoice.submission_uid && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      Submission UID
+                    </label>
+                    <div
+                      className="font-mono text-sm truncate"
+                      title={invoice.submission_uid}
+                    >
+                      {invoice.submission_uid}
+                    </div>
+                  </div>
+                )}
+                {invoice.long_id && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      Long ID
+                    </label>
+                    <div
+                      className="font-mono text-sm truncate"
+                      title={invoice.long_id}
+                    >
+                      {invoice.long_id}
+                    </div>
+                  </div>
+                )}
+                {invoice.datetime_validated && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      Validation Date
+                    </label>
+                    <div className="text-sm">
+                      {new Date(invoice.datetime_validated).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Add MyInvois portal link if valid */}
+              {invoice.einvoice_status === "valid" && invoice.long_id && (
+                <div className="mt-4 text-center">
+                  <a
+                    href={`https://myinvois.hasil.gov.my/search?q=${invoice.long_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
+                  >
+                    View in MyInvois Portal
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <ConfirmationDialog
         isOpen={isCancelPaymentDialogOpen}
         onClose={() => setIsCancelPaymentDialogOpen(false)}
