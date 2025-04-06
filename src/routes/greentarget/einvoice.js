@@ -16,15 +16,20 @@ export default function (pool, defaultConfig) {
       // 1. Get invoice details
       const invoiceQuery = `
         SELECT i.*, 
-               c.name as customer_name,
-               c.phone_number as customer_phone_number,
-               c.tin_number,
-               c.id_type,
-               c.id_number,
-               c.email,
-               c.state
+              c.name as customer_name,
+              c.phone_number as customer_phone_number,
+              c.tin_number,
+              c.id_type,
+              c.id_number,
+              c.email,
+              c.state,
+              c.address as customer_address,
+              r.rental_id,
+              l.address as location_address
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
+        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+        LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         WHERE i.invoice_id = $1
       `;
       const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
@@ -67,6 +72,7 @@ export default function (pool, defaultConfig) {
         id_number: invoice.id_number,
         email: invoice.email,
         state: invoice.state,
+        address: invoice.location_address || invoice.customer_address || "",
       };
 
       // 4. Submit to MyInvois
