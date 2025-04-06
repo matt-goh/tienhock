@@ -1,9 +1,12 @@
 // src/routes/greentarget/einvoice.js
 import { Router } from "express";
 import { submitInvoiceToMyInvois } from "../../utils/greenTarget/einvoice/GTServerSubmissionUtil.js";
+import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 
 export default function (pool, defaultConfig) {
   const router = Router();
+
+  const apiClient = GTEInvoiceApiClientFactory.getInstance(defaultConfig);
 
   // Submit e-Invoice for a specific invoice
   router.post("/submit/:invoiceId", async (req, res) => {
@@ -193,13 +196,6 @@ export default function (pool, defaultConfig) {
           updated: false,
         });
       }
-
-      const config = defaultConfig;
-
-      const apiClient =
-        require("../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js").default.getInstance(
-          config
-        );
 
       // Call MyInvois API to check document status
       console.log(
