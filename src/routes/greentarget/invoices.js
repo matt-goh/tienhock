@@ -431,58 +431,5 @@ export default function (pool) {
     }
   });
 
-  // Replace the DELETE endpoint with a redirect to the cancel endpoint
-  router.delete("/:invoice_id", async (req, res, next) => {
-    // Added next
-    const { invoice_id } = req.params;
-    const numericInvoiceId = parseInt(invoice_id, 10);
-
-    if (isNaN(numericInvoiceId)) {
-      return res.status(400).json({ message: "Invalid invoice ID format" });
-    }
-
-    // Deprecation Warning (Optional but good practice)
-    console.warn(
-      `DELETE /greentarget/api/invoices/${invoice_id} is deprecated. Use PUT /greentarget/api/invoices/${invoice_id}/cancel.`
-    );
-    res.setHeader(
-      "X-Deprecated-API",
-      `DELETE /greentarget/api/invoices/:invoice_id is deprecated. Use PUT /greentarget/api/invoices/:invoice_id/cancel instead.`
-    );
-    res.setHeader("Warning", '299 - "Deprecated API Endpoint"'); // Standard warning header
-
-    // --- Option 1: Directly call the cancel logic (more efficient) ---
-    // Simulate the PUT request body if needed (e.g., if cancel expects a reason)
-    req.body = {
-      reason: req.body.reason || "Cancelled via deprecated DELETE endpoint",
-    }; // Provide a default reason
-
-    // Find the handler for the PUT route and call it
-    const putRoute = router.stack.find(
-      (layer) =>
-        layer.route &&
-        layer.route.path === "/:invoice_id/cancel" &&
-        layer.route.methods.put
-    );
-
-    if (putRoute && putRoute.route.stack[0].handle) {
-      putRoute.route.stack[0].handle(req, res, next); // Execute the PUT handler
-    } else {
-      console.error(
-        "Could not find PUT /:invoice_id/cancel handler to forward DELETE request."
-      );
-      res
-        .status(500)
-        .json({
-          message: "Internal configuration error forwarding delete request.",
-        });
-    }
-
-    // --- Option 2: Use internal Express routing (less common for this scenario) ---
-    // req.method = 'PUT';
-    // req.url = `/${numericInvoiceId}/cancel`;
-    // router.handle(req, res, next); // Re-route the request internally
-  });
-
   return router;
 }
