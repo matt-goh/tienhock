@@ -23,7 +23,6 @@ export default function (pool, defaultConfig) {
               c.id_number,
               c.email,
               c.state,
-              c.address as customer_address,
               r.rental_id,
               l.address as location_address
         FROM greentarget.invoices i
@@ -72,7 +71,7 @@ export default function (pool, defaultConfig) {
         id_number: invoice.id_number,
         email: invoice.email,
         state: invoice.state,
-        address: invoice.location_address || invoice.customer_address || "",
+        address: invoice.location_address || "Tong Location",
       };
 
       // 4. Submit to MyInvois
