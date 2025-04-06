@@ -325,8 +325,47 @@ const InvoiceDetailsPage: React.FC = () => {
       // Dismiss the loading toast regardless of outcome
       toast.dismiss(toastId);
 
-      // Store the full response for the modal
-      setSubmissionResults(response);
+      // Transform the Green Target response to match the expected format
+      const transformedResponse = {
+        success: response.success,
+        message: response.message || "e-Invoice submitted successfully",
+        overallStatus:
+          response.einvoice?.einvoice_status === "valid"
+            ? "Valid"
+            : response.einvoice?.einvoice_status === "pending"
+            ? "Pending"
+            : "Unknown",
+        acceptedDocuments: response.einvoice
+          ? [
+              {
+                internalId: response.einvoice.invoice_number,
+                uuid: response.einvoice.uuid,
+                longId: response.einvoice.long_id,
+                status:
+                  response.einvoice.einvoice_status === "valid"
+                    ? "ACCEPTED"
+                    : "Submitted",
+                dateTimeValidated: response.einvoice.datetime_validated,
+              },
+            ]
+          : [],
+        rejectedDocuments:
+          !response.success && response.error
+            ? [
+                {
+                  internalId: invoice.invoice_id.toString(),
+                  error: {
+                    code: "ERROR",
+                    message: response.error.message || "Unknown error",
+                    details: response.error.details,
+                  },
+                },
+              ]
+            : [],
+      };
+
+      // Store the transformed response for the modal
+      setSubmissionResults(transformedResponse);
 
       // Show the results modal instead of simple toasts
       setShowSubmissionResultsModal(true);
