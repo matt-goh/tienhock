@@ -532,7 +532,7 @@ export interface InvoiceGT {
   status: "paid" | "unpaid" | "cancelled" | "overdue";
 
   // E-invoice fields
-  einvoice_status?: "valid" | "invalid" | "pending" | null;
+  einvoice_status?: "valid" | "invalid" | "pending" | "cancelled" | null;
   uuid: string | null; // UUID from e-invoice system
   submission_uid: string | null;
   long_id: string | null;
