@@ -1285,13 +1285,13 @@ const InvoiceDetailsPage: React.FC = () => {
                           className="px-2"
                         >
                           {payment.status === "cancelled" ? (
-                            <button className="italic cursor-not-allowed">
+                            <span className="italic cursor-not-allowed">
                               Cancelled
-                            </button>
+                            </span>
                           ) : (
-                            <button className="flex items-center gap-1">
+                            <span className="flex items-center gap-1">
                               <IconTrash size={16} /> Cancel
-                            </button>
+                            </span>
                           )}
                         </Button>
                       </td>
