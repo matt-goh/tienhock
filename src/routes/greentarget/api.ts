@@ -77,7 +77,6 @@ export const greenTargetApi = {
     api.put(`/greentarget/api/invoices/${id}`, data),
   cancelInvoice: (id: number, reason?: string) =>
     api.put(`/greentarget/api/invoices/${id}/cancel`, { reason }),
-  deleteInvoice: (id: any) => api.delete(`/greentarget/api/invoices/${id}`),
 
   // e-Invoice endpoints
   submitEInvoice: async (invoiceId: number) => {
@@ -98,12 +97,6 @@ export const greenTargetApi = {
       throw error;
     }
   },
-
-  getEInvoiceStatus: (uuid: string) =>
-    api.get(`/greentarget/api/einvoice/status/${uuid}`),
-
-  checkEInvoiceForInvoice: (invoiceId: number) =>
-    api.get(`/greentarget/api/einvoice/check/${invoiceId}`),
 
   // Payment endpoints
   getPayments: (includeCancelled = false) =>
