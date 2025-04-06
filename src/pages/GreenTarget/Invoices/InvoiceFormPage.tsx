@@ -22,7 +22,9 @@ import {
   IconSquare,
 } from "@tabler/icons-react";
 import clsx from "clsx";
-import { FormCombobox, SelectOption } from "../../../components/FormComponents"; // Use FormCombobox and SelectOption
+import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
+import { EInvoiceSubmissionResult } from "../../../types/types";
 
 // Interfaces
 interface Customer {
@@ -107,8 +109,10 @@ const InvoiceFormPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
-  const [showEinvoiceError, setShowEinvoiceError] = useState(false);
-  const [einvoiceErrorMessage, setEinvoiceErrorMessage] = useState("");
+  const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
+    useState(false);
+  const [submissionResults, setSubmissionResults] =
+    useState<EInvoiceSubmissionResult | null>(null);
 
   // State to remember rental selection when switching types
   const [previousRental, setPreviousRental] = useState<{
@@ -458,11 +462,6 @@ const InvoiceFormPage: React.FC = () => {
         toast.error("eInvoice: Customer missing.");
         return false;
       }
-      if (!selCust.tin_number || !selCust.id_number) {
-        setEinvoiceErrorMessage("eInvoice requires Customer TIN & ID.");
-        setShowEinvoiceError(true);
-        return false;
-      }
     }
     if (isPaid && !paymentMethod) {
       toast.error("Select payment method.");
@@ -520,7 +519,6 @@ const InvoiceFormPage: React.FC = () => {
             (c) => c.customer_id === formData.customer_id
           );
 
-          // Change this part to properly handle e-invoice submission:
           if (
             submitAsEinvoice &&
             selCust?.tin_number &&
@@ -530,33 +528,47 @@ const InvoiceFormPage: React.FC = () => {
             const eTid = toast.loading("Submitting e-Invoice...");
             try {
               const eRes = await greenTargetApi.submitEInvoice(navId);
-              if (!eRes.success) {
-                toast.error(eRes.message || "e-Invoice submission failed", {
-                  id: eTid,
-                });
-                setEinvoiceErrorMessage(
-                  eRes.message || "e-Invoice submission failed"
-                );
-                setShowEinvoiceError(true);
-              } else {
-                // Check if it's pending or valid
+
+              // Dismiss loading toast
+              toast.dismiss(eTid);
+
+              // Store the full response for the modal
+              setSubmissionResults(eRes);
+
+              // Show the results modal
+              setShowSubmissionResultsModal(true);
+
+              // Only show minor toast if needed
+              if (eRes.success && !showSubmissionResultsModal) {
                 const status = eRes.einvoice?.einvoice_status || "pending";
                 if (status === "valid") {
-                  toast.success("e-Invoice submitted and validated", {
-                    id: eTid,
-                  });
+                  toast.success("e-Invoice submitted and validated");
                 } else {
-                  toast.success("e-Invoice submitted and pending validation", {
-                    id: eTid,
-                  });
+                  toast.success("e-Invoice submitted and pending validation");
                 }
               }
-            } catch (eErr: any) {
+            } catch (eErr) {
               console.error("e-Invoice submission error:", eErr);
-              const m = eErr instanceof Error ? eErr.message : "Unknown error";
-              toast.error(`e-Invoice submission failed: ${m}`, { id: eTid });
-              setEinvoiceErrorMessage(`e-Invoice submission failed: ${m}`);
-              setShowEinvoiceError(true);
+              toast.error("e-Invoice submission failed", { id: eTid });
+
+              // Format error for modal
+              const errorMessage =
+                eErr instanceof Error ? eErr.message : "Unknown error";
+              setSubmissionResults({
+                success: false,
+                message: `e-Invoice submission failed: ${errorMessage}`,
+                overallStatus: "Error",
+                rejectedDocuments: [
+                  {
+                    internalId: navId.toString(),
+                    error: {
+                      code: "EINVOICE_ERROR",
+                      message: errorMessage,
+                    },
+                  },
+                ],
+              });
+              setShowSubmissionResultsModal(true);
             }
           }
           if (isPaid && navId) {
@@ -1300,6 +1312,20 @@ const InvoiceFormPage: React.FC = () => {
           </div>
         </form>
       </div>
+      <SubmissionResultsModal
+        isOpen={showSubmissionResultsModal}
+        onClose={() => setShowSubmissionResultsModal(false)}
+        results={
+          submissionResults
+            ? {
+                ...submissionResults,
+                message: submissionResults.message || "", // Ensure message is always a string
+                overallStatus: submissionResults.overallStatus || "Unknown", // Ensure overallStatus is always a string
+              }
+            : null
+        }
+        isLoading={isSaving && submitAsEinvoice}
+      />
       {/* Dialogs */}
       <ConfirmationDialog
         isOpen={showBackConfirmation}
@@ -1309,16 +1335,6 @@ const InvoiceFormPage: React.FC = () => {
         message="Leave without saving?"
         confirmButtonText="Discard"
         variant="danger"
-      />
-      <ConfirmationDialog
-        isOpen={showEinvoiceError}
-        onClose={() => setShowEinvoiceError(false)}
-        onConfirm={() => setShowEinvoiceError(false)}
-        title="e-Invoice Issue"
-        message={einvoiceErrorMessage || "Error."}
-        confirmButtonText="OK"
-        variant="danger"
-        hideCancelButton={true}
       />
     </div>
   );

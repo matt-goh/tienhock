@@ -25,8 +25,9 @@ import {
 } from "@headlessui/react";
 import clsx from "clsx"; // Added clsx
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { SelectOption } from "../../../components/FormComponents";
-import { InvoiceGT } from "../../../types/types";
+import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
 
 interface Payment {
   payment_id: number;
@@ -87,6 +88,10 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
   const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
   const [isCheckingEInvoice, setIsCheckingEInvoice] = useState(false);
+  const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
+    useState(false);
+  const [submissionResults, setSubmissionResults] =
+    useState<EInvoiceSubmissionResult | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -317,29 +322,48 @@ const InvoiceDetailsPage: React.FC = () => {
       // Call the actual e-Invoice submission API
       const response = await greenTargetApi.submitEInvoice(invoice.invoice_id);
 
-      if (response.success) {
-        toast.success("e-Invoice submitted successfully", { id: toastId });
+      // Dismiss the loading toast regardless of outcome
+      toast.dismiss(toastId);
 
-        // Refresh invoice details to show updated status
+      // Store the full response for the modal
+      setSubmissionResults(response);
+
+      // Show the results modal instead of simple toasts
+      setShowSubmissionResultsModal(true);
+
+      // Only show a toast for major failures that might prevent the modal from showing
+      if (!response.success && !response.message && !response.error) {
+        toast.error("Failed to submit e-Invoice due to an unexpected error");
+      }
+
+      // Still refresh the invoice data if successful
+      if (response.success) {
         fetchInvoiceDetails(invoice.invoice_id);
-      } else {
-        toast.error(response.message || "Failed to submit e-Invoice", {
-          id: toastId,
-        });
-        setEInvoiceErrorMessage(
-          response.message || "Failed to submit e-Invoice"
-        );
-        setShowEInvoiceErrorDialog(true);
       }
     } catch (error) {
       console.error("Error submitting e-Invoice:", error);
       toast.error("Failed to submit e-Invoice");
-      setEInvoiceErrorMessage(
-        error instanceof Error
-          ? `Failed to submit e-Invoice: ${error.message}`
-          : "Failed to submit e-Invoice due to an unknown error"
-      );
-      setShowEInvoiceErrorDialog(true);
+
+      // Create a formatted error response for the modal
+      setSubmissionResults({
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Unknown error occurred",
+        overallStatus: "Error",
+        rejectedDocuments: [
+          {
+            internalId: invoice.invoice_id.toString(),
+            error: {
+              code: "SYSTEM_ERROR",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Unknown error occurred",
+            },
+          },
+        ],
+      });
+      setShowSubmissionResultsModal(true);
     } finally {
       setIsSubmittingEInvoice(false);
     }
@@ -357,28 +381,82 @@ const InvoiceDetailsPage: React.FC = () => {
         invoice.invoice_id
       );
 
-      if (response.success) {
-        if (response.updated) {
-          toast.success(`e-Invoice status updated to ${response.status}`, {
-            id: toastId,
-          });
-          // Refresh invoice details
-          fetchInvoiceDetails(invoice.invoice_id);
-        } else {
-          // No change in status
-          toast.success(
-            `e-Invoice status check complete. Status remains ${response.status}`,
-            { id: toastId }
-          );
-        }
-      } else {
-        toast.error(response.message || "Failed to check e-Invoice status", {
-          id: toastId,
-        });
+      toast.dismiss(toastId);
+
+      // Format the response for the SubmissionResultsModal
+      const formattedResponse = {
+        success: response.success,
+        message: response.message || `e-Invoice status: ${response.status}`,
+        overallStatus:
+          response.status === "valid"
+            ? "Valid"
+            : response.status === "pending"
+            ? "Pending"
+            : "Invalid",
+        // Format in a way the modal can understand
+        acceptedDocuments:
+          response.status === "valid"
+            ? [
+                {
+                  internalId: invoice.invoice_id.toString(),
+                  uuid: invoice.uuid,
+                  longId: response.longId,
+                  status: "Valid",
+                  dateTimeValidated: response.dateTimeValidated,
+                },
+              ]
+            : [],
+        pendingUpdated:
+          response.status === "pending"
+            ? [
+                {
+                  id: invoice.invoice_id.toString(),
+                  status: "pending",
+                  updated: response.updated,
+                },
+              ]
+            : [],
+        rejectedDocuments:
+          response.status === "invalid"
+            ? [
+                {
+                  internalId: invoice.invoice_id.toString(),
+                  error: {
+                    code: "INVALID_EINVOICE",
+                    message: "e-Invoice is invalid",
+                  },
+                },
+              ]
+            : [],
+      };
+
+      setSubmissionResults(formattedResponse);
+      setShowSubmissionResultsModal(true);
+
+      // Refresh invoice details if status changed
+      if (response.updated) {
+        fetchInvoiceDetails(invoice.invoice_id);
       }
     } catch (error) {
       console.error("Error checking e-Invoice status:", error);
       toast.error("Failed to check e-Invoice status");
+
+      // Create error response for modal
+      setSubmissionResults({
+        success: false,
+        message: "Failed to check e-Invoice status",
+        overallStatus: "Error",
+        rejectedDocuments: [
+          {
+            internalId: invoice.invoice_id.toString(),
+            error: {
+              code: "STATUS_CHECK_ERROR",
+              message: error instanceof Error ? error.message : "Unknown error",
+            },
+          },
+        ],
+      });
+      setShowSubmissionResultsModal(true);
     } finally {
       setIsCheckingEInvoice(false);
     }
@@ -895,7 +973,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       Statement Period:
                     </td>
                     <td className="py-2 font-medium text-default-900 truncate max-w-[200px] md:max-w-none">
-                      {formatDate(invoice.statement_period_start || "")} to{" "}
+                      {formatDate(invoice.statement_period_start || "")} to
                       {formatDate(invoice.statement_period_end || "")}
                     </td>
                   </tr>
@@ -1372,6 +1450,20 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         </div>
       )}
+      <SubmissionResultsModal
+        isOpen={showSubmissionResultsModal}
+        onClose={() => setShowSubmissionResultsModal(false)}
+        results={
+          submissionResults
+            ? {
+                ...submissionResults,
+                message: submissionResults.message || "", // Ensure message is always a string
+                overallStatus: submissionResults.overallStatus || "Unknown", // Ensure overallStatus is always a string
+              }
+            : null
+        }
+        isLoading={isSubmittingEInvoice || isCheckingEInvoice}
+      />
       <ConfirmationDialog
         isOpen={isCancelPaymentDialogOpen}
         onClose={() => setIsCancelPaymentDialogOpen(false)}
