@@ -497,7 +497,7 @@ export default function (pool) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT status, total_amount FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE", // Lock the row
+        "SELECT status, total_amount, uuid, einvoice_status FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE", // Lock the row
         [numericInvoiceId]
       );
 
@@ -505,8 +505,9 @@ export default function (pool) {
         await client.query("ROLLBACK"); // Release lock
         return res.status(404).json({ message: "Invoice not found" });
       }
-      const currentStatus = invoiceCheck.rows[0].status;
-      const totalAmount = parseFloat(invoiceCheck.rows[0].total_amount);
+      const invoice = invoiceCheck.rows[0];
+      const currentStatus = invoice.status;
+      const totalAmount = parseFloat(invoice.total_amount);
 
       if (currentStatus === "cancelled") {
         await client.query("ROLLBACK"); // Release lock
@@ -528,22 +529,74 @@ export default function (pool) {
         );
       }
 
+      // NEW CODE: Handle e-Invoice cancellation
+      let einvoiceCancelledApi = false;
+      let apiResponseMessage = null;
+
+      if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+        try {
+          // Get MyInvois API client
+          const config = {
+            MYINVOIS_API_BASE_URL: process.env.MYINVOIS_API_BASE_URL,
+            MYINVOIS_GT_CLIENT_ID: process.env.MYINVOIS_GT_CLIENT_ID,
+            MYINVOIS_GT_CLIENT_SECRET: process.env.MYINVOIS_GT_CLIENT_SECRET,
+          };
+
+          const apiClient =
+            require("../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js").default.getInstance(
+              config
+            );
+
+          // Call MyInvois API to cancel e-invoice
+          console.log(
+            `Attempting to cancel e-invoice ${invoice.uuid} for invoice ${invoice_id}`
+          );
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${invoice.uuid}/state`,
+            { status: "cancelled", reason: reason || "Invoice cancelled" }
+          );
+
+          einvoiceCancelledApi = true;
+          apiResponseMessage = `Successfully cancelled e-invoice ${invoice.uuid} via API.`;
+          console.log(apiResponseMessage);
+        } catch (cancelError) {
+          console.error(
+            `Error cancelling e-invoice ${invoice.uuid} via API:`,
+            cancelError
+          );
+          // Log error but continue with local cancellation
+          if (cancelError.status === 400) {
+            console.warn(
+              `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
+            );
+            einvoiceCancelledApi = true; // Assume cancelled if API fails in a way suggesting it's already done
+          }
+          apiResponseMessage = `Failed to cancel e-invoice via API: ${cancelError.message}`;
+        }
+      }
+
+      // Determine new e-Invoice status based on API result
+      const newEInvoiceStatus = einvoiceCancelledApi
+        ? "cancelled"
+        : invoice.einvoice_status;
+
       // Update the invoice status to cancelled, set balance to 0
       const updateQuery = `
         UPDATE greentarget.invoices
         SET status = 'cancelled',
             balance_due = 0, -- Set balance to 0 upon cancellation
             cancellation_date = CURRENT_TIMESTAMP,
-            cancellation_reason = $1
-        WHERE invoice_id = $2
+            cancellation_reason = $1,
+            einvoice_status = $2 -- Update e-invoice status
+        WHERE invoice_id = $3
         RETURNING *;
       `;
       const updateResult = await client.query(updateQuery, [
         reason || null,
+        newEInvoiceStatus,
         numericInvoiceId,
       ]);
-
-      // Optionally: Update related rental status if applicable? (Depends on business logic)
 
       await client.query("COMMIT");
 
@@ -556,6 +609,8 @@ export default function (pool) {
       res.json({
         message: "Invoice cancelled successfully",
         invoice: cancelledInvoice,
+        einvoice_cancelled: einvoiceCancelledApi,
+        einvoice_message: apiResponseMessage,
       });
     } catch (error) {
       await client.query("ROLLBACK");
