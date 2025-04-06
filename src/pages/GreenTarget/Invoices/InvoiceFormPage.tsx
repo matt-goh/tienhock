@@ -519,6 +519,8 @@ const InvoiceFormPage: React.FC = () => {
           const selCust = customers.find(
             (c) => c.customer_id === formData.customer_id
           );
+
+          // Change this part to properly handle e-invoice submission:
           if (
             submitAsEinvoice &&
             selCust?.tin_number &&
@@ -529,21 +531,32 @@ const InvoiceFormPage: React.FC = () => {
             try {
               const eRes = await greenTargetApi.submitEInvoice(navId);
               if (!eRes.success) {
-                toast.error(eRes.message || "eInvoice failed", { id: eTid });
-                setEinvoiceErrorMessage(eRes.message || "eInvoice failed");
+                toast.error(eRes.message || "e-Invoice submission failed", {
+                  id: eTid,
+                });
+                setEinvoiceErrorMessage(
+                  eRes.message || "e-Invoice submission failed"
+                );
                 setShowEinvoiceError(true);
-                setIsSaving(false);
-                return;
+              } else {
+                // Check if it's pending or valid
+                const status = eRes.einvoice?.einvoice_status || "pending";
+                if (status === "valid") {
+                  toast.success("e-Invoice submitted and validated", {
+                    id: eTid,
+                  });
+                } else {
+                  toast.success("e-Invoice submitted and pending validation", {
+                    id: eTid,
+                  });
+                }
               }
-              toast.success("eInvoice submitted", { id: eTid });
             } catch (eErr: any) {
-              console.error("eInvoice err:", eErr);
-              const m = eErr instanceof Error ? eErr.message : "Unknown";
-              toast.error(`eInvoice failed: ${m}`, { id: eTid });
-              setEinvoiceErrorMessage(`eInvoice failed: ${m}`);
+              console.error("e-Invoice submission error:", eErr);
+              const m = eErr instanceof Error ? eErr.message : "Unknown error";
+              toast.error(`e-Invoice submission failed: ${m}`, { id: eTid });
+              setEinvoiceErrorMessage(`e-Invoice submission failed: ${m}`);
               setShowEinvoiceError(true);
-              setIsSaving(false);
-              return;
             }
           }
           if (isPaid && navId) {
@@ -1102,120 +1115,117 @@ const InvoiceFormPage: React.FC = () => {
           </div>
 
           {/* Payment Method Section */}
-          {!isEditMode &&
-            isPaid && (
-              <div className="mt-6 border-t pt-6">
-                <h2 className="text-lg font-medium mb-4">
-                  Payment Info (Optional)
-                </h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="pm-paid"
-                      className="block text-sm font-medium text-default-700"
-                    >
-                      Method <span className="text-red-500">*</span>
-                    </label>
-                    <Listbox
-                      value={paymentMethod}
-                      onChange={handlePaymentMethodChange}
-                      name="payment_method_paid"
-                    >
-                      <div className="relative">
-                        <HeadlessListboxButton
-                          id="pm-paid"
-                          className={clsx(
-                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
-                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                          )}
-                        >
-                          <span className="block truncate">
-                            {getOptionName(
-                              paymentMethodOptions,
-                              paymentMethod
-                            ) || "Select"}
-                          </span>
-                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                            <IconChevronDown
-                              size={20}
-                              className="text-gray-400"
-                            />
-                          </span>
-                        </HeadlessListboxButton>
-                        <Transition
-                          as={Fragment}
-                          leave="transition ease-in duration-100"
-                          leaveFrom="opacity-100"
-                          leaveTo="opacity-0"
-                        >
-                          <ListboxOptions
-                            className={clsx(
-                              "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
-                              "bottom-full mb-1"
-                            )}
-                          >
-                            {paymentMethodOptions.map((o) => (
-                              <ListboxOption
-                                key={o.id}
-                                className={({ active }) =>
-                                  clsx(
-                                    "relative cursor-default select-none py-2 pl-3 pr-10",
-                                    active
-                                      ? "bg-sky-100 text-sky-900"
-                                      : "text-gray-900"
-                                  )
-                                }
-                                value={o.id.toString()}
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span
-                                      className={clsx(
-                                        "block truncate",
-                                        selected ? "font-medium" : "font-normal"
-                                      )}
-                                    >
-                                      {o.name}
-                                    </span>
-                                    {selected && (
-                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                        <IconCheck size={20} />
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </ListboxOption>
-                            ))}
-                          </ListboxOptions>
-                        </Transition>
-                      </div>
-                    </Listbox>
-                  </div>
-                  {(paymentMethod === "cheque" ||
-                    paymentMethod === "bank_transfer") && (
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="payment_reference"
-                        className="block text-sm font-medium text-default-700"
-                      >
-                        {paymentMethod === "cheque" ? "Cheque No" : "Reference"}{" "}
-                      </label>
-                      <input
-                        type="text"
-                        id="payment_reference"
-                        name="payment_reference"
-                        value={paymentReference}
-                        onChange={(e) => setPaymentReference(e.target.value)}
+          {!isEditMode && isPaid && (
+            <div className="mt-6 border-t pt-6">
+              <h2 className="text-lg font-medium mb-4">
+                Payment Info (Optional)
+              </h2>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="pm-paid"
+                    className="block text-sm font-medium text-default-700"
+                  >
+                    Method <span className="text-red-500">*</span>
+                  </label>
+                  <Listbox
+                    value={paymentMethod}
+                    onChange={handlePaymentMethodChange}
+                    name="payment_method_paid"
+                  >
+                    <div className="relative">
+                      <HeadlessListboxButton
+                        id="pm-paid"
                         className={clsx(
-                          "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                          "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
                           "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                         )}
-                      />
+                      >
+                        <span className="block truncate">
+                          {getOptionName(paymentMethodOptions, paymentMethod) ||
+                            "Select"}
+                        </span>
+                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                          <IconChevronDown
+                            size={20}
+                            className="text-gray-400"
+                          />
+                        </span>
+                      </HeadlessListboxButton>
+                      <Transition
+                        as={Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <ListboxOptions
+                          className={clsx(
+                            "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                            "bottom-full mb-1"
+                          )}
+                        >
+                          {paymentMethodOptions.map((o) => (
+                            <ListboxOption
+                              key={o.id}
+                              className={({ active }) =>
+                                clsx(
+                                  "relative cursor-default select-none py-2 pl-3 pr-10",
+                                  active
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "text-gray-900"
+                                )
+                              }
+                              value={o.id.toString()}
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span
+                                    className={clsx(
+                                      "block truncate",
+                                      selected ? "font-medium" : "font-normal"
+                                    )}
+                                  >
+                                    {o.name}
+                                  </span>
+                                  {selected && (
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                      <IconCheck size={20} />
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </ListboxOption>
+                          ))}
+                        </ListboxOptions>
+                      </Transition>
                     </div>
-                  )}
+                  </Listbox>
                 </div>
+                {(paymentMethod === "cheque" ||
+                  paymentMethod === "bank_transfer") && (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="payment_reference"
+                      className="block text-sm font-medium text-default-700"
+                    >
+                      {paymentMethod === "cheque" ? "Cheque No" : "Reference"}{" "}
+                    </label>
+                    <input
+                      type="text"
+                      id="payment_reference"
+                      name="payment_reference"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className={clsx(
+                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      )}
+                    />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
           {/* e-Invoice Section */}
           {!isEditMode &&

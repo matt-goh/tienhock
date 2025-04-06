@@ -4,6 +4,34 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Generate a unique invoice number
+  async function generateInvoiceNumber(client, type) {
+    const year = new Date().getFullYear();
+    const sequenceName =
+      type === "regular"
+        ? "greentarget.regular_invoice_seq"
+        : "greentarget.statement_invoice_seq";
+
+    try {
+      const result = await client.query(
+        `SELECT nextval('${sequenceName}') as next_val`
+      );
+      const nextVal = result.rows[0].next_val;
+
+      if (type === "regular") {
+        return `${year}/${String(nextVal).padStart(5, "0")}`;
+      } else {
+        return `I${year}/${String(nextVal).padStart(4, "0")}`;
+      }
+    } catch (seqError) {
+      console.error(
+        `Error getting next value for sequence ${sequenceName}:`,
+        seqError
+      );
+      throw new Error("Failed to generate invoice number."); // Throw a more specific error
+    }
+  }
+
   // Get all invoices (with optional filters - ADDED status filter)
   router.get("/", async (req, res) => {
     // Added 'status' to destructuring
@@ -114,34 +142,6 @@ export default function (pool) {
       });
     }
   });
-
-  // Generate a unique invoice number
-  async function generateInvoiceNumber(client, type) {
-    const year = new Date().getFullYear();
-    const sequenceName =
-      type === "regular"
-        ? "greentarget.regular_invoice_seq"
-        : "greentarget.statement_invoice_seq";
-
-    try {
-      const result = await client.query(
-        `SELECT nextval('${sequenceName}') as next_val`
-      );
-      const nextVal = result.rows[0].next_val;
-
-      if (type === "regular") {
-        return `${year}/${String(nextVal).padStart(5, "0")}`;
-      } else {
-        return `I${year}/${String(nextVal).padStart(4, "0")}`;
-      }
-    } catch (seqError) {
-      console.error(
-        `Error getting next value for sequence ${sequenceName}:`,
-        seqError
-      );
-      throw new Error("Failed to generate invoice number."); // Throw a more specific error
-    }
-  }
 
   // Get invoice by ID
   router.get("/:invoice_id", async (req, res) => {
@@ -334,6 +334,148 @@ export default function (pool) {
           message: "Error creating invoice",
           error: error.message,
         });
+    } finally {
+      client.release();
+    }
+  });
+
+  // Check/update e-invoice status
+  router.put("/:invoice_id/check-einvoice-status", async (req, res) => {
+    const { invoice_id } = req.params;
+    const numericInvoiceId = parseInt(invoice_id, 10);
+    const client = await pool.connect();
+
+    if (isNaN(numericInvoiceId)) {
+      return res.status(400).json({ message: "Invalid invoice ID format" });
+    }
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and has a UUID
+      const invoiceQuery = `
+      SELECT uuid, einvoice_status, submission_uid
+      FROM greentarget.invoices 
+      WHERE invoice_id = $1
+      FOR UPDATE
+    `;
+
+      const invoiceResult = await client.query(invoiceQuery, [
+        numericInvoiceId,
+      ]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // We can only check status if we have a UUID
+      if (!invoice.uuid) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: "This invoice has no e-Invoice UUID to check",
+        });
+      }
+
+      // If already valid, no need to check
+      if (invoice.einvoice_status === "valid") {
+        await client.query("ROLLBACK");
+        return res.json({
+          success: true,
+          message: "Invoice already has a valid e-Invoice status",
+          status: invoice.einvoice_status,
+          updated: false,
+        });
+      }
+
+      // Create API client to check status
+      const config = {
+        MYINVOIS_API_BASE_URL: process.env.MYINVOIS_API_BASE_URL,
+        MYINVOIS_GT_CLIENT_ID: process.env.MYINVOIS_GT_CLIENT_ID,
+        MYINVOIS_GT_CLIENT_SECRET: process.env.MYINVOIS_GT_CLIENT_SECRET,
+      };
+
+      const apiClient =
+        require("../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js").default.getInstance(
+          config
+        );
+
+      // Call MyInvois API to check document status
+      console.log(
+        `Checking MyInvois status for document UUID: ${invoice.uuid}`
+      );
+      const documentDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${invoice.uuid}/details`
+      );
+
+      // Determine new status based on response
+      let newStatus = invoice.einvoice_status; // Default to keep current
+      let newLongId = null;
+      let newDateTimeValidated = null;
+      let updated = false;
+
+      if (documentDetails.longId) {
+        newStatus = "valid";
+        newLongId = documentDetails.longId;
+        newDateTimeValidated =
+          documentDetails.dateTimeValidated ||
+          (documentDetails.dateTimeValidation
+            ? new Date(documentDetails.dateTimeValidation).toISOString()
+            : null);
+        updated = true;
+      } else if (
+        documentDetails.status === "Invalid" ||
+        documentDetails.status === "Rejected"
+      ) {
+        newStatus = "invalid";
+        updated = true;
+      }
+
+      // Update database if status changed
+      if (updated) {
+        const updateQuery = `
+        UPDATE greentarget.invoices
+        SET einvoice_status = $1,
+            long_id = $2,
+            datetime_validated = $3
+        WHERE invoice_id = $4
+      `;
+
+        await client.query(updateQuery, [
+          newStatus,
+          newLongId,
+          newDateTimeValidated,
+          numericInvoiceId,
+        ]);
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        success: true,
+        message: updated
+          ? `Status updated to ${newStatus}`
+          : `Status remains ${newStatus}`,
+        status: newStatus,
+        longId: newLongId,
+        dateTimeValidated: newDateTimeValidated,
+        updated: updated,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(
+        `Error checking e-invoice status for invoice ${invoice_id}:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        message: "Error checking e-invoice status",
+        error: error.message,
+      });
     } finally {
       client.release();
     }

@@ -97,6 +97,8 @@ export const greenTargetApi = {
       throw error;
     }
   },
+  checkEInvoiceStatus: (invoiceId: number) =>
+    api.put(`/greentarget/api/invoices/${invoiceId}/check-einvoice-status`),
 
   // Payment endpoints
   getPayments: (includeCancelled = false) =>
