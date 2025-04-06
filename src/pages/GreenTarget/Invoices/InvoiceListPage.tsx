@@ -207,7 +207,7 @@ const InvoiceCard = ({
                     </span>
                   ) : invoice.einvoice_status === "cancelled" ? (
                     <span className="inline-flex items-center text-xs font-medium text-default-700">
-                      <IconCheck size={14} className="mr-1" />
+                      <IconCancel size={14} className="mr-1" />
                       e-Invoice Cancelled
                     </span>
                   ) : null}
@@ -305,20 +305,17 @@ const InvoiceCard = ({
     2. Invoice is not already submitted as e-Invoice or submitted but invalid */}
           {invoice.tin_number &&
             invoice.id_number &&
+            invoice.status !== "cancelled" &&
             (!invoice.einvoice_status ||
-              invoice.einvoice_status === "invalid") && (
+              invoice.einvoice_status === "invalid" ||
+              invoice.einvoice_status !== "cancelled") && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onSubmitEInvoiceClick(invoice);
                 }}
-                className={`p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors ${
-                  invoice.status === "cancelled"
-                    ? "cursor-not-allowed opacity-50"
-                    : ""
-                }`}
+                className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors"
                 title="Submit as e-Invoice"
-                disabled={invoice.status === "cancelled"}
               >
                 <IconFileInvoice size={18} stroke={1.5} />
               </button>
@@ -436,8 +433,6 @@ const InvoiceListPage: React.FC = () => {
   const [invoiceToCancel, setInvoiceToCancel] = useState<InvoiceGT | null>(
     null
   );
-  const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
-  const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
     useState(false);
   const [submissionResults, setSubmissionResults] =
@@ -570,7 +565,7 @@ const InvoiceListPage: React.FC = () => {
           setInvoices(
             invoices.map((i) =>
               i.invoice_id === invoiceToCancel.invoice_id
-                ? { ...i, status: "cancelled" }
+                ? { ...i, status: "cancelled", einvoice_status: "cancelled" }
                 : i
             )
           );

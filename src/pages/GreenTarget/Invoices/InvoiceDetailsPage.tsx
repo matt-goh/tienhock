@@ -11,6 +11,7 @@ import {
   IconChevronDown,
   IconClock,
   IconAlertTriangle,
+  IconCancel,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -514,7 +515,8 @@ const InvoiceDetailsPage: React.FC = () => {
     if (!invoice) return;
 
     // Check if invoice has payments
-    if (payments.length > 0) {
+    const activePayments = payments.filter((p) => p.status === "active");
+    if (activePayments.length > 0) {
       toast.error(
         "Cannot cancel invoice: it has associated payments. Cancel the payments first."
       );
@@ -1346,7 +1348,6 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* e-Invoice Details Section */}
       {invoice.einvoice_status && (
         <div className="mt-8">
-          <h2 className="text-xl font-medium mb-4">e-Invoice Information</h2>
           <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
             <div
               className={`p-4 ${
@@ -1356,6 +1357,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   ? "bg-sky-50 border-b border-sky-200"
                   : invoice.einvoice_status === "invalid"
                   ? "bg-rose-50 border-b border-rose-200"
+                  : invoice.einvoice_status === "cancelled"
+                  ? "bg-default-50 border-b border-default-200"
                   : "bg-default-50 border-b border-default-200"
               }`}
             >
@@ -1366,6 +1369,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   <IconClock size={22} className="text-sky-600 mr-3" />
                 ) : invoice.einvoice_status === "invalid" ? (
                   <IconAlertTriangle size={22} className="text-rose-600 mr-3" />
+                ) : invoice.einvoice_status === "cancelled" ? (
+                  <IconCancel size={22} className="text-default-600 mr-3" />
                 ) : null}
                 <div>
                   <h3 className="text-lg font-medium">
@@ -1375,6 +1380,8 @@ const InvoiceDetailsPage: React.FC = () => {
                       ? "Pending Validation"
                       : invoice.einvoice_status === "invalid"
                       ? "Invalid e-Invoice"
+                      : invoice.einvoice_status === "cancelled"
+                      ? "Cancelled e-Invoice"
                       : "e-Invoice Status"}
                   </h3>
                   {invoice.einvoice_status === "pending" && (
@@ -1476,7 +1483,7 @@ const InvoiceDetailsPage: React.FC = () => {
               {invoice.einvoice_status === "valid" && invoice.long_id && (
                 <div className="mt-4 text-center">
                   <a
-                    href={`https://myinvois.hasil.gov.my/search?q=${invoice.long_id}`}
+                    href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
