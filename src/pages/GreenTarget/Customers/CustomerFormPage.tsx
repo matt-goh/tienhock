@@ -464,29 +464,6 @@ const CustomerFormPage: React.FC = () => {
   ) => {
     const value = formData[name]?.toString() || "";
 
-    // For state field, we want to show the name but save the code
-    if (name === "state") {
-      const selectedState = stateOptions.find((opt) => opt.id === value);
-      return (
-        <FormListbox
-          name={name}
-          label={label}
-          value={selectedState ? selectedState.name : value}
-          onChange={(selectedName) => {
-            const selectedOption = stateOptions.find(
-              (opt) => opt.name === selectedName
-            );
-            handleListboxChange(
-              name,
-              selectedOption ? selectedOption.id : selectedName
-            );
-          }}
-          options={options}
-        />
-      );
-    }
-
-    // For other fields, normal behavior
     return (
       <FormListbox
         name={name}
