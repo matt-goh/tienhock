@@ -290,17 +290,6 @@ const InvoiceCard = ({
               e.stopPropagation();
               navigate(`/greentarget/invoices/${invoice.invoice_id}`);
             }}
-            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
-            title="View Details"
-          >
-            <IconFileDownload size={18} stroke={1.5} />
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/greentarget/invoices/${invoice.invoice_id}`);
-            }}
             className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
             title="Print Invoice"
           >
