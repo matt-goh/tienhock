@@ -493,7 +493,7 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
             <div className="flex items-center">
               <div className="mr-3">
                 <div className="text-sm font-medium text-default-800">
-                  Auto Consolidation
+                  Auto Consolidation (Monthly)
                 </div>
                 <p className="text-xs text-default-500 mt-0.5">
                   Automatically consolidate eligible invoices 1 day after
@@ -535,7 +535,6 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
                 company="greentarget"
                 year={selectedYear}
                 month={selectedMonth}
-                onRefresh={fetchAutoConsolidationSettings}
               />
             </div>
           )}
