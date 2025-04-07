@@ -7,11 +7,6 @@ import {
   CACHE_KEYS,
   CACHE_EXPIRY,
 } from "../../utils/greenTarget/cacheUtils";
-import {
-  MYINVOIS_API_BASE_URL,
-  MYINVOIS_GT_CLIENT_ID,
-  MYINVOIS_GT_CLIENT_SECRET,
-} from "../../configs/config.js";
 
 export const greenTargetApi = {
   // Customer endpoints
