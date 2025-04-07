@@ -776,6 +776,110 @@ export default function (pool, defaultConfig) {
     }
   });
 
+  // Get auto-consolidation settings
+  router.get("/settings/auto-consolidation", async (req, res) => {
+    try {
+      const query =
+        "SELECT * FROM consolidation_settings WHERE company_id = 'tienhock'";
+      const result = await pool.query(query);
+
+      if (result.rows.length === 0) {
+        await pool.query(
+          "INSERT INTO consolidation_settings (company_id, auto_consolidation_enabled) VALUES ('tienhock', FALSE) RETURNING *"
+        );
+        return res.json({ enabled: false });
+      }
+
+      return res.json({
+        enabled: result.rows[0].auto_consolidation_enabled,
+      });
+    } catch (error) {
+      console.error("Error fetching auto-consolidation settings:", error);
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to fetch settings" });
+    }
+  });
+
+  // Toggle enabled/disabled:
+  router.post("/settings/auto-consolidation", async (req, res) => {
+    const { enabled } = req.body;
+    const sessionId = req.headers["x-session-id"];
+
+    try {
+      const sessionQuery = "SELECT staffid FROM sessions WHERE id = $1";
+      const sessionResult = await pool.query(sessionQuery, [sessionId]);
+      const staffId = sessionResult.rows[0]?.staffid || "system";
+
+      const query = `
+        UPDATE consolidation_settings 
+        SET 
+          auto_consolidation_enabled = $1,
+          last_updated = CURRENT_TIMESTAMP,
+          updated_by = $2
+        WHERE company_id = 'tienhock'
+        RETURNING *
+      `;
+
+      const result = await pool.query(query, [enabled, staffId]);
+
+      return res.json({
+        success: true,
+        message: "Settings updated successfully",
+        settings: {
+          enabled: result.rows[0].auto_consolidation_enabled,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating auto-consolidation settings:", error);
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to update settings" });
+    }
+  });
+
+  // Get auto-consolidation status
+  router.get("/auto-consolidation/status", async (req, res) => {
+    const { year, month } = req.query;
+
+    if (!year || month === undefined) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Year and month are required" });
+    }
+
+    try {
+      const query = `
+      SELECT * FROM consolidation_tracking 
+      WHERE company_id = 'greentarget' AND year = $1 AND month = $2
+    `;
+
+      const result = await pool.query(query, [year, month]);
+
+      if (result.rows.length === 0) {
+        return res.json({
+          exists: false,
+          status: null,
+        });
+      }
+
+      return res.json({
+        exists: true,
+        status: result.rows[0].status,
+        attempt_count: result.rows[0].attempt_count,
+        last_attempt: result.rows[0].last_attempt,
+        next_attempt: result.rows[0].next_attempt,
+        consolidated_invoice_id: result.rows[0].consolidated_invoice_id,
+        error: result.rows[0].error,
+      });
+    } catch (error) {
+      console.error("Error fetching auto-consolidation status:", error);
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to fetch status" });
+    }
+  });
+
   // Update status of consolidated invoice
   router.post("/consolidated/:invoice_id/update-status", async (req, res) => {
     const { invoice_id } = req.params;

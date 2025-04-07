@@ -14,6 +14,10 @@ import {
 import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";
+import {
+  checkAndProcessDueConsolidations,
+  scheduleNextMonthConsolidation,
+} from "./src/utils/invoice/autoConsolidation.js";
 
 dotenv.config();
 
@@ -105,6 +109,45 @@ cron.schedule(
   }
 );
 console.log("Daily invoice status update job scheduled for 8:00 AM KLT.");
+
+// --- Auto-consolidation scheduler ---
+console.log("Setting up auto-consolidation scheduler...");
+
+// Run once daily at 8 AM to check for consolidation tasks
+cron.schedule(
+  "0 8 * * *", // Run at 8 AM every day
+  async () => {
+    console.log(
+      `[${new Date().toISOString()}] Running auto-consolidation check...`
+    );
+    try {
+      // Check if any consolidations are due today
+      await checkAndProcessDueConsolidations(pool);
+
+      // Schedule next month's consolidation if we're at month-end
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // If today is the last day of the month, schedule next month's consolidation
+      if (now.getMonth() !== tomorrow.getMonth()) {
+        console.log(
+          `[${new Date().toISOString()}] End of month detected, scheduling next month's consolidation...`
+        );
+        await scheduleNextMonthConsolidation(pool);
+      }
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error in auto-consolidation job:`,
+        error
+      );
+    }
+  },
+  {
+    scheduled: true,
+    timezone: "Asia/Kuala_Lumpur",
+  }
+);
 
 // Handle react routing (Catch-all for client-side routing)
 // This should generally be AFTER your API routes

@@ -31,6 +31,7 @@ import {
   Transition,
 } from "@headlessui/react";
 import SubmissionResultsModal from "../Invoice/SubmissionResultsModal";
+import ConsolidationStatusPanel from "../Invoice/ConsolidationStatusPanel";
 
 interface GTConsolidatedInvoiceModalProps {
   isOpen: boolean;
@@ -104,6 +105,7 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
   const [historyYear, setHistoryYear] = useState<number>(
     new Date().getFullYear()
   );
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   // Create an array of month options
   const monthOptions = useMemo(
@@ -128,6 +130,7 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
       // Fetch data
       fetchEligibleInvoices();
       fetchConsolidationHistory();
+      fetchAutoConsolidationSettings();
     }
   }, [isOpen]);
 
@@ -177,6 +180,48 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
       setConsolidationHistory([]);
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+  const fetchAutoConsolidationSettings = async () => {
+    setIsLoadingSettings(true);
+    try {
+      const response = await api.get(
+        "/greentarget/api/einvoice/settings/auto-consolidation"
+      );
+      setIsAutoConsolidationEnabled(response.enabled);
+    } catch (error) {
+      console.error("Error fetching auto-consolidation settings:", error);
+      toast.error("Couldn't load auto-consolidation settings");
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const toggleAutoConsolidation = async () => {
+    setIsLoadingSettings(true);
+    try {
+      const response = await api.post(
+        "/greentarget/api/einvoice/settings/auto-consolidation",
+        {
+          enabled: !isAutoConsolidationEnabled,
+        }
+      );
+
+      if (response.success) {
+        setIsAutoConsolidationEnabled(response.settings.enabled);
+        toast.success(
+          `Auto-consolidation ${
+            response.settings.enabled ? "enabled" : "disabled"
+          }`
+        );
+      } else {
+        throw new Error(response.message || "Update failed");
+      }
+    } catch (error) {
+      console.error("Error toggling auto-consolidation:", error);
+      toast.error("Couldn't update auto-consolidation settings");
+    } finally {
+      setIsLoadingSettings(false);
     }
   };
 
@@ -442,35 +487,58 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
           </div>
         </div>
 
-        {/* Auto-consolidation toggle */}
-        <div className="px-5 py-4 border-b border-default-200 flex justify-between items-center bg-default-50/60 flex-shrink-0">
-          <div className="flex items-center">
-            <div className="mr-3">
-              <div className="text-sm font-medium text-default-800 flex items-center">
-                Auto Consolidation
-                <span className="ml-2 text-[11px] font-normal py-0.5 px-2 bg-default-200 text-default-600 rounded-full">
-                  Coming Soon
-                </span>
+        {/* Auto-consolidation toggle - simplified version */}
+        <div className="px-5 py-4 border-b border-default-200 flex flex-col bg-default-50/60 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="mr-3">
+                <div className="text-sm font-medium text-default-800">
+                  Auto Consolidation
+                </div>
+                <p className="text-xs text-default-500 mt-0.5">
+                  Automatically consolidate eligible invoices 1 day after
+                  month-end, with retries for up to 7 days.
+                </p>
               </div>
-              <p className="text-xs text-default-500 mt-0.5">
-                Automatically consolidate eligible invoices monthly.
-              </p>
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isAutoConsolidationEnabled}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${
+                  isLoadingSettings ? "opacity-50 cursor-not-allowed" : ""
+                } ${
+                  isAutoConsolidationEnabled ? "bg-sky-600" : "bg-default-200"
+                }`}
+                onClick={toggleAutoConsolidation}
+                disabled={isLoadingSettings}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isAutoConsolidationEnabled
+                      ? "translate-x-6"
+                      : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
           </div>
-          <div className="relative">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isAutoConsolidationEnabled}
-              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30 bg-gray-200"
-              onClick={() =>
-                setIsAutoConsolidationEnabled(!isAutoConsolidationEnabled)
-              }
-              disabled={true}
-            >
-              <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1" />
-            </button>
-          </div>
+
+          {/* Status panel - only show if auto-consolidation is enabled */}
+          {isAutoConsolidationEnabled && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-default-700 mb-2">
+                Current Month Status
+              </h4>
+              <ConsolidationStatusPanel
+                company="greentarget"
+                year={selectedYear}
+                month={selectedMonth}
+                onRefresh={fetchAutoConsolidationSettings}
+              />
+            </div>
+          )}
         </div>
 
         {/* Main Content Area */}
