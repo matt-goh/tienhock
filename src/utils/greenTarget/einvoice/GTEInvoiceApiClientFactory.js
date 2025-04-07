@@ -21,7 +21,6 @@ export default {
         config.MYINVOIS_GT_CLIENT_ID,
         config.MYINVOIS_GT_CLIENT_SECRET
       );
-      console.log("Created new GTEInvoiceApiClient instance");
     }
     return instance;
   },
