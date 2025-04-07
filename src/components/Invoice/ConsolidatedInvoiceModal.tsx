@@ -5,7 +5,6 @@ import Button from "../Button";
 import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../ConfirmationDialog";
-
 import {
   IconCircleCheck,
   IconFileInvoice,
@@ -37,6 +36,7 @@ import {
 import SubmissionResultsModal from "./SubmissionResultsModal";
 import ConsolidatedInfoTooltip from "./ConsolidatedInfoTooltip";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
+import ConsolidationStatusPanel from "./ConsolidationStatusPanel";
 
 // Interfaces remain the same
 interface ConsolidatedInvoiceModalProps {
@@ -111,6 +111,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [historyYear, setHistoryYear] = useState<number>(
     new Date().getFullYear()
   );
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   // Create an array of month options (similar to how historyYear works)
   const monthOptions = useMemo(
@@ -135,6 +136,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       // Fetch data
       fetchEligibleInvoices();
       fetchConsolidationHistory();
+      fetchAutoConsolidationSettings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -303,6 +305,49 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     }
   };
 
+  const toggleAutoConsolidation = async () => {
+    setIsLoadingSettings(true);
+    try {
+      const response = await api.post(
+        "/api/einvoice/settings/auto-consolidation",
+        {
+          enabled: !isAutoConsolidationEnabled,
+        }
+      );
+
+      if (response.success) {
+        setIsAutoConsolidationEnabled(response.settings.enabled);
+        toast.success(
+          `Auto-consolidation ${
+            response.settings.enabled ? "enabled" : "disabled"
+          }`
+        );
+      } else {
+        throw new Error(response.message || "Update failed");
+      }
+    } catch (error) {
+      console.error("Error toggling auto-consolidation:", error);
+      toast.error("Couldn't update auto-consolidation settings");
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const fetchAutoConsolidationSettings = async () => {
+    setIsLoadingSettings(true);
+    try {
+      const response = await api.get(
+        "/api/einvoice/settings/auto-consolidation"
+      );
+      setIsAutoConsolidationEnabled(response.enabled);
+    } catch (error) {
+      console.error("Error fetching auto-consolidation settings:", error);
+      toast.error("Couldn't load auto-consolidation settings");
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
   const handleMonthChange = (newMonth: number) => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -446,38 +491,58 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           </div>
         </div>
 
-        {/* Auto-consolidation toggle */}
-        <div className="px-5 py-4 border-b border-default-200 flex justify-between items-center bg-default-50/60 flex-shrink-0">
-          {/* Auto Consolidation section remains the same */}
-          <div className="flex items-center">
-            <div className="mr-3">
-              <div className="text-sm font-medium text-default-800 flex items-center">
-                Auto Consolidation
-                <span className="ml-2 text-[11px] font-normal py-0.5 px-2 bg-default-200 text-default-600 rounded-full">
-                  Coming Soon
-                </span>
+        {/* Auto-consolidation toggle - simplified version */}
+        <div className="px-5 py-4 border-b border-default-200 flex flex-col bg-default-50/60 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="mr-3">
+                <div className="text-sm font-medium text-default-800">
+                  Auto Consolidation
+                </div>
+                <p className="text-xs text-default-500 mt-0.5">
+                  Automatically consolidate eligible invoices 1 day after
+                  month-end, with retries for up to 7 days.
+                </p>
               </div>
-              <p className="text-xs text-default-500 mt-0.5">
-                Automatically consolidate eligible invoices monthly.
-              </p>
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isAutoConsolidationEnabled}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${
+                  isLoadingSettings ? "opacity-50 cursor-not-allowed" : ""
+                } ${
+                  isAutoConsolidationEnabled ? "bg-sky-600" : "bg-default-200"
+                }`}
+                onClick={toggleAutoConsolidation}
+                disabled={isLoadingSettings}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isAutoConsolidationEnabled
+                      ? "translate-x-6"
+                      : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
           </div>
-          <div className="relative">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isAutoConsolidationEnabled}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30 bg-gray-200`} // Always disabled style
-              onClick={() =>
-                setIsAutoConsolidationEnabled(!isAutoConsolidationEnabled)
-              }
-              disabled={true} // Disabled functionally
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1`} // Always off style
+
+          {/* Status panel - only show if auto-consolidation is enabled */}
+          {isAutoConsolidationEnabled && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-default-700 mb-2">
+                Current Month Status
+              </h4>
+              <ConsolidationStatusPanel
+                company="tienhock"
+                year={selectedYear}
+                month={selectedMonth}
+                onRefresh={fetchAutoConsolidationSettings}
               />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Main Content Area */}
@@ -1113,17 +1178,17 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
       </div>
 
-      {/* --- UPDATED Confirmation Dialog with Reason Input --- */}
+      {/* --- Confirmation Dialog with Reason Input --- */}
       <ConfirmationDialog
         isOpen={showCancelConfirm}
-        onClose={closeCancelDialog} // Use dedicated close handler
+        onClose={closeCancelDialog}
         onConfirm={confirmCancelConsolidated}
         title={`Cancel Consolidated Invoice ${cancelTargetId}?`}
         confirmButtonText="Confirm Cancellation"
         variant="danger"
         message={`Are you sure you want to cancel the consolidated invoice ${cancelTargetId}"?`}
       />
-      {/* Submission Results Modal (Unchanged) */}
+      {/* Submission Results Modal */}
       <SubmissionResultsModal
         isOpen={showSubmissionResults}
         onClose={() => setShowSubmissionResults(false)}
