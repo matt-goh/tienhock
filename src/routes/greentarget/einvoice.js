@@ -473,6 +473,9 @@ export default function (pool, defaultConfig) {
         WHERE consolidated.is_consolidated = true
         AND consolidated.consolidated_invoices IS NOT NULL
         AND consolidated.consolidated_invoices ? i.invoice_number
+        AND consolidated.consolidated_invoices::jsonb ? CAST(i.invoice_id AS TEXT)
+        AND consolidated.status != 'cancelled'
+        AND consolidated.einvoice_status != 'cancelled'
       )
       ORDER BY i.date_issued ASC
     `;
@@ -675,6 +678,7 @@ export default function (pool, defaultConfig) {
       );
 
       // 7. Process and update the response in our database
+      // 7. Process and update the response in our database
       if (submissionResponse.acceptedDocuments?.length > 0) {
         // Poll for final status
         const finalStatus = await submissionHandler.pollSubmissionStatus(
@@ -704,6 +708,35 @@ export default function (pool, defaultConfig) {
           consolidatedData.dateTimeValidated || null,
           consolidatedInvoice.invoice_id,
         ]);
+
+        await client.query("COMMIT");
+
+        // Format for SubmissionResultsModal compatibility
+        const formattedResponse = {
+          success: true,
+          message:
+            status === "pending"
+              ? "Consolidated invoice submitted, but is still pending validation"
+              : "Consolidated invoice submitted successfully",
+          acceptedDocuments: [
+            {
+              internalId: consolidatedInvoiceNumber,
+              uuid: consolidatedData.uuid,
+              longId: consolidatedData.longId || null,
+              status: consolidatedData.status || "Submitted",
+              dateTimeReceived:
+                finalStatus.dateTimeReceived || new Date().toISOString(),
+              dateTimeValidated: consolidatedData.dateTimeValidated || null,
+              submissionUid: submissionResponse.submissionUid,
+            },
+          ],
+          rejectedDocuments: submissionResponse.rejectedDocuments || [],
+          overallStatus: status === "pending" ? "Pending" : "Valid",
+          submissionUid: submissionResponse.submissionUid,
+          documentCount: 1,
+        };
+
+        return res.status(201).json(formattedResponse);
       } else if (submissionResponse.rejectedDocuments?.length > 0) {
         // Handle rejected documents
         console.error(

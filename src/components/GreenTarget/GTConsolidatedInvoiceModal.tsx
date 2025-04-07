@@ -1079,10 +1079,10 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
         isOpen={showCancelConfirm}
         onClose={closeCancelDialog}
         onConfirm={confirmCancelConsolidated}
-        title={`Cancel Consolidated Invoice ${cancelTargetId}?`}
+        title={`Cancel Consolidated Invoice?`}
         confirmButtonText="Confirm Cancellation"
         variant="danger"
-        message={`Are you sure you want to cancel the consolidated invoice ${cancelTargetId}"?`}
+        message={`Are you sure you want to cancel this consolidated invoice?`}
       />
 
       {/* Submission Results Modal */}
