@@ -330,6 +330,7 @@ const InvoiceCard = ({
             (!invoice.einvoice_status ||
               invoice.einvoice_status === "invalid" ||
               invoice.einvoice_status !== "cancelled") &&
+            invoice.einvoice_status !== "valid" &&
             isInvoiceDateEligibleForEinvoice(invoice.date_issued) && (
               <button
                 onClick={(e) => {
@@ -623,9 +624,14 @@ const InvoiceListPage: React.FC = () => {
   const handleConfirmEInvoiceSubmission = async () => {
     if (!invoiceToSubmitAsEInvoice) return;
 
+    // Close dialog immediately before any async operations
+    setShowEInvoiceConfirmDialog(false);
+
+    // Small timeout to ensure dialog is closed before showing next UI
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     try {
       setIsProcessingEInvoice(true);
-      setShowEInvoiceConfirmDialog(false);
       setSubmissionResults(null);
       setShowSubmissionResultsModal(true);
 
