@@ -21,7 +21,6 @@ export default {
         config.MYINVOIS_CLIENT_ID,
         config.MYINVOIS_CLIENT_SECRET
       );
-      console.log("Created new EInvoiceApiClient instance");
     }
     return instance;
   },
