@@ -1,7 +1,18 @@
 // src/utils/invoice/autoConsolidation.js
-import { createHash } from "crypto";
 import { EInvoiceConsolidatedTemplate } from "../invoice/einvoice/EInvoiceConsolidatedTemplate.js";
 import { GTEInvoiceConsolidatedTemplate } from "../greenTarget/einvoice/GTEInvoiceConsolidatedTemplate.js";
+import EInvoiceApiClientFactory from "../invoice/einvoice/EInvoiceApiClientFactory.js";
+import EInvoiceSubmissionHandler from "../invoice/einvoice/EInvoiceSubmissionHandler.js";
+import GTEInvoiceApiClientFactory from "../greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
+import GTEInvoiceSubmissionHandler from "../greenTarget/einvoice/GTEInvoiceSubmissionHandler.js";
+import {
+  MYINVOIS_API_BASE_URL,
+  MYINVOIS_CLIENT_ID,
+  MYINVOIS_CLIENT_SECRET,
+  MYINVOIS_GT_CLIENT_ID,
+  MYINVOIS_GT_CLIENT_SECRET,
+} from "../../configs/config.js";
+import { createHash } from "crypto";
 
 // Hard-coded values
 const CONSOLIDATION_DAY = 1; // 1 day after month end
@@ -286,16 +297,16 @@ export const checkAndProcessDueConsolidations = async (pool) => {
  */
 async function processTienhockConsolidation(client, invoices, month, year) {
   try {
-    // Get configuration data
-    const apiClientQuery =
-      "SELECT * FROM einvoice_api_settings WHERE company_id = 'tienhock'";
-    const apiClientResult = await client.query(apiClientQuery);
+    // Use config from environment variables/imports
+    const apiConfig = {
+      MYINVOIS_API_BASE_URL,
+      MYINVOIS_CLIENT_ID,
+      MYINVOIS_CLIENT_SECRET,
+    };
 
-    if (!apiClientResult.rows.length) {
-      throw new Error("MyInvois API configuration not found for Tien Hock");
-    }
-
-    const apiConfig = apiClientResult.rows[0];
+    // Initialize API client and submission handler
+    const apiClient = EInvoiceApiClientFactory.getInstance(apiConfig);
+    const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
 
     // Generate consolidated XML
     const consolidatedXml = await EInvoiceConsolidatedTemplate(
@@ -357,11 +368,29 @@ async function processTienhockConsolidation(client, invoices, month, year) {
       0
     );
 
-    // Insert consolidated record
-    const invoiceIds = invoices.map((inv) => inv.id);
+    // Prepare and submit to MyInvois API
+    console.log(
+      `Submitting consolidated invoice ${consolidatedId} to MyInvois API`
+    );
 
-    // In a real implementation, we would call the MyInvois API here using the API client
-    // For now, we'll simulate this and create a record directly
+    // Prepare document for submission using the XML
+    const submissionResult = await submissionHandler.submitAndPollDocuments(
+      consolidatedXml
+    );
+
+    if (!submissionResult.success) {
+      throw new Error(
+        submissionResult.message ||
+          "Failed to submit consolidated invoice to MyInvois"
+      );
+    }
+
+    // Get consolidation details from the response
+    const documentDetails = submissionResult.acceptedDocuments[0];
+    const status = documentDetails.longId ? "valid" : "pending";
+
+    // Insert consolidated record with API response details
+    const invoiceIds = invoices.map((inv) => inv.id);
 
     await client.query(
       `INSERT INTO invoices (
@@ -372,16 +401,16 @@ async function processTienhockConsolidation(client, invoices, month, year) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         consolidatedId,
-        null, // uuid (would come from API)
-        null, // submission_uid
-        null, // long_id
-        null, // datetime_validated
+        documentDetails.uuid,
+        submissionResult.submissionUid,
+        documentDetails.longId || null,
+        documentDetails.dateTimeValidated || null,
         totalExcludingTax,
         taxAmount,
         rounding,
         totalPayable,
         "paid", // invoice_status
-        "pending", // einvoice_status
+        status, // einvoice_status based on API response
         true, // is_consolidated
         JSON.stringify(invoiceIds),
         "Consolidated customers", // customerid
@@ -411,16 +440,15 @@ async function processTienhockConsolidation(client, invoices, month, year) {
  */
 async function processGreentargetConsolidation(client, invoices, month, year) {
   try {
-    // Get configuration data
-    const apiClientQuery =
-      "SELECT * FROM einvoice_api_settings WHERE company_id = 'greentarget'";
-    const apiClientResult = await client.query(apiClientQuery);
+    const apiConfig = {
+      MYINVOIS_API_BASE_URL,
+      MYINVOIS_GT_CLIENT_ID,
+      MYINVOIS_GT_CLIENT_SECRET,
+    };
 
-    if (!apiClientResult.rows.length) {
-      throw new Error("MyInvois API configuration not found for Green Target");
-    }
-
-    const apiConfig = apiClientResult.rows[0];
+    // Initialize API client and submission handler
+    const apiClient = GTEInvoiceApiClientFactory.getInstance(apiConfig);
+    const submissionHandler = new GTEInvoiceSubmissionHandler(apiClient);
 
     // Generate consolidated XML
     const consolidatedXml = await GTEInvoiceConsolidatedTemplate(
@@ -455,19 +483,38 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
       0
     );
 
-    // Insert consolidated record
+    // Submit to MyInvois API
+    console.log(
+      `Submitting consolidated invoice ${consolidatedInvoiceNumber} to MyInvois API`
+    );
+
+    // Prepare document for submission
+    const submissionResult = await submissionHandler.submitAndPollDocument(
+      consolidatedXml
+    );
+
+    if (!submissionResult.success) {
+      throw new Error(
+        submissionResult.message ||
+          "Failed to submit consolidated invoice to MyInvois"
+      );
+    }
+
+    // Get consolidation details from the response
+    const documentDetails = submissionResult.acceptedDocuments[0];
+    const status = documentDetails.longId ? "valid" : "pending";
+
+    // Insert consolidated record with API response details
     const invoiceIds = invoices.map((inv) => inv.invoice_number);
 
-    // In a real implementation, we would call the MyInvois API here
-    // For now, we'll create a record directly
-
-    const insertResult = await client.query(
+    await client.query(
       `INSERT INTO greentarget.invoices (
         invoice_number, type, customer_id,
         amount_before_tax, tax_amount, total_amount, date_issued,
-        balance_due, status, is_consolidated, consolidated_invoices
+        balance_due, status, is_consolidated, consolidated_invoices,
+        uuid, submission_uid, long_id, datetime_validated, einvoice_status
       )
-      VALUES ($1, 'consolidated', NULL, $2, $3, $4, CURRENT_DATE, $5, 'active', true, $6)
+      VALUES ($1, 'consolidated', NULL, $2, $3, $4, CURRENT_DATE, $5, 'active', true, $6, $7, $8, $9, $10, $11)
       RETURNING invoice_id`,
       [
         consolidatedInvoiceNumber,
@@ -476,6 +523,11 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
         totalAmount.toFixed(2),
         totalAmount.toFixed(2), // Initial balance due equals total
         JSON.stringify(invoiceIds),
+        documentDetails.uuid,
+        submissionResult.submissionUid,
+        documentDetails.longId || null,
+        documentDetails.dateTimeValidated || null,
+        status, // einvoice_status based on API response
       ]
     );
 
