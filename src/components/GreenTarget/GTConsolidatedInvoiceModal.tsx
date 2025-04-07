@@ -100,13 +100,10 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<number>(month);
+  const [selectedYear, setSelectedYear] = useState<number>(year);
   const [historyYear, setHistoryYear] = useState<number>(
     new Date().getFullYear()
   );
-
-  const monthName = new Date(year, month).toLocaleString("default", {
-    month: "long",
-  });
 
   // Create an array of month options
   const monthOptions = useMemo(
@@ -261,7 +258,10 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
   const getTotalAmountSelected = (): number => {
     return eligibleInvoices
       .filter((invoice) => selectedInvoices.has(invoice.invoice_id))
-      .reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0);
+      .reduce((sum, invoice) => {
+        const amount = Number(invoice.total_amount) || 0;
+        return sum + amount;
+      }, 0);
   };
 
   // Handler to update status (only for pending)
@@ -315,6 +315,8 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
     }
 
     setSelectedMonth(newMonth);
+    setSelectedYear(targetYear);
+
     // Update the parent component's state if needed or trigger a refetch
     if (typeof onMonthYearChange === "function") {
       onMonthYearChange(newMonth, targetYear);
@@ -550,7 +552,7 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
                   </Listbox>
 
                   <span className="text-base font-semibold text-default-800 mx-1">
-                    {year}
+                    {selectedYear}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

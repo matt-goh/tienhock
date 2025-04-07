@@ -1,12 +1,16 @@
 // src/routes/greentarget/einvoice.js
 import { Router } from "express";
+import { createHash } from "crypto";
 import { submitInvoiceToMyInvois } from "../../utils/greenTarget/einvoice/GTServerSubmissionUtil.js";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
+import { GTEInvoiceConsolidatedTemplate } from "../../utils/greenTarget/einvoice/GTEInvoiceConsolidatedTemplate.js";
+import GTEInvoiceSubmissionHandler from "../../utils/greenTarget/einvoice/GTEInvoiceSubmissionHandler.js";
 
 export default function (pool, defaultConfig) {
   const router = Router();
 
   const apiClient = GTEInvoiceApiClientFactory.getInstance(defaultConfig);
+  const submissionHandler = new GTEInvoiceSubmissionHandler(apiClient);
 
   // Submit e-Invoice for a specific invoice
   router.post("/submit/:invoiceId", async (req, res) => {
@@ -515,8 +519,7 @@ export default function (pool, defaultConfig) {
       SELECT 
         i.invoice_id, i.invoice_number, i.uuid, i.long_id, i.submission_uid,
         i.datetime_validated, i.einvoice_status, i.amount_before_tax, 
-        i.tax_amount, i.total_amount, i.date_issued, i.created_at,
-        i.consolidated_invoices
+        i.tax_amount, i.total_amount, i.date_issued, i.consolidated_invoices
       FROM greentarget.invoices i
       WHERE i.is_consolidated = true
       AND i.date_issued >= $1 AND i.date_issued < $2
@@ -559,16 +562,16 @@ export default function (pool, defaultConfig) {
 
       // 1. Get details of selected invoices
       const invoiceQuery = `
-      SELECT i.*, 
-             c.name as customer_name,
-             c.phone_number as customer_phone_number,
-             c.tin_number,
-             c.id_type,
-             c.id_number
-      FROM greentarget.invoices i
-      JOIN greentarget.customers c ON i.customer_id = c.customer_id
-      WHERE i.invoice_id = ANY($1)
-    `;
+        SELECT i.*, 
+               c.name as customer_name,
+               c.phone_number as customer_phone_number,
+               c.tin_number,
+               c.id_type,
+               c.id_number
+        FROM greentarget.invoices i
+        JOIN greentarget.customers c ON i.customer_id = c.customer_id
+        WHERE i.invoice_id = ANY($1)
+      `;
 
       const invoiceResult = await client.query(invoiceQuery, [invoices]);
 
@@ -601,10 +604,10 @@ export default function (pool, defaultConfig) {
         "0"
       )}`;
       const consolidatedSequenceQuery = `
-      SELECT COALESCE(MAX(NULLIF(regexp_replace(invoice_number, '^CON-\\d{6}-(\\d+)$', '\\1'), '')), '0')::int + 1 as next_seq
-      FROM greentarget.invoices
-      WHERE invoice_number LIKE 'CON-${datePrefix}-%'
-    `;
+        SELECT COALESCE(MAX(NULLIF(regexp_replace(invoice_number, '^CON-\\d{6}-(\\d+)$', '\\1'), '')), '0')::int + 1 as next_seq
+        FROM greentarget.invoices
+        WHERE invoice_number LIKE 'CON-${datePrefix}-%'
+      `;
 
       const sequenceResult = await client.query(consolidatedSequenceQuery);
       const sequence = sequenceResult.rows[0].next_seq;
@@ -612,18 +615,18 @@ export default function (pool, defaultConfig) {
 
       // 4. Create the consolidated invoice record
       const createConsolidatedQuery = `
-      INSERT INTO greentarget.invoices (
-        invoice_number, type, customer_id,
-        amount_before_tax, tax_amount, total_amount, date_issued,
-        balance_due, status, is_consolidated, consolidated_invoices
-      )
-      VALUES (
-        $1, 'consolidated', $2,
-        $3, $4, $5, CURRENT_DATE,
-        $6, 'active', true, $7
-      )
-      RETURNING *
-    `;
+        INSERT INTO greentarget.invoices (
+          invoice_number, type, customer_id,
+          amount_before_tax, tax_amount, total_amount, date_issued,
+          balance_due, status, is_consolidated, consolidated_invoices
+        )
+        VALUES (
+          $1, 'consolidated', $2,
+          $3, $4, $5, CURRENT_DATE,
+          $6, 'active', true, $7
+        )
+        RETURNING *
+      `;
 
       // Use the first invoice's customer for reference (needs harmonization logic for different customers)
       const referenceCustomer = selectedInvoices[0];
@@ -643,57 +646,87 @@ export default function (pool, defaultConfig) {
 
       const consolidatedInvoice = createResult.rows[0];
 
-      // 5. Submit to MyInvois
-      const customerData = {
-        name: referenceCustomer.customer_name,
-        phone_number: referenceCustomer.customer_phone_number,
-        tin_number: referenceCustomer.tin_number,
-        id_type: referenceCustomer.id_type,
-        id_number: referenceCustomer.id_number,
-      };
-
-      // Submit the consolidated invoice to MyInvois
-      const submissionResult = await submitInvoiceToMyInvois(
-        config,
-        consolidatedInvoice,
-        customerData
+      // 5. Generate XML using the Green Target Consolidated Template
+      const consolidatedXml = await GTEInvoiceConsolidatedTemplate(
+        selectedInvoices,
+        month,
+        year
       );
 
-      // 6. Update the consolidated invoice with e-invoice data
-      if (submissionResult.success) {
-        const documentDetails = submissionResult.document;
-        const updateQuery = `
-        UPDATE greentarget.invoices
-        SET einvoice_status = $1,
-            uuid = $2,
-            submission_uid = $3,
-            long_id = $4,
-            datetime_validated = $5
-        WHERE invoice_id = $6
-        RETURNING *
-      `;
+      // 6. Submit to MyInvois API
+      const requestBody = {
+        documents: [
+          {
+            format: "XML",
+            document: Buffer.from(consolidatedXml, "utf8").toString("base64"),
+            documentHash: createHash("sha256")
+              .update(consolidatedXml, "utf8")
+              .digest("hex"),
+            codeNumber: consolidatedInvoiceNumber,
+          },
+        ],
+      };
 
-        const status = documentDetails.longId ? "valid" : "pending";
+      // Submit to MyInvois API
+      const submissionResponse = await apiClient.makeApiCall(
+        "POST",
+        "/api/v1.0/documentsubmissions",
+        requestBody
+      );
+
+      // 7. Process and update the response in our database
+      if (submissionResponse.acceptedDocuments?.length > 0) {
+        // Poll for final status
+        const finalStatus = await submissionHandler.pollSubmissionStatus(
+          submissionResponse.submissionUid
+        );
+        const consolidatedData = finalStatus.documentSummary[0];
+
+        // Update the consolidated invoice with e-invoice data
+        const updateQuery = `
+          UPDATE greentarget.invoices
+          SET einvoice_status = $1,
+              uuid = $2,
+              submission_uid = $3,
+              long_id = $4,
+              datetime_validated = $5
+          WHERE invoice_id = $6
+          RETURNING *
+        `;
+
+        const status = consolidatedData.longId ? "valid" : "pending";
 
         await client.query(updateQuery, [
           status,
-          documentDetails.uuid,
-          submissionResult.submissionUid,
-          documentDetails.longId || null,
-          documentDetails.dateTimeValidated || null,
+          consolidatedData.uuid,
+          submissionResponse.submissionUid,
+          consolidatedData.longId || null,
+          consolidatedData.dateTimeValidated || null,
           consolidatedInvoice.invoice_id,
         ]);
+      } else if (submissionResponse.rejectedDocuments?.length > 0) {
+        // Handle rejected documents
+        console.error(
+          "Consolidated invoice submission was rejected:",
+          submissionResponse.rejectedDocuments
+        );
       }
 
       await client.query("COMMIT");
 
-      // Return success with details
-      return res.status(201).json({
+      // Format response for front-end
+      const formattedResponse = {
         success: true,
-        message: "Consolidated invoice created and submitted successfully",
+        message: "Consolidated invoice submitted successfully",
+        acceptedDocuments: submissionResponse.acceptedDocuments || [],
+        rejectedDocuments: submissionResponse.rejectedDocuments || [],
+        overallStatus: submissionResponse.overallStatus || "Pending",
+        submissionUid: submissionResponse.submissionUid,
+        documentCount: 1,
         consolidatedInvoice: consolidatedInvoice,
-        submissionResult,
-      });
+      };
+
+      return res.status(201).json(formattedResponse);
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error creating consolidated invoice:", error);
