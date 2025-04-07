@@ -1414,9 +1414,10 @@ export default function (pool, config) {
     const sessionId = req.headers["x-session-id"];
 
     try {
-      const sessionQuery = "SELECT staffid FROM sessions WHERE id = $1";
+      const sessionQuery =
+        "SELECT staff_id FROM active_sessions WHERE session_id = $1";
       const sessionResult = await pool.query(sessionQuery, [sessionId]);
-      const staffId = sessionResult.rows[0]?.staffid || "system";
+      const staffId = sessionResult.rows[0]?.staff_id || "system";
 
       const query = `
         UPDATE consolidation_settings 

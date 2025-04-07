@@ -780,12 +780,12 @@ export default function (pool, defaultConfig) {
   router.get("/settings/auto-consolidation", async (req, res) => {
     try {
       const query =
-        "SELECT * FROM consolidation_settings WHERE company_id = 'tienhock'";
+        "SELECT * FROM consolidation_settings WHERE company_id = 'greentarget'";
       const result = await pool.query(query);
 
       if (result.rows.length === 0) {
         await pool.query(
-          "INSERT INTO consolidation_settings (company_id, auto_consolidation_enabled) VALUES ('tienhock', FALSE) RETURNING *"
+          "INSERT INTO consolidation_settings (company_id, auto_consolidation_enabled) VALUES ('greentarget', FALSE) RETURNING *"
         );
         return res.json({ enabled: false });
       }
@@ -807,9 +807,10 @@ export default function (pool, defaultConfig) {
     const sessionId = req.headers["x-session-id"];
 
     try {
-      const sessionQuery = "SELECT staffid FROM sessions WHERE id = $1";
+      const sessionQuery =
+        "SELECT staff_id FROM active_sessions WHERE session_id = $1";
       const sessionResult = await pool.query(sessionQuery, [sessionId]);
-      const staffId = sessionResult.rows[0]?.staffid || "system";
+      const staffId = sessionResult.rows[0]?.staff_id || "system";
 
       const query = `
         UPDATE consolidation_settings 
@@ -817,7 +818,7 @@ export default function (pool, defaultConfig) {
           auto_consolidation_enabled = $1,
           last_updated = CURRENT_TIMESTAMP,
           updated_by = $2
-        WHERE company_id = 'tienhock'
+        WHERE company_id = 'greentarget'
         RETURNING *
       `;
 
