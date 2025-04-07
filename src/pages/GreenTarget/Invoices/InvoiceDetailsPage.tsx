@@ -86,13 +86,13 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [isCancellingInvoice, setIsCancellingInvoice] = useState(false);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
-  const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
-  const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
   const [isCheckingEInvoice, setIsCheckingEInvoice] = useState(false);
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
     useState(false);
   const [submissionResults, setSubmissionResults] =
     useState<EInvoiceSubmissionResult | null>(null);
+  const [showEInvoiceConfirmDialog, setShowEInvoiceConfirmDialog] =
+    useState(false);
 
   useEffect(() => {
     if (id) {
@@ -319,15 +319,25 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const handleSubmitEInvoice = async () => {
     if (!invoice) return;
+    setShowEInvoiceConfirmDialog(true);
+  };
+
+  // Add this new function for the confirmed submission
+  const handleConfirmEInvoiceSubmission = async () => {
+    if (!invoice) return;
 
     try {
       setIsSubmittingEInvoice(true);
+      // Show the modal with loading state immediately
+      setSubmissionResults(null);
+      setShowSubmissionResultsModal(true);
+
       const toastId = toast.loading("Submitting e-Invoice...");
 
       // Call the actual e-Invoice submission API
       const response = await greenTargetApi.submitEInvoice(invoice.invoice_id);
 
-      // Dismiss the loading toast regardless of outcome
+      // Dismiss the loading toast
       toast.dismiss(toastId);
 
       // Transform the Green Target response to match the expected format
@@ -372,9 +382,6 @@ const InvoiceDetailsPage: React.FC = () => {
       // Store the transformed response for the modal
       setSubmissionResults(transformedResponse);
 
-      // Show the results modal instead of simple toasts
-      setShowSubmissionResultsModal(true);
-
       // Only show a toast for major failures that might prevent the modal from showing
       if (!response.success && !response.message && !response.error) {
         toast.error("Failed to submit e-Invoice due to an unexpected error");
@@ -407,9 +414,9 @@ const InvoiceDetailsPage: React.FC = () => {
           },
         ],
       });
-      setShowSubmissionResultsModal(true);
     } finally {
       setIsSubmittingEInvoice(false);
+      setShowEInvoiceConfirmDialog(false);
     }
   };
 
@@ -1512,7 +1519,7 @@ const InvoiceDetailsPage: React.FC = () => {
               }
             : null
         }
-        isLoading={isSubmittingEInvoice || isCheckingEInvoice}
+        isLoading={isSubmittingEInvoice && !submissionResults}
       />
       <ConfirmationDialog
         isOpen={isCancelPaymentDialogOpen}
@@ -1546,15 +1553,15 @@ const InvoiceDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
+      {/* e-Invoice Confirmation Dialog */}
       <ConfirmationDialog
-        isOpen={showEInvoiceErrorDialog}
-        onClose={() => setShowEInvoiceErrorDialog(false)}
-        onConfirm={() => setShowEInvoiceErrorDialog(false)}
-        title="e-Invoice Submission Error"
-        message={eInvoiceErrorMessage}
-        confirmButtonText="Close"
-        variant="danger"
-        hideCancelButton={true}
+        isOpen={showEInvoiceConfirmDialog}
+        onClose={() => setShowEInvoiceConfirmDialog(false)}
+        onConfirm={handleConfirmEInvoiceSubmission}
+        title="Submit e-Invoice"
+        message={`Are you sure you want to submit Invoice ${invoice?.invoice_number} as an e-Invoice to MyInvois?`}
+        confirmButtonText="Submit"
+        variant="default"
       />
     </div>
   );
