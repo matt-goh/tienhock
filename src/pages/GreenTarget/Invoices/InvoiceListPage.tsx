@@ -625,8 +625,8 @@ const InvoiceListPage: React.FC = () => {
 
     try {
       setIsProcessingEInvoice(true);
-      // Show the modal with loading state immediately
-      setSubmissionResults(null); // Clear any previous results
+      setShowEInvoiceConfirmDialog(false);
+      setSubmissionResults(null);
       setShowSubmissionResultsModal(true);
 
       const toastId = toast.loading("Submitting e-Invoice...");

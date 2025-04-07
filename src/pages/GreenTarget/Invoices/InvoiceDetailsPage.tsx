@@ -731,9 +731,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     color="sky"
                     disabled={isCheckingEInvoice}
                   >
-                    {isCheckingEInvoice
-                      ? "Checking..."
-                      : "Check e-Invoice Status"}
+                    {isCheckingEInvoice ? "Checking..." : "Check Status"}
                   </Button>
                 ) : null}
               </>
@@ -1431,34 +1429,6 @@ const InvoiceDetailsPage: React.FC = () => {
                     </p>
                   )}
                 </div>
-                {/* Show check status button for pending */}
-                {invoice.einvoice_status === "pending" && (
-                  <Button
-                    onClick={handleCheckEInvoiceStatus}
-                    variant="outline"
-                    color="sky"
-                    className="ml-auto"
-                    disabled={isCheckingEInvoice}
-                  >
-                    {isCheckingEInvoice ? "Checking..." : "Check Status"}
-                  </Button>
-                )}
-                {/* Show re-submit button for invalid */}
-                {invoice.einvoice_status === "invalid" &&
-                  invoice.tin_number &&
-                  invoice.id_number && (
-                    <Button
-                      onClick={handleSubmitEInvoice}
-                      variant="outline"
-                      color="amber"
-                      className="ml-auto"
-                      disabled={isSubmittingEInvoice}
-                    >
-                      {isSubmittingEInvoice
-                        ? "Submitting..."
-                        : "Re-submit e-Invoice"}
-                    </Button>
-                  )}
               </div>
             </div>
             <div className="p-4">
