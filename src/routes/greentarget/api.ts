@@ -87,6 +87,8 @@ export const greenTargetApi = {
   },
   checkEInvoiceStatus: (invoiceId: number) =>
     api.put(`/greentarget/api/einvoice/${invoiceId}/check-einvoice-status`),
+  syncEInvoiceCancellation: (invoiceId: number) =>
+    api.put(`/greentarget/api/einvoice/${invoiceId}/sync-cancellation`),
 
   // Payment endpoints
   getPayments: (includeCancelled = false) =>

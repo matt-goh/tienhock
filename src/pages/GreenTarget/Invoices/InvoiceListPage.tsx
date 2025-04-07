@@ -18,6 +18,7 @@ import {
   IconClock,
   IconAlertTriangle,
   IconCancel,
+  IconRefresh,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -39,6 +40,7 @@ interface InvoiceCardProps {
   onCancelClick: (invoice: InvoiceGT) => void;
   onSubmitEInvoiceClick: (invoice: InvoiceGT) => void;
   onCheckEInvoiceStatus: (invoice: InvoiceGT) => void;
+  onSyncCancellationStatus: (invoice: InvoiceGT) => void;
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -48,6 +50,7 @@ const InvoiceCard = ({
   onCancelClick,
   onSubmitEInvoiceClick,
   onCheckEInvoiceStatus,
+  onSyncCancellationStatus,
 }: InvoiceCardProps) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
@@ -358,6 +361,22 @@ const InvoiceCard = ({
             </button>
           )}
 
+          {invoice.status === "cancelled" &&
+            invoice.einvoice_status &&
+            invoice.einvoice_status !== "cancelled" &&
+            invoice.uuid && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSyncCancellationStatus(invoice);
+                }}
+                className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+                title="Sync e-Invoice Cancellation"
+              >
+                <IconRefresh size={18} stroke={1.5} />
+              </button>
+            )}
+
           {!isPaid && (
             <button
               onClick={(e) => {
@@ -466,6 +485,7 @@ const InvoiceListPage: React.FC = () => {
     useState(false);
   const [invoiceToSubmitAsEInvoice, setInvoiceToSubmitAsEInvoice] =
     useState<InvoiceGT | null>(null);
+  const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
 
   const ITEMS_PER_PAGE = 12;
 
@@ -814,6 +834,35 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const handleSyncCancellationStatus = async (invoice: InvoiceGT) => {
+    try {
+      setIsSyncingCancellation(true);
+      const toastId = toast.loading("Syncing cancellation status...");
+
+      // Call API to sync cancellation status
+      const response = await greenTargetApi.syncEInvoiceCancellation(
+        invoice.invoice_id
+      );
+
+      toast.dismiss(toastId);
+
+      // Show success message
+      if (response.success) {
+        toast.success(response.message);
+
+        // Refresh invoices list
+        fetchInvoices();
+      } else {
+        toast.error(response.message || "Failed to sync cancellation status");
+      }
+    } catch (error) {
+      console.error("Error syncing cancellation status:", error);
+      toast.error("Failed to sync cancellation status");
+    } finally {
+      setIsSyncingCancellation(false);
+    }
+  };
+
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
       // Filter by search term (invoice number or customer name)
@@ -1094,6 +1143,7 @@ const InvoiceListPage: React.FC = () => {
               onCancelClick={handleCancelClick}
               onSubmitEInvoiceClick={handleSubmitEInvoice}
               onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
+              onSyncCancellationStatus={handleSyncCancellationStatus}
             />
           ))}
         </div>

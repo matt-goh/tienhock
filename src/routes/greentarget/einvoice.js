@@ -275,6 +275,161 @@ export default function (pool, defaultConfig) {
     }
   });
 
+  // Sync cancellation status with MyInvois
+  router.put("/:invoice_id/sync-cancellation", async (req, res) => {
+    const { invoice_id } = req.params;
+    const numericInvoiceId = parseInt(invoice_id, 10);
+    const client = await pool.connect();
+
+    if (isNaN(numericInvoiceId)) {
+      return res.status(400).json({ message: "Invalid invoice ID format" });
+    }
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and has a UUID
+      const invoiceQuery = `
+      SELECT uuid, einvoice_status, status, invoice_number
+      FROM greentarget.invoices 
+      WHERE invoice_id = $1
+      FOR UPDATE
+    `;
+
+      const invoiceResult = await client.query(invoiceQuery, [
+        numericInvoiceId,
+      ]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // Need a UUID to check status in MyInvois
+      if (!invoice.uuid) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: "This invoice has no e-Invoice UUID to check",
+        });
+      }
+
+      // If invoice is not cancelled in local system, we shouldn't proceed
+      if (invoice.status !== "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invoice must be cancelled locally before syncing cancellation",
+        });
+      }
+
+      // Call MyInvois API to check document status
+      console.log(
+        `Checking MyInvois status for document UUID: ${invoice.uuid}`
+      );
+      const documentDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${invoice.uuid}/details`
+      );
+
+      console.log("Document status from MyInvois:", documentDetails.status);
+
+      let syncResult = {
+        success: true,
+        message: "",
+        actionTaken: "none",
+        statusBefore: invoice.einvoice_status,
+        statusAfter: invoice.einvoice_status,
+      };
+
+      // If already cancelled in MyInvois, just update our database
+      if (documentDetails.status === "Cancelled") {
+        // Update einvoice_status to cancelled
+        const updateQuery = `
+        UPDATE greentarget.invoices
+        SET einvoice_status = 'cancelled'
+        WHERE invoice_id = $1
+      `;
+        await client.query(updateQuery, [numericInvoiceId]);
+
+        syncResult.message =
+          "e-Invoice is already cancelled in MyInvois. Local status updated.";
+        syncResult.actionTaken = "status_updated";
+        syncResult.statusAfter = "cancelled";
+      }
+      // If still valid in MyInvois, try to cancel it
+      else if (documentDetails.status === "Valid") {
+        try {
+          // Call MyInvois API to cancel e-invoice
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${invoice.uuid}/state`,
+            { status: "cancelled", reason: "Invoice cancelled in system" }
+          );
+
+          // Update einvoice_status to cancelled
+          const updateQuery = `
+          UPDATE greentarget.invoices
+          SET einvoice_status = 'cancelled'
+          WHERE invoice_id = $1
+        `;
+          await client.query(updateQuery, [numericInvoiceId]);
+
+          syncResult.message =
+            "Successfully cancelled e-Invoice in MyInvois and updated local status.";
+          syncResult.actionTaken = "cancelled_in_myinvois";
+          syncResult.statusAfter = "cancelled";
+        } catch (cancelError) {
+          // This means we couldn't cancel in MyInvois
+          await client.query("ROLLBACK");
+          return res.status(500).json({
+            success: false,
+            message: `Failed to cancel e-Invoice in MyInvois: ${cancelError.message}`,
+            error: cancelError,
+          });
+        }
+      }
+      // Other status (pending, invalid, etc.)
+      else {
+        // For other statuses, we still update to cancelled
+        const updateQuery = `
+        UPDATE greentarget.invoices
+        SET einvoice_status = 'cancelled'
+        WHERE invoice_id = $1
+      `;
+        await client.query(updateQuery, [numericInvoiceId]);
+
+        syncResult.message = `e-Invoice has status "${documentDetails.status}" in MyInvois. Local status updated to cancelled.`;
+        syncResult.actionTaken = "status_updated";
+        syncResult.statusAfter = "cancelled";
+      }
+
+      await client.query("COMMIT");
+
+      return res.json({
+        success: true,
+        ...syncResult,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(
+        `Error syncing cancellation status for invoice ${invoice_id}:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        message: "Error syncing cancellation status",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // Get invoices eligible for consolidation
   router.get("/eligible-for-consolidation", async (req, res) => {
     try {
       const { month, year } = req.query;

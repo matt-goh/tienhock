@@ -12,6 +12,7 @@ import {
   IconClock,
   IconAlertTriangle,
   IconCancel,
+  IconRefresh,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -93,6 +94,7 @@ const InvoiceDetailsPage: React.FC = () => {
     useState<EInvoiceSubmissionResult | null>(null);
   const [showEInvoiceConfirmDialog, setShowEInvoiceConfirmDialog] =
     useState(false);
+  const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -518,6 +520,37 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const handleSyncCancellationStatus = async () => {
+    if (!invoice?.invoice_id) return;
+
+    try {
+      setIsSyncingCancellation(true);
+      const toastId = toast.loading("Syncing cancellation status...");
+
+      // Call API to sync cancellation status
+      const response = await greenTargetApi.syncEInvoiceCancellation(
+        invoice.invoice_id
+      );
+
+      toast.dismiss(toastId);
+
+      // Show success message
+      if (response.success) {
+        toast.success(response.message);
+
+        // Refresh invoice details
+        fetchInvoiceDetails(invoice.invoice_id);
+      } else {
+        toast.error(response.message || "Failed to sync cancellation status");
+      }
+    } catch (error) {
+      console.error("Error syncing cancellation status:", error);
+      toast.error("Failed to sync cancellation status");
+    } finally {
+      setIsSyncingCancellation(false);
+    }
+  };
+
   const handlePrintInvoice = () => {
     // Placeholder for print functionality
     toast.success("Invoice printing functionality would go here");
@@ -740,6 +773,20 @@ const InvoiceDetailsPage: React.FC = () => {
                   </Button>
                 ) : null}
               </>
+            )}
+          {invoice.status === "cancelled" &&
+            invoice.einvoice_status &&
+            invoice.einvoice_status !== "cancelled" &&
+            invoice.uuid && (
+              <Button
+                onClick={handleSyncCancellationStatus}
+                icon={IconRefresh}
+                variant="outline"
+                color="rose"
+                disabled={isSyncingCancellation}
+              >
+                {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+              </Button>
             )}
           <Button
             onClick={handlePrintInvoice}
