@@ -975,9 +975,6 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
                                 )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
-                                {item.created_at
-                                  ? formatDisplayDate(item.created_at)
-                                  : "-"}
                                 {item.datetime_validated && (
                                   <span
                                     className="block text-xs text-green-600"
