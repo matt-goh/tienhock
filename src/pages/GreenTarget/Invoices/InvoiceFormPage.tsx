@@ -337,6 +337,26 @@ const InvoiceFormPage: React.FC = () => {
     return selected ? selected.name : "";
   };
 
+  const isInvoiceDateEligibleForEinvoice = (
+    dateIssuedString: string | undefined | null
+  ): boolean => {
+    if (!dateIssuedString) return false;
+
+    try {
+      // Parse the ISO date string to a Date object
+      const dateIssued = new Date(dateIssuedString);
+      if (isNaN(dateIssued.getTime())) return false; // Invalid date
+
+      const now = new Date();
+      const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+      const cutoffDate = new Date(now.getTime() - threeDaysInMillis);
+
+      return dateIssued >= cutoffDate;
+    } catch {
+      return false;
+    }
+  };
+
   // --- EVENT HANDLERS ---
 
   const handleInputChange = (
@@ -1284,11 +1304,11 @@ const InvoiceFormPage: React.FC = () => {
           )}
 
           {/* e-Invoice Section */}
-          {!isEditMode &&
-            formData.customer_id > 0 /* ... e-invoice checkbox ... */ && (
-              <div className="mt-6 border-t pt-6">
-                <h2 className="text-lg font-medium mb-2">e-Invoice Option</h2>
-                {canSubmitEinvoice ? (
+          {!isEditMode && formData.customer_id > 0 && (
+            <div className="mt-6 border-t pt-6">
+              <h2 className="text-lg font-medium mb-2">e-Invoice Option</h2>
+              {canSubmitEinvoice ? (
+                isInvoiceDateEligibleForEinvoice(formData.date_issued) ? (
                   <div className="flex items-center space-x-2">
                     <button
                       type="button"
@@ -1312,23 +1332,26 @@ const InvoiceFormPage: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          `/greentarget/customers/${formData.customer_id}`
-                        )
-                      }
-                      className="text-sm text-default-500 hover:text-sky-800 hover:underline focus:outline-none"
-                      title="Add TIN & ID for customer"
-                    >
-                      Cannot submit e-Invoice. Customer missing TIN or ID.
-                    </button>
+                  <div className="text-sm text-amber-600">
+                    Cannot submit e-Invoice for dates older than 3 days.
                   </div>
-                )}
-              </div>
-            )}
+                )
+              ) : (
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/greentarget/customers/${formData.customer_id}`)
+                    }
+                    className="text-sm text-default-500 hover:text-sky-800 hover:underline focus:outline-none"
+                    title="Add TIN & ID for customer"
+                  >
+                    Cannot submit e-Invoice. Customer missing TIN or ID.
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="mt-8 pt-5 border-t border-default-200 flex justify-end">

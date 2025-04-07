@@ -567,6 +567,26 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const isInvoiceDateEligibleForEinvoice = (
+    dateIssuedString: string | undefined | null
+  ): boolean => {
+    if (!dateIssuedString) return false;
+
+    try {
+      // Parse the ISO date string to a Date object
+      const dateIssued = new Date(dateIssuedString);
+      if (isNaN(dateIssued.getTime())) return false; // Invalid date
+
+      const now = new Date();
+      const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+      const cutoffDate = new Date(now.getTime() - threeDaysInMillis);
+
+      return dateIssued >= cutoffDate;
+    } catch {
+      return false;
+    }
+  };
+
   // Format currency
   const formatCurrency = (amount: number | string) => {
     // Allow string input
@@ -683,37 +703,41 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
 
         <div className="flex space-x-3 mt-4 md:mt-0 md:self-end">
-          {/* e-Invoice button - only show if customer has required fields */}
-          {invoice.tin_number && invoice.id_number && (
-            <>
-              {!invoice.einvoice_status ||
-              invoice.einvoice_status === "invalid" ? (
-                <Button
-                  onClick={handleSubmitEInvoice}
-                  icon={IconFileInvoice}
-                  variant="outline"
-                  color="amber"
-                  disabled={
-                    isSubmittingEInvoice || invoice.status === "cancelled"
-                  }
-                >
-                  {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
-                </Button>
-              ) : invoice.einvoice_status === "pending" ? (
-                <Button
-                  onClick={handleCheckEInvoiceStatus}
-                  icon={IconClock}
-                  variant="outline"
-                  color="sky"
-                  disabled={isCheckingEInvoice}
-                >
-                  {isCheckingEInvoice
-                    ? "Checking..."
-                    : "Check e-Invoice Status"}
-                </Button>
-              ) : null}
-            </>
-          )}
+          {/* e-Invoice button - only show if customer has required fields AND date eligible */}
+          {invoice.tin_number &&
+            invoice.id_number &&
+            isInvoiceDateEligibleForEinvoice(invoice.date_issued) && (
+              <>
+                {!invoice.einvoice_status ||
+                invoice.einvoice_status === "invalid" ? (
+                  <Button
+                    onClick={handleSubmitEInvoice}
+                    icon={IconFileInvoice}
+                    variant="outline"
+                    color="amber"
+                    disabled={
+                      isSubmittingEInvoice || invoice.status === "cancelled"
+                    }
+                  >
+                    {isSubmittingEInvoice
+                      ? "Submitting..."
+                      : "Submit e-Invoice"}
+                  </Button>
+                ) : invoice.einvoice_status === "pending" ? (
+                  <Button
+                    onClick={handleCheckEInvoiceStatus}
+                    icon={IconClock}
+                    variant="outline"
+                    color="sky"
+                    disabled={isCheckingEInvoice}
+                  >
+                    {isCheckingEInvoice
+                      ? "Checking..."
+                      : "Check e-Invoice Status"}
+                  </Button>
+                ) : null}
+              </>
+            )}
           <Button
             onClick={handlePrintInvoice}
             icon={IconPrinter}
