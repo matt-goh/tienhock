@@ -513,7 +513,10 @@ const InvoiceFormPage: React.FC = () => {
 
       // 4. Submit e-Invoice (if checked and eligible)
       const shouldSubmitEinvoice =
-        submitAsEinvoice && customerTinNumber && customerIdNumber;
+        submitAsEinvoice &&
+        customerTinNumber &&
+        customerIdNumber &&
+        isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
       if (shouldSubmitEinvoice) {
         // --- TRIGGER MODAL ---
@@ -613,8 +616,22 @@ const InvoiceFormPage: React.FC = () => {
     { id: "online", name: "Online" },
   ];
 
+  const isInvoiceDateEligibleForEinvoice = (
+    createdDateString: string | undefined | null
+  ): boolean => {
+    if (!createdDateString) return false;
+    const now = Date.now();
+    const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+    const cutoffTimestamp = now - threeDaysInMillis;
+    const invoiceTimestamp = parseInt(createdDateString, 10);
+    return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
+  };
+
   // Determine if e-invoice checkbox should be enabled
-  const canSubmitEinvoice = !!customerTinNumber && !!customerIdNumber;
+  const canSubmitEinvoice =
+    !!customerTinNumber &&
+    !!customerIdNumber &&
+    isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
   // --- JSX Output ---
   return (
