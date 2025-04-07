@@ -1306,7 +1306,7 @@ export default function (pool, config) {
       res.status(200).json({
         message:
           "Invoice and associated active payments cancelled successfully",
-        invoice: {
+        deletedInvoice: { // using deletedInvoice to match the old format for mobile app to work
           ...finalCancelledInvoice,
           total_excluding_tax: parseFloat(
             finalCancelledInvoice.total_excluding_tax || 0
