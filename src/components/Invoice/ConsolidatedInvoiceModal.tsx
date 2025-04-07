@@ -990,9 +990,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
-                                {item.created_at
-                                  ? formatDisplayDate(new Date(item.created_at))
-                                  : "-"}
                                 {item.datetime_validated && (
                                   <span
                                     className="block text-xs text-green-600"
