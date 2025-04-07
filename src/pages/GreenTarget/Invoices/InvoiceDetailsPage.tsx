@@ -212,39 +212,43 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
-      // Fetch all payments to find unused reference numbers for the current month and year
+      // Fetch all payments to find unused reference numbers (including cancelled ones)
       const allPayments = await greenTargetApi.getPayments(true);
 
-      // Get current year (last 2 digits) and month (padded with zero)
-      const currentYear = new Date().getFullYear().toString().slice(-2);
-      const currentMonth = (new Date().getMonth() + 1)
+      // Get year and month from the INVOICE'S issued date, not payment date
+      const invoiceDate = new Date(invoice.date_issued);
+      const invoiceYear = invoiceDate.getFullYear().toString().slice(-2);
+      const invoiceMonth = (invoiceDate.getMonth() + 1)
         .toString()
         .padStart(2, "0");
 
       // Regular expression to match the format RV{year}/{month}/{number}
-      const regex = new RegExp(`^RV${currentYear}/${currentMonth}/(\\d+)$`);
+      const regex = new RegExp(`^RV${invoiceYear}/${invoiceMonth}/(\\d+)$`);
 
-      // Find the highest used number for the current month and year
+      // Find the highest used number for the invoice month and year
+      // (including cancelled payments)
       let highestNumber = 0;
-      allPayments.forEach((payment: { internal_reference: string | null }) => {
-        // Handle potential null
-        if (payment.internal_reference) {
-          const match = payment.internal_reference.match(regex);
-          if (match) {
-            const currentNumber = parseInt(match[1], 10);
-            if (currentNumber > highestNumber) {
-              highestNumber = currentNumber;
+      allPayments.forEach(
+        (payment: { internal_reference: string | null; status?: string }) => {
+          // Handle potential null and consider ALL payments regardless of status
+          if (payment.internal_reference) {
+            const match = payment.internal_reference.match(regex);
+            if (match) {
+              const currentNumber = parseInt(match[1], 10);
+              if (currentNumber > highestNumber) {
+                highestNumber = currentNumber;
+              }
             }
           }
         }
-      });
+      );
 
       // Increment by 1 to get the next number
       const nextNumber = highestNumber + 1;
 
-      // Format the reference number
+      // Format the reference number using invoice date's year/month
       const paddedNumber = nextNumber.toString().padStart(2, "0");
-      const referenceNumber = `RV${currentYear}/${currentMonth}/${paddedNumber}`;
+      const referenceNumber = `RV${invoiceYear}/${invoiceMonth}/${paddedNumber}`;
 
       const paymentData = {
         invoice_id: invoice.invoice_id,
