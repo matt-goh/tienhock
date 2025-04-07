@@ -12,7 +12,6 @@ import {
   MYINVOIS_GT_CLIENT_ID,
   MYINVOIS_GT_CLIENT_SECRET,
 } from "../../configs/config.js";
-import { createHash } from "crypto";
 
 // Hard-coded values
 const CONSOLIDATION_DAY = 1; // 1 day after month end
@@ -112,7 +111,7 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               JOIN greentarget.customers c ON i.customer_id = c.customer_id
               WHERE EXTRACT(MONTH FROM i.date_issued) = $1 + 1
               AND EXTRACT(YEAR FROM i.date_issued) = $2
-              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
               AND i.status != 'cancelled'
               AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
             `;
@@ -135,7 +134,7 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               JOIN customers c ON i.customerid = c.id
               WHERE i.createddate::bigint >= $1
               AND i.createddate::bigint <= $2
-              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
               AND i.invoice_status != 'cancelled'
               AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
             `;
