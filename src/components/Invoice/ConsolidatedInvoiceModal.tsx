@@ -107,13 +107,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState(""); // State for cancellation reason input
   const [selectedMonth, setSelectedMonth] = useState<number>(month);
+  const [selectedYear, setSelectedYear] = useState<number>(year);
   const [historyYear, setHistoryYear] = useState<number>(
     new Date().getFullYear()
   );
-
-  const monthName = new Date(year, month).toLocaleString("default", {
-    month: "long",
-  });
 
   // Create an array of month options (similar to how historyYear works)
   const monthOptions = useMemo(
@@ -320,8 +317,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     }
 
     setSelectedMonth(newMonth);
+    setSelectedYear(targetYear);
+
     // Update the parent component's state if needed or trigger a refetch
-    // Assuming onMonthYearChange is a new prop to handle changes
     if (typeof onMonthYearChange === "function") {
       onMonthYearChange(newMonth, targetYear);
     }
@@ -374,7 +372,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       }
     } catch (error: any) {
       console.error(`Error cancelling ${currentId}:`, error);
-      toast.error(`Cancellation failed for ${currentId}: ${error.message}`, {
+      toast.error(`${error.message}`, {
         id: toastId,
         duration: 6000,
       });
@@ -561,7 +559,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   </Listbox>
 
                   <span className="text-base font-semibold text-default-800 mx-1">
-                    {year}
+                    {selectedYear}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

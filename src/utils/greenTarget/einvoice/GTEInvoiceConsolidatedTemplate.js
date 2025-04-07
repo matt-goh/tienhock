@@ -1,5 +1,5 @@
-// src/utils/invoice/einvoice/EInvoiceConsolidatedTemplate.js
-import { TIENHOCK_INFO } from "./companyInfo.js";
+// src/utils/greenTarget/einvoice/GTEInvoiceConsolidatedTemplate.js
+import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo.js";
 
 // Helper function to format ISO date (YYYY-MM-DD)
 const formatDate = (date) => {
@@ -18,7 +18,7 @@ const formatTime = () => {
   return `${hours}:${minutes}:00Z`;
 };
 
-export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
+export async function GTEInvoiceConsolidatedTemplate(invoices, month, year) {
   try {
     if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
       throw {
@@ -36,37 +36,18 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
     let totalProductTax = 0;
 
     invoices.forEach((invoice) => {
-      // Calculate true tax-exclusive amount using product data if available
-      if (invoice.orderDetails && Array.isArray(invoice.orderDetails)) {
-        // Sum product price * quantity for true tax-exclusive amount
-        const invoiceSubtotal = invoice.orderDetails.reduce((sum, product) => {
-          if (!product.issubtotal) {
-            return (
-              sum +
-              (Number(product.price) || 0) * (Number(product.quantity) || 0)
-            );
-          }
-          return sum;
-        }, 0);
-        totalExcludingTax += invoiceSubtotal;
+      // Calculate true tax-exclusive amount
+      totalExcludingTax += parseFloat(invoice.amount_before_tax || 0);
+      totalProductTax += parseFloat(invoice.tax_amount || 0);
+      totalPayableAmount += parseFloat(invoice.total_amount || 0);
 
-        // Sum product taxes
-        invoice.orderDetails.forEach((product) => {
-          if (!product.issubtotal) {
-            totalProductTax += Number(product.tax) || 0;
-          }
-        });
-      } else {
-        // Fallback: Use amount directly if specified as tax-exclusive
-        // If it's tax-inclusive and we don't have product data, this will be inaccurate
-        totalExcludingTax += Number(invoice.amount) || 0;
+      // Add rounding if present
+      if (invoice.rounding) {
+        totalRounding += parseFloat(invoice.rounding);
       }
-
-      totalPayableAmount += Number(invoice.totalamountpayable) || 0;
-      totalRounding += Number(invoice.rounding) || 0;
     });
 
-    // Calculate tax amount - prefer product-level calculation but fall back if needed
+    // Calculate tax amount
     let taxAmount = totalProductTax;
     if (taxAmount === 0) {
       // If no product-level taxes found, calculate based on totals and account for rounding
@@ -102,28 +83,28 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cbc:IndustryClassificationCode name="${
-        TIENHOCK_INFO.msic_description
-      }">${TIENHOCK_INFO.msic_code}</cbc:IndustryClassificationCode>
+        GREENTARGET_INFO.msic_description
+      }">${GREENTARGET_INFO.msic_code}</cbc:IndustryClassificationCode>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="TIN">${TIENHOCK_INFO.tin}</cbc:ID>
+        <cbc:ID schemeID="TIN">${GREENTARGET_INFO.tin}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="BRN">${TIENHOCK_INFO.reg_no}</cbc:ID>
+        <cbc:ID schemeID="BRN">${GREENTARGET_INFO.reg_no}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="SST">${TIENHOCK_INFO.sst_id_xml || "-"}</cbc:ID>
+        <cbc:ID schemeID="SST">${GREENTARGET_INFO.sst_id_xml || "-"}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyIdentification>
         <cbc:ID schemeID="TTX">-</cbc:ID>
       </cac:PartyIdentification>
       <cac:PostalAddress>
-        <cbc:CityName>${TIENHOCK_INFO.city_xml}</cbc:CityName>
-        <cbc:PostalZone>${TIENHOCK_INFO.postcode}</cbc:PostalZone>
+        <cbc:CityName>${GREENTARGET_INFO.city_xml}</cbc:CityName>
+        <cbc:PostalZone>${GREENTARGET_INFO.postcode}</cbc:PostalZone>
         <cbc:CountrySubentityCode>${
-          TIENHOCK_INFO.country_code
+          GREENTARGET_INFO.country_code
         }</cbc:CountrySubentityCode>
         <cac:AddressLine>
-          <cbc:Line>${TIENHOCK_INFO.address_xml}</cbc:Line>
+          <cbc:Line>${GREENTARGET_INFO.address_xml}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
           <cbc:Line></cbc:Line>
@@ -136,11 +117,11 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>${TIENHOCK_INFO.name}</cbc:RegistrationName>
+        <cbc:RegistrationName>${GREENTARGET_INFO.name}</cbc:RegistrationName>
       </cac:PartyLegalEntity>
       <cac:Contact>
-        <cbc:Telephone>${TIENHOCK_INFO.phone}</cbc:Telephone>
-        <cbc:ElectronicMail>${TIENHOCK_INFO.email}</cbc:ElectronicMail>
+        <cbc:Telephone>${GREENTARGET_INFO.phone}</cbc:Telephone>
+        <cbc:ElectronicMail>${GREENTARGET_INFO.email}</cbc:ElectronicMail>
       </cac:Contact>
     </cac:Party>
   </cac:AccountingSupplierParty>`;
@@ -244,7 +225,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
       </cac:TaxSubtotal>
     </cac:TaxTotal>
     <cac:Item>
-      <cbc:Description>Consolidated Invoices for ${monthYearName} (${invoices.length} invoices)</cbc:Description>
+      <cbc:Description>Consolidated Waste Management Services for ${monthYearName} (${invoices.length} invoices)</cbc:Description>
       <cac:OriginCountry>
         <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
       </cac:OriginCountry>
