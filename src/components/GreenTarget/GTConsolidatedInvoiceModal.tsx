@@ -845,7 +845,6 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
               {isLoadingHistory && !processingHistoryId && (
                 <div className="flex justify-center items-center py-16 text-default-500">
                   <LoadingSpinner size="md" />
-                  <span className="ml-2">Loading history...</span>
                 </div>
               )}
 
