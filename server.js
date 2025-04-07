@@ -84,10 +84,8 @@ app.use(express.static(path.join(__dirname, "build")));
 setupRoutes(app, pool); // Pass the pool instance here
 
 // --- Scheduled Job for Invoice Status Updates ---
-// Runs every day at 8:00 AM Kuala Lumpur time (adjust as needed)
-console.log("Setting up daily invoice status update job...");
 cron.schedule(
-  "0 8 * * *",
+  "0 8 * * *", // Run daily at 8 AM
   async () => {
     console.log(
       `[${new Date().toISOString()}] Running daily invoice status update job...`
@@ -108,7 +106,6 @@ cron.schedule(
     timezone: "Asia/Kuala_Lumpur", // Set your desired timezone
   }
 );
-console.log("Daily invoice status update job scheduled for 8:00 AM KLT.");
 
 // --- Auto-consolidation scheduler ---
 console.log("Setting up auto-consolidation scheduler...");
