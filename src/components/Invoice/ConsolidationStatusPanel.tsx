@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../LoadingSpinner";
-import Button from "../Button";
 import {
   IconClock,
   IconCircleCheck,
@@ -16,7 +15,6 @@ interface ConsolidationStatusProps {
   company: "tienhock" | "greentarget";
   year: number;
   month: number;
-  onRefresh?: () => void;
 }
 
 // Define the possible status values
@@ -60,7 +58,6 @@ const ConsolidationStatusPanel: React.FC<ConsolidationStatusProps> = ({
   company,
   year,
   month,
-  onRefresh,
 }) => {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,11 +86,6 @@ const ConsolidationStatusPanel: React.FC<ConsolidationStatusProps> = ({
     fetchStatus();
   }, [company, year, month]);
 
-  const handleRefresh = () => {
-    fetchStatus();
-    if (onRefresh) onRefresh();
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-6">
@@ -106,15 +98,6 @@ const ConsolidationStatusPanel: React.FC<ConsolidationStatusProps> = ({
     return (
       <div className="bg-rose-50 p-4 rounded-lg border border-rose-200">
         <p className="text-rose-700 text-sm">{error}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-2"
-          onClick={handleRefresh}
-          icon={IconRefresh}
-        >
-          Retry
-        </Button>
       </div>
     );
   }
@@ -144,40 +127,19 @@ const ConsolidationStatusPanel: React.FC<ConsolidationStatusProps> = ({
 
   return (
     <div className="bg-white p-4 rounded-lg border border-default-200">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-3">
         <h3 className="text-base font-medium text-default-800">
-          Consolidation Status
+          Auto Consolidation Status
         </h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          icon={IconRefresh}
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium flex items-center ${statusColors[statusKey]}`}
         >
-          Refresh
-        </Button>
+          {statusIcons[statusKey]}
+          {status.status.charAt(0).toUpperCase() + status.status.slice(1)}
+        </span>
       </div>
 
       <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-default-600">Status:</span>
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium flex items-center ${statusColors[statusKey]}`}
-          >
-            {statusIcons[statusKey]}
-            {status.status.charAt(0).toUpperCase() + status.status.slice(1)}
-          </span>
-        </div>
-
-        {status.attempt_count > 0 && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-default-600">Attempts:</span>
-            <span className="text-sm font-medium text-default-700">
-              {status.attempt_count}
-            </span>
-          </div>
-        )}
-
         {status.last_attempt && (
           <div className="flex justify-between items-center">
             <span className="text-sm text-default-600">Last attempt:</span>

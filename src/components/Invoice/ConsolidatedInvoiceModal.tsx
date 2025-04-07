@@ -497,7 +497,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
             <div className="flex items-center">
               <div className="mr-3">
                 <div className="text-sm font-medium text-default-800">
-                  Auto Consolidation
+                  Auto Consolidation (Monthly)
                 </div>
                 <p className="text-xs text-default-500 mt-0.5">
                   Automatically consolidate eligible invoices 1 day after
@@ -532,14 +532,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           {/* Status panel - only show if auto-consolidation is enabled */}
           {isAutoConsolidationEnabled && (
             <div className="mt-4">
-              <h4 className="text-sm font-medium text-default-700 mb-2">
-                Current Month Status
-              </h4>
               <ConsolidationStatusPanel
                 company="tienhock"
                 year={selectedYear}
                 month={selectedMonth}
-                onRefresh={fetchAutoConsolidationSettings}
               />
             </div>
           )}
