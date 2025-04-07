@@ -14,6 +14,7 @@ import {
   cancelInvoice,
   createPayment,
   cancelPayment,
+  syncCancellationStatus,
 } from "../../utils/invoice/InvoiceUtils";
 import {
   parseDatabaseTimestamp,
@@ -22,7 +23,6 @@ import {
 import toast from "react-hot-toast";
 import {
   IconFileInvoice,
-  IconPrinter,
   IconBan,
   IconCash,
   IconTrash,
@@ -30,6 +30,7 @@ import {
   IconClockHour4,
   IconAlertTriangle,
   IconSend,
+  IconRefresh,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
@@ -163,9 +164,9 @@ const InvoiceDetailsPage: React.FC = () => {
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showCancelPaymentConfirm, setShowCancelPaymentConfirm] =
-    useState(false); // Rename from showDeletePaymentConfirm
-  const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null); // Rename from paymentToDelete
-  const [isCancellingPayment, setIsCancellingPayment] = useState(false); // Rename from isDeletingPayment
+    useState(false);
+  const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
+  const [isCancellingPayment, setIsCancellingPayment] = useState(false);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
@@ -173,6 +174,7 @@ const InvoiceDetailsPage: React.FC = () => {
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
+  const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -327,6 +329,35 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsSubmittingInvoice(false);
       setIsSubmittingEInvoice(false);
+    }
+  };
+
+  const handleSyncCancellationStatus = async () => {
+    if (!invoiceData) return;
+
+    setIsSyncingCancellation(true);
+    const toastId = toast.loading("Syncing cancellation status...");
+
+    try {
+      const response = await syncCancellationStatus(invoiceData.id);
+
+      if (response.success) {
+        toast.success(
+          response.message || "Cancellation status synced successfully",
+          { id: toastId }
+        );
+        // Refresh invoice details
+        fetchDetails();
+      } else {
+        toast.error(response.message || "Failed to sync cancellation status", {
+          id: toastId,
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing cancellation status:", error);
+      toast.error("Failed to sync cancellation status", { id: toastId });
+    } finally {
+      setIsSyncingCancellation(false);
     }
   };
 
@@ -617,6 +648,19 @@ const InvoiceDetailsPage: React.FC = () => {
         </h1>
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
+          {invoiceData.invoice_status === "cancelled" &&
+            invoiceData.uuid &&
+            invoiceData.einvoice_status !== "cancelled" && (
+              <Button
+                onClick={handleSyncCancellationStatus}
+                icon={IconRefresh}
+                variant="outline"
+                color="rose"
+                disabled={isSyncingCancellation}
+              >
+                {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+              </Button>
+            )}
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||

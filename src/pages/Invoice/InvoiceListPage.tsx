@@ -47,6 +47,7 @@ import {
   getInvoices,
   cancelInvoice,
   getInvoiceById,
+  syncCancellationStatus,
 } from "../../utils/invoice/InvoiceUtils";
 import FilterSummary from "../../components/Invoice/FilterSummary";
 import Pagination from "../../components/Invoice/Pagination";
@@ -604,6 +605,70 @@ const InvoiceListPage: React.FC = () => {
     // setIsFetchTriggered(true);
   };
 
+  const hasCancelledUnsynced = useCallback(() => {
+    return invoices.some(
+      (inv) =>
+        selectedInvoiceIds.has(inv.id) &&
+        inv.invoice_status === "cancelled" &&
+        inv.uuid &&
+        inv.einvoice_status !== "cancelled"
+    );
+  }, [invoices, selectedInvoiceIds]);
+
+  // Add this handler for batch syncing
+  const handleBatchSyncCancellation = async () => {
+    if (selectedInvoiceIds.size === 0) return;
+
+    // Filter for eligible invoices based on current data
+    const eligibleInvoices = invoices.filter(
+      (inv) =>
+        selectedInvoiceIds.has(inv.id) &&
+        inv.invoice_status === "cancelled" &&
+        inv.uuid &&
+        inv.einvoice_status !== "cancelled"
+    );
+
+    if (eligibleInvoices.length === 0) {
+      toast.error("No selected invoices are eligible for cancellation sync.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Syncing cancellation status for ${eligibleInvoices.length} invoice(s)...`
+    );
+    let successCount = 0;
+    let failCount = 0;
+
+    const results = await Promise.allSettled(
+      eligibleInvoices.map((inv) => syncCancellationStatus(inv.id))
+    );
+
+    results.forEach((result) => {
+      if (result.status === "fulfilled") {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    });
+
+    // Clear selection after attempting
+    setSelectedInvoiceIds(new Set());
+
+    if (failCount > 0) {
+      toast.error(
+        `${failCount} sync operation(s) failed. ${successCount} succeeded.`,
+        { id: toastId, duration: 5000 }
+      );
+    } else {
+      toast.success(`${successCount} invoice(s) synced successfully.`, {
+        id: toastId,
+      });
+    }
+
+    // Refresh the list to show updated statuses
+    setIsFetchTriggered(true);
+  };
+
   // Initiate Bulk E-Invoice Submission
   const handleBulkSubmitEInvoice = () => {
     if (selectedInvoiceIds.size === 0) return;
@@ -1063,6 +1128,23 @@ const InvoiceListPage: React.FC = () => {
               >
                 Cancel
               </Button>
+              {hasCancelledUnsynced() && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="rose"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBatchSyncCancellation();
+                  }}
+                  icon={IconRefresh}
+                  disabled={isLoading}
+                  aria-label="Sync Cancellation Status"
+                  title="Sync Cancellation Status"
+                >
+                  Sync Cancellation
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -1128,8 +1210,6 @@ const InvoiceListPage: React.FC = () => {
         </div>
         {/* --- Invoice Grid Area --- */}
         <div className="flex-1 min-h-[400px] relative">
-          {" "}
-          {/* Allow vertical scroll */}
           {/* Loading Overlay */}
           {isLoading && (
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
