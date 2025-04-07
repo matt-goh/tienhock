@@ -602,7 +602,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               {isLoadingEligible && (
                 <div className="flex justify-center items-center py-16 text-default-500">
                   <LoadingSpinner size="md" />
-                  <span className="ml-2">Loading eligible invoices...</span>
                 </div>
               )}
               {!isLoadingEligible && error && (

@@ -472,13 +472,18 @@ export default function (pool, defaultConfig) {
         SELECT 1 FROM greentarget.invoices consolidated 
         WHERE consolidated.is_consolidated = true
         AND consolidated.consolidated_invoices IS NOT NULL
-        AND consolidated.consolidated_invoices ? i.invoice_number
-        AND consolidated.consolidated_invoices::jsonb ? CAST(i.invoice_id AS TEXT)
-        AND consolidated.status != 'cancelled'
-        AND consolidated.einvoice_status != 'cancelled'
+        AND (
+          consolidated.consolidated_invoices ? i.invoice_number
+          OR consolidated.consolidated_invoices::jsonb ? CAST(i.invoice_id AS TEXT)
+        )
+        AND (
+          consolidated.status != 'cancelled'
+          AND consolidated.einvoice_status != 'cancelled'
+          AND (consolidated.einvoice_status = 'pending' OR consolidated.einvoice_status = 'valid')
+        )
       )
       ORDER BY i.date_issued ASC
-    `;
+        `;
 
       const result = await pool.query(query, [
         formattedStartDate,
@@ -631,15 +636,13 @@ export default function (pool, defaultConfig) {
         RETURNING *
       `;
 
-      // Use the first invoice's customer for reference (needs harmonization logic for different customers)
-      const referenceCustomer = selectedInvoices[0];
       const consolidatedInvoiceNumbers = selectedInvoices.map(
         (inv) => inv.invoice_number
       );
 
       const createResult = await client.query(createConsolidatedQuery, [
         consolidatedInvoiceNumber,
-        referenceCustomer.customer_id,
+        null,
         totalExcludingTax.toFixed(2),
         taxAmount.toFixed(2),
         totalAmount.toFixed(2),
