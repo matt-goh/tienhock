@@ -326,6 +326,12 @@ const InvoiceDetailsPage: React.FC = () => {
   const handleConfirmEInvoiceSubmission = async () => {
     if (!invoice) return;
 
+    // Close dialog immediately before any async operations
+    setShowEInvoiceConfirmDialog(false);
+
+    // Small timeout to ensure dialog is closed before showing next UI
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     try {
       setIsSubmittingEInvoice(true);
       // Show the modal with loading state immediately
@@ -416,7 +422,6 @@ const InvoiceDetailsPage: React.FC = () => {
       });
     } finally {
       setIsSubmittingEInvoice(false);
-      setShowEInvoiceConfirmDialog(false);
     }
   };
 
