@@ -59,7 +59,8 @@ export default function (pool, defaultConfig) {
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         -- LEFT JOIN ensures invoices without payments are included
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
-        WHERE 1=1
+        WHERE (i.is_consolidated IS NOT TRUE OR i.is_consolidated IS NULL)
+        AND i.type != 'consolidated'
       `;
 
       const queryParams = [];
