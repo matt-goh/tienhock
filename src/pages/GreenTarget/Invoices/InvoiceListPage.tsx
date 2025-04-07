@@ -19,6 +19,7 @@ import {
   IconAlertTriangle,
   IconCancel,
   IconRefresh,
+  IconFiles,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -34,6 +35,7 @@ import { api } from "../../../routes/utils/api";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
+import GTConsolidatedInvoiceModal from "../../../components/GreenTarget/GTConsolidatedInvoiceModal";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -485,7 +487,7 @@ const InvoiceListPage: React.FC = () => {
     useState(false);
   const [invoiceToSubmitAsEInvoice, setInvoiceToSubmitAsEInvoice] =
     useState<InvoiceGT | null>(null);
-  const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
+  const [isConsolidateModalOpen, setIsConsolidateModalOpen] = useState(false);
 
   const ITEMS_PER_PAGE = 12;
 
@@ -836,7 +838,6 @@ const InvoiceListPage: React.FC = () => {
 
   const handleSyncCancellationStatus = async (invoice: InvoiceGT) => {
     try {
-      setIsSyncingCancellation(true);
       const toastId = toast.loading("Syncing cancellation status...");
 
       // Call API to sync cancellation status
@@ -858,8 +859,6 @@ const InvoiceListPage: React.FC = () => {
     } catch (error) {
       console.error("Error syncing cancellation status:", error);
       toast.error("Failed to sync cancellation status");
-    } finally {
-      setIsSyncingCancellation(false);
     }
   };
 
@@ -1015,13 +1014,26 @@ const InvoiceListPage: React.FC = () => {
                 icon={IconPlus}
                 variant="outline"
               >
-                Create Invoice
+                Create
               </Button>
             </div>
           </div>
 
           {/* Filters and Create Button Row - responsive */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap lg:flex-nowrap">
+            {/* Consolidate Button */}
+            <div className="w-full sm:w-auto flex-shrink-0">
+              <Button
+                onClick={() => setIsConsolidateModalOpen(true)}
+                icon={IconFiles}
+                variant="outline"
+                color="amber"
+                className="w-full sm:w-auto"
+              >
+                Consolidate
+              </Button>
+            </div>
+
             {/* DateRangePicker */}
             <div className="w-full sm:w-auto flex-grow lg:flex-grow-0">
               <DateRangePicker
@@ -1111,7 +1123,7 @@ const InvoiceListPage: React.FC = () => {
                 icon={IconPlus}
                 variant="outline"
               >
-                Create Invoice
+                Create
               </Button>
             </div>
           </div>
@@ -1200,6 +1212,12 @@ const InvoiceListPage: React.FC = () => {
         message={`Are you sure you want to submit Invoice ${invoiceToSubmitAsEInvoice?.invoice_number} as an e-Invoice to MyInvois?`}
         confirmButtonText="Submit"
         variant="default"
+      />
+      <GTConsolidatedInvoiceModal
+        isOpen={isConsolidateModalOpen}
+        onClose={() => setIsConsolidateModalOpen(false)}
+        month={selectedMonth.id}
+        year={currentYear}
       />
     </div>
   );
