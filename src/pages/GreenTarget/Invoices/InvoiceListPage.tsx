@@ -81,6 +81,26 @@ const InvoiceCard = ({
     }).format(amount);
   };
 
+  const isInvoiceDateEligibleForEinvoice = (
+    dateIssuedString: string | undefined | null
+  ): boolean => {
+    if (!dateIssuedString) return false;
+
+    try {
+      // Parse the ISO date string to a Date object
+      const dateIssued = new Date(dateIssuedString);
+      if (isNaN(dateIssued.getTime())) return false; // Invalid date
+
+      const now = new Date();
+      const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+      const cutoffDate = new Date(now.getTime() - threeDaysInMillis);
+
+      return dateIssued >= cutoffDate;
+    } catch {
+      return false;
+    }
+  };
+
   const isPaid = invoice.current_balance <= 0;
   const isCancelled = invoice.status === "cancelled";
 
@@ -302,13 +322,15 @@ const InvoiceCard = ({
 
           {/* Only show e-Invoice button if: 
     1. Customer has tin_number and id_number 
-    2. Invoice is not already submitted as e-Invoice or submitted but invalid */}
+    2. Invoice is not already submitted as e-Invoice or submitted but invalid
+    3. Invoice date is within the last 3 days */}
           {invoice.tin_number &&
             invoice.id_number &&
             invoice.status !== "cancelled" &&
             (!invoice.einvoice_status ||
               invoice.einvoice_status === "invalid" ||
-              invoice.einvoice_status !== "cancelled") && (
+              invoice.einvoice_status !== "cancelled") &&
+            isInvoiceDateEligibleForEinvoice(invoice.date_issued) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
