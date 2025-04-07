@@ -801,6 +801,167 @@ export default function (pool, config) {
     }
   });
 
+  // Update Status for a Cancelled Invoice (Sync with MyInvois) ---
+  router.post("/cancelled/:id/sync", async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      // Fetch the invoice record
+      const invoiceQuery = `
+      SELECT uuid, einvoice_status, invoice_status, long_id
+      FROM invoices
+      WHERE id = $1
+    `;
+      const invoiceResult = await client.query(invoiceQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found.",
+        });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // We can only check/update status if we have a UUID
+      if (!invoice.uuid) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invoice has no MyInvois UUID, cannot sync cancellation status.",
+        });
+      }
+
+      // Ensure the invoice is actually cancelled locally
+      if (invoice.invoice_status !== "cancelled") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invoice must be cancelled locally before syncing cancellation status.",
+        });
+      }
+
+      // Check if already marked as cancelled in our system
+      if (invoice.einvoice_status === "cancelled") {
+        return res.json({
+          success: true,
+          message: "Invoice e-invoice status is already marked as cancelled.",
+          status: "cancelled",
+          updated: false,
+        });
+      }
+
+      // Call MyInvois API to check current status
+      console.log(
+        `Checking MyInvois status for document UUID: ${invoice.uuid}`
+      );
+      const documentDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${invoice.uuid}/details`
+      );
+
+      let syncResult = {
+        success: true,
+        message: "",
+        actionTaken: "none",
+        statusBefore: invoice.einvoice_status,
+        statusAfter: invoice.einvoice_status,
+      };
+
+      // If already cancelled in MyInvois, just update our database
+      if (documentDetails.status === "Cancelled") {
+        console.log(
+          `E-invoice ${invoice.uuid} is already cancelled in MyInvois. Updating local status.`
+        );
+        const updateQuery = `
+        UPDATE invoices 
+        SET einvoice_status = 'cancelled'
+        WHERE id = $1
+      `;
+        await client.query(updateQuery, [id]);
+
+        syncResult.message =
+          "e-Invoice is already cancelled in MyInvois. Local status updated.";
+        syncResult.actionTaken = "status_updated";
+        syncResult.statusAfter = "cancelled";
+      }
+      // If still valid in MyInvois, try to cancel it
+      else if (documentDetails.status === "Valid" || documentDetails.longId) {
+        try {
+          console.log(
+            `Attempting to cancel e-invoice ${invoice.uuid} in MyInvois.`
+          );
+          // Call MyInvois API to cancel e-invoice
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${invoice.uuid}/state`,
+            { status: "cancelled", reason: "Invoice cancelled in system" }
+          );
+
+          // Update einvoice_status to cancelled
+          const updateQuery = `
+          UPDATE invoices
+          SET einvoice_status = 'cancelled'
+          WHERE id = $1
+        `;
+          await client.query(updateQuery, [id]);
+
+          syncResult.message =
+            "Successfully cancelled e-Invoice in MyInvois and updated local status.";
+          syncResult.actionTaken = "cancelled_in_myinvois";
+          syncResult.statusAfter = "cancelled";
+        } catch (cancelError) {
+          console.error(
+            `Error cancelling e-invoice ${invoice.uuid} via API:`,
+            cancelError
+          );
+          return res.status(500).json({
+            success: false,
+            message: `Failed to cancel e-Invoice in MyInvois: ${
+              cancelError.message || "Unknown error"
+            }`,
+            error: cancelError,
+          });
+        }
+      }
+      // Other status (pending, invalid, etc.)
+      else {
+        console.log(
+          `E-invoice ${invoice.uuid} has status ${documentDetails.status}. Updating local status to cancelled.`
+        );
+        // For other statuses, we still update to cancelled
+        const updateQuery = `
+        UPDATE invoices
+        SET einvoice_status = 'cancelled'
+        WHERE id = $1
+      `;
+        await client.query(updateQuery, [id]);
+
+        syncResult.message = `e-Invoice has status "${documentDetails.status}" in MyInvois. Local status updated to cancelled.`;
+        syncResult.actionTaken = "status_updated";
+        syncResult.statusAfter = "cancelled";
+      }
+
+      return res.json({
+        success: true,
+        ...syncResult,
+      });
+    } catch (error) {
+      console.error(
+        `Error syncing cancellation status for invoice ${id}:`,
+        error
+      );
+      return res.status(500).json({
+        success: false,
+        message: "Failed to sync cancellation status",
+        error: error.message || "An unexpected error occurred",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // Get consolidated invoice history
   router.get("/consolidated-history", async (req, res) => {
     try {
@@ -1222,7 +1383,7 @@ export default function (pool, config) {
     }
   });
 
-  // --- NEW: Update Status for a Pending Consolidated Invoice ---
+  //  Update Status for a Pending Consolidated Invoice ---
   router.post("/consolidated/:id/update-status", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect(); // Use client for potential update
@@ -1359,7 +1520,7 @@ export default function (pool, config) {
     }
   });
 
-  // --- UPDATED: Cancel a Valid or Invalid Consolidated Invoice ---
+  // Cancel a Valid or Invalid Consolidated Invoice ---
   router.post("/consolidated/:id/cancel", async (req, res) => {
     const { id } = req.params;
     const cancellationReason = req.body.reason || "Cancelled via system"; // Allow providing a reason

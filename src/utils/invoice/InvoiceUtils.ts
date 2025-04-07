@@ -288,6 +288,22 @@ export const checkDuplicateInvoiceNo = async (
   }
 };
 
+// Sync cancellation status for an e-invoice
+export const syncCancellationStatus = async (invoiceId: string) => {
+  try {
+    const response = await api.post(
+      `/api/einvoice/cancelled/${invoiceId}/sync`
+    );
+    return response;
+  } catch (error) {
+    console.error(
+      `Error syncing cancellation status for invoice ${invoiceId}:`,
+      error
+    );
+    throw error;
+  }
+};
+
 // --- NEW Payment Utilities ---
 
 // CREATE Payment
