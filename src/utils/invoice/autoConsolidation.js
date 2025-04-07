@@ -500,7 +500,7 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
     }
 
     // Get consolidation details from the response
-    const documentDetails = submissionResult.acceptedDocuments[0];
+    const documentDetails = submissionResult.document;
     const status = documentDetails.longId ? "valid" : "pending";
 
     // Insert consolidated record with API response details
