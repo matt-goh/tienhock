@@ -113,6 +113,7 @@ const InvoiceFormPage: React.FC = () => {
     useState(false);
   const [submissionResults, setSubmissionResults] =
     useState<EInvoiceSubmissionResult | null>(null);
+  const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
 
   // State to remember rental selection when switching types
   const [previousRental, setPreviousRental] = useState<{
@@ -525,6 +526,11 @@ const InvoiceFormPage: React.FC = () => {
             selCust?.id_number &&
             navId
           ) {
+            // Set state to show loading in modal immediately
+            setIsSubmittingEInvoice(true);
+            setSubmissionResults(null); // Clear previous results
+            setShowSubmissionResultsModal(true); // Show modal immediately with loading state
+
             const eTid = toast.loading("Submitting e-Invoice...");
             try {
               const eRes = await greenTargetApi.submitEInvoice(navId);
@@ -574,9 +580,6 @@ const InvoiceFormPage: React.FC = () => {
               // Store the transformed response for the modal
               setSubmissionResults(transformedResponse);
 
-              // Show the results modal
-              setShowSubmissionResultsModal(true);
-
               // Only show minor toast if needed
               if (eRes.success && !showSubmissionResultsModal) {
                 const status = eRes.einvoice?.einvoice_status || "pending";
@@ -607,7 +610,9 @@ const InvoiceFormPage: React.FC = () => {
                   },
                 ],
               });
-              setShowSubmissionResultsModal(true);
+            } finally {
+              // Make sure to set the submitting state to false when done
+              setIsSubmittingEInvoice(false);
             }
           }
           if (isPaid && navId) {
@@ -1363,7 +1368,7 @@ const InvoiceFormPage: React.FC = () => {
               }
             : null
         }
-        isLoading={isSaving && submitAsEinvoice}
+        isLoading={isSubmittingEInvoice}
       />
       {/* Dialogs */}
       <ConfirmationDialog

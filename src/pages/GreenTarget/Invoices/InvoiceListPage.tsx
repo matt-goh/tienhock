@@ -439,6 +439,10 @@ const InvoiceListPage: React.FC = () => {
     useState<EInvoiceSubmissionResult | null>(null);
   const [isProcessingEInvoice, setIsProcessingEInvoice] = useState(false);
   const navigate = useNavigate();
+  const [showEInvoiceConfirmDialog, setShowEInvoiceConfirmDialog] =
+    useState(false);
+  const [invoiceToSubmitAsEInvoice, setInvoiceToSubmitAsEInvoice] =
+    useState<InvoiceGT | null>(null);
 
   const ITEMS_PER_PAGE = 12;
 
@@ -588,12 +592,27 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const handleSubmitEInvoice = async (invoice: InvoiceGT) => {
+    // Instead of immediate processing, set state for confirmation
+    setInvoiceToSubmitAsEInvoice(invoice);
+    setShowEInvoiceConfirmDialog(true);
+  };
+
+  // Add a new function to handle the confirmed submission
+  const handleConfirmEInvoiceSubmission = async () => {
+    if (!invoiceToSubmitAsEInvoice) return;
+
     try {
       setIsProcessingEInvoice(true);
+      // Show the modal with loading state immediately
+      setSubmissionResults(null); // Clear any previous results
+      setShowSubmissionResultsModal(true);
+
       const toastId = toast.loading("Submitting e-Invoice...");
 
       // Call the actual e-Invoice submission API
-      const response = await greenTargetApi.submitEInvoice(invoice.invoice_id);
+      const response = await greenTargetApi.submitEInvoice(
+        invoiceToSubmitAsEInvoice.invoice_id
+      );
 
       // Dismiss the loading toast
       toast.dismiss(toastId);
@@ -626,7 +645,7 @@ const InvoiceListPage: React.FC = () => {
           !response.success && response.error
             ? [
                 {
-                  internalId: invoice.invoice_id.toString(),
+                  internalId: invoiceToSubmitAsEInvoice.invoice_id.toString(),
                   error: {
                     code: "ERROR",
                     message: response.error.message || "Unknown error",
@@ -639,9 +658,6 @@ const InvoiceListPage: React.FC = () => {
 
       // Store the transformed response for the modal
       setSubmissionResults(transformedResponse);
-
-      // Show the results modal
-      setShowSubmissionResultsModal(true);
 
       // Still refresh invoices list if successful
       if (response.success) {
@@ -659,7 +675,7 @@ const InvoiceListPage: React.FC = () => {
         overallStatus: "Error",
         rejectedDocuments: [
           {
-            internalId: invoice.invoice_id.toString(),
+            internalId: invoiceToSubmitAsEInvoice.invoice_id.toString(),
             error: {
               code: "SYSTEM_ERROR",
               message:
@@ -670,9 +686,10 @@ const InvoiceListPage: React.FC = () => {
           },
         ],
       });
-      setShowSubmissionResultsModal(true);
     } finally {
       setIsProcessingEInvoice(false);
+      setShowEInvoiceConfirmDialog(false);
+      setInvoiceToSubmitAsEInvoice(null);
     }
   };
 
@@ -1085,7 +1102,7 @@ const InvoiceListPage: React.FC = () => {
               }
             : null
         }
-        isLoading={isProcessingEInvoice}
+        isLoading={isProcessingEInvoice && !submissionResults}
       />
       <ConfirmationDialog
         isOpen={isCancelDialogOpen}
@@ -1095,6 +1112,16 @@ const InvoiceListPage: React.FC = () => {
         message={`Are you sure you want to cancel invoice ${invoiceToCancel?.invoice_number}? This action cannot be undone.`}
         confirmButtonText="Cancel Invoice"
         variant="danger"
+      />
+      {/* Confirmation dialog for e-Invoice submission */}
+      <ConfirmationDialog
+        isOpen={showEInvoiceConfirmDialog}
+        onClose={() => setShowEInvoiceConfirmDialog(false)}
+        onConfirm={handleConfirmEInvoiceSubmission}
+        title="Submit e-Invoice"
+        message={`Are you sure you want to submit Invoice ${invoiceToSubmitAsEInvoice?.invoice_number} as an e-Invoice to MyInvois?`}
+        confirmButtonText="Submit"
+        variant="default"
       />
     </div>
   );
