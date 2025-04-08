@@ -189,6 +189,25 @@ const styles = StyleSheet.create({
     width: 60,
     textAlign: "right",
   },
+  signatureSection: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 80,
+    marginBottom: 20,
+  },
+  signatureColumn: {
+    alignItems: "center",
+    width: 240,
+  },
+  signatureLine: {
+    width: 180,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    marginBottom: 8,
+  },
+  signatureText: {
+    textAlign: "center",
+  },
   footer: {
     position: "absolute",
     bottom: 20,
@@ -198,21 +217,6 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontSize: 8,
     lineHeight: 1.5,
-  },
-  statusBanner: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    opacity: 0.8,
-  },
-  statusText: {
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF",
-    textTransform: "uppercase",
   },
 });
 
@@ -542,6 +546,21 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
               {formatCurrency(invoice.current_balance)}
             </Text>
           </View>
+        </View>
+      </View>
+
+      {/* Signature Section */}
+      <View style={styles.signatureSection}>
+        <View style={styles.signatureColumn}>
+          <View style={styles.signatureLine} />
+          <Text style={styles.signatureText}>Received by</Text>
+        </View>
+
+        <View style={styles.signatureColumn}>
+          <View style={styles.signatureLine} />
+          <Text style={styles.signatureText}>
+            For GREEN TARGET WASTE TREATMENT IND. S/B
+          </Text>
         </View>
       </View>
 
