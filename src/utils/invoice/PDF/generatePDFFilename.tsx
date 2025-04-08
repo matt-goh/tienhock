@@ -8,7 +8,7 @@ export const generatePDFFilename = (invoices: InvoiceData[]): string => {
   // For single invoice, use invoice number
   if (invoices.length === 1) {
     const invoice = invoices[0];
-    return `Th_invoice_${invoice.paymenttype}${invoice.id}.pdf`;
+    return `TH_invoice_${invoice.paymenttype}${invoice.id}.pdf`;
   }
 
   // Sort invoices by date
@@ -36,10 +36,10 @@ export const generatePDFFilename = (invoices: InvoiceData[]): string => {
 
   // If it's a single day
   if (startDate === endDate) {
-    return `Th_Invoices_${startDate}.pdf`;
+    return `TH_Invoices_${startDate}.pdf`;
   }
 
-  return `Th_Invoices_${startDate}_to_${endDate}.pdf`;
+  return `TH_Invoices_${startDate}_to_${endDate}.pdf`;
 };
 
 // Helper function to parse date strings in DD/MM/YYYY format
