@@ -7,11 +7,13 @@ import { useNavigate } from "react-router-dom";
 interface ConsolidatedInfoTooltipProps {
   invoices: string[];
   className?: string;
+  disableNavigation?: boolean; // New prop
 }
 
 const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
   invoices,
   className = "",
+  disableNavigation = false, // Default to false to maintain existing behavior
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -94,10 +96,16 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
               {invoices.map((invoice, index) => (
                 <div
                   key={index}
-                  className="text-center text-xs py-1 px-2 bg-default-50 rounded border border-default-200 cursor-pointer hover:bg-default-100 transition-colors duration-200"
+                  className={`text-center text-xs py-1 px-2 bg-default-50 rounded border border-default-200 ${
+                    !disableNavigation
+                      ? "cursor-pointer hover:bg-default-100"
+                      : ""
+                  } transition-colors duration-200`}
                   title={`Invoice #${invoice}`}
                   onClick={() => {
-                    navigate(`${invoice}`);
+                    if (!disableNavigation) {
+                      navigate(`${invoice}`);
+                    }
                   }}
                 >
                   {invoice}
