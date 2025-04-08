@@ -142,7 +142,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     >
       {/* Header - Now includes checkbox and is clickable for selection */}
       <div
-        className={`invoice-card-header flex justify-between items-center gap-3 border-b ${invoiceStatusStyle.border} ${invoiceStatusStyle.bg} -mx-4 -mt-4 px-4 py-2 rounded-t-lg cursor-pointer`} // Negative margins, re-add padding, ADD cursor-pointer
+        className={`invoice-card-header flex justify-between items-center gap-3 border-b ${invoiceStatusStyle.border} ${invoiceStatusStyle.bg} -mx-4 -mt-4 px-4 py-1.5 rounded-t-lg cursor-pointer`} // Negative margins, re-add padding, ADD cursor-pointer
         onClick={handleHeaderClick} // <-- Add header click handler
       >
         {/* Invoice ID - Takes available space */}
