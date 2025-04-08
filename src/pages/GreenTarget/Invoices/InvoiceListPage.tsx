@@ -41,8 +41,10 @@ import { greenTargetApi } from "../../../routes/greentarget/api";
 import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import GTConsolidatedInvoiceModal from "../../../components/GreenTarget/GTConsolidatedInvoiceModal";
-import GTPDFDownloadHandler from "../../../utils/greenTarget/PDF/GTPDFDownloadHandler";
 import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
+import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For PDF structure
+import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
+import { pdf, Document } from "@react-pdf/renderer";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -522,8 +524,7 @@ const InvoiceListPage: React.FC = () => {
     new Set()
   );
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
-  const [showDownloadHandler, setShowDownloadHandler] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // Unified state
   const [invoicesForPDF, setInvoicesForPDF] = useState<InvoiceGT[]>([]); // Holds detailed invoices for PDF
 
   const ITEMS_PER_PAGE = 12;
@@ -868,7 +869,7 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  // Fetch full details for selected invoices
+  // ++ PDF Handlers ++
   const fetchFullInvoiceDetails = useCallback(
     async (ids: string[]): Promise<InvoiceGT[]> => {
       if (ids.length === 0) return [];
@@ -876,10 +877,8 @@ const InvoiceListPage: React.FC = () => {
         `Fetching details for ${ids.length} invoice(s)...`
       );
       try {
-        // Using Promise.allSettled to handle potential errors for individual fetches
         const promises = ids.map((id) => greenTargetApi.getInvoice(Number(id)));
         const results = await Promise.allSettled(promises);
-
         const successfulInvoices: InvoiceGT[] = [];
         const failedIds: string[] = [];
 
@@ -903,7 +902,7 @@ const InvoiceListPage: React.FC = () => {
             { id: toastId }
           );
         } else {
-          toast.dismiss(toastId); // Dismiss only if all succeed
+          toast.dismiss(toastId);
         }
         return successfulInvoices;
       } catch (error) {
@@ -912,10 +911,9 @@ const InvoiceListPage: React.FC = () => {
         return [];
       }
     },
-    [] // No dependencies, relies on passed IDs
+    []
   );
 
-  // ++ PDF Handlers ++
   const handleBulkDownloadPDF = async () => {
     const idsToFetch = Array.from(selectedInvoiceIds);
     if (idsToFetch.length === 0) {
@@ -926,13 +924,57 @@ const InvoiceListPage: React.FC = () => {
 
     const detailedInvoices = await fetchFullInvoiceDetails(idsToFetch);
 
-    if (detailedInvoices.length > 0) {
-      setInvoicesForPDF(detailedInvoices);
-      setShowDownloadHandler(true); // Trigger rendering the download handler
-      // onComplete in the handler will reset isGeneratingPDF and clear invoicesForPDF
-    } else {
-      // Error handled in fetch function, just reset state
-      setIsGeneratingPDF(false);
+    if (detailedInvoices.length === 0) {
+      // Error toast was shown in fetch function
+      setIsGeneratingPDF(false); // Re-enable buttons
+      return;
+    }
+
+    // Now generate and download directly
+    const toastId = toast.loading(
+      `Generating PDF for ${detailedInvoices.length} invoice(s)...`
+    );
+    try {
+      const pdfPages = detailedInvoices.map((invoice) => (
+        <GTInvoicePDF key={invoice.invoice_id} invoice={invoice} />
+      ));
+
+      const pdfComponent = (
+        <Document
+          title={generateGTPDFFilename(detailedInvoices).replace(".pdf", "")}
+        >
+          {pdfPages}
+        </Document>
+      );
+
+      const pdfBlob = await pdf(pdfComponent).toBlob();
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = generateGTPDFFilename(detailedInvoices);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("PDF downloaded successfully", { id: toastId });
+        setIsGeneratingPDF(false); // Re-enable buttons
+        setInvoicesForPDF([]); // Clear temp data
+        // Optionally clear selection:
+        // setSelectedInvoiceIds(new Set());
+      }, 100);
+    } catch (error) {
+      console.error("Error generating PDF for download:", error);
+      toast.error(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+      setIsGeneratingPDF(false); // Re-enable buttons
+      setInvoicesForPDF([]); // Clear temp data
     }
   };
 
@@ -942,8 +984,6 @@ const InvoiceListPage: React.FC = () => {
       toast.error("No invoices selected.");
       return;
     }
-    setIsGeneratingPDF(true); // Disable buttons
-
     const detailedInvoices = await fetchFullInvoiceDetails(idsToFetch);
 
     if (detailedInvoices.length > 0) {
@@ -1351,7 +1391,7 @@ const InvoiceListPage: React.FC = () => {
                 variant="outline"
                 onClick={handleBulkDownloadPDF}
                 icon={IconFileDownload}
-                disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading list
+                disabled={loading}
                 aria-label="Download Selected Invoices"
                 title="Download PDF"
               >
@@ -1362,7 +1402,7 @@ const InvoiceListPage: React.FC = () => {
                 variant="outline"
                 onClick={handleBulkPrintPDF} // Use the new handler
                 icon={IconPrinter}
-                disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading list
+                disabled={loading}
                 aria-label="Print Selected Invoices"
                 title="Print PDF"
               >
@@ -1474,20 +1514,6 @@ const InvoiceListPage: React.FC = () => {
             setInvoicesForPDF([]); // Clear the detailed data
           }}
         />
-      )}
-      {/* Render Download Handler briefly when needed */}
-      {showDownloadHandler && invoicesForPDF.length > 0 && (
-        <div style={{ display: "none" }}>
-          <GTPDFDownloadHandler
-            invoices={invoicesForPDF}
-            disabled={isGeneratingPDF}
-            onComplete={() => {
-              setShowDownloadHandler(false); // Hide the handler component
-              setIsGeneratingPDF(false);
-              setInvoicesForPDF([]); // Clear the detailed data
-            }}
-          />
-        </div>
       )}
     </div>
   );
