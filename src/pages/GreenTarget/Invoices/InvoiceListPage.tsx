@@ -521,7 +521,6 @@ const InvoiceListPage: React.FC = () => {
     new Set()
   );
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // Unified state
   const [invoicesForPDF, setInvoicesForPDF] = useState<InvoiceGT[]>([]); // Holds detailed invoices for PDF
 
   const ITEMS_PER_PAGE = 12;
@@ -917,13 +916,11 @@ const InvoiceListPage: React.FC = () => {
       toast.error("No invoices selected.");
       return;
     }
-    setIsGeneratingPDF(true); // Disable buttons
 
     const detailedInvoices = await fetchFullInvoiceDetails(idsToFetch);
 
     if (detailedInvoices.length === 0) {
       // Error toast was shown in fetch function
-      setIsGeneratingPDF(false); // Re-enable buttons
       return;
     }
 
@@ -987,7 +984,6 @@ const InvoiceListPage: React.FC = () => {
       setTimeout(() => {
         URL.revokeObjectURL(pdfUrl);
         toast.success("PDF downloaded successfully", { id: toastId });
-        setIsGeneratingPDF(false); // Re-enable buttons
         setInvoicesForPDF([]); // Clear temp data
         // Optionally clear selection:
         // setSelectedInvoiceIds(new Set());
@@ -1000,7 +996,6 @@ const InvoiceListPage: React.FC = () => {
         }`,
         { id: toastId }
       );
-      setIsGeneratingPDF(false); // Re-enable buttons
       setInvoicesForPDF([]); // Clear temp data
     }
   };
@@ -1017,9 +1012,6 @@ const InvoiceListPage: React.FC = () => {
       setInvoicesForPDF(detailedInvoices);
       setShowPrintOverlay(true); // Trigger rendering the print overlay
       // onComplete in the overlay will reset isGeneratingPDF and clear invoicesForPDF
-    } else {
-      // Error handled in fetch function, just reset state
-      setIsGeneratingPDF(false);
     }
   };
 
@@ -1416,17 +1408,6 @@ const InvoiceListPage: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleBulkDownloadPDF}
-                icon={IconFileDownload}
-                disabled={loading}
-                aria-label="Download Selected Invoices"
-                title="Download PDF"
-              >
-                Download
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
                 onClick={handleBulkPrintPDF} // Use the new handler
                 icon={IconPrinter}
                 disabled={loading}
@@ -1434,6 +1415,17 @@ const InvoiceListPage: React.FC = () => {
                 title="Print PDF"
               >
                 Print
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkDownloadPDF}
+                icon={IconFileDownload}
+                disabled={loading}
+                aria-label="Download Selected Invoices"
+                title="Download PDF"
+              >
+                Download
               </Button>
             </div>
           )}
@@ -1537,7 +1529,6 @@ const InvoiceListPage: React.FC = () => {
           invoices={invoicesForPDF}
           onComplete={() => {
             setShowPrintOverlay(false);
-            setIsGeneratingPDF(false);
             setInvoicesForPDF([]); // Clear the detailed data
           }}
         />

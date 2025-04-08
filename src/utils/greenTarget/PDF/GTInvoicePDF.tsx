@@ -232,18 +232,7 @@ const generateDescription = (invoice: InvoiceGT): string => {
     )} to ${formatDate(invoice.statement_period_end)}.`;
   }
   if (invoice.type === "regular" && invoice.rental_id) {
-    let desc = `Rental Service Fee for Rental #${invoice.rental_id}`;
-    if (invoice.tong_no) {
-      desc += ` (Dumpster: ${invoice.tong_no})`;
-    }
-    if (invoice.date_placed) {
-      desc += ` placed on ${formatDate(invoice.date_placed)}`;
-    }
-    if (invoice.date_picked) {
-      desc += `, picked up on ${formatDate(invoice.date_picked)}`;
-    }
-    desc += ".";
-    return desc;
+    return `Trip(s): Waste Management Service`;
   }
   return "Invoice for services rendered.";
 };
