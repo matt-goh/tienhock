@@ -35,6 +35,7 @@ import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay"
 import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For PDF structure
 import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
 import { pdf, Document } from "@react-pdf/renderer";
+import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 
 interface Payment {
   payment_id: number;
@@ -102,6 +103,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -114,6 +116,27 @@ const InvoiceDetailsPage: React.FC = () => {
       setShowPaymentForm(true);
     }
   }, [state]);
+
+  useEffect(() => {
+    // Generate QR code when invoice loads and has valid e-invoice data
+    const generateQR = async () => {
+      if (
+        invoice?.uuid &&
+        invoice?.long_id &&
+        (invoice?.einvoice_status === "valid" ||
+          invoice?.einvoice_status === "cancelled")
+      ) {
+        try {
+          const qrData = await generateQRDataUrl(invoice.uuid, invoice.long_id);
+          setQrCodeData(qrData);
+        } catch (error) {
+          console.error("Error generating QR code:", error);
+        }
+      }
+    };
+
+    generateQR();
+  }, [invoice]);
 
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
@@ -569,7 +592,7 @@ const InvoiceDetailsPage: React.FC = () => {
       // Prepare the PDF document structure
       const pdfComponent = (
         <Document title={generateGTPDFFilename([invoice]).replace(".pdf", "")}>
-          <GTInvoicePDF invoice={invoice} /> {/* Pass the single invoice */}
+          <GTInvoicePDF invoice={invoice} qrCodeData={qrCodeData} />
         </Document>
       );
 

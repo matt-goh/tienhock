@@ -5,6 +5,7 @@ import { InvoiceGT } from "../../../types/types";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { generateGTPDFFilename } from "./generateGTPDFFilename";
+import { generateQRDataUrl } from "../../invoice/einvoice/generateQRCode";
 
 const GTPrintPDFOverlay = ({
   invoices,
@@ -50,9 +51,36 @@ const GTPrintPDFOverlay = ({
       if (hasPrintedRef.current || !invoices || invoices.length === 0) return;
 
       try {
-        const pdfPages = invoices.map((invoice) => (
-          <GTInvoicePDF key={invoice.invoice_id} invoice={invoice} />
-        ));
+        // Generate QR codes for invoices with valid UUIDs and long IDs
+        const pdfPages = await Promise.all(
+          invoices.map(async (invoice) => {
+            let qrCodeData = null;
+            if (
+              invoice.uuid &&
+              invoice.long_id &&
+              invoice.einvoice_status === "valid"
+            ) {
+              try {
+                qrCodeData = await generateQRDataUrl(
+                  invoice.uuid,
+                  invoice.long_id
+                );
+              } catch (error) {
+                console.error(
+                  `Error generating QR code for invoice ${invoice.invoice_number}:`,
+                  error
+                );
+              }
+            }
+            return (
+              <GTInvoicePDF
+                key={invoice.invoice_id}
+                invoice={invoice}
+                qrCodeData={qrCodeData}
+              />
+            );
+          })
+        );
 
         const pdfComponent = (
           <Document title={generateGTPDFFilename(invoices).replace(".pdf", "")}>
