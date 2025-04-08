@@ -315,21 +315,11 @@ const InvoiceCard = ({
             <p className="text-xs text-default-500 mb-1">Date Issued</p>
             <p className="font-medium">{formatDate(invoice.date_issued)}</p>
           </div>
-          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
-            <p className="text-xs text-default-500 mb-1">Total</p>
-            <p className="font-medium">
-              {formatCurrency(invoice.total_amount)}
-            </p>
-          </div>
-          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
-            <p className="text-xs text-default-500 mb-1">Paid</p>
-            <p className="font-medium text-green-600">
-              {formatCurrency(invoice.amount_paid)}
-            </p>
-          </div>
           <div
             className={`p-2 border rounded-md ${
-              isPaid
+              isCancelled
+                ? "bg-default-50 border-default-100"
+                : isPaid
                 ? "bg-green-50 border-green-100"
                 : invoice.status === "overdue"
                 ? "bg-red-50 border-red-100"
@@ -339,14 +329,20 @@ const InvoiceCard = ({
             <p className="text-xs text-default-500 mb-1">Balance</p>
             <p
               className={`font-medium ${
-                isPaid
+                isCancelled
+                  ? "text-default-700"
+                  : isPaid
                   ? "text-green-700"
                   : invoice.status === "overdue"
                   ? "text-red-700"
                   : "text-amber-700"
               }`}
             >
-              {formatCurrency(invoice.current_balance)}
+              {invoice.status === "cancelled"
+                ? "Cancelled"
+                : invoice.current_balance === 0
+                ? "Paid"
+                : formatCurrency(invoice.current_balance)}
             </p>
           </div>
         </div>
@@ -1210,7 +1206,7 @@ const InvoiceListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8 -mt-6">
+    <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8 -mt-4">
       {/* Revised Header Layout - 2 rows total on desktop */}
       <div className="space-y-4 mb-6">
         {/* Row 1: Header with title, filters, search and action buttons */}

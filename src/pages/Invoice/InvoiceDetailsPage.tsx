@@ -905,8 +905,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {(invoiceData.uuid || invoiceData.einvoice_status) && (
           <section className="p-4 border rounded-lg bg-white shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800">
-              {invoiceData.einvoice_status === "valid" &&
-              invoiceData.long_id ? (
+                {(invoiceData.einvoice_status === "valid" ||
+                invoiceData.einvoice_status === "cancelled") &&
+                invoiceData.long_id ? (
                 <a
                   href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
                   target="_blank"

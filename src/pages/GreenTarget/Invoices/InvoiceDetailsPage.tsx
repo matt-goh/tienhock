@@ -1614,18 +1614,20 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
 
               {/* Add MyInvois portal link if valid */}
-              {invoice.einvoice_status === "valid" && invoice.long_id && (
-                <div className="mt-4 text-center">
-                  <a
-                    href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
-                  >
-                    View in MyInvois Portal
-                  </a>
-                </div>
-              )}
+              {(invoice.einvoice_status === "valid" ||
+                invoice.einvoice_status === "cancelled") &&
+                invoice.long_id && (
+                  <div className="mt-4 text-center">
+                    <a
+                      href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
+                    >
+                      View in MyInvois Portal
+                    </a>
+                  </div>
+                )}
             </div>
           </div>
         </div>
