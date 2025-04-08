@@ -207,17 +207,18 @@ export const cancelInvoice = async (
     // Backend DELETE /:id now handles the cancellation logic (updating status)
     const response = await api.delete(`/api/invoices/${id}`);
 
-    if (!response || !response.invoice) {
+    // Update this check to look for deletedInvoice instead of invoice
+    if (!response || (!response.invoice && !response.deletedInvoice)) {
       throw new Error("Invalid response received after cancelling invoice.");
     }
-    // The response *is* the updated (cancelled) invoice record
-    const cancelledInvoice = response.invoice;
+
+    // Use deletedInvoice if present, otherwise fall back to invoice
+    const cancelledInvoice = response.deletedInvoice || response.invoice;
 
     return {
       ...cancelledInvoice,
       // Ensure correct types and add UIDs for products from the *cancelled* record if available
-      // If backend doesn't return products on cancel, we might need to fetch them separately or use existing state
-      products: ensureProductsHaveUid(cancelledInvoice.products || []), // Assuming products might be returned
+      products: ensureProductsHaveUid(cancelledInvoice.products || []),
       customerName:
         cancelledInvoice.customerName || cancelledInvoice.customerid,
     };
