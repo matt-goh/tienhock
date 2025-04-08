@@ -8,7 +8,6 @@ import {
   IconChevronRight,
   IconPlus,
   IconFileInvoice,
-  IconPrinter,
   IconCash,
   IconChevronDown,
   IconCheck,
@@ -20,6 +19,10 @@ import {
   IconCancel,
   IconRefresh,
   IconFiles,
+  IconPrinter,
+  IconFileDownload,
+  IconSquareCheck,
+  IconSquare,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -43,6 +46,8 @@ interface InvoiceCardProps {
   onSubmitEInvoiceClick: (invoice: InvoiceGT) => void;
   onCheckEInvoiceStatus: (invoice: InvoiceGT) => void;
   onSyncCancellationStatus: (invoice: InvoiceGT) => void;
+  isSelected: boolean;
+  onSelect: (invoiceId: string, isSelected: boolean) => void;
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -53,12 +58,20 @@ const InvoiceCard = ({
   onSubmitEInvoiceClick,
   onCheckEInvoiceStatus,
   onSyncCancellationStatus,
+  isSelected,
+  onSelect,
 }: InvoiceCardProps) => {
   const navigate = useNavigate();
   const [isCardHovered, setIsCardHovered] = useState(false);
 
   const handleClick = () => {
     navigate(`/greentarget/invoices/${invoice.invoice_id}`);
+  };
+
+  const handleCardSelection = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelect(invoice.invoice_id.toString(), !isSelected);
   };
 
   const handleCancelClick = (e: React.MouseEvent) => {
@@ -122,9 +135,9 @@ const InvoiceCard = ({
           ? "border-red-400"
           : "border-amber-400"
       }`}
-      onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
+      onClick={handleCardSelection}
     >
       {/* Status banner */}
       <div
@@ -140,19 +153,29 @@ const InvoiceCard = ({
       >
         <div className="flex justify-between items-center">
           <span>{invoice.invoice_number}</span>
-          <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
-            {isCancelled
-              ? "Cancelled"
-              : isPaid
-              ? "Paid"
-              : invoice.status === "overdue"
-              ? "Overdue"
-              : "Unpaid"}
-          </span>
+          <div className="flex items-center">
+            {/* Add checkbox or visual indicator */}
+            <div
+              className={`w-4 h-4 mr-2 rounded ${
+                isSelected ? "bg-white" : "border border-white/70"
+              } flex items-center justify-center`}
+            >
+              <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
+                {isCancelled
+                  ? "Cancelled"
+                  : isPaid
+                  ? "Paid"
+                  : invoice.status === "overdue"
+                  ? "Overdue"
+                  : "Unpaid"}
+              </span>
+              {isSelected && <IconCheck size={12} className="text-sky-600" />}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4" onClick={handleClick}>
         {/* Customer section */}
         <div className="mb-3 border-b pb-3">
           <div className="flex justify-between items-start">
@@ -314,17 +337,6 @@ const InvoiceCard = ({
             isCardHovered ? "opacity-100" : "opacity-70"
           }`}
         >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/greentarget/invoices/${invoice.invoice_id}`);
-            }}
-            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
-            title="Print Invoice"
-          >
-            <IconPrinter size={18} stroke={1.5} />
-          </button>
-
           {/* Only show e-Invoice button if: 
     1. Customer has tin_number and id_number 
     2. Invoice is not already submitted as e-Invoice or submitted but invalid
@@ -488,6 +500,9 @@ const InvoiceListPage: React.FC = () => {
   const [invoiceToSubmitAsEInvoice, setInvoiceToSubmitAsEInvoice] =
     useState<InvoiceGT | null>(null);
   const [isConsolidateModalOpen, setIsConsolidateModalOpen] = useState(false);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const ITEMS_PER_PAGE = 12;
 
@@ -657,15 +672,10 @@ const InvoiceListPage: React.FC = () => {
       setSubmissionResults(null);
       setShowSubmissionResultsModal(true);
 
-      const toastId = toast.loading("Submitting e-Invoice...");
-
       // Call the actual e-Invoice submission API
       const response = await greenTargetApi.submitEInvoice(
         invoiceToSubmitAsEInvoice.invoice_id
       );
-
-      // Dismiss the loading toast
-      toast.dismiss(toastId);
 
       // Transform the Green Target response to match the expected format
       const transformedResponse = {
@@ -836,6 +846,39 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const isAllSelectedOnPage = useMemo(() => {
+    if (!Array.isArray(invoices) || invoices.length === 0) return false;
+    return invoices.every((inv) =>
+      selectedInvoiceIds.has(inv.invoice_id.toString())
+    );
+  }, [invoices, selectedInvoiceIds]);
+
+  const handleSelectAllOnPage = () => {
+    if (isAllSelectedOnPage) {
+      // Deselect all
+      setSelectedInvoiceIds(new Set());
+    } else {
+      // Select all
+      const newSelected = new Set(selectedInvoiceIds);
+      invoices.forEach((invoice) => {
+        newSelected.add(invoice.invoice_id.toString());
+      });
+      setSelectedInvoiceIds(newSelected);
+    }
+  };
+
+  const handleSelectInvoice = (invoiceId: string, isSelected: boolean) => {
+    setSelectedInvoiceIds((prev) => {
+      const newSet = new Set(prev);
+      if (isSelected) {
+        newSet.add(invoiceId);
+      } else {
+        newSet.delete(invoiceId);
+      }
+      return newSet;
+    });
+  };
+
   const handleSyncCancellationStatus = async (invoice: InvoiceGT) => {
     try {
       const toastId = toast.loading("Syncing cancellation status...");
@@ -864,12 +907,34 @@ const InvoiceListPage: React.FC = () => {
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
-      // Filter by search term (invoice number or customer name)
+      const searchTermLower = searchTerm.toLowerCase();
+
       return (
-        invoice.invoice_number
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        invoice.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+        // Search invoice number
+        invoice.invoice_number.toLowerCase().includes(searchTermLower) ||
+        // Search customer name
+        invoice.customer_name.toLowerCase().includes(searchTermLower) ||
+        // Search driver name
+        invoice.driver?.toLowerCase().includes(searchTermLower) ||
+        false ||
+        // Search phone numbers
+        invoice.customer_phone_number
+          ?.toLowerCase()
+          .includes(searchTermLower) ||
+        false ||
+        invoice.location_phone_number
+          ?.toLowerCase()
+          .includes(searchTermLower) ||
+        false ||
+        // Search location address
+        invoice.location_address?.toLowerCase().includes(searchTermLower) ||
+        false ||
+        // Search rental ID
+        invoice.rental_id?.toString().includes(searchTermLower) ||
+        false ||
+        // Search dumpster ID
+        invoice.tong_no?.toLowerCase().includes(searchTermLower) ||
+        false
       );
     });
   }, [invoices, searchTerm]);
@@ -996,8 +1061,8 @@ const InvoiceListPage: React.FC = () => {
 
   return (
     <div className="relative w-full mx-20">
-      <div className="flex flex-col space-y-4 mb-6">
-        {/* Header and controls row */}
+      <div className="space-y-4 mb-6">
+        {/* Header and actions row */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center justify-between">
             <h1
@@ -1019,8 +1084,8 @@ const InvoiceListPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters and Create Button Row - responsive */}
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap lg:flex-nowrap">
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2 items-center">
             {/* Consolidate Button */}
             <div className="w-full sm:w-auto flex-shrink-0">
               <Button
@@ -1033,101 +1098,147 @@ const InvoiceListPage: React.FC = () => {
                 Consolidate
               </Button>
             </div>
+            {/* Create Invoice Button - Visible on desktop */}
+            <Button
+              onClick={() => navigate("/greentarget/invoices/new")}
+              icon={IconPlus}
+              variant="outline"
+              className="hidden lg:flex"
+            >
+              Create
+            </Button>
+          </div>
+        </div>
 
-            {/* DateRangePicker */}
-            <div className="w-full sm:w-auto flex-grow lg:flex-grow-0">
-              <DateRangePicker
-                dateRange={dateRange}
-                onDateChange={(newDateRange) => {
-                  saveDatesToStorage(newDateRange.start, newDateRange.end);
-                  setDateRange(newDateRange);
-                  setCurrentPage(1);
-                }}
-                className="w-full"
-              />
-            </div>
+        {/* Filters and search row */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap lg:flex-nowrap">
+          {/* DateRangePicker */}
+          <div className="w-full sm:w-auto flex-grow lg:flex-grow-0">
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateChange={(newDateRange) => {
+                saveDatesToStorage(newDateRange.start, newDateRange.end);
+                setDateRange(newDateRange);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            />
+          </div>
 
-            {/* Month selection */}
-            <div className="w-full sm:w-48">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                    <span className="block truncate pl-2">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                    {monthOptions.map((month) => (
-                      <ListboxOption
-                        key={month.id}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-default-900"
-                          }`
-                        }
-                        value={month}
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {month.name}
+          {/* Month selection */}
+          <div className="w-full sm:w-48">
+            <Listbox value={selectedMonth} onChange={handleMonthChange}>
+              <div className="relative">
+                <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                  <span className="block truncate pl-2">
+                    {selectedMonth.name}
+                  </span>
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                    <IconChevronDown
+                      className="h-5 w-5 text-default-400"
+                      aria-hidden="true"
+                    />
+                  </span>
+                </ListboxButton>
+                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                  {monthOptions.map((month) => (
+                    <ListboxOption
+                      key={month.id}
+                      className={({ active }) =>
+                        `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
+                          active
+                            ? "bg-default-100 text-default-900"
+                            : "text-default-900"
+                        }`
+                      }
+                      value={month}
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : "font-normal"
+                            }`}
+                          >
+                            {month.name}
+                          </span>
+                          {selected && (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                              <IconCheck
+                                className="h-5 w-5"
+                                aria-hidden="true"
+                              />
                             </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </div>
-              </Listbox>
-            </div>
+                          )}
+                        </>
+                      )}
+                    </ListboxOption>
+                  ))}
+                </ListboxOptions>
+              </div>
+            </Listbox>
+          </div>
 
-            {/* Search box */}
-            <div className="w-full sm:w-auto flex-grow relative">
-              <IconSearch
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-                size={22}
-              />
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+          {/* Search box */}
+          <div className="w-full sm:w-auto flex-grow relative">
+            <IconSearch
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
+              size={22}
+            />
+            <input
+              type="text"
+              placeholder="Search"
+              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
 
-            {/* Create Invoice Button - Hidden on mobile, visible on larger screens */}
-            <div className="hidden lg:block flex-shrink-0">
-              <Button
-                onClick={() => navigate("/greentarget/invoices/new")}
-                icon={IconPlus}
-                variant="outline"
+        {/* Selection action bar - only visible when items are selected */}
+        {selectedInvoiceIds.size > 0 && (
+          <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSelectAllOnPage}
+                className="p-1 rounded-full hover:bg-sky-100"
+                title={isAllSelectedOnPage ? "Deselect All" : "Select All"}
               >
-                Create
+                {isAllSelectedOnPage ? (
+                  <IconSquareCheck className="text-sky-600" size={20} />
+                ) : (
+                  <IconSquare className="text-sky-600" size={20} />
+                )}
+              </button>
+              <span className="text-sm font-medium text-sky-800">
+                {selectedInvoiceIds.size} invoice(s) selected
+              </span>
+            </div>
+
+            <div className="flex gap-2 ml-auto">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  /* Handle download */
+                }}
+                icon={IconFileDownload}
+              >
+                Download
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  /* Handle print */
+                }}
+                icon={IconPrinter}
+              >
+                Print
               </Button>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {filteredInvoices.length === 0 ? (
@@ -1156,6 +1267,8 @@ const InvoiceListPage: React.FC = () => {
               onSubmitEInvoiceClick={handleSubmitEInvoice}
               onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
               onSyncCancellationStatus={handleSyncCancellationStatus}
+              isSelected={selectedInvoiceIds.has(invoice.invoice_id.toString())}
+              onSelect={handleSelectInvoice}
             />
           ))}
         </div>
