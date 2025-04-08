@@ -158,7 +158,7 @@ const InvoiceCard = ({
           <div className="flex justify-between items-start">
             <div className="max-w-[65%]">
               <h3
-                className="font-semibold text-default-900 truncate cursor-pointer hover:underline"
+                className="w-fit font-semibold text-default-900 truncate cursor-pointer hover:underline"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/greentarget/customers/${invoice.customer_id}`);

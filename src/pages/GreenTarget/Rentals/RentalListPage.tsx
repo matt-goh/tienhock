@@ -141,7 +141,7 @@ const RentalCard = ({
             <div className="w-full">
               <div className="w-full">
                 <h3
-                  className="font-semibold text-default-900 truncate cursor-pointer hover:underline max-w-[60%]"
+                  className="font-semibold text-default-900 truncate cursor-pointer hover:underline w-fit"
                   title={rental.customer_name}
                   onClick={(e) => {
                     e.stopPropagation();
