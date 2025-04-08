@@ -289,7 +289,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
               {GREENTARGET_INFO.state_pdf}
             </Text>
             <Text style={styles.companyDetail}>
-              Tel: {GREENTARGET_INFO.phone}
+              Tel: {GREENTARGET_INFO.phone}, {GREENTARGET_INFO.office_phone_pdf}
             </Text>
             <Text style={styles.companyDetail}>
               Email: {GREENTARGET_INFO.email}
