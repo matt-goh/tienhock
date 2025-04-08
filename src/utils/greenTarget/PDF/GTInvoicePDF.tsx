@@ -250,7 +250,7 @@ const generateDescription = (invoice: InvoiceGT): string => {
 
 interface GTInvoicePDFProps {
   invoice: InvoiceGT;
-  qrCodeData?: string; // Allow passing in pre-generated QR code data
+  qrCodeData?: string | null;
 }
 
 const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {

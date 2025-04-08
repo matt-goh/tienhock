@@ -45,6 +45,7 @@ import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay"
 import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For PDF structure
 import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
 import { pdf, Document } from "@react-pdf/renderer";
+import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -931,8 +932,38 @@ const InvoiceListPage: React.FC = () => {
       `Generating PDF for ${detailedInvoices.length} invoice(s)...`
     );
     try {
-      const pdfPages = detailedInvoices.map((invoice) => (
-        <GTInvoicePDF key={invoice.invoice_id} invoice={invoice} />
+      // Generate QR codes for each valid invoice
+      const invoicesWithQR = await Promise.all(
+        detailedInvoices.map(async (invoice) => {
+          let qrCodeData = null;
+          if (
+            invoice.uuid &&
+            invoice.long_id &&
+            invoice.einvoice_status === "valid"
+          ) {
+            try {
+              qrCodeData = await generateQRDataUrl(
+                invoice.uuid,
+                invoice.long_id
+              );
+            } catch (error) {
+              console.error(
+                `Error generating QR code for invoice ${invoice.invoice_number}:`,
+                error
+              );
+            }
+          }
+          return { ...invoice, qrCodeData };
+        })
+      );
+
+      // Create PDF pages with QR codes
+      const pdfPages = invoicesWithQR.map((invoice) => (
+        <GTInvoicePDF
+          key={invoice.invoice_id}
+          invoice={invoice}
+          qrCodeData={invoice.qrCodeData}
+        />
       ));
 
       const pdfComponent = (
