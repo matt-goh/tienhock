@@ -220,15 +220,9 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       </Button>
       {isOpen && (
         // Add overflow-y-auto and max-height for scrollability if menu gets long
-        <div className="absolute mt-1 py-1 right-0 w-72 text-default-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-30 border border-default-200 flex flex-col max-h-[80vh]">
-          <div className="flex-grow space-y-1 px-1 pb-2">
-            {" "}
-            {/* Scrollable content area */}
-            {/* --- Salesman Filter --- */}
-            {/* Read/Write from/to pendingFilters */}
+        <div className="absolute mt-1 pt-1 right-0 w-72 text-default-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-30 border border-default-200 flex flex-col max-h-[80vh]">
+          <div className="flex-grow space-y-1 px-1 pb-1">
             <div className="">
-              {" "}
-              {/* Removed px-1 */}
               <Combobox
                 multiple
                 value={getSelectedSalesmanIds()}
