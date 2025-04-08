@@ -299,16 +299,10 @@ const generateDescription = (invoice: InvoiceGT): string => {
 
 const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice }) => {
   const statusStyle = getStatusStyle(invoice.status, invoice.current_balance);
-  const statusText = getStatusText(invoice.status, invoice.current_balance);
   const description = generateDescription(invoice);
 
   return (
     <Page size="A4" style={styles.page}>
-      {/* Status Banner */}
-      <View style={[styles.statusBanner, statusStyle]} fixed>
-        <Text style={styles.statusText}>{statusText}</Text>
-      </View>
-
       {/* Header */}
       <View style={styles.header} fixed>
         <View style={styles.companyInfoContainer}>
@@ -326,21 +320,6 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice }) => {
               style={styles.companyDetails}
             >{`Tel: ${GREENTARGET_INFO.phone} | Email: ${GREENTARGET_INFO.email}`}</Text>
           </View>
-        </View>
-        <View style={styles.invoiceTitleSection}>
-          <Text style={styles.invoiceTitle}>
-            {invoice.type === "statement" ? "Statement" : "Invoice"}
-          </Text>
-          <Text style={styles.invoiceNumber}>#{invoice.invoice_number}</Text>
-          <Text style={styles.invoiceDate}>
-            Date Issued: {formatDate(invoice.date_issued)}
-          </Text>
-          {invoice.type === "statement" && (
-            <Text style={styles.invoiceDate}>
-              Period: {formatDate(invoice.statement_period_start)} -{" "}
-              {formatDate(invoice.statement_period_end)}
-            </Text>
-          )}
         </View>
       </View>
 
