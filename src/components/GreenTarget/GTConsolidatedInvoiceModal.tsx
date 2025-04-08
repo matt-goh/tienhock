@@ -5,7 +5,6 @@ import Button from "../Button";
 import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../ConfirmationDialog";
-
 import {
   IconCircleCheck,
   IconFileInvoice,
@@ -33,6 +32,7 @@ import {
 import SubmissionResultsModal from "../Invoice/SubmissionResultsModal";
 import ConsolidationStatusPanel from "../Invoice/ConsolidationStatusPanel";
 import ConsolidatedInfoTooltip from "../Invoice/ConsolidatedInfoTooltip";
+import GTPDFHandler from "../../utils/greenTarget/PDF/GTPDFHandler";
 
 interface GTConsolidatedInvoiceModalProps {
   isOpen: boolean;
@@ -1105,26 +1105,42 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
                                     Update
                                   </Button>
                                 ) : currentStatus === "valid" ||
-                                  currentStatus === "invalid" ? (
-                                  // Show cancel button for Valid or Invalid
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    color="rose"
-                                    onClick={() =>
-                                      handleCancelConsolidatedRequest(
-                                        item.invoice_id
-                                      )
-                                    }
-                                    disabled={
-                                      !!processingHistoryId || isSubmitting
-                                    }
-                                    icon={IconTrash}
-                                    aria-label={`Cancel consolidated invoice ${item.invoice_id}`}
-                                    title="Cancel"
-                                  >
-                                    Cancel
-                                  </Button>
+                                  currentStatus === "invalid" ||
+                                  currentStatus === "cancelled" ? (
+                                  // Show multiple buttons for Valid or Invalid
+                                  <div className="flex gap-2 justify-center">
+                                    {/* Download button */}
+                                    {(currentStatus === "valid" ||
+                                      currentStatus === "cancelled") && (
+                                      <GTPDFHandler
+                                        invoice={item}
+                                        disabled={
+                                          !!processingHistoryId || isSubmitting
+                                        }
+                                      />
+                                    )}
+                                    {/* Cancel button */}
+                                    {currentStatus !== "cancelled" && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        color="rose"
+                                        onClick={() =>
+                                          handleCancelConsolidatedRequest(
+                                            item.invoice_id
+                                          )
+                                        }
+                                        disabled={
+                                          !!processingHistoryId || isSubmitting
+                                        }
+                                        icon={IconTrash}
+                                        aria-label={`Cancel consolidated invoice ${item.invoice_id}`}
+                                        title="Cancel"
+                                      >
+                                        Cancel
+                                      </Button>
+                                    )}
+                                  </div>
                                 ) : (
                                   // Show placeholder for other statuses
                                   <span className="text-default-400 text-xs">
