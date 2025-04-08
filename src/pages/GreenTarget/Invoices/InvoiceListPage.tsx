@@ -23,6 +23,9 @@ import {
   IconFileDownload,
   IconSquareCheck,
   IconSquare,
+  IconSquareMinusFilled,
+  IconSelectAll,
+  IconSquareCheckFilled,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -124,24 +127,28 @@ const InvoiceCard = ({
 
   return (
     <div
-      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer ${
-        isCardHovered ? "shadow-md" : "shadow-sm"
-      } ${
-        isCancelled
-          ? "border-default-400"
-          : isPaid
-          ? "border-green-400"
-          : invoice.status === "overdue"
-          ? "border-red-400"
-          : "border-amber-400"
-      }`}
+      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer 
+    ${
+      isSelected
+        ? "shadow-md ring-2 ring-sky-400 ring-offset-1" // Clear visual indication when selected
+        : "shadow-sm hover:shadow-md"
+    } 
+    ${
+      isCancelled
+        ? "border-default-400"
+        : isPaid
+        ? "border-green-400"
+        : invoice.status === "overdue"
+        ? "border-red-400"
+        : "border-amber-400"
+    }`}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
       onClick={handleCardSelection}
     >
       {/* Status banner */}
       <div
-        className={`w-full py-1.5 px-4 text-sm font-medium text-white ${
+        className={`w-full py-2 px-4 text-sm font-medium text-white ${
           isCancelled
             ? "bg-default-500"
             : isPaid
@@ -153,24 +160,34 @@ const InvoiceCard = ({
       >
         <div className="flex justify-between items-center">
           <span>{invoice.invoice_number}</span>
-          <div className="flex items-center">
-            {/* Add checkbox or visual indicator */}
-            <div
-              className={`w-4 h-4 mr-2 rounded ${
-                isSelected ? "bg-white" : "border border-white/70"
-              } flex items-center justify-center`}
-            >
-              <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
-                {isCancelled
-                  ? "Cancelled"
-                  : isPaid
-                  ? "Paid"
-                  : invoice.status === "overdue"
-                  ? "Overdue"
-                  : "Unpaid"}
-              </span>
-              {isSelected && <IconCheck size={12} className="text-sky-600" />}
-            </div>
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelect(invoice.invoice_id.toString(), !isSelected);
+            }}
+            className="flex items-center justify-center gap-1.5"
+          >
+            <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
+              {isCancelled
+                ? "Cancelled"
+                : isPaid
+                ? "Paid"
+                : invoice.status === "overdue"
+                ? "Overdue"
+                : "Unpaid"}
+            </span>
+            {isSelected ? (
+              <IconSquareCheckFilled
+                className="text-sky-400 cursor-pointer w-5 h-5"
+                size={22}
+              />
+            ) : (
+              <IconSquare
+                className="group-hover:text-sky-400 transition-colors cursor-pointer w-5 h-5"
+                size={22}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1195,50 +1212,100 @@ const InvoiceListPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Selection action bar - only visible when items are selected */}
-        {selectedInvoiceIds.size > 0 && (
-          <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSelectAllOnPage}
-                className="p-1 rounded-full hover:bg-sky-100"
-                title={isAllSelectedOnPage ? "Deselect All" : "Select All"}
-              >
-                {isAllSelectedOnPage ? (
-                  <IconSquareCheck className="text-sky-600" size={20} />
-                ) : (
-                  <IconSquare className="text-sky-600" size={20} />
-                )}
-              </button>
-              <span className="text-sm font-medium text-sky-800">
-                {selectedInvoiceIds.size} invoice(s) selected
-              </span>
-            </div>
+        {/* Selection summary and actions row */}
+        <div
+          className={`p-3 ${
+            selectedInvoiceIds.size > 0
+              ? "bg-sky-50 border border-sky-200"
+              : "bg-white border border-dashed border-default-200"
+          } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
+          onClick={handleSelectAllOnPage}
+          title={
+            isAllSelectedOnPage ? "Deselect All on Page" : "Select All on Page"
+          }
+        >
+          {/* Selection checkbox - always visible */}
+          <button className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
+            {isAllSelectedOnPage ? (
+              <IconSquareMinusFilled className="text-sky-600" size={20} />
+            ) : (
+              <IconSelectAll className="text-default-400" size={20} />
+            )}
+          </button>
 
-            <div className="flex gap-2 ml-auto">
+          {/* Selection Count and Total */}
+          <div className="flex-grow min-w-[150px]">
+            {selectedInvoiceIds.size > 0 ? (
+              <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
+                <span>{selectedInvoiceIds.size} selected</span>
+                <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
+                <span className="whitespace-nowrap">
+                  Total:{" "}
+                  {new Intl.NumberFormat("en-MY", {
+                    style: "currency",
+                    currency: "MYR",
+                  }).format(
+                    invoices
+                      .filter((inv) =>
+                        selectedInvoiceIds.has(String(inv.invoice_id))
+                      )
+                      .reduce(
+                        (sum, inv) => sum + (Number(inv.total_amount) || 0),
+                        0
+                      )
+                  )}
+                </span>
+              </span>
+            ) : (
+              <span
+                className="text-default-500 text-sm cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectAllOnPage();
+                }}
+              >
+                Select invoices to perform actions
+              </span>
+            )}
+          </div>
+
+          {/* Action Buttons (Show only when items are selected) */}
+          {selectedInvoiceIds.size > 0 && (
+            <div
+              className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
+              onClick={(e) => e.stopPropagation()} // Prevent row selection click
+            >
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   /* Handle download */
                 }}
                 icon={IconFileDownload}
+                disabled={false}
+                aria-label="Download Selected Invoices"
+                title="Download PDF"
               >
                 Download
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   /* Handle print */
                 }}
                 icon={IconPrinter}
+                disabled={false}
+                aria-label="Print Selected Invoices"
+                title="Print PDF"
               >
                 Print
               </Button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {filteredInvoices.length === 0 ? (
