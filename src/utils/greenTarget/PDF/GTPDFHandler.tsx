@@ -1,7 +1,7 @@
 // Add these imports at the top of the file
 import { useState } from "react";
 import GTPrintPDFOverlay from "./GTPrintPDFOverlay";
-import { IconDownload } from "@tabler/icons-react"; // Add this icon import
+import { IconPrinter } from "@tabler/icons-react"; // Add this icon import
 import Button from "../../../components/Button";
 
 // Add this component inside the file, before the GTConsolidatedInvoiceModal component
@@ -29,11 +29,11 @@ const GTPDFHandler: React.FC<GTPDFHandlerProps> = ({
         color="sky"
         onClick={handlePrint}
         disabled={disabled || isPrinting}
-        icon={IconDownload}
-        aria-label={`Download invoice ${invoice.invoice_number}`}
-        title="Download"
+        icon={IconPrinter}
+        aria-label={`Print invoice ${invoice.invoice_number}`}
+        title="Print invoice"
       >
-        Download
+        Print
       </Button>
       {isPrinting && (
         <GTPrintPDFOverlay
