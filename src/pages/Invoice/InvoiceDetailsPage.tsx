@@ -956,7 +956,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Validated:
                   </strong>
-                  {formatDisplayDate(new Date(invoiceData.datetime_validated))}
+                  {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
                   {new Date(invoiceData.datetime_validated).toLocaleTimeString(
                     "en-US",
                     {
