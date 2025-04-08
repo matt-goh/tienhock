@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Invoices/InvoiceListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DateRangePicker from "../../../components/DateRangePicker";
 import {
@@ -21,7 +21,6 @@ import {
   IconFiles,
   IconPrinter,
   IconFileDownload,
-  IconSquareCheck,
   IconSquare,
   IconSquareMinusFilled,
   IconSelectAll,
@@ -42,6 +41,8 @@ import { greenTargetApi } from "../../../routes/greentarget/api";
 import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import GTConsolidatedInvoiceModal from "../../../components/GreenTarget/GTConsolidatedInvoiceModal";
+import GTPDFDownloadHandler from "../../../utils/greenTarget/PDF/GTPDFDownloadHandler";
+import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -520,6 +521,10 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
     new Set()
   );
+  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [showDownloadHandler, setShowDownloadHandler] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
+  const [invoicesForPDF, setInvoicesForPDF] = useState<InvoiceGT[]>([]); // Holds detailed invoices for PDF
 
   const ITEMS_PER_PAGE = 12;
 
@@ -863,6 +868,94 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  // Fetch full details for selected invoices
+  const fetchFullInvoiceDetails = useCallback(
+    async (ids: string[]): Promise<InvoiceGT[]> => {
+      if (ids.length === 0) return [];
+      const toastId = toast.loading(
+        `Fetching details for ${ids.length} invoice(s)...`
+      );
+      try {
+        // Using Promise.allSettled to handle potential errors for individual fetches
+        const promises = ids.map((id) => greenTargetApi.getInvoice(Number(id)));
+        const results = await Promise.allSettled(promises);
+
+        const successfulInvoices: InvoiceGT[] = [];
+        const failedIds: string[] = [];
+
+        results.forEach((result, index) => {
+          if (result.status === "fulfilled" && result.value?.invoice) {
+            successfulInvoices.push(result.value.invoice);
+          } else {
+            failedIds.push(ids[index]);
+            console.error(
+              `Failed to fetch invoice ${ids[index]}:`,
+              result.status === "rejected"
+                ? result.reason
+                : "No invoice data found"
+            );
+          }
+        });
+
+        if (failedIds.length > 0) {
+          toast.error(
+            `Could not fetch details for ${failedIds.length} invoice(s).`,
+            { id: toastId }
+          );
+        } else {
+          toast.dismiss(toastId); // Dismiss only if all succeed
+        }
+        return successfulInvoices;
+      } catch (error) {
+        toast.error("Failed to fetch invoice details.", { id: toastId });
+        console.error("Error fetching batch invoice details:", error);
+        return [];
+      }
+    },
+    [] // No dependencies, relies on passed IDs
+  );
+
+  // ++ PDF Handlers ++
+  const handleBulkDownloadPDF = async () => {
+    const idsToFetch = Array.from(selectedInvoiceIds);
+    if (idsToFetch.length === 0) {
+      toast.error("No invoices selected.");
+      return;
+    }
+    setIsGeneratingPDF(true); // Disable buttons
+
+    const detailedInvoices = await fetchFullInvoiceDetails(idsToFetch);
+
+    if (detailedInvoices.length > 0) {
+      setInvoicesForPDF(detailedInvoices);
+      setShowDownloadHandler(true); // Trigger rendering the download handler
+      // onComplete in the handler will reset isGeneratingPDF and clear invoicesForPDF
+    } else {
+      // Error handled in fetch function, just reset state
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleBulkPrintPDF = async () => {
+    const idsToFetch = Array.from(selectedInvoiceIds);
+    if (idsToFetch.length === 0) {
+      toast.error("No invoices selected.");
+      return;
+    }
+    setIsGeneratingPDF(true); // Disable buttons
+
+    const detailedInvoices = await fetchFullInvoiceDetails(idsToFetch);
+
+    if (detailedInvoices.length > 0) {
+      setInvoicesForPDF(detailedInvoices);
+      setShowPrintOverlay(true); // Trigger rendering the print overlay
+      // onComplete in the overlay will reset isGeneratingPDF and clear invoicesForPDF
+    } else {
+      // Error handled in fetch function, just reset state
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const isAllSelectedOnPage = useMemo(() => {
     if (!Array.isArray(invoices) || invoices.length === 0) return false;
     return invoices.every((inv) =>
@@ -1077,7 +1170,7 @@ const InvoiceListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-20">
+    <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8">
       {/* Revised Header Layout - 2 rows total on desktop */}
       <div className="space-y-4 mb-6">
         {/* Row 1: Header with title, filters, search and action buttons */}
@@ -1256,12 +1349,9 @@ const InvoiceListPage: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  /* Handle download */
-                }}
+                onClick={handleBulkDownloadPDF}
                 icon={IconFileDownload}
-                disabled={false}
+                disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading list
                 aria-label="Download Selected Invoices"
                 title="Download PDF"
               >
@@ -1270,12 +1360,9 @@ const InvoiceListPage: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  /* Handle print */
-                }}
+                onClick={handleBulkPrintPDF} // Use the new handler
                 icon={IconPrinter}
-                disabled={false}
+                disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading list
                 aria-label="Print Selected Invoices"
                 title="Print PDF"
               >
@@ -1377,6 +1464,31 @@ const InvoiceListPage: React.FC = () => {
         month={selectedMonth.id}
         year={currentYear}
       />
+      {/* ++ PDF Handlers (Rendered conditionally) ++ */}
+      {showPrintOverlay && invoicesForPDF.length > 0 && (
+        <GTPrintPDFOverlay
+          invoices={invoicesForPDF}
+          onComplete={() => {
+            setShowPrintOverlay(false);
+            setIsGeneratingPDF(false);
+            setInvoicesForPDF([]); // Clear the detailed data
+          }}
+        />
+      )}
+      {/* Render Download Handler briefly when needed */}
+      {showDownloadHandler && invoicesForPDF.length > 0 && (
+        <div style={{ display: "none" }}>
+          <GTPDFDownloadHandler
+            invoices={invoicesForPDF}
+            disabled={isGeneratingPDF}
+            onComplete={() => {
+              setShowDownloadHandler(false); // Hide the handler component
+              setIsGeneratingPDF(false);
+              setInvoicesForPDF([]); // Clear the detailed data
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
