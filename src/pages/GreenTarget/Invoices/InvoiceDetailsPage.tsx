@@ -13,6 +13,7 @@ import {
   IconAlertTriangle,
   IconCancel,
   IconRefresh,
+  IconFileDownload,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -30,6 +31,8 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { SelectOption } from "../../../components/FormComponents";
 import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
+import GTPDFDownloadHandler from "../../../utils/greenTarget/PDF/GTPDFDownloadHandler";
+import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
 
 interface Payment {
   payment_id: number;
@@ -95,6 +98,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showEInvoiceConfirmDialog, setShowEInvoiceConfirmDialog] =
     useState(false);
   const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
+  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [showDownloadHandler, setShowDownloadHandler] = useState(false); // To trigger download
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
 
   useEffect(() => {
     if (id) {
@@ -551,13 +557,19 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const handleDownloadInvoice = () => {
+    if (!invoice || isGeneratingPDF) return;
+    setShowDownloadHandler(true); // Render the download handler component
+    setIsGeneratingPDF(true); // Disable button visually
+    // The GTPDFDownloadHandler component will handle the actual download trigger
+    // and call onComplete which resets showDownloadHandler and isGeneratingPDF
+  };
+
   const handlePrintInvoice = () => {
-    // Placeholder for print functionality
-    toast.success("Invoice printing functionality would go here");
-    // In a real implementation, you'd either:
-    // 1. Open a print-friendly view
-    // 2. Generate a PDF and download it
-    // 3. Send to a backend endpoint for printing
+    if (!invoice || isGeneratingPDF) return;
+    setShowPrintOverlay(true); // Render the print overlay component
+    setIsGeneratingPDF(true); // Disable button visually
+    // GTPrintPDFOverlay handles the print process and calls onComplete
   };
 
   const handleCancelInvoice = async () => {
@@ -788,14 +800,27 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
               </Button>
             )}
+          {/* PDF Buttons */}
           <Button
             onClick={handlePrintInvoice}
             icon={IconPrinter}
             variant="outline"
-            className="hidden md:block"
+            disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading data
+            title="Print PDF"
           >
             Print
           </Button>
+          <Button
+            onClick={handleDownloadInvoice}
+            icon={IconFileDownload}
+            variant="outline"
+            disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading data
+            title="Download PDF"
+          >
+            Download
+          </Button>
+
+          {/* Payment/Cancel Buttons */}
           {invoice.current_balance > 0 && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -1609,6 +1634,29 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText="Submit"
         variant="default"
       />
+      {/* PDF Handlers (Rendered conditionally) */}
+      {showPrintOverlay && invoice && (
+        <GTPrintPDFOverlay
+          invoices={[invoice]} // Pass the single detailed invoice in an array
+          onComplete={() => {
+            setShowPrintOverlay(false);
+            setIsGeneratingPDF(false); // Reset generating state
+          }}
+        />
+      )}
+      {/* Render Download Handler briefly when needed */}
+      {showDownloadHandler && invoice && (
+        <div style={{ display: "none" }}>
+          <GTPDFDownloadHandler
+            invoices={[invoice]}
+            disabled={isGeneratingPDF}
+            onComplete={() => {
+              setShowDownloadHandler(false); // Hide the handler component
+              setIsGeneratingPDF(false); // Reset generating state
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
