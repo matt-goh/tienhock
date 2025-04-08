@@ -1325,7 +1325,7 @@ const InvoiceListPage: React.FC = () => {
 
         {/* Row 2: Selection bar */}
         <div
-          className={`p-3 ${
+          className={`px-3 py-2 ${
             selectedInvoiceIds.size > 0
               ? "bg-sky-50 border border-sky-200"
               : "bg-white border border-dashed border-default-200"
