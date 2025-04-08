@@ -32,6 +32,7 @@ import {
 } from "@headlessui/react";
 import SubmissionResultsModal from "../Invoice/SubmissionResultsModal";
 import ConsolidationStatusPanel from "../Invoice/ConsolidationStatusPanel";
+import ConsolidatedInfoTooltip from "../Invoice/ConsolidatedInfoTooltip";
 
 interface GTConsolidatedInvoiceModalProps {
   isOpen: boolean;
@@ -1030,6 +1031,14 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
                               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
                                 <div className="flex items-center">
                                   <span>{item.invoice_number}</span>
+                                  {item.consolidated_invoices &&
+                                    item.consolidated_invoices.length > 0 && (
+                                      <ConsolidatedInfoTooltip
+                                        invoices={item.consolidated_invoices}
+                                        className="ml-1.5"
+                                        disableNavigation={true}
+                                      />
+                                    )}
                                 </div>
                                 {item.long_id && (
                                   <span
