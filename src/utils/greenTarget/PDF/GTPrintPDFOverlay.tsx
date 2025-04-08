@@ -128,7 +128,6 @@ const GTPrintPDFOverlay = ({
     // Cleanup on unmount
     return () => {
       if (resourcesRef.current.printFrame || resourcesRef.current.pdfUrl) {
-        console.log("Cleaning up print overlay resources...");
         cleanup(true);
       }
     };
@@ -137,29 +136,18 @@ const GTPrintPDFOverlay = ({
 
   return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-[100]">
-      {" "}
       {/* Ensure high z-index */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-100">
-        {" "}
+      <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[240px] transform scale-100">
         {/* Use scale-100 */}
         <div className="flex flex-col items-center gap-3">
           <LoadingSpinner size="sm" hideText />
           <p className="text-base font-medium text-default-900">
             {isGenerating ? "Preparing document..." : "Opening print dialog..."}
           </p>
-          <p className="text-sm text-default-500">Please wait</p>
           {error && (
             <p className="text-sm text-rose-600 mt-2 text-center">{error}</p>
           )}
-          <button
-            onClick={() => {
-              cleanup(true);
-            }}
-            className="mt-2 text-sm text-center text-sky-600 hover:underline"
-          >
-            Cancel
-          </button>
         </div>
       </div>
     </div>

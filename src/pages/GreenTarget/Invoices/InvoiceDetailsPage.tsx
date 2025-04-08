@@ -31,8 +31,10 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { SelectOption } from "../../../components/FormComponents";
 import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
-import GTPDFDownloadHandler from "../../../utils/greenTarget/PDF/GTPDFDownloadHandler";
 import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
+import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For PDF structure
+import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
+import { pdf, Document } from "@react-pdf/renderer";
 
 interface Payment {
   payment_id: number;
@@ -99,7 +101,6 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
-  const [showDownloadHandler, setShowDownloadHandler] = useState(false); // To trigger download
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
 
   useEffect(() => {
@@ -557,18 +558,54 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handleDownloadInvoice = () => {
+  const handleDownloadInvoice = async () => {
+    // Made async
     if (!invoice || isGeneratingPDF) return;
-    setShowDownloadHandler(true); // Render the download handler component
-    setIsGeneratingPDF(true); // Disable button visually
-    // The GTPDFDownloadHandler component will handle the actual download trigger
-    // and call onComplete which resets showDownloadHandler and isGeneratingPDF
+
+    setIsGeneratingPDF(true); // Disable button
+    const toastId = toast.loading("Generating PDF...");
+
+    try {
+      // Prepare the PDF document structure
+      const pdfComponent = (
+        <Document title={generateGTPDFFilename([invoice]).replace(".pdf", "")}>
+          <GTInvoicePDF invoice={invoice} /> {/* Pass the single invoice */}
+        </Document>
+      );
+
+      // Generate PDF blob
+      const pdfBlob = await pdf(pdfComponent).toBlob();
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      // Create and trigger download link
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = generateGTPDFFilename([invoice]); // Generate filename
+      document.body.appendChild(link);
+      link.click(); // Trigger download
+      document.body.removeChild(link); // Clean up link
+
+      // Delay slightly before revoking URL to ensure download starts
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("PDF downloaded successfully", { id: toastId });
+        setIsGeneratingPDF(false); // Re-enable button
+      }, 100);
+    } catch (error) {
+      console.error("Error generating PDF for download:", error);
+      toast.error(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+      setIsGeneratingPDF(false); // Re-enable button on error
+    }
   };
 
   const handlePrintInvoice = () => {
     if (!invoice || isGeneratingPDF) return;
     setShowPrintOverlay(true); // Render the print overlay component
-    setIsGeneratingPDF(true); // Disable button visually
     // GTPrintPDFOverlay handles the print process and calls onComplete
   };
 
@@ -752,95 +789,110 @@ const InvoiceDetailsPage: React.FC = () => {
           </h1>
         </div>
 
-        <div className="flex space-x-3 mt-4 md:mt-0 md:self-end">
-          {/* e-Invoice button - only show if customer has required fields AND date eligible */}
-          {invoice.tin_number &&
-            invoice.id_number &&
-            isInvoiceDateEligibleForEinvoice(invoice.date_issued) && (
-              <>
-                {!invoice.einvoice_status ||
-                invoice.einvoice_status === "invalid" ? (
-                  <Button
-                    onClick={handleSubmitEInvoice}
-                    icon={IconFileInvoice}
-                    variant="outline"
-                    color="amber"
-                    disabled={
-                      isSubmittingEInvoice || invoice.status === "cancelled"
-                    }
-                  >
-                    {isSubmittingEInvoice
-                      ? "Submitting..."
-                      : "Submit e-Invoice"}
-                  </Button>
-                ) : invoice.einvoice_status === "pending" ? (
-                  <Button
-                    onClick={handleCheckEInvoiceStatus}
-                    icon={IconClock}
-                    variant="outline"
-                    color="sky"
-                    disabled={isCheckingEInvoice}
-                  >
-                    {isCheckingEInvoice ? "Checking..." : "Check Status"}
-                  </Button>
-                ) : null}
-              </>
-            )}
-          {invoice.status === "cancelled" &&
-            invoice.einvoice_status &&
-            invoice.einvoice_status !== "cancelled" &&
-            invoice.uuid && (
+        <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3 mt-4 md:mt-0 w-full md:w-auto md:self-end">
+          {/* Group buttons by function using responsive flex containers */}
+          <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            {/* e-Invoice buttons */}
+            {invoice.tin_number &&
+              invoice.id_number &&
+              isInvoiceDateEligibleForEinvoice(invoice.date_issued) && (
+                <>
+                  {!invoice.einvoice_status ||
+                  invoice.einvoice_status === "invalid" ? (
+                    <Button
+                      onClick={handleSubmitEInvoice}
+                      icon={IconFileInvoice}
+                      variant="outline"
+                      color="amber"
+                      disabled={
+                        isSubmittingEInvoice || invoice.status === "cancelled"
+                      }
+                      className="w-full sm:w-auto"
+                    >
+                      {isSubmittingEInvoice
+                        ? "Submitting..."
+                        : "Submit e-Invoice"}
+                    </Button>
+                  ) : invoice.einvoice_status === "pending" ? (
+                    <Button
+                      onClick={handleCheckEInvoiceStatus}
+                      icon={IconClock}
+                      variant="outline"
+                      color="sky"
+                      disabled={isCheckingEInvoice}
+                      className="w-full sm:w-auto"
+                    >
+                      {isCheckingEInvoice ? "Checking..." : "Check Status"}
+                    </Button>
+                  ) : null}
+                </>
+              )}
+            {invoice.status === "cancelled" &&
+              invoice.einvoice_status &&
+              invoice.einvoice_status !== "cancelled" &&
+              invoice.uuid && (
+                <Button
+                  onClick={handleSyncCancellationStatus}
+                  icon={IconRefresh}
+                  variant="outline"
+                  color="rose"
+                  disabled={isSyncingCancellation}
+                  className="w-full sm:w-auto"
+                >
+                  {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+                </Button>
+              )}
+          </div>
+
+          {/* PDF action buttons */}
+          <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            <Button
+              onClick={handlePrintInvoice}
+              icon={IconPrinter}
+              variant="outline"
+              disabled={loading}
+              title="Print PDF"
+              className="flex-1 sm:flex-none"
+            >
+              Print
+            </Button>
+            <Button
+              onClick={handleDownloadInvoice}
+              icon={IconFileDownload}
+              variant="outline"
+              disabled={isGeneratingPDF || loading}
+              title="Download PDF"
+              className="flex-1 sm:flex-none"
+            >
+              {isGeneratingPDF ? "Generating..." : "Download"}
+            </Button>
+          </div>
+
+          {/* Invoice action buttons */}
+          <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            {invoice.current_balance > 0 && (
               <Button
-                onClick={handleSyncCancellationStatus}
-                icon={IconRefresh}
+                onClick={() => setShowPaymentForm(!showPaymentForm)}
+                icon={IconCash}
                 variant="outline"
-                color="rose"
-                disabled={isSyncingCancellation}
+                color="sky"
+                disabled={invoice.status === "cancelled"}
+                className="flex-1 sm:flex-none"
               >
-                {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+                {showPaymentForm ? "Cancel" : "Record Payment"}
               </Button>
             )}
-          {/* PDF Buttons */}
-          <Button
-            onClick={handlePrintInvoice}
-            icon={IconPrinter}
-            variant="outline"
-            disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading data
-            title="Print PDF"
-          >
-            Print
-          </Button>
-          <Button
-            onClick={handleDownloadInvoice}
-            icon={IconFileDownload}
-            variant="outline"
-            disabled={isGeneratingPDF || loading} // Disable while generating PDF or loading data
-            title="Download PDF"
-          >
-            Download
-          </Button>
-
-          {/* Payment/Cancel Buttons */}
-          {invoice.current_balance > 0 && (
             <Button
-              onClick={() => setShowPaymentForm(!showPaymentForm)}
-              icon={IconCash}
+              onClick={() => setIsCancelInvoiceDialogOpen(true)}
+              icon={IconTrash}
               variant="outline"
-              color="sky"
+              color="rose"
               disabled={invoice.status === "cancelled"}
+              className="flex-1 sm:flex-none"
             >
-              {showPaymentForm ? "Cancel" : "Record Payment"}
+              {invoice.status === "cancelled" ? "Cancelled" : "Cancel Invoice"}
             </Button>
-          )}
-          <Button
-            onClick={() => setIsCancelInvoiceDialogOpen(true)}
-            icon={IconTrash}
-            variant="outline"
-            color="rose"
-            disabled={invoice.status === "cancelled"}
-          >
-            {invoice.status === "cancelled" ? "Cancelled" : "Cancel Invoice"}
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -1640,22 +1692,8 @@ const InvoiceDetailsPage: React.FC = () => {
           invoices={[invoice]} // Pass the single detailed invoice in an array
           onComplete={() => {
             setShowPrintOverlay(false);
-            setIsGeneratingPDF(false); // Reset generating state
           }}
         />
-      )}
-      {/* Render Download Handler briefly when needed */}
-      {showDownloadHandler && invoice && (
-        <div style={{ display: "none" }}>
-          <GTPDFDownloadHandler
-            invoices={[invoice]}
-            disabled={isGeneratingPDF}
-            onComplete={() => {
-              setShowDownloadHandler(false); // Hide the handler component
-              setIsGeneratingPDF(false); // Reset generating state
-            }}
-          />
-        </div>
       )}
     </div>
   );
