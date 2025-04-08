@@ -53,6 +53,8 @@ interface InvoiceCardProps {
   onSubmitEInvoiceClick: (invoice: InvoiceGT) => void;
   onCheckEInvoiceStatus: (invoice: InvoiceGT) => void;
   onSyncCancellationStatus: (invoice: InvoiceGT) => void;
+  onPrintClick: (invoice: InvoiceGT) => void;
+  onDownloadClick: (invoice: InvoiceGT) => void;
   isSelected: boolean;
   onSelect: (invoiceId: string, isSelected: boolean) => void;
 }
@@ -65,6 +67,8 @@ const InvoiceCard = ({
   onSubmitEInvoiceClick,
   onCheckEInvoiceStatus,
   onSyncCancellationStatus,
+  onPrintClick,
+  onDownloadClick,
   isSelected,
   onSelect,
 }: InvoiceCardProps) => {
@@ -407,6 +411,28 @@ const InvoiceCard = ({
                 <IconRefresh size={18} stroke={1.5} />
               </button>
             )}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrintClick(invoice);
+            }}
+            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+            title="Print Invoice"
+          >
+            <IconPrinter size={18} stroke={1.5} />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownloadClick(invoice);
+            }}
+            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+            title="Download Invoice"
+          >
+            <IconFileDownload size={18} stroke={1.5} />
+          </button>
 
           {!isPaid && (
             <button
@@ -1015,6 +1041,67 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const handlePrintInvoice = async (invoice: InvoiceGT) => {
+    setInvoicesForPDF([invoice]);
+    setShowPrintOverlay(true);
+  };
+
+  const handleDownloadInvoice = async (invoice: InvoiceGT) => {
+    const toastId = toast.loading("Generating PDF...");
+
+    try {
+      // Generate QR code if needed
+      let qrCodeData = null;
+      if (
+        invoice.uuid &&
+        invoice.long_id &&
+        invoice.einvoice_status === "valid"
+      ) {
+        try {
+          qrCodeData = await generateQRDataUrl(invoice.uuid, invoice.long_id);
+        } catch (error) {
+          console.error("Error generating QR code:", error);
+        }
+      }
+
+      // Create PDF document
+      const pdfComponent = (
+        <Document title={invoice.invoice_number}>
+          <GTInvoicePDF invoice={invoice} qrCodeData={qrCodeData} />
+        </Document>
+      );
+
+      // Generate PDF blob
+      const pdfBlob = await pdf(pdfComponent).toBlob();
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      // Create and trigger download link
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = `GT_Invoice_${invoice.invoice_number.replace(
+        /[^a-zA-Z0-9]/g,
+        "_"
+      )}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("PDF downloaded successfully", { id: toastId });
+      }, 100);
+    } catch (error) {
+      console.error("Error generating PDF for download:", error);
+      toast.error(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+    }
+  };
+
   const isAllSelectedOnPage = useMemo(() => {
     if (!Array.isArray(invoices) || invoices.length === 0) return false;
     return invoices.every((inv) =>
@@ -1458,6 +1545,8 @@ const InvoiceListPage: React.FC = () => {
               onSubmitEInvoiceClick={handleSubmitEInvoice}
               onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
               onSyncCancellationStatus={handleSyncCancellationStatus}
+              onPrintClick={handlePrintInvoice}
+              onDownloadClick={handleDownloadInvoice}
               isSelected={selectedInvoiceIds.has(invoice.invoice_id.toString())}
               onSelect={handleSelectInvoice}
             />
