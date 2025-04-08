@@ -112,8 +112,8 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
 
         const filename =
           preparedData.length === 1
-            ? `einvoice-${preparedData[0].invoice.id}.pdf`
-            : `einvoices-batch-${new Date().toISOString().slice(0, 10)}.pdf`;
+            ? `TH_einvoice-${preparedData[0].invoice.id}.pdf`
+            : `TH_einvoices-batch-${new Date().toISOString().slice(0, 10)}.pdf`;
 
         link.download = filename;
         document.body.appendChild(link);
@@ -129,14 +129,14 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       } else if (einvoice) {
         // Handle single einvoice (original logic)
         const isConsolidated =
-          einvoice.is_consolidated || einvoice.internal_id.startsWith("CON-");
+          einvoice.is_consolidated || einvoice.internal_id.startsWith("TH_CON-");
         const qrDataUrl = await generateQRDataUrl(
           einvoice.uuid,
           einvoice.long_id
         );
         const pdfData = await preparePDFData(einvoice);
         const pdfComponent = (
-          <Document title={`einvoice-${einvoice.internal_id}`}>
+          <Document title={`TH_einvoice-${einvoice.internal_id}`}>
             <EInvoicePDF
               data={pdfData}
               qrCodeData={qrDataUrl}
@@ -148,7 +148,7 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
         const pdfUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement("a");
         link.href = pdfUrl;
-        link.download = `einvoice-${einvoice.internal_id}.pdf`;
+        link.download = `TH_einvoice-${einvoice.internal_id}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

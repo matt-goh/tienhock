@@ -2,7 +2,6 @@
 import { api } from "../routes/utils/api";
 import {
   TIENHOCK_INFO,
-  GREENTARGET_INFO,
 } from "../utils/invoice/einvoice/companyInfo";
 import { ExtendedInvoiceData } from "../types/types";
 

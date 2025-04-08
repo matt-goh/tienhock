@@ -109,7 +109,7 @@ cron.schedule(
 
 // --- Auto-consolidation scheduler ---
 cron.schedule(
-  "18 23 * * *", // Run at 8 AM every day
+  "0 8 * * *", // Run at 8 AM every day
   async () => {
     console.log(
       `[${new Date().toISOString()}] Running auto-consolidation check...`

@@ -1,211 +1,190 @@
+// src/utils/greenTarget/PDF/GTInvoicePDF.tsx
 import React from "react";
-import { Page, Text, View, StyleSheet, Image, Font } from "@react-pdf/renderer";
+import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { InvoiceGT } from "../../../types/types";
 import { GREENTARGET_INFO } from "../../invoice/einvoice/companyInfo";
-// Import the logo directly
-import GreenTargetLogo from "../../GreenTargetLogo.png"; // Adjust path as necessary
+import GreenTargetLogo from "../../GreenTargetLogo.png";
 
-// --- Font Registration (Recommended) ---
-// If Helvetica isn't standard on your PDF generation environment (like a server),
-// you might need to register font files. Example:
-// Font.register({
-//   family: 'Helvetica',
-//   fonts: [
-//     { src: '/path/to/helvetica.ttf' }, // Regular
-//     { src: '/path/to/helvetica-bold.ttf', fontWeight: 'bold' }, // Bold
-//     // Add italic, bold-italic if needed
-//   ],
-// });
-// Ensure the font files are accessible where the PDF is generated.
-
-interface GTInvoicePDFProps {
-  invoice: InvoiceGT; // Expecting a single, detailed invoice object
-}
-
-// Color palette (remains the same)
-const colors = {
-  background: "#ffffff",
-  header: {
-    companyName: "#107C10", // Green Target Green
-    companyDetails: "#334155",
-  },
-  text: {
-    primary: "#111827",
-    secondary: "#374151",
-    bold: "#030712",
-  },
-  borders: {
-    invoice: "#4CAF50", // Green Target Green
-    table: "#D1D5DB", // Lighter gray
-  },
-  status: {
-    paid: "#16A34A",
-    unpaid: "#F59E0B",
-    overdue: "#DC2626",
-    cancelled: "#6B7280",
-  },
-};
-
+// Define styles
 const styles = StyleSheet.create({
   page: {
-    flexDirection: "column",
-    padding: 30,
-    fontFamily: "Helvetica", // Ensure this font is available or registered
+    padding: 20,
     fontSize: 9,
-    color: colors.text.primary,
+    fontFamily: "Helvetica",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 15,
-    paddingBottom: 10,
-    borderBottomWidth: 1.5,
-    borderBottomColor: colors.borders.invoice,
+    marginBottom: 10,
   },
-  companyInfoContainer: {
+  companySection: {
     flexDirection: "row",
-    alignItems: "center",
-    flex: 2,
+    flex: 1,
+    marginRight: 15,
   },
   logo: {
-    width: 55,
-    height: 55,
-    marginRight: 12,
-    objectFit: "contain", // Adjust how the image fits
+    width: 80,
+    height: 80,
+    marginRight: 10,
   },
-  companyText: {
+  companyInfo: {
     flex: 1,
+    justifyContent: "center",
+    color: "#111827",
   },
   companyName: {
-    fontSize: 14,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: colors.header.companyName,
-    marginBottom: 3,
+    marginBottom: 2,
   },
-  companyDetails: {
+  companyDetail: {
     fontSize: 9,
+    marginBottom: 1,
     lineHeight: 1.3,
-    color: colors.header.companyDetails,
   },
-  invoiceTitleSection: {
+  qrCode: {
+    width: 70,
+    height: 70,
+    alignSelf: "flex-start",
+  },
+  invoiceDetails: {
+    marginBottom: 6,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  detailLabel: {
+    fontFamily: "Helvetica-Bold",
+    width: 120,
+  },
+  detailValue: {
     flex: 1,
     textAlign: "right",
   },
-  invoiceTitle: {
-    fontSize: 16,
+  title: {
+    fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    color: colors.text.bold,
-    marginBottom: 3,
-    textTransform: "uppercase",
+    marginBottom: 8,
+    textAlign: "right",
   },
-  invoiceNumber: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 3,
-  },
-  invoiceDate: {
-    fontSize: 9,
-  },
-  infoSection: {
+  infoContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-    gap: 20, // Add gap between Bill To and Site Info
+    gap: 8,
   },
   infoBox: {
     flex: 1,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.borders.table,
-    borderRadius: 4,
-    minHeight: 100, // Ensure boxes have some height
+    border: "1 solid #9CA3AF",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   infoTitle: {
-    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 5,
-    paddingBottom: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.borders.table,
+    marginBottom: 6,
     textTransform: "uppercase",
   },
   infoRow: {
     flexDirection: "row",
-    marginBottom: 3,
+    lineHeight: 0.75,
   },
   infoLabel: {
-    fontFamily: "Helvetica-Bold",
     width: "35%",
-    marginRight: 5,
+    paddingRight: 6,
   },
   infoValue: {
     flex: 1,
-    maxWidth: "65%", // Prevent long text overflow issues
   },
-  // Style for the description section replacing the table
-  descriptionSection: {
+  infoColumns: {
+    flexDirection: "row",
+    marginTop: 6,
+  },
+  column: {
+    flex: 1,
+    paddingRight: 15,
+  },
+  bold: {
+    fontFamily: "Helvetica-Bold",
+  },
+  table: {
     marginTop: 20,
     marginBottom: 20,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.borders.table,
-    borderRadius: 4,
-    minHeight: 50, // Give it some space
   },
-  descriptionTitle: {
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 5,
-    fontSize: 10,
-  },
-  descriptionText: {
-    fontSize: 9,
-    lineHeight: 1.4,
-  },
-  // Summary styles remain similar
-  summarySection: {
-    marginTop: 15, // Adjusted margin
+  tableHeader: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    paddingBottom: 4,
   },
-  summaryBox: {
-    width: "45%",
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#666",
+    paddingVertical: 4,
+  },
+  classCol: {
+    width: "8%",
+  },
+  itemNameCol: {
+    width: "44%",
+  },
+  qtyCol: {
+    width: "5%",
+    textAlign: "center",
+  },
+  priceCol: {
+    width: "11%",
+    textAlign: "right",
+  },
+  subtotalCol: {
+    width: "11%",
+    textAlign: "right",
+  },
+  taxCol: {
+    width: "10%",
+    textAlign: "right",
+  },
+  totalCol: {
+    width: "11%",
+    textAlign: "right",
+  },
+  headerText: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+  },
+  cellText: {
+    fontSize: 9,
+  },
+  summary: {
+    alignItems: "flex-end",
   },
   summaryRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 3,
-    paddingHorizontal: 5,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.borders.table,
+    justifyContent: "flex-end",
+    marginBottom: 4,
   },
   summaryLabel: {
-    fontFamily: "Helvetica",
+    width: 160,
     textAlign: "right",
-    flex: 1,
-    paddingRight: 10,
   },
   summaryValue: {
-    fontFamily: "Helvetica-Bold",
+    width: 60,
     textAlign: "right",
-    minWidth: 80, // Ensure space for value
   },
-  finalTotalRow: {
-    backgroundColor: "#E5E7EB", // Slightly darker gray
-    borderTopWidth: 1,
-    borderTopColor: colors.borders.table,
-  },
-  notesSection: {
-    marginTop: 20,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.borders.invoice,
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    color: "#6B7280",
     fontSize: 8,
-    color: colors.text.secondary,
+    lineHeight: 1.5,
   },
   statusBanner: {
     position: "absolute",
-    top: 10, // Adjust position as needed
+    top: 10,
     right: 10,
     paddingVertical: 3,
     paddingHorizontal: 8,
@@ -218,25 +197,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textTransform: "uppercase",
   },
-  pageNumber: {
-    position: "absolute",
-    fontSize: 8,
-    bottom: 15,
-    left: 0,
-    right: 30,
-    textAlign: "right",
-    color: colors.text.secondary,
-  },
 });
 
-// Helper to format date (remains the same)
+// Helper to format date
 const formatDate = (dateString: string | null | undefined) => {
   if (!dateString) return "N/A";
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "Invalid Date";
     return date.toLocaleDateString("en-GB", {
-      // DD/MM/YYYY
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -246,30 +215,13 @@ const formatDate = (dateString: string | null | undefined) => {
   }
 };
 
-// Helper to format currency (remains the same)
+// Helper to format currency
 const formatCurrency = (amount: number | string | null | undefined) => {
   const num = Number(amount);
   if (amount === null || amount === undefined || isNaN(num)) {
     return "0.00";
   }
   return num.toFixed(2);
-};
-
-// Get status styles (remains the same)
-const getStatusStyle = (status: string | undefined, balance: number) => {
-  if (status === "cancelled")
-    return { backgroundColor: colors.status.cancelled };
-  if (balance <= 0 && status !== "cancelled")
-    return { backgroundColor: colors.status.paid }; // Check status isn't cancelled
-  if (status === "overdue") return { backgroundColor: colors.status.overdue };
-  return { backgroundColor: colors.status.unpaid }; // Default to unpaid
-};
-
-const getStatusText = (status: string | undefined, balance: number) => {
-  if (status === "cancelled") return "Cancelled";
-  if (balance <= 0 && status !== "cancelled") return "Paid";
-  if (status === "overdue") return "Overdue";
-  return "Unpaid";
 };
 
 // Generate a basic description based on invoice type and details
@@ -293,192 +245,284 @@ const generateDescription = (invoice: InvoiceGT): string => {
     desc += ".";
     return desc;
   }
-  // Fallback generic description
   return "Invoice for services rendered.";
 };
 
-const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice }) => {
-  const statusStyle = getStatusStyle(invoice.status, invoice.current_balance);
+interface GTInvoicePDFProps {
+  invoice: InvoiceGT;
+  qrCodeData?: string; // Allow passing in pre-generated QR code data
+}
+
+const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
   const description = generateDescription(invoice);
+  const hasValidEInvoice =
+    invoice.uuid && invoice.long_id && invoice.einvoice_status === "valid";
+  const isConsolidated = invoice.is_consolidated;
+
+  // Create order details for the table
+  const orderDetails = [
+    {
+      description: description,
+      qty: 1,
+      price: invoice.amount_before_tax,
+      total: invoice.amount_before_tax,
+      tax: invoice.tax_amount,
+    },
+  ];
 
   return (
     <Page size="A4" style={styles.page}>
-      {/* Header */}
-      <View style={styles.header} fixed>
-        <View style={styles.companyInfoContainer}>
-          {/* Use the imported logo */}
+      {/* Header Section */}
+      <View style={styles.header}>
+        <View style={styles.companySection}>
           <Image src={GreenTargetLogo} style={styles.logo} />
-          <View style={styles.companyText}>
+          <View style={styles.companyInfo}>
             <Text style={styles.companyName}>{GREENTARGET_INFO.name}</Text>
-            <Text style={styles.companyDetails}>
-              {`Reg. No: ${GREENTARGET_INFO.reg_no} | TIN: ${GREENTARGET_INFO.tin}`}
+            <Text style={styles.companyDetail}>
+              Reg. No: {GREENTARGET_INFO.reg_no}
             </Text>
-            <Text style={styles.companyDetails}>
-              {`${GREENTARGET_INFO.address_pdf}, ${GREENTARGET_INFO.postcode} ${GREENTARGET_INFO.city_pdf}, ${GREENTARGET_INFO.state_pdf}`}
+            <Text style={styles.companyDetail}>
+              {GREENTARGET_INFO.address_pdf}
             </Text>
-            <Text
-              style={styles.companyDetails}
-            >{`Tel: ${GREENTARGET_INFO.phone} | Email: ${GREENTARGET_INFO.email}`}</Text>
+            <Text style={styles.companyDetail}>
+              {GREENTARGET_INFO.postcode}, {GREENTARGET_INFO.city_pdf},{" "}
+              {GREENTARGET_INFO.state_pdf}
+            </Text>
+            <Text style={styles.companyDetail}>
+              Tel: {GREENTARGET_INFO.phone}
+            </Text>
+            <Text style={styles.companyDetail}>
+              Email: {GREENTARGET_INFO.email}
+            </Text>
           </View>
         </View>
-      </View>
-
-      {/* Info Section (remains the same) */}
-      <View style={styles.infoSection}>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Bill To</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Customer:</Text>
-            <Text style={styles.infoValue}>{invoice.customer_name}</Text>
-          </View>
-          {invoice.customer_phone_number && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Phone:</Text>
-              <Text style={styles.infoValue}>
-                {invoice.customer_phone_number}
-              </Text>
-            </View>
-          )}
-          {(invoice.tin_number || invoice.id_number) && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>ID:</Text>
-              <Text style={styles.infoValue}>{`${
-                invoice.tin_number ? `TIN: ${invoice.tin_number}` : ""
-              }${invoice.tin_number && invoice.id_number ? " | " : ""}${
-                invoice.id_number ? `Reg: ${invoice.id_number}` : ""
-              }`}</Text>
-            </View>
-          )}
-        </View>
-        {/* Site/Rental Info Box (remains the same) */}
-        {(invoice.location_address ||
-          invoice.driver ||
-          invoice.tong_no ||
-          invoice.rental_id) && (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>Site / Rental Info</Text>
-            {invoice.rental_id && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Rental ID:</Text>
-                <Text style={styles.infoValue}>{invoice.rental_id}</Text>
-              </View>
-            )}
-            {invoice.location_address && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Location:</Text>
-                <Text style={styles.infoValue}>{invoice.location_address}</Text>
-              </View>
-            )}
-            {invoice.location_phone_number && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Site Phone:</Text>
-                <Text style={styles.infoValue}>
-                  {invoice.location_phone_number}
-                </Text>
-              </View>
-            )}
-            {invoice.driver && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Driver:</Text>
-                <Text style={styles.infoValue}>{invoice.driver}</Text>
-              </View>
-            )}
-            {invoice.tong_no && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Dumpster:</Text>
-                <Text style={styles.infoValue}>{invoice.tong_no}</Text>
-              </View>
-            )}
-          </View>
+        {hasValidEInvoice && qrCodeData && (
+          <Image src={qrCodeData} style={styles.qrCode} />
         )}
       </View>
 
-      {/* ---- REMOVED Line Items Table ---- */}
+      {/* E-Invoice Title */}
+      <Text style={styles.title}>
+        {hasValidEInvoice
+          ? isConsolidated
+            ? "Consolidated e-Invoice"
+            : "e-Invoice"
+          : "Invoice"}
+      </Text>
 
-      {/* ++++ NEW Description Section ++++ */}
-      <View style={styles.descriptionSection}>
-        <Text style={styles.descriptionTitle}>Description</Text>
-        <Text style={styles.descriptionText}>{description}</Text>
-      </View>
-      {/* ++++ END Description Section ++++ */}
-
-      {/* Summary Section (remains mostly the same) */}
-      <View style={styles.summarySection}>
-        <View style={styles.summaryBox}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal (RM):</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.amount_before_tax)}
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Tax (RM):</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.tax_amount)}
-            </Text>
-          </View>
-          {/* Only show rounding if it's non-zero - Assuming 'rounding' field exists on InvoiceGT now */}
-          {/* If 'rounding' is not on InvoiceGT, remove this section or calculate it */}
-          {/* {Number(invoice.rounding || 0) !== 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Rounding (RM):</Text>
-              <Text style={styles.summaryValue}>
-                {formatCurrency(invoice.rounding)}
-              </Text>
-            </View>
-          )} */}
-          <View style={[styles.summaryRow, styles.finalTotalRow]}>
-            <Text
-              style={[styles.summaryLabel, { fontFamily: "Helvetica-Bold" }]}
-            >
-              Total Amount (RM):
-            </Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.total_amount)}
-            </Text>
-          </View>
-          {/* Show Amount Paid only if > 0 */}
-          {Number(invoice.amount_paid) > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Amount Paid (RM):</Text>
-              <Text style={styles.summaryValue}>
-                {formatCurrency(invoice.amount_paid)}
-              </Text>
-            </View>
-          )}
-          <View style={styles.summaryRow}>
-            <Text
-              style={[styles.summaryLabel, { fontFamily: "Helvetica-Bold" }]}
-            >
-              Balance Due (RM):
-            </Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.current_balance)}
-            </Text>
-          </View>
+      {/* Key Invoice Details */}
+      <View style={styles.invoiceDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Invoice No.</Text>
+          <Text style={styles.detailValue}>{invoice.invoice_number}</Text>
         </View>
-      </View>
-
-      {/* Notes/Footer (remains the same) */}
-      <View style={styles.notesSection} fixed>
-        <Text>Thank you for your business!</Text>
-        <Text>Payment can be made via Bank Transfer to:</Text>
-        <Text>Bank: [Your Bank Name Here]</Text>
-        <Text>Account Name: GREEN TARGET WASTE TREATMENT IND. SDN BHD</Text>
-        <Text>Account Number: [Your Account Number Here]</Text>
-        {invoice.status === "cancelled" && invoice.cancellation_reason && (
-          <Text style={{ marginTop: 5 }}>
-            Reason for Cancellation: {invoice.cancellation_reason}
+        {hasValidEInvoice && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Unique ID No.</Text>
+            <Text style={styles.detailValue}>{invoice.uuid}</Text>
+          </View>
+        )}
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Invoice Date & Time</Text>
+          <Text style={styles.detailValue}>
+            {formatDate(invoice.date_issued)}
           </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Currency</Text>
+          <Text style={styles.detailValue}>MYR</Text>
+        </View>
+      </View>
+
+      {/* FROM and BILLING TO Containers */}
+      <View style={styles.infoContainer}>
+        {/* FROM Container */}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>FROM</Text>
+          <View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier TIN</Text>
+              <Text style={styles.infoValue}>{GREENTARGET_INFO.tin}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier Name</Text>
+              <Text style={styles.infoValue}>{GREENTARGET_INFO.name}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier BRN:</Text>
+              <Text style={styles.infoValue}>{GREENTARGET_INFO.reg_no}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Supplier SST No.</Text>
+              <Text style={styles.infoValue}>
+                {GREENTARGET_INFO.sst_id_pdf || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Billing Address</Text>
+              <Text style={styles.infoValue}>
+                {GREENTARGET_INFO.address_pdf}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Contact No.</Text>
+              <Text style={styles.infoValue}>{GREENTARGET_INFO.phone}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoValue}>{GREENTARGET_INFO.email}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* BILLING TO Container */}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>BILLING TO</Text>
+          <View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer TIN</Text>
+              <Text style={styles.infoValue}>
+                {invoice.tin_number || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer Name</Text>
+              <Text style={styles.infoValue}>{invoice.customer_name}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer Reg No.</Text>
+              <Text style={styles.infoValue}>{invoice.id_number || "N/A"}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Customer SST No.</Text>
+              <Text style={styles.infoValue}>N/A</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Billing Address</Text>
+              <Text style={styles.infoValue}>
+                {invoice.location_address || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Contact No.</Text>
+              <Text style={styles.infoValue}>
+                {invoice.customer_phone_number || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoValue}>N/A</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Table */}
+      <View style={styles.table}>
+        {/* Table Header */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.classCol, styles.headerText]}>Class</Text>
+          <Text style={[styles.itemNameCol, styles.headerText]}>
+            Product Name
+          </Text>
+          <Text style={[styles.qtyCol, styles.headerText]}>Qty</Text>
+          <Text style={[styles.priceCol, styles.headerText]}>U. Price</Text>
+          <Text style={[styles.subtotalCol, styles.headerText]}>Subtotal</Text>
+          <Text style={[styles.taxCol, styles.headerText]}>Tax</Text>
+          <Text style={[styles.totalCol, styles.headerText]}>Total</Text>
+        </View>
+
+        {/* Table Rows */}
+        {orderDetails && orderDetails.length > 0 ? (
+          orderDetails.map((item, index) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.classCol, styles.cellText]}>022</Text>
+              <Text style={[styles.itemNameCol, styles.cellText]}>
+                {item.description}
+              </Text>
+              <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
+              <Text style={[styles.priceCol, styles.cellText]}>
+                {formatCurrency(item.price)}
+              </Text>
+              <Text style={[styles.subtotalCol, styles.cellText]}>
+                {formatCurrency(item.price)}
+              </Text>
+              <Text style={[styles.taxCol, styles.cellText]}>
+                {formatCurrency(item.tax || 0)}
+              </Text>
+              <Text style={[styles.totalCol, styles.cellText]}>
+                {formatCurrency(Number(item.price) + Number(item.tax || 0))}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <View style={styles.tableRow}>
+            <Text
+              style={[
+                styles.itemNameCol,
+                styles.cellText,
+                { textAlign: "center" },
+              ]}
+            >
+              No item details available
+            </Text>
+            <Text style={[styles.qtyCol, styles.cellText]}></Text>
+            <Text style={[styles.priceCol, styles.cellText]}></Text>
+            <Text style={[styles.subtotalCol, styles.cellText]}></Text>
+            <Text style={[styles.taxCol, styles.cellText]}></Text>
+            <Text style={[styles.totalCol, styles.cellText]}></Text>
+          </View>
         )}
       </View>
 
-      {/* Page Number (remains the same) */}
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
+      {/* Summary Section */}
+      <View style={styles.summary}>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Excl. Tax (MYR)</Text>
+          <Text style={styles.summaryValue}>
+            {formatCurrency(invoice.amount_before_tax)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Tax Amount (MYR)</Text>
+          <Text style={styles.summaryValue}>
+            {formatCurrency(invoice.tax_amount)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Incl. Tax (MYR)</Text>
+          <Text style={styles.summaryValue}>
+            {formatCurrency(invoice.total_amount)}
+          </Text>
+        </View>
+        {invoice.amount_paid > 0 && (
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Amount Paid (MYR)</Text>
+            <Text style={styles.summaryValue}>
+              {formatCurrency(invoice.amount_paid)}
+            </Text>
+          </View>
+        )}
+        <View style={[styles.summaryRow, styles.bold]}>
+          <Text style={styles.summaryLabel}>Balance Due (MYR)</Text>
+          <Text style={styles.summaryValue}>
+            {formatCurrency(invoice.current_balance)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Footer */}
+      <Text style={styles.footer}>
+        {hasValidEInvoice
+          ? "This document is computer generated e-Invoice."
+          : "This is a computer generated invoice."}
+        {hasValidEInvoice && invoice.datetime_validated && (
+          <>
+            {"\n"}
+            Validated on {new Date(invoice.datetime_validated).toLocaleString()}
+          </>
+        )}
+      </Text>
     </Page>
   );
 };
