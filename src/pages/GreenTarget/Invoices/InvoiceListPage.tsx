@@ -195,7 +195,7 @@ const InvoiceCard = ({
         </div>
       </div>
 
-      <div className="p-4" onClick={handleClick}>
+      <div className="px-4 py-3" onClick={handleClick}>
         {/* Customer section */}
         <div className="mb-3 border-b pb-3">
           <div className="flex justify-between items-start">
@@ -1210,7 +1210,7 @@ const InvoiceListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8">
+    <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8 -mt-6">
       {/* Revised Header Layout - 2 rows total on desktop */}
       <div className="space-y-4 mb-6">
         {/* Row 1: Header with title, filters, search and action buttons */}
@@ -1325,7 +1325,7 @@ const InvoiceListPage: React.FC = () => {
 
         {/* Row 2: Selection bar */}
         <div
-          className={`px-3 py-2 ${
+          className={`p-3 ${
             selectedInvoiceIds.size > 0
               ? "bg-sky-50 border border-sky-200"
               : "bg-white border border-dashed border-default-200"
