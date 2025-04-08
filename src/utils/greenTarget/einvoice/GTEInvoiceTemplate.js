@@ -321,11 +321,7 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
     </cac:TaxTotal>
     <cac:Item>
       <cbc:Description>${escapeXml(
-        invoiceData.type === "regular"
-          ? `Dumpster Rental Service${
-              invoiceData.rental_id ? ` - Rental #${invoiceData.rental_id}` : ""
-            }`
-          : "Waste Management Services"
+        "Trip(s): Waste Management Service"
       )}</cbc:Description>
       <cac:OriginCountry>
         <cbc:IdentificationCode>MYS</cbc:IdentificationCode>

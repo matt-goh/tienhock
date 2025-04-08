@@ -157,7 +157,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   summary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  summaryLeftCol: {
+    flex: 1,
+    paddingRight: 20,
+  },
+  summaryRightCol: {
     alignItems: "flex-end",
+  },
+  paymentTitle: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9,
+    marginBottom: 4,
+  },
+  paymentInfo: {
+    fontSize: 9,
+    lineHeight: 1.4,
   },
   summaryRow: {
     flexDirection: "row",
@@ -466,37 +483,65 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
 
       {/* Summary Section */}
       <View style={styles.summary}>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total Excl. Tax (MYR)</Text>
-          <Text style={styles.summaryValue}>
-            {formatCurrency(invoice.amount_before_tax)}
-          </Text>
+        {/* Payment Info - Left column */}
+        <View style={styles.summaryLeftCol}>
+          {invoice.current_balance > 0 ? (
+            <>
+              <Text style={styles.paymentTitle}>
+                All payments are to be made payable to:
+              </Text>
+              <Text style={styles.paymentInfo}>
+                Green Target Waste Treatment Industries S/B{"\n"}
+                Public Bank Berhad{"\n"}
+                3137836814
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.paymentTitle}>Payment Status:</Text>
+              <Text style={styles.paymentInfo}>
+                {invoice.status === "cancelled"
+                  ? "This invoice has been cancelled."
+                  : "This invoice has been paid in full."}
+              </Text>
+            </>
+          )}
         </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Tax Amount (MYR)</Text>
-          <Text style={styles.summaryValue}>
-            {formatCurrency(invoice.tax_amount)}
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total Incl. Tax (MYR)</Text>
-          <Text style={styles.summaryValue}>
-            {formatCurrency(invoice.total_amount)}
-          </Text>
-        </View>
-        {invoice.amount_paid > 0 && (
+
+        {/* Summary info - Right column */}
+        <View style={styles.summaryRightCol}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Amount Paid (MYR)</Text>
+            <Text style={styles.summaryLabel}>Total Excl. Tax (MYR)</Text>
             <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.amount_paid)}
+              {formatCurrency(invoice.amount_before_tax)}
             </Text>
           </View>
-        )}
-        <View style={[styles.summaryRow, styles.bold]}>
-          <Text style={styles.summaryLabel}>Balance Due (MYR)</Text>
-          <Text style={styles.summaryValue}>
-            {formatCurrency(invoice.current_balance)}
-          </Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tax Amount (MYR)</Text>
+            <Text style={styles.summaryValue}>
+              {formatCurrency(invoice.tax_amount)}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Incl. Tax (MYR)</Text>
+            <Text style={styles.summaryValue}>
+              {formatCurrency(invoice.total_amount)}
+            </Text>
+          </View>
+          {invoice.amount_paid > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Amount Paid (MYR)</Text>
+              <Text style={styles.summaryValue}>
+                {formatCurrency(invoice.amount_paid)}
+              </Text>
+            </View>
+          )}
+          <View style={[styles.summaryRow, styles.bold]}>
+            <Text style={styles.summaryLabel}>Balance Due (MYR)</Text>
+            <Text style={styles.summaryValue}>
+              {formatCurrency(invoice.current_balance)}
+            </Text>
+          </View>
         </View>
       </View>
 
