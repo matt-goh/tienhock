@@ -1601,38 +1601,66 @@ const InvoiceListPage: React.FC = () => {
                 )}
               </Button>
 
-              {/* Filters info dropdown panel */}
+              {/* Filters info dropdown panel - Improved */}
               {isFilterButtonHovered && activeFilterCount > 0 && (
-                <div className="absolute z-10 mt-1 w-64 bg-white rounded-md shadow-lg py-2 px-3 text-sm border border-default-200">
-                  <h3 className="font-medium text-default-700 mb-1">
-                    Applied Filters:
+                <div className="absolute z-10 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
+                  <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
+                    Applied Filters
                   </h3>
-                  <ul className="space-y-1">
+                  <ul className="space-y-2">
                     {filters.customer_id && (
-                      <li className="text-default-600 flex items-center">
-                        <IconUser size={14} className="mr-1.5 text-sky-500" />
-                        Customer:{" "}
-                        {customerOptions.find(
-                          (c) => c.id === filters.customer_id
-                        )?.name || "Unknown"}
+                      <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <div className="bg-sky-100 p-1 rounded-md mr-2">
+                          <IconUser size={14} className="text-sky-600" />
+                        </div>
+                        <div>
+                          <span className="text-default-500 text-xs">
+                            Customer
+                          </span>
+                          <div className="font-medium truncate">
+                            {customerOptions.find(
+                              (c) => c.id === filters.customer_id
+                            )?.name || "Unknown"}
+                          </div>
+                        </div>
                       </li>
                     )}
                     {filters.status && filters.status.length > 0 && (
-                      <li className="text-default-600 flex items-center">
-                        <IconCircleCheck
-                          size={14}
-                          className="mr-1.5 text-sky-500"
-                        />
-                        Status: {filters.status.join(", ")}
+                      <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <div className="bg-sky-100 p-1 rounded-md mr-2">
+                          <IconCircleCheck size={14} className="text-sky-600" />
+                        </div>
+                        <div>
+                          <span className="text-default-500 text-xs">
+                            Status
+                          </span>
+                          <div className="font-medium">
+                            {filters.status
+                              .map(
+                                (status) =>
+                                  status.charAt(0).toUpperCase() +
+                                  status.slice(1)
+                              )
+                              .join(", ")}
+                          </div>
+                        </div>
                       </li>
                     )}
                     {filters.consolidation !== "all" && (
-                      <li className="text-default-600 flex items-center">
-                        <IconFiles size={14} className="mr-1.5 text-sky-500" />
-                        Consolidation:{" "}
-                        {filters.consolidation === "consolidated"
-                          ? "Part of Consolidated"
-                          : "Standalone Only"}
+                      <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <div className="bg-sky-100 p-1 rounded-md mr-2">
+                          <IconFiles size={14} className="text-sky-600" />
+                        </div>
+                        <div>
+                          <span className="text-default-500 text-xs">
+                            Consolidation
+                          </span>
+                          <div className="font-medium">
+                            {filters.consolidation === "consolidated"
+                              ? "Part of Consolidated"
+                              : "Standalone Only"}
+                          </div>
+                        </div>
                       </li>
                     )}
                   </ul>
