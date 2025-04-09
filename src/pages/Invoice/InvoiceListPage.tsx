@@ -1019,14 +1019,14 @@ const InvoiceListPage: React.FC = () => {
                       {filters.salespersonId &&
                         filters.salespersonId.length > 0 && (
                           <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
                               <IconUser size={14} className="text-sky-600" />
                             </div>
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <span className="text-default-500 text-xs">
-                                Salesperson
+                                Salesman
                               </span>
-                              <div className="font-medium truncate">
+                              <div className="font-medium break-words">
                                 {filters.salespersonId.join(", ")}
                               </div>
                             </div>
