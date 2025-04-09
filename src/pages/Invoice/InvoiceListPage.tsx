@@ -50,7 +50,6 @@ import { useCustomerNames } from "../../hooks/useCustomerNames";
 import {
   getInvoices,
   cancelInvoice,
-  getInvoiceById,
   syncCancellationStatus,
   getInvoicesByIds,
 } from "../../utils/invoice/InvoiceUtils";
@@ -270,8 +269,8 @@ const InvoiceListPage: React.FC = () => {
           currentSearchTerm // Pass the search term
         );
         setInvoices(response.data);
-        setTotalItems(response.total);
-        setTotalPages(response.totalPages);
+        setTotalItems(response.pagination.total); // FIXED - access the nested property
+        setTotalPages(response.pagination.totalPages); // FIXED - access the nested property
         setCurrentPage(pageToFetch); // Ensure page state matches fetched page
         // Optional: Clear selection when data reloads
         // setSelectedInvoiceIds(new Set());
