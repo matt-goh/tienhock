@@ -119,73 +119,59 @@ export const createInvoice = async (
 // GET Invoices (List)
 export const getInvoices = async (
   filters: InvoiceFilters,
-  page: number,
-  limit: number,
-  searchTerm: string
-): Promise<{
-  data: ExtendedInvoiceData[];
-  total: number;
-  totalPages: number;
-}> => {
+  page: number = 1,
+  limit: number = 15,
+  searchTerm: string = ""
+) => {
   try {
+    // Build query parameters
     const params = new URLSearchParams();
 
-    // Date Range
-    if (filters.dateRange.start) {
-      const startDate = new Date(filters.dateRange.start);
-      startDate.setHours(0, 0, 0, 0); // Start of the day
-      params.append("startDate", startDate.getTime().toString());
-    }
-    if (filters.dateRange.end) {
-      const endDate = new Date(filters.dateRange.end);
-      endDate.setHours(23, 59, 59, 999); // End of the day
-      params.append("endDate", endDate.getTime().toString());
-    }
-
-    // Search Term
-    if (searchTerm) params.append("search", searchTerm);
-
-    // Pagination
+    // Add pagination
     params.append("page", page.toString());
     params.append("limit", limit.toString());
 
-    const response = await api.get(`/api/invoices?${params.toString()}`);
-
-    if (!response || !response.data || !response.pagination) {
-      console.error("Invalid response format fetching invoices:", response);
-      throw new Error("Invalid response format from server");
+    // Add date range
+    if (filters.dateRange.start) {
+      params.append("startDate", filters.dateRange.start.getTime().toString());
+    }
+    if (filters.dateRange.end) {
+      params.append("endDate", filters.dateRange.end.getTime().toString());
     }
 
-    // Map backend data to frontend ExtendedInvoiceData shape
-    const mappedData = response.data.map(
-      (inv: any): ExtendedInvoiceData => ({
-        ...inv,
-        // Ensure numeric types (backend should return numbers, but safeguard here)
-        total_excluding_tax: parseFloat(inv.total_excluding_tax || 0),
-        tax_amount: parseFloat(inv.tax_amount || 0),
-        rounding: parseFloat(inv.rounding || 0),
-        totalamountpayable: parseFloat(inv.totalamountpayable || 0),
-        // Use customerName from backend if available, otherwise fallback
-        customerName: inv.customerName || inv.customerid,
-        // Ensure boolean type for is_consolidated
-        is_consolidated: Boolean(inv.is_consolidated || false),
-        // Parse consolidated_invoices if it's JSON string (backend returns JSON object)
-        consolidated_invoices: inv.consolidated_invoices, // Assuming backend sends parsed JSON array or null
-        products: [], // Assuming products are not returned in the list endpoint
-      })
-    );
+    // Add salesperson filter
+    if (filters.salespersonId && filters.salespersonId.length > 0) {
+      params.append("salesman", filters.salespersonId.join(","));
+    }
 
-    return {
-      data: mappedData,
-      total: response.pagination.total,
-      totalPages: response.pagination.totalPages,
-    };
+    // Add payment type filter
+    if (filters.paymentType) {
+      params.append("paymentType", filters.paymentType);
+    }
+
+    // Add invoice status filter
+    if (filters.invoiceStatus && filters.invoiceStatus.length > 0) {
+      params.append("invoiceStatus", filters.invoiceStatus.join(","));
+    }
+
+    // Add e-invoice status filter
+    if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+      params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
+    }
+
+    // Add search term
+    if (searchTerm) {
+      params.append("search", searchTerm);
+    }
+
+    // Make the API call with all parameters
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+    const response = await api.get(`/api/invoices${queryString}`);
+
+    return response;
   } catch (error) {
     console.error("Error fetching invoices:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to fetch invoices";
-    toast.error(errorMessage);
-    throw new Error(errorMessage); // Re-throw
+    throw error;
   }
 };
 

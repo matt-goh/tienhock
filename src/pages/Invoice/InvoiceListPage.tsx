@@ -168,6 +168,14 @@ const InvoiceListPage: React.FC = () => {
   );
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
 
+  const DEFAULT_FILTERS: InvoiceFilters = {
+    dateRange: getInitialDates(), // This will be overridden in actual usage
+    salespersonId: null,
+    paymentType: null,
+    invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
+    eInvoiceStatus: [], // Default e-invoice status
+  };
+
   // Month Selector State
   const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
   const monthOptions: MonthOption[] = useMemo(
@@ -183,14 +191,13 @@ const InvoiceListPage: React.FC = () => {
   );
 
   // Data Hooks
-  const { salesmen /*, isLoading: salesmenLoading */ } = useSalesmanCache(); // Assuming salesmenLoading isn't needed directly here
+  const { salesmen } = useSalesmanCache();
   const customerIds = useMemo(
     () => invoices.map((inv) => inv.customerid),
     [invoices]
   );
   // Fetch customer names based on IDs present in the currently loaded invoices
-  const { customerNames /*, isLoading: namesLoading */ } =
-    useCustomerNames(customerIds);
+  const { customerNames } = useCustomerNames(customerIds);
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -291,9 +298,9 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [showEInvoiceDownloader, eInvoicesToDownload]);
 
+  // Effect to calculate active filter count comparing against defaults
   useEffect(() => {
     let count = 0;
-    const defaultInvoiceStatus = ["paid", "Unpaid", "overdue"];
 
     // Check if salesperson filter is active
     if (filters.salespersonId && filters.salespersonId.length > 0) {
@@ -301,19 +308,20 @@ const InvoiceListPage: React.FC = () => {
     }
 
     // Check if payment type filter is active
-    if (filters.paymentType) {
+    if (filters.paymentType !== DEFAULT_FILTERS.paymentType) {
       count++;
     }
 
     // Check if invoice status filter is different from default
     if (filters.invoiceStatus) {
+      // Need to compare arrays contents, not references
       const isDefaultStatus =
-        filters.invoiceStatus.length === defaultInvoiceStatus.length &&
+        DEFAULT_FILTERS.invoiceStatus.length === filters.invoiceStatus.length &&
         filters.invoiceStatus.every((status) =>
-          defaultInvoiceStatus.includes(status)
+          DEFAULT_FILTERS.invoiceStatus.includes(status)
         ) &&
-        defaultInvoiceStatus.every((status) =>
-          filters.invoiceStatus?.includes(status)
+        DEFAULT_FILTERS.invoiceStatus.every((status) =>
+          filters.invoiceStatus.includes(status)
         );
 
       if (!isDefaultStatus) {
