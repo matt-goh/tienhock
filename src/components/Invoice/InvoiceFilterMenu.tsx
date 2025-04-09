@@ -226,7 +226,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       >
         Filter
       </Button>
-      {activeFilterCount && activeFilterCount > 0 && !hasViewedFilters && (
+      {(activeFilterCount ?? 0) > 0 && !hasViewedFilters && (
         <span className="absolute -top-1 -right-1 bg-sky-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
           {activeFilterCount}
         </span>
@@ -255,13 +255,16 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             leaveTo="opacity-0 scale-95"
           >
             <div className="relative bg-white rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <DialogTitle as="h3" className="text-lg font-medium">
+              <div className="flex justify-between items-center mb-5">
+                <DialogTitle
+                  as="h3"
+                  className="text-xl font-semibold text-default-800"
+                >
                   Filter Invoices
                 </DialogTitle>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-2 rounded-full hover:bg-default-100"
+                  className="p-2 rounded-full hover:bg-default-100 text-default-500 hover:text-default-700 transition-colors"
                 >
                   <IconX size={18} />
                 </button>
@@ -551,11 +554,21 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     </div>
                   </div>
 
-                  <div className="mt-6 flex justify-between">
-                    <Button onClick={clearPendingFilters} variant="outline">
+                  <div className="mt-8 flex justify-between">
+                    <Button
+                      onClick={clearPendingFilters}
+                      variant="outline"
+                      icon={IconTrash}
+                      color="default"
+                    >
                       Clear Filters
                     </Button>
-                    <Button onClick={applyFilters} variant="filled" color="sky">
+                    <Button
+                      onClick={applyFilters}
+                      variant="filled"
+                      color="sky"
+                      icon={IconFilter}
+                    >
                       Apply Filters
                     </Button>
                   </div>

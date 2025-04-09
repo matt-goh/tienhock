@@ -416,71 +416,6 @@ const InvoiceListPage: React.FC = () => {
     [filters, handleApplyFilters] // Depends on current filters and the apply function
   );
 
-  // Remove Filter Tag Handler (Applies Immediately)
-  const handleRemoveFilter = useCallback(
-    (filterKey: keyof InvoiceFilters, specificValue?: string) => {
-      let updatedFilters = { ...filters }; // Start with a copy of current applied filters
-
-      // --- Logic to modify the updatedFilters object based on key/value ---
-      if (specificValue) {
-        // Remove a specific value from a multi-select array
-        const currentValues = filters[filterKey];
-        if (Array.isArray(currentValues)) {
-          const newValues = currentValues.filter(
-            (val) => val !== specificValue
-          );
-          updatedFilters = {
-            ...updatedFilters,
-            [filterKey]: newValues,
-            // Optionally disable the 'apply' toggle if the array becomes empty
-            [`apply${
-              filterKey.charAt(0).toUpperCase() + filterKey.slice(1)
-            }Filter` as keyof InvoiceFilters]: newValues.length > 0,
-          };
-        }
-      } else {
-        // Remove/reset an entire filter type (clear value and disable toggle)
-        switch (filterKey) {
-          case "salespersonId":
-            updatedFilters = {
-              ...updatedFilters,
-              salespersonId: null,
-            };
-            break;
-          case "paymentType":
-            updatedFilters = {
-              ...updatedFilters,
-              paymentType: null,
-            };
-            break;
-          case "invoiceStatus":
-            updatedFilters = {
-              ...updatedFilters,
-              invoiceStatus: [],
-            };
-            break;
-          case "eInvoiceStatus":
-            updatedFilters = {
-              ...updatedFilters,
-              eInvoiceStatus: [],
-            };
-            break;
-          // Add cases for other filter types if needed
-          default:
-            console.warn(
-              "Attempted to remove unhandled filter key:",
-              filterKey
-            );
-            return; // Don't proceed if key is unknown
-        }
-      }
-
-      // --- Apply the modified filter state ---
-      handleApplyFilters(updatedFilters);
-    },
-    [filters, handleApplyFilters]
-  ); // Depends on current filters and the apply function
-
   // Search Handlers - Update state locally, trigger fetch on blur/enter
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -1071,7 +1006,7 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Filters info dropdown panel */}
               {isFilterButtonHovered && (
-                <div className="absolute z-10 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
+                <div className="absolute z-10 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
                   <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
                     {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
