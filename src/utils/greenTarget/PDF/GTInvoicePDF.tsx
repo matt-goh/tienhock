@@ -247,6 +247,23 @@ const formatCurrency = (amount: number | string | null | undefined) => {
 
 // Generate a basic description based on invoice type and details
 const generateDescription = (invoice: InvoiceGT): string => {
+  // Check both conditions for consolidated invoices
+  const isConsolidated =
+    (Array.isArray(invoice.consolidated_invoices) &&
+      invoice.consolidated_invoices.length > 0) || // Check consolidated_invoices array
+    (invoice.invoice_number && invoice.invoice_number.startsWith("CON-")); // Check invoice number format
+
+  if (isConsolidated) {
+    // Extract date part from consolidated invoice number (CON-YYYYMM-###)
+    const match = invoice.invoice_number?.match(/CON-(\d{4})(\d{2})/);
+    if (match) {
+      const year = match[1];
+      const month = match[2];
+      return `Consolidated Invoice for ${month}/${year}`;
+    }
+    return "Consolidated Invoice";
+  }
+
   if (invoice.type === "statement") {
     return `Statement of Account for the period ${formatDate(
       invoice.statement_period_start
@@ -267,18 +284,31 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
   const description = generateDescription(invoice);
   const hasValidEInvoice =
     invoice.uuid && invoice.long_id && invoice.einvoice_status === "valid";
-  const isConsolidated = invoice.is_consolidated;
+  const isConsolidated =
+    (Array.isArray(invoice.consolidated_invoices) &&
+      invoice.consolidated_invoices.length > 0) ||
+    (invoice.invoice_number && invoice.invoice_number.startsWith("CON-"));
 
   // Create order details for the table
-  const orderDetails = [
-    {
-      description: description,
-      qty: 1,
-      price: invoice.amount_before_tax,
-      total: invoice.amount_before_tax,
-      tax: invoice.tax_amount,
-    },
-  ];
+  const orderDetails = isConsolidated
+    ? [
+        {
+          description: description,
+          qty: 1,
+          price: invoice.amount_before_tax,
+          total: invoice.total_amount,
+          tax: invoice.tax_amount,
+        },
+      ]
+    : [
+        {
+          description: description,
+          qty: 1,
+          price: invoice.amount_before_tax,
+          total: invoice.amount_before_tax,
+          tax: invoice.tax_amount,
+        },
+      ];
 
   return (
     <Page size="A4" style={styles.page}>
@@ -313,10 +343,10 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
 
       {/* E-Invoice Title */}
       <Text style={styles.title}>
-        {hasValidEInvoice
-          ? isConsolidated
-            ? "Consolidated e-Invoice"
-            : "e-Invoice"
+        {isConsolidated
+          ? "Consolidated e-Invoice"
+          : hasValidEInvoice
+          ? "e-Invoice"
           : "Invoice"}
       </Text>
 
@@ -392,36 +422,40 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer TIN</Text>
               <Text style={styles.infoValue}>
-                {invoice.tin_number || "N/A"}
+                {isConsolidated ? "EI00000000010" : invoice.tin_number || "-"}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer Name</Text>
-              <Text style={styles.infoValue}>{invoice.customer_name}</Text>
+              <Text style={styles.infoValue}>
+                {isConsolidated
+                  ? "Consolidated Customers"
+                  : invoice.customer_name || "Customer"}
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer Reg No.</Text>
-              <Text style={styles.infoValue}>{invoice.id_number || "N/A"}</Text>
+              <Text style={styles.infoValue}>{invoice.id_number || "-"}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer SST No.</Text>
-              <Text style={styles.infoValue}>N/A</Text>
+              <Text style={styles.infoValue}>-</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Billing Address</Text>
               <Text style={styles.infoValue}>
-                {invoice.location_address || "N/A"}
+                {invoice.location_address || "-"}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Contact No.</Text>
               <Text style={styles.infoValue}>
-                {invoice.customer_phone_number || "N/A"}
+                {invoice.customer_phone_number || "-"}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>N/A</Text>
+              <Text style={styles.infoValue}>-</Text>
             </View>
           </View>
         </View>
@@ -489,7 +523,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
       <View style={styles.summary}>
         {/* Payment Info - Left column */}
         <View style={styles.summaryLeftCol}>
-          {invoice.current_balance > 0 ? (
+          {!isConsolidated && invoice.current_balance > 0 ? (
             <>
               <Text style={styles.paymentTitle}>
                 All payments are to be made payable to:
@@ -500,7 +534,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
                 3137836814
               </Text>
             </>
-          ) : (
+          ) : !isConsolidated ? (
             <>
               <Text style={styles.paymentTitle}>Payment Status:</Text>
               <Text style={styles.paymentInfo}>
@@ -509,6 +543,9 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
                   : "This invoice has been paid in full."}
               </Text>
             </>
+          ) : (
+            // Empty View to maintain spacing for consolidated invoices
+            <View />
           )}
         </View>
 
