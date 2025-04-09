@@ -322,6 +322,112 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/batch - Get Multiple Invoices By IDs
+  router.get("/batch", async (req, res) => {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res
+        .status(400)
+        .json({ message: "Missing required ids parameter" });
+    }
+
+    try {
+      // Split comma-separated string into array
+      const invoiceIds = ids.split(",");
+
+      // Limit batch size for performance
+      if (invoiceIds.length > 100) {
+        return res.status(400).json({
+          message: "Too many invoices requested. Maximum batch size is 100.",
+        });
+      }
+
+      // Generate a query to fetch multiple invoices at once
+      const placeholders = invoiceIds.map((_, i) => `$${i + 1}`).join(",");
+
+      const query = `
+      SELECT
+        i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+        i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+        i.invoice_status, i.einvoice_status, i.balance_due,
+        i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
+        i.is_consolidated, i.consolidated_invoices,
+        c.name as customerName, c.tin_number, c.id_number,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', od.id,
+              'code', od.code,
+              'quantity', od.quantity,
+              'price', od.price,
+              'freeProduct', od.freeproduct,
+              'returnProduct', od.returnproduct,
+              'description', od.description,
+              'tax', od.tax,
+              'total', od.total,
+              'issubtotal', od.issubtotal
+            )
+            ORDER BY od.id
+          ) FILTER (WHERE od.id IS NOT NULL),
+          '[]'::json
+        ) as products
+      FROM invoices i
+      LEFT JOIN customers c ON i.customerid = c.id
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE i.id IN (${placeholders})
+      GROUP BY i.id, c.name, c.tin_number, c.id_number
+    `;
+
+      const result = await pool.query(query, invoiceIds);
+
+      // Format each invoice the same way as the single invoice endpoint
+      const formattedInvoices = result.rows.map((invoice) => ({
+        id: invoice.id,
+        salespersonid: invoice.salespersonid,
+        customerid: invoice.customerid,
+        createddate: invoice.createddate,
+        paymenttype: invoice.paymenttype,
+        total_excluding_tax: parseFloat(invoice.total_excluding_tax || 0),
+        tax_amount: parseFloat(invoice.tax_amount || 0),
+        rounding: parseFloat(invoice.rounding || 0),
+        totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
+        balance_due: parseFloat(invoice.balance_due || 0),
+        invoice_status: invoice.invoice_status,
+        einvoice_status: invoice.einvoice_status,
+        uuid: invoice.uuid,
+        submission_uid: invoice.submission_uid,
+        long_id: invoice.long_id,
+        datetime_validated: invoice.datetime_validated,
+        is_consolidated: invoice.is_consolidated || false,
+        consolidated_invoices: invoice.consolidated_invoices,
+        customerName: invoice.customername || invoice.customerid,
+        customerTin: invoice.tin_number,
+        customerIdNumber: invoice.id_number,
+        products: (invoice.products || []).map((product) => ({
+          id: product.id,
+          code: product.code,
+          price: parseFloat(product.price || 0),
+          quantity: parseInt(product.quantity || 0),
+          freeProduct: parseInt(product.freeProduct || 0),
+          returnProduct: parseInt(product.returnProduct || 0),
+          tax: parseFloat(product.tax || 0),
+          description: product.description,
+          total: String(product.total || "0.00"),
+          issubtotal: product.issubtotal || false,
+        })),
+      }));
+
+      res.json(formattedInvoices);
+    } catch (error) {
+      console.error("Error fetching batch invoices:", error);
+      res.status(500).json({
+        message: "Error fetching invoices",
+        error: error.message,
+      });
+    }
+  });
+
   // Get order details for a specific invoice
   router.get("/details/:id/items", async (req, res) => {
     const { id } = req.params;
