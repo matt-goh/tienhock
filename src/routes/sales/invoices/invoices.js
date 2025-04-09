@@ -139,7 +139,7 @@ export default function (pool, config) {
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
       `;
-      let whereClause = ` WHERE 1=1 AND (i.is_consolidated = false OR i.is_consolidated IS NULL) `; // Add filter for non-consolidated invoices
+      let whereClause = ` WHERE 1=1 `; // Start with basic condition
       let groupByClause = `GROUP BY i.id, c.name, c.tin_number, c.id_number, c.id_type`; // Grouping by primary key is sufficient if using aggregates or joins correctly
 
       const filterParams = []; // Parameters ONLY for filtering (WHERE clause)
@@ -196,15 +196,38 @@ export default function (pool, config) {
           COALESCE(i.einvoice_status, '') ILIKE ${searchParam} OR
           CAST(i.totalamountpayable AS TEXT) ILIKE ${searchParam} OR
           EXISTS (
-            SELECT 1 FROM order_details od
-            WHERE od.invoiceid = i.id AND (
-              od.code ILIKE ${searchParam} OR
-              od.description ILIKE ${searchParam}
-            )
+        SELECT 1 FROM order_details od
+        WHERE od.invoiceid = i.id AND (
+          od.code ILIKE ${searchParam} OR
+          od.description ILIKE ${searchParam}
+        )
           )
         )`;
       }
+      const consolidatedOnly = req.query.consolidated_only === "true";
+      const excludeConsolidated = req.query.exclude_consolidated === "true";
 
+      // Fix the consolidated invoices logic:
+      if (consolidatedOnly) {
+        // Show ONLY invoices that are part of any consolidated invoice
+        whereClause += ` AND EXISTS (
+          SELECT 1 FROM invoices con 
+          WHERE con.is_consolidated = true 
+          AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+          AND con.invoice_status != 'cancelled'
+        )`;
+      } else if (excludeConsolidated) {
+        // Exclude invoices that are part of any consolidated invoice
+        whereClause += ` AND NOT EXISTS (
+          SELECT 1 FROM invoices con 
+          WHERE con.is_consolidated = true 
+          AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+          AND con.invoice_status != 'cancelled'
+        )`;
+      }
+
+      // Always exclude the consolidated invoices themselves from this listing
+      whereClause += ` AND (i.is_consolidated = false OR i.is_consolidated IS NULL)`;
       // Construct Count Query
       const countQuery = `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
 
