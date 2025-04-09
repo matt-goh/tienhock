@@ -25,12 +25,17 @@ import {
   IconSquareMinusFilled,
   IconSelectAll,
   IconSquareCheckFilled,
+  IconFilter,
+  IconX,
 } from "@tabler/icons-react";
 import {
   Listbox,
   ListboxButton,
   ListboxOption,
   ListboxOptions,
+  Dialog,
+  TransitionChild,
+  DialogTitle,
 } from "@headlessui/react";
 import { toast } from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -46,6 +51,7 @@ import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For P
 import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
+import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -57,6 +63,12 @@ interface InvoiceCardProps {
   onDownloadClick: (invoice: InvoiceGT) => void;
   isSelected: boolean;
   onSelect: (invoiceId: string, isSelected: boolean) => void;
+}
+
+interface InvoiceFilters {
+  customer_id: string | null;
+  status: string[] | null;
+  consolidation: "all" | "standalone" | "consolidated"; // Whether it's part of consolidated invoice
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -661,6 +673,15 @@ const InvoiceListPage: React.FC = () => {
   );
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [invoicesForPDF, setInvoicesForPDF] = useState<InvoiceGT[]>([]); // Holds detailed invoices for PDF
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<InvoiceFilters>({
+    customer_id: null,
+    status: null,
+    consolidation: "all",
+  });
+  const [customerOptions, setCustomerOptions] = useState<SelectOption[]>([]);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
+  const [customerQuery, setCustomerQuery] = useState("");
 
   const ITEMS_PER_PAGE = 12;
 
@@ -668,6 +689,14 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     fetchInvoices();
   }, [dateRange]);
+
+  useEffect(() => {
+    let count = 0;
+    if (filters.customer_id) count++;
+    if (filters.status && filters.status.length > 0) count++;
+    if (filters.consolidation !== "all") count++;
+    setActiveFilterCount(count);
+  }, [filters]);
 
   // Function to save dates to localStorage
   const saveDatesToStorage = (startDate: Date, endDate: Date) => {
@@ -724,29 +753,37 @@ const InvoiceListPage: React.FC = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      let queryParams = "";
+      const params = new URLSearchParams();
 
-      if (dateRange.start || dateRange.end) {
-        const params = new URLSearchParams();
-
-        if (dateRange.start) {
-          params.append(
-            "start_date",
-            formatDateForAPI(dateRange.start) // Use local date formatting
-          );
-        }
-
-        if (dateRange.end) {
-          params.append(
-            "end_date",
-            formatDateForAPI(dateRange.end) // Use local date formatting
-          );
-        }
-
-        queryParams = `?${params.toString()}`;
+      // Add existing date filters
+      if (dateRange.start) {
+        params.append("start_date", formatDateForAPI(dateRange.start));
+      }
+      if (dateRange.end) {
+        params.append("end_date", formatDateForAPI(dateRange.end));
       }
 
-      const data = await api.get(`/greentarget/api/invoices${queryParams}`);
+      // Add new filters
+      if (filters.customer_id) {
+        params.append("customer_id", filters.customer_id);
+      }
+
+      if (filters.status && filters.status.length > 0) {
+        params.append("status", filters.status.join(","));
+      }
+
+      // Handle consolidation filter
+      if (filters.consolidation === "consolidated") {
+        params.append("consolidated_only", "true");
+      } else if (filters.consolidation === "standalone") {
+        params.append("exclude_consolidated", "true");
+      }
+
+      // Build query string
+      const queryString = params.toString() ? `?${params.toString()}` : "";
+
+      // Fetch data with filters
+      const data = await api.get(`/greentarget/api/invoices${queryString}`);
       setInvoices(data);
       setError(null);
     } catch (err) {
@@ -756,6 +793,31 @@ const InvoiceListPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchCustomers = async () => {
+    try {
+      const customers = await greenTargetApi.getCustomers();
+      const options = customers.map(
+        (customer: {
+          customer_id: { toString: () => any };
+          name: any;
+          phone_number: any;
+        }) => ({
+          id: customer.customer_id.toString(),
+          name: customer.name,
+          phone_number: customer.phone_number,
+        })
+      );
+      setCustomerOptions(options);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    }
+  };
+
+  // Add to useEffect
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
 
   const handleCancelClick = (invoice: InvoiceGT) => {
     setInvoiceToCancel(invoice);
@@ -1507,6 +1569,22 @@ const InvoiceListPage: React.FC = () => {
                 </div>
               </Listbox>
             </div>
+
+            {/* Filters button */}
+            <Button
+              onClick={() => setShowFilters(true)}
+              icon={IconFilter}
+              variant="outline"
+              className="relative"
+            >
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-sky-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+
             {/* Search input */}
             <div className="w-full sm:w-64 relative">
               <IconSearch
@@ -1644,6 +1722,175 @@ const InvoiceListPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Dialog
+        as="div"
+        className="fixed inset-0 overflow-y-auto z-50"
+        open={showFilters}
+        onClose={() => setShowFilters(false)}
+      >
+        <div className="flex items-center justify-center min-h-screen">
+          <TransitionChild
+            as="div"
+            enter="ease-out duration-300"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <div className="relative bg-white rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <DialogTitle as="h3" className="text-lg font-medium">
+                  Filter Invoices
+                </DialogTitle>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="p-2 rounded-full hover:bg-default-100"
+                >
+                  <IconX size={18} />
+                </button>
+              </div>
+              <div className="space-y-4">
+                {/* Customer Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Customer
+                  </label>
+                  <FormCombobox
+                    name="customer_filter"
+                    label=""
+                    value={filters.customer_id || ""}
+                    onChange={(value) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        customer_id: Array.isArray(value)
+                          ? value[0] || null
+                          : value,
+                      }))
+                    }
+                    options={customerOptions}
+                    query={customerQuery}
+                    setQuery={setCustomerQuery}
+                    mode="single"
+                    placeholder="Select a customer..."
+                  />
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Status
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {["active", "paid", "overdue", "cancelled"].map(
+                      (status) => (
+                        <label
+                          key={status}
+                          className="inline-flex items-center"
+                        >
+                          <input
+                            type="checkbox"
+                            className="form-checkbox h-4 w-4 text-sky-600"
+                            checked={filters.status?.includes(status) || false}
+                            onChange={(e) => {
+                              setFilters((prev) => ({
+                                ...prev,
+                                status: e.target.checked
+                                  ? [...(prev.status || []), status]
+                                  : (prev.status || []).filter(
+                                      (s) => s !== status
+                                    ),
+                              }));
+                            }}
+                          />
+                          <span className="ml-2 capitalize">{status}</span>
+                        </label>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                {/* Consolidation Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Consolidation Status
+                  </label>
+                  <div className="flex space-x-4">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-sky-600"
+                        checked={filters.consolidation === "all"}
+                        onChange={() =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            consolidation: "all",
+                          }))
+                        }
+                      />
+                      <span className="ml-2">All</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-sky-600"
+                        checked={filters.consolidation === "standalone"}
+                        onChange={() =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            consolidation: "standalone",
+                          }))
+                        }
+                      />
+                      <span className="ml-2">Standalone Only</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-sky-600"
+                        checked={filters.consolidation === "consolidated"}
+                        onChange={() =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            consolidation: "consolidated",
+                          }))
+                        }
+                      />
+                      <span className="ml-2">Part of Consolidated</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-between">
+                  <Button
+                    onClick={() => {
+                      setFilters({
+                        customer_id: null,
+                        status: null,
+                        consolidation: "all",
+                      });
+                    }}
+                    variant="outline"
+                  >
+                    Clear Filters
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowFilters(false);
+                      fetchInvoices();
+                    }}
+                    variant="filled"
+                    color="sky"
+                  >
+                    Apply Filters
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </TransitionChild>
+        </div>
+      </Dialog>
 
       {filteredInvoices.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200">

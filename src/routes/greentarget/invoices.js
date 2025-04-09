@@ -38,7 +38,14 @@ export default function (pool, defaultConfig) {
   // Get all invoices (with optional filters - ADDED status filter)
   router.get("/", async (req, res) => {
     // Added 'status' to destructuring
-    const { customer_id, rental_id, start_date, end_date, status } = req.query;
+    const {
+      customer_id,
+      start_date,
+      end_date,
+      status,
+      consolidated_only,
+      exclude_consolidated,
+    } = req.query;
 
     try {
       let query = `
@@ -88,12 +95,6 @@ export default function (pool, defaultConfig) {
         paramCounter++;
       }
 
-      if (rental_id) {
-        query += ` AND i.rental_id = $${paramCounter}`;
-        queryParams.push(rental_id);
-        paramCounter++;
-      }
-
       if (start_date) {
         // Ensure date format compatibility or cast if needed
         query += ` AND i.date_issued >= $${paramCounter}`;
@@ -108,7 +109,27 @@ export default function (pool, defaultConfig) {
         paramCounter++;
       }
 
-      // *** ADDED Status Filter (Handles comma-separated list) ***
+      if (consolidated_only === "true") {
+        // Check if this invoice is referenced in any consolidated invoice
+        query += ` AND EXISTS (
+          SELECT 1 FROM greentarget.invoices con 
+          WHERE con.is_consolidated = true
+          AND con.status != 'cancelled'
+          AND con.consolidated_invoices ? i.invoice_number
+        )`;
+      }
+
+      if (exclude_consolidated === "true") {
+        // Check that this invoice is NOT referenced in any consolidated invoice
+        query += ` AND NOT EXISTS (
+          SELECT 1 FROM greentarget.invoices con 
+          WHERE con.is_consolidated = true
+          AND con.status != 'cancelled'
+          AND con.consolidated_invoices ? i.invoice_number
+        )`;
+      }
+
+      // *** Status Filter (Handles comma-separated list) ***
       if (status) {
         const statuses = status
           .split(",")
