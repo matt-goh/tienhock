@@ -1,19 +1,20 @@
 // src/utils/invoice/PDF/PrintPDFOverlay.tsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import InvoicePDF from "./InvoicePDF";
 import { InvoiceData } from "../../../types/types";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { api } from "../../../routes/utils/api";
 
 const PrintPDFOverlay = ({
   invoices,
   onComplete,
+  customerNames = {},
 }: {
   invoices: InvoiceData[];
   onComplete: () => void;
+  customerNames: Record<string, string>;
 }) => {
   const [isPrinting, setIsPrinting] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
@@ -29,9 +30,6 @@ const PrintPDFOverlay = ({
     container: null,
     pdfUrl: null,
   });
-  const [customerNames, setCustomerNames] = useState<Record<string, string>>(
-    {}
-  );
 
   const cleanup = (fullCleanup = false) => {
     if (fullCleanup) {
@@ -135,64 +133,6 @@ const PrintPDFOverlay = ({
       }
     };
   }, [invoices, isPrinting, onComplete]);
-
-  // Customer names fetching logic (unchanged)
-  useEffect(() => {
-    const fetchCustomerNames = async () => {
-      const uniqueCustomerIds = Array.from(
-        new Set(invoices.map((invoice) => invoice.customerid))
-      );
-      const missingCustomerIds = uniqueCustomerIds.filter(
-        (id) => !(id in customerNames)
-      );
-      if (missingCustomerIds.length === 0) return;
-
-      try {
-        const CACHE_KEY = "customers_cache";
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        let customersFromCache: Record<string, string> = {};
-        let idsToFetch: string[] = [...missingCustomerIds];
-
-        if (cachedData) {
-          const { data } = JSON.parse(cachedData);
-          if (Array.isArray(data)) {
-            customersFromCache = data.reduce((map, customer) => {
-              if (missingCustomerIds.includes(customer.id)) {
-                map[customer.id] = customer.name;
-                idsToFetch = idsToFetch.filter((id) => id !== customer.id);
-              }
-              return map;
-            }, {} as Record<string, string>);
-          }
-        }
-
-        let customersFromApi: Record<string, string> = {};
-        if (idsToFetch.length > 0) {
-          customersFromApi = await api.post("/api/customers/names", {
-            customerIds: idsToFetch,
-          });
-        }
-
-        setCustomerNames((prev) => ({
-          ...prev,
-          ...customersFromCache,
-          ...customersFromApi,
-        }));
-      } catch (error) {
-        console.error("Error fetching customer names:", error);
-        const fallbackNames = missingCustomerIds.reduce<Record<string, string>>(
-          (map, id) => {
-            map[id] = id;
-            return map;
-          },
-          {}
-        );
-        setCustomerNames((prev) => ({ ...prev, ...fallbackNames }));
-      }
-    };
-
-    fetchCustomerNames();
-  }, [invoices, customerNames]);
 
   return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-50">

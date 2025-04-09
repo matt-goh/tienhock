@@ -410,10 +410,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         // Refresh eligible invoices
         fetchEligibleInvoices();
         setShowCancelConfirm(false); // Close dialog on success
-        setCancelTargetId(null); // Reset target} else {
-        // Keep dialog open on failure? Maybe show error within dialog?
-        // For now, just show toast and keep dialog open.
-        throw new Error(response.message || "Cancellation failed.");
+        setCancelTargetId(null);
       }
     } catch (error: any) {
       console.error(`Error cancelling ${currentId}:`, error);
