@@ -176,6 +176,14 @@ const GTPrintPDFOverlay = ({
           {error && (
             <p className="text-sm text-rose-600 mt-2 text-center">{error}</p>
           )}
+          <button
+            onClick={() => {
+              cleanup(true);
+            }}
+            className="mt-2 text-sm text-center text-sky-600 hover:underline"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

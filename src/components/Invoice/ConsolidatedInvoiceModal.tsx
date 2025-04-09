@@ -35,8 +35,8 @@ import {
 } from "../../utils/invoice/dateUtils";
 import SubmissionResultsModal from "./SubmissionResultsModal";
 import ConsolidatedInfoTooltip from "./ConsolidatedInfoTooltip";
-import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import ConsolidationStatusPanel from "./ConsolidationStatusPanel";
+import EInvoicePrintHandler from "../../utils/invoice/einvoice/EInvoicePrintHandler";
 
 // Interfaces remain the same
 interface ConsolidatedInvoiceModalProps {
@@ -1110,7 +1110,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                   <div className="flex gap-2 justify-center">
                                     {/* Add Download button for valid status only */}
                                     {currentStatus === "valid" && (
-                                      <EInvoicePDFHandler
+                                      <EInvoicePrintHandler
                                         invoices={[
                                           {
                                             ...item,
