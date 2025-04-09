@@ -83,7 +83,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   >([]);
 
   const invoiceStatusOptions = [
-    { id: "active", name: "Active" },
     { id: "paid", name: "Paid" },
     { id: "Unpaid", name: "Unpaid" },
     { id: "cancelled", name: "Cancelled" },
