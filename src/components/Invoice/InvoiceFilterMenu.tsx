@@ -209,12 +209,15 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
   // --- Render ---
   return (
-    <div className="relative inline-block text-left ml-2" ref={menuRef}>
+    <div
+      className="relative inline-block text-left w-full md:w-auto"
+      ref={menuRef}
+    >
       <Button
         onClick={() => setIsOpen(!isOpen)}
         icon={IconFilter}
         variant="outline"
-        className="w-full"
+        className="w-full md:w-auto"
       >
         Filter
       </Button>

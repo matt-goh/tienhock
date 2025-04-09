@@ -909,108 +909,109 @@ const InvoiceListPage: React.FC = () => {
   return (
     <div className="flex flex-col w-full h-full px-4 md:px-12">
       <div className="space-y-4">
-        {/* --- Header --- */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
-          <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
+        {/* --- Combined Header and Filters --- */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
+          {/* Title */}
+          <h1 className="text-2xl md:text-3xl font-semibold text-default-900 md:mr-4">
             Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
           </h1>
-        </div>
-        {/* --- Filters Row --- */}
-        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center flex-wrap flex-shrink-0">
-          {/* Date Range Picker */}
-          <div className="flex-grow lg:flex-grow-0">
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange} // Applies immediately
-            />
-          </div>
-          {/* Month Selector */}
-          <div className="w-full sm:w-auto lg:w-40">
-            <Listbox value={selectedMonth} onChange={handleMonthChange}>
-              <div className="relative">
-                <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                  <span className="block truncate pl-1">
-                    {selectedMonth.name}
-                  </span>
-                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <IconChevronDown
-                      className="h-5 w-5 text-default-400"
-                      aria-hidden="true"
-                    />
-                  </span>
-                </ListboxButton>
-                <Transition
-                  leave="transition ease-in duration-100"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                    {monthOptions.map((month) => (
-                      <ListboxOption
-                        key={month.id}
-                        value={month}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-gray-900"
-                          }`
-                        }
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {month.name}
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                  stroke={2.5}
-                                />
+
+          {/* Filters container */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap md:flex-1 md:justify-end">
+            {/* Date Range Picker */}
+            <div className="w-full sm:w-auto">
+              <DateRangePicker
+                dateRange={{
+                  start: filters.dateRange.start || new Date(),
+                  end: filters.dateRange.end || new Date(),
+                }}
+                onDateChange={handleDateChange}
+              />
+            </div>
+
+            {/* Month Selector */}
+            <div className="w-full sm:w-40">
+              <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                <div className="relative">
+                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                    <span className="block truncate pl-1">
+                      {selectedMonth.name}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <IconChevronDown
+                        className="h-5 w-5 text-default-400"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                      {monthOptions.map((month) => (
+                        <ListboxOption
+                          key={month.id}
+                          value={month}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-gray-900"
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {month.name}
                               </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </Transition>
-              </div>
-            </Listbox>
-          </div>
-          {/* Search Input */}
-          <div className="flex-grow relative min-w-[200px]">
-            {/* Ensure minimum width */}
-            <IconSearch
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Search by invoice, product, amount, customer, salesman, status, payment type..."
-              className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onBlur={handleSearchBlur} // Triggers fetch
-              onKeyDown={handleSearchKeyDown} // Triggers fetch on Enter
-            />
-          </div>
-          {/* Filter Menu Button */}
-          <div className="flex-shrink-0">
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                    stroke={2.5}
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:flex-1 md:max-w-md">
+              <IconSearch
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search"
+                className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onBlur={handleSearchBlur}
+                onKeyDown={handleSearchKeyDown}
+              />
+            </div>
+
+            {/* Filter Menu Button */}
             <InvoiceFilterMenu
-              currentFilters={filters} // Pass currently applied filters
-              onFilterChange={handleApplyFilters} // Pass the main apply function
+              currentFilters={filters}
+              onFilterChange={handleApplyFilters}
               salesmanOptions={salesmen.map((s) => ({
-                // Pass salesmen options
                 id: s.id,
                 name: s.name || s.id,
               }))}
