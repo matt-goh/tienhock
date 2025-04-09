@@ -1521,33 +1521,6 @@ const InvoiceListPage: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-2 items-center whitespace-nowrap">
-              <Button
-                onClick={() => fetchInvoices()}
-                icon={IconRefresh}
-                variant="outline"
-                title="Refresh invoice data"
-                aria-label="Refresh invoices"
-              >
-                Refresh
-              </Button>
-              <Button
-                onClick={() => setIsConsolidateModalOpen(true)}
-                icon={IconFiles}
-                variant="outline"
-              >
-                Consolidate
-              </Button>
-              <Button
-                onClick={() => navigate("/greentarget/invoices/new")}
-                icon={IconPlus}
-                variant="outline"
-              >
-                Create
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -1608,36 +1581,65 @@ const InvoiceListPage: React.FC = () => {
             )}
           </div>
 
-          {/* Action Buttons (Show only when items are selected) */}
-          {selectedInvoiceIds.size > 0 && (
-            <div
-              className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
-              onClick={(e) => e.stopPropagation()} // Prevent row selection click
+          {/* Action buttons */}
+          <div
+            className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
+            onClick={(e) => e.stopPropagation()} // Prevent row selection click
+          >
+            {/* PDF Buttons (Show only when items are selected) */}
+            {selectedInvoiceIds.size > 0 && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkPrintPDF} // Use the new handler
+                  icon={IconPrinter}
+                  disabled={loading}
+                  aria-label="Print Selected Invoices"
+                  title="Print PDF"
+                >
+                  Print
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkDownloadPDF}
+                  icon={IconFileDownload}
+                  disabled={loading}
+                  aria-label="Download Selected Invoices"
+                  title="Download PDF"
+                >
+                  Download
+                </Button>
+              </>
+            )}
+            <Button
+              onClick={() => setIsConsolidateModalOpen(true)}
+              icon={IconFiles}
+              variant="outline"
+              size="sm"
             >
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkPrintPDF} // Use the new handler
-                icon={IconPrinter}
-                disabled={loading}
-                aria-label="Print Selected Invoices"
-                title="Print PDF"
-              >
-                Print
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkDownloadPDF}
-                icon={IconFileDownload}
-                disabled={loading}
-                aria-label="Download Selected Invoices"
-                title="Download PDF"
-              >
-                Download
-              </Button>
-            </div>
-          )}
+              Consolidate
+            </Button>
+            <Button
+              onClick={() => fetchInvoices()}
+              icon={IconRefresh}
+              variant="outline"
+              title="Refresh invoice data"
+              aria-label="Refresh invoices"
+              size="sm"
+            >
+              Refresh
+            </Button>
+            <Button
+              onClick={() => navigate("/greentarget/invoices/new")}
+              icon={IconPlus}
+              variant="outline"
+              size="sm"
+            >
+              Create
+            </Button>
+          </div>
         </div>
       </div>
 
