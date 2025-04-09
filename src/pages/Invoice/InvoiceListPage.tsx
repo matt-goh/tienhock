@@ -1471,6 +1471,7 @@ const InvoiceListPage: React.FC = () => {
       {showPrintOverlay && selectedInvoicesForPDF.length > 0 && (
         <PrintPDFOverlay
           invoices={selectedInvoicesForPDF}
+          customerNames={customerNames}
           onComplete={() => {
             setShowPrintOverlay(false);
             setSelectedInvoicesForPDF([]);
