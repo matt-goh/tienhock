@@ -500,29 +500,96 @@ const InvoiceListPage: React.FC = () => {
     });
   }, []);
 
-  // Select/Deselect all invoices visible on the current page
-  const handleSelectAllOnPage = useCallback(() => {
-    // Ensure invoices is an array
-    if (!Array.isArray(invoices)) return;
+  // Toggle between no selection and all invoices selected across all pages
+  const handleToggleSelectAll = useCallback(
+    async (e: { stopPropagation: () => void }) => {
+      e?.stopPropagation(); // Prevent event bubbling
 
-    const currentPageIds = invoices.map((inv) => inv.id);
-    if (currentPageIds.length === 0) return; // Nothing to select/deselect
-
-    setSelectedInvoiceIds((prev) => {
-      const newSet = new Set(prev);
-      // Check if ALL on the current page are already selected within the main set
-      const allCurrentlySelected = currentPageIds.every((id) => newSet.has(id));
-
-      if (allCurrentlySelected) {
-        // Deselect all on current page
-        currentPageIds.forEach((id) => newSet.delete(id));
-      } else {
-        // Select all on current page
-        currentPageIds.forEach((id) => newSet.add(id));
+      // If we already have selections, clear them
+      if (selectedInvoiceIds.size > 0) {
+        setSelectedInvoiceIds(new Set());
+        return;
       }
-      return newSet;
-    });
-  }, [invoices]); // Depends on the invoices currently displayed
+
+      // Otherwise, fetch all IDs matching current filters
+      try {
+        const toastId = toast.loading("Selecting all matching invoices...");
+
+        // Build query parameters matching current filters
+        const params = new URLSearchParams();
+
+        // Add date range
+        if (filters.dateRange.start) {
+          params.append(
+            "startDate",
+            filters.dateRange.start.getTime().toString()
+          );
+        }
+        if (filters.dateRange.end) {
+          params.append("endDate", filters.dateRange.end.getTime().toString());
+        }
+
+        // Add salesperson filter
+        if (filters.salespersonId && filters.salespersonId.length > 0) {
+          params.append("salesman", filters.salespersonId.join(","));
+        }
+
+        // Add payment type filter
+        if (filters.paymentType) {
+          params.append("paymentType", filters.paymentType);
+        }
+
+        // Add invoice status filter
+        if (filters.invoiceStatus && filters.invoiceStatus.length > 0) {
+          params.append("invoiceStatus", filters.invoiceStatus.join(","));
+        }
+
+        // Add e-invoice status filter
+        if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+          params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
+        }
+
+        // Handle consolidation filter
+        if (filters.consolidation === "consolidated") {
+          params.append("consolidated_only", "true");
+        } else if (filters.consolidation === "individual") {
+          params.append("exclude_consolidated", "true");
+        }
+
+        // Add search term
+        if (searchTerm) {
+          params.append("search", searchTerm);
+        }
+
+        // Make the API call with all parameters
+        const queryString = params.toString() ? `?${params.toString()}` : "";
+        const response = await api.get(
+          `/api/invoices/selection/ids${queryString}`
+        );
+
+        if (Array.isArray(response) && response.length > 0) {
+          setSelectedInvoiceIds(new Set(response));
+          toast.success(`Selected all ${response.length} matching invoices`, {
+            id: toastId,
+          });
+        } else if (Array.isArray(response) && response.length === 0) {
+          toast.error("No invoices match your current filters", {
+            id: toastId,
+          });
+        } else {
+          toast.error("Failed to select all invoices", { id: toastId });
+        }
+      } catch (error) {
+        console.error("Error fetching all invoice IDs:", error);
+        toast.error(
+          `Failed to select all invoices: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
+    },
+    [filters, searchTerm]
+  );
 
   // Function to clear selection (can be called externally via ref)
   const clearCurrentSelection = useCallback(() => {
@@ -565,14 +632,14 @@ const InvoiceListPage: React.FC = () => {
   const confirmBulkCancel = async () => {
     setShowCancelConfirm(false);
     // Re-filter right before cancelling
-    const idsToCancel = invoices
-      .filter(
-        (inv) =>
-          selectedInvoiceIds.has(inv.id) && inv.invoice_status !== "cancelled"
-      )
-      .map((inv) => inv.id);
+    const idsToCancel = Array.from(selectedInvoiceIds).filter((id) => {
+      // Find invoice in current page data if available
+      const invoice = invoices.find((inv) => inv.id === id);
+      // Only include if not already cancelled
+      return !invoice || invoice.invoice_status !== "cancelled";
+    });
 
-    if (idsToCancel.length === 0) return; // Should not happen if button was enabled, but safety check
+    if (idsToCancel.length === 0) return;
 
     const toastId = toast.loading(
       `Cancelling ${idsToCancel.length} invoice(s)...`
@@ -580,31 +647,40 @@ const InvoiceListPage: React.FC = () => {
     let successCount = 0;
     let failCount = 0;
 
-    const results = await Promise.allSettled(
-      idsToCancel.map((id) => cancelInvoice(id)) // Using the utility function
-    );
+    // Process in batches of 10 to avoid too many concurrent requests
+    const BATCH_SIZE = 10;
 
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        successCount++;
-        // Update local state for the cancelled invoice immediately
-        setInvoices((prev) =>
-          prev.map((inv) =>
-            inv.id === idsToCancel[index]
-              ? { ...inv, ...result.value } // Merge update from cancelInvoice response
-              : inv
-          )
-        );
-      } else {
-        failCount++;
-        console.error(
-          `Failed to cancel invoice ${idsToCancel[index]}:`,
-          result.reason
-        );
-        // Error toast can be improved, maybe show ID
-        // toast.error(`Failed to cancel ${idsToCancel[index]}. ${result.reason?.message || ''}`);
-      }
-    });
+    for (let i = 0; i < idsToCancel.length; i += BATCH_SIZE) {
+      const batchIds = idsToCancel.slice(i, i + BATCH_SIZE);
+      toast.loading(`Cancelling invoices (${i}/${idsToCancel.length})...`, {
+        id: toastId,
+      });
+
+      const batchResults = await Promise.allSettled(
+        batchIds.map((id) => cancelInvoice(id))
+      );
+
+      batchResults.forEach((result, index) => {
+        const invoiceId = batchIds[index];
+        if (result.status === "fulfilled") {
+          successCount++;
+          // Update local state for the cancelled invoice if it's on current page
+          setInvoices((prev) =>
+            prev.map((inv) =>
+              inv.id === invoiceId
+                ? { ...inv, ...result.value } // Merge update from cancelInvoice response
+                : inv
+            )
+          );
+        } else {
+          failCount++;
+          console.error(
+            `Failed to cancel invoice ${invoiceId}:`,
+            result.reason
+          );
+        }
+      });
+    }
 
     setSelectedInvoiceIds(new Set()); // Clear selection after attempting
 
@@ -618,8 +694,9 @@ const InvoiceListPage: React.FC = () => {
         id: toastId,
       });
     }
-    // No full refresh needed if local state is updated, but can trigger one if preferred:
-    // setIsFetchTriggered(true);
+
+    // Refresh to make sure we have the latest data
+    setIsFetchTriggered(true);
   };
 
   const hasCancelledUnsynced = useCallback(() => {
@@ -1187,7 +1264,7 @@ const InvoiceListPage: React.FC = () => {
               ? "bg-sky-50 border border-sky-200"
               : "bg-white border border-dashed border-default-200"
           } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-0 z-0 shadow-sm`}
-          onClick={handleSelectAllOnPage}
+          onClick={handleToggleSelectAll}
           title={
             selectionState.isAllSelectedOnPage
               ? "Deselect All on Page"
@@ -1195,42 +1272,37 @@ const InvoiceListPage: React.FC = () => {
           }
         >
           <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
-            {/* Selection checkbox - always visible */}
+            {/* Selection checkbox - now toggles all selection across pages */}
             <div className="relative">
               <button
                 className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleSelectAll(e);
+                }}
                 title={
-                  selectionState.hasSelectionsOnOtherPages
-                    ? "Selections exist across multiple pages"
-                    : selectionState.isAllSelectedOnPage
-                    ? "Deselect all on this page"
-                    : "Select all on this page"
+                  selectedInvoiceIds.size > 0
+                    ? "Clear selection"
+                    : "Select all invoices across all pages"
                 }
               >
-                {selectionState.isAllSelectedOnPage ? (
+                {selectedInvoiceIds.size > 0 ? (
                   <IconSquareMinusFilled className="text-sky-600" size={20} />
-                ) : selectionState.isIndeterminate ? (
-                  <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
                 ) : (
                   <IconSelectAll className="text-default-400" size={20} />
                 )}
               </button>
-
-              {/* Indicator badge for multi-page selections */}
-              {selectionState.hasSelectionsOnOtherPages && (
-                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                  +
-                </span>
-              )}
             </div>
 
             {/* Selection Count and Total */}
             <div className="flex-grow">
+              {/* Selection info text */}
               {selectedInvoiceIds.size > 0 ? (
                 <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
                   <span>{selectedInvoiceIds.size} selected</span>
                   <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
                   <span className="whitespace-nowrap">
+                    {/* Show total only for selected invoices visible on this page */}
                     Total:{" "}
                     {new Intl.NumberFormat("en-MY", {
                       style: "currency",
@@ -1244,26 +1316,13 @@ const InvoiceListPage: React.FC = () => {
                         )
                     )}
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (
-                        window.confirm("Clear all selections across all pages?")
-                      ) {
-                        setSelectedInvoiceIds(new Set());
-                      }
-                    }}
-                    className="text-sky-600 hover:text-sky-800 text-xs underline ml-2"
-                  >
-                    Clear all
-                  </button>
                 </span>
               ) : (
                 <span
                   className="text-default-500 text-sm cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleSelectAllOnPage();
+                    handleToggleSelectAll(e);
                   }}
                 >
                   Select invoices to perform actions
