@@ -31,6 +31,7 @@ import {
   IconAlertTriangle,
   IconSend,
   IconRefresh,
+  IconFiles,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
@@ -560,6 +561,21 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const getConsolidatedStatusInfo = (consolidatedInfo: any) => {
+    if (!consolidatedInfo) return null;
+
+    // Only show for valid consolidated invoices - adjust based on your requirements
+    if (consolidatedInfo.einvoice_status !== "valid") return null;
+
+    return {
+      text: "Consolidated",
+      color: "text-indigo-600",
+      border: "border-indigo-200",
+      icon: IconFiles,
+      info: consolidatedInfo,
+    };
+  };
+
   // --- Render Logic ---
   if (isLoading && !invoiceData) {
     // Show full page spinner only on initial load
@@ -597,6 +613,10 @@ const InvoiceDetailsPage: React.FC = () => {
   const invoiceStatusStyle = getStatusBadgeClass(invoiceData.invoice_status);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoiceData.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
+  const consolidatedStatusInfo = getConsolidatedStatusInfo(
+    invoiceData.consolidated_part_of
+  );
+  const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const isCancelled = invoiceData.invoice_status === "cancelled";
   const isPaid = !isCancelled && invoiceData.balance_due <= 0; // Check balance only if not cancelled
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
@@ -643,6 +663,16 @@ const InvoiceDetailsPage: React.FC = () => {
             >
               <EInvoiceIcon size={14} className="mr-1" />
               e-Invoice: {eInvoiceStatusInfo.text}
+            </span>
+          )}
+          {/* Add Consolidated Status Badge */}
+          {consolidatedStatusInfo && ConsolidatedIcon && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color}`}
+              title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
+            >
+              <ConsolidatedIcon size={14} />
+              Consolidated Invoice
             </span>
           )}
         </h1>
@@ -906,7 +936,9 @@ const InvoiceDetailsPage: React.FC = () => {
         </section>
 
         {/* E-Invoice Details */}
-        {(invoiceData.uuid || invoiceData.einvoice_status) && (
+        {(invoiceData.uuid ||
+          invoiceData.einvoice_status ||
+          invoiceData.consolidated_part_of) && (
           <section className="p-4 border rounded-lg bg-white shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800">
               {(invoiceData.einvoice_status === "valid" ||
@@ -918,6 +950,16 @@ const InvoiceDetailsPage: React.FC = () => {
                   rel="noopener noreferrer"
                   className="hover:text-sky-600 hover:underline"
                   title="View in MyInvois Portal"
+                >
+                  E-Invoice Details
+                </a>
+              ) : consolidatedStatusInfo?.info?.long_id ? (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-sky-600 hover:underline"
+                  title="View Consolidated Invoice in MyInvois Portal"
                 >
                   E-Invoice Details
                 </a>
@@ -973,18 +1015,42 @@ const InvoiceDetailsPage: React.FC = () => {
                   )}
                 </p>
               )}
-              <p>
-                <strong className="text-gray-500 font-medium w-24 inline-block">
-                  Status:
-                </strong>
-                {eInvoiceStatusInfo ? (
-                  <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
-                    {eInvoiceStatusInfo.text}
-                  </span>
-                ) : (
-                  <span className="text-gray-500">Not Submitted</span>
-                )}
-              </p>
+              {!consolidatedStatusInfo && (
+                <p>
+                  <strong className="text-gray-500 font-medium w-24 inline-block">
+                    Status:
+                  </strong>
+                  {eInvoiceStatusInfo ? (
+                    <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
+                      {eInvoiceStatusInfo.text}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">Not Submitted</span>
+                  )}
+                </p>
+              )}
+              {consolidatedStatusInfo && (
+                <>
+                  <p>
+                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                      Invoice ID:
+                    </strong>
+                    <span className="font-medium">
+                      {consolidatedStatusInfo.info.id}
+                    </span>
+                  </p>
+                  {consolidatedStatusInfo.info.uuid && (
+                    <p>
+                      <strong className="text-gray-500 font-medium w-24 inline-block">
+                        UUID:
+                      </strong>
+                      <span className="font-mono text-sm break-all">
+                        {consolidatedStatusInfo.info.uuid}
+                      </span>
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </section>
         )}
