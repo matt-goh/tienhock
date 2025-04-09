@@ -12,6 +12,7 @@ import {
   IconBan,
   IconAlertTriangle,
   IconCircleCheck,
+  IconFiles,
 } from "@tabler/icons-react";
 import {
   formatDisplayDate,
@@ -89,6 +90,21 @@ const getEInvoiceStatusInfo = (status: EInvoiceStatus) => {
   }
 };
 
+const getConsolidatedStatusInfo = (consolidatedInfo: any) => {
+  if (!consolidatedInfo) return null;
+
+  // Only show for valid consolidated invoices - adjust based on your requirements
+  if (consolidatedInfo.einvoice_status !== "valid") return null;
+
+  return {
+    text: "Consolidated",
+    color: "text-indigo-600",
+    border: "border-indigo-200",
+    icon: IconFiles,
+    info: consolidatedInfo,
+  };
+};
+
 const InvoiceCard: React.FC<InvoiceCardProps> = ({
   invoice,
   isSelected,
@@ -99,6 +115,10 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const invoiceStatusStyle = getInvoiceStatusStyles(invoice.invoice_status);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoice.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
+  const consolidatedStatusInfo = getConsolidatedStatusInfo(
+    invoice.consolidated_part_of
+  );
+  const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const navigate = useNavigate();
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -244,6 +264,20 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               e-Invoice
             </span>
           ))}
+        {/* Consolidated Status - add this */}
+        {consolidatedStatusInfo && ConsolidatedIcon && (
+          <a
+            href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${consolidatedStatusInfo.color} hover:underline`}
+            title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
+          >
+            <ConsolidatedIcon size={14} className="mr-1" />
+            Consolidated
+          </a>
+        )}
       </div>
     </div>
   );
