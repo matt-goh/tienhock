@@ -52,6 +52,7 @@ import {
   cancelInvoice,
   getInvoiceById,
   syncCancellationStatus,
+  getInvoicesByIds,
 } from "../../utils/invoice/InvoiceUtils";
 import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
@@ -206,16 +207,30 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Derived State ---
   // Selection state based on currently displayed invoices on the page
+  // Selection state based on currently displayed invoices and total selections
   const selectionState = useMemo(() => {
     // Ensure invoices is an array before proceeding
     if (!Array.isArray(invoices) || invoices.length === 0) {
-      return { isAllSelectedOnPage: false, isIndeterminate: false };
+      return {
+        isAllSelectedOnPage: false,
+        isIndeterminate: false,
+        selectedOnPageCount: 0,
+        totalSelectableOnPage: 0,
+        hasSelectionsOnOtherPages: false,
+      };
     }
+
     const currentPageIds = new Set(invoices.map((inv) => inv.id));
-    const selectedOnPageCount = Array.from(selectedInvoiceIds).filter((id) =>
+    const selectedOnPage = Array.from(selectedInvoiceIds).filter((id) =>
       currentPageIds.has(id)
-    ).length;
+    );
+
+    const selectedOnPageCount = selectedOnPage.length;
     const totalSelectableOnPage = invoices.length;
+
+    // Check if we have selections on other pages
+    const totalSelectedCount = selectedInvoiceIds.size;
+    const hasSelectionsOnOtherPages = totalSelectedCount > selectedOnPageCount;
 
     return {
       isAllSelectedOnPage:
@@ -223,6 +238,9 @@ const InvoiceListPage: React.FC = () => {
         totalSelectableOnPage > 0,
       isIndeterminate:
         selectedOnPageCount > 0 && selectedOnPageCount < totalSelectableOnPage,
+      selectedOnPageCount,
+      totalSelectableOnPage,
+      hasSelectionsOnOtherPages,
     };
   }, [selectedInvoiceIds, invoices]);
 
@@ -354,28 +372,35 @@ const InvoiceListPage: React.FC = () => {
   // Filter Change Handler - Receives the COMPLETE, new filter state to apply
   const handleApplyFilters = useCallback(
     (newAppliedFilters: InvoiceFilters) => {
+      // Check if there are any existing selections first
+      if (selectedInvoiceIds.size > 0) {
+        if (
+          window.confirm(
+            "Your current selections will be lost when changing filters. Continue?"
+          )
+        ) {
+          setSelectedInvoiceIds(new Set()); // Only clear if user confirms
+        } else {
+          return; // Don't apply filters if user cancels
+        }
+      }
+
       // 1. Update the main filters state
       setFilters(newAppliedFilters);
 
-      // 2. Save date range to storage IF it has changed
-      // (Compare with previous state *before* setting the new state if needed,
-      // or just save the new dates regardless)
+      // 2. Save date range to storage
       saveDatesToStorage(
         newAppliedFilters.dateRange.start,
         newAppliedFilters.dateRange.end
       );
 
       // 3. Trigger Fetch: Reset to page 1 and set trigger
-      // (Comparison with previous state isn't needed here, always reset/refetch on apply)
       if (currentPage !== 1) {
-        setCurrentPage(1); // This state change will trigger the useEffect
+        setCurrentPage(1);
       }
-      setIsFetchTriggered(true); // Ensure fetch happens even if already on page 1
-
-      // 4. Clear selection
-      setSelectedInvoiceIds(new Set());
+      setIsFetchTriggered(true);
     },
-    [currentPage] // Depends on currentPage to decide whether to reset page or just trigger
+    [currentPage, selectedInvoiceIds]
   );
 
   // --- Specific Filter Handlers (Date, Month, Remove Tag) ---
@@ -791,35 +816,39 @@ const InvoiceListPage: React.FC = () => {
       return;
     }
 
-    const toastId = toast.loading("Preparing invoice PDF...");
+    const toastId = toast.loading(
+      `Preparing ${selectedInvoiceIds.size} invoice PDFs...`
+    );
 
     try {
-      // Get selected invoices data
-      const selectedInvoicesData = invoices.filter((inv) =>
-        selectedInvoiceIds.has(inv.id)
-      );
-      if (selectedInvoicesData.length === 0) {
-        throw new Error("Failed to retrieve selected invoice data");
-      }
+      // Get ALL selected invoice IDs from the Set
+      const selectedIds = Array.from(selectedInvoiceIds);
 
-      // We need complete invoice data with products
-      const completeInvoices = [];
-      for (const invoice of selectedInvoicesData) {
-        // Fetch complete invoice with products
-        try {
-          const fullInvoice = await getInvoiceById(invoice.id);
-          completeInvoices.push(fullInvoice);
-        } catch (error) {
-          console.error(
-            `Failed to fetch complete data for invoice ${invoice.id}:`,
-            error
-          );
-          // Continue with other invoices
-        }
+      // Process in chunks of 50 to avoid overwhelming the server
+      const BATCH_SIZE = 50;
+      let completeInvoices:
+        | any[]
+        | ((prevState: ExtendedInvoiceData[]) => ExtendedInvoiceData[]) = [];
+
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
+        toast.loading(`Loading invoices (${i}/${selectedIds.length})...`, {
+          id: toastId,
+        });
+
+        const batchInvoices = await getInvoicesByIds(batchIds);
+        completeInvoices = completeInvoices.concat(batchInvoices);
       }
 
       if (completeInvoices.length === 0) {
         throw new Error("Could not fetch required invoice details");
+      }
+
+      if (completeInvoices.length < selectedIds.length) {
+        toast.loading(
+          `Generating PDFs for ${completeInvoices.length}/${selectedIds.length} invoices...`,
+          { id: toastId }
+        );
       }
 
       setSelectedInvoicesForPDF(completeInvoices);
@@ -856,38 +885,43 @@ const InvoiceListPage: React.FC = () => {
       return;
     }
 
-    const toastId = toast.loading("Preparing invoice for printing...");
+    const toastId = toast.loading(
+      `Preparing ${selectedInvoiceIds.size} invoices for printing...`
+    );
 
     try {
-      // Get selected invoices data
-      const selectedInvoicesData = invoices.filter((inv) =>
-        selectedInvoiceIds.has(inv.id)
-      );
-      if (selectedInvoicesData.length === 0) {
-        throw new Error("Failed to retrieve selected invoice data");
-      }
+      // Get ALL selected invoice IDs from the Set
+      const selectedIds = Array.from(selectedInvoiceIds);
 
-      // We need complete invoice data with products
-      const completeInvoices = [];
-      for (const invoice of selectedInvoicesData) {
-        // Fetch complete invoice with products
-        try {
-          const fullInvoice = await getInvoiceById(invoice.id);
-          completeInvoices.push(fullInvoice);
-        } catch (error) {
-          console.error(
-            `Failed to fetch complete data for invoice ${invoice.id}:`,
-            error
-          );
-          // Continue with other invoices
-        }
+      // Process in chunks of 50 to avoid overwhelming the server
+      const BATCH_SIZE = 50;
+      let completeInvoices:
+        | any[]
+        | ((prevState: ExtendedInvoiceData[]) => ExtendedInvoiceData[]) = [];
+
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
+        toast.loading(`Loading invoices (${i}/${selectedIds.length})...`, {
+          id: toastId,
+        });
+
+        const batchInvoices = await getInvoicesByIds(batchIds);
+        completeInvoices = completeInvoices.concat(batchInvoices);
       }
 
       if (completeInvoices.length === 0) {
         throw new Error("Could not fetch required invoice details");
       }
 
-      toast.success("Opening print dialog...", { id: toastId });
+      if (completeInvoices.length < selectedIds.length) {
+        toast.error(
+          `Only ${completeInvoices.length} out of ${selectedIds.length} invoices could be loaded`,
+          { id: toastId, duration: 4000 }
+        );
+      } else {
+        toast.success("Opening print dialog...", { id: toastId });
+      }
+
       setSelectedInvoicesForPDF(completeInvoices);
       setShowPrintOverlay(true);
     } catch (error) {
@@ -1163,15 +1197,33 @@ const InvoiceListPage: React.FC = () => {
         >
           <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
             {/* Selection checkbox - always visible */}
-            <button className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
-              {selectionState.isAllSelectedOnPage ? (
-                <IconSquareMinusFilled className="text-sky-600" size={20} />
-              ) : selectionState.isIndeterminate ? (
-                <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
-              ) : (
-                <IconSelectAll className="text-default-400" size={20} />
+            <div className="relative">
+              <button
+                className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
+                title={
+                  selectionState.hasSelectionsOnOtherPages
+                    ? "Selections exist across multiple pages"
+                    : selectionState.isAllSelectedOnPage
+                    ? "Deselect all on this page"
+                    : "Select all on this page"
+                }
+              >
+                {selectionState.isAllSelectedOnPage ? (
+                  <IconSquareMinusFilled className="text-sky-600" size={20} />
+                ) : selectionState.isIndeterminate ? (
+                  <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
+                ) : (
+                  <IconSelectAll className="text-default-400" size={20} />
+                )}
+              </button>
+
+              {/* Indicator badge for multi-page selections */}
+              {selectionState.hasSelectionsOnOtherPages && (
+                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                  +
+                </span>
               )}
-            </button>
+            </div>
 
             {/* Selection Count and Total */}
             <div className="flex-grow">
@@ -1193,6 +1245,19 @@ const InvoiceListPage: React.FC = () => {
                         )
                     )}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        window.confirm("Clear all selections across all pages?")
+                      ) {
+                        setSelectedInvoiceIds(new Set());
+                      }
+                    }}
+                    className="text-sky-600 hover:text-sky-800 text-xs underline ml-2"
+                  >
+                    Clear all
+                  </button>
                 </span>
               ) : (
                 <span

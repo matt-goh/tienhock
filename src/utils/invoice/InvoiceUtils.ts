@@ -247,6 +247,44 @@ export const getInvoiceById = async (
   }
 };
 
+// GET Multiple Invoices By IDs (batch fetch)
+export const getInvoicesByIds = async (
+  ids: string[]
+): Promise<ExtendedInvoiceData[]> => {
+  try {
+    if (!ids.length) return [];
+
+    // Create URL-safe parameter string (comma-separated IDs)
+    const idsParam = ids.join(",");
+
+    // Use a new backend endpoint that can handle multiple IDs
+    const response = await api.get(`/api/invoices/batch?ids=${idsParam}`);
+
+    if (!response || !Array.isArray(response)) {
+      throw new Error("Invalid response format from batch invoice endpoint");
+    }
+
+    // Map backend data to frontend ExtendedInvoiceData shape
+    return response.map((inv) => ({
+      ...inv,
+      total_excluding_tax: parseFloat(inv.total_excluding_tax || 0),
+      tax_amount: parseFloat(inv.tax_amount || 0),
+      rounding: parseFloat(inv.rounding || 0),
+      totalamountpayable: parseFloat(inv.totalamountpayable || 0),
+      products: ensureProductsHaveUid(inv.products),
+      customerName: inv.customerName || inv.customerid,
+      is_consolidated: Boolean(inv.is_consolidated || false),
+      consolidated_invoices: inv.consolidated_invoices,
+    }));
+  } catch (error) {
+    console.error(`Error batch fetching invoices:`, error);
+    const errorMessage =
+      error instanceof Error ? error.message : `Failed to fetch invoices`;
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
 // Check Duplicate Invoice Number (No changes needed if endpoint is same)
 export const checkDuplicateInvoiceNo = async (
   invoiceNo: string
