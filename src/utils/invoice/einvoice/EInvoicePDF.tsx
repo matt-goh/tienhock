@@ -367,7 +367,6 @@ const EInvoicePDF: React.FC<Props> = ({
         </View>
 
         {/* Table Rows */}
-        {/* Table Rows */}
         {data.orderDetails && data.orderDetails.length > 0 ? (
           data.orderDetails.map((item, index) => (
             <View key={index} style={styles.tableRow}>

@@ -50,7 +50,7 @@ const fetchCustomerData = async (customerId: string): Promise<any> => {
     // Check if customer ID is valid
     if (!customerId || customerId === "Consolidated customers") {
       return {
-        name: "Consolidated Buyers",
+        name: "Consolidated Customers",
         tin_number: "EI00000000010",
         id_number: "-",
         phone_number: "-",
