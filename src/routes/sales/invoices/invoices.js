@@ -322,6 +322,133 @@ export default function (pool, config) {
     }
   });
 
+  // Get all invoice IDs matching current filters
+  router.get("/selection/ids", async (req, res) => {
+    try {
+      const {
+        startDate,
+        endDate,
+        salesman,
+        paymentType,
+        invoiceStatus,
+        eInvoiceStatus,
+        search,
+        consolidated_only,
+        exclude_consolidated,
+      } = req.query;
+
+      // Start building query
+      let whereClause = " WHERE 1=1 "; // Start with basic condition
+      const filterParams = []; // Parameters for filtering
+      let filterParamCounter = 1;
+
+      // Apply date filters
+      if (startDate && endDate) {
+        whereClause += ` AND CAST(createddate AS bigint) BETWEEN $${filterParamCounter++} AND $${filterParamCounter++}`;
+        filterParams.push(startDate, endDate);
+      } else {
+        // Default to last year if no date range specified
+        const currentDate = Date.now();
+        const oneYearAgo = currentDate - 365 * 24 * 60 * 60 * 1000;
+        whereClause += ` AND CAST(createddate AS bigint) BETWEEN $${filterParamCounter++} AND $${filterParamCounter++}`;
+        filterParams.push(oneYearAgo.toString(), currentDate.toString());
+      }
+
+      // Apply salesman filter
+      if (salesman) {
+        whereClause += ` AND salespersonid = ANY($${filterParamCounter++})`;
+        filterParams.push(salesman.split(","));
+      }
+
+      // Apply payment type filter
+      if (paymentType) {
+        whereClause += ` AND paymenttype = $${filterParamCounter++}`;
+        filterParams.push(paymentType.toUpperCase());
+      }
+
+      // Apply invoice status filter
+      if (invoiceStatus) {
+        whereClause += ` AND invoice_status = ANY($${filterParamCounter++})`;
+        filterParams.push(invoiceStatus.split(","));
+      } else {
+        // Default filter to exclude cancelled invoices
+        whereClause += ` AND invoice_status != 'cancelled'`;
+      }
+
+      // Apply e-invoice status filter
+      if (eInvoiceStatus) {
+        const statuses = eInvoiceStatus.split(",");
+        if (statuses.includes("null")) {
+          // Handle 'null' specifically
+          filterParams.push(statuses.filter((s) => s !== "null"));
+          whereClause += ` AND (einvoice_status = ANY($${filterParamCounter++}) OR einvoice_status IS NULL)`;
+        } else {
+          filterParams.push(statuses);
+          whereClause += ` AND einvoice_status = ANY($${filterParamCounter++})`;
+        }
+      }
+
+      // Apply search filter
+      if (search) {
+        whereClause += ` AND (
+        id ILIKE $${filterParamCounter++} OR
+        EXISTS (
+          SELECT 1 FROM customers c 
+          WHERE c.id = customerid AND c.name ILIKE $${filterParamCounter++}
+        ) OR
+        CAST(customerid AS TEXT) ILIKE $${filterParamCounter++} OR
+        CAST(salespersonid AS TEXT) ILIKE $${filterParamCounter++} OR
+        paymenttype ILIKE $${filterParamCounter++} OR
+        invoice_status ILIKE $${filterParamCounter++} OR
+        COALESCE(einvoice_status, '') ILIKE $${filterParamCounter++} OR
+        CAST(totalamountpayable AS TEXT) ILIKE $${filterParamCounter++}
+      )`;
+
+        const searchPattern = `%${search}%`;
+        // Add search param 8 times for each ILIKE condition
+        for (let i = 0; i < 8; i++) {
+          filterParams.push(searchPattern);
+        }
+      }
+
+      // Apply consolidation filters
+      if (consolidated_only === "true") {
+        // Show ONLY invoices that are part of any consolidated invoice
+        whereClause += ` AND EXISTS (
+        SELECT 1 FROM invoices con 
+        WHERE con.is_consolidated = true 
+        AND con.consolidated_invoices::jsonb ? CAST(invoices.id AS TEXT)
+        AND con.invoice_status != 'cancelled'
+      )`;
+      } else if (exclude_consolidated === "true") {
+        // Exclude invoices that are part of any consolidated invoice
+        whereClause += ` AND NOT EXISTS (
+        SELECT 1 FROM invoices con 
+        WHERE con.is_consolidated = true 
+        AND con.consolidated_invoices::jsonb ? CAST(invoices.id AS TEXT)
+        AND con.invoice_status != 'cancelled'
+      )`;
+      }
+
+      // Always exclude the consolidated invoices themselves
+      whereClause += ` AND (is_consolidated = false OR is_consolidated IS NULL)`;
+
+      // Build final query
+      const query = `SELECT id FROM invoices ${whereClause} ORDER BY CAST(createddate AS bigint) DESC`;
+
+      const result = await pool.query(query, filterParams);
+
+      // Return just the IDs as an array
+      res.json(result.rows.map((row) => row.id));
+    } catch (error) {
+      console.error("Error fetching invoice IDs:", error);
+      res.status(500).json({
+        message: "Error fetching invoice IDs",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/invoices/batch - Get Multiple Invoices By IDs
   router.get("/batch", async (req, res) => {
     const { ids } = req.query;
