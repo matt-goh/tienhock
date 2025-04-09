@@ -684,7 +684,11 @@ const InvoiceDetailsPage: React.FC = () => {
                     : "Submit for e-Invoicing"
                 }
               >
-                {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
+                {isSubmittingEInvoice
+                  ? "Submitting..."
+                  : invoiceData.einvoice_status === "pending"
+                  ? "Update e-Invoice"
+                  : "Submit e-Invoice"}
               </Button>
             )}
           {invoiceData.einvoice_status === "valid" && (
@@ -905,9 +909,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {(invoiceData.uuid || invoiceData.einvoice_status) && (
           <section className="p-4 border rounded-lg bg-white shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800">
-                {(invoiceData.einvoice_status === "valid" ||
+              {(invoiceData.einvoice_status === "valid" ||
                 invoiceData.einvoice_status === "cancelled") &&
-                invoiceData.long_id ? (
+              invoiceData.long_id ? (
                 <a
                   href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
                   target="_blank"
@@ -1114,8 +1118,18 @@ const InvoiceDetailsPage: React.FC = () => {
         onClose={() => setShowSubmitEInvoiceConfirm(false)}
         onConfirm={handleConfirmSubmitEInvoice}
         title="Submit Invoice for e-Invoicing"
-        message={`You are about to submit this invoice to the MyInvois e-invoicing system. Continue?`}
-        confirmButtonText="Submit e-Invoice"
+        message={
+          invoiceData.einvoice_status === "pending"
+            ? "You are about to update this invoice in the MyInvois e-invoicing system. Continue?"
+            : "You are about to submit this invoice to the MyInvois e-invoicing system. Continue?"
+        }
+        confirmButtonText={
+          isSubmittingEInvoice
+            ? "Submitting..."
+            : invoiceData.einvoice_status === "pending"
+            ? "Update e-Invoice"
+            : "Submit e-Invoice"
+        }
         variant="default"
       />
       <ConfirmationDialog

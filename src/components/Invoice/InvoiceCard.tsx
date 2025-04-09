@@ -221,15 +221,29 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
           {invoiceStatusStyle.label}
         </span>
         {/* E-Invoice Status */}
-        {eInvoiceStatusInfo && EInvoiceIcon && (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
-            title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
-          >
-            <EInvoiceIcon size={14} className="mr-1" />
-            e-Invoice
-          </span>
-        )}
+        {eInvoiceStatusInfo &&
+          EInvoiceIcon &&
+          (invoice.long_id ? (
+            <a
+              href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
+              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+            >
+              <EInvoiceIcon size={14} className="mr-1" />
+              e-Invoice
+            </a>
+          ) : (
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
+              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+            >
+              <EInvoiceIcon size={14} className="mr-1" />
+              e-Invoice
+            </span>
+          ))}
       </div>
     </div>
   );
