@@ -346,8 +346,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             {/* --- Payment Type Filter --- */}
             {/* Read/Write from/to pendingFilters */}
             <div className="">
-              {" "}
-              {/* Removed px-1 */}
               <Listbox
                 value={pendingFilters.paymentType}
                 // Use handlePendingFilterChange directly for single select
@@ -741,7 +739,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                 <IconTrash size={18} className="text-default-500" />
               </button>
             </div>
-          </div>{" "}
+          </div>
           {/* End Scrollable Content Area */}
           {/* --- Action Buttons Footer --- */}
           <div className="flex-shrink-0 flex justify-end gap-2 px-3 py-2 border-t border-default-200 bg-default-50 rounded-b-md">
