@@ -171,8 +171,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       dateRange: currentFilters.dateRange, // Preserve date range from applied filters
       salespersonId: null,
       paymentType: null,
-      invoiceStatus: [],
-      eInvoiceStatus: [],
+      invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
+      eInvoiceStatus: [], // Default e-invoice status
     };
     setPendingFilters(clearedPending);
   };
@@ -302,7 +302,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             leave="transition ease-in duration-100"
                             leaveFrom="opacity-100"
                             leaveTo="opacity-0"
-                          > 
+                          >
                             <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-sm">
                               {cachedSalesmanOptions.length === 0 ? (
                                 <div className="relative cursor-default select-none py-2 px-4 text-default-500">
