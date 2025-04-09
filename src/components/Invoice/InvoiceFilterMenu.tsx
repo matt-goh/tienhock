@@ -214,6 +214,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         icon={IconFilter}
         variant="outline"
+        className="w-full"
       >
         Filter
       </Button>
