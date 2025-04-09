@@ -173,6 +173,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       paymentType: null,
       invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
       eInvoiceStatus: [], // Default e-invoice status
+      consolidation: "all",
     };
     setPendingFilters(clearedPending);
   };
@@ -551,6 +552,101 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                           <span className={`ml-2`}>{status.name}</span>
                         </label>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Consolidation Filter */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Consolidation Status
+                    </label>
+                    <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-6">
+                      <label className="inline-flex items-center cursor-pointer">
+                        <div className="relative flex items-center">
+                          <input
+                            type="radio"
+                            name="consolidation"
+                            className="sr-only"
+                            checked={pendingFilters.consolidation === "all"}
+                            onChange={() =>
+                              handlePendingFilterChange("consolidation", "all")
+                            }
+                          />
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
+                              pendingFilters.consolidation === "all"
+                                ? "border-sky-500 bg-white"
+                                : "border-default-300 bg-white"
+                            }`}
+                          >
+                            {pendingFilters.consolidation === "all" && (
+                              <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-default-700">All</span>
+                      </label>
+                      <label className="inline-flex items-center cursor-pointer">
+                        <div className="relative flex items-center">
+                          <input
+                            type="radio"
+                            name="consolidation"
+                            className="sr-only"
+                            checked={
+                              pendingFilters.consolidation === "individual"
+                            }
+                            onChange={() =>
+                              handlePendingFilterChange(
+                                "consolidation",
+                                "individual"
+                              )
+                            }
+                          />
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
+                              pendingFilters.consolidation === "individual"
+                                ? "border-sky-500 bg-white"
+                                : "border-default-300 bg-white"
+                            }`}
+                          >
+                            {pendingFilters.consolidation === "individual" && (
+                              <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-default-700">Individual</span>
+                      </label>
+                      <label className="inline-flex items-center cursor-pointer">
+                        <div className="relative flex items-center">
+                          <input
+                            type="radio"
+                            name="consolidation"
+                            className="sr-only"
+                            checked={
+                              pendingFilters.consolidation === "consolidated"
+                            }
+                            onChange={() =>
+                              handlePendingFilterChange(
+                                "consolidation",
+                                "consolidated"
+                              )
+                            }
+                          />
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
+                              pendingFilters.consolidation === "consolidated"
+                                ? "border-sky-500 bg-white"
+                                : "border-default-300 bg-white"
+                            }`}
+                          >
+                            {pendingFilters.consolidation ===
+                              "consolidated" && (
+                              <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-default-700">Consolidated</span>
+                      </label>
                     </div>
                   </div>
 

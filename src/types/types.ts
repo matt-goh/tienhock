@@ -341,11 +341,11 @@ export interface InvoiceData {
   einvoice_status: EInvoiceStatus; // Keep EInvoiceStatus type separate
 
   products: ProductItem[];
+  customerName?: string; // For UI display
 }
 
 // Extended invoice for UI purposes
 export interface ExtendedInvoiceData extends InvoiceData {
-  customerName?: string; // For UI display
   isEditing?: boolean; // UI state flag
   originalId?: string; // Used when invoice ID itself is changed during edit
   cancellation_date?: string | null; // ISO date string of cancellation (might come from cancelled_invoices table)
@@ -452,6 +452,7 @@ export interface InvoiceFilters {
   paymentType: string | null;
   invoiceStatus: string[];
   eInvoiceStatus: string[];
+  consolidation: "all" | "individual" | "consolidated";
 }
 
 export interface CustomerList {

@@ -159,6 +159,13 @@ export const getInvoices = async (
       params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
     }
 
+    // Handle consolidation filter
+    if (filters.consolidation === "consolidated") {
+      params.append("consolidated_only", "true");
+    } else if (filters.consolidation === "individual") {
+      params.append("exclude_consolidated", "true");
+    }
+
     // Add search term
     if (searchTerm) {
       params.append("search", searchTerm);

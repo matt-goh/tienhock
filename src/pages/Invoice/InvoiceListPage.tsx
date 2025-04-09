@@ -163,6 +163,7 @@ const InvoiceListPage: React.FC = () => {
       paymentType: null,
       invoiceStatus: ["paid", "Unpaid", "overdue"], // Default excludes 'cancelled'
       eInvoiceStatus: [],
+      consolidation: "all",
     }),
     []
   );
@@ -174,6 +175,7 @@ const InvoiceListPage: React.FC = () => {
     paymentType: null,
     invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
     eInvoiceStatus: [], // Default e-invoice status
+    consolidation: "all",
   };
 
   // Month Selector State
@@ -331,6 +333,11 @@ const InvoiceListPage: React.FC = () => {
 
     // Check if e-invoice status filter is active
     if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+      count++;
+    }
+
+    // Check if consolidation filter is active
+    if (filters.consolidation !== DEFAULT_FILTERS.consolidation) {
       count++;
     }
 
@@ -1115,6 +1122,24 @@ const InvoiceListPage: React.FC = () => {
                             </div>
                           </li>
                         )}
+
+                      {filters.consolidation !== "all" && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconFiles size={14} className="text-sky-600" />
+                          </div>
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Consolidation
+                            </span>
+                            <div className="font-medium">
+                              {filters.consolidation === "consolidated"
+                                ? "Consolidated"
+                                : "Individual"}
+                            </div>
+                          </div>
+                        </li>
+                      )}
                     </ul>
                   )}
                 </div>
