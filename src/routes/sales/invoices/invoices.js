@@ -339,23 +339,36 @@ export default function (pool, config) {
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName, c.tin_number, c.id_number,
+          (
+            SELECT jsonb_build_object(
+              'id', con.id,
+              'uuid', con.uuid,
+              'long_id', con.long_id,
+              'einvoice_status', con.einvoice_status
+            )
+            FROM invoices con
+            WHERE con.is_consolidated = true
+              AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+              AND con.invoice_status != 'cancelled'
+            LIMIT 1
+          ) as consolidated_part_of,
           COALESCE(
-        json_agg(
-          json_build_object(
-             'id', od.id,
-             'code', od.code,
-             'quantity', od.quantity,
-             'price', od.price,
-             'freeProduct', od.freeproduct,
-             'returnProduct', od.returnproduct,
-             'description', od.description,
-             'tax', od.tax,
-             'total', od.total,
-             'issubtotal', od.issubtotal
-          )
-          ORDER BY od.id
-        ) FILTER (WHERE od.id IS NOT NULL),
-        '[]'::json
+            json_agg(
+              json_build_object(
+                'id', od.id,
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+              ORDER BY od.id
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
           ) as products
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
@@ -392,11 +405,12 @@ export default function (pool, config) {
         datetime_validated: invoice.datetime_validated,
         is_consolidated: invoice.is_consolidated || false,
         consolidated_invoices: invoice.consolidated_invoices,
+        consolidated_part_of: invoice.consolidated_part_of,
         customerName: invoice.customername || invoice.customerid,
         customerTin: invoice.tin_number,
         customerIdNumber: invoice.id_number,
         products: (invoice.products || []).map((product) => ({
-          id: product.id, // order_details.id
+          id: product.id,
           code: product.code,
           price: parseFloat(product.price || 0),
           quantity: parseInt(product.quantity || 0),
