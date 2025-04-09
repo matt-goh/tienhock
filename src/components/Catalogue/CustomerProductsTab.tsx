@@ -19,17 +19,6 @@ interface CustomerProductsTabProps {
   disabled?: boolean; // Optional disabled state for inputs/buttons
 }
 
-// Helper function to format currency for display/input editing
-const formatCurrencyForInput = (
-  value: number | string | null | undefined
-): string => {
-  if (value === null || value === undefined) return "";
-  // If it's already a string (e.g., "12."), keep it for editing
-  if (typeof value === "string") return value;
-  // Otherwise, format the number
-  return Number(value).toFixed(2);
-};
-
 const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   products: customerProducts, // Rename prop internally for clarity
   onProductsChange,

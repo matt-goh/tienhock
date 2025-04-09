@@ -27,6 +27,8 @@ import {
   IconSquareCheckFilled,
   IconFilter,
   IconX,
+  IconCircleCheck,
+  IconUser,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -682,6 +684,8 @@ const InvoiceListPage: React.FC = () => {
   const [customerOptions, setCustomerOptions] = useState<SelectOption[]>([]);
   const [activeFilterCount, setActiveFilterCount] = useState(0);
   const [customerQuery, setCustomerQuery] = useState("");
+  const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
+  const [hasViewedFilters, setHasViewedFilters] = useState(false);
 
   const ITEMS_PER_PAGE = 12;
 
@@ -697,6 +701,12 @@ const InvoiceListPage: React.FC = () => {
     if (filters.consolidation !== "all") count++;
     setActiveFilterCount(count);
   }, [filters]);
+
+  useEffect(() => {
+    if (activeFilterCount > 0) {
+      setHasViewedFilters(false);
+    }
+  }, [filters]); // This will reset hasViewedFilters whenever filters change
 
   // Function to save dates to localStorage
   const saveDatesToStorage = (startDate: Date, endDate: Date) => {
@@ -1571,19 +1581,64 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Filters button */}
-            <Button
-              onClick={() => setShowFilters(true)}
-              icon={IconFilter}
-              variant="outline"
-              className="relative"
-            >
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-sky-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
+            <div className="relative">
+              <Button
+                onClick={() => setShowFilters(true)}
+                icon={IconFilter}
+                variant="outline"
+                className="relative w-full"
+                onMouseEnter={() => {
+                  setIsFilterButtonHovered(true);
+                  setHasViewedFilters(true);
+                }}
+                onMouseLeave={() => setIsFilterButtonHovered(false)}
+              >
+                Filters
+                {activeFilterCount > 0 && !hasViewedFilters && (
+                  <span className="absolute -top-1 -right-1 bg-sky-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+
+              {/* Filters info dropdown panel */}
+              {isFilterButtonHovered && activeFilterCount > 0 && (
+                <div className="absolute z-10 mt-1 w-64 bg-white rounded-md shadow-lg py-2 px-3 text-sm border border-default-200">
+                  <h3 className="font-medium text-default-700 mb-1">
+                    Applied Filters:
+                  </h3>
+                  <ul className="space-y-1">
+                    {filters.customer_id && (
+                      <li className="text-default-600 flex items-center">
+                        <IconUser size={14} className="mr-1.5 text-sky-500" />
+                        Customer:{" "}
+                        {customerOptions.find(
+                          (c) => c.id === filters.customer_id
+                        )?.name || "Unknown"}
+                      </li>
+                    )}
+                    {filters.status && filters.status.length > 0 && (
+                      <li className="text-default-600 flex items-center">
+                        <IconCircleCheck
+                          size={14}
+                          className="mr-1.5 text-sky-500"
+                        />
+                        Status: {filters.status.join(", ")}
+                      </li>
+                    )}
+                    {filters.consolidation !== "all" && (
+                      <li className="text-default-600 flex items-center">
+                        <IconFiles size={14} className="mr-1.5 text-sky-500" />
+                        Consolidation:{" "}
+                        {filters.consolidation === "consolidated"
+                          ? "Part of Consolidated"
+                          : "Standalone Only"}
+                      </li>
+                    )}
+                  </ul>
+                </div>
               )}
-            </Button>
+            </div>
 
             {/* Search input */}
             <div className="w-full sm:w-64 relative">
