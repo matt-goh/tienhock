@@ -689,30 +689,52 @@ const InvoiceListPage: React.FC = () => {
 
   const ITEMS_PER_PAGE = 12;
 
+  // Define default filter values as constants
+  const DEFAULT_FILTERS: InvoiceFilters = {
+    customer_id: null,
+    status: ["active", "overdue", "paid"],
+    consolidation: "all",
+  };
+
   // Effect to fetch invoices when filters change
   useEffect(() => {
     fetchInvoices();
   }, [dateRange]);
 
+  // Effect to calculate active filter count comparing against defaults
   useEffect(() => {
     let count = 0;
-    if (filters.customer_id) count++;
 
-    // Only count status if it's different from the default (just "active")
-    if (
-      filters.status &&
-      !(
-        filters.status.length === 3 &&
-        filters.status[0] === "active" &&
-        filters.status[1] === "overdue" &&
-        filters.status[2] === "paid"
-      )
-    ) {
+    // Check if customer filter is active
+    if (filters.customer_id !== DEFAULT_FILTERS.customer_id) {
       count++;
     }
 
-    // Only count consolidation if it's not the default "individual"
-    if (filters.consolidation !== "all") count++;
+    // Check if status filter is different from default
+    if (filters.status) {
+      // Need to compare arrays contents, not references
+      const isDefaultStatus =
+        DEFAULT_FILTERS.status !== null &&
+        filters.status.length === DEFAULT_FILTERS.status.length &&
+        filters.status.every((status) =>
+          DEFAULT_FILTERS.status?.includes(status)
+        ) &&
+        DEFAULT_FILTERS.status.every((status) =>
+          filters.status?.includes(status)
+        );
+
+      if (!isDefaultStatus) {
+        count++;
+      }
+    } else if (DEFAULT_FILTERS.status !== null) {
+      // If filters.status is null but default isn't
+      count++;
+    }
+
+    // Check if consolidation filter is active
+    if (filters.consolidation !== DEFAULT_FILTERS.consolidation) {
+      count++;
+    }
 
     setActiveFilterCount(count);
   }, [filters]);
@@ -1617,68 +1639,77 @@ const InvoiceListPage: React.FC = () => {
               </Button>
 
               {/* Filters info dropdown panel - Improved */}
-              {isFilterButtonHovered && activeFilterCount > 0 && (
+              {isFilterButtonHovered && (
                 <div className="absolute z-10 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
                   <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
-                    Applied Filters
+                    {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
-                  <ul className="space-y-2">
-                    {filters.customer_id && (
-                      <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                        <div className="bg-sky-100 p-1 rounded-md mr-2">
-                          <IconUser size={14} className="text-sky-600" />
-                        </div>
-                        <div>
-                          <span className="text-default-500 text-xs">
-                            Customer
-                          </span>
-                          <div className="font-medium truncate">
-                            {customerOptions.find(
-                              (c) => c.id === filters.customer_id
-                            )?.name || "Unknown"}
+                  {activeFilterCount === 0 ? (
+                    <div className="text-default-500 py-2 px-1">
+                      No filters applied.
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {filters.customer_id && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconUser size={14} className="text-sky-600" />
                           </div>
-                        </div>
-                      </li>
-                    )}
-                    {filters.status && filters.status.length > 0 && (
-                      <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                        <div className="bg-sky-100 p-1 rounded-md mr-2">
-                          <IconCircleCheck size={14} className="text-sky-600" />
-                        </div>
-                        <div>
-                          <span className="text-default-500 text-xs">
-                            Status
-                          </span>
-                          <div className="font-medium">
-                            {filters.status
-                              .map(
-                                (status) =>
-                                  status.charAt(0).toUpperCase() +
-                                  status.slice(1)
-                              )
-                              .join(", ")}
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Customer
+                            </span>
+                            <div className="font-medium truncate">
+                              {customerOptions.find(
+                                (c) => c.id === filters.customer_id
+                              )?.name || "Unknown"}
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    )}
-                    {filters.consolidation !== "all" && (
-                      <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                        <div className="bg-sky-100 p-1 rounded-md mr-2">
-                          <IconFiles size={14} className="text-sky-600" />
-                        </div>
-                        <div>
-                          <span className="text-default-500 text-xs">
-                            Consolidation
-                          </span>
-                          <div className="font-medium">
-                            {filters.consolidation === "consolidated"
-                              ? "Consolidated"
-                              : "Individual"}
+                        </li>
+                      )}
+                      {filters.status && filters.status.length > 0 && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconCircleCheck
+                              size={14}
+                              className="text-sky-600"
+                            />
                           </div>
-                        </div>
-                      </li>
-                    )}
-                  </ul>
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Status
+                            </span>
+                            <div className="font-medium">
+                              {filters.status
+                                .map(
+                                  (status) =>
+                                    status.charAt(0).toUpperCase() +
+                                    status.slice(1)
+                                )
+                                .join(", ")}
+                            </div>
+                          </div>
+                        </li>
+                      )}
+                      {filters.consolidation !== "all" && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconFiles size={14} className="text-sky-600" />
+                          </div>
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Consolidation
+                            </span>
+                            <div className="font-medium">
+                              {filters.consolidation === "consolidated"
+                                ? "Consolidated"
+                                : "Individual"}
+                            </div>
+                          </div>
+                        </li>
+                      )}
+                    </ul>
+                  )}
                 </div>
               )}
             </div>
