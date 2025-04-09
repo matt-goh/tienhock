@@ -353,6 +353,7 @@ export interface ExtendedInvoiceData extends InvoiceData {
   payment_method?: Payment["payment_method"];
   payment_reference?: string;
   payment_notes?: string;
+  consolidated_part_of?: ConsolidatedInfo | null;
 }
 
 export interface ProductItem {
@@ -556,4 +557,11 @@ export interface EInvoiceSubmissionResult {
       message: string;
     };
   }>;
+}
+
+export interface ConsolidatedInfo {
+  id: string;
+  uuid: string | null;
+  long_id: string | null;
+  einvoice_status: EInvoiceStatus;
 }

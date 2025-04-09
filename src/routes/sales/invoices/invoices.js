@@ -120,7 +120,20 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType
+          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType,
+          (
+            SELECT jsonb_build_object(
+              'id', con.id,
+              'uuid', con.uuid,
+              'long_id', con.long_id,
+              'einvoice_status', con.einvoice_status
+            )
+            FROM invoices con
+            WHERE con.is_consolidated = true
+              AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+              AND con.invoice_status != 'cancelled'
+            LIMIT 1
+          ) as consolidated_part_of
       `;
       let fromClause = `
         FROM invoices i
@@ -237,6 +250,7 @@ export default function (pool, config) {
         datetime_validated: row.datetime_validated,
         is_consolidated: row.is_consolidated || false,
         consolidated_invoices: row.consolidated_invoices,
+        consolidated_part_of: row.consolidated_part_of,
         customerName: row.customername || row.customerid,
         customerTin: row.customertin,
         customerIdNumber: row.customeridnumber,
@@ -1306,7 +1320,8 @@ export default function (pool, config) {
       res.status(200).json({
         message:
           "Invoice and associated active payments cancelled successfully",
-        deletedInvoice: { // using deletedInvoice to match the old format for mobile app to work
+        deletedInvoice: {
+          // using deletedInvoice to match the old format for mobile app to work
           ...finalCancelledInvoice,
           total_excluding_tax: parseFloat(
             finalCancelledInvoice.total_excluding_tax || 0
