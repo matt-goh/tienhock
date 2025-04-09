@@ -33,6 +33,10 @@ import {
   IconBan,
   IconSelectAll,
   IconFiles,
+  IconCash,
+  IconCircleCheck,
+  IconFileInvoice,
+  IconUser,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -147,19 +151,18 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoicesForPDF, setSelectedInvoicesForPDF] = useState<
     ExtendedInvoiceData[]
   >([]);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
+  const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
+  const [hasViewedFilters, setHasViewedFilters] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
     (): InvoiceFilters => ({
-      dateRange: getInitialDates(), // Get dates from storage or default
+      dateRange: getInitialDates(),
       salespersonId: null,
-      applySalespersonFilter: true,
       paymentType: null,
-      applyPaymentTypeFilter: true,
-      invoiceStatus: [],
-      applyInvoiceStatusFilter: true,
+      invoiceStatus: ["paid", "Unpaid", "overdue"], // Default excludes 'cancelled'
       eInvoiceStatus: [],
-      applyEInvoiceStatusFilter: true,
     }),
     []
   );
@@ -288,6 +291,51 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [showEInvoiceDownloader, eInvoicesToDownload]);
 
+  useEffect(() => {
+    let count = 0;
+    const defaultInvoiceStatus = ["paid", "Unpaid", "overdue"];
+
+    // Check if salesperson filter is active
+    if (filters.salespersonId && filters.salespersonId.length > 0) {
+      count++;
+    }
+
+    // Check if payment type filter is active
+    if (filters.paymentType) {
+      count++;
+    }
+
+    // Check if invoice status filter is different from default
+    if (filters.invoiceStatus) {
+      const isDefaultStatus =
+        filters.invoiceStatus.length === defaultInvoiceStatus.length &&
+        filters.invoiceStatus.every((status) =>
+          defaultInvoiceStatus.includes(status)
+        ) &&
+        defaultInvoiceStatus.every((status) =>
+          filters.invoiceStatus?.includes(status)
+        );
+
+      if (!isDefaultStatus) {
+        count++;
+      }
+    }
+
+    // Check if e-invoice status filter is active
+    if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+      count++;
+    }
+
+    setActiveFilterCount(count);
+  }, [filters]);
+
+  // Add this effect to reset hasViewedFilters
+  useEffect(() => {
+    if (activeFilterCount > 0) {
+      setHasViewedFilters(false);
+    }
+  }, [filters]); // Reset when filters change
+
   // Filter Change Handler - Receives the COMPLETE, new filter state to apply
   const handleApplyFilters = useCallback(
     (newAppliedFilters: InvoiceFilters) => {
@@ -397,28 +445,24 @@ const InvoiceListPage: React.FC = () => {
             updatedFilters = {
               ...updatedFilters,
               salespersonId: null,
-              applySalespersonFilter: false,
             };
             break;
           case "paymentType":
             updatedFilters = {
               ...updatedFilters,
               paymentType: null,
-              applyPaymentTypeFilter: false,
             };
             break;
           case "invoiceStatus":
             updatedFilters = {
               ...updatedFilters,
               invoiceStatus: [],
-              applyInvoiceStatusFilter: false,
             };
             break;
           case "eInvoiceStatus":
             updatedFilters = {
               ...updatedFilters,
               eInvoiceStatus: [],
-              applyEInvoiceStatusFilter: false,
             };
             break;
           // Add cases for other filter types if needed
@@ -1008,14 +1052,131 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Filter Menu Button */}
-            <InvoiceFilterMenu
-              currentFilters={filters}
-              onFilterChange={handleApplyFilters}
-              salesmanOptions={salesmen.map((s) => ({
-                id: s.id,
-                name: s.name || s.id,
-              }))}
-            />
+            <div className="relative">
+              <InvoiceFilterMenu
+                currentFilters={filters}
+                onFilterChange={handleApplyFilters}
+                salesmanOptions={salesmen.map((s) => ({
+                  id: s.id,
+                  name: s.name || s.id,
+                }))}
+                onMouseEnter={() => {
+                  setIsFilterButtonHovered(true);
+                  setHasViewedFilters(true);
+                }}
+                onMouseLeave={() => setIsFilterButtonHovered(false)}
+                activeFilterCount={activeFilterCount}
+                hasViewedFilters={hasViewedFilters}
+              />
+
+              {/* Filters info dropdown panel */}
+              {isFilterButtonHovered && (
+                <div className="absolute z-10 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
+                  <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
+                    {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
+                  </h3>
+                  {activeFilterCount === 0 ? (
+                    <div className="text-default-500 py-2 px-1">
+                      No filters applied.
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {filters.salespersonId &&
+                        filters.salespersonId.length > 0 && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                              <IconUser size={14} className="text-sky-600" />
+                            </div>
+                            <div>
+                              <span className="text-default-500 text-xs">
+                                Salesperson
+                              </span>
+                              <div className="font-medium truncate">
+                                {filters.salespersonId.join(", ")}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+
+                      {filters.paymentType && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconCash size={14} className="text-sky-600" />
+                          </div>
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Payment Type
+                            </span>
+                            <div className="font-medium">
+                              {filters.paymentType}
+                            </div>
+                          </div>
+                        </li>
+                      )}
+
+                      {filters.invoiceStatus &&
+                        filters.invoiceStatus.length > 0 &&
+                        !(
+                          filters.invoiceStatus.length === 3 &&
+                          filters.invoiceStatus.includes("paid") &&
+                          filters.invoiceStatus.includes("Unpaid") &&
+                          filters.invoiceStatus.includes("overdue")
+                        ) && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                              <IconCircleCheck
+                                size={14}
+                                className="text-sky-600"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-default-500 text-xs">
+                                Invoice Status
+                              </span>
+                              <div className="font-medium">
+                                {filters.invoiceStatus
+                                  .map(
+                                    (status) =>
+                                      status.charAt(0).toUpperCase() +
+                                      status.slice(1)
+                                  )
+                                  .join(", ")}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+
+                      {filters.eInvoiceStatus &&
+                        filters.eInvoiceStatus.length > 0 && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                              <IconFileInvoice
+                                size={14}
+                                className="text-sky-600"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-default-500 text-xs">
+                                E-Invoice Status
+                              </span>
+                              <div className="font-medium">
+                                {filters.eInvoiceStatus
+                                  .map((status) =>
+                                    status === "null"
+                                      ? "Not Submitted"
+                                      : status.charAt(0).toUpperCase() +
+                                        status.slice(1)
+                                  )
+                                  .join(", ")}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {/* --- Batch Action Bar --- */}

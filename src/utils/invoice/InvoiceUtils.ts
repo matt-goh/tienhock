@@ -142,16 +142,6 @@ export const getInvoices = async (
       params.append("endDate", endDate.getTime().toString());
     }
 
-    // Other Filters (check backend expects comma-separated strings)
-    if (filters.applySalespersonFilter && filters.salespersonId?.length)
-      params.append("salesman", filters.salespersonId.join(","));
-    if (filters.applyPaymentTypeFilter && filters.paymentType)
-      params.append("paymentType", filters.paymentType); // CASH or INVOICE
-    if (filters.applyInvoiceStatusFilter && filters.invoiceStatus?.length)
-      params.append("invoiceStatus", filters.invoiceStatus.join(","));
-    if (filters.applyEInvoiceStatusFilter && filters.eInvoiceStatus?.length)
-      params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
-
     // Search Term
     if (searchTerm) params.append("search", searchTerm);
 

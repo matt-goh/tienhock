@@ -167,6 +167,9 @@ export default function (pool, config) {
         const statusParam = `$${filterParamCounter++}`;
         filterParams.push(invoiceStatus.split(","));
         whereClause += ` AND i.invoice_status = ANY(${statusParam})`;
+      } else {
+        // Default filter to exclude cancelled invoices
+        whereClause += ` AND i.invoice_status != 'cancelled'`;
       }
       if (eInvoiceStatus) {
         const eStatusParam = `$${filterParamCounter++}`;

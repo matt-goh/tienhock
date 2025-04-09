@@ -449,13 +449,9 @@ export interface InvoiceFilters {
     end: Date | null;
   };
   salespersonId: string[] | null;
-  applySalespersonFilter: boolean;
   paymentType: string | null;
-  applyPaymentTypeFilter?: boolean;
   invoiceStatus: string[];
-  applyInvoiceStatusFilter: boolean;
   eInvoiceStatus: string[];
-  applyEInvoiceStatusFilter: boolean;
 }
 
 export interface CustomerList {
