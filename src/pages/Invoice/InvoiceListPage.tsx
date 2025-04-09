@@ -1015,8 +1015,7 @@ const InvoiceListPage: React.FC = () => {
             </Listbox>
           </div>
           {/* Search Input */}
-          <div className="flex-grow relative min-w-[250px]">
-            {" "}
+          <div className="flex-grow relative min-w-[200px]">
             {/* Ensure minimum width */}
             <IconSearch
               className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
