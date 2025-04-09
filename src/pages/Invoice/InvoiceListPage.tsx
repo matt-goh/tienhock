@@ -914,33 +914,6 @@ const InvoiceListPage: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
             Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
           </h1>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              onClick={() => setShowConsolidatedModal(true)}
-              icon={IconFiles}
-              variant="outline"
-              color="amber"
-              disabled={isLoading}
-            >
-              Consolidated
-            </Button>
-            <Button
-              onClick={handleRefresh}
-              icon={IconRefresh}
-              variant="outline"
-              disabled={isLoading}
-            >
-              Refresh
-            </Button>
-            <Button
-              onClick={handleCreateNewInvoice}
-              icon={IconPlus}
-              variant="filled"
-              color="sky"
-            >
-              Create New
-            </Button>
-          </div>
         </div>
         {/* --- Filters Row --- */}
         <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center flex-wrap flex-shrink-0">
@@ -1105,105 +1078,136 @@ const InvoiceListPage: React.FC = () => {
           </div>
 
           {/* Action Buttons (Show only when items are selected) */}
-          {selectedInvoiceIds.size > 0 && (
-            <div
-              className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
-              onClick={(e) => e.stopPropagation()} // Prevent row selection click
-            >
-              <Button
-                size="sm"
-                variant="outline"
-                color="rose"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkCancel();
-                }}
-                icon={IconBan}
-                disabled={isLoading}
-                aria-label="Cancel Selected Invoices"
-                title="Cancel"
-              >
-                Cancel
-              </Button>
-              {hasCancelledUnsynced() && (
+          <div
+            className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
+            onClick={(e) => e.stopPropagation()} // Prevent row selection click
+          >
+            {selectedInvoiceIds.size > 0 && (
+              <>
                 <Button
                   size="sm"
                   variant="outline"
                   color="rose"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleBatchSyncCancellation();
+                    handleBulkCancel();
                   }}
-                  icon={IconRefresh}
+                  icon={IconBan}
                   disabled={isLoading}
-                  aria-label="Sync Cancellation Status"
-                  title="Sync Cancellation Status"
+                  aria-label="Cancel Selected Invoices"
+                  title="Cancel"
                 >
-                  Sync Cancellation
+                  Cancel
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                color="amber"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkSubmitEInvoice();
-                }}
-                icon={IconSend}
-                disabled={isLoading}
-                aria-label="Submit Selected for E-Invoice"
-                title="Submit e-Invoice"
-              >
-                Submit e-Invoice
-              </Button>
-              {hasValidEInvoices() && (
+                {hasCancelledUnsynced() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="rose"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBatchSyncCancellation();
+                    }}
+                    icon={IconRefresh}
+                    disabled={isLoading}
+                    aria-label="Sync Cancellation Status"
+                    title="Sync Cancellation Status"
+                  >
+                    Sync Cancellation
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
-                  color="sky"
+                  color="amber"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDownloadValidEInvoices();
+                    handleBulkSubmitEInvoice();
+                  }}
+                  icon={IconSend}
+                  disabled={isLoading}
+                  aria-label="Submit Selected for E-Invoice"
+                  title="Submit e-Invoice"
+                >
+                  Submit e-Invoice
+                </Button>
+                {hasValidEInvoices() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="sky"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadValidEInvoices();
+                    }}
+                    icon={IconFileDownload}
+                    disabled={isLoading}
+                    aria-label="e-Invoice"
+                    title="Download e-Invoice"
+                  >
+                    Download e-Invoice
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkDownload();
                   }}
                   icon={IconFileDownload}
                   disabled={isLoading}
-                  aria-label="e-Invoice"
-                  title="Download e-Invoice"
+                  aria-label="Download Selected Invoices"
+                  title="Download PDF"
                 >
-                  Download e-Invoice
+                  Download
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkDownload();
-                }}
-                icon={IconFileDownload}
-                disabled={isLoading}
-                aria-label="Download Selected Invoices"
-                title="Download PDF"
-              >
-                Download
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkPrint();
-                }}
-                icon={IconPrinter}
-                disabled={isLoading}
-                aria-label="Print Selected Invoices"
-                title="Print PDF"
-              >
-                Print
-              </Button>
-            </div>
-          )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkPrint();
+                  }}
+                  icon={IconPrinter}
+                  disabled={isLoading}
+                  aria-label="Print Selected Invoices"
+                  title="Print PDF"
+                >
+                  Print
+                </Button>
+              </>
+            )}
+
+            <Button
+              onClick={() => setShowConsolidatedModal(true)}
+              icon={IconFiles}
+              variant="outline"
+              color="amber"
+              disabled={isLoading}
+              size="sm"
+            >
+              Consolidated
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              icon={IconRefresh}
+              variant="outline"
+              disabled={isLoading}
+              size="sm"
+            >
+              Refresh
+            </Button>
+            <Button
+              onClick={handleCreateNewInvoice}
+              icon={IconPlus}
+              variant="filled"
+              color="sky"
+              size="sm"
+            >
+              Create New
+            </Button>
+          </div>
         </div>
         {/* --- Invoice Grid Area --- */}
         <div className="flex-1 min-h-[400px] relative">
