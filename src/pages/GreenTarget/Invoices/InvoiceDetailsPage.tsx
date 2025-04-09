@@ -14,6 +14,7 @@ import {
   IconCancel,
   IconRefresh,
   IconFileDownload,
+  IconFiles,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -104,6 +105,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [consolidatedInfo, setConsolidatedInfo] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -150,8 +152,8 @@ const InvoiceDetailsPage: React.FC = () => {
       const invoice = data.invoice;
 
       setInvoice(invoice);
-
       setPayments(data.payments || []);
+      setConsolidatedInfo(invoice.consolidated_part_of || null);
 
       // Pre-fill amount in payment form
       setPaymentFormData((prev) => ({
@@ -550,6 +552,22 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const getConsolidatedInfo = (consolidatedInfo: any) => {
+    if (!consolidatedInfo) return null;
+
+    // Only show for valid consolidated invoices
+    if (consolidatedInfo.einvoice_status !== "valid") return null;
+
+    return {
+      text: "Consolidated",
+      color: "text-indigo-700",
+      bg: "bg-indigo-50",
+      border: "border-indigo-200",
+      icon: IconFiles,
+      info: consolidatedInfo,
+    };
+  };
+
   const handleSyncCancellationStatus = async () => {
     if (!invoice?.invoice_id) return;
 
@@ -782,6 +800,7 @@ const InvoiceDetailsPage: React.FC = () => {
             >
               {invoice.invoice_number}
             </span>
+            {/* e-Invoice status badges */}
             {invoice.einvoice_status === "valid" && (
               <button
                 className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 border border-green-300 text-green-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
@@ -809,6 +828,20 @@ const InvoiceDetailsPage: React.FC = () => {
                 <span className="truncate">e-Invoice Invalid</span>
               </button>
             )}
+            {/* Consolidated badge */}
+            {consolidatedInfo &&
+              consolidatedInfo.einvoice_status === "valid" && (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${consolidatedInfo.uuid}/share/${consolidatedInfo.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-3 px-3 py-1.5 text-xs font-medium bg-indigo-100 border border-indigo-300 text-indigo-600 rounded-full flex items-center gap-1 max-w-[180px]"
+                  title={`Part of consolidated invoice ${consolidatedInfo.invoice_number}`}
+                >
+                  <IconFiles size={18} stroke={1.5} />
+                  <span className="truncate">Consolidated</span>
+                </a>
+              )}
           </h1>
         </div>
 

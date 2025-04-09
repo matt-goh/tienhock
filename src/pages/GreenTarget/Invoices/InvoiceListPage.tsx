@@ -130,6 +130,36 @@ const InvoiceCard = ({
     }
   };
 
+  const getConsolidatedBadge = () => {
+    if (!invoice.consolidated_part_of) return null;
+
+    // Only show for valid consolidated invoices
+    if (invoice.consolidated_part_of.einvoice_status !== "valid") return null;
+
+    return (
+      <a
+        href={
+          invoice.consolidated_part_of.long_id
+            ? `https://myinvois.hasil.gov.my/${invoice.consolidated_part_of.uuid}/share/${invoice.consolidated_part_of.long_id}`
+            : "#"
+        }
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center text-xs font-medium text-indigo-700 hover:text-indigo-800 hover:underline"
+        onClick={(e) => {
+          if (!invoice.consolidated_part_of?.long_id) {
+            e.preventDefault();
+          }
+          e.stopPropagation();
+        }}
+        title={`Part of consolidated invoice ${invoice.consolidated_part_of.invoice_number}`}
+      >
+        <IconFiles size={14} className="mr-1" />
+        Consolidated
+      </a>
+    );
+  };
+
   const isPaid = invoice.current_balance <= 0;
   const isCancelled = invoice.status === "cancelled";
 
@@ -360,6 +390,13 @@ const InvoiceCard = ({
                       e-Invoice Cancelled
                     </a>
                   ) : null}
+                </div>
+              )}
+
+              {/* Consolidated Badge */}
+              {invoice.consolidated_part_of && (
+                <div className="truncate overflow-auto">
+                  {getConsolidatedBadge()}
                 </div>
               )}
             </div>
@@ -1487,6 +1524,15 @@ const InvoiceListPage: React.FC = () => {
 
             {/* Action buttons */}
             <div className="flex gap-2 items-center whitespace-nowrap">
+              <Button
+                onClick={() => fetchInvoices()}
+                icon={IconRefresh}
+                variant="outline"
+                title="Refresh invoice data"
+                aria-label="Refresh invoices"
+              >
+                Refresh
+              </Button>
               <Button
                 onClick={() => setIsConsolidateModalOpen(true)}
                 icon={IconFiles}
