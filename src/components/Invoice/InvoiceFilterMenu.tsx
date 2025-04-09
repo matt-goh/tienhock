@@ -284,12 +284,12 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     <div className="relative">
                       <div className="flex items-center">
                         <div className="relative w-full">
-                          <ComboboxButton className="w-full text-left py-2 pl-3 pr-10 border border-default-300 rounded-lg flex items-center justify-between">
+                          <ComboboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 rounded-lg flex items-center justify-between">
                             <span className="block truncate">
                               {pendingFilters.salespersonId &&
                               pendingFilters.salespersonId.length > 0
                                 ? `${pendingFilters.salespersonId.length} selected`
-                                : "Select salespeople..."}
+                                : "Select salesman"}
                             </span>
                             <IconChevronDown
                               className="text-default-400 ml-2"
@@ -302,7 +302,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             leave="transition ease-in duration-100"
                             leaveFrom="opacity-100"
                             leaveTo="opacity-0"
-                          >
+                          > 
                             <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-sm">
                               {cachedSalesmanOptions.length === 0 ? (
                                 <div className="relative cursor-default select-none py-2 px-4 text-default-500">
@@ -385,7 +385,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                       }
                     >
                       <div className="relative w-full">
-                        <ListboxButton className="w-full text-left py-2 pl-3 pr-10 border border-default-300 rounded-lg flex items-center justify-between">
+                        <ListboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 rounded-lg flex items-center justify-between">
                           <span className="block truncate">
                             {pendingFilters.paymentType === "Cash"
                               ? "Cash Sales"
@@ -449,14 +449,14 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
                 {/* Invoice Status Filter */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium">
                     Invoice Status
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {invoiceStatusOptions.map((status) => (
                       <label
                         key={status.id}
-                        className="inline-flex items-center group cursor-pointer py-1"
+                        className="inline-flex items-center group cursor-pointer py-2"
                       >
                         <div className="relative flex items-center">
                           <input
@@ -500,14 +500,14 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                   </div>
                   {/* E-Invoice Status Filter */}
                   <div>
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block text-sm font-medium">
                       E-Invoice Status
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {eInvoiceStatusOptions.map((status) => (
                         <label
                           key={status.id}
-                          className="inline-flex items-center group cursor-pointer py-1"
+                          className="inline-flex items-center group cursor-pointer py-2"
                         >
                           <div className="relative flex items-center">
                             <input

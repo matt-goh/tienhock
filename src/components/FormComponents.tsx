@@ -377,7 +377,6 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
         disabled={disabled}
         name={name}
         multiple={isMultiple} // Set based on mode
-        nullable={!isMultiple} // Allow null selection in single mode
       >
         <div className="relative">
           {/* Input area */}
