@@ -1024,7 +1024,7 @@ const InvoiceListPage: React.FC = () => {
             selectedInvoiceIds.size > 0
               ? "bg-sky-50 border border-sky-200"
               : "bg-white border border-dashed border-default-200"
-          } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-0 z-0 shadow-sm`}
           onClick={handleSelectAllOnPage}
           title={
             selectionState.isAllSelectedOnPage
@@ -1032,55 +1032,56 @@ const InvoiceListPage: React.FC = () => {
               : "Select All on Page"
           }
         >
-          {/* Selection checkbox - always visible */}
-          <button className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
-            {selectionState.isAllSelectedOnPage ? (
-              <IconSquareMinusFilled className="text-sky-600" size={20} />
-            ) : selectionState.isIndeterminate ? (
-              <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
-            ) : (
-              <IconSelectAll className="text-default-400" size={20} />
-            )}
-          </button>
+          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+            {/* Selection checkbox - always visible */}
+            <button className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
+              {selectionState.isAllSelectedOnPage ? (
+                <IconSquareMinusFilled className="text-sky-600" size={20} />
+              ) : selectionState.isIndeterminate ? (
+                <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
+              ) : (
+                <IconSelectAll className="text-default-400" size={20} />
+              )}
+            </button>
 
-          {/* Selection Count and Total */}
-          <div className="flex-grow min-w-[150px]">
-            {/* Allow text to wrap */}
-            {selectedInvoiceIds.size > 0 ? (
-              <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
-                <span>{selectedInvoiceIds.size} selected</span>
-                <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
-                <span className="whitespace-nowrap">
-                  Total:{" "}
-                  {new Intl.NumberFormat("en-MY", {
-                    style: "currency",
-                    currency: "MYR",
-                  }).format(
-                    invoices
-                      .filter((inv) => selectedInvoiceIds.has(inv.id))
-                      .reduce(
-                        (sum, inv) => sum + (inv.totalamountpayable || 0),
-                        0
-                      )
-                  )}
+            {/* Selection Count and Total */}
+            <div className="flex-grow">
+              {selectedInvoiceIds.size > 0 ? (
+                <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
+                  <span>{selectedInvoiceIds.size} selected</span>
+                  <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
+                  <span className="whitespace-nowrap">
+                    Total:{" "}
+                    {new Intl.NumberFormat("en-MY", {
+                      style: "currency",
+                      currency: "MYR",
+                    }).format(
+                      invoices
+                        .filter((inv) => selectedInvoiceIds.has(inv.id))
+                        .reduce(
+                          (sum, inv) => sum + (inv.totalamountpayable || 0),
+                          0
+                        )
+                    )}
+                  </span>
                 </span>
-              </span>
-            ) : (
-              <span
-                className="text-default-500 text-sm cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelectAllOnPage();
-                }}
-              >
-                Select invoices to perform actions
-              </span>
-            )}
+              ) : (
+                <span
+                  className="text-default-500 text-sm cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectAllOnPage();
+                  }}
+                >
+                  Select invoices to perform actions
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons (Show only when items are selected) */}
           <div
-            className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
+            className="flex gap-2 flex-wrap w-full sm:w-auto sm:ml-auto"
             onClick={(e) => e.stopPropagation()} // Prevent row selection click
           >
             {selectedInvoiceIds.size > 0 && (
