@@ -49,7 +49,6 @@ import {
   getInvoiceById,
   syncCancellationStatus,
 } from "../../utils/invoice/InvoiceUtils";
-import FilterSummary from "../../components/Invoice/FilterSummary";
 import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
@@ -1046,7 +1045,6 @@ const InvoiceListPage: React.FC = () => {
             />
           </div>
         </div>
-        <FilterSummary filters={filters} onRemoveFilter={handleRemoveFilter} />
         {/* --- Batch Action Bar --- */}
         <div
           className={`p-3 ${

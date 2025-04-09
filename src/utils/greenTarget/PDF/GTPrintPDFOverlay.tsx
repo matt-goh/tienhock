@@ -180,7 +180,7 @@ const GTPrintPDFOverlay = ({
             onClick={() => {
               cleanup(true);
             }}
-            className="mt-2 text-sm text-center text-sky-600 hover:underline"
+            className="mt-1 text-sm text-center text-sky-600 hover:underline"
           >
             Close
           </button>

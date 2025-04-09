@@ -43,16 +43,32 @@ export default function (pool, defaultConfig) {
     try {
       let query = `
         SELECT i.*,
-               c.name as customer_name,
-               c.phone_number as customer_phone_number,
-               c.tin_number,
-               c.id_number,
-               l.address as location_address,
-               l.phone_number as location_phone_number,
-               r.driver,
-               r.tong_no,
-               -- Calculate paid amount correctly using non-cancelled payments
-               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid
+              c.name as customer_name,
+              c.phone_number as customer_phone_number,
+              c.tin_number,
+              c.id_number,
+              c.id_type,
+              l.address as location_address,
+              l.phone_number as location_phone_number,
+              r.driver,
+              r.tong_no,
+              -- Calculate paid amount correctly using non-cancelled payments
+              COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
+              -- Add subquery to check if invoice is part of a consolidated invoice
+              (
+                SELECT jsonb_build_object(
+                  'id', con.invoice_id,
+                  'invoice_number', con.invoice_number,
+                  'uuid', con.uuid,
+                  'long_id', con.long_id,
+                  'einvoice_status', con.einvoice_status
+                )
+                FROM greentarget.invoices con
+                WHERE con.is_consolidated = true
+                  AND con.status != 'cancelled'
+                  AND con.consolidated_invoices ? i.invoice_number
+                LIMIT 1
+              ) as consolidated_part_of
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
         LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
@@ -134,6 +150,7 @@ export default function (pool, defaultConfig) {
           amount_paid: parseFloat(amountPaid.toFixed(2)), // Ensure correct format
           current_balance: finalBalanceDue, // Use the calculated and clamped balance
           balance_due: finalBalanceDue, // Keep balance_due consistent
+          consolidated_part_of: invoice.consolidated_part_of,
         };
       });
 
@@ -160,20 +177,35 @@ export default function (pool, defaultConfig) {
       // Get invoice details with customer, rental, and payment info
       // Calculate amount_paid correctly, excluding cancelled payments
       const invoiceQuery = `
-        SELECT i.*,
-               c.name as customer_name,
-               c.phone_number as customer_phone_number,
-               c.tin_number,
-               c.id_number,
-               r.rental_id,
-               r.tong_no,
-               r.date_placed,
-               r.date_picked,
-               r.driver,
-               l.address as location_address,
-               l.phone_number as location_phone_number,
-               -- Calculate paid amount correctly using non-cancelled payments
-               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid
+              SELECT i.*,
+              c.name as customer_name,
+              c.phone_number as customer_phone_number,
+              c.tin_number,
+              c.id_number,
+              r.rental_id,
+              r.tong_no,
+              r.date_placed,
+              r.date_picked,
+              r.driver,
+              l.address as location_address,
+              l.phone_number as location_phone_number,
+              -- Calculate paid amount correctly using non-cancelled payments
+              COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
+              -- Add subquery for consolidated part info
+              (
+                SELECT jsonb_build_object(
+                  'id', con.invoice_id,
+                  'invoice_number', con.invoice_number,
+                  'uuid', con.uuid,
+                  'long_id', con.long_id,
+                  'einvoice_status', con.einvoice_status
+                )
+                FROM greentarget.invoices con
+                WHERE con.is_consolidated = true
+                  AND con.status != 'cancelled'
+                  AND con.consolidated_invoices ? i.invoice_number
+                LIMIT 1
+              ) as consolidated_part_of
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
         LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
@@ -212,6 +244,7 @@ export default function (pool, defaultConfig) {
       invoice.current_balance = currentBalance;
       invoice.balance_due = invoice.status === "cancelled" ? 0 : currentBalance;
       invoice.amount_paid = parseFloat(amountPaid.toFixed(2)); // Ensure format
+      invoice.consolidated_part_of = invoice.consolidated_part_of;
 
       res.json({
         invoice: invoice,

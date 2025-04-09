@@ -469,8 +469,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             {/* --- Invoice Status Filter --- */}
             {/* Read/Write from/to pendingFilters */}
             <div className="">
-              {" "}
-              {/* Removed px-1 */}
               <Combobox
                 multiple
                 value={pendingFilters.invoiceStatus ?? []} // Directly use the string array
@@ -580,8 +578,22 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               {pendingFilters.invoiceStatus &&
                 pendingFilters.invoiceStatus.length > 0 && (
                   <SelectedFilterTags
-                    items={pendingFilters.invoiceStatus}
-                    onRemove={removePendingInvoiceStatus}
+                    items={pendingFilters.invoiceStatus.map((status) => {
+                      // Map raw status values to properly capitalized display names
+                      const option = invoiceStatusOptions.find(
+                        (opt) => opt.id === status
+                      );
+                      return option ? option.name : status;
+                    })}
+                    onRemove={(displayName) => {
+                      // Map display name back to raw status value
+                      const option = invoiceStatusOptions.find(
+                        (opt) => opt.name === displayName
+                      );
+                      removePendingInvoiceStatus(
+                        option ? option.id : displayName
+                      );
+                    }}
                     label="Inv Status"
                   />
                 )}
@@ -589,8 +601,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             {/* --- E-Invoice Status Filter --- */}
             {/* Read/Write from/to pendingFilters */}
             <div className="">
-              {" "}
-              {/* Removed px-1 */}
               <Combobox
                 multiple
                 value={pendingFilters.eInvoiceStatus ?? []} // Directly use the string array
@@ -700,16 +710,21 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               {pendingFilters.eInvoiceStatus &&
                 pendingFilters.eInvoiceStatus.length > 0 && (
                   <SelectedFilterTags
-                    items={pendingFilters.eInvoiceStatus.map((s) =>
-                      s === "null" ? "Not Submitted" : s
-                    )} // Map 'null' for display
-                    onRemove={(itemNameToRemove) => {
-                      // Map display name back to actual value ('null') if needed
-                      const actualValueToRemove =
-                        itemNameToRemove === "Not Submitted"
-                          ? "null"
-                          : itemNameToRemove;
-                      removePendingEInvoiceStatus(actualValueToRemove);
+                    items={pendingFilters.eInvoiceStatus.map((status) => {
+                      // Map raw status values to properly capitalized display names
+                      const option = eInvoiceStatusOptions.find(
+                        (opt) => opt.id === status
+                      );
+                      return option ? option.name : status;
+                    })}
+                    onRemove={(displayName) => {
+                      // Map display name back to raw status value
+                      const option = eInvoiceStatusOptions.find(
+                        (opt) => opt.name === displayName
+                      );
+                      removePendingEInvoiceStatus(
+                        option ? option.id : displayName
+                      );
                     }}
                     label="eInv Status"
                   />
@@ -717,8 +732,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             </div>
             {/* --- Clear Selections Button (acts on pending state) --- */}
             <div className="">
-              {" "}
-              {/* Removed px-1 */}
               <button
                 type="button"
                 onClick={clearPendingFilters}

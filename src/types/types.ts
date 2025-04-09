@@ -531,6 +531,7 @@ export interface InvoiceGT {
   statement_period_start?: string;
   statement_period_end?: string;
   status: "paid" | "unpaid" | "cancelled" | "overdue";
+  consolidated_part_of?: ConsolidatedInfo | null;
 
   // E-invoice fields
   einvoice_status?: "valid" | "invalid" | "pending" | "cancelled" | null;
@@ -564,4 +565,5 @@ export interface ConsolidatedInfo {
   uuid: string | null;
   long_id: string | null;
   einvoice_status: EInvoiceStatus;
+  invoice_number?: string;
 }
