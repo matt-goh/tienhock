@@ -70,7 +70,7 @@ interface InvoiceCardProps {
 interface InvoiceFilters {
   customer_id: string | null;
   status: string[] | null;
-  consolidation: "all" | "standalone" | "consolidated"; // Whether it's part of consolidated invoice
+  consolidation: "all" | "individual" | "consolidated"; // Whether it's part of consolidated invoice
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
@@ -678,7 +678,7 @@ const InvoiceListPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<InvoiceFilters>({
     customer_id: null,
-    status: null,
+    status: ["active", "overdue", "paid"],
     consolidation: "all",
   });
   const [customerOptions, setCustomerOptions] = useState<SelectOption[]>([]);
@@ -697,8 +697,23 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     let count = 0;
     if (filters.customer_id) count++;
-    if (filters.status && filters.status.length > 0) count++;
+
+    // Only count status if it's different from the default (just "active")
+    if (
+      filters.status &&
+      !(
+        filters.status.length === 3 &&
+        filters.status[0] === "active" &&
+        filters.status[1] === "overdue" &&
+        filters.status[2] === "paid"
+      )
+    ) {
+      count++;
+    }
+
+    // Only count consolidation if it's not the default "individual"
     if (filters.consolidation !== "all") count++;
+
     setActiveFilterCount(count);
   }, [filters]);
 
@@ -785,7 +800,7 @@ const InvoiceListPage: React.FC = () => {
       // Handle consolidation filter
       if (filters.consolidation === "consolidated") {
         params.append("consolidated_only", "true");
-      } else if (filters.consolidation === "standalone") {
+      } else if (filters.consolidation === "individual") {
         params.append("exclude_consolidated", "true");
       }
 
@@ -1657,8 +1672,8 @@ const InvoiceListPage: React.FC = () => {
                           </span>
                           <div className="font-medium">
                             {filters.consolidation === "consolidated"
-                              ? "Part of Consolidated"
-                              : "Standalone Only"}
+                              ? "Consolidated"
+                              : "Individual"}
                           </div>
                         </div>
                       </li>
@@ -1953,27 +1968,27 @@ const InvoiceListPage: React.FC = () => {
                           type="radio"
                           name="consolidation"
                           className="sr-only"
-                          checked={filters.consolidation === "standalone"}
+                          checked={filters.consolidation === "individual"}
                           onChange={() =>
                             setFilters((prev) => ({
                               ...prev,
-                              consolidation: "standalone",
+                              consolidation: "individual",
                             }))
                           }
                         />
                         <div
                           className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
-                            filters.consolidation === "standalone"
+                            filters.consolidation === "individual"
                               ? "border-sky-500 bg-white"
                               : "border-default-300 bg-white"
                           }`}
                         >
-                          {filters.consolidation === "standalone" && (
+                          {filters.consolidation === "individual" && (
                             <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
                           )}
                         </div>
                       </div>
-                      <span className="text-default-700">Standalone Only</span>
+                      <span className="text-default-700">Individual</span>
                     </label>
                     <label className="inline-flex items-center cursor-pointer">
                       <div className="relative flex items-center">
@@ -2001,9 +2016,7 @@ const InvoiceListPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <span className="text-default-700">
-                        Part of Consolidated
-                      </span>
+                      <span className="text-default-700">Consolidated</span>
                     </label>
                   </div>
                 </div>
@@ -2013,7 +2026,7 @@ const InvoiceListPage: React.FC = () => {
                     onClick={() => {
                       setFilters({
                         customer_id: null,
-                        status: null,
+                        status: ["active", "overdue", "paid"],
                         consolidation: "all",
                       });
                     }}
