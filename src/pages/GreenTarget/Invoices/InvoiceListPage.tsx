@@ -264,25 +264,101 @@ const InvoiceCard = ({
               {invoice.einvoice_status && (
                 <div className="truncate overflow-auto">
                   {invoice.einvoice_status === "valid" ? (
-                    <span className="inline-flex items-center text-xs font-medium text-green-700">
+                    <a
+                      href={
+                        invoice.long_id
+                          ? `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`
+                          : "#"
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center text-xs font-medium text-green-700 ${
+                        invoice.long_id
+                          ? "hover:text-green-800 hover:underline"
+                          : ""
+                      }`}
+                      onClick={(e) => {
+                        if (!invoice.long_id) {
+                          e.preventDefault();
+                        }
+                        e.stopPropagation();
+                      }}
+                    >
                       <IconCheck size={14} className="mr-1" />
                       e-Invoice Valid
-                    </span>
+                    </a>
                   ) : invoice.einvoice_status === "pending" ? (
-                    <span className="inline-flex items-center text-xs font-medium text-sky-700">
+                    <a
+                      href={
+                        invoice.long_id
+                          ? `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`
+                          : "#"
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center text-xs font-medium text-sky-700 ${
+                        invoice.long_id
+                          ? "hover:text-sky-800 hover:underline"
+                          : ""
+                      }`}
+                      onClick={(e) => {
+                        if (!invoice.long_id) {
+                          e.preventDefault();
+                        }
+                        e.stopPropagation();
+                      }}
+                    >
                       <IconClock size={14} className="mr-1" />
                       e-Invoice Pending
-                    </span>
+                    </a>
                   ) : invoice.einvoice_status === "invalid" ? (
-                    <span className="inline-flex items-center text-xs font-medium text-rose-700">
+                    <a
+                      href={
+                        invoice.long_id
+                          ? `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`
+                          : "#"
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center text-xs font-medium text-rose-700 ${
+                        invoice.long_id
+                          ? "hover:text-rose-800 hover:underline"
+                          : ""
+                      }`}
+                      onClick={(e) => {
+                        if (!invoice.long_id) {
+                          e.preventDefault();
+                        }
+                        e.stopPropagation();
+                      }}
+                    >
                       <IconAlertTriangle size={14} className="mr-1" />
                       e-Invoice Invalid
-                    </span>
+                    </a>
                   ) : invoice.einvoice_status === "cancelled" ? (
-                    <span className="inline-flex items-center text-xs font-medium text-default-700">
+                    <a
+                      href={
+                        invoice.long_id
+                          ? `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`
+                          : "#"
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center text-xs font-medium text-default-700 ${
+                        invoice.long_id
+                          ? "hover:text-default-800 hover:underline"
+                          : ""
+                      }`}
+                      onClick={(e) => {
+                        if (!invoice.long_id) {
+                          e.preventDefault();
+                        }
+                        e.stopPropagation();
+                      }}
+                    >
                       <IconCancel size={14} className="mr-1" />
                       e-Invoice Cancelled
-                    </span>
+                    </a>
                   ) : null}
                 </div>
               )}
