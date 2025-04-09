@@ -59,7 +59,7 @@ import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler"
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
-const ITEMS_PER_PAGE = 15; // Number of items per page
+const ITEMS_PER_PAGE = 50; // Number of items per page
 
 interface MonthOption {
   id: number;
@@ -154,6 +154,17 @@ const InvoiceListPage: React.FC = () => {
   const [activeFilterCount, setActiveFilterCount] = useState(0);
   const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
   const [hasViewedFilters, setHasViewedFilters] = useState(false);
+  const [isAllSelectFetching, setIsAllSelectFetching] = useState(false);
+  const cachedSelectAllIdsRef = useRef<{
+    ids: string[];
+    hash: string;
+    total: number;
+  }>({
+    ids: [],
+    hash: "",
+    total: 0,
+  });
+  const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
@@ -177,6 +188,22 @@ const InvoiceListPage: React.FC = () => {
     eInvoiceStatus: [], // Default e-invoice status
     consolidation: "all",
   };
+
+  // Helper function to generate a hash of current filters
+  const getFiltersHash = useCallback(() => {
+    return JSON.stringify({
+      dateRange: {
+        start: filters.dateRange.start?.getTime(),
+        end: filters.dateRange.end?.getTime(),
+      },
+      salespersonId: filters.salespersonId?.join(","),
+      paymentType: filters.paymentType,
+      invoiceStatus: filters.invoiceStatus?.join(","),
+      eInvoiceStatus: filters.eInvoiceStatus?.join(","),
+      consolidation: filters.consolidation,
+      searchTerm,
+    });
+  }, [filters, searchTerm]);
 
   // Month Selector State
   const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
@@ -368,6 +395,12 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [filters]); // Reset when filters change
 
+  // Effect to invalidate the cache when filters change
+  useEffect(() => {
+    // Invalidate the cache when filters or search term changes
+    cachedSelectAllIdsRef.current = { ids: [], hash: "", total: 0 };
+  }, [filters, searchTerm]);
+
   // Filter Change Handler - Receives the COMPLETE, new filter state to apply
   const handleApplyFilters = useCallback(
     (newAppliedFilters: InvoiceFilters) => {
@@ -491,30 +524,65 @@ const InvoiceListPage: React.FC = () => {
   };
 
   // Select/Deselect a single invoice
-  const handleSelectInvoice = useCallback((invoiceId: string) => {
-    setSelectedInvoiceIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(invoiceId)) newSet.delete(invoiceId);
-      else newSet.add(invoiceId);
-      return newSet;
-    });
-  }, []);
+  const handleSelectInvoice = useCallback(
+    (invoiceId: string) => {
+      setSelectedInvoiceIds((prev) => {
+        const newSet = new Set(prev);
+        const invoice = invoices.find((inv) => inv.id === invoiceId);
+
+        if (newSet.has(invoiceId)) {
+          // Deselect: remove from set and subtract amount
+          newSet.delete(invoiceId);
+          if (invoice) {
+            setSelectedInvoicesTotal((current) =>
+              Math.max(0, current - (invoice.totalamountpayable || 0))
+            );
+          }
+        } else {
+          // Select: add to set and add amount
+          newSet.add(invoiceId);
+          if (invoice) {
+            setSelectedInvoicesTotal(
+              (current) => current + (invoice.totalamountpayable || 0)
+            );
+          }
+        }
+        return newSet;
+      });
+    },
+    [invoices]
+  );
 
   // Toggle between no selection and all invoices selected across all pages
   const handleToggleSelectAll = useCallback(
     async (e: { stopPropagation: () => void }) => {
       e?.stopPropagation(); // Prevent event bubbling
 
-      // If we already have selections, clear them
+      // If we already have selections, clear them and reset total
       if (selectedInvoiceIds.size > 0) {
         setSelectedInvoiceIds(new Set());
+        setSelectedInvoicesTotal(0);
         return;
       }
 
+      // Check if we have cached results with matching filters
+      const currentFiltersHash = getFiltersHash();
+      if (
+        cachedSelectAllIdsRef.current.hash === currentFiltersHash &&
+        cachedSelectAllIdsRef.current.ids.length > 0
+      ) {
+        // Use cached IDs and total
+        setSelectedInvoiceIds(new Set(cachedSelectAllIdsRef.current.ids));
+        setSelectedInvoicesTotal(cachedSelectAllIdsRef.current.total || 0);
+        return;
+      }
+
+      // Prevent duplicate API calls
+      if (isAllSelectFetching) return;
+
+      setIsAllSelectFetching(true);
       // Otherwise, fetch all IDs matching current filters
       try {
-        const toastId = toast.loading("Selecting all matching invoices...");
-
         // Build query parameters matching current filters
         const params = new URLSearchParams();
 
@@ -567,17 +635,20 @@ const InvoiceListPage: React.FC = () => {
           `/api/invoices/selection/ids${queryString}`
         );
 
-        if (Array.isArray(response) && response.length > 0) {
-          setSelectedInvoiceIds(new Set(response));
-          toast.success(`Selected all ${response.length} matching invoices`, {
-            id: toastId,
-          });
+        if (response && response.ids && Array.isArray(response.ids)) {
+          // Cache the results with total
+          cachedSelectAllIdsRef.current = {
+            ids: response.ids,
+            hash: currentFiltersHash,
+            total: response.total || 0,
+          };
+
+          setSelectedInvoiceIds(new Set(response.ids));
+          setSelectedInvoicesTotal(response.total || 0);
         } else if (Array.isArray(response) && response.length === 0) {
-          toast.error("No invoices match your current filters", {
-            id: toastId,
-          });
+          toast.error("No invoices match your current filters");
         } else {
-          toast.error("Failed to select all invoices", { id: toastId });
+          toast.error("Failed to select all invoices");
         }
       } catch (error) {
         console.error("Error fetching all invoice IDs:", error);
@@ -586,9 +657,17 @@ const InvoiceListPage: React.FC = () => {
             error instanceof Error ? error.message : "Unknown error"
           }`
         );
+      } finally {
+        setIsAllSelectFetching(false);
       }
     },
-    [filters, searchTerm]
+    [
+      filters,
+      searchTerm,
+      selectedInvoiceIds.size,
+      getFiltersHash,
+      isAllSelectFetching,
+    ]
   );
 
   // Function to clear selection (can be called externally via ref)
@@ -1302,19 +1381,12 @@ const InvoiceListPage: React.FC = () => {
                   <span>{selectedInvoiceIds.size} selected</span>
                   <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
                   <span className="whitespace-nowrap">
-                    {/* Show total only for selected invoices visible on this page */}
+                    {/* Use the total state instead of calculating from visible invoices */}
                     Total:{" "}
                     {new Intl.NumberFormat("en-MY", {
                       style: "currency",
                       currency: "MYR",
-                    }).format(
-                      invoices
-                        .filter((inv) => selectedInvoiceIds.has(inv.id))
-                        .reduce(
-                          (sum, inv) => sum + (inv.totalamountpayable || 0),
-                          0
-                        )
-                    )}
+                    }).format(selectedInvoicesTotal)}
                   </span>
                 </span>
               ) : (

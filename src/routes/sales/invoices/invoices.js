@@ -322,7 +322,7 @@ export default function (pool, config) {
     }
   });
 
-  // Get all invoice IDs matching current filters
+  // Get all invoice IDs and summary matching current filters
   router.get("/selection/ids", async (req, res) => {
     try {
       const {
@@ -433,17 +433,37 @@ export default function (pool, config) {
       // Always exclude the consolidated invoices themselves
       whereClause += ` AND (is_consolidated = false OR is_consolidated IS NULL)`;
 
-      // Build final query
-      const query = `SELECT id FROM invoices ${whereClause} ORDER BY CAST(createddate AS bigint) DESC`;
+      // Modified query to get both IDs and total amount
+      const query = `
+      SELECT 
+        id,
+        totalamountpayable
+      FROM invoices 
+      ${whereClause} 
+      ORDER BY CAST(createddate AS bigint) DESC
+    `;
 
       const result = await pool.query(query, filterParams);
 
-      // Return just the IDs as an array
-      res.json(result.rows.map((row) => row.id));
+      // Calculate total amount
+      const totalAmount = result.rows.reduce(
+        (sum, row) => sum + parseFloat(row.totalamountpayable || 0),
+        0
+      );
+
+      // Extract just the IDs for the response
+      const invoiceIds = result.rows.map((row) => row.id);
+
+      // Return both IDs and total
+      res.json({
+        ids: invoiceIds,
+        total: totalAmount,
+        count: invoiceIds.length,
+      });
     } catch (error) {
-      console.error("Error fetching invoice IDs:", error);
+      console.error("Error fetching invoice IDs and summary:", error);
       res.status(500).json({
-        message: "Error fetching invoice IDs",
+        message: "Error fetching invoice data",
         error: error.message,
       });
     }
