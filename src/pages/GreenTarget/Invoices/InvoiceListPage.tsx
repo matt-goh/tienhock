@@ -1784,7 +1784,11 @@ const InvoiceListPage: React.FC = () => {
         open={showFilters}
         onClose={() => setShowFilters(false)}
       >
-        <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm"
+          aria-hidden="true"
+        />
+        <div className="flex items-center justify-center min-h-screen relative">
           <TransitionChild
             as="div"
             enter="ease-out duration-300"
@@ -1842,23 +1846,38 @@ const InvoiceListPage: React.FC = () => {
                       (status) => (
                         <label
                           key={status}
-                          className="inline-flex items-center"
+                          className="inline-flex items-center group cursor-pointer py-1"
                         >
-                          <input
-                            type="checkbox"
-                            className="form-checkbox h-4 w-4 text-sky-600"
-                            checked={filters.status?.includes(status) || false}
-                            onChange={(e) => {
-                              setFilters((prev) => ({
-                                ...prev,
-                                status: e.target.checked
-                                  ? [...(prev.status || []), status]
-                                  : (prev.status || []).filter(
-                                      (s) => s !== status
-                                    ),
-                              }));
-                            }}
-                          />
+                          <div className="relative flex items-center">
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={
+                                filters.status?.includes(status) || false
+                              }
+                              onChange={(e) => {
+                                setFilters((prev) => ({
+                                  ...prev,
+                                  status: e.target.checked
+                                    ? [...(prev.status || []), status]
+                                    : (prev.status || []).filter(
+                                        (s) => s !== status
+                                      ),
+                                }));
+                              }}
+                            />
+                            {filters.status?.includes(status) ? (
+                              <IconSquareCheckFilled
+                                className="text-sky-500"
+                                size={20}
+                              />
+                            ) : (
+                              <IconSquare
+                                className="text-default-400 group-hover:text-sky-400 transition-colors"
+                                size={20}
+                              />
+                            )}
+                          </div>
                           <span className="ml-2 capitalize">{status}</span>
                         </label>
                       )
@@ -1868,51 +1887,95 @@ const InvoiceListPage: React.FC = () => {
 
                 {/* Consolidation Filter */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-2">
                     Consolidation Status
                   </label>
-                  <div className="flex space-x-4">
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio h-4 w-4 text-sky-600"
-                        checked={filters.consolidation === "all"}
-                        onChange={() =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            consolidation: "all",
-                          }))
-                        }
-                      />
-                      <span className="ml-2">All</span>
+                  <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-6">
+                    <label className="inline-flex items-center cursor-pointer">
+                      <div className="relative flex items-center">
+                        <input
+                          type="radio"
+                          name="consolidation"
+                          className="sr-only"
+                          checked={filters.consolidation === "all"}
+                          onChange={() =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              consolidation: "all",
+                            }))
+                          }
+                        />
+                        <div
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
+                            filters.consolidation === "all"
+                              ? "border-sky-500 bg-white"
+                              : "border-default-300 bg-white"
+                          }`}
+                        >
+                          {filters.consolidation === "all" && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-default-700">All</span>
                     </label>
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio h-4 w-4 text-sky-600"
-                        checked={filters.consolidation === "standalone"}
-                        onChange={() =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            consolidation: "standalone",
-                          }))
-                        }
-                      />
-                      <span className="ml-2">Standalone Only</span>
+                    <label className="inline-flex items-center cursor-pointer">
+                      <div className="relative flex items-center">
+                        <input
+                          type="radio"
+                          name="consolidation"
+                          className="sr-only"
+                          checked={filters.consolidation === "standalone"}
+                          onChange={() =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              consolidation: "standalone",
+                            }))
+                          }
+                        />
+                        <div
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
+                            filters.consolidation === "standalone"
+                              ? "border-sky-500 bg-white"
+                              : "border-default-300 bg-white"
+                          }`}
+                        >
+                          {filters.consolidation === "standalone" && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-default-700">Standalone Only</span>
                     </label>
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio h-4 w-4 text-sky-600"
-                        checked={filters.consolidation === "consolidated"}
-                        onChange={() =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            consolidation: "consolidated",
-                          }))
-                        }
-                      />
-                      <span className="ml-2">Part of Consolidated</span>
+                    <label className="inline-flex items-center cursor-pointer">
+                      <div className="relative flex items-center">
+                        <input
+                          type="radio"
+                          name="consolidation"
+                          className="sr-only"
+                          checked={filters.consolidation === "consolidated"}
+                          onChange={() =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              consolidation: "consolidated",
+                            }))
+                          }
+                        />
+                        <div
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
+                            filters.consolidation === "consolidated"
+                              ? "border-sky-500 bg-white"
+                              : "border-default-300 bg-white"
+                          }`}
+                        >
+                          {filters.consolidation === "consolidated" && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-sky-500"></div>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-default-700">
+                        Part of Consolidated
+                      </span>
                     </label>
                   </div>
                 </div>
