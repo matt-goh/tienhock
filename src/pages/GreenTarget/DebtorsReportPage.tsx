@@ -33,8 +33,6 @@ const DebtorsReportPage: React.FC = () => {
     field: keyof Debtor;
     direction: "asc" | "desc";
   }>({ field: "balance", direction: "desc" });
-  const [minBalance, setMinBalance] = useState<number | null>(null);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     fetchDebtors();
@@ -83,25 +81,8 @@ const DebtorsReportPage: React.FC = () => {
     );
   };
 
-  const filteredDebtors = useMemo(() => {
-    return debtors.filter((debtor) => {
-      // Updated to search in all phone numbers
-      const phoneNumbersMatch = debtor.phone_numbers?.some((phone) =>
-        phone.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-
-      const matchesSearch =
-        debtor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        phoneNumbersMatch;
-
-      const matchesMinBalance =
-        minBalance === null || debtor.balance >= minBalance;
-      return matchesSearch && matchesMinBalance;
-    });
-  }, [debtors, searchTerm, minBalance]);
-
   const sortedDebtors = useMemo(() => {
-    return [...filteredDebtors].sort((a, b) => {
+    return [...debtors].sort((a, b) => {
       const aValue = a[sortBy.field];
       const bValue = b[sortBy.field];
 
@@ -111,7 +92,7 @@ const DebtorsReportPage: React.FC = () => {
         return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
       }
     });
-  }, [filteredDebtors, sortBy]);
+  }, [debtors, sortBy]);
 
   // Calculate summary statistics
   const totalOutstanding = useMemo(() => {
@@ -164,14 +145,6 @@ const DebtorsReportPage: React.FC = () => {
           </div>
 
           <Button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            icon={IconFilter}
-            variant="outline"
-          >
-            Filter
-          </Button>
-
-          <Button
             onClick={handleExportCSV}
             icon={IconDownload}
             variant="outline"
@@ -222,7 +195,7 @@ const DebtorsReportPage: React.FC = () => {
             No debtors found
           </h2>
           <p className="text-default-500">
-            {searchTerm || minBalance
+            {searchTerm
               ? "Try adjusting your filters"
               : "All invoices have been paid"}
           </p>
