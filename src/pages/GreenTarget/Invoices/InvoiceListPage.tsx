@@ -1475,10 +1475,6 @@ const InvoiceListPage: React.FC = () => {
     });
   }, [invoices, searchTerm]);
 
-  const applyFilters = () => {
-    setShowFilters(false);
-  };
-
   const clearFilters = () => {
     setFilters(DEFAULT_FILTERS);
     setCustomerQuery("");
@@ -2127,12 +2123,13 @@ const InvoiceListPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 flex justify-between">
-                  <Button onClick={clearFilters} variant="outline">
-                    Clear Filters
-                  </Button>
-                  <Button onClick={applyFilters} variant="filled" color="sky">
-                    Apply Filters
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    onClick={clearFilters}
+                    variant="outline"
+                    className="w-40"
+                  >
+                    Reset
                   </Button>
                 </div>
               </div>
