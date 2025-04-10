@@ -20,12 +20,6 @@ import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
 
-// Keep SelectOption interface if not imported
-// interface SelectOption {
-//   id: string;
-//   name: string;
-// }
-
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -77,8 +71,7 @@ const CustomerFormPage: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [loading, setLoading] = useState(isEditMode); // Only true initially if editing
   const [error, setError] = useState<string | null>(null);
-  const { salesmen: salesmenData, isLoading: salesmenLoading } =
-    useSalesmanCache();
+  const { salesmen: salesmenData } = useSalesmanCache();
 
   // Options
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);

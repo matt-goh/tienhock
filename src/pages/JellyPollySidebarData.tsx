@@ -29,5 +29,6 @@ export const JellyPollySidebarData: SidebarItem[] = [
         ],
       },
     ],
+    defaultOpen: true,
   },
 ];
