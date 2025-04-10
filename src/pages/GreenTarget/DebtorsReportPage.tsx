@@ -17,7 +17,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 interface Debtor {
   customer_id: number;
   name: string;
-  phone_number: string;
+  phone_numbers: string[]; // Changed from phone_number to array of phone numbers
   total_invoiced: number;
   total_paid: number;
   balance: number;
@@ -77,16 +77,23 @@ const DebtorsReportPage: React.FC = () => {
   };
 
   const handleViewInvoices = (customerId: number) => {
+    // Updated to pass both customer_id and status filters
     navigate(
-      `/greentarget/invoices?customer_id=${customerId}&outstanding_only=true`
+      `/greentarget/invoices?customer_id=${customerId}&status=active,overdue`
     );
   };
 
   const filteredDebtors = useMemo(() => {
     return debtors.filter((debtor) => {
+      // Updated to search in all phone numbers
+      const phoneNumbersMatch = debtor.phone_numbers?.some((phone) =>
+        phone.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
       const matchesSearch =
         debtor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        debtor.phone_number?.toLowerCase().includes(searchTerm.toLowerCase());
+        phoneNumbersMatch;
+
       const matchesMinBalance =
         minBalance === null || debtor.balance >= minBalance;
       return matchesSearch && matchesMinBalance;
@@ -320,14 +327,16 @@ const DebtorsReportPage: React.FC = () => {
                       </span>
                     )}
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-default-200">
                 {sortedDebtors.map((debtor) => (
-                  <tr key={debtor.customer_id} className="hover:bg-default-50">
+                  <tr
+                    key={debtor.customer_id}
+                    className="hover:bg-sky-50 cursor-pointer transition-colors"
+                    onClick={() => handleViewInvoices(debtor.customer_id)}
+                    title="Click to view invoices for this customer"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-default-900">
                         {debtor.name}
@@ -337,14 +346,26 @@ const DebtorsReportPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {debtor.phone_number && (
-                        <div className="flex items-center text-sm text-default-700">
-                          <IconPhone
-                            size={16}
-                            className="mr-2 text-default-400"
-                          />
-                          {debtor.phone_number}
+                      {debtor.phone_numbers &&
+                      debtor.phone_numbers.length > 0 ? (
+                        <div className="flex flex-col space-y-1">
+                          {debtor.phone_numbers.map((phone, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center text-sm text-default-700"
+                            >
+                              <IconPhone
+                                size={16}
+                                className="mr-2 text-default-400"
+                              />
+                              {phone}
+                            </div>
+                          ))}
                         </div>
+                      ) : (
+                        <span className="text-default-400 text-sm">
+                          No phone number
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-900">
@@ -355,17 +376,6 @@ const DebtorsReportPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-amber-600">
                       {formatCurrency(debtor.balance)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                      <div className="flex justify-center space-x-2">
-                        <button
-                          onClick={() => handleViewInvoices(debtor.customer_id)}
-                          className="p-1 text-blue-600 hover:text-blue-800"
-                          title="View Invoices"
-                        >
-                          <IconFileInvoice size={20} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))}
