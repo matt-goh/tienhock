@@ -181,53 +181,6 @@ const DebtorsReportPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Panel */}
-      {isFilterOpen && (
-        <div className="bg-white border border-default-200 rounded-lg p-4 mb-6 shadow-sm">
-          <h2 className="text-lg font-medium mb-4">Filter Debtors</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Minimum Balance
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-default-500">
-                  RM
-                </span>
-                <input
-                  type="number"
-                  value={minBalance || ""}
-                  onChange={(e) =>
-                    setMinBalance(
-                      e.target.value ? parseFloat(e.target.value) : null
-                    )
-                  }
-                  className="w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
-                  placeholder="Enter minimum amount"
-                  min="0"
-                  step="10"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex justify-end space-x-3">
-            <Button
-              onClick={() => {
-                setMinBalance(null);
-                setSearchTerm("");
-              }}
-              variant="outline"
-            >
-              Reset
-            </Button>
-            <Button onClick={() => setIsFilterOpen(false)}>
-              Apply Filters
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div className="bg-white border border-default-200 rounded-lg p-4 shadow-sm">
