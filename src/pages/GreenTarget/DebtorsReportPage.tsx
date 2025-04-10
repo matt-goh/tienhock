@@ -4,10 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
   IconDownload,
-  IconFilter, // Note: IconFilter is imported but not used in the provided code. Keeping it as is.
   IconAlertCircle,
   IconPhone,
-  IconFileInvoice, // Note: IconFileInvoice is imported but not used in the provided code. Keeping it as is.
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
@@ -17,10 +15,11 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 interface Debtor {
   customer_id: number;
   name: string;
-  phone_numbers: string[]; // Changed from phone_number to array of phone numbers
+  phone_numbers: string[];
   total_invoiced: number;
   total_paid: number;
   balance: number;
+  has_overdue?: boolean;
 }
 
 const DebtorsReportPage: React.FC = () => {
@@ -330,7 +329,11 @@ const DebtorsReportPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
                       {formatCurrency(debtor.total_paid)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-amber-600">
+                    <td
+                      className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${
+                        debtor.has_overdue ? "text-red-600" : "text-amber-600"
+                      }`}
+                    >
                       {formatCurrency(debtor.balance)}
                     </td>
                   </tr>
