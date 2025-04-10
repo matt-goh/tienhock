@@ -365,15 +365,6 @@ const DebtorsReportPage: React.FC = () => {
                         >
                           <IconFileInvoice size={20} />
                         </button>
-                        {debtor.phone_number && (
-                          <a
-                            href={`tel:${debtor.phone_number}`}
-                            className="p-1 text-green-600 hover:text-green-800"
-                            title="Call Customer"
-                          >
-                            <IconPhone size={20} />
-                          </a>
-                        )}
                       </div>
                     </td>
                   </tr>
