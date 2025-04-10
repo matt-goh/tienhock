@@ -2123,7 +2123,7 @@ const InvoiceListPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-8 flex justify-center">
+                <div className="mt-8 pt-2 flex justify-center">
                   <Button
                     onClick={clearFilters}
                     variant="outline"
