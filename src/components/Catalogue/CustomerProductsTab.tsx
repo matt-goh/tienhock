@@ -24,7 +24,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   onProductsChange,
   disabled = false, // Default to not disabled
 }) => {
-  const { products: allProducts } = useProductsCache(); // Full product list from cache
+  const { products: allProducts } = useProductsCache("all"); // Full product list from cache
 
   // Memoize product options for performance
   const productOptions = useMemo(() => {
