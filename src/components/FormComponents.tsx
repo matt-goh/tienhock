@@ -400,7 +400,10 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
               disabled={disabled}
               id={`${name}-input`}
             />
-            <HeadlessComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+            <HeadlessComboboxButton
+              className="absolute inset-y-0 right-0 flex items-center pr-2"
+              onClick={() => setQuery("")}
+            >
               <IconChevronDown
                 size={20}
                 className="text-gray-400"
