@@ -609,6 +609,7 @@ const InvoiceCard = ({
 };
 
 const InvoiceListPage: React.FC = () => {
+  const ITEMS_PER_PAGE = 12;
   // Function to get initial dates from localStorage
   const getInitialDates = () => {
     const savedFilters = localStorage.getItem(STORAGE_KEY);
@@ -629,6 +630,13 @@ const InvoiceListPage: React.FC = () => {
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
+
+  // Define default filter values as constants
+  const DEFAULT_FILTERS: InvoiceFilters = {
+    customer_id: null,
+    status: ["active", "overdue", "paid"],
+    consolidation: "all",
+  };
 
   // Month options
   const monthOptions = [
@@ -676,181 +684,40 @@ const InvoiceListPage: React.FC = () => {
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [invoicesForPDF, setInvoicesForPDF] = useState<InvoiceGT[]>([]); // Holds detailed invoices for PDF
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<InvoiceFilters>({
-    customer_id: null,
-    status: ["active", "overdue", "paid"],
-    consolidation: "all",
+  const [filters, setFilters] = useState<InvoiceFilters>(() => {
+    // Initialize filters potentially from URL params on first load
+    const params = new URLSearchParams(window.location.search);
+    const customerIdParam = params.get("customer_id");
+    const statusParam = params.get("status");
+
+    let initialFilters = { ...DEFAULT_FILTERS }; // Start with defaults
+    if (customerIdParam) {
+      initialFilters.customer_id = customerIdParam;
+    }
+    if (statusParam) {
+      const statusValues = statusParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statusValues.length > 0) {
+        initialFilters.status = statusValues;
+      }
+    }
+    return initialFilters;
   });
   const [customerOptions, setCustomerOptions] = useState<SelectOption[]>([]);
   const [activeFilterCount, setActiveFilterCount] = useState(0);
   const [customerQuery, setCustomerQuery] = useState("");
   const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
   const [hasViewedFilters, setHasViewedFilters] = useState(false);
+  const [initialParamsApplied, setInitialParamsApplied] = useState(false);
   const [searchParams] = useSearchParams();
-
-  const ITEMS_PER_PAGE = 12;
-
-  // Define default filter values as constants
-  const DEFAULT_FILTERS: InvoiceFilters = {
-    customer_id: null,
-    status: ["active", "overdue", "paid"],
-    consolidation: "all",
-  };
-
-  // Effect to fetch invoices when filters change
-  useEffect(() => {
-    fetchInvoices();
-  }, [dateRange]);
-
-  // Effect to calculate active filter count comparing against defaults
-  useEffect(() => {
-    let count = 0;
-
-    // Check if customer filter is active
-    if (filters.customer_id !== DEFAULT_FILTERS.customer_id) {
-      count++;
-    }
-
-    // Check if status filter is different from default
-    if (filters.status) {
-      // Need to compare arrays contents, not references
-      const isDefaultStatus =
-        DEFAULT_FILTERS.status !== null &&
-        filters.status.length === DEFAULT_FILTERS.status.length &&
-        filters.status.every((status) =>
-          DEFAULT_FILTERS.status?.includes(status)
-        ) &&
-        DEFAULT_FILTERS.status.every((status) =>
-          filters.status?.includes(status)
-        );
-
-      if (!isDefaultStatus) {
-        count++;
-      }
-    } else if (DEFAULT_FILTERS.status !== null) {
-      // If filters.status is null but default isn't
-      count++;
-    }
-
-    // Check if consolidation filter is active
-    if (filters.consolidation !== DEFAULT_FILTERS.consolidation) {
-      count++;
-    }
-
-    setActiveFilterCount(count);
-  }, [filters]);
 
   useEffect(() => {
     if (activeFilterCount > 0) {
       setHasViewedFilters(false);
     }
   }, [filters]); // This will reset hasViewedFilters whenever filters change
-
-  useEffect(() => {
-    // Get URL parameters
-    const customerIdParam = searchParams.get("customer_id");
-    const statusParam = searchParams.get("status");
-
-    // Only process URL parameters if they exist and haven't been applied yet
-    if ((customerIdParam || statusParam) && !hasViewedFilters) {
-      let newFilters = { ...filters };
-      let shouldFetch = false;
-
-      // Apply customer filter if provided
-      if (customerIdParam) {
-        newFilters.customer_id = customerIdParam;
-        shouldFetch = true;
-
-        // If we have customer options loaded, find the matching customer
-        if (customerOptions.length > 0) {
-          const customer = customerOptions.find(
-            (c) => c.id.toString() === customerIdParam
-          );
-          if (customer) {
-            // Set customer query to the name for visual feedback
-            setCustomerQuery(customer.name);
-          }
-        } else {
-          // If customer options aren't loaded yet, we need to fetch customer details
-          const fetchCustomerDetails = async () => {
-            try {
-              const customer = await greenTargetApi.getCustomer(
-                parseInt(customerIdParam)
-              );
-              if (customer) {
-                setCustomerQuery(customer.name || "");
-              }
-            } catch (error) {
-              console.error("Error fetching customer details:", error);
-            }
-          };
-
-          fetchCustomerDetails();
-        }
-      }
-
-      // Apply status filter if provided (e.g., "active,overdue")
-      if (statusParam) {
-        const statusValues = statusParam.split(",");
-        newFilters.status = statusValues;
-        shouldFetch = true;
-      }
-
-      // Update filters if needed
-      if (shouldFetch) {
-        setFilters(newFilters);
-        setHasViewedFilters(true); // Prevent this from running again
-
-        // Apply filters immediately without showing dialog
-        const fetchWithFilters = async () => {
-          try {
-            // Create params for API call
-            const params = new URLSearchParams();
-
-            // Add date filters
-            if (dateRange.start) {
-              params.append("start_date", formatDateForAPI(dateRange.start));
-            }
-            if (dateRange.end) {
-              params.append("end_date", formatDateForAPI(dateRange.end));
-            }
-
-            // Add customer filter
-            if (newFilters.customer_id) {
-              params.append("customer_id", newFilters.customer_id);
-            }
-
-            // Add status filter
-            if (newFilters.status && newFilters.status.length > 0) {
-              params.append("status", newFilters.status.join(","));
-            }
-
-            // Add consolidation filter if needed
-            if (newFilters.consolidation === "consolidated") {
-              params.append("consolidated_only", "true");
-            } else if (newFilters.consolidation === "individual") {
-              params.append("exclude_consolidated", "true");
-            }
-
-            // Build query string and fetch data
-            const queryString = params.toString()
-              ? `?${params.toString()}`
-              : "";
-            const data = await api.get(
-              `/greentarget/api/invoices${queryString}`
-            );
-            setInvoices(data);
-            setError(null);
-          } catch (err) {
-            setError("Failed to fetch invoices. Please try again later.");
-            console.error("Error fetching invoices:", err);
-          }
-        };
-
-        fetchWithFilters();
-      }
-    }
-  }, [searchParams, customerOptions, hasViewedFilters, filters, dateRange]);
 
   // Function to save dates to localStorage
   const saveDatesToStorage = (startDate: Date, endDate: Date) => {
@@ -904,12 +771,12 @@ const InvoiceListPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const params = new URLSearchParams();
 
-      // Add existing date filters
+      // Add date filters
       if (dateRange.start) {
         params.append("start_date", formatDateForAPI(dateRange.start));
       }
@@ -917,26 +784,20 @@ const InvoiceListPage: React.FC = () => {
         params.append("end_date", formatDateForAPI(dateRange.end));
       }
 
-      // Add new filters
+      // Add current filters from state
       if (filters.customer_id) {
         params.append("customer_id", filters.customer_id);
       }
-
       if (filters.status && filters.status.length > 0) {
         params.append("status", filters.status.join(","));
       }
-
-      // Handle consolidation filter
       if (filters.consolidation === "consolidated") {
         params.append("consolidated_only", "true");
       } else if (filters.consolidation === "individual") {
         params.append("exclude_consolidated", "true");
       }
 
-      // Build query string
       const queryString = params.toString() ? `?${params.toString()}` : "";
-
-      // Fetch data with filters
       const data = await api.get(`/greentarget/api/invoices${queryString}`);
       setInvoices(data);
       setError(null);
@@ -946,32 +807,122 @@ const InvoiceListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, dateRange]);
 
   const fetchCustomers = async () => {
     try {
       const customers = await greenTargetApi.getCustomers();
       const options = customers.map(
-        (customer: {
-          customer_id: { toString: () => any };
-          name: any;
-          phone_number: any;
-        }) => ({
+        (customer: { customer_id: any; name: any; phone_number: any }) => ({
           id: customer.customer_id.toString(),
-          name: customer.name,
+          name: customer.name || `Customer ${customer.customer_id}`, // Fallback name
           phone_number: customer.phone_number,
         })
       );
       setCustomerOptions(options);
+
+      // --- Set customerQuery AFTER options are loaded if customer_id is set ---
+      const currentCustomerId = filters.customer_id;
+      if (currentCustomerId) {
+        const selectedCustomer = options.find(
+          (c: { id: string }) => c.id === currentCustomerId
+        );
+        if (selectedCustomer) {
+          setCustomerQuery(selectedCustomer.name);
+        } else {
+          setCustomerQuery(""); // Reset if customer not found in options (maybe invalid ID?)
+        }
+      }
     } catch (error) {
       console.error("Error fetching customers:", error);
     }
   };
 
-  // Add to useEffect
+  // Effect 1: Fetch customers ONCE on mount
   useEffect(() => {
     fetchCustomers();
   }, []);
+
+  // Effect 2: Process initial URL parameters ONCE after mount
+  useEffect(() => {
+    const customerIdParam = searchParams.get("customer_id");
+    const statusParam = searchParams.get("status");
+
+    // Check if params exist and we haven't applied them yet
+    if ((customerIdParam || statusParam) && !initialParamsApplied) {
+      let newFilters = { ...filters }; // Use current filters (which were initialized from URL)
+      let filtersChanged = false;
+
+      // Re-apply or confirm filters from URL (handles potential direct navigation)
+      if (customerIdParam && newFilters.customer_id !== customerIdParam) {
+        newFilters.customer_id = customerIdParam;
+        filtersChanged = true;
+        // Update customerQuery if options are ready
+        const customer = customerOptions.find(
+          (c) => c.id.toString() === customerIdParam
+        );
+        if (customer) setCustomerQuery(customer.name);
+        else setCustomerQuery("");
+      }
+      if (statusParam) {
+        const statusValues = statusParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        // Simple comparison (might need deep comparison for arrays if complex)
+        if (
+          JSON.stringify(newFilters.status?.sort()) !==
+          JSON.stringify(statusValues.sort())
+        ) {
+          newFilters.status = statusValues.length > 0 ? statusValues : null;
+          filtersChanged = true;
+        }
+      }
+
+      if (filtersChanged) {
+        console.log("Applying filters from URL params:", newFilters); // Debug log
+        setFilters(newFilters);
+      }
+
+      // Mark initial params as processed so the main fetch effect can run
+      setInitialParamsApplied(true);
+    } else if (!initialParamsApplied) {
+      // No specific params found in URL, or already processed, mark as ready
+      setInitialParamsApplied(true);
+    }
+  }, [searchParams, initialParamsApplied, customerOptions, filters]); // Add dependencies
+
+  // Effect 3: Fetch invoices when filters, dateRange change, OR after initial params are applied
+  useEffect(() => {
+    // Only run fetch if initial parameter processing is complete
+    if (initialParamsApplied) {
+      fetchInvoices();
+      // Reset to page 1 when filters or date range change
+      setCurrentPage(1);
+    }
+  }, [filters, dateRange, initialParamsApplied, fetchInvoices]); // Add fetchInvoices
+
+  // Effect 4: Calculate active filter count (remains the same)
+  useEffect(() => {
+    let count = 0;
+    if (filters.customer_id !== DEFAULT_FILTERS.customer_id) count++;
+    if (filters.status) {
+      const isDefaultStatus =
+        DEFAULT_FILTERS.status !== null &&
+        filters.status.length === DEFAULT_FILTERS.status.length &&
+        filters.status.every((status) =>
+          DEFAULT_FILTERS.status?.includes(status)
+        ) &&
+        DEFAULT_FILTERS.status.every((status) =>
+          filters.status?.includes(status)
+        );
+      if (!isDefaultStatus) count++;
+    } else if (DEFAULT_FILTERS.status !== null) {
+      count++;
+    }
+    if (filters.consolidation !== DEFAULT_FILTERS.consolidation) count++;
+    setActiveFilterCount(count);
+  }, [filters]);
 
   const handleCancelClick = (invoice: InvoiceGT) => {
     setInvoiceToCancel(invoice);
@@ -1524,6 +1475,15 @@ const InvoiceListPage: React.FC = () => {
     });
   }, [invoices, searchTerm]);
 
+  const applyFilters = () => {
+    setShowFilters(false);
+  };
+
+  const clearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setCustomerQuery("");
+  };
+
   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
 
   const paginatedInvoices = useMemo(() => {
@@ -2001,14 +1961,22 @@ const InvoiceListPage: React.FC = () => {
                     name="customer_filter"
                     label=""
                     value={filters.customer_id || ""}
-                    onChange={(value) =>
+                    onChange={(value) => {
+                      const newCustomerId = Array.isArray(value)
+                        ? value[0] || null
+                        : value || null;
                       setFilters((prev) => ({
                         ...prev,
-                        customer_id: Array.isArray(value)
-                          ? value[0] || null
-                          : value,
-                      }))
-                    }
+                        customer_id: newCustomerId,
+                      }));
+                      // Update customerQuery based on selection
+                      const selectedOption = customerOptions.find(
+                        (opt) => opt.id === newCustomerId
+                      );
+                      setCustomerQuery(
+                        selectedOption ? selectedOption.name : ""
+                      );
+                    }}
                     options={customerOptions}
                     query={customerQuery}
                     setQuery={setCustomerQuery}
@@ -2160,26 +2128,10 @@ const InvoiceListPage: React.FC = () => {
                 </div>
 
                 <div className="mt-6 flex justify-between">
-                  <Button
-                    onClick={() => {
-                      setFilters({
-                        customer_id: null,
-                        status: ["active", "overdue", "paid"],
-                        consolidation: "all",
-                      });
-                    }}
-                    variant="outline"
-                  >
+                  <Button onClick={clearFilters} variant="outline">
                     Clear Filters
                   </Button>
-                  <Button
-                    onClick={() => {
-                      setShowFilters(false);
-                      fetchInvoices();
-                    }}
-                    variant="filled"
-                    color="sky"
-                  >
+                  <Button onClick={applyFilters} variant="filled" color="sky">
                     Apply Filters
                   </Button>
                 </div>
