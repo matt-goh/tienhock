@@ -69,9 +69,9 @@ const DebtorsReportPage: React.FC = () => {
     });
   };
 
-  const handleExportCSV = () => {
+  const handlePrint = () => {
     // This would be implemented to export data to CSV
-    toast.success("Export functionality would be implemented here");
+    toast.success("Printing functionality would be implemented here");
   };
 
   const handleViewInvoices = (customerId: number) => {
@@ -145,11 +145,11 @@ const DebtorsReportPage: React.FC = () => {
           </div>
 
           <Button
-            onClick={handleExportCSV}
+            onClick={handlePrint}
             icon={IconDownload}
             variant="outline"
           >
-            Export
+            Prnt
           </Button>
         </div>
       </div>
