@@ -115,7 +115,7 @@ export default function (pool) {
         parseFloat(invoice.balance_due) - parseFloat(amount_paid)
       );
       const currentStatus = invoice.status;
-      
+
       if (newBalanceDue === 0) {
         // If fully paid, always set to paid
         await client.query(
@@ -163,18 +163,30 @@ export default function (pool) {
         SELECT 
           c.customer_id,
           c.name,
-          c.phone_number,
+          /* Collect unique phone numbers as an array */
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(ph.phone_number, '')), NULL) as phone_numbers,
           SUM(i.total_amount) as total_invoiced,
           SUM(COALESCE(p.amount_paid, 0)) as total_paid,
           SUM(i.total_amount) - SUM(COALESCE(p.amount_paid, 0)) as balance
         FROM greentarget.customers c
         JOIN greentarget.invoices i ON c.customer_id = i.customer_id
+        /* Collect phone numbers from both customer and locations */
+        LEFT JOIN LATERAL (
+          SELECT c.phone_number
+          UNION
+          SELECT l.phone_number
+          FROM greentarget.rentals r
+          JOIN greentarget.locations l ON r.location_id = l.location_id
+          WHERE r.customer_id = c.customer_id
+        ) ph ON true
         LEFT JOIN (
           SELECT invoice_id, SUM(amount_paid) as amount_paid
           FROM greentarget.payments
+          WHERE status IS NULL OR status = 'active'
           GROUP BY invoice_id
         ) p ON i.invoice_id = p.invoice_id
-        GROUP BY c.customer_id, c.name, c.phone_number
+        WHERE i.status != 'cancelled' /* Explicitly exclude cancelled invoices */
+        GROUP BY c.customer_id, c.name
         HAVING SUM(i.total_amount) > SUM(COALESCE(p.amount_paid, 0))
         ORDER BY balance DESC
       `;

@@ -1,6 +1,6 @@
 // src/pages/GreenTarget/Invoices/InvoiceListPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DateRangePicker from "../../../components/DateRangePicker";
 import {
   IconSearch,
@@ -686,6 +686,7 @@ const InvoiceListPage: React.FC = () => {
   const [customerQuery, setCustomerQuery] = useState("");
   const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
   const [hasViewedFilters, setHasViewedFilters] = useState(false);
+  const [searchParams] = useSearchParams();
 
   const ITEMS_PER_PAGE = 12;
 
@@ -744,6 +745,112 @@ const InvoiceListPage: React.FC = () => {
       setHasViewedFilters(false);
     }
   }, [filters]); // This will reset hasViewedFilters whenever filters change
+
+  useEffect(() => {
+    // Get URL parameters
+    const customerIdParam = searchParams.get("customer_id");
+    const statusParam = searchParams.get("status");
+
+    // Only process URL parameters if they exist and haven't been applied yet
+    if ((customerIdParam || statusParam) && !hasViewedFilters) {
+      let newFilters = { ...filters };
+      let shouldFetch = false;
+
+      // Apply customer filter if provided
+      if (customerIdParam) {
+        newFilters.customer_id = customerIdParam;
+        shouldFetch = true;
+
+        // If we have customer options loaded, find the matching customer
+        if (customerOptions.length > 0) {
+          const customer = customerOptions.find(
+            (c) => c.id.toString() === customerIdParam
+          );
+          if (customer) {
+            // Set customer query to the name for visual feedback
+            setCustomerQuery(customer.name);
+          }
+        } else {
+          // If customer options aren't loaded yet, we need to fetch customer details
+          const fetchCustomerDetails = async () => {
+            try {
+              const customer = await greenTargetApi.getCustomer(
+                parseInt(customerIdParam)
+              );
+              if (customer) {
+                setCustomerQuery(customer.name || "");
+              }
+            } catch (error) {
+              console.error("Error fetching customer details:", error);
+            }
+          };
+
+          fetchCustomerDetails();
+        }
+      }
+
+      // Apply status filter if provided (e.g., "active,overdue")
+      if (statusParam) {
+        const statusValues = statusParam.split(",");
+        newFilters.status = statusValues;
+        shouldFetch = true;
+      }
+
+      // Update filters if needed
+      if (shouldFetch) {
+        setFilters(newFilters);
+        setHasViewedFilters(true); // Prevent this from running again
+
+        // Apply filters immediately without showing dialog
+        const fetchWithFilters = async () => {
+          try {
+            // Create params for API call
+            const params = new URLSearchParams();
+
+            // Add date filters
+            if (dateRange.start) {
+              params.append("start_date", formatDateForAPI(dateRange.start));
+            }
+            if (dateRange.end) {
+              params.append("end_date", formatDateForAPI(dateRange.end));
+            }
+
+            // Add customer filter
+            if (newFilters.customer_id) {
+              params.append("customer_id", newFilters.customer_id);
+            }
+
+            // Add status filter
+            if (newFilters.status && newFilters.status.length > 0) {
+              params.append("status", newFilters.status.join(","));
+            }
+
+            // Add consolidation filter if needed
+            if (newFilters.consolidation === "consolidated") {
+              params.append("consolidated_only", "true");
+            } else if (newFilters.consolidation === "individual") {
+              params.append("exclude_consolidated", "true");
+            }
+
+            // Build query string and fetch data
+            const queryString = params.toString()
+              ? `?${params.toString()}`
+              : "";
+            const data = await api.get(
+              `/greentarget/api/invoices${queryString}`
+            );
+            setInvoices(data);
+            setError(null);
+          } catch (err) {
+            setError("Failed to fetch invoices. Please try again later.");
+            console.error("Error fetching invoices:", err);
+          }
+        };
+
+        fetchWithFilters();
+      }
+    }
+  }, [searchParams, customerOptions, hasViewedFilters, filters, dateRange]);
 
   // Function to save dates to localStorage
   const saveDatesToStorage = (startDate: Date, endDate: Date) => {
