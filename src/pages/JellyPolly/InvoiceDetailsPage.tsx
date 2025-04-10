@@ -1,4 +1,4 @@
-// src/pages/Invoice/InvoiceDetailsPage.tsx
+//src/pages/JellyPolly/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ExtendedInvoiceData, Payment, ProductItem } from "../../types/types";
@@ -15,7 +15,7 @@ import {
   createPayment,
   cancelPayment,
   syncCancellationStatus,
-} from "../../utils/invoice/InvoiceUtils";
+} from "../../utils/JellyPolly/InvoiceUtils";
 import {
   parseDatabaseTimestamp,
   formatDisplayDate,
@@ -305,7 +305,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     try {
       // Call the backend e-invoice submission endpoint with the current invoice ID
-      const response = await api.post("/api/einvoice/submit", {
+      const response = await api.post("/jellypolly/api/einvoice/submit", {
         invoiceIds: [invoiceData.id],
       });
 
@@ -589,7 +589,7 @@ const InvoiceDetailsPage: React.FC = () => {
   if (error) {
     return (
       <div className="p-6">
-        <BackButton onClick={() => navigate("/sales/invoice")} />
+        <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
         <div className="p-4 text-center text-rose-600 bg-rose-50 rounded-lg mt-4">
           Error: {error}
         </div>
@@ -600,7 +600,7 @@ const InvoiceDetailsPage: React.FC = () => {
   if (!invoiceData) {
     return (
       <div className="p-6">
-        <BackButton onClick={() => navigate("/sales/invoice")} />
+        <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
         <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-lg mt-4">
           Invoice data could not be loaded or invoice not found.
         </div>
@@ -638,7 +638,7 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
       )}
       <BackButton
-        onClick={() => navigate("/sales/invoice")}
+        onClick={() => navigate("/jellypolly/sales/invoice")}
         disabled={isLoading}
       />
       {/* Header Area */}
@@ -1139,10 +1139,7 @@ const InvoiceDetailsPage: React.FC = () => {
                             variant="outline"
                             color="rose"
                             onClick={() => handleCancelPaymentClick(p)}
-                            disabled={
-                              isCancellingPayment ||
-                              isCancelled
-                            }
+                            disabled={isCancellingPayment || isCancelled}
                             title={
                               isCancelled
                                 ? "Cannot cancel payment for cancelled invoice"
