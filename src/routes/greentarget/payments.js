@@ -169,7 +169,15 @@ export default function (pool) {
           -- Get pre-aggregated invoice and payment data from subquery
           invoice_data.total_invoiced,
           invoice_data.total_paid,
-          invoice_data.balance
+          invoice_data.balance,
+          
+          -- Add new field to check for overdue invoices (as a subquery)
+          (SELECT EXISTS(
+            SELECT 1 FROM greentarget.invoices oi 
+            WHERE oi.customer_id = c.customer_id 
+            AND oi.status = 'overdue'
+            AND oi.status != 'cancelled'
+          )) as has_overdue
           
         FROM greentarget.customers c
         -- Collect phone numbers from both customer and locations (existing logic)
@@ -190,9 +198,9 @@ export default function (pool) {
             SUM(
               COALESCE(
                 (SELECT SUM(amount_paid) 
-                 FROM greentarget.payments p 
-                 WHERE p.invoice_id = i.invoice_id 
-                 AND (p.status IS NULL OR p.status = 'active')
+                FROM greentarget.payments p 
+                WHERE p.invoice_id = i.invoice_id 
+                AND (p.status IS NULL OR p.status = 'active')
                 ), 0
               )
             ) as total_paid,
@@ -200,9 +208,9 @@ export default function (pool) {
             SUM(
               COALESCE(
                 (SELECT SUM(amount_paid) 
-                 FROM greentarget.payments p 
-                 WHERE p.invoice_id = i.invoice_id 
-                 AND (p.status IS NULL OR p.status = 'active')
+                FROM greentarget.payments p 
+                WHERE p.invoice_id = i.invoice_id 
+                AND (p.status IS NULL OR p.status = 'active')
                 ), 0
               )
             ) as balance
@@ -228,6 +236,7 @@ export default function (pool) {
         total_invoiced: parseFloat(debtor.total_invoiced || 0),
         total_paid: parseFloat(debtor.total_paid || 0),
         balance: parseFloat(debtor.balance || 0),
+        has_overdue: !!debtor.has_overdue,
       }));
       res.json(debtors);
     } catch (error) {
