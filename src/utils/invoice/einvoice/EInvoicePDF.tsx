@@ -2,6 +2,7 @@
 import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
+import TienHockLogo from "../../tienhock.png";
 
 // State mapping
 const stateOptions = [
@@ -224,7 +225,7 @@ const EInvoicePDF: React.FC<Props> = ({
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>
-          <Image src="../tienhock.png" style={styles.logo} />
+          <Image src={TienHockLogo} style={styles.logo} />
           <View style={styles.companyInfo}>
             <Text style={styles.companyName}>{data.company.name}</Text>
             <Text style={styles.companyDetail}>

@@ -632,7 +632,7 @@ const InvoiceListPage: React.FC = () => {
         // Make the API call with all parameters
         const queryString = params.toString() ? `?${params.toString()}` : "";
         const response = await api.get(
-          `/api/invoices/selection/ids${queryString}`
+          `/jellypolly/api/invoices/selection/ids${queryString}`
         );
 
         if (response && response.ids && Array.isArray(response.ids)) {
@@ -907,7 +907,7 @@ const InvoiceListPage: React.FC = () => {
 
     try {
       // Call backend endpoint responsible for submitting
-      const response = await api.post("/api/einvoice/submit", {
+      const response = await api.post("/jellypolly/api/einvoice/submit", {
         invoiceIds: idsToSubmit,
       });
 
