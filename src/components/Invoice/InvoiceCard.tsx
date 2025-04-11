@@ -54,14 +54,12 @@ const getInvoiceStatusStyles = (status: InvoiceStatus | undefined) => {
         border: "border-red-200",
         label: "Overdue",
       };
-    case "active":
-    case "unpaid": // Treat 'active' and 'unpaid' the same visually
     default: // Default to Unpaid style
       return {
         bg: "bg-amber-100",
         text: "text-amber-800",
         border: "border-amber-200",
-        label: status === "active" ? "Active" : "Unpaid", // Keep original label if needed
+        label: "Unpaid", // Keep original label if needed
       };
   }
 };
