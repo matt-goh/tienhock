@@ -3,6 +3,7 @@ import React from "react";
 import { Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { InvoiceData, ProductItem } from "../../../types/types";
 import { TIENHOCK_INFO } from "../einvoice/companyInfo";
+import TienHockLogo from "../../tienhock.png";
 
 interface InvoicePDFProps {
   invoices: InvoiceData[];
@@ -585,7 +586,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
         <Page key={`page-${pageIndex}`} size="LETTER" style={styles.page}>
           {pageIndex === 0 && (
             <View style={styles.header}>
-              <Image src="../../tienhock.png" style={styles.logo} />
+              <Image src={TienHockLogo} style={styles.logo} />
               <View style={styles.headerTextContainer}>
                 <Text style={styles.companyName}>{TIENHOCK_INFO.name}</Text>
                 <Text style={styles.companyDetails}>
