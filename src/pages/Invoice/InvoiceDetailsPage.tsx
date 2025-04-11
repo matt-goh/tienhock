@@ -1,6 +1,6 @@
 // src/pages/Invoice/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ExtendedInvoiceData, Payment, ProductItem } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
@@ -138,6 +138,7 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const invoiceId = id || "";
 
@@ -152,7 +153,9 @@ const InvoiceDetailsPage: React.FC = () => {
   // Action States
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(
+    location.state?.showPaymentForm || false
+  );
   const [paymentFormData, setPaymentFormData] = useState<
     Omit<Payment, "payment_id" | "invoice_id" | "created_at">
   >({
@@ -1139,10 +1142,7 @@ const InvoiceDetailsPage: React.FC = () => {
                             variant="outline"
                             color="rose"
                             onClick={() => handleCancelPaymentClick(p)}
-                            disabled={
-                              isCancellingPayment ||
-                              isCancelled
-                            }
+                            disabled={isCancellingPayment || isCancelled}
                             title={
                               isCancelled
                                 ? "Cannot cancel payment for cancelled invoice"

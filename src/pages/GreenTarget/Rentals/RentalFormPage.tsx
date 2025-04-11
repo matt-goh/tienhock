@@ -1081,7 +1081,7 @@ const RentalFormPage: React.FC = () => {
                                     />
                                   );
                                   c += " text-amber-600";
-                                  t = `Avail after ${formatDumpsterDate(
+                                  t = `Available after ${formatDumpsterDate(
                                     d.available_after
                                   )}`;
                                   if (d.customer) t += ` (from ${d.customer})`;
@@ -1097,7 +1097,7 @@ const RentalFormPage: React.FC = () => {
                                   if (d.customer) t += ` (with ${d.customer})`;
                                 } else if (d.next_rental?.date) {
                                   c += " text-amber-600";
-                                  t = `Avail until ${formatDumpsterDate(
+                                  t = `Available until ${formatDumpsterDate(
                                     d.available_until
                                   )}`;
                                   if (d.next_rental.customer)

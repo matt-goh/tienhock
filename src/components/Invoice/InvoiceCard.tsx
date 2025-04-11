@@ -232,9 +232,28 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
       {/* Footer - Uses parent's horizontal padding */}
       <div className="flex flex-wrap gap-x-2 gap-y-1 items-center">
-        {/* Invoice Status */}
+        {/* Invoice Status - Make Unpaid and Overdue clickable */}
         <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${invoiceStatusStyle.bg} ${invoiceStatusStyle.text}`}
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            invoiceStatusStyle.bg
+          } ${invoiceStatusStyle.text} ${
+            invoiceStatusStyle.label === "Unpaid" ||
+            invoiceStatusStyle.label === "Overdue"
+              ? "cursor-pointer hover:brightness-95"
+              : ""
+          }`}
+          onClick={(e) => {
+            if (
+              invoiceStatusStyle.label === "Unpaid" ||
+              invoiceStatusStyle.label === "Overdue"
+            ) {
+              e.stopPropagation();
+              // Navigate directly to details page with payment form open
+              navigate(`/sales/invoice/${invoice.id}`, {
+                state: { showPaymentForm: true },
+              });
+            }
+          }}
         >
           {invoiceStatusStyle.label}
         </span>
