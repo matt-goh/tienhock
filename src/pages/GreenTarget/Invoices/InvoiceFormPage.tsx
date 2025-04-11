@@ -641,7 +641,7 @@ const InvoiceFormPage: React.FC = () => {
   if (loading) return <LoadingSpinner />;
   if (error) {
     return (
-      <div className="container mx-auto -mt-12 px-4">
+      <div className="container mx-auto px-4">
         <BackButton onClick={handleBackClick} className="ml-5" />
         <div className="bg-white rounded-lg p-6 border border-rose-200 shadow-sm">
           <h2 className="text-xl font-semibold text-rose-700 mb-4">
@@ -679,7 +679,7 @@ const InvoiceFormPage: React.FC = () => {
   );
 
   return (
-    <div className="container mx-auto -mt-12 px-4 pb-10">
+    <div className="container mx-auto px-4 pb-10">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
