@@ -193,7 +193,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     marginTop: 80,
-    marginBottom: 20,
   },
   signatureColumn: {
     alignItems: "center",
@@ -311,7 +310,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
       ];
 
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size={hasValidEInvoice ? "A4" : "LETTER"} style={styles.page}>
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>
@@ -534,17 +533,15 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
                 3137836814
               </Text>
             </>
-          ) : !isConsolidated ? (
+          ) : !isConsolidated && invoice.status === "cancelled" ? (
             <>
               <Text style={styles.paymentTitle}>Payment Status:</Text>
               <Text style={styles.paymentInfo}>
-                {invoice.status === "cancelled"
-                  ? "This invoice has been cancelled."
-                  : "This invoice has been paid in full."}
+                This invoice has been cancelled.
               </Text>
             </>
           ) : (
-            // Empty View to maintain spacing for consolidated invoices
+            // Empty View for both consolidated invoices and paid invoices
             <View />
           )}
         </View>
