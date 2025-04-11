@@ -1178,27 +1178,34 @@ const InvoiceListPage: React.FC = () => {
       const toastId = toast.loading(
         `Fetching details for ${ids.length} invoice(s)...`
       );
-      try {
-        const promises = ids.map((id) => greenTargetApi.getInvoice(Number(id)));
-        const results = await Promise.allSettled(promises);
-        const successfulInvoices: InvoiceGT[] = [];
-        const failedIds: string[] = [];
 
-        results.forEach((result, index) => {
-          if (result.status === "fulfilled" && result.value?.invoice) {
-            successfulInvoices.push(result.value.invoice);
-          } else {
-            failedIds.push(ids[index]);
-            console.error(
-              `Failed to fetch invoice ${ids[index]}:`,
-              result.status === "rejected"
-                ? result.reason
-                : "No invoice data found"
-            );
-          }
-        });
+      try {
+        // Convert string IDs to numbers
+        const numericIds = ids
+          .map((id) => Number(id))
+          .filter((id) => !isNaN(id));
+
+        if (numericIds.length === 0) {
+          toast.error("No valid invoice IDs to fetch", { id: toastId });
+          return [];
+        }
+
+        // Use batch API instead of individual requests
+        const batchResults = await greenTargetApi.getBatchInvoices(numericIds);
+
+        if (!Array.isArray(batchResults) || batchResults.length === 0) {
+          toast.error("No invoice data returned", { id: toastId });
+          return [];
+        }
+
+        // Check if any IDs failed to fetch
+        const fetchedIds = new Set(
+          batchResults.map((inv) => inv.invoice_id.toString())
+        );
+        const failedIds = ids.filter((id) => !fetchedIds.has(id));
 
         if (failedIds.length > 0) {
+          console.error(`Failed to fetch invoices: ${failedIds.join(", ")}`);
           toast.error(
             `Could not fetch details for ${failedIds.length} invoice(s).`,
             { id: toastId }
@@ -1206,7 +1213,8 @@ const InvoiceListPage: React.FC = () => {
         } else {
           toast.dismiss(toastId);
         }
-        return successfulInvoices;
+
+        return batchResults;
       } catch (error) {
         toast.error("Failed to fetch invoice details.", { id: toastId });
         console.error("Error fetching batch invoice details:", error);

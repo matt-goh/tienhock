@@ -185,6 +185,111 @@ export default function (pool, defaultConfig) {
     }
   });
 
+  // GET /greentarget/api/invoices/batch - Get Multiple Invoices By IDs
+  router.get("/batch", async (req, res) => {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res
+        .status(400)
+        .json({ message: "Missing required ids parameter" });
+    }
+
+    try {
+      // Split comma-separated string into array
+      const invoiceIds = ids.split(",").map((id) => parseInt(id, 10));
+
+      // Filter out any NaN values
+      const validIds = invoiceIds.filter((id) => !isNaN(id));
+
+      // Limit batch size for performance
+      if (validIds.length > 100) {
+        return res.status(400).json({
+          message: "Too many invoices requested. Maximum batch size is 100.",
+        });
+      }
+
+      if (validIds.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No valid invoice IDs provided" });
+      }
+
+      // Generate a query to fetch multiple invoices at once
+      const placeholders = validIds.map((_, i) => `$${i + 1}`).join(",");
+
+      const invoiceQuery = `
+      SELECT i.*,
+            c.name as customer_name,
+            c.phone_number as customer_phone_number,
+            c.tin_number,
+            c.id_number,
+            c.id_type,
+            r.rental_id,
+            r.tong_no,
+            r.date_placed,
+            r.date_picked,
+            r.driver,
+            l.address as location_address,
+            l.phone_number as location_phone_number,
+            -- Calculate paid amount correctly using non-cancelled payments
+            COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
+            -- Add subquery for consolidated part info
+            (
+              SELECT jsonb_build_object(
+                'id', con.invoice_id,
+                'invoice_number', con.invoice_number,
+                'uuid', con.uuid,
+                'long_id', con.long_id,
+                'einvoice_status', con.einvoice_status
+              )
+              FROM greentarget.invoices con
+              WHERE con.is_consolidated = true
+                AND con.status != 'cancelled'
+                AND con.consolidated_invoices ? i.invoice_number
+              LIMIT 1
+            ) as consolidated_part_of
+      FROM greentarget.invoices i
+      JOIN greentarget.customers c ON i.customer_id = c.customer_id
+      LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+      LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
+      LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
+      WHERE i.invoice_id IN (${placeholders})
+      GROUP BY i.invoice_id, c.customer_id, r.rental_id, l.location_id
+    `;
+
+      const result = await pool.query(invoiceQuery, validIds);
+
+      // Calculate current balance for each invoice
+      const invoicesWithBalance = result.rows.map((invoice) => {
+        const totalAmount = parseFloat(invoice.total_amount || 0);
+        const amountPaid = parseFloat(invoice.amount_paid || 0);
+        const balance = totalAmount - amountPaid;
+
+        // Ensure balance_due is consistent
+        let finalBalanceDue = invoice.status === "cancelled" ? 0 : balance;
+        // Clamp balance to zero if slightly negative due to float issues
+        finalBalanceDue = Math.max(0, parseFloat(finalBalanceDue.toFixed(2)));
+
+        return {
+          ...invoice,
+          amount_paid: parseFloat(amountPaid.toFixed(2)),
+          current_balance: finalBalanceDue,
+          balance_due: finalBalanceDue,
+          consolidated_part_of: invoice.consolidated_part_of,
+        };
+      });
+
+      res.json(invoicesWithBalance);
+    } catch (error) {
+      console.error("Error fetching batch invoices:", error);
+      res.status(500).json({
+        message: "Error fetching invoices",
+        error: error.message,
+      });
+    }
+  });
+
   // Get invoice by ID
   router.get("/:invoice_id", async (req, res) => {
     const { invoice_id } = req.params;

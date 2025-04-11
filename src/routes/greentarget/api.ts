@@ -67,6 +67,10 @@ export const greenTargetApi = {
   // Invoice endpoints
   getInvoices: () => api.get("/greentarget/api/invoices"),
   getInvoice: (id: any) => api.get(`/greentarget/api/invoices/${id}`),
+  getBatchInvoices: (ids: number[]) => {
+    if (!ids || ids.length === 0) return Promise.resolve([]);
+    return api.get(`/greentarget/api/invoices/batch?ids=${ids.join(",")}`);
+  },
   createInvoice: (data: any) => api.post("/greentarget/api/invoices", data),
   updateInvoice: (id: any, data: any) =>
     api.put(`/greentarget/api/invoices/${id}`, data),
