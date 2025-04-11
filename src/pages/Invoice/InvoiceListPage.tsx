@@ -1341,7 +1341,7 @@ const InvoiceListPage: React.FC = () => {
           className={`p-3 ${
             selectedInvoiceIds.size > 0
               ? "bg-sky-50/95 border border-sky-200"
-              : "bg-white/95 border border-dashed border-default-200"
+              : "bg-white/95 border border-default-200"
           } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow-md backdrop-blur-sm`}
           onClick={handleToggleSelectAll}
           title={
