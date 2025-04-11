@@ -54,15 +54,13 @@ interface Rental {
 interface Invoice {
   invoice_id?: number;
   invoice_number?: string;
-  type: "regular" | "statement";
+  type: "regular";
   customer_id: number; // Store as number
   rental_id?: number | null; // Store as number or null
   amount_before_tax: number;
   tax_amount: number;
   total_amount?: number; // Calculated
   date_issued: string; // YYYY-MM-DD
-  statement_period_start?: string | null; // YYYY-MM-DD or null
-  statement_period_end?: string | null; // YYYY-MM-DD or null
 }
 
 // Payment method options
@@ -294,12 +292,6 @@ const InvoiceFormPage: React.FC = () => {
         date_issued: inv.date_issued
           ? new Date(inv.date_issued).toISOString().split("T")[0]
           : "",
-        statement_period_start: inv.statement_period_start
-          ? new Date(inv.statement_period_start).toISOString().split("T")[0]
-          : null,
-        statement_period_end: inv.statement_period_end
-          ? new Date(inv.statement_period_end).toISOString().split("T")[0]
-          : null,
       };
       setFormData(parsed);
       setInitialFormData(parsed);
@@ -371,33 +363,6 @@ const InvoiceFormPage: React.FC = () => {
         type === "number" ? (value === "" ? 0 : parseFloat(value) || 0) : value,
     }));
   };
-  const handleTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    if (value === "regular") {
-      setFormData((p) => ({
-        ...p,
-        type: "regular",
-        statement_period_start: null,
-        statement_period_end: null,
-        rental_id:
-          previousRental.rental?.customer_id === p.customer_id
-            ? previousRental.rental_id
-            : null,
-      }));
-      setSelectedRental(
-        previousRental.rental?.customer_id === formData.customer_id
-          ? previousRental.rental
-          : null
-      );
-    } else if (value === "statement") {
-      setPreviousRental({
-        rental_id: formData.rental_id ?? null,
-        rental: selectedRental,
-      });
-      setFormData((p) => ({ ...p, type: "statement", rental_id: null }));
-      setSelectedRental(null);
-    }
-  };
   const handleCustomerChange = (selectedId: string | string[] | null) => {
     const newCustId =
       selectedId && typeof selectedId === "string" ? Number(selectedId) : 0;
@@ -453,23 +418,6 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Select rental");
       return false;
     }
-    if (
-      formData.type === "statement" &&
-      (!formData.statement_period_start || !formData.statement_period_end)
-    ) {
-      toast.error("Specify statement period");
-      return false;
-    }
-    if (
-      formData.type === "statement" &&
-      formData.statement_period_start &&
-      formData.statement_period_end &&
-      new Date(formData.statement_period_start) >
-        new Date(formData.statement_period_end)
-    ) {
-      toast.error("Start date after end");
-      return false;
-    }
     if (!formData.date_issued) {
       toast.error("Specify issue date");
       return false;
@@ -517,8 +465,6 @@ const InvoiceFormPage: React.FC = () => {
         tax_amount: Number(formData.tax_amount),
         total_amount: Number(totalAmount),
         date_issued: formData.date_issued,
-        statement_period_start: formData.statement_period_start || null,
-        statement_period_end: formData.statement_period_end || null,
       };
       if (isEditMode && formData.invoice_id)
         invData.invoice_id = formData.invoice_id;
@@ -751,83 +697,6 @@ const InvoiceFormPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6">
-          {/* Invoice Type Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-default-700 mb-2">
-              Invoice Type
-            </label>
-            <div className="flex space-x-4">
-              <label className="inline-flex items-center cursor-pointer">
-                <div className="relative flex items-center">
-                  <input
-                    type="radio"
-                    name="type"
-                    value="regular"
-                    checked={formData.type === "regular"}
-                    onChange={handleTypeChange}
-                    className="sr-only"
-                    disabled={isEditMode}
-                  />
-                  <div
-                    className={clsx(
-                      "w-4 h-4 rounded-full border flex items-center justify-center mr-2",
-                      formData.type === "regular"
-                        ? "border-sky-500 bg-white"
-                        : "border-default-300 bg-white",
-                      isEditMode ? "cursor-not-allowed opacity-50" : ""
-                    )}
-                  >
-                    {formData.type === "regular" && (
-                      <div className="w-2 h-2 rounded-full bg-sky-500"></div>
-                    )}
-                  </div>
-                  <span
-                    className={clsx(
-                      "text-sm",
-                      isEditMode ? "text-default-500" : "text-default-700"
-                    )}
-                  >
-                    Regular Invoice
-                  </span>
-                </div>
-              </label>
-              <label className="inline-flex items-center cursor-pointer">
-                <div className="relative flex items-center">
-                  <input
-                    type="radio"
-                    name="type"
-                    value="statement"
-                    checked={formData.type === "statement"}
-                    onChange={handleTypeChange}
-                    className="sr-only"
-                    disabled={isEditMode}
-                  />
-                  <div
-                    className={clsx(
-                      "w-4 h-4 rounded-full border flex items-center justify-center mr-2",
-                      formData.type === "statement"
-                        ? "border-sky-500 bg-white"
-                        : "border-default-300 bg-white",
-                      isEditMode ? "cursor-not-allowed opacity-50" : ""
-                    )}
-                  >
-                    {formData.type === "statement" && (
-                      <div className="w-2 h-2 rounded-full bg-sky-500"></div>
-                    )}
-                  </div>
-                  <span
-                    className={clsx(
-                      "text-sm",
-                      isEditMode ? "text-default-500" : "text-default-700"
-                    )}
-                  >
-                    Statement
-                  </span>
-                </div>
-              </label>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* Customer Combobox */}
             <div className="space-y-2">
@@ -1037,53 +906,6 @@ const InvoiceFormPage: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Conditional Fields (Statement Invoice) */}
-          {formData.type ===
-            "statement" /* ... Statement date fields ... */ && (
-            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label
-                  htmlFor="statement_period_start"
-                  className="block text-sm font-medium text-default-700"
-                >
-                  Start Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="statement_period_start"
-                  name="statement_period_start"
-                  value={formData.statement_period_start || ""}
-                  onChange={handleInputChange}
-                  required
-                  className={clsx(
-                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                  )}
-                />
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="statement_period_end"
-                  className="block text-sm font-medium text-default-700"
-                >
-                  End Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="statement_period_end"
-                  name="statement_period_end"
-                  value={formData.statement_period_end || ""}
-                  onChange={handleInputChange}
-                  required
-                  className={clsx(
-                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                  )}
-                />
-              </div>
             </div>
           )}
 
