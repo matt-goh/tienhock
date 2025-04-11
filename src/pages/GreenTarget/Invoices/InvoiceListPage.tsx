@@ -1611,7 +1611,7 @@ const InvoiceListPage: React.FC = () => {
   return (
     <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8 -mt-4">
       {/* Revised Header Layout - 2 rows total on desktop */}
-      <div className="space-y-4 mb-6">
+      <div className="space-y-4">
         {/* Row 1: Header with title, filters, search and action buttons */}
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
           {/* Title */}
@@ -1711,7 +1711,7 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Filters info dropdown panel - Improved */}
               {isFilterButtonHovered && (
-                <div className="absolute z-10 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
+                <div className="absolute z-30 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
                   <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
                     {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
@@ -1806,9 +1806,9 @@ const InvoiceListPage: React.FC = () => {
         <div
           className={`p-3 ${
             selectedInvoiceIds.size > 0
-              ? "bg-sky-50 border border-sky-200"
-              : "bg-white border border-dashed border-default-200"
-          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-0 z-0 shadow-sm`}
+              ? "bg-sky-50/95 border border-sky-200"
+              : "bg-white/95 border border-dashed border-default-200"
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow-md backdrop-blur-sm`}
           onClick={handleSelectAllOnPage}
           title={
             isAllSelectedOnPage ? "Deselect All on Page" : "Select All on Page"
@@ -1921,7 +1921,64 @@ const InvoiceListPage: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {filteredInvoices.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200">
+            <IconFileInvoice
+              size={64}
+              className="text-default-300 mb-5"
+              stroke={1.2}
+            />
+            <h3 className="text-xl font-semibold text-default-700 mb-2">
+              No invoices found
+            </h3>
+            <p className="text-default-500 text-center max-w-md mb-6">
+              {searchTerm
+                ? "Your search didn't match any invoices. Try adjusting your search terms or filters."
+                : "You haven't created any invoices yet."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedInvoices.map((invoice) => (
+              <InvoiceCard
+                key={invoice.invoice_id}
+                invoice={invoice}
+                onCancelClick={handleCancelClick}
+                onSubmitEInvoiceClick={handleSubmitEInvoice}
+                onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
+                onSyncCancellationStatus={handleSyncCancellationStatus}
+                onPrintClick={handlePrintInvoice}
+                onDownloadClick={handleDownloadInvoice}
+                isSelected={selectedInvoiceIds.has(
+                  invoice.invoice_id.toString()
+                )}
+                onSelect={handleSelectInvoice}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {filteredInvoices.length > 0 && (
+        <div className="mt-6 flex justify-between items-center text-default-700">
+          <button
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
+          </button>
+          <div className="flex space-x-2">{renderPaginationButtons()}</div>
+          <button
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next <IconChevronRight className="w-5 h-5 ml-2" />
+          </button>
+        </div>
+      )}
 
       <Dialog
         as="div"
@@ -2145,61 +2202,6 @@ const InvoiceListPage: React.FC = () => {
           </TransitionChild>
         </div>
       </Dialog>
-
-      {filteredInvoices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200">
-          <IconFileInvoice
-            size={64}
-            className="text-default-300 mb-5"
-            stroke={1.2}
-          />
-          <h3 className="text-xl font-semibold text-default-700 mb-2">
-            No invoices found
-          </h3>
-          <p className="text-default-500 text-center max-w-md mb-6">
-            {searchTerm
-              ? "Your search didn't match any invoices. Try adjusting your search terms or filters."
-              : "You haven't created any invoices yet."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {paginatedInvoices.map((invoice) => (
-            <InvoiceCard
-              key={invoice.invoice_id}
-              invoice={invoice}
-              onCancelClick={handleCancelClick}
-              onSubmitEInvoiceClick={handleSubmitEInvoice}
-              onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
-              onSyncCancellationStatus={handleSyncCancellationStatus}
-              onPrintClick={handlePrintInvoice}
-              onDownloadClick={handleDownloadInvoice}
-              isSelected={selectedInvoiceIds.has(invoice.invoice_id.toString())}
-              onSelect={handleSelectInvoice}
-            />
-          ))}
-        </div>
-      )}
-
-      {filteredInvoices.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
-          <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
-          </button>
-          <div className="flex space-x-2">{renderPaginationButtons()}</div>
-          <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Next <IconChevronRight className="w-5 h-5 ml-2" />
-          </button>
-        </div>
-      )}
       <SubmissionResultsModal
         isOpen={showSubmissionResultsModal}
         onClose={() => setShowSubmissionResultsModal(false)}
