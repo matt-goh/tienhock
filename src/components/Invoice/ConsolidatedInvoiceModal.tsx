@@ -96,7 +96,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [isAutoConsolidationEnabled, setIsAutoConsolidationEnabled] =
     useState(false);
   const [activeTab, setActiveTab] = useState<"eligible" | "history">(
-    "eligible"
+    "history"
   );
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState<any>(null);
@@ -126,7 +126,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       // Reset state when opening
-      setActiveTab("eligible");
+      setActiveTab("history");
       setSelectedInvoices(new Set());
       setError(null);
       setProcessingHistoryId(null);
@@ -467,16 +467,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           <div className="flex space-x-1 w-fit bg-default-100 rounded-lg p-1">
             <button
               className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
-                activeTab === "eligible"
-                  ? "bg-white shadow-sm text-sky-700 font-semibold"
-                  : "text-default-600 hover:text-default-900 hover:bg-default-50"
-              }`}
-              onClick={() => setActiveTab("eligible")}
-            >
-              Eligible Invoices ({eligibleInvoices.length})
-            </button>
-            <button
-              className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
                 activeTab === "history"
                   ? "bg-white shadow-sm text-sky-700 font-semibold"
                   : "text-default-600 hover:text-default-900 hover:bg-default-50"
@@ -484,6 +474,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               onClick={() => setActiveTab("history")}
             >
               Consolidation History ({consolidationHistory.length})
+            </button>
+            <button
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
+                activeTab === "eligible"
+                  ? "bg-white shadow-sm text-sky-700 font-semibold"
+                  : "text-default-600 hover:text-default-900 hover:bg-default-50"
+              }`}
+              onClick={() => setActiveTab("eligible")}
+            >
+              Manually Submit ({eligibleInvoices.length})
             </button>
           </div>
         </div>

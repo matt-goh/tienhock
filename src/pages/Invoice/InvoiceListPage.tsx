@@ -1342,7 +1342,7 @@ const InvoiceListPage: React.FC = () => {
             selectedInvoiceIds.size > 0
               ? "bg-sky-50/95 border border-sky-200"
               : "bg-white/95 border border-default-200"
-          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow-md backdrop-blur-sm`}
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
           onClick={handleToggleSelectAll}
           title={
             selectionState.isAllSelectedOnPage
@@ -1512,6 +1512,8 @@ const InvoiceListPage: React.FC = () => {
               color="amber"
               disabled={isLoading}
               size="sm"
+              title="Consolidated Invoice"
+              aria-label="Consolidated Invoice"
             >
               Consolidated
             </Button>
@@ -1521,6 +1523,8 @@ const InvoiceListPage: React.FC = () => {
               variant="outline"
               disabled={isLoading}
               size="sm"
+              title="Refresh Invoices"
+              aria-label="Refresh Invoices"
             >
               Refresh
             </Button>
@@ -1530,6 +1534,8 @@ const InvoiceListPage: React.FC = () => {
               variant="filled"
               color="sky"
               size="sm"
+              title="Create New Invoice"
+              aria-label="Create New Invoice"
             >
               Create New
             </Button>
