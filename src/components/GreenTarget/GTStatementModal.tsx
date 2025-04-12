@@ -284,10 +284,18 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                 {/* Selected customers summary */}
                 {selectedCustomers.length > 0 && (
                   <div className="mt-2 p-2 bg-sky-50 border border-sky-100 rounded-lg">
-                    <p className="text-sm text-default-700 font-medium mb-1">
-                      Selected: {selectedCustomers.length} customer
-                      {selectedCustomers.length > 1 ? "s" : ""}
-                    </p>
+                    <div className="flex justify-between">
+                      <p className="text-sm text-default-700 font-medium mb-1">
+                        Selected: {selectedCustomers.length} customer
+                        {selectedCustomers.length > 1 ? "s" : ""}
+                      </p>
+                      <button
+                        className="text-xs text-sky-600 hover:text-sky-800 hover:underline"
+                        onClick={() => setSelectedCustomers([])}
+                      >
+                        Clear all
+                      </button>
+                    </div>
                     <div className="max-h-36 overflow-y-auto">
                       <ul className="text-xs text-default-600 space-y-1">
                         {selectedCustomers.map((customerId) => {
@@ -306,14 +314,6 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                           );
                         })}
                       </ul>
-                    </div>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        className="text-xs text-sky-600 hover:text-sky-800 hover:underline"
-                        onClick={() => setSelectedCustomers([])}
-                      >
-                        Clear all
-                      </button>
                     </div>
                   </div>
                 )}
