@@ -54,6 +54,7 @@ import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGT
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import GTStatementModal from "../../../components/GreenTarget/GTStatementModal";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -712,6 +713,7 @@ const InvoiceListPage: React.FC = () => {
   const [hasViewedFilters, setHasViewedFilters] = useState(false);
   const [initialParamsApplied, setInitialParamsApplied] = useState(false);
   const [searchParams] = useSearchParams();
+  const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
 
   useEffect(() => {
     if (activeFilterCount > 0) {
@@ -1808,7 +1810,7 @@ const InvoiceListPage: React.FC = () => {
             selectedInvoiceIds.size > 0
               ? "bg-sky-50/95 border border-sky-200"
               : "bg-white/95 border border-default-200"
-          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow-md backdrop-blur-sm`}
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
           onClick={handleSelectAllOnPage}
           title={
             isAllSelectedOnPage ? "Deselect All on Page" : "Select All on Page"
@@ -1898,8 +1900,18 @@ const InvoiceListPage: React.FC = () => {
               icon={IconFiles}
               variant="outline"
               size="sm"
+              title="Consolidate menu"
             >
               Consolidate
+            </Button>
+            <Button
+              onClick={() => setIsStatementModalOpen(true)}
+              icon={IconFileInvoice}
+              variant="outline"
+              size="sm"
+              title="Generate Statement"
+            >
+              Statement
             </Button>
             <Button
               onClick={() => fetchInvoices()}
@@ -1916,6 +1928,7 @@ const InvoiceListPage: React.FC = () => {
               icon={IconPlus}
               variant="outline"
               size="sm"
+              title="Create new invoice"
             >
               Create
             </Button>
@@ -2234,6 +2247,13 @@ const InvoiceListPage: React.FC = () => {
         message={`Are you sure you want to submit Invoice ${invoiceToSubmitAsEInvoice?.invoice_number} as an e-Invoice to MyInvois?`}
         confirmButtonText="Submit"
         variant="default"
+      />
+      {/* Statement modal */}
+      <GTStatementModal
+        isOpen={isStatementModalOpen}
+        onClose={() => setIsStatementModalOpen(false)}
+        month={selectedMonth.id}
+        year={currentYear}
       />
       <GTConsolidatedInvoiceModal
         isOpen={isConsolidateModalOpen}
