@@ -1,11 +1,16 @@
 // src/components/GreenTarget/GTStatementModal.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, TransitionChild, DialogTitle } from "@headlessui/react";
 import { IconX, IconChevronRight } from "@tabler/icons-react";
 import Button from "../Button";
 import { FormCombobox, FormListbox, SelectOption } from "../FormComponents";
 import { greenTargetApi } from "../../routes/greentarget/api";
 import { toast } from "react-hot-toast";
+import { pdf, Document } from "@react-pdf/renderer";
+import GTStatementPDF from "../../utils/greenTarget/PDF/GTStatementPDF";
+import LoadingSpinner from "../LoadingSpinner";
+import { generateQRDataUrl } from "../../utils/invoice/einvoice/generateQRCode";
+import { InvoiceGT } from "../../types/types";
 
 interface GTStatementModalProps {
   isOpen: boolean;
@@ -36,6 +41,19 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
   const [customerOptions, setCustomerOptions] = useState<SelectOption[]>([]);
   const [customerQuery, setCustomerQuery] = useState<string>("");
   const [isValidRange, setIsValidRange] = useState<boolean>(true);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isLoadingDialogVisible, setIsLoadingDialogVisible] =
+    useState<boolean>(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const hasPrintedRef = useRef(false);
+  const resourcesRef = useRef<{
+    printFrame: HTMLIFrameElement | null;
+    pdfUrl: string | null;
+  }>({
+    printFrame: null,
+    pdfUrl: null,
+  });
 
   // Generate month-year options (current year and previous year)
   const monthYearOptions: MonthYearOption[] = [];
@@ -113,6 +131,25 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     setIsValidRange(endTotalMonths >= startTotalMonths);
   }, [startMonthYear, endMonthYear]);
 
+  const cleanup = (fullCleanup = false) => {
+    if (fullCleanup) {
+      if (resourcesRef.current.pdfUrl) {
+        URL.revokeObjectURL(resourcesRef.current.pdfUrl);
+      }
+      if (
+        resourcesRef.current.printFrame &&
+        resourcesRef.current.printFrame.parentNode
+      ) {
+        document.body.removeChild(resourcesRef.current.printFrame);
+      }
+      resourcesRef.current = { printFrame: null, pdfUrl: null };
+      setIsPrinting(false);
+      hasPrintedRef.current = false;
+    }
+    setIsGenerating(false);
+    setIsLoadingDialogVisible(false);
+  };
+
   const handleGenerate = async () => {
     if (selectedCustomers.length === 0) {
       toast.error("Please select at least one customer");
@@ -134,30 +171,166 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       }
     }
 
-    setLoading(true);
+    // Find selected customer data
+    const customer = customerOptions.find((c) => c.id === selectedCustomers[0]);
+    if (!customer) {
+      toast.error("Selected customer not found");
+      return;
+    }
+
+    // Convert month-year to ISO date string format for period
+    const [startMonth, startYear] = startMonthYear.split("-").map(Number);
+    const startDate = new Date(startYear, startMonth, 1).toISOString();
+
+    let endDate;
+    if (endMonthYear) {
+      const [endMonth, endYear] = endMonthYear.split("-").map(Number);
+      // Set to last day of the month
+      const lastDay = new Date(endYear, endMonth + 1, 0).getDate();
+      endDate = new Date(endYear, endMonth, lastDay).toISOString();
+    } else {
+      // If no end date, use last day of start month
+      const lastDay = new Date(startYear, startMonth + 1, 0).getDate();
+      endDate = new Date(startYear, startMonth, lastDay).toISOString();
+    }
+
+    // Generate and print the statement PDF
+    await generateAndPrintStatementPDF(customer, startDate, endDate);
+  };
+
+  const generateAndPrintStatementPDF = async (
+    customerData: any,
+    startPeriod: any,
+    endPeriod: any
+  ) => {
+    setIsPrinting(true);
+    setIsGenerating(true);
+    setIsLoadingDialogVisible(true);
+    setPrintError(null);
 
     try {
-      // Frontend-only implementation for now
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Create a mock statement invoice for demonstration
+      // In a real implementation, you would fetch actual statement data from the API
+      const statementInvoice: InvoiceGT = {
+        invoice_id: Date.now(),
+        invoice_number: `S${new Date().getFullYear()}/${Math.floor(
+          Math.random() * 10000
+        )
+          .toString()
+          .padStart(4, "0")}`,
+        type: "statement" as "statement", // Type assertion to make TypeScript happy
+        customer_id: parseInt(customerData.id),
+        customer_name: customerData.name,
+        customer_phone_number: customerData.phone_number,
+        tin_number: "EI00000000010", // Mock TIN
+        amount_before_tax: 0,
+        tax_amount: 0,
+        total_amount: 0,
+        amount_paid: 0,
+        current_balance: 0,
+        balance_due: 0,
+        date_issued: new Date().toISOString(),
+        statement_period_start: startPeriod,
+        statement_period_end: endPeriod || startPeriod,
+        status: "unpaid",
+        uuid: null,
+        submission_uid: null,
+        long_id: null,
+        datetime_validated: null,
+        is_consolidated: false,
+        consolidated_invoices: null,
+        einvoice_status: null,
+      };
 
-      const startOption = monthYearOptions.find((o) => o.id === startMonthYear);
-      const endOption = endMonthYear
-        ? monthYearOptions.find((o) => o.id === endMonthYear)
-        : null;
+      // Sample statement details - would be fetched from backend in real implementation
+      const statementDetails = [
+        {
+          date: new Date(startPeriod).toISOString(),
+          description: "Opening Balance",
+          invoiceNo: "-",
+          amount: 0,
+          balance: 0,
+        },
+        {
+          date: new Date().toISOString(),
+          description: "Statement of Account",
+          invoiceNo: statementInvoice.invoice_number,
+          amount: 0,
+          balance: 0,
+        },
+      ];
 
-      const monthRangeText = endOption
-        ? `${startOption?.name} to ${endOption?.name}`
-        : startOption?.name;
-
-      toast.success(
-        `Statement generation requested for ${selectedCustomers.length} customer(s) for ${monthRangeText}`
+      // Generate PDF document
+      const pdfComponent = (
+        <Document title={`Statement_${customerData.name}`}>
+          <GTStatementPDF
+            invoice={statementInvoice}
+            statementDetails={statementDetails}
+          />
+        </Document>
       );
-      onClose();
+
+      const pdfBlob = await pdf(pdfComponent).toBlob();
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      resourcesRef.current.pdfUrl = pdfUrl;
+      setIsGenerating(false);
+
+      // Create iframe for printing
+      const printFrame = document.createElement("iframe");
+      printFrame.style.position = "absolute";
+      printFrame.style.width = "0";
+      printFrame.style.height = "0";
+      printFrame.style.border = "0";
+      printFrame.style.left = "-9999px"; // Hide the iframe
+      document.body.appendChild(printFrame);
+      resourcesRef.current.printFrame = printFrame;
+
+      printFrame.onload = () => {
+        if (!hasPrintedRef.current && printFrame?.contentWindow) {
+          hasPrintedRef.current = true;
+          // Small delay for content rendering in iframe
+          setTimeout(() => {
+            try {
+              printFrame.contentWindow?.focus(); // Focus is important for print dialog
+              printFrame.contentWindow?.print();
+              cleanup(); // Hide loading dialog, wait for user interaction
+            } catch (printError) {
+              console.error("Print dialog error:", printError);
+              setPrintError("Could not open print dialog.");
+              cleanup(true); // Full cleanup on error
+            }
+          }, 500);
+
+          // Fallback cleanup mechanism
+          const onFocus = () => {
+            window.removeEventListener("focus", onFocus);
+            clearTimeout(fallbackTimeout);
+            cleanup(true); // Full cleanup after user interaction
+            onClose(); // Close the modal after printing
+          };
+          window.addEventListener("focus", onFocus);
+
+          const fallbackTimeout = setTimeout(() => {
+            console.warn("Print dialog focus timeout, cleaning up.");
+            window.removeEventListener("focus", onFocus);
+            cleanup(true); // Full cleanup after timeout
+            onClose(); // Close the modal after timeout
+          }, 60000); // 60 seconds timeout
+        }
+      };
+
+      printFrame.onerror = (e) => {
+        console.error("Iframe loading error:", e);
+        setPrintError("Failed to load document for printing.");
+        cleanup(true);
+      };
+
+      printFrame.src = pdfUrl;
     } catch (error) {
-      console.error("Error generating statement:", error);
-      toast.error("Failed to generate statement");
-    } finally {
-      setLoading(false);
+      console.error("Error generating PDF for print:", error);
+      setPrintError(error instanceof Error ? error.message : "Unknown error");
+      toast.error("Error preparing document for print. Please try again.");
+      cleanup(true);
     }
   };
 
@@ -342,6 +515,35 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           </div>
         </TransitionChild>
       </div>
+      {isLoadingDialogVisible && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[240px]">
+            <div className="flex flex-col items-center gap-3">
+              <LoadingSpinner size="sm" hideText />
+              <p className="text-base font-medium text-default-900">
+                {isGenerating
+                  ? "Preparing document..."
+                  : "Opening print dialog..."}
+              </p>
+              {printError && (
+                <p className="text-sm text-rose-600 mt-2 text-center">
+                  {printError}
+                </p>
+              )}
+              <button
+                onClick={() => {
+                  cleanup(true);
+                  onClose();
+                }}
+                className="mt-1 text-sm text-center text-sky-600 hover:underline"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 };
