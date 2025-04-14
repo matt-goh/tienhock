@@ -1,5 +1,5 @@
 // src/utils/invoice/PDF/PrintPDFOverlay.tsx
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import InvoicePDF from "./InvoicePDF";
 import { InvoiceData } from "../../../types/types";
