@@ -65,7 +65,38 @@ export const greenTargetApi = {
     api.get(`/greentarget/api/rentals/${rentalId}/do`),
 
   // Invoice endpoints
-  getInvoices: () => api.get("/greentarget/api/invoices"),
+  getInvoices: (
+    filters: {
+      customer_id?: string | number;
+      start_date?: string;
+      end_date?: string;
+      status?: string;
+    } = {}
+  ) => {
+    // Build query string from filters
+    const queryParams = new URLSearchParams();
+
+    if (filters.customer_id) {
+      queryParams.append("customer_id", filters.customer_id.toString());
+    }
+
+    if (filters.start_date) {
+      queryParams.append("start_date", filters.start_date);
+    }
+
+    if (filters.end_date) {
+      queryParams.append("end_date", filters.end_date);
+    }
+
+    if (filters.status) {
+      queryParams.append("status", filters.status);
+    }
+
+    const queryString = queryParams.toString();
+    return api.get(
+      `/greentarget/api/invoices${queryString ? `?${queryString}` : ""}`
+    );
+  },
   getInvoice: (id: any) => api.get(`/greentarget/api/invoices/${id}`),
   getBatchInvoices: (ids: number[]) => {
     if (!ids || ids.length === 0) return Promise.resolve([]);
@@ -95,12 +126,32 @@ export const greenTargetApi = {
     api.put(`/greentarget/api/einvoice/${invoiceId}/sync-cancellation`),
 
   // Payment endpoints
-  getPayments: (includeCancelled = false) =>
-    api.get(
-      `/greentarget/api/payments${
-        includeCancelled ? "?include_cancelled=true" : ""
-      }`
-    ),
+  getPayments: (
+    options: {
+      invoice_id?: string | number;
+      includeCancelled?: boolean;
+      customer_id?: string | number;
+    } = {}
+  ) => {
+    const queryParams = new URLSearchParams();
+
+    if (options.invoice_id) {
+      queryParams.append("invoice_id", options.invoice_id.toString());
+    }
+
+    if (options.includeCancelled) {
+      queryParams.append("include_cancelled", "true");
+    }
+
+    if (options.customer_id) {
+      queryParams.append("customer_id", options.customer_id.toString());
+    }
+
+    const queryString = queryParams.toString();
+    return api.get(
+      `/greentarget/api/payments${queryString ? `?${queryString}` : ""}`
+    );
+  },
   getPaymentsByInvoice: (invoiceId: any, includeCancelled = false) =>
     api.get(
       `/greentarget/api/invoices/${invoiceId}/payments${

@@ -1374,7 +1374,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Selection Count and Total */}
-            <div className="flex-grow">
+            <div className="flex-grow pb-0.5">
               {/* Selection info text */}
               {selectedInvoiceIds.size > 0 ? (
                 <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">

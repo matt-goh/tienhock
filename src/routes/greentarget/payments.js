@@ -6,7 +6,7 @@ export default function (pool) {
 
   // Get all payments (with optional invoice_id filter)
   router.get("/", async (req, res) => {
-    const { invoice_id, include_cancelled } = req.query; // Add include_cancelled parameter
+    const { invoice_id, include_cancelled, customer_id } = req.query;
 
     try {
       let query = `
@@ -27,6 +27,12 @@ export default function (pool) {
         paramCounter++;
       } else {
         query += " WHERE 1=1";
+      }
+
+      if (customer_id) {
+        query += ` AND i.customer_id = $${paramCounter}`;
+        queryParams.push(customer_id);
+        paramCounter++;
       }
 
       // Only include active payments by default
