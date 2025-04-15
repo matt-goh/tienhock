@@ -187,15 +187,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     paddingRight: 4,
   },
-  paymentTitle: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 9,
-    marginBottom: 4,
-  },
-  paymentInfo: {
-    fontSize: 9,
-    lineHeight: 1.4,
-  },
   agingSection: {
     marginTop: 20,
     marginBottom: 10,
@@ -234,28 +225,59 @@ const styles = StyleSheet.create({
   agingCellText: {
     fontSize: 8,
   },
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    color: "#6B7280",
-    fontSize: 8,
-    lineHeight: 1.5,
+  footerSection: {
+    marginTop: 30,
+    flexDirection: "row",
+    borderTop: "1 solid #e5e7eb",
+    paddingTop: 15,
+    paddingBottom: 15,
   },
-  note: {
-    marginTop: 20,
-    padding: 10,
-    borderWidth: 0.5,
-    borderColor: "#d1d5db",
-    borderRadius: 4,
-    fontSize: 9,
-    lineHeight: 1.4,
+  footerColumn: {
+    flex: 1,
+    paddingHorizontal: 10,
   },
-  noteTitle: {
+  footerHeading: {
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
+    marginBottom: 6,
+    color: "#4b5563",
+  },
+  paymentDetails: {
+    fontSize: 9,
+  },
+  paymentRow: {
+    flexDirection: "row",
     marginBottom: 4,
+  },
+  paymentLabel: {
+    fontSize: 9,
+    width: 80,
+    color: "#4b5563",
+  },
+  paymentValue: {
+    fontSize: 9,
+    flex: 1,
+  },
+  noteText: {
+    fontSize: 9,
+    marginBottom: 4,
+    color: "#4b5563",
+  },
+  footerDivider: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#d1d5db",
+    marginBottom: 10,
+  },
+  documentFooter: {
+    marginTop: 10,
+    padding: 10,
+    textAlign: "center",
+  },
+  footerText: {
+    fontSize: 8,
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 2,
   },
 });
 
@@ -367,7 +389,7 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       {/* Statement Title */}
       <Text style={styles.title}>Statement of Account</Text>
 
-      {/* Statement Period - MOVED AND RESTYLED */}
+      {/* Statement Period */}
       {invoice.statement_period_start && invoice.statement_period_end && (
         <Text style={styles.statementPeriod}>
           {formatDate(invoice.statement_period_start)} to{" "}
@@ -447,7 +469,7 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         })}
       </View>
 
-      {/* Summary Section - UPDATED FOR ALIGNMENT */}
+      {/* Summary Section */}
       <View style={styles.simpleSummary}>
         <Text style={styles.summaryLabel}>Current Balance (MYR):</Text>
         <Text style={styles.summaryTotalValue}>
@@ -491,31 +513,54 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         </View>
       )}
 
-      {/* Note Section */}
-      <View style={styles.note}>
-        <Text style={styles.noteTitle}>Note:</Text>
-        <Text>
-          This statement reflects your account status as of{" "}
-          {/* Use statement end date or issue date if available */}
-          {formatDate(invoice.statement_period_end || invoice.date_issued)}.
-          Please remit payment promptly. If you have already made a payment,
-          please disregard this statement with our thanks. For inquiries, please
-          contact us.
-        </Text>
+      {/* Notes and Payment Section */}
+      <View style={styles.footerSection}>
+        <View style={styles.footerColumn}>
+          <Text style={styles.footerHeading}>Payment Instructions</Text>
+          <View style={styles.paymentDetails}>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentLabel}>Account Name:</Text>
+              <Text style={styles.paymentValue}>
+                Green Target Waste Treatment Industries S/B
+              </Text>
+            </View>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentLabel}>Bank:</Text>
+              <Text style={styles.paymentValue}>Public Bank Berhad</Text>
+            </View>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentLabel}>Account No:</Text>
+              <Text style={styles.paymentValue}>3137836814</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.footerColumn}>
+          <Text style={styles.footerHeading}>Information</Text>
+          <Text style={styles.noteText}>
+            This statement reflects your account status as of{" "}
+            {formatDate(invoice.statement_period_end || invoice.date_issued)}.
+          </Text>
+          <Text style={styles.noteText}>
+            If you have already made a payment, please disregard this statement
+            with our thanks.
+          </Text>
+        </View>
       </View>
 
-      {/* Payment Info */}
-      <View style={{ marginTop: 15 }}>
-        <Text style={styles.paymentTitle}>Payment Instructions:</Text>
-        <Text style={styles.paymentInfo}>
-          Account Name: Green Target Waste Treatment Industries S/B{"\n"}
-          Bank: Public Bank Berhad{"\n"}
-          Account No: 3137836814
-        </Text>
-      </View>
+      {/* Divider line */}
+      <View style={styles.footerDivider} />
 
       {/* Footer */}
-      <Text style={styles.footer}>This is a computer-generated statement.</Text>
+      <View style={styles.documentFooter}>
+        <Text style={styles.footerText}>
+          This is a computer-generated statement and requires no signature.
+        </Text>
+        <Text style={styles.footerText}>
+          © {new Date().getFullYear()} Green Target Waste Treatment Industries
+          S/B.
+        </Text>
+      </View>
     </Page>
   );
 };
