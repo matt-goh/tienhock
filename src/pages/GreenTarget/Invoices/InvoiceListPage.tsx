@@ -956,7 +956,11 @@ const InvoiceListPage: React.FC = () => {
           setInvoices(
             invoices.map((i) =>
               i.invoice_id === invoiceToCancel.invoice_id
-                ? { ...i, status: "cancelled", einvoice_status: "cancelled" }
+                ? { 
+                    ...i, 
+                    status: "cancelled", 
+                    einvoice_status: i.einvoice_status ? "cancelled" : null 
+                  }
                 : i
             )
           );

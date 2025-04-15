@@ -196,6 +196,44 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 1.4,
   },
+  agingSection: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  agingTable: {
+    borderWidth: 0.5,
+    borderColor: "#000",
+  },
+  agingHeader: {
+    flexDirection: "row",
+    backgroundColor: "#f3f4f6",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#000",
+  },
+  agingRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#000",
+  },
+  agingCell: {
+    padding: 4,
+    flex: 1,
+    textAlign: "center",
+    borderRightWidth: 0.5,
+    borderRightColor: "#000",
+  },
+  agingCellLast: {
+    padding: 4,
+    flex: 1,
+    textAlign: "center",
+  },
+  agingHeaderText: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+  },
+  agingCellText: {
+    fontSize: 8,
+  },
   footer: {
     position: "absolute",
     bottom: 20,
@@ -255,9 +293,16 @@ interface GTStatementPDFProps {
     date: string;
     description: string;
     invoiceNo: string;
-    amount: number; // Use amount for debit/credit distinction
+    amount: number;
     balance: number;
   }>;
+  agingData?: {
+    current: number;
+    month1: number;
+    month2: number;
+    month3Plus: number;
+    total: number;
+  };
 }
 
 const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
@@ -409,6 +454,42 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
           {formatCurrency(currentBalance)}
         </Text>
       </View>
+
+      {/* Aging Section */}
+      {invoice.agingData && (
+        <View style={styles.agingSection}>
+          <View style={styles.agingTable}>
+            <View style={styles.agingHeader}>
+              <Text style={[styles.agingCell, styles.agingHeaderText]}>
+                Over 3 Months
+              </Text>
+              <Text style={[styles.agingCell, styles.agingHeaderText]}>
+                2 Months
+              </Text>
+              <Text style={[styles.agingCell, styles.agingHeaderText]}>
+                1 Month
+              </Text>
+              <Text style={[styles.agingCellLast, styles.agingHeaderText]}>
+                Current
+              </Text>
+            </View>
+            <View style={styles.agingRow}>
+              <Text style={[styles.agingCell, styles.agingCellText]}>
+                {formatCurrency(invoice.agingData.month3Plus)}
+              </Text>
+              <Text style={[styles.agingCell, styles.agingCellText]}>
+                {formatCurrency(invoice.agingData.month2)}
+              </Text>
+              <Text style={[styles.agingCell, styles.agingCellText]}>
+                {formatCurrency(invoice.agingData.month1)}
+              </Text>
+              <Text style={[styles.agingCellLast, styles.agingCellText]}>
+                {formatCurrency(invoice.agingData.current)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Note Section */}
       <View style={styles.note}>
