@@ -9,7 +9,6 @@ import { toast } from "react-hot-toast";
 import { pdf, Document } from "@react-pdf/renderer";
 import GTStatementPDF from "../../utils/greenTarget/PDF/GTStatementPDF";
 import LoadingSpinner from "../LoadingSpinner";
-import { generateQRDataUrl } from "../../utils/invoice/einvoice/generateQRCode";
 import { InvoiceGT } from "../../types/types";
 
 interface GTStatementModalProps {
@@ -26,6 +25,12 @@ interface MonthYearOption {
   year: number;
 }
 
+interface CustomerWithInvoiceCounts extends SelectOption {
+  activeInvoiceCount: number;
+  overdueInvoiceCount: number;
+  totalInvoiceCount: number;
+}
+
 const GTStatementModal: React.FC<GTStatementModalProps> = ({
   isOpen,
   onClose,
@@ -37,11 +42,8 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
   );
   const [endMonthYear, setEndMonthYear] = useState<string | null>(null);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [customerOptions, setCustomerOptions] = useState<SelectOption[]>([]);
   const [customerQuery, setCustomerQuery] = useState<string>("");
   const [isValidRange, setIsValidRange] = useState<boolean>(true);
-  const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] =
     useState<boolean>(false);
@@ -54,6 +56,9 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     printFrame: null,
     pdfUrl: null,
   });
+  const [customerOptions, setCustomerOptions] = useState<
+    CustomerWithInvoiceCounts[]
+  >([]);
 
   // Generate month-year options (current year and previous year)
   const monthYearOptions: MonthYearOption[] = [];
@@ -92,25 +97,85 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
   // Fetch customers
   useEffect(() => {
-    const fetchCustomers = async () => {
+    const fetchCustomersWithInvoiceCounts = async () => {
       try {
-        const customers = await greenTargetApi.getCustomers();
+        // Fetch both customers and invoices in parallel
+        const [customers, invoices] = await Promise.all([
+          greenTargetApi.getCustomers(),
+          greenTargetApi.getInvoices(),
+        ]);
+
+        // Create a map to count invoices by customer
+        const invoiceCounts = new Map();
+
+        // Initialize counts for each customer
+        customers.forEach(
+          (customer: { customer_id: { toString: () => any } }) => {
+            invoiceCounts.set(customer.customer_id.toString(), {
+              active: 0,
+              overdue: 0,
+              total: 0,
+            });
+          }
+        );
+
+        // Count invoices by customer and status
+        invoices.forEach(
+          (invoice: {
+            customer_id: { toString: () => any };
+            status: string;
+          }) => {
+            const customerId = invoice.customer_id.toString();
+            if (invoiceCounts.has(customerId)) {
+              const counts = invoiceCounts.get(customerId);
+
+              if (invoice.status === "active") {
+                counts.active += 1;
+                counts.total += 1;
+              } else if (invoice.status === "overdue") {
+                counts.overdue += 1;
+                counts.total += 1;
+              }
+            }
+          }
+        );
+
+        // Map customers to options with invoice counts
         const options = customers.map(
-          (customer: { customer_id: any; name: any; phone_number: any }) => ({
+          (customer: {
+            customer_id: { toString: () => any };
+            name: any;
+            phone_number: any;
+          }) => ({
             id: customer.customer_id.toString(),
             name: customer.name || `Customer ${customer.customer_id}`,
             phone_number: customer.phone_number,
+            activeInvoiceCount:
+              invoiceCounts.get(customer.customer_id.toString())?.active || 0,
+            overdueInvoiceCount:
+              invoiceCounts.get(customer.customer_id.toString())?.overdue || 0,
+            totalInvoiceCount:
+              invoiceCounts.get(customer.customer_id.toString())?.total || 0,
           })
         );
+
+        // Sort by total invoice count (descending)
+        options.sort(
+          (
+            a: { totalInvoiceCount: number },
+            b: { totalInvoiceCount: number }
+          ) => b.totalInvoiceCount - a.totalInvoiceCount
+        );
+
         setCustomerOptions(options);
       } catch (error) {
-        console.error("Error fetching customers:", error);
+        console.error("Error fetching customers with invoice counts:", error);
         toast.error("Failed to load customers");
       }
     };
 
     if (isOpen) {
-      fetchCustomers();
+      fetchCustomersWithInvoiceCounts();
     }
   }, [isOpen]);
 
@@ -143,7 +208,6 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         document.body.removeChild(resourcesRef.current.printFrame);
       }
       resourcesRef.current = { printFrame: null, pdfUrl: null };
-      setIsPrinting(false);
       hasPrintedRef.current = false;
     }
     setIsGenerating(false);
@@ -203,7 +267,6 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     startPeriod: any,
     endPeriod: any
   ) => {
-    setIsPrinting(true);
     setIsGenerating(true);
     setIsLoadingDialogVisible(true);
     setPrintError(null);
@@ -447,7 +510,15 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                       setSelectedCustomers([]);
                     }
                   }}
-                  options={customerOptions}
+                  options={customerOptions.map((option) => ({
+                    ...option,
+                    // Customize the name to include invoice counts
+                    name: `${option.name} ${
+                      option.phone_number ? `(${option.phone_number})` : ""
+                    } - ${option.activeInvoiceCount} active, ${
+                      option.overdueInvoiceCount
+                    } overdue`,
+                  }))}
                   query={customerQuery}
                   setQuery={setCustomerQuery}
                   mode="multiple"
@@ -482,6 +553,8 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                                 {customer?.name || `Customer #${customerId}`}
                                 {customer?.phone_number &&
                                   ` (${customer.phone_number})`}
+                                {customer &&
+                                  ` - ${customer.activeInvoiceCount} active, ${customer.overdueInvoiceCount} overdue`}
                               </span>
                             </li>
                           );
@@ -498,16 +571,14 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             </div>
 
             <div className="mt-8 flex space-x-3 justify-end">
-              <Button onClick={onClose} variant="outline" disabled={loading}>
+              <Button onClick={onClose} variant="outline">
                 Cancel
               </Button>
               <Button
                 onClick={handleGenerate}
                 variant="filled"
                 color="sky"
-                disabled={
-                  loading || selectedCustomers.length === 0 || !isValidRange
-                }
+                disabled={selectedCustomers.length === 0 || !isValidRange}
               >
                 Generate Statement{selectedCustomers.length > 1 ? "s" : ""}
               </Button>
