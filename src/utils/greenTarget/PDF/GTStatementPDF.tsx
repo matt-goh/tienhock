@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   statementPeriod: {
     fontSize: 10,
     textAlign: "right", // Align with the title
-    marginBottom: 15, // Space before customer info
+    marginBottom: 8, // Space before customer info
   },
   customerInfo: {
     marginBottom: 15,
@@ -128,9 +128,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     paddingVertical: 4,
-  },
-  evenRow: {
-    backgroundColor: "#f9fafb",
   },
   dateCol: {
     width: "12%",
@@ -374,7 +371,6 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
                 index === finalStatementDetails.length - 1
                   ? styles.lastTableRow
                   : styles.tableRow,
-                index % 2 !== 0 ? styles.evenRow : {},
               ]}
             >
               <Text style={[styles.dateCol, styles.cellText]}>
