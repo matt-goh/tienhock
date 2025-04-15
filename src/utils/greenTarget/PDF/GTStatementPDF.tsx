@@ -106,11 +106,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statementPeriod: {
-    marginTop: 10,
-    marginBottom: 5,
+    marginTop: 15,
+    marginBottom: 15,
+    padding: 6,
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 4,
+    borderWidth: 0.5,
+    borderColor: "#cbd5e1",
   },
   table: {
     marginTop: 20,
@@ -126,6 +131,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderBottomColor: "#666",
+    paddingVertical: 4,
+  },
+  lastTableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
     paddingVertical: 4,
   },
   evenRow: {
@@ -168,10 +179,6 @@ const styles = StyleSheet.create({
   simpleSummary: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#000",
   },
   summaryLabel: {
     fontFamily: "Helvetica-Bold",
@@ -354,7 +361,12 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         {finalStatementDetails.map((item, index) => (
           <View
             key={index}
-            style={[styles.tableRow, index % 2 === 1 ? styles.evenRow : {}]}
+            style={[
+              index === finalStatementDetails.length - 1
+                ? styles.lastTableRow
+                : styles.tableRow,
+              index % 2 === 1 ? styles.evenRow : {},
+            ]}
           >
             <Text style={[styles.dateCol, styles.cellText]}>
               {formatDate(item.date)}
@@ -410,9 +422,7 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>
-        This is a computer generated statement.
-      </Text>
+      <Text style={styles.footer}>This is a computer generated statement.</Text>
     </Page>
   );
 };
