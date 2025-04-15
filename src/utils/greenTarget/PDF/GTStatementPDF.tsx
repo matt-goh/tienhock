@@ -42,6 +42,20 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     lineHeight: 1.3,
   },
+  customerInfo: {
+    marginBottom: 15,
+    marginLeft: 5,
+  },
+  customerName: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 2,
+  },
+  customerDetail: {
+    fontSize: 9,
+    marginBottom: 1,
+    lineHeight: 1.3,
+  },
   invoiceDetails: {
     marginBottom: 6,
   },
@@ -118,24 +132,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9fafb",
   },
   dateCol: {
-    width: "15%",
+    width: "12%",
+    paddingLeft: 4,
+  },
+  referenceCol: {
+    width: "13%",
     paddingLeft: 4,
   },
   descriptionCol: {
-    width: "45%",
+    width: "35%",
     paddingLeft: 4,
   },
-  invoiceNoCol: {
-    width: "15%",
-    paddingLeft: 4,
+  debitCol: {
+    width: "12%",
+    textAlign: "right",
+    paddingRight: 4,
   },
-  amountCol: {
-    width: "12.5%",
+  creditCol: {
+    width: "12%",
     textAlign: "right",
     paddingRight: 4,
   },
   balanceCol: {
-    width: "12.5%",
+    width: "16%",
     textAlign: "right",
     paddingRight: 4,
   },
@@ -146,18 +165,24 @@ const styles = StyleSheet.create({
   cellText: {
     fontSize: 9,
   },
-  summary: {
+  simpleSummary: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#000",
   },
-  summaryLeftCol: {
-    flex: 1,
-    paddingRight: 20,
+  summaryLabel: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 10,
   },
-  summaryRightCol: {
-    alignItems: "flex-end",
-    paddingLeft: 20,
+  summaryTotalValue: {
+    width: 100,
+    textAlign: "right",
+    fontFamily: "Helvetica-Bold",
+    fontSize: 10,
+    marginLeft: 10,
   },
   paymentTitle: {
     fontFamily: "Helvetica-Bold",
@@ -167,26 +192,6 @@ const styles = StyleSheet.create({
   paymentInfo: {
     fontSize: 9,
     lineHeight: 1.4,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 4,
-  },
-  summaryLabel: {
-    width: 160,
-    textAlign: "right",
-    fontFamily: "Helvetica-Bold",
-  },
-  summaryValue: {
-    width: 60,
-    textAlign: "right",
-  },
-  summaryTotal: {
-    fontFamily: "Helvetica-Bold",
-    paddingTop: 2,
-    borderTopWidth: 1,
-    borderTopColor: "#000",
   },
   footer: {
     position: "absolute",
@@ -306,6 +311,21 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       {/* Statement Title */}
       <Text style={styles.title}>Statement of Account</Text>
 
+      {/* Customer Information - New Section */}
+      <View style={styles.customerInfo}>
+        <Text style={styles.customerName}>
+          {invoice.customer_name || "Customer"}
+        </Text>
+        {invoice.customer_phone_number && (
+          <Text style={styles.customerDetail}>
+            Tel: {invoice.customer_phone_number}
+          </Text>
+        )}
+        {invoice.additional_info && (
+          <Text style={styles.customerDetail}>{invoice.additional_info}</Text>
+        )}
+      </View>
+
       {/* Statement Period */}
       {invoice.statement_period_start && invoice.statement_period_end && (
         <Text style={styles.statementPeriod}>
@@ -319,13 +339,14 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         {/* Table Header */}
         <View style={styles.tableHeader}>
           <Text style={[styles.dateCol, styles.headerText]}>Date</Text>
+          <Text style={[styles.referenceCol, styles.headerText]}>
+            Reference
+          </Text>
           <Text style={[styles.descriptionCol, styles.headerText]}>
             Description
           </Text>
-          <Text style={[styles.invoiceNoCol, styles.headerText]}>
-            Invoice No.
-          </Text>
-          <Text style={[styles.amountCol, styles.headerText]}>Amount</Text>
+          <Text style={[styles.debitCol, styles.headerText]}>Debit</Text>
+          <Text style={[styles.creditCol, styles.headerText]}>Credit</Text>
           <Text style={[styles.balanceCol, styles.headerText]}>Balance</Text>
         </View>
 
@@ -338,14 +359,17 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
             <Text style={[styles.dateCol, styles.cellText]}>
               {formatDate(item.date)}
             </Text>
+            <Text style={[styles.referenceCol, styles.cellText]}>
+              {item.invoiceNo}
+            </Text>
             <Text style={[styles.descriptionCol, styles.cellText]}>
               {item.description}
             </Text>
-            <Text style={[styles.invoiceNoCol, styles.cellText]}>
-              {item.invoiceNo}
+            <Text style={[styles.debitCol, styles.cellText]}>
+              {item.amount > 0 ? formatCurrency(item.amount) : ""}
             </Text>
-            <Text style={[styles.amountCol, styles.cellText]}>
-              {formatCurrency(item.amount)}
+            <Text style={[styles.creditCol, styles.cellText]}>
+              {item.amount < 0 ? formatCurrency(Math.abs(item.amount)) : ""}
             </Text>
             <Text style={[styles.balanceCol, styles.cellText]}>
               {formatCurrency(item.balance)}
@@ -355,40 +379,11 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       </View>
 
       {/* Summary Section */}
-      <View style={styles.summary}>
-        {/* Payment Info - Left column */}
-        <View style={styles.summaryLeftCol}>
-          <Text style={styles.paymentTitle}>
-            All payments are to be made payable to:
-          </Text>
-          <Text style={styles.paymentInfo}>
-            Green Target Waste Treatment Industries S/B{"\n"}
-            Public Bank Berhad{"\n"}
-            3137836814
-          </Text>
-        </View>
-
-        {/* Summary info - Right column */}
-        <View style={styles.summaryRightCol}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Excl. Tax (MYR)</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.amount_before_tax)}
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tax Amount (MYR)</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.tax_amount)}
-            </Text>
-          </View>
-          <View style={[styles.summaryRow, styles.summaryTotal]}>
-            <Text style={styles.summaryLabel}>Current Balance (MYR)</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(invoice.total_amount)}
-            </Text>
-          </View>
-        </View>
+      <View style={styles.simpleSummary}>
+        <Text style={styles.summaryLabel}>Current Balance (MYR):</Text>
+        <Text style={styles.summaryTotalValue}>
+          {formatCurrency(invoice.total_amount)}
+        </Text>
       </View>
 
       {/* Note Section */}
@@ -402,14 +397,21 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         </Text>
       </View>
 
+      {/* Payment Info */}
+      <View style={{ marginTop: 10 }}>
+        <Text style={styles.paymentTitle}>
+          All payments are to be made payable to:
+        </Text>
+        <Text style={styles.paymentInfo}>
+          Green Target Waste Treatment Industries S/B{"\n"}
+          Public Bank Berhad{"\n"}
+          3137836814
+        </Text>
+      </View>
+
       {/* Footer */}
       <Text style={styles.footer}>
         This is a computer generated statement.
-        {"\n"}
-        Validated on{" "}
-        {invoice.datetime_validated
-          ? new Date(invoice.datetime_validated).toLocaleString()
-          : "N/A"}
       </Text>
     </Page>
   );
