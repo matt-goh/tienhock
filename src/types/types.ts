@@ -530,6 +530,13 @@ export interface InvoiceGT {
   statement_period_end?: string;
   status: "paid" | "unpaid" | "cancelled" | "overdue";
   consolidated_part_of?: ConsolidatedInfo | null;
+  agingData?: {
+    current: number;
+    month1: number;
+    month2: number;
+    month3Plus: number;
+    total: number;
+  };
 
   // E-invoice fields
   einvoice_status?: "valid" | "invalid" | "pending" | "cancelled" | null;

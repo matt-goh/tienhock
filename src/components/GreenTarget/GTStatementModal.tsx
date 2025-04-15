@@ -396,10 +396,20 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         );
 
         // Calculate opening balance (sum of all unpaid amounts before the period start)
+        // Calculate opening balance (total outstanding as of start date)
         let openingBalance = 0;
-        beforePeriodInvoices.forEach((invoice: { current_balance: number }) => {
-          openingBalance += parseFloat(invoice.current_balance.toString());
-        });
+
+        // Check if we need to fetch previous statement for this customer
+        // For simplicity, we're using the calculation method, but in a production system
+        // you might want to check if there was a previous statement and use its closing balance
+        beforePeriodInvoices.forEach(
+          (invoice: { current_balance: number; status: string }) => {
+            // Only include invoices that aren't cancelled and have an outstanding balance
+            if (invoice.status !== "cancelled" && invoice.current_balance > 0) {
+              openingBalance += parseFloat(invoice.current_balance.toString());
+            }
+          }
+        );
 
         // Get all payments for this customer during the period
         const allPayments = await greenTargetApi.getPayments({
@@ -432,7 +442,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         // Add opening balance entry
         statementDetails.push({
           date: startDateISO,
-          description: "Opening Balance",
+          description: "Balance Brought Forward",
           invoiceNo: "-",
           amount: 0, // Not a transaction itself
           balance: openingBalance,
@@ -525,6 +535,17 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           consolidated_invoices: null,
           einvoice_status: null,
           additional_info: customer.additional_info || "",
+          agingData: calculateAgingData(
+            beforePeriodInvoices
+              .concat(periodInvoices)
+              .filter(
+                (invoice: { status: string; current_balance: number }) =>
+                  invoice.status !== "paid" &&
+                  invoice.status !== "cancelled" &&
+                  invoice.current_balance > 0
+              ),
+            endDate
+          ),
         };
 
         // Add to the list of PDFs to generate
@@ -542,6 +563,45 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       toast.error("Error generating statement. Please try again.");
       cleanup(true);
     }
+  };
+
+  // Update the calculateAgingData function in GTStatementModal.tsx
+  const calculateAgingData = (invoices: any[], referenceDate: Date) => {
+    // Initialize aging buckets with new names
+    const agingData = {
+      current: 0,
+      month1: 0,
+      month2: 0,
+      month3Plus: 0,
+      total: 0,
+    };
+
+    // Calculate days outstanding and assign to appropriate bucket
+    invoices.forEach((invoice) => {
+      if (invoice.status === "cancelled") return; // Skip cancelled invoices
+
+      const invoiceDate = new Date(invoice.date_issued);
+      const daysDifference = Math.floor(
+        (referenceDate.getTime() - invoiceDate.getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      const outstandingAmount = parseFloat(invoice.current_balance);
+
+      // Updated categorization based on months
+      if (daysDifference <= 30) {
+        agingData.current += outstandingAmount; // Current: 1-30 days
+      } else if (daysDifference <= 60) {
+        agingData.month1 += outstandingAmount; // 1 Month: 31-60 days
+      } else if (daysDifference <= 90) {
+        agingData.month2 += outstandingAmount; // 2 Months: 61-90 days
+      } else {
+        agingData.month3Plus += outstandingAmount; // Over 3 Months: 90+ days
+      }
+
+      agingData.total += outstandingAmount;
+    });
+
+    return agingData;
   };
 
   return (
@@ -684,7 +744,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                         className="text-xs text-sky-600 hover:text-sky-800 hover:underline"
                         onClick={() => setSelectedCustomers([])}
                       >
-                        Clear all
+                        Clear selection
                       </button>
                     </div>
                     <div className="max-h-36 overflow-y-auto">
