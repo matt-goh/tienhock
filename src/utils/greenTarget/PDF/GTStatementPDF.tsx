@@ -42,11 +42,6 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     lineHeight: 1.3,
   },
-  qrCode: {
-    width: 70,
-    height: 70,
-    alignSelf: "flex-start",
-  },
   invoiceDetails: {
     marginBottom: 6,
   },
@@ -104,7 +99,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   table: {
-    marginTop: 10,
+    marginTop: 20,
     marginBottom: 20,
   },
   tableHeader: {
@@ -112,12 +107,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     paddingBottom: 4,
-    backgroundColor: "#f3f4f6",
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
-    borderBottomColor: "#d1d5db",
+    borderBottomColor: "#666",
     paddingVertical: 4,
   },
   evenRow: {
@@ -258,12 +252,8 @@ interface GTStatementPDFProps {
 
 const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
   invoice,
-  qrCodeData,
   statementDetails = [],
 }) => {
-  const hasValidEInvoice =
-    invoice.uuid && invoice.long_id && invoice.einvoice_status === "valid";
-
   // If no statement details are provided, create a sample one from the invoice itself
   const finalStatementDetails =
     statementDetails.length > 0
@@ -311,129 +301,15 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
             </Text>
           </View>
         </View>
-        {hasValidEInvoice && qrCodeData && (
-          <Image src={qrCodeData} style={styles.qrCode} />
-        )}
       </View>
 
       {/* Statement Title */}
-      <Text style={styles.title}>
-        {hasValidEInvoice
-          ? "Statement of Account (e-Invoice)"
-          : "Statement of Account"}
-      </Text>
-
-      {/* Key Statement Details */}
-      <View style={styles.invoiceDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Statement No.</Text>
-          <Text style={styles.detailValue}>{invoice.invoice_number}</Text>
-        </View>
-        {hasValidEInvoice && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Unique ID No.</Text>
-            <Text style={styles.detailValue}>{invoice.uuid}</Text>
-          </View>
-        )}
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Statement Date</Text>
-          <Text style={styles.detailValue}>
-            {formatDate(invoice.date_issued)}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Currency</Text>
-          <Text style={styles.detailValue}>MYR</Text>
-        </View>
-      </View>
-
-      {/* FROM and BILLING TO Containers */}
-      <View style={styles.infoContainer}>
-        {/* FROM Container */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>FROM</Text>
-          <View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier TIN</Text>
-              <Text style={styles.infoValue}>{GREENTARGET_INFO.tin}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier Name</Text>
-              <Text style={styles.infoValue}>{GREENTARGET_INFO.name}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier BRN:</Text>
-              <Text style={styles.infoValue}>{GREENTARGET_INFO.reg_no}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Supplier SST No.</Text>
-              <Text style={styles.infoValue}>
-                {GREENTARGET_INFO.sst_id_pdf || "N/A"}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Billing Address</Text>
-              <Text style={styles.infoValue}>
-                {GREENTARGET_INFO.address_pdf}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Contact No.</Text>
-              <Text style={styles.infoValue}>{GREENTARGET_INFO.phone}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{GREENTARGET_INFO.email}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* BILLING TO Container */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>BILLING TO</Text>
-          <View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer TIN</Text>
-              <Text style={styles.infoValue}>{invoice.tin_number || "-"}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer Name</Text>
-              <Text style={styles.infoValue}>
-                {invoice.customer_name || "Customer"}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer Reg No.</Text>
-              <Text style={styles.infoValue}>{invoice.id_number || "-"}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Customer SST No.</Text>
-              <Text style={styles.infoValue}>-</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Billing Address</Text>
-              <Text style={styles.infoValue}>
-                {invoice.location_address || "-"}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Contact No.</Text>
-              <Text style={styles.infoValue}>
-                {invoice.customer_phone_number || "-"}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>-</Text>
-            </View>
-          </View>
-        </View>
-      </View>
+      <Text style={styles.title}>Statement of Account</Text>
 
       {/* Statement Period */}
       {invoice.statement_period_start && invoice.statement_period_end && (
         <Text style={styles.statementPeriod}>
-          Statement Period: {formatDate(invoice.statement_period_start)} to{" "}
+          {formatDate(invoice.statement_period_start)} to{" "}
           {formatDate(invoice.statement_period_end)}
         </Text>
       )}
@@ -528,15 +404,12 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
 
       {/* Footer */}
       <Text style={styles.footer}>
-        {hasValidEInvoice
-          ? "This document is a computer generated e-Invoice statement."
-          : "This is a computer generated statement."}
-        {hasValidEInvoice && invoice.datetime_validated && (
-          <>
-            {"\n"}
-            Validated on {new Date(invoice.datetime_validated).toLocaleString()}
-          </>
-        )}
+        This is a computer generated statement.
+        {"\n"}
+        Validated on{" "}
+        {invoice.datetime_validated
+          ? new Date(invoice.datetime_validated).toLocaleString()
+          : "N/A"}
       </Text>
     </Page>
   );

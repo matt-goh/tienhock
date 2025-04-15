@@ -55,6 +55,7 @@ export default function (pool, defaultConfig) {
               c.tin_number,
               c.id_number,
               c.id_type,
+              c.additional_info,
               l.address as location_address,
               l.phone_number as location_phone_number,
               r.driver,
