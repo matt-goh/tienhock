@@ -42,17 +42,29 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     lineHeight: 1.3,
   },
+  title: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 4, // Reduced margin to bring period closer
+    textAlign: "right",
+  },
+  // Updated statementPeriod style
+  statementPeriod: {
+    fontSize: 10,
+    textAlign: "right", // Align with the title
+    marginBottom: 15, // Space before customer info
+  },
   customerInfo: {
     marginBottom: 15,
-    marginLeft: 5,
+    marginLeft: 5, // Kept small left margin for customer block
   },
   customerName: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Helvetica-Bold",
     marginBottom: 2,
   },
   customerDetail: {
-    fontSize: 9,
+    fontSize: 10,
     marginBottom: 1,
     lineHeight: 1.3,
   },
@@ -70,12 +82,6 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     flex: 1,
-    textAlign: "right",
-  },
-  title: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
     textAlign: "right",
   },
   infoContainer: {
@@ -104,22 +110,6 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     flex: 1,
-  },
-  statementPeriod: {
-    marginTop: 15,
-    marginBottom: 15,
-    padding: 6,
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 4,
-    borderWidth: 0.5,
-    borderColor: "#cbd5e1",
-  },
-  table: {
-    marginTop: 20,
-    marginBottom: 20,
   },
   tableHeader: {
     flexDirection: "row",
@@ -165,9 +155,9 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   balanceCol: {
-    width: "16%",
+    width: "16%", // Keep track of this width for summary alignment
     textAlign: "right",
-    paddingRight: 4,
+    paddingRight: 4, // Keep track of this padding for summary alignment
   },
   headerText: {
     fontSize: 9,
@@ -176,20 +166,29 @@ const styles = StyleSheet.create({
   cellText: {
     fontSize: 9,
   },
+  // Updated simpleSummary styles for alignment
   simpleSummary: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
+    flexDirection: "row", // Keep as row
+    // Removed justifyContent: 'flex-end'
+    marginTop: 10, // Added margin top for spacing
   },
+  // Updated summaryLabel styles
   summaryLabel: {
     fontFamily: "Helvetica-Bold",
     fontSize: 10,
+    // Calculate width to push value to the right: 100% - balanceCol width (16%) = 84%
+    width: "84%",
+    textAlign: "right", // Align text to the right within its space
+    paddingRight: 10, // Add padding for separation from value
   },
+  // Updated summaryTotalValue styles
   summaryTotalValue: {
-    width: 100,
+    // Match the width of the balance column
+    width: "16%",
     textAlign: "right",
     fontFamily: "Helvetica-Bold",
     fontSize: 10,
-    marginLeft: 10,
+    paddingRight: 4,
   },
   paymentTitle: {
     fontFamily: "Helvetica-Bold",
@@ -257,7 +256,7 @@ interface GTStatementPDFProps {
     date: string;
     description: string;
     invoiceNo: string;
-    amount: number;
+    amount: number; // Use amount for debit/credit distinction
     balance: number;
   }>;
 }
@@ -275,21 +274,27 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
             date: invoice.date_issued,
             description: "Opening Balance",
             invoiceNo: "-",
-            amount: 0,
+            amount: 0, // Represents neither debit nor credit initially
             balance: 0,
           },
           {
             date: invoice.date_issued,
-            description: "Statement of Account",
+            description: `Invoice ${invoice.invoice_number}`, // More specific description
             invoiceNo: invoice.invoice_number,
-            amount: invoice.amount_before_tax + (invoice.tax_amount || 0),
-            balance: invoice.amount_before_tax + (invoice.tax_amount || 0),
+            amount: invoice.total_amount, // Positive amount represents a debit (amount owed)
+            balance: invoice.total_amount,
           },
         ];
 
+  // Calculate the final balance from the last statement detail item
+  const currentBalance =
+    finalStatementDetails.length > 0
+      ? finalStatementDetails[finalStatementDetails.length - 1].balance
+      : 0;
+
   return (
     <Page size="A4" style={styles.page}>
-      {/* Header Section - Reused from GTInvoicePDF */}
+      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>
           <Image src={GreenTargetLogo} style={styles.logo} />
@@ -318,7 +323,15 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       {/* Statement Title */}
       <Text style={styles.title}>Statement of Account</Text>
 
-      {/* Customer Information - New Section */}
+      {/* Statement Period - MOVED AND RESTYLED */}
+      {invoice.statement_period_start && invoice.statement_period_end && (
+        <Text style={styles.statementPeriod}>
+          {formatDate(invoice.statement_period_start)} to{" "}
+          {formatDate(invoice.statement_period_end)}
+        </Text>
+      )}
+
+      {/* Customer Information */}
       <View style={styles.customerInfo}>
         <Text style={styles.customerName}>
           {invoice.customer_name || "Customer"}
@@ -333,16 +346,8 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         )}
       </View>
 
-      {/* Statement Period */}
-      {invoice.statement_period_start && invoice.statement_period_end && (
-        <Text style={styles.statementPeriod}>
-          {formatDate(invoice.statement_period_start)} to{" "}
-          {formatDate(invoice.statement_period_end)}
-        </Text>
-      )}
-
       {/* Statement Table */}
-      <View style={styles.table}>
+      <View>
         {/* Table Header */}
         <View style={styles.tableHeader}>
           <Text style={[styles.dateCol, styles.headerText]}>Date</Text>
@@ -363,23 +368,25 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
             key={index}
             style={[
               index === finalStatementDetails.length - 1
-                ? styles.lastTableRow
+                ? styles.lastTableRow // Apply different style if it's the last row
                 : styles.tableRow,
-              index % 2 === 1 ? styles.evenRow : {},
+              index % 2 !== 0 ? styles.evenRow : {}, // Apply even row style based on index (0-based)
             ]}
           >
             <Text style={[styles.dateCol, styles.cellText]}>
               {formatDate(item.date)}
             </Text>
             <Text style={[styles.referenceCol, styles.cellText]}>
-              {item.invoiceNo}
+              {item.invoiceNo || "-"} {/* Ensure reference exists */}
             </Text>
             <Text style={[styles.descriptionCol, styles.cellText]}>
               {item.description}
             </Text>
+            {/* Display amount as Debit if positive, otherwise empty */}
             <Text style={[styles.debitCol, styles.cellText]}>
               {item.amount > 0 ? formatCurrency(item.amount) : ""}
             </Text>
+            {/* Display amount as Credit if negative (take absolute value), otherwise empty */}
             <Text style={[styles.creditCol, styles.cellText]}>
               {item.amount < 0 ? formatCurrency(Math.abs(item.amount)) : ""}
             </Text>
@@ -390,11 +397,12 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         ))}
       </View>
 
-      {/* Summary Section */}
+      {/* Summary Section - UPDATED FOR ALIGNMENT */}
       <View style={styles.simpleSummary}>
         <Text style={styles.summaryLabel}>Current Balance (MYR):</Text>
         <Text style={styles.summaryTotalValue}>
-          {formatCurrency(invoice.total_amount)}
+          {/* Display the balance from the last item in the details */}
+          {formatCurrency(currentBalance)}
         </Text>
       </View>
 
@@ -403,26 +411,26 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         <Text style={styles.noteTitle}>Note:</Text>
         <Text>
           This statement reflects your account status as of{" "}
-          {formatDate(invoice.date_issued)}. Please remit payment promptly to
-          avoid service interruptions. If you have already made a payment,
-          please disregard this statement with our thanks.
+          {/* Use statement end date or issue date if available */}
+          {formatDate(invoice.statement_period_end || invoice.date_issued)}.
+          Please remit payment promptly. If you have already made a payment,
+          please disregard this statement with our thanks. For inquiries, please
+          contact us.
         </Text>
       </View>
 
       {/* Payment Info */}
-      <View style={{ marginTop: 10 }}>
-        <Text style={styles.paymentTitle}>
-          All payments are to be made payable to:
-        </Text>
+      <View style={{ marginTop: 15 }}>
+        <Text style={styles.paymentTitle}>Payment Instructions:</Text>
         <Text style={styles.paymentInfo}>
-          Green Target Waste Treatment Industries S/B{"\n"}
-          Public Bank Berhad{"\n"}
-          3137836814
+          Account Name: Green Target Waste Treatment Industries S/B{"\n"}
+          Bank: Public Bank Berhad{"\n"}
+          Account No: 3137836814
         </Text>
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>This is a computer generated statement.</Text>
+      <Text style={styles.footer}>This is a computer-generated statement.</Text>
     </Page>
   );
 };
