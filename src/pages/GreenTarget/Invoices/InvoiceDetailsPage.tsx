@@ -247,7 +247,9 @@ const InvoiceDetailsPage: React.FC = () => {
 
     try {
       // Fetch all payments to find unused reference numbers (including cancelled ones)
-      const allPayments = await greenTargetApi.getPayments(true);
+      const allPayments = await greenTargetApi.getPayments({
+        includeCancelled: true,
+      });
 
       // Get year and month from the INVOICE'S issued date, not payment date
       const invoiceDate = new Date(invoice.date_issued);

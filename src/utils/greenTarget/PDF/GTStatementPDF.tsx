@@ -249,6 +249,8 @@ const formatCurrency = (amount: number | string | null | undefined) => {
   return num.toFixed(2);
 };
 
+const isDebit = (amount: number) => amount > 0;
+
 interface GTStatementPDFProps {
   invoice: InvoiceGT;
   qrCodeData?: string | null;
@@ -363,45 +365,51 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         </View>
 
         {/* Table Rows */}
-        {finalStatementDetails.map((item, index) => (
-          <View
-            key={index}
-            style={[
-              index === finalStatementDetails.length - 1
-                ? styles.lastTableRow // Apply different style if it's the last row
-                : styles.tableRow,
-              index % 2 !== 0 ? styles.evenRow : {}, // Apply even row style based on index (0-based)
-            ]}
-          >
-            <Text style={[styles.dateCol, styles.cellText]}>
-              {formatDate(item.date)}
-            </Text>
-            <Text style={[styles.referenceCol, styles.cellText]}>
-              {item.invoiceNo || "-"} {/* Ensure reference exists */}
-            </Text>
-            <Text style={[styles.descriptionCol, styles.cellText]}>
-              {item.description}
-            </Text>
-            {/* Display amount as Debit if positive, otherwise empty */}
-            <Text style={[styles.debitCol, styles.cellText]}>
-              {item.amount > 0 ? formatCurrency(item.amount) : ""}
-            </Text>
-            {/* Display amount as Credit if negative (take absolute value), otherwise empty */}
-            <Text style={[styles.creditCol, styles.cellText]}>
-              {item.amount < 0 ? formatCurrency(Math.abs(item.amount)) : ""}
-            </Text>
-            <Text style={[styles.balanceCol, styles.cellText]}>
-              {formatCurrency(item.balance)}
-            </Text>
-          </View>
-        ))}
+        {finalStatementDetails.map((item, index) => {
+          const isDebitItem = isDebit(item.amount);
+          return (
+            <View
+              key={index}
+              style={[
+                index === finalStatementDetails.length - 1
+                  ? styles.lastTableRow
+                  : styles.tableRow,
+                index % 2 !== 0 ? styles.evenRow : {},
+              ]}
+            >
+              <Text style={[styles.dateCol, styles.cellText]}>
+                {formatDate(item.date)}
+              </Text>
+              <Text style={[styles.referenceCol, styles.cellText]}>
+                {item.invoiceNo || "-"}
+              </Text>
+              <Text style={[styles.descriptionCol, styles.cellText]}>
+                {item.description}
+              </Text>
+              {/* Debit column - show amount if positive */}
+              <Text style={[styles.debitCol, styles.cellText]}>
+                {item.amount !== 0 && isDebitItem
+                  ? formatCurrency(Math.abs(item.amount))
+                  : ""}
+              </Text>
+              {/* Credit column - show amount if negative (converted to positive) */}
+              <Text style={[styles.creditCol, styles.cellText]}>
+                {item.amount !== 0 && !isDebitItem
+                  ? formatCurrency(Math.abs(item.amount))
+                  : ""}
+              </Text>
+              <Text style={[styles.balanceCol, styles.cellText]}>
+                {formatCurrency(item.balance)}
+              </Text>
+            </View>
+          );
+        })}
       </View>
 
       {/* Summary Section - UPDATED FOR ALIGNMENT */}
       <View style={styles.simpleSummary}>
         <Text style={styles.summaryLabel}>Current Balance (MYR):</Text>
         <Text style={styles.summaryTotalValue}>
-          {/* Display the balance from the last item in the details */}
           {formatCurrency(currentBalance)}
         </Text>
       </View>

@@ -29,6 +29,7 @@ interface CustomerWithInvoiceCounts extends SelectOption {
   activeInvoiceCount: number;
   overdueInvoiceCount: number;
   totalInvoiceCount: number;
+  additional_info?: string;
 }
 
 const GTStatementModal: React.FC<GTStatementModalProps> = ({
@@ -242,60 +243,172 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       return;
     }
 
-    // Convert month-year to ISO date string format for period
-    const [startMonth, startYear] = startMonthYear.split("-").map(Number);
-    const startDate = new Date(startYear, startMonth, 1).toISOString();
-
-    let endDate;
-    if (endMonthYear) {
-      const [endMonth, endYear] = endMonthYear.split("-").map(Number);
-      // Set to last day of the month
-      const lastDay = new Date(endYear, endMonth + 1, 0).getDate();
-      endDate = new Date(endYear, endMonth, lastDay).toISOString();
-    } else {
-      // If no end date, use last day of start month
-      const lastDay = new Date(startYear, startMonth + 1, 0).getDate();
-      endDate = new Date(startYear, startMonth, lastDay).toISOString();
-    }
-
-    // Generate and print the statement PDF
-    await generateAndPrintStatementPDF(customer, startDate, endDate);
-  };
-
-  const generateAndPrintStatementPDF = async (
-    customerData: any,
-    startPeriod: any,
-    endPeriod: any
-  ) => {
     setIsGenerating(true);
     setIsLoadingDialogVisible(true);
     setPrintError(null);
 
     try {
-      // Create a mock statement invoice for demonstration
-      // In a real implementation, you would fetch actual statement data from the API
-      const statementInvoice: InvoiceGT = {
+      // Convert month-year to ISO date string format for period
+      const [startMonth, startYear] = startMonthYear.split("-").map(Number);
+      // First day of the month
+      const startDate = new Date(startYear, startMonth, 1);
+
+      let endDate: Date;
+      if (endMonthYear) {
+        const [endMonth, endYear] = endMonthYear.split("-").map(Number);
+        // Last day of the month
+        const lastDay = new Date(endYear, endMonth + 1, 0).getDate();
+        endDate = new Date(endYear, endMonth, lastDay);
+      } else {
+        // If no end date, use last day of start month
+        const lastDay = new Date(startYear, startMonth + 1, 0).getDate();
+        endDate = new Date(startYear, startMonth, lastDay);
+      }
+
+      // Format as ISO strings for API
+      const startDateISO = startDate.toISOString();
+      const endDateISO = endDate.toISOString();
+
+      // Get one day before the start date for opening balance calculation
+      const dayBeforeStart = new Date(startDate);
+      dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+      const openingBalanceDate = dayBeforeStart.toISOString();
+
+      // 1. Fetch invoices and payments data from the API
+      // Get all invoices for this customer up to the end date
+      // We'll use these to calculate opening balance and statement entries
+      const allInvoices = await greenTargetApi.getInvoices({
+        customer_id: customer.id,
+        end_date: endDateISO,
+      });
+
+      // Filter invoices to separate those before the period (for opening balance)
+      // and those during the period (for statement details)
+      const beforePeriodInvoices = allInvoices.filter(
+        (invoice: { date_issued: string | number | Date }) =>
+          new Date(invoice.date_issued) < startDate
+      );
+
+      const periodInvoices = allInvoices.filter(
+        (invoice: { date_issued: string | number | Date }) =>
+          new Date(invoice.date_issued) >= startDate &&
+          new Date(invoice.date_issued) <= endDate
+      );
+
+      // 2. Calculate opening balance (sum of all unpaid amounts before the period start)
+      let openingBalance = 0;
+      beforePeriodInvoices.forEach(
+        (invoice: { status: string; current_balance: number }) => {
+          if (invoice.status !== "cancelled") {
+            openingBalance += invoice.current_balance;
+          }
+        }
+      );
+
+      // 3. Get all payments made during the period
+      const allPayments = await greenTargetApi.getPayments();
+      const periodPayments = allPayments.filter(
+        (payment: {
+          payment_date: string | number | Date;
+          status: string;
+          invoice_id: any;
+        }) => {
+          const paymentDate = new Date(payment.payment_date);
+          return (
+            payment.status !== "cancelled" &&
+            paymentDate >= startDate &&
+            paymentDate <= endDate &&
+            allInvoices.some(
+              (inv: { invoice_id: any }) =>
+                inv.invoice_id === payment.invoice_id
+            )
+          );
+        }
+      );
+
+      // 4. Create statement details (transactions during the period)
+      const statementDetails = [];
+
+      // Add opening balance entry
+      statementDetails.push({
+        date: startDateISO,
+        description: "Opening Balance",
+        invoiceNo: "-",
+        amount: 0, // Not a transaction itself
+        balance: openingBalance,
+      });
+
+      // Sort all transactions (invoices and payments) by date
+      const allTransactions = [
+        ...periodInvoices.map(
+          (invoice: {
+            date_issued: any;
+            invoice_number: any;
+            total_amount: any;
+            invoice_id: any;
+          }) => ({
+            date: invoice.date_issued,
+            description: `Invoice ${invoice.invoice_number}`,
+            invoiceNo: invoice.invoice_number,
+            amount: invoice.total_amount, // Debit (positive)
+            isInvoice: true,
+            invoiceId: invoice.invoice_id,
+          })
+        ),
+        ...periodPayments.map(
+          (payment: {
+            payment_date: any;
+            payment_method: any;
+            payment_reference: string;
+            payment_id: any;
+            amount_paid: number;
+            invoice_id: any;
+          }) => ({
+            date: payment.payment_date,
+            description: `Payment (${payment.payment_method})${
+              payment.payment_reference ? " - " + payment.payment_reference : ""
+            }`,
+            invoiceNo: `P-${payment.payment_id}`,
+            amount: -payment.amount_paid, // Credit (negative)
+            isPayment: true,
+            invoiceId: payment.invoice_id,
+          })
+        ),
+      ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Add all transactions with running balance
+      let runningBalance = openingBalance;
+      allTransactions.forEach((transaction) => {
+        runningBalance += transaction.amount;
+        statementDetails.push({
+          date: transaction.date,
+          description: transaction.description,
+          invoiceNo: transaction.invoiceNo,
+          amount: transaction.amount,
+          balance: runningBalance,
+        });
+      });
+
+      // Create a statement invoice object
+      const statementInvoice = {
         invoice_id: Date.now(),
-        invoice_number: `S${new Date().getFullYear()}/${Math.floor(
-          Math.random() * 10000
-        )
-          .toString()
-          .padStart(4, "0")}`,
-        type: "statement" as "statement", // Type assertion to make TypeScript happy
-        customer_id: parseInt(customerData.id),
-        customer_name: customerData.name,
-        customer_phone_number: customerData.phone_number,
-        tin_number: "EI00000000010", // Mock TIN
-        amount_before_tax: 0,
-        tax_amount: 0,
-        total_amount: 0,
-        amount_paid: 0,
-        current_balance: 0,
-        balance_due: 0,
+        invoice_number: `S${new Date().getFullYear()}/${String(
+          Math.floor(Math.random() * 10000)
+        ).padStart(4, "0")}`,
+        type: "statement" as "statement",
+        customer_id: Number(customer.id),
+        customer_name: customer.name,
+        customer_phone_number: customer.phone_number || undefined,
+        amount_before_tax: 0, // Not relevant for statement
+        tax_amount: 0, // Not relevant for statement
+        total_amount: runningBalance, // Current balance
+        amount_paid: 0, // Not relevant for statement
+        current_balance: runningBalance, // Current balance
+        balance_due: runningBalance, // Current balance
         date_issued: new Date().toISOString(),
-        statement_period_start: startPeriod,
-        statement_period_end: endPeriod || startPeriod,
-        status: "unpaid",
+        statement_period_start: startDateISO,
+        statement_period_end: endDateISO,
+        status: "unpaid" as "unpaid" | "paid" | "cancelled" | "overdue",
         uuid: null,
         submission_uid: null,
         long_id: null,
@@ -303,29 +416,35 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         is_consolidated: false,
         consolidated_invoices: null,
         einvoice_status: null,
+        additional_info: customer.additional_info || "",
       };
 
-      // Sample statement details - would be fetched from backend in real implementation
-      const statementDetails = [
-        {
-          date: new Date(startPeriod).toISOString(),
-          description: "Opening Balance",
-          invoiceNo: "-",
-          amount: 0,
-          balance: 0,
-        },
-        {
-          date: new Date().toISOString(),
-          description: "Statement of Account",
-          invoiceNo: statementInvoice.invoice_number,
-          amount: 0,
-          balance: 0,
-        },
-      ];
+      // Generate and print the statement PDF
+      await generatePrintStatementPDF(statementInvoice, statementDetails);
+    } catch (error) {
+      console.error("Error generating statement:", error);
+      setPrintError(error instanceof Error ? error.message : "Unknown error");
+      toast.error("Error generating statement. Please try again.");
+      cleanup(true);
+    }
+  };
 
+  const generatePrintStatementPDF = async (
+    statementInvoice: InvoiceGT,
+    statementDetails:
+      | {
+          date: string;
+          description: string;
+          invoiceNo: string;
+          amount: number; // Not a transaction itself
+          balance: number;
+        }[]
+      | undefined
+  ) => {
+    try {
       // Generate PDF document
       const pdfComponent = (
-        <Document title={`Statement_${customerData.name}`}>
+        <Document title={`Statement_${statementInvoice.customer_name}`}>
           <GTStatementPDF
             invoice={statementInvoice}
             statementDetails={statementDetails}
