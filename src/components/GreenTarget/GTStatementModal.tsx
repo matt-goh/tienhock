@@ -369,19 +369,27 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         if (!customer) continue;
 
         // Get all invoices for this customer up to the end date
+        // Add status parameter to exclude cancelled invoices
         const allInvoices = await greenTargetApi.getInvoices({
           customer_id: customer.id,
           end_date: endDateISO,
+          status: "active,overdue,paid,unpaid", // Explicitly include only valid statuses
         });
+
+        // Filter out any invoices that are part of consolidated invoices
+        const validInvoices = allInvoices.filter(
+          (invoice: { consolidated_part_of: any }) =>
+            !invoice.consolidated_part_of
+        );
 
         // Filter invoices to separate those before the period (for opening balance)
         // and those during the period (for statement details)
-        const beforePeriodInvoices = allInvoices.filter(
+        const beforePeriodInvoices = validInvoices.filter(
           (invoice: { date_issued: string | number | Date }) =>
             new Date(invoice.date_issued) < startDate
         );
 
-        const periodInvoices = allInvoices.filter(
+        const periodInvoices = validInvoices.filter(
           (invoice: { date_issued: string | number | Date }) =>
             new Date(invoice.date_issued) >= startDate &&
             new Date(invoice.date_issued) <= endDate
@@ -389,13 +397,9 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
         // Calculate opening balance (sum of all unpaid amounts before the period start)
         let openingBalance = 0;
-        beforePeriodInvoices.forEach(
-          (invoice: { status: string; current_balance: number }) => {
-            if (invoice.status !== "cancelled") {
-              openingBalance += invoice.current_balance;
-            }
-          }
-        );
+        beforePeriodInvoices.forEach((invoice: { current_balance: number }) => {
+          openingBalance += parseFloat(invoice.current_balance.toString());
+        });
 
         // Get all payments for this customer during the period
         const allPayments = await greenTargetApi.getPayments({
@@ -403,21 +407,21 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           includeCancelled: false,
         });
 
+        // Filter payments to only include those for valid invoices
+        const validInvoiceIds = validInvoices.map(
+          (inv: { invoice_id: any }) => inv.invoice_id
+        );
+
         const periodPayments = allPayments.filter(
           (payment: {
             payment_date: string | number | Date;
-            status: string;
             invoice_id: any;
           }) => {
             const paymentDate = new Date(payment.payment_date);
             return (
-              payment.status !== "cancelled" &&
               paymentDate >= startDate &&
               paymentDate <= endDate &&
-              allInvoices.some(
-                (inv: { invoice_id: any }) =>
-                  inv.invoice_id === payment.invoice_id
-              )
+              validInvoiceIds.includes(payment.invoice_id)
             );
           }
         );
@@ -446,7 +450,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               date: invoice.date_issued,
               description: `Invoice ${invoice.invoice_number}`,
               invoiceNo: invoice.invoice_number,
-              amount: invoice.total_amount, // Debit (positive)
+              amount: parseFloat(invoice.total_amount.toString()), // Debit (positive)
               isInvoice: true,
               invoiceId: invoice.invoice_id,
             })
@@ -468,7 +472,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                   : ""
               }`,
               invoiceNo: `${payment.internal_reference || payment.payment_id}`,
-              amount: -payment.amount_paid, // Credit (negative)
+              amount: -parseFloat(payment.amount_paid.toString()), // Credit (negative)
               isPayment: true,
               invoiceId: payment.invoice_id,
             })
@@ -477,11 +481,12 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
         );
 
-        // Simple balance calculation - debits add, credits subtract
+        // Calculate running balance - debits add, credits subtract
         let runningBalance = openingBalance;
+
+        // Process transactions and update balance properly
         allTransactions.forEach((transaction) => {
-          // Simply add the amount to the running balance
-          runningBalance += transaction.amount;
+          runningBalance += transaction.amount; // Amount is already parsed to a number above
 
           statementDetails.push({
             date: transaction.date,
