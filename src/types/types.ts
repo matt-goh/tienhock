@@ -511,6 +511,7 @@ export interface InvoiceGT {
   customer_phone_number?: string;
   tin_number?: string;
   id_number?: string;
+  additional_info?: string;
   location_address?: string;
   location_phone_number?: string;
   date_placed?: string;
