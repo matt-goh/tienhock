@@ -456,9 +456,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               invoice_number: any;
               total_amount: any;
               invoice_id: any;
+              location_address: any;
             }) => ({
               date: invoice.date_issued,
-              description: `Invoice ${invoice.invoice_number}`,
+              description: `Trip: Waste Management Service (${invoice.location_address})`,
               invoiceNo: invoice.invoice_number,
               amount: parseFloat(invoice.total_amount.toString()), // Debit (positive)
               isInvoice: true,
@@ -476,11 +477,11 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               invoice_id: any;
             }) => ({
               date: payment.payment_date,
-              description: `Payment (${payment.payment_method})${
+              description: `Payment ${
                 payment.payment_reference
-                  ? " - " + payment.payment_reference
+                  ? "- " + payment.payment_reference
                   : ""
-              }`,
+              } (${payment.payment_method})`,
               invoiceNo: `${payment.internal_reference || payment.payment_id}`,
               amount: -parseFloat(payment.amount_paid.toString()), // Credit (negative)
               isPayment: true,
