@@ -9,6 +9,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+import { invalidateBookmarksCache } from "../../utils/bookmarkCache";
 
 interface SidebarOptionProps {
   name: string;
@@ -58,7 +59,13 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
         await api.delete(
           `/api/bookmarks/${user?.id}/${encodeURIComponent(name)}`
         );
+
+        // Invalidate the cache after successful API call
+        invalidateBookmarksCache();
+
+        // Update the UI state
         await onBookmarkUpdate(name, false);
+
         // Update the loading toast with success message
         toast.success(`Removed "${name}" from bookmarks`, {
           id: toastId,
@@ -68,7 +75,13 @@ const SidebarOption: React.FC<SidebarOptionProps> = ({
           staffId: user?.id,
           name,
         });
+
+        // Invalidate the cache after successful API call
+        invalidateBookmarksCache();
+
+        // Update the UI state
         await onBookmarkUpdate(name, true);
+
         // Update the loading toast with success message
         toast.success(`Added "${name}" to bookmarks`, {
           id: toastId,
