@@ -25,27 +25,74 @@ export default function (pool) {
     next();
   };
 
-  // Register session
-  router.post("/register", async (req, res) => {
+  // Unified session initialization endpoint (replaces the old register endpoint)
+  router.post("/initialize", async (req, res) => {
     const { sessionId, staffId = null } = req.body;
 
-    const query = `
-      INSERT INTO active_sessions (session_id, staff_id)
-      VALUES ($1, $2)
-      ON CONFLICT (session_id) 
-      DO UPDATE SET
-        staff_id = EXCLUDED.staff_id,
-        last_active = CURRENT_TIMESTAMP,
-        status = 'active'
-      RETURNING *
-    `;
-
     try {
+      // Step 1: Register or update the session
+      const query = `
+        INSERT INTO active_sessions (session_id, staff_id)
+        VALUES ($1, $2)
+        ON CONFLICT (session_id) 
+        DO UPDATE SET
+          staff_id = EXCLUDED.staff_id,
+          last_active = CURRENT_TIMESTAMP,
+          status = 'active'
+        RETURNING *
+      `;
+
       const result = await pool.query(query, [sessionId, staffId]);
-      res.json(result.rows[0]);
+
+      if (result.rows.length === 0) {
+        return res.status(401).json({
+          error: "Failed to register session",
+          requireLogin: true,
+        });
+      }
+
+      // Step 2: Get staff data if staff_id exists
+      let staffData = null;
+      let hasActiveProfile = false;
+
+      if (result.rows[0].staff_id) {
+        const staffQuery = `
+          SELECT st.id as staff_id, st.name as staff_name, st.job as staff_job
+          FROM staffs st
+          WHERE st.id = $1
+        `;
+
+        const staffResult = await pool.query(staffQuery, [
+          result.rows[0].staff_id,
+        ]);
+
+        if (staffResult.rows.length > 0) {
+          hasActiveProfile = true;
+          staffData = {
+            id: staffResult.rows[0].staff_id,
+            name: staffResult.rows[0].staff_name,
+            job: Array.isArray(staffResult.rows[0].staff_job)
+              ? staffResult.rows[0].staff_job
+              : typeof staffResult.rows[0].staff_job === "string"
+              ? JSON.parse(staffResult.rows[0].staff_job)
+              : [],
+          };
+        }
+      }
+
+      // Return combined session and staff information
+      return res.json({
+        hasActiveProfile,
+        staff: staffData,
+        lastActive: result.rows[0].last_active,
+        status: result.rows[0].status,
+      });
     } catch (error) {
-      console.error("Session registration failed:", error);
-      res.status(500).json({ error: "Failed to register session" });
+      console.error("Session initialization failed:", error);
+      return res.status(500).json({
+        error: "Failed to initialize session",
+        code: "SERVER_ERROR",
+      });
     }
   });
 

@@ -22,16 +22,25 @@ export interface AuthenticatedSession extends StoredSession {
   user: AuthenticatedUser | null;
 }
 
+export interface SessionState {
+  staff: AuthenticatedUser | null;
+  hasActiveProfile: boolean;
+}
+
 class SessionService {
   private readonly SESSION_KEY = "app_session";
   private readonly SESSION_ID_KEY = "app_sessionId";
   private currentSessionId: string;
   private stateCheckInterval?: NodeJS.Timeout;
+  private lastCheckTime: number = 0;
+  private MINIMUM_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes between activity-based checks
+  private REGULAR_CHECK_INTERVAL = 30 * 60 * 1000; // 30 minutes for background check
 
   constructor() {
     this.currentSessionId =
       this.getStoredSessionId() || this.generateSessionId();
     this.startStateCheck();
+    this.setupActivityBasedChecks();
   }
 
   private getStoredSessionId(): string | null {
@@ -58,13 +67,41 @@ class SessionService {
     return error;
   }
 
-  // In src/services/SessionService.ts
+  // New method for activity-based checks
+  private setupActivityBasedChecks(): void {
+    // Record initial check time
+    this.lastCheckTime = Date.now();
 
-  async initialize(): Promise<void> {
+    // Function to check session state if enough time has passed
+    const checkOnActivity = () => {
+      const now = Date.now();
+      if (now - this.lastCheckTime > this.MINIMUM_CHECK_INTERVAL) {
+        this.checkState().catch(console.error);
+        this.lastCheckTime = now;
+      }
+    };
+
+    // Check on relevant user activities
+    if (typeof window !== "undefined") {
+      // Navigation events
+      window.addEventListener("popstate", checkOnActivity);
+
+      // User interaction events
+      document.addEventListener("click", checkOnActivity);
+
+      // Window focus events
+      window.addEventListener("focus", checkOnActivity);
+
+      // Custom events that might be dispatched on important actions
+      window.addEventListener("app:importantAction", checkOnActivity);
+    }
+  }
+
+  async initialize(): Promise<SessionState> {
     try {
       const storedSession = this.getStoredSession();
 
-      const response = await api.post("/api/sessions/register", {
+      const response = await api.post("/api/sessions/initialize", {
         sessionId: this.currentSessionId,
         staffId: storedSession?.staffId || null,
       });
@@ -81,6 +118,19 @@ class SessionService {
       if (!this.getStoredSessionId()) {
         localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
       }
+
+      // Update the last check time since we just did a check
+      this.lastCheckTime = Date.now();
+
+      // Update stored session with staff data if available
+      if (response.staff) {
+        this.updateStoredSession(response.staff.id, response.staff);
+      }
+
+      return {
+        staff: response.staff || null,
+        hasActiveProfile: response.hasActiveProfile,
+      };
     } catch (error) {
       // If there's a connection error, don't throw - allow the app to function
       // in a degraded state and attempt reconnection later
@@ -92,7 +142,10 @@ class SessionService {
         console.warn(
           "Network error during session initialization, will retry later"
         );
-        return;
+        return {
+          staff: null,
+          hasActiveProfile: false,
+        };
       }
 
       throw this.createSessionError(
@@ -107,20 +160,21 @@ class SessionService {
     if (this.stateCheckInterval) {
       clearInterval(this.stateCheckInterval);
     }
-    // Check every 5 minutes
+    // Extended to 30 minutes instead of 5
     this.stateCheckInterval = setInterval(() => {
       this.checkState().catch(console.error);
-    }, 5 * 60 * 1000);
+    }, this.REGULAR_CHECK_INTERVAL);
   }
 
-  async checkState(): Promise<{
-    staff: AuthenticatedUser | null;
-    hasActiveProfile: boolean;
-  }> {
+  async checkState(): Promise<SessionState> {
     try {
+      // Use the state endpoint to check session without creating/updating it
       const response = await api.get(
         `/api/sessions/state/${this.currentSessionId}`
       );
+
+      // Update the last check time
+      this.lastCheckTime = Date.now();
 
       // Handle maintenance mode from server
       if (response.maintenance) {
@@ -175,6 +229,9 @@ class SessionService {
       this.currentSessionId = data.sessionId;
       localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
       this.saveSession(session);
+
+      // Update the last check time after login
+      this.lastCheckTime = Date.now();
 
       return session;
     } catch (error) {
