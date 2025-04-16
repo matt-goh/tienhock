@@ -106,11 +106,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   dateCol: { width: "12%", paddingLeft: 4 },
-  referenceCol: { width: "13%", paddingLeft: 4 },
-  descriptionCol: { width: "35%", paddingLeft: 4 },
-  debitCol: { width: "12%", textAlign: "right", paddingRight: 4 },
-  creditCol: { width: "12%", textAlign: "right", paddingRight: 4 },
-  balanceCol: { width: "16%", textAlign: "right", paddingRight: 4 },
+  referenceCol: { width: "12%", paddingLeft: 4 },
+  descriptionCol: { width: "46%", paddingLeft: 4 },
+  debitCol: { width: "10%", textAlign: "right", paddingRight: 4 },
+  creditCol: { width: "10%", textAlign: "right", paddingRight: 4 },
+  balanceCol: { width: "10%", textAlign: "right", paddingRight: 4 },
   headerText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
   cellText: { fontSize: 9 },
 
@@ -299,21 +299,18 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       : [
           {
             date: invoice.date_issued,
-            description: "Opening Balance",
+            description: "Balance Brought Forward",
             invoiceNo: "-",
             amount: 0,
             balance: 0,
           },
           {
             date: invoice.date_issued,
-            description: `Invoice ${invoice.invoice_number}`,
+            description: `Trip: Waste Management Service`,
             invoiceNo: invoice.invoice_number,
             amount: invoice.total_amount,
             balance: invoice.total_amount,
           },
-          // Simulate a few more rows for testing short tables
-          // { date: "2023-10-05", description: "Short Item 1", invoiceNo: "INV-001", amount: 50, balance: invoice.total_amount + 50 },
-          // { date: "2023-10-10", description: "Payment Received", invoiceNo: "PMT-001", amount: -20, balance: invoice.total_amount + 30 },
         ];
 
   const currentBalance =
