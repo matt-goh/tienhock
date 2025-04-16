@@ -194,6 +194,7 @@ const styles = StyleSheet.create({
   agingTable: {
     borderWidth: 0.5,
     borderColor: "#000",
+    borderBottomWidth: 0,
   },
   agingHeader: {
     flexDirection: "row",
