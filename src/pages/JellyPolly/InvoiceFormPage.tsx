@@ -526,7 +526,7 @@ const InvoiceFormPage: React.FC = () => {
         toast.dismiss(toastId); // Dismiss previous toasts, modal shows progress/result
 
         try {
-          const einvoiceResponse = await api.post("/api/einvoice/submit", {
+          const einvoiceResponse = await api.post("/jellypolly/api/einvoice/submit", {
             invoiceIds: [invoiceIdForNavigation], // Use the saved ID
           });
           setEinvoiceResults(einvoiceResponse); // Set results for the modal
