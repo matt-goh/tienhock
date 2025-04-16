@@ -14,6 +14,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: "Helvetica",
     flexDirection: "column", // Essential for vertical flex layout
+    height: "100%", // Essential for flexGrow to work against page height
   },
   header: {
     flexDirection: "row",
@@ -75,15 +76,16 @@ const styles = StyleSheet.create({
     lineHeight: 1.3,
   },
 
-  // NEW: Wrapper for the main variable content area
+  // MODIFIED: Wrapper for the main variable content area
   contentArea: {
-    flexShrink: 0, // Prevent this whole block from shrinking vertically
-    // No flexGrow here, its height is determined by its content
+    flexGrow: 1, // Allow this area to expand vertically to fill space
+    flexShrink: 0, // Prevent this area itself from shrinking
+    flexDirection: "column", // Arrange children (table, summary, spacer, aging...) vertically
   },
 
   // Statement Table styles (now inside contentArea)
   statementTableContainer: {
-    // flexShrink: 0, // Removed, handled by contentArea
+    flexShrink: 0, // Prevent table block from shrinking
   },
   tableHeader: {
     flexDirection: "row",
@@ -116,7 +118,7 @@ const styles = StyleSheet.create({
   simpleSummary: {
     flexDirection: "row",
     marginTop: 10,
-    // flexShrink: 0, // Removed, handled by contentArea
+    flexShrink: 0, // Prevent summary block from shrinking
   },
   summaryLabel: {
     fontFamily: "Helvetica-Bold",
@@ -133,10 +135,18 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
 
+  // Spacer View: Now INSIDE contentArea, sibling to summary, aging etc.
+  spacer: {
+    flexGrow: 1, // Takes up available vertical space WITHIN contentArea
+    minHeight: 10, // Good for debugging if needed
+    // backgroundColor: "rgba(0, 255, 0, 0.2)", // Optional debugging color
+  },
+
   // Aging Section Styles (now inside contentArea)
   agingSection: {
-    marginTop: 20,
-    // flexShrink: 0, // Removed, handled by contentArea
+    marginTop: 6, // Keep existing margin for spacing after spacer
+    marginBottom: 10,
+    flexShrink: 0, // Prevent aging block from shrinking
   },
   agingTable: {
     borderWidth: 0.5,
@@ -176,10 +186,10 @@ const styles = StyleSheet.create({
 
   // Interest Note Styles (now inside contentArea)
   interestNoteContainer: {
-    marginTop: 8,
-    marginBottom: 15, // Added bottom margin for spacing before payment info
+    marginTop: 6,
+    marginBottom: 4,
     alignItems: "center",
-    // flexShrink: 0, // Removed, handled by contentArea
+    flexShrink: 0, // Prevent note block from shrinking
   },
   interestNoteText: {
     fontSize: 8.5,
@@ -191,8 +201,7 @@ const styles = StyleSheet.create({
   // Payment and Info Section (now inside contentArea)
   paymentAndInfoSection: {
     flexDirection: "row",
-    marginTop: 10, // Keep spacing if needed
-    // flexShrink: 0, // Removed, handled by contentArea
+    flexShrink: 0, // Prevent payment info block from shrinking
   },
   footerColumn: {
     flex: 1,
@@ -223,18 +232,11 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 9,
     marginBottom: 4,
-    color: "#4b5563",
   },
 
-  // Spacer View: Sibling to contentArea and documentFooter
-  spacer: {
-    flexGrow: 1, // Takes up all available vertical space
-    // Add minHeight if needed for debugging, e.g., minHeight: 10, backgroundColor: 'red'
-  },
-
-  // Document Footer: Sibling to contentArea and spacer
+  // Document Footer: Sibling to header, title, customerInfo, contentArea
   documentFooter: {
-    paddingTop: 10, // Space above footer text
+    paddingTop: 12, // Space above footer text
     paddingBottom: 15, // Generous space at the very bottom
     paddingHorizontal: 10,
     textAlign: "center",
@@ -322,14 +324,14 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
   const hasAgingData = !!invoice.agingData;
 
   return (
+    // Page is the main flex container (column)
     <Page size="A4" style={styles.page}>
-      {/* --- Static Header Content --- */}
+      {/* --- Static Header Content (flexShrink: 0) --- */}
       <View style={styles.header}>
         <View style={styles.companySection}>
           <Image src={GreenTargetLogo} style={styles.logo} />
           <View style={styles.companyInfo}>
             <Text style={styles.companyName}>{GREENTARGET_INFO.name}</Text>
-            {/* Other company details... */}
             <Text style={styles.companyDetail}>
               Reg. No: {GREENTARGET_INFO.reg_no}
             </Text>
@@ -360,7 +362,6 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         <Text style={styles.customerName}>
           {invoice.customer_name || "Customer"}
         </Text>
-        {/* Other customer details... */}
         {invoice.customer_phone_number && (
           <Text style={styles.customerDetail}>
             Tel: {invoice.customer_phone_number}
@@ -372,9 +373,10 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       </View>
       {/* --- End Static Header Content --- */}
 
-      {/* --- Main Content Area Wrapper --- */}
+      {/* --- Main Content Area Wrapper (flexGrow: 1, flexDirection: 'column') --- */}
+      {/* This area expands vertically between header and footer */}
       <View style={styles.contentArea}>
-        {/* --- Statement Table --- */}
+        {/* --- Statement Table (flexShrink: 0) --- */}
         <View style={styles.statementTableContainer}>
           {/* Table Header */}
           <View style={styles.tableHeader}>
@@ -442,7 +444,22 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         </View>
         {/* --- End Summary Section --- */}
 
-        {/* --- Aging Section (Conditional) --- */}
+        {/* --- Spacer View (flexGrow: 1) --- */}
+        {/* Takes up space WITHIN contentArea, pushing subsequent items down */}
+        <View style={styles.spacer} />
+        {/* --- End Spacer View --- */}
+
+        {/* --- Interest Rate Note --- */}
+        <View style={styles.interestNoteContainer}>
+          <Text style={styles.interestNoteText}>
+            We reserve the rights to charge interest at the rate of 1.5% per
+            month on overdue accounts.
+          </Text>
+        </View>
+        {/* --- End Interest Rate Note --- */}
+
+        {/* --- Aging Section --- */}
+        {/* This section and below are pushed down by the spacer */}
         {hasAgingData && (
           <View style={styles.agingSection}>
             <View style={styles.agingTable}>
@@ -451,7 +468,6 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
                 <Text style={[styles.agingCell, styles.agingHeaderText]}>
                   Over 3 Months
                 </Text>
-                {/* Other aging headers... */}
                 <Text style={[styles.agingCell, styles.agingHeaderText]}>
                   2 Months
                 </Text>
@@ -467,7 +483,6 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
                 <Text style={[styles.agingCell, styles.agingCellText]}>
                   {formatCurrency(invoice.agingData?.month3Plus)}
                 </Text>
-                {/* Other aging data... */}
                 <Text style={[styles.agingCell, styles.agingCellText]}>
                   {formatCurrency(invoice.agingData?.month2)}
                 </Text>
@@ -483,20 +498,11 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
         )}
         {/* --- End Aging Section --- */}
 
-        {/* --- Interest Rate Note --- */}
-        <View style={styles.interestNoteContainer}>
-          <Text style={styles.interestNoteText}>
-            We reserve the rights to charge interest at the rate of 1.5% per
-            month on overdue accounts.
-          </Text>
-        </View>
-        {/* --- End Interest Rate Note --- */}
-
         {/* --- Payment and Info Section --- */}
         <View style={styles.paymentAndInfoSection}>
           {/* Column 1: Payment Instructions */}
           <View style={styles.footerColumn}>
-            <Text style={styles.footerHeading}>Payment Instructions</Text>
+            <Text style={styles.footerHeading}>Payment</Text>
             <View style={styles.paymentDetails}>
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>Account Name:</Text>
@@ -504,7 +510,6 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
                   Green Target Waste Treatment Industries S/B
                 </Text>
               </View>
-              {/* Other payment details... */}
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>Bank:</Text>
                 <Text style={styles.paymentValue}>Public Bank Berhad</Text>
@@ -532,11 +537,8 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
       </View>
       {/* --- End Main Content Area Wrapper --- */}
 
-      {/* --- Spacer View - Pushes Footer Down --- */}
-      <View style={styles.spacer} />
-      {/* --- End Spacer View --- */}
-
-      {/* --- Fixed Footer Area --- */}
+      {/* --- Fixed Footer Area (flexShrink: 0) --- */}
+      {/* Sits below the contentArea */}
       <View style={styles.documentFooter}>
         <Text style={styles.footerText}>
           This is a computer-generated statement and requires no signature.
