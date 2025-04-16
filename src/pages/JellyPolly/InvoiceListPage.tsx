@@ -1211,7 +1211,7 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Filters info dropdown panel */}
               {isFilterButtonHovered && (
-                <div className="absolute z-10 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
+                <div className="absolute z-30 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
                   <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
                     {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
@@ -1375,7 +1375,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Selection Count and Total */}
-            <div className="flex-grow">
+            <div className="flex-grow pb-0.5">
               {/* Selection info text */}
               {selectedInvoiceIds.size > 0 ? (
                 <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
