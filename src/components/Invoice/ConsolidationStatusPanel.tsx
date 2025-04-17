@@ -12,7 +12,7 @@ import {
 } from "@tabler/icons-react";
 
 interface ConsolidationStatusProps {
-  company: "tienhock" | "greentarget";
+  company: "tienhock" | "greentarget" | "jellypolly";
   year: number;
   month: number;
 }
@@ -70,6 +70,8 @@ const ConsolidationStatusPanel: React.FC<ConsolidationStatusProps> = ({
       const endpoint =
         company === "greentarget"
           ? `/greentarget/api/einvoice/auto-consolidation/status?year=${year}&month=${month}`
+          : company === "jellypolly"
+          ? `/jellypolly/api/einvoice/auto-consolidation/status?year=${year}&month=${month}`
           : `/api/einvoice/auto-consolidation/status?year=${year}&month=${month}`;
 
       const response = await api.get(endpoint);
