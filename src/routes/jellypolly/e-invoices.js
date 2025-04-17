@@ -1,4 +1,4 @@
-// src/routes/sales/invoices/e-invoice.js
+// src/routes/jellypolly/sales/invoices/e-invoice.js
 import { EInvoiceTemplate } from "../../utils/invoice/einvoice/EInvoiceTemplate.js";
 import { Router } from "express";
 import { createHash } from "crypto";

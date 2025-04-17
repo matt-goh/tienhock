@@ -54,7 +54,7 @@ import {
   getInvoicesByIds,
 } from "../../utils/JellyPolly/InvoiceUtils";
 import Pagination from "../../components/Invoice/Pagination";
-import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
+import JPConsolidatedInvoiceModal from "../../components/Invoice/JPConsolidatedInvoiceModal";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 
 // --- Constants ---
@@ -1600,7 +1600,7 @@ const InvoiceListPage: React.FC = () => {
         </div>
       </div>
       {/* Consolidated Invoice Modal */}
-      <ConsolidatedInvoiceModal
+      <JPConsolidatedInvoiceModal
         isOpen={showConsolidatedModal}
         onClose={() => setShowConsolidatedModal(false)}
         month={selectedMonth.id}

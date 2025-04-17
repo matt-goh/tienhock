@@ -53,6 +53,21 @@ export const updateInvoiceStatuses = async () => {
       `GreenTarget: Marked ${greenTargetResult.rowCount} invoices as overdue.`
     );
 
+    // --- Update Jellypolly Invoices ---
+    const jellypollyUpdateQuery = `
+    UPDATE jellypolly.invoices
+    SET invoice_status = 'overdue'
+    WHERE invoice_status = 'Unpaid'        -- Only update unpaid ones
+      AND COALESCE(balance_due, 0) > 0     -- Must have a balance due
+      AND CAST(createddate AS bigint) < $1; -- Older than 30 days
+    `;
+    const jellypollyResult = await client.query(jellypollyUpdateQuery, [
+      thirtyDaysAgoTimestamp,
+    ]);
+    console.log(
+      `Jellypolly: Marked ${jellypollyResult.rowCount} invoices as Overdue.`
+    );
+
     await client.query("COMMIT");
     console.log("Invoice status update committed successfully.");
   } catch (error) {

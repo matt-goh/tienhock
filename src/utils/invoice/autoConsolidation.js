@@ -121,6 +121,45 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               year,
             ]);
             eligibleInvoices = invoiceResult.rows;
+          } else if (company === "jellypolly") {
+            // Jellypolly logic
+            const startOfMonth = new Date(year, month, 1).getTime().toString();
+            const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+              .getTime()
+              .toString();
+
+            const invoiceQuery = `
+              SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
+              FROM jellypolly.invoices i
+              JOIN customers c ON i.customerid = c.id
+              WHERE i.createddate::bigint >= $1
+              AND i.createddate::bigint <= $2
+              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
+              AND i.invoice_status != 'cancelled'
+              AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+            `;
+
+            const invoiceResult = await client.query(invoiceQuery, [
+              startOfMonth,
+              endOfMonth,
+            ]);
+
+            // Also get order details for each invoice
+            for (const invoice of invoiceResult.rows) {
+              const orderDetailsQuery = `
+                SELECT *
+                FROM jellypolly.order_details
+                WHERE invoiceid = $1
+                ORDER BY id
+              `;
+
+              const orderDetailsResult = await client.query(orderDetailsQuery, [
+                invoice.id,
+              ]);
+              invoice.orderDetails = orderDetailsResult.rows;
+            }
+
+            eligibleInvoices = invoiceResult.rows;
           } else {
             // Tien Hock logic
             const startOfMonth = new Date(year, month, 1).getTime().toString();
@@ -200,6 +239,13 @@ export const checkAndProcessDueConsolidations = async (pool) => {
           let result;
           if (isGreentarget) {
             result = await processGreentargetConsolidation(
+              client,
+              eligibleInvoices,
+              month,
+              year
+            );
+          } else if (company === "jellypolly") {
+            result = await processJellypollyConsolidation(
               client,
               eligibleInvoices,
               month,
@@ -541,6 +587,126 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
       success: false,
       message:
         error.message || "Unknown error during Green Target consolidation",
+    };
+  }
+}
+
+/**
+ * Process Jellypolly consolidation
+ */
+async function processJellypollyConsolidation(client, invoices, month, year) {
+  try {
+    // Use config from environment variables/imports
+    const apiConfig = {
+      MYINVOIS_API_BASE_URL,
+      MYINVOIS_CLIENT_ID,
+      MYINVOIS_CLIENT_SECRET,
+    };
+
+    // Initialize API client and submission handler
+    const apiClient = EInvoiceApiClientFactory.getInstance(apiConfig);
+    const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
+
+    // Generate consolidated XML
+    const consolidatedXml = await EInvoiceConsolidatedTemplate(
+      invoices,
+      month,
+      year
+    );
+
+    // Generate consolidated invoice number
+    const datePrefix = `${year}${String(month + 1).padStart(2, "0")}`;
+    const consolidatedSequenceQuery = `
+      SELECT COALESCE(MAX(NULLIF(regexp_replace(id, '^CON-\\d{6}-(\\d+)$', '\\1'), '')), '0')::int + 1 as next_seq
+      FROM jellypolly.invoices
+      WHERE id LIKE 'CON-${datePrefix}-%'
+    `;
+
+    const sequenceResult = await client.query(consolidatedSequenceQuery);
+    const sequence = sequenceResult.rows[0].next_seq;
+    const consolidatedInvoiceNumber = `CON-${datePrefix}-${sequence}`;
+
+    // Calculate totals
+    const totalExcludingTax = invoices.reduce(
+      (sum, inv) => sum + parseFloat(inv.total_excluding_tax || 0),
+      0
+    );
+    const taxAmount = invoices.reduce(
+      (sum, inv) => sum + parseFloat(inv.tax_amount || 0),
+      0
+    );
+    const rounding = invoices.reduce(
+      (sum, inv) => sum + parseFloat(inv.rounding || 0),
+      0
+    );
+    const totalPayable = invoices.reduce(
+      (sum, inv) => sum + parseFloat(inv.totalamountpayable || 0),
+      0
+    );
+
+    // Submit to MyInvois API
+    console.log(
+      `Submitting consolidated invoice ${consolidatedInvoiceNumber} to MyInvois API`
+    );
+
+    // Prepare document for submission
+    const submissionResult = await submissionHandler.submitAndPollDocuments(
+      consolidatedXml
+    );
+
+    if (!submissionResult.success) {
+      throw new Error(
+        submissionResult.message ||
+          "Failed to submit consolidated invoice to MyInvois"
+      );
+    }
+
+    // Get consolidation details from the response
+    const documentDetails = submissionResult.document;
+    const status = documentDetails.longId ? "valid" : "pending";
+
+    // Insert consolidated record with API response details
+    const invoiceIds = invoices.map((inv) => inv.id);
+
+    await client.query(
+      `INSERT INTO jellypolly.invoices (
+        id, uuid, submission_uid, long_id, datetime_validated,
+        total_excluding_tax, tax_amount, rounding, totalamountpayable,
+        invoice_status, einvoice_status, is_consolidated, consolidated_invoices,
+        customerid, salespersonid, createddate, paymenttype, balance_due
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+      [
+        consolidatedInvoiceNumber,
+        documentDetails.uuid,
+        submissionResult.submissionUid,
+        documentDetails.longId || null,
+        documentDetails.dateTimeValidated || null,
+        totalExcludingTax,
+        taxAmount,
+        rounding,
+        totalPayable,
+        "paid", // invoice_status
+        status, // einvoice_status based on API response
+        true, // is_consolidated
+        JSON.stringify(invoiceIds),
+        "Consolidated customers", // customerid
+        "SYSTEM-AUTO", // salespersonid
+        new Date().getTime().toString(), // createddate
+        "INVOICE", // paymenttype
+        0, // balance_due
+      ]
+    );
+
+    return {
+      success: true,
+      message: "Consolidation successful",
+      consolidated_invoice_id: consolidatedInvoiceNumber,
+    };
+  } catch (error) {
+    console.error("Error in Jellypolly consolidation:", error);
+    return {
+      success: false,
+      message: error.message || "Unknown error during Jellypolly consolidation",
     };
   }
 }
