@@ -385,122 +385,26 @@ const SalesByProductsPage: React.FC = () => {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      // Add product filter parameter
-      let url = `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`;
-      if (selectedChartProducts.length > 0) {
-        url += `&products=${selectedChartProducts.join(",")}`;
-      }
+      // Use new trends endpoint with product type
+      const url = `/api/invoices/sales/trends?type=products&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartProducts.join(
+        ","
+      )}`;
 
-      const invoices = await api.get(url);
+      const chartData = await api.get(url);
 
-      if (!Array.isArray(invoices)) {
+      if (!Array.isArray(chartData)) {
         throw new Error("Invalid response format");
       }
 
-      // Check if we received any invoices
-      if (invoices.length === 0) {
+      // Check if we received any data
+      if (chartData.length === 0) {
         toast.error("No data found for the selected products in the past year");
         setYearlyTrendData([]);
-        setIsGeneratingChart(false);
         return;
       }
 
-      // Group sales by month and product/type
-      const monthlyData = new Map<string, Record<string, number>>();
-      const allProductsOrTypes = new Set<string>();
-
-      invoices.forEach((invoice) => {
-        // Skip cancelled invoices
-        if (invoice.invoice_status === "cancelled") return;
-
-        const invoiceDate = new Date(Number(invoice.createddate));
-        const monthYear = `${invoiceDate.getFullYear()}-${String(
-          invoiceDate.getMonth() + 1
-        ).padStart(2, "0")}`;
-
-        if (!monthlyData.has(monthYear)) {
-          monthlyData.set(monthYear, {});
-        }
-
-        if (Array.isArray(invoice.products)) {
-          invoice.products.forEach(
-            (product: {
-              issubtotal: any;
-              istotal: any;
-              code: any;
-              quantity: any;
-              price: any;
-            }) => {
-              if (product.issubtotal || product.istotal) return;
-
-              const productId = product.code;
-              const productType = getProductType(productId);
-
-              // Calculate the total for this product
-              const quantity = Number(product.quantity) || 0;
-              const price = Number(product.price) || 0;
-              const total = quantity * price;
-
-              // Track sales for the individual product if it's selected
-              if (selectedChartProducts.includes(productId)) {
-                allProductsOrTypes.add(productId);
-                const monthData = monthlyData.get(monthYear)!;
-                monthData[productId] = (monthData[productId] || 0) + total;
-              }
-
-              // Also track sales for the product type if it's selected
-              if (selectedChartProducts.includes(productType)) {
-                allProductsOrTypes.add(productType);
-                const monthData = monthlyData.get(monthYear)!;
-                monthData[productType] = (monthData[productType] || 0) + total;
-              }
-            }
-          );
-        }
-      });
-
-      // Convert to array format for chart
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const sortedMonths = Array.from(monthlyData.keys()).sort();
-
-      const chartData = sortedMonths.map((monthYear) => {
-        const [year, month] = monthYear.split("-");
-        const monthData = monthlyData.get(monthYear)!;
-
-        // Create data point with month label and selected products/types
-        const dataPoint: MonthlyTypeData = {
-          month: `${monthNames[parseInt(month) - 1]} ${year}`,
-        };
-
-        // Add values for each selected product/type
-        Array.from(allProductsOrTypes).forEach((key) => {
-          dataPoint[key] = monthData[key] || 0;
-        });
-
-        return dataPoint;
-      });
-
-      // Check if we have any data points after processing
-      if (chartData.length === 0 || allProductsOrTypes.size === 0) {
-        toast.error("No sales data found for the selected products");
-        setYearlyTrendData([]);
-      } else {
-        setYearlyTrendData(chartData);
-        toast.success("Product trend data generated successfully");
-      }
+      setYearlyTrendData(chartData);
+      toast.success("Product trend data generated successfully");
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
       toast.error("Failed to generate product trend data");
@@ -520,14 +424,18 @@ const SalesByProductsPage: React.FC = () => {
         const startTimestamp = dateRange.start.getTime().toString();
         const endTimestamp = dateRange.end.getTime().toString();
 
-        // Fetch invoices for the selected date range
-        const invoices = await api.get(
-          `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
-        );
+        // Use the new dedicated endpoint
+        let url = `/api/invoices/sales/products?startDate=${startTimestamp}&endDate=${endTimestamp}`;
 
-        if (Array.isArray(invoices)) {
-          const processedData = processInvoiceData(invoices);
-          setSalesData(processedData);
+        // Add salesman filter if not "All Salesmen"
+        if (selectedSalesman !== "All Salesmen") {
+          url += `&salesman=${selectedSalesman}`;
+        }
+
+        const data = await api.get(url);
+
+        if (Array.isArray(data)) {
+          setSalesData(data);
         } else {
           throw new Error("Invalid response format");
         }
@@ -540,11 +448,8 @@ const SalesByProductsPage: React.FC = () => {
       }
     };
 
-    // Only fetch if products are loaded
-    if (products.length > 0) {
-      fetchSalesData();
-    }
-  }, [dateRange, products, selectedSalesman]);
+    fetchSalesData();
+  }, [dateRange, selectedSalesman]);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {

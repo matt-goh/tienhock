@@ -231,95 +231,23 @@ const SalesBySalesmanPage: React.FC = () => {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      // Add the salesmen parameter to filter invoices
-      const salesmenParam = selectedChartSalesmen.join(",");
-      const invoices = await api.get(
-        `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}&salesman=${salesmenParam}`
-      );
+      // Use the new dedicated trends endpoint
+      const url = `/api/invoices/sales/trends?type=salesmen&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartSalesmen.join(
+        ","
+      )}`;
 
-      if (!Array.isArray(invoices)) {
+      const chartData = await api.get(url);
+
+      if (!Array.isArray(chartData)) {
         throw new Error("Invalid response format");
       }
 
-      // Group sales by month and salesman
-      const monthlyData = new Map<string, Record<string, number>>();
-      const allSalesmen = new Set<string>(selectedChartSalesmen); // Only include selected salesmen
-
-      invoices.forEach((invoice) => {
-        // Skip cancelled invoices
-        if (invoice.invoice_status === "cancelled") return;
-
-        // Skip if not a selected salesman
-        if (!selectedChartSalesmen.includes(invoice.salespersonid)) return;
-
-        const invoiceDate = new Date(Number(invoice.createddate));
-        const monthYear = `${invoiceDate.getFullYear()}-${String(
-          invoiceDate.getMonth() + 1
-        ).padStart(2, "0")}`;
-
-        if (!monthlyData.has(monthYear)) {
-          monthlyData.set(monthYear, {});
-        }
-
-        const salesmanId = invoice.salespersonid;
-        if (!salesmanId) return;
-
-        // Calculate total for the invoice (product quantity * price)
-        let invoiceTotal = 0;
-        if (Array.isArray(invoice.products)) {
-          invoice.products.forEach(
-            (product: {
-              issubtotal: any;
-              istotal: any;
-              quantity: any;
-              price: any;
-            }) => {
-              // Skip subtotal or total rows
-              if (product.issubtotal || product.istotal) return;
-              const quantity = Number(product.quantity) || 0;
-              const price = Number(product.price) || 0;
-              invoiceTotal += quantity * price;
-            }
-          );
-        }
-
-        const monthData = monthlyData.get(monthYear)!;
-        monthData[salesmanId] = (monthData[salesmanId] || 0) + invoiceTotal;
-      });
-
-      // Convert to array format for chart
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const sortedMonths = Array.from(monthlyData.keys()).sort();
-
-      const chartData = sortedMonths.map((monthYear) => {
-        const [year, month] = monthYear.split("-");
-        const monthData = monthlyData.get(monthYear)!;
-
-        // Create data point with month label and all salesmen
-        const dataPoint: SalesTrendData = {
-          month: `${monthNames[parseInt(month) - 1]} ${year}`,
-        };
-
-        // Add values for each salesman
-        Array.from(allSalesmen).forEach((salesmanId) => {
-          dataPoint[salesmanId] = monthData[salesmanId] || 0;
-        });
-
-        return dataPoint;
-      });
+      // Check if we received any data
+      if (chartData.length === 0) {
+        toast.error("No data found for the selected salesmen in the past year");
+        setSalesTrendData([]);
+        return;
+      }
 
       setSalesTrendData(chartData);
       toast.success("Sales trend data generated successfully");
@@ -342,14 +270,13 @@ const SalesBySalesmanPage: React.FC = () => {
         const startTimestamp = dateRange.start.getTime().toString();
         const endTimestamp = dateRange.end.getTime().toString();
 
-        // Fetch invoices for the selected date range
-        const invoices = await api.get(
-          `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
+        // Use the new dedicated endpoint
+        const data = await api.get(
+          `/api/invoices/sales/salesmen?startDate=${startTimestamp}&endDate=${endTimestamp}`
         );
 
-        if (Array.isArray(invoices)) {
-          const processedData = processInvoiceData(invoices);
-          setSalesmanData(processedData);
+        if (Array.isArray(data)) {
+          setSalesmanData(data);
         } else {
           throw new Error("Invalid response format");
         }

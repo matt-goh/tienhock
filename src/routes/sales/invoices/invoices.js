@@ -612,6 +612,300 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/sales/products - Get product sales data
+  router.get("/sales/products", async (req, res) => {
+    try {
+      const { startDate, endDate, salesman } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      // Base query to get invoices and their products within date range
+      let query = `
+      SELECT 
+        i.id, i.salespersonid, i.invoice_status, i.paymenttype,
+        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, 
+        p.type
+      FROM invoices i
+      JOIN order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE 
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+    `;
+
+      const queryParams = [startDate, endDate];
+      let paramCount = 3;
+
+      // Add optional salesman filter
+      if (salesman && salesman !== "All Salesmen") {
+        query += ` AND i.salespersonid = $${paramCount++}`;
+        queryParams.push(salesman);
+      }
+
+      const result = await pool.query(query, queryParams);
+
+      // Process data - group by product
+      const productMap = new Map();
+
+      result.rows.forEach((product) => {
+        const productId = product.code;
+        if (!productId) return;
+
+        // Parse values from string to number
+        const quantity = parseInt(product.quantity) || 0;
+        const price = parseFloat(product.price) || 0;
+        const total = quantity * price;
+        const foc = parseInt(product.freeproduct) || 0;
+        const returns = parseInt(product.returnproduct) || 0;
+
+        if (productMap.has(productId)) {
+          const existingProduct = productMap.get(productId);
+          existingProduct.quantity += quantity;
+          existingProduct.totalSales += total;
+          existingProduct.foc += foc;
+          existingProduct.returns += returns;
+        } else {
+          productMap.set(productId, {
+            id: productId,
+            description: product.description || productId,
+            type: product.type || "OTHER",
+            quantity,
+            totalSales: total,
+            foc,
+            returns,
+          });
+        }
+      });
+
+      // Convert Map to Array for response
+      const productData = Array.from(productMap.values());
+
+      res.json(productData);
+    } catch (error) {
+      console.error("Error fetching product sales data:", error);
+      res.status(500).json({
+        message: "Error fetching product sales data",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/invoices/sales/salesmen - Get salesmen sales data
+  router.get("/sales/salesmen", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      // Query to get sales statistics grouped by salesperson
+      const query = `
+      WITH invoice_totals AS (
+        SELECT 
+          i.id, i.salespersonid, i.paymenttype,
+          SUM(od.quantity * od.price) as total_amount,
+          SUM(od.quantity) as total_quantity
+        FROM invoices i
+        JOIN order_details od ON i.id = od.invoiceid
+        WHERE 
+          CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+          AND i.invoice_status != 'cancelled'
+          AND od.issubtotal IS NOT TRUE
+        GROUP BY i.id, i.salespersonid, i.paymenttype
+      )
+      SELECT 
+        it.salespersonid as id,
+        SUM(it.total_amount) as total_sales,
+        SUM(it.total_quantity) as total_quantity,
+        COUNT(it.id) as sales_count,
+        COUNT(CASE WHEN it.paymenttype = 'INVOICE' THEN 1 END) as invoice_count,
+        COUNT(CASE WHEN it.paymenttype = 'CASH' THEN 1 END) as cash_count
+      FROM invoice_totals it
+      GROUP BY it.salespersonid
+      ORDER BY total_sales DESC
+    `;
+
+      const result = await pool.query(query, [startDate, endDate]);
+
+      res.json(
+        result.rows.map((row) => ({
+          id: row.id,
+          totalSales: parseFloat(row.total_sales) || 0,
+          totalQuantity: parseInt(row.total_quantity) || 0,
+          salesCount: parseInt(row.sales_count) || 0,
+          invoiceCount: parseInt(row.invoice_count) || 0,
+          cashCount: parseInt(row.cash_count) || 0,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching salesman sales data:", error);
+      res.status(500).json({
+        message: "Error fetching salesman sales data",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/invoices/sales/trends - Get monthly sales trends for products or salesmen
+  router.get("/sales/trends", async (req, res) => {
+    try {
+      const { startDate, endDate, type, ids } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      if (!type || (type !== "products" && type !== "salesmen")) {
+        return res
+          .status(400)
+          .json({
+            message: "Valid type parameter (products or salesmen) is required",
+          });
+      }
+
+      // Parse IDs from comma-separated string if provided
+      const idArray = ids ? ids.split(",") : [];
+
+      // Different SQL logic based on type
+      let query;
+      const queryParams = [startDate, endDate];
+
+      if (type === "products") {
+        // Product trends - include category level (BH, MEE) and individual products
+        query = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            od.code as product_id,
+            p.type as product_type,
+            SUM(od.quantity * od.price) as total_sales
+          FROM invoices i
+          JOIN order_details od ON i.id = od.invoiceid
+          LEFT JOIN products p ON od.code = p.id
+          WHERE 
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+          GROUP BY month, product_id, product_type
+        )
+        SELECT 
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          product_id,
+          product_type,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, product_id
+      `;
+      } else {
+        // Salesman trends
+        query = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            i.salespersonid,
+            SUM(od.quantity * od.price) as total_sales
+          FROM invoices i
+          JOIN order_details od ON i.id = od.invoiceid
+          WHERE 
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+            ${idArray.length > 0 ? "AND i.salespersonid = ANY($3)" : ""}
+          GROUP BY month, i.salespersonid
+        )
+        SELECT 
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          salespersonid,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, salespersonid
+      `;
+
+        if (idArray.length > 0) {
+          queryParams.push(idArray);
+        }
+      }
+
+      const result = await pool.query(query, queryParams);
+
+      // Transform data for frontend consumption
+      const monthlyData = new Map();
+
+      // For products, we also track by product type (BH, MEE)
+      const trackedItems = new Set();
+      if (type === "products" && idArray.length > 0) {
+        idArray.forEach((id) => trackedItems.add(id));
+      }
+
+      result.rows.forEach((row) => {
+        const monthYear = row.month_year;
+
+        if (!monthlyData.has(monthYear)) {
+          monthlyData.set(monthYear, {
+            month: monthYear,
+          });
+        }
+
+        const monthData = monthlyData.get(monthYear);
+
+        if (type === "products") {
+          const productId = row.product_id;
+          const productType = row.product_type;
+          const sales = parseFloat(row.total_sales) || 0;
+
+          // Track product ID and product type both when needed
+          if (trackedItems.has(productId)) {
+            monthData[productId] = sales;
+          }
+
+          if (trackedItems.has(productType)) {
+            // Aggregate sales for product type
+            monthData[productType] = (monthData[productType] || 0) + sales;
+          }
+        } else {
+          // Salesman data - more straightforward
+          const salesmanId = row.salespersonid;
+          monthData[salesmanId] = parseFloat(row.total_sales) || 0;
+        }
+      });
+
+      // Return as array
+      const chartData = Array.from(monthlyData.values());
+
+      // Add nice month names for display
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      chartData.forEach((dataPoint) => {
+        const [year, month] = dataPoint.month.split("-");
+        dataPoint.month = `${monthNames[parseInt(month) - 1]} ${year}`;
+      });
+
+      res.json(chartData);
+    } catch (error) {
+      console.error(`Error fetching sales trends:`, error);
+      res.status(500).json({
+        message: "Error fetching sales trend data",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/invoices/:id - Get Single Invoice (Updated Schema)
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
