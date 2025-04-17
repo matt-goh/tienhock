@@ -1740,11 +1740,6 @@ export default function (pool, config) {
       }
 
       if (parsedOriginalIds.length > 0) {
-        console.log(
-          `Updating original invoices (${parsedOriginalIds.join(
-            ", "
-          )}) to remove consolidation flag.`
-        );
         // Reset flags. Reset einvoice_status to null, allowing them to be picked up again.
         const updateOriginalsQuery = `
             UPDATE invoices
@@ -1761,9 +1756,6 @@ export default function (pool, config) {
         const updateResult = await client.query(updateOriginalsQuery, [
           parsedOriginalIds,
         ]);
-        console.log(
-          `Successfully updated ${updateResult.rowCount} original invoices.`
-        );
       } else {
         console.warn(
           `Consolidated invoice ${id} had no original invoice IDs listed or failed to parse.`
