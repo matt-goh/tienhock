@@ -87,9 +87,6 @@ setupRoutes(app, pool); // Pass the pool instance here
 cron.schedule(
   "0 8 * * *", // Run daily at 8 AM
   async () => {
-    console.log(
-      `[${new Date().toISOString()}] Running daily invoice status update job...`
-    );
     try {
       // The updater function now imports and uses the pool directly
       await updateInvoiceStatuses();
@@ -111,9 +108,6 @@ cron.schedule(
 cron.schedule(
   "0 8 * * *", // Run at 8 AM every day
   async () => {
-    console.log(
-      `[${new Date().toISOString()}] Running auto-consolidation check...`
-    );
     try {
       // Check if any consolidations are due today
       await checkAndProcessDueConsolidations(pool);
@@ -125,9 +119,6 @@ cron.schedule(
 
       // If today is the last day of the month, schedule next month's consolidation
       if (now.getMonth() !== tomorrow.getMonth()) {
-        console.log(
-          `[${new Date().toISOString()}] End of month detected, scheduling next month's consolidation...`
-        );
         await scheduleNextMonthConsolidation(pool);
       }
     } catch (error) {
@@ -158,35 +149,15 @@ app.get("*", (req, res) => {
 });
 
 // Start server
-const server = app.listen(port, "0.0.0.0", () => {
-  // Use SERVER_HOST from config if available, otherwise '0.0.0.0'
-  const displayHost =
-    NODE_ENV === "development"
-      ? `localhost:${port}`
-      : `${SERVER_HOST || "0.0.0.0"}:${port}`;
-
-  console.log(`🚀Server running on http://${displayHost}`);
-  console.log(`Environment: ${NODE_ENV}`);
-  if (MYINVOIS_API_BASE_URL) {
-    console.log(`MyInvois API: ${MYINVOIS_API_BASE_URL}`);
-  } else {
-    console.warn("MyInvois API URL not configured.");
-  }
-});
+const server = app.listen(port, "0.0.0.0");
 
 // Enhanced graceful shutdown
 const shutdownGracefully = async (signal) => {
-  console.log(`\n${signal} signal received.`);
-  console.log("Closing HTTP server...");
-
   server.close(async () => {
-    console.log("HTTP server closed.");
-    console.log("Closing database pool...");
     try {
       // Give active queries a chance to complete gracefully
       // The pool.end() method waits for acquired clients to be returned.
       await pool.end();
-      console.log("Database pool closed successfully.");
       process.exit(0); // Exit cleanly
     } catch (error) {
       console.error("Error closing database pool:", error);

@@ -134,9 +134,6 @@ class GTEInvoiceSubmissionHandler {
           // If document is in "Submitted" state for consecutive polls,
           // consider it a success (the API may take longer to fully validate)
           if (allDocumentsSubmitted && attempts > 8) {
-            console.log(
-              "Document is in Submitted state, considering successful"
-            );
             return {
               ...response,
               overallStatus: "Valid", // Override to avoid timeout error
@@ -160,9 +157,6 @@ class GTEInvoiceSubmissionHandler {
       lastResponse.documentSummary &&
       lastResponse.documentSummary.length > 0
     ) {
-      console.log(
-        "Polling timed out, but document was processed. Returning last status."
-      );
       return {
         ...lastResponse,
         overallStatus: "Valid",

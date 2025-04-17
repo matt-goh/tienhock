@@ -202,9 +202,6 @@ export default function (pool, defaultConfig) {
       }
 
       // Call MyInvois API to check document status
-      console.log(
-        `Checking MyInvois status for document UUID: ${invoice.uuid}`
-      );
       const documentDetails = await apiClient.makeApiCall(
         "GET",
         `/api/v1.0/documents/${invoice.uuid}/details`
@@ -331,15 +328,10 @@ export default function (pool, defaultConfig) {
       }
 
       // Call MyInvois API to check document status
-      console.log(
-        `Checking MyInvois status for document UUID: ${invoice.uuid}`
-      );
       const documentDetails = await apiClient.makeApiCall(
         "GET",
         `/api/v1.0/documents/${invoice.uuid}/details`
       );
-
-      console.log("Document status from MyInvois:", documentDetails.status);
 
       let syncResult = {
         success: true,

@@ -122,16 +122,6 @@ class EInvoiceApiClient {
           },
         };
 
-        // Set up XML content type for document submission
-        if (
-          data &&
-          data.documents &&
-          data.documents.some((doc) => doc.format === "XML")
-        ) {
-          // Keep content-type as application/json since we're still wrapping XML in a JSON structure
-          console.log("Preparing to send XML documents in JSON wrapper");
-        }
-
         const req = request(options, (res) => {
           let responseData = "";
 
@@ -140,9 +130,6 @@ class EInvoiceApiClient {
           });
 
           res.on("end", () => {
-            console.log("API Response Status:", res.statusCode);
-            console.log("API Response Body:", responseData);
-
             try {
               // Handle empty response
               if (!responseData.trim()) {

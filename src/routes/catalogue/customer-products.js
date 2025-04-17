@@ -144,9 +144,6 @@ export default function (pool) {
 
       // Process deletions if any
       if (deletedProductIds && deletedProductIds.length > 0) {
-        console.log(
-          `Deleting ${deletedProductIds.length} products for customer ${customerId}`
-        );
         const deleteQuery = `
           DELETE FROM customer_products 
           WHERE customer_id = $1 AND product_id = ANY($2)
@@ -156,10 +153,6 @@ export default function (pool) {
 
       // Process upserts
       if (products && products.length > 0) {
-        console.log(
-          `Upserting ${products.length} products for customer ${customerId}`
-        );
-
         for (const product of products) {
           const { productId, customPrice, isAvailable } = product;
 

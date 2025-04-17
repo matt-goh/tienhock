@@ -129,9 +129,6 @@ class GTEInvoiceApiClient {
           });
 
           res.on("end", () => {
-            console.log("API Response Status:", res.statusCode);
-            console.log("API Response Body:", responseData);
-
             try {
               // Handle empty response
               if (!responseData.trim()) {
