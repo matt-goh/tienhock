@@ -853,9 +853,6 @@ export default function (pool, config) {
       }
 
       // Call MyInvois API to check current status
-      console.log(
-        `Checking MyInvois status for document UUID: ${invoice.uuid}`
-      );
       const documentDetails = await apiClient.makeApiCall(
         "GET",
         `/api/v1.0/documents/${invoice.uuid}/details`
@@ -871,9 +868,6 @@ export default function (pool, config) {
 
       // If already cancelled in MyInvois, just update our database
       if (documentDetails.status === "Cancelled") {
-        console.log(
-          `E-invoice ${invoice.uuid} is already cancelled in MyInvois. Updating local status.`
-        );
         const updateQuery = `
         UPDATE invoices 
         SET einvoice_status = 'cancelled'
@@ -889,9 +883,6 @@ export default function (pool, config) {
       // If still valid in MyInvois, try to cancel it
       else if (documentDetails.status === "Valid" || documentDetails.longId) {
         try {
-          console.log(
-            `Attempting to cancel e-invoice ${invoice.uuid} in MyInvois.`
-          );
           // Call MyInvois API to cancel e-invoice
           await apiClient.makeApiCall(
             "PUT",
@@ -927,9 +918,6 @@ export default function (pool, config) {
       }
       // Other status (pending, invalid, etc.)
       else {
-        console.log(
-          `E-invoice ${invoice.uuid} has status ${documentDetails.status}. Updating local status to cancelled.`
-        );
         // For other statuses, we still update to cancelled
         const updateQuery = `
         UPDATE invoices
@@ -1521,9 +1509,6 @@ export default function (pool, config) {
       // Don't need to re-check if already valid or invalid
       // Allow re-checking invalid? Maybe. Allow re-checking pending is the main goal.
       if (invoice.einvoice_status === "valid") {
-        console.log(
-          `Skipping status check for already valid consolidated invoice: ${id}`
-        );
         return res.json({
           success: true,
           message: "Invoice is already valid.",
@@ -1535,9 +1520,6 @@ export default function (pool, config) {
       }
 
       // Call MyInvois API to check current status
-      console.log(
-        `Checking MyInvois status for consolidated document UUID: ${invoice.uuid}`
-      );
       const documentDetails = await apiClient.makeApiCall(
         "GET",
         `/api/v1.0/documents/${invoice.uuid}/details`
@@ -1578,9 +1560,6 @@ export default function (pool, config) {
         newLongId !== invoice.long_id ||
         newDateTimeValidated !== invoice.datetime_validated
       ) {
-        console.log(
-          `Updating consolidated invoice ${id} status from ${invoice.einvoice_status} to ${newStatus}`
-        );
         await client.query(
           `UPDATE invoices SET
                 einvoice_status = $1,
@@ -1590,11 +1569,6 @@ export default function (pool, config) {
           [newStatus, newLongId, newDateTimeValidated, id]
         );
         updated = true;
-        console.log(`Consolidated invoice ${id} successfully updated in DB.`);
-      } else {
-        console.log(
-          `No status change detected for consolidated invoice ${id}. Current: ${invoice.einvoice_status}, Remote: ${remoteStatus}`
-        );
       }
 
       res.json({
@@ -1670,18 +1644,11 @@ export default function (pool, config) {
 
       if (invoice.uuid) {
         try {
-          console.log(
-            `Attempting to cancel MyInvois document UUID: ${invoice.uuid} for consolidated invoice ${id}`
-          );
           // Use the correct PUT endpoint for cancellation
           const apiResponse = await apiClient.makeApiCall(
             "PUT",
             `/api/v1.0/documents/state/${invoice.uuid}/state`,
             { status: "cancelled", reason: cancellationReason } // Send payload
-          );
-          console.log(
-            `MyInvois document ${invoice.uuid} cancellation request sent. Response:`,
-            apiResponse
           );
           // Assuming success if no error is thrown. Check response if needed.
           apiCancellationSuccess = true;
@@ -1700,9 +1667,6 @@ export default function (pool, config) {
           // The primary goal is local cleanup.
         }
       } else {
-        console.log(
-          `No MyInvois UUID found for consolidated invoice ${id}, skipping API cancellation.`
-        );
         apiResponseMessage = "Skipped MyInvois cancellation (no UUID).";
       }
       // --- End API Cancellation ---
@@ -1710,7 +1674,6 @@ export default function (pool, config) {
       // --- Step 2: Local Database Cleanup ---
 
       // 2a. Update the consolidated invoice status to cancelled
-      console.log(`Updating consolidated invoice ${id} to cancelled status`);
       const updateResult = await client.query(
         "UPDATE invoices SET invoice_status = 'cancelled', einvoice_status = 'cancelled' WHERE id = $1",
         [id]

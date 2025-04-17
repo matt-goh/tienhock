@@ -53,7 +53,6 @@ export const checkAndProcessDueConsolidations = async (pool) => {
     `;
 
     const pendingResult = await client.query(pendingQuery, [currentDate]);
-    console.log(`Found ${pendingResult.rows.length} consolidations due today`);
 
     for (const task of pendingResult.rows) {
       try {
@@ -61,21 +60,12 @@ export const checkAndProcessDueConsolidations = async (pool) => {
         const year = task.year;
         const month = task.month;
 
-        console.log(
-          `Processing ${company} consolidation for ${year}-${month + 1}`
-        );
-
         // Check if we're still within the retry window
         const monthEndDate = new Date(year, month + 1, 0); // Last day of the target month
         const cutoffDate = new Date(monthEndDate);
         cutoffDate.setDate(cutoffDate.getDate() + RETRY_DAYS);
 
         if (malaysiaTime > cutoffDate) {
-          console.log(
-            `Outside of ${RETRY_DAYS}-day window for ${company} ${year}-${
-              month + 1
-            }, marking as expired`
-          );
           await client.query(
             `UPDATE consolidation_tracking SET 
               status = 'expired', 
@@ -211,11 +201,6 @@ export const checkAndProcessDueConsolidations = async (pool) => {
         }
 
         if (eligibleInvoices.length === 0) {
-          console.log(
-            `No eligible invoices for ${company} ${year}-${
-              month + 1
-            }, marking as skipped`
-          );
           await client.query(
             `UPDATE consolidation_tracking SET 
               status = 'skipped', 
@@ -226,13 +211,6 @@ export const checkAndProcessDueConsolidations = async (pool) => {
           );
           continue;
         }
-
-        // Process the consolidation
-        console.log(
-          `Found ${
-            eligibleInvoices.length
-          } eligible invoices for ${company} ${year}-${month + 1}`
-        );
 
         try {
           // Perform the actual consolidation based on company
@@ -270,12 +248,6 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               WHERE id = $1`,
               [task.id, result.consolidated_invoice_id]
             );
-
-            console.log(
-              `Successfully consolidated ${company} ${year}-${
-                month + 1
-              }, invoice ID: ${result.consolidated_invoice_id}`
-            );
           } else {
             throw new Error(result.message || "Consolidation failed");
           }
@@ -298,12 +270,6 @@ export const checkAndProcessDueConsolidations = async (pool) => {
               WHERE id = $1`,
               [task.id, error.message || "Consolidation error", nextRetry]
             );
-
-            console.log(
-              `Failed consolidation for ${company} ${year}-${
-                month + 1
-              }, will retry on ${nextRetry.toISOString()}`
-            );
           } else {
             await client.query(
               `UPDATE consolidation_tracking SET 
@@ -311,12 +277,6 @@ export const checkAndProcessDueConsolidations = async (pool) => {
                 error = $2
               WHERE id = $1`,
               [task.id, error.message || "Consolidation error"]
-            );
-
-            console.log(
-              `Failed consolidation for ${company} ${year}-${
-                month + 1
-              }, no more retries available`
             );
           }
         }
@@ -411,11 +371,6 @@ async function processTienhockConsolidation(client, invoices, month, year) {
     const totalPayable = invoices.reduce(
       (sum, inv) => sum + parseFloat(inv.totalamountpayable || 0),
       0
-    );
-
-    // Prepare and submit to MyInvois API
-    console.log(
-      `Submitting consolidated invoice ${consolidatedId} to MyInvois API`
     );
 
     // Prepare document for submission using the XML
@@ -526,11 +481,6 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
     const totalAmount = invoices.reduce(
       (sum, inv) => sum + parseFloat(inv.total_amount || 0),
       0
-    );
-
-    // Submit to MyInvois API
-    console.log(
-      `Submitting consolidated invoice ${consolidatedInvoiceNumber} to MyInvois API`
     );
 
     // Prepare document for submission
@@ -644,11 +594,6 @@ async function processJellypollyConsolidation(client, invoices, month, year) {
       0
     );
 
-    // Submit to MyInvois API
-    console.log(
-      `Submitting consolidated invoice ${consolidatedInvoiceNumber} to MyInvois API`
-    );
-
     // Prepare document for submission
     const submissionResult = await submissionHandler.submitAndPollDocuments(
       consolidatedXml
@@ -729,8 +674,6 @@ export const scheduleNextMonthConsolidation = async (pool) => {
     const nextYear =
       now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
 
-    console.log(`Scheduling consolidation for ${nextYear}-${nextMonth + 1}`);
-
     for (const settings of settingsResult.rows) {
       const company = settings.company_id;
 
@@ -747,11 +690,6 @@ export const scheduleNextMonthConsolidation = async (pool) => {
       ]);
 
       if (existingResult.rows.length > 0) {
-        console.log(
-          `Consolidation for ${company} ${nextYear}-${
-            nextMonth + 1
-          } is already scheduled`
-        );
         continue;
       }
 
@@ -759,12 +697,6 @@ export const scheduleNextMonthConsolidation = async (pool) => {
       const monthEndDate = new Date(nextYear, nextMonth + 1, 0); // Last day of the target month
       const scheduledDate = new Date(monthEndDate);
       scheduledDate.setDate(scheduledDate.getDate() + CONSOLIDATION_DAY);
-
-      console.log(
-        `Scheduling ${company} consolidation for ${nextYear}-${
-          nextMonth + 1
-        } on ${scheduledDate.toISOString()}`
-      );
 
       // Create the tracking record
       await client.query(

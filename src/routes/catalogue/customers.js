@@ -432,8 +432,6 @@ export default function (pool) {
         await client.query("BEGIN");
 
         if (isChangingId) {
-          console.log(`Changing customer ID from ${id} to ${newId}`);
-
           // 1. Check if new ID already exists
           const checkQuery = "SELECT id FROM customers WHERE id = $1";
           const checkResult = await client.query(checkQuery, [newId]);

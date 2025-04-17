@@ -882,7 +882,6 @@ const InvoiceListPage: React.FC = () => {
       }
 
       if (filtersChanged) {
-        console.log("Applying filters from URL params:", newFilters); // Debug log
         setFilters(newFilters);
       }
 

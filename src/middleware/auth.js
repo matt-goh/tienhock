@@ -61,7 +61,6 @@ export const authMiddleware = (pool) => async (req, res, next) => {
     try {
       await pool.query("SELECT 1");
     } catch (error) {
-      console.log("Database connectivity check failed:", error);
       return res.status(503).json({
         error: "Service temporarily unavailable",
         message:
@@ -90,7 +89,6 @@ export const authMiddleware = (pool) => async (req, res, next) => {
     if (sessionResult.rows.length === 0) {
       // No valid session - check for maintenance mode
       if (pool.pool.maintenanceMode) {
-        console.log("Auth middleware: System in maintenance mode");
         return res.status(503).json({
           error: "Service temporarily unavailable",
           message:
@@ -147,10 +145,6 @@ export const authMiddleware = (pool) => async (req, res, next) => {
       error.code === "57P01" || // database unavailable
       error.code === "ECONNREFUSED"
     ) {
-      console.log(
-        "Database unavailable - likely during restore process:",
-        error
-      );
       return res.status(503).json({
         error: "Service temporarily unavailable",
         message:

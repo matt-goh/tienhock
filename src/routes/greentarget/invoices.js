@@ -558,9 +558,6 @@ export default function (pool, defaultConfig) {
       if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
         try {
           // Call MyInvois API to cancel e-invoice
-          console.log(
-            `Attempting to cancel e-invoice ${invoice.uuid} for invoice ${invoice_id}`
-          );
           await apiClient.makeApiCall(
             "PUT",
             `/api/v1.0/documents/state/${invoice.uuid}/state`,
@@ -569,7 +566,6 @@ export default function (pool, defaultConfig) {
 
           einvoiceCancelledApi = true;
           apiResponseMessage = `Successfully cancelled e-invoice ${invoice.uuid} via API.`;
-          console.log(apiResponseMessage);
         } catch (cancelError) {
           console.error(
             `Error cancelling e-invoice ${invoice.uuid} via API:`,

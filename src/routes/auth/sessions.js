@@ -9,7 +9,6 @@ export default function (pool) {
   setInterval(async () => {
     try {
       await pool.query("SELECT cleanup_old_sessions($1)", [24]);
-      console.log("Cleaned up old sessions");
     } catch (error) {
       console.error("Error cleaning up sessions:", error);
     }

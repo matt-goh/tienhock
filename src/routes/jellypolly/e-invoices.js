@@ -1202,9 +1202,6 @@ export default function (pool, config) {
       // Don't need to re-check if already valid or invalid
       // Allow re-checking invalid? Maybe. Allow re-checking pending is the main goal.
       if (invoice.einvoice_status === "valid") {
-        console.log(
-          `Skipping status check for already valid consolidated invoice: ${id}`
-        );
         return res.json({
           success: true,
           message: "Invoice is already valid.",
@@ -1264,11 +1261,6 @@ export default function (pool, config) {
           [newStatus, newLongId, newDateTimeValidated, id]
         );
         updated = true;
-        console.log(`Consolidated invoice ${id} successfully updated in DB.`);
-      } else {
-        console.log(
-          `No status change detected for consolidated invoice ${id}. Current: ${invoice.einvoice_status}, Remote: ${remoteStatus}`
-        );
       }
 
       res.json({
@@ -1374,7 +1366,6 @@ export default function (pool, config) {
       // --- Step 2: Local Database Cleanup ---
 
       // 2a. Update the consolidated invoice status to cancelled
-      console.log(`Updating consolidated invoice ${id} to cancelled status`);
       const updateResult = await client.query(
         "UPDATE jellypolly.invoices SET invoice_status = 'cancelled', einvoice_status = 'cancelled' WHERE id = $1",
         [id]

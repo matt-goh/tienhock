@@ -1441,15 +1441,11 @@ export default function (pool, config) {
 
     if (savedInvoiceDataForEInvoice.length > 0) {
       try {
-        console.log(
-          `Attempting to submit ${savedInvoiceDataForEInvoice.length} invoices to MyInvois...`
-        );
         einvoiceResults = await submitInvoicesToMyInvois(
           config, // Pass the main config object
           savedInvoiceDataForEInvoice,
           fetchCustomerDataWithCache
         );
-        console.log("MyInvois submission response received.");
 
         // --- Step 3: Update Database with E-Invoice Results ---
         if (
@@ -1539,10 +1535,6 @@ export default function (pool, config) {
           einvoiceResults.error = einvoiceError.message || "Unknown API error";
         }
       }
-    } else {
-      console.log(
-        "No invoices were successfully saved to DB, skipping MyInvois submission."
-      );
     }
 
     // --- Step 4: Construct Final Response (Prioritizing Consistency) ---
@@ -1804,9 +1796,6 @@ export default function (pool, config) {
       const activePayments = activePaymentsResult.rows;
 
       if (activePayments.length > 0) {
-        console.log(
-          `Found ${activePayments.length} active payment(s) for invoice ${id}. Cancelling...`
-        );
         const cancelPaymentQuery = `
           UPDATE payments 
           SET status = 'cancelled', 
@@ -1824,13 +1813,9 @@ export default function (pool, config) {
             cancellationReason,
             payment.payment_id,
           ]);
-          console.log(`Payment ${payment.payment_id} cancelled.`);
 
           // Reverse customer credit adjustment ONLY if the original invoice was an INVOICE type
           if (invoice.paymenttype === "INVOICE" && paidAmount !== 0) {
-            console.log(
-              `Reversing credit for cancelled payment ${payment.payment_id} (Amount: ${paidAmount}) for customer ${invoice.customerid}`
-            );
             // Add the paid amount BACK to credit_used (reversing the payment's effect)
             await updateCustomerCredit(
               client,
@@ -1839,8 +1824,6 @@ export default function (pool, config) {
             );
           }
         }
-      } else {
-        console.log(`No active payments found for invoice ${id}.`);
       }
 
       // --- END: Added Logic for Cancelling Payments ---
@@ -1848,11 +1831,6 @@ export default function (pool, config) {
       // 3. Adjust Customer Credit for the INVOICE TOTAL (This reverses the initial credit impact of creating the invoice)
       // This logic remains the same as before.
       if (invoice.paymenttype === "INVOICE" && invoiceTotal !== 0) {
-        console.log(
-          `Adjusting invoice total credit for cancelled invoice ${id} (Amount: ${-invoiceTotal}) for customer ${
-            invoice.customerid
-          }`
-        );
         await updateCustomerCredit(
           client,
           invoice.customerid,
@@ -1870,9 +1848,6 @@ export default function (pool, config) {
             { status: "cancelled", reason: "Invoice cancelled" }
           );
           einvoiceCancelledApi = true;
-          console.log(
-            `Successfully cancelled e-invoice ${invoice.uuid} via API.`
-          );
         } catch (cancelError) {
           console.error(
             `Error cancelling e-invoice ${invoice.uuid} via API:`,

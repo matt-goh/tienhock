@@ -176,15 +176,6 @@ class SessionService {
       // Update the last check time
       this.lastCheckTime = Date.now();
 
-      // Handle maintenance mode from server
-      if (response.maintenance) {
-        console.log("Server is in maintenance mode");
-        return {
-          staff: null,
-          hasActiveProfile: false,
-        };
-      }
-
       if (response.staff) {
         this.updateStoredSession(response.staff.id, response.staff);
       }
@@ -199,7 +190,6 @@ class SessionService {
         error.response?.data?.code === "SESSION_NOT_FOUND" ||
         error.response?.data?.requireLogin
       ) {
-        console.log("Session no longer valid, triggering logout");
         // Fire session expired event
         window.dispatchEvent(new Event("sessionExpired"));
       }
