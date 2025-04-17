@@ -317,6 +317,9 @@ const SalesByProductsPage: React.FC = () => {
     const productMap = new Map<string, ProductSalesData>();
 
     filteredInvoices.forEach((invoice) => {
+      // Skip cancelled invoices
+      if (invoice.invoice_status === "cancelled") return;
+
       if (Array.isArray(invoice.products)) {
         invoice.products.forEach((product: any) => {
           // Skip subtotal or total rows
@@ -325,18 +328,20 @@ const SalesByProductsPage: React.FC = () => {
           const productId = product.code;
           if (!productId) return;
 
+          // Convert string fields to numbers if needed
           const quantity = Number(product.quantity) || 0;
           const price = Number(product.price) || 0;
           const total = quantity * price;
-          const foc = Number(product.freeProduct) || 0; // Get FOC quantity
-          const returns = Number(product.returnProduct) || 0; // Get Returns quantity
+          const foc = Number(product.freeProduct || product.freeproduct) || 0; // Handle both camelCase and lowercase
+          const returns =
+            Number(product.returnProduct || product.returnproduct) || 0; // Handle both camelCase and lowercase
 
           if (productMap.has(productId)) {
             const existingProduct = productMap.get(productId)!;
             existingProduct.quantity += quantity;
             existingProduct.totalSales += total;
-            existingProduct.foc += foc; // Add FOC
-            existingProduct.returns += returns; // Add Returns
+            existingProduct.foc += foc;
+            existingProduct.returns += returns;
           } else {
             // Get product type from cache
             const type = getProductType(productId);
@@ -348,8 +353,8 @@ const SalesByProductsPage: React.FC = () => {
               type,
               quantity,
               totalSales: total,
-              foc, // Initialize FOC
-              returns, // Initialize Returns
+              foc,
+              returns,
             });
           }
         });
@@ -405,6 +410,9 @@ const SalesByProductsPage: React.FC = () => {
       const allProductsOrTypes = new Set<string>();
 
       invoices.forEach((invoice) => {
+        // Skip cancelled invoices
+        if (invoice.invoice_status === "cancelled") return;
+
         const invoiceDate = new Date(Number(invoice.createddate));
         const monthYear = `${invoiceDate.getFullYear()}-${String(
           invoiceDate.getMonth() + 1
@@ -1261,7 +1269,11 @@ const SalesByProductsPage: React.FC = () => {
                       // Limit selection to prevent chart overcrowding
                       if (values.length <= maxChartProducts) {
                         setSelectedChartProducts(
-                          Array.isArray(values) ? values : values ? [values] : []
+                          Array.isArray(values)
+                            ? values
+                            : values
+                            ? [values]
+                            : []
                         );
                       } else {
                         toast.error(
@@ -1269,9 +1281,11 @@ const SalesByProductsPage: React.FC = () => {
                         );
                         // Keep the first max number of selections
                         setSelectedChartProducts(
-                          Array.isArray(values) 
-                            ? values.slice(0, maxChartProducts) 
-                            : values ? [values] : []
+                          Array.isArray(values)
+                            ? values.slice(0, maxChartProducts)
+                            : values
+                            ? [values]
+                            : []
                         );
                       }
                     }}

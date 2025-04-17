@@ -166,6 +166,9 @@ const SalesBySalesmanPage: React.FC = () => {
     const salesmanMap = new Map<string, SalesmanData>();
 
     invoices.forEach((invoice) => {
+      // Skip cancelled invoices
+      if (invoice.invoice_status === "cancelled") return;
+
       const salesmanId = invoice.salespersonid;
       if (!salesmanId) return;
 
@@ -181,7 +184,7 @@ const SalesBySalesmanPage: React.FC = () => {
           const quantity = Number(product.quantity) || 0;
           const price = Number(product.price) || 0;
 
-          // Calculate product total (same as in SalesByProductsPage)
+          // Calculate product total
           invoiceTotal += quantity * price;
           totalQuantity += quantity;
         });
@@ -243,6 +246,9 @@ const SalesBySalesmanPage: React.FC = () => {
       const allSalesmen = new Set<string>(selectedChartSalesmen); // Only include selected salesmen
 
       invoices.forEach((invoice) => {
+        // Skip cancelled invoices
+        if (invoice.invoice_status === "cancelled") return;
+
         // Skip if not a selected salesman
         if (!selectedChartSalesmen.includes(invoice.salespersonid)) return;
 
