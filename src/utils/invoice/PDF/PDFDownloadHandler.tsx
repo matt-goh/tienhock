@@ -36,9 +36,15 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
 
     try {
       // First render the PDF component
+      const isJellyPolly = window.location.pathname.includes("/jellypolly");
+
       const pdfComponent = (
         <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-          <InvoicePDF invoices={invoices} customerNames={customerNames} />
+          <InvoicePDF
+            invoices={invoices}
+            customerNames={customerNames}
+            companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
+          />
         </Document>
       );
 

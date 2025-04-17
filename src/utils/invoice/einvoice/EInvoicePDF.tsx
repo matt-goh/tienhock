@@ -213,12 +213,14 @@ interface Props {
   data: EInvoicePDFData;
   qrCodeData: string;
   isConsolidated?: boolean;
+  companyContext?: "tienhock" | "jellypolly";
 }
 
 const EInvoicePDF: React.FC<Props> = ({
   data,
   qrCodeData,
   isConsolidated = false,
+  companyContext = "tienhock",
 }) => {
   return (
     <Page size="A4" style={styles.page}>
@@ -227,7 +229,11 @@ const EInvoicePDF: React.FC<Props> = ({
         <View style={styles.companySection}>
           <Image src={TienHockLogo} style={styles.logo} />
           <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>{data.company.name}</Text>
+            <Text style={styles.companyName}>
+              {companyContext === "jellypolly"
+                ? "JELLY POLLY FOOD INDUSTRIES"
+                : data.company.name}
+            </Text>
             <Text style={styles.companyDetail}>
               Reg. No: {data.company.reg_no}
             </Text>
@@ -284,7 +290,11 @@ const EInvoicePDF: React.FC<Props> = ({
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier Name</Text>
-              <Text style={styles.infoValue}>{data.company.name}</Text>
+              <Text style={styles.infoValue}>
+                {companyContext === "jellypolly"
+                  ? "JELLY POLLY FOOD INDUSTRIES"
+                  : data.company.name}
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier BRN:</Text>

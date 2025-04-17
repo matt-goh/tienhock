@@ -84,12 +84,16 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
               Boolean(invoice.is_consolidated) ||
               (invoice.id ? invoice.id.startsWith("CON-") : false);
 
+            const isJellyPolly =
+              window.location.pathname.includes("/jellypolly");
+
             pdfPages.push(
               <EInvoicePDF
                 key={invoice.id}
                 data={pdfData}
                 qrCodeData={qrDataUrl || ""}
                 isConsolidated={isConsolidated}
+                companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
               />
             );
           } catch (innerError) {
@@ -129,7 +133,8 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       } else if (einvoice) {
         // Handle single einvoice (original logic)
         const isConsolidated =
-          einvoice.is_consolidated || einvoice.internal_id.startsWith("TH_CON-");
+          einvoice.is_consolidated ||
+          einvoice.internal_id.startsWith("TH_CON-");
         const qrDataUrl = await generateQRDataUrl(
           einvoice.uuid,
           einvoice.long_id
