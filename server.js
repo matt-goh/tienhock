@@ -149,7 +149,8 @@ app.get("*", (req, res) => {
   // Avoid sending index.html for API-like paths that weren't matched
   if (
     req.path.startsWith("/api/") ||
-    req.path.startsWith("/greentarget/api/")
+    req.path.startsWith("/greentarget/api/") ||
+    req.path.startsWith("/jellypolly/api/")
   ) {
     return res.status(404).json({ message: "API endpoint not found" });
   }
