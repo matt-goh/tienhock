@@ -8,6 +8,7 @@ import TienHockLogo from "../../tienhock.png";
 interface InvoicePDFProps {
   invoices: InvoiceData[];
   customerNames?: Record<string, string>;
+  companyContext?: "tienhock" | "jellypolly";
 }
 
 const ROWS_PER_PAGE = 32;
@@ -232,6 +233,7 @@ const styles = StyleSheet.create({
 const InvoicePDF: React.FC<InvoicePDFProps> = ({
   invoices,
   customerNames = {},
+  companyContext = "tienhock",
 }) => {
   const getProcessedProducts = (products: ProductItem[]) => {
     // Keep track of all rows in their original order
@@ -588,7 +590,11 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
             <View style={styles.header}>
               <Image src={TienHockLogo} style={styles.logo} />
               <View style={styles.headerTextContainer}>
-                <Text style={styles.companyName}>{TIENHOCK_INFO.name}</Text>
+                <Text style={styles.companyName}>
+                  {companyContext === "jellypolly"
+                    ? "JELLY POLLY FOOD INDUSTRIES"
+                    : TIENHOCK_INFO.name}
+                </Text>
                 <Text style={styles.companyDetails}>
                   {TIENHOCK_INFO.address_pdf}
                 </Text>

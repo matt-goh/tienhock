@@ -109,12 +109,16 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               Boolean(invoice.is_consolidated) ||
               (invoice.id ? invoice.id.startsWith("CON-") : false);
 
+            const isJellyPolly =
+              window.location.pathname.includes("/jellypolly");
+
             pdfPages.push(
               <EInvoicePDF
                 key={invoice.id}
                 data={pdfData}
                 qrCodeData={qrDataUrl || ""}
                 isConsolidated={isConsolidated}
+                companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
               />
             );
           } catch (innerError) {

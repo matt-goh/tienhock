@@ -71,9 +71,15 @@ const PrintPDFOverlay = ({
         document.body.appendChild(container);
         resourcesRef.current.container = container;
 
+        const isJellyPolly = window.location.pathname.includes("/jellypolly");
+
         const pdfComponent = (
           <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-            <InvoicePDF invoices={invoices} customerNames={customerNames} />
+            <InvoicePDF
+              invoices={invoices}
+              customerNames={customerNames}
+              companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
+            />
           </Document>
         );
 
