@@ -55,6 +55,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
     if (isGenerating || isPrinting) return;
 
     const isBatch = invoices && invoices.length > 0;
+    const isJellyPolly = window.location.pathname.includes("/jellypolly");
     setIsGenerating(true);
     setIsLoadingDialogVisible(true);
     setIsPrinting(true);
@@ -105,9 +106,6 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
             const isConsolidated: boolean =
               Boolean(invoice.is_consolidated) ||
               (invoice.id ? invoice.id.startsWith("CON-") : false);
-
-            const isJellyPolly =
-              window.location.pathname.includes("/jellypolly");
 
             pdfPages.push(
               <EInvoicePDF
@@ -168,19 +166,23 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
       } else if (einvoice) {
         // Handle single einvoice logic
         const isConsolidated =
-          einvoice.is_consolidated ||
-          einvoice.internal_id.startsWith("TH_CON-");
+          einvoice.is_consolidated
         const qrDataUrl = await generateQRDataUrl(
           einvoice.uuid,
           einvoice.long_id
         );
         const pdfData = await preparePDFData(einvoice);
         const pdfComponent = (
-          <Document title={`TH_einvoice-${einvoice.internal_id}`}>
+          <Document
+            title={`${isJellyPolly ? "JP" : "TH"}_einvoice-${
+              einvoice.internal_id
+            }`}
+          >
             <EInvoicePDF
               data={pdfData}
               qrCodeData={qrDataUrl}
               isConsolidated={isConsolidated}
+              companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
             />
           </Document>
         );

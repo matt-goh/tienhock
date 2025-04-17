@@ -39,7 +39,12 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       const isJellyPolly = window.location.pathname.includes("/jellypolly");
 
       const pdfComponent = (
-        <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
+        <Document
+          title={generatePDFFilename(
+            invoices,
+            isJellyPolly ? "jellypolly" : "tienhock"
+          ).replace(".pdf", "")}
+        >
           <InvoicePDF
             invoices={invoices}
             customerNames={customerNames}
@@ -55,7 +60,10 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Create and trigger download
       const link = document.createElement("a");
       link.href = pdfUrl;
-      link.download = generatePDFFilename(invoices);
+      link.download = generatePDFFilename(
+        invoices,
+        isJellyPolly ? "jellypolly" : "tienhock"
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
