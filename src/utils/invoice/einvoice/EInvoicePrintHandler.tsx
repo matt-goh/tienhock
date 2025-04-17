@@ -55,9 +55,6 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
     if (isGenerating || isPrinting) return;
 
     const isBatch = invoices && invoices.length > 0;
-    const toastId = toast.loading(
-      `Preparing ${isBatch ? "e-invoices" : "e-invoice"} for printing...`
-    );
     setIsGenerating(true);
     setIsLoadingDialogVisible(true);
     setIsPrinting(true);
@@ -149,7 +146,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               printFrame.contentWindow?.print();
               setIsGenerating(false);
               setIsLoadingDialogVisible(false);
-              toast.success("Print dialog opened", { id: toastId });
+              toast.success("Print dialog opened");
 
               // Set a cleanup function when focus returns to window (print dialog closed)
               const onFocus = () => {
@@ -202,7 +199,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               printFrame.contentWindow?.print();
               setIsGenerating(false);
               setIsLoadingDialogVisible(false);
-              toast.success("Print dialog opened", { id: toastId });
+              toast.success("Print dialog opened");
 
               const onFocus = () => {
                 window.removeEventListener("focus", onFocus);
@@ -227,8 +224,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
       toast.error(
         `Failed to print e-invoice: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`,
-        { id: toastId }
+        }`
       );
       setIsPrinting(false);
       setIsGenerating(false);
