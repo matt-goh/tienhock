@@ -168,14 +168,6 @@ export default function (pool, config) {
       const validatedResult = await pool.query(validatedQuery, [invoiceIds]);
       const alreadyValidatedInvoices = validatedResult.rows;
 
-      // Track already processed invoices to skip
-      const alreadyProcessed = alreadyValidatedInvoices.map((invoice) => ({
-        id: invoice.id,
-        uuid: invoice.uuid,
-        longId: invoice.long_id,
-        status: invoice.einvoice_status,
-      }));
-
       // STEP 2: Identify and process any pending invoices next
       const pendingQuery = `
       SELECT id, uuid, submission_uid 
@@ -219,7 +211,7 @@ export default function (pool, config) {
             (newStatus === "valid" && documentDetails.longId)
           ) {
             await pool.query(
-              `UPDATE invoices SET 
+              `UPDATE jellypolly.invoices SET 
               einvoice_status = $1, 
               long_id = $2, 
               datetime_validated = $3 
