@@ -47,9 +47,10 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
         for (const invoice of invoices) {
           try {
             // Fetch complete invoice details including products
-            const fullInvoiceData = await api.get(
-              `/api/invoices/${invoice.id}`
-            );
+            const endpoint = isJellyPolly
+              ? `/jellypolly/api/invoices/${invoice.id}`
+              : `/api/invoices/${invoice.id}`;
+            const fullInvoiceData = await api.get(endpoint);
 
             if (fullInvoiceData) {
               processedInvoices.push({
@@ -135,8 +136,7 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
         );
       } else if (einvoice) {
         // Handle single einvoice (original logic)
-        const isConsolidated =
-          einvoice.is_consolidated
+        const isConsolidated = einvoice.is_consolidated;
         const qrDataUrl = await generateQRDataUrl(
           einvoice.uuid,
           einvoice.long_id
