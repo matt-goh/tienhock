@@ -1,14 +1,20 @@
 import { InvoiceData } from "../../../types/types";
 
-export const generatePDFFilename = (invoices: InvoiceData[]): string => {
+export const generatePDFFilename = (
+  invoices: InvoiceData[],
+  companyContext: "tienhock" | "jellypolly" = "tienhock"
+): string => {
   if (!invoices || invoices.length === 0) {
     return "no-invoices.pdf";
   }
 
+  // Get company prefix
+  const prefix = companyContext === "jellypolly" ? "JP" : "TH";
+
   // For single invoice, use invoice number
   if (invoices.length === 1) {
     const invoice = invoices[0];
-    return `TH_invoice_${invoice.paymenttype}${invoice.id}.pdf`;
+    return `${prefix}_invoice_${invoice.paymenttype}${invoice.id}.pdf`;
   }
 
   // Sort invoices by date
@@ -36,10 +42,10 @@ export const generatePDFFilename = (invoices: InvoiceData[]): string => {
 
   // If it's a single day
   if (startDate === endDate) {
-    return `TH_Invoices_${startDate}.pdf`;
+    return `${prefix}_Invoices_${startDate}.pdf`;
   }
 
-  return `TH_Invoices_${startDate}_to_${endDate}.pdf`;
+  return `${prefix}_Invoices_${startDate}_to_${endDate}.pdf`;
 };
 
 // Helper function to parse date strings in DD/MM/YYYY format

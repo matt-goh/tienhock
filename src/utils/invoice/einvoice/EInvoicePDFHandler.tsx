@@ -31,6 +31,8 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
   const handleDownload = async () => {
     if (isGenerating) return;
 
+    const isJellyPolly = window.location.pathname.includes("/jellypolly");
+
     const isBatch = invoices && invoices.length > 0;
     const toastId = toast.loading(
       `Generating ${isBatch ? "e-invoices" : "e-invoice"} PDF...`
@@ -84,9 +86,6 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
               Boolean(invoice.is_consolidated) ||
               (invoice.id ? invoice.id.startsWith("CON-") : false);
 
-            const isJellyPolly =
-              window.location.pathname.includes("/jellypolly");
-
             pdfPages.push(
               <EInvoicePDF
                 key={invoice.id}
@@ -116,8 +115,12 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
 
         const filename =
           preparedData.length === 1
-            ? `TH_einvoice-${preparedData[0].invoice.id}.pdf`
-            : `TH_einvoices-batch-${new Date().toISOString().slice(0, 10)}.pdf`;
+            ? `${isJellyPolly ? "JP" : "TH"}_einvoice-${
+                preparedData[0].invoice.id
+              }.pdf`
+            : `${isJellyPolly ? "JP" : "TH"}_einvoices-batch-${new Date()
+                .toISOString()
+                .slice(0, 10)}.pdf`;
 
         link.download = filename;
         document.body.appendChild(link);
@@ -133,19 +136,23 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       } else if (einvoice) {
         // Handle single einvoice (original logic)
         const isConsolidated =
-          einvoice.is_consolidated ||
-          einvoice.internal_id.startsWith("TH_CON-");
+          einvoice.is_consolidated
         const qrDataUrl = await generateQRDataUrl(
           einvoice.uuid,
           einvoice.long_id
         );
         const pdfData = await preparePDFData(einvoice);
         const pdfComponent = (
-          <Document title={`TH_einvoice-${einvoice.internal_id}`}>
+          <Document
+            title={`${isJellyPolly ? "JP" : "TH"}_einvoice-${
+              einvoice.internal_id
+            }`}
+          >
             <EInvoicePDF
               data={pdfData}
               qrCodeData={qrDataUrl}
               isConsolidated={isConsolidated}
+              companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
             />
           </Document>
         );
@@ -153,7 +160,9 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
         const pdfUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement("a");
         link.href = pdfUrl;
-        link.download = `TH_einvoice-${einvoice.internal_id}.pdf`;
+        link.download = `${isJellyPolly ? "JP" : "TH"}_einvoice-${
+          einvoice.internal_id
+        }.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
