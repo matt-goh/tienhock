@@ -572,3 +572,8 @@ export interface ConsolidatedInfo {
   einvoice_status: EInvoiceStatus;
   invoice_number?: string;
 }
+
+export interface SelectOption {
+  id: string;
+  name: string;
+}
