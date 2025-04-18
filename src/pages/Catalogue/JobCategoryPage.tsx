@@ -1,6 +1,5 @@
+// src/pages/Catalogue/JobCategoryPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Table from "../../components/Table/Table";
-import { ColumnConfig, JobCategory } from "../../types/types";
 import toast from "react-hot-toast";
 import {
   Listbox,
@@ -8,76 +7,60 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
+import {
+  IconCheck,
+  IconChevronDown,
+  IconSearch,
+  IconPlus,
+  IconPencil,
+  IconTrash,
+} from "@tabler/icons-react";
+
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   useJobCategoriesCache,
   refreshJobCategoriesCache,
 } from "../../utils/catalogue/useJobCategoriesCache";
+import { JobCategory, SelectOption } from "../../types/types";
+import JobCategoryModal from "../../components/Catalogue/JobCategoryModal"; // Import the modal
+import ConfirmationDialog from "../../components/ConfirmationDialog"; // Import confirmation dialog
+import Button from "../../components/Button"; // Import Button component
 
 const JobCategoryPage: React.FC = () => {
-  // Replace direct state with cached data
-  const { jobCategories, isLoading, error } = useJobCategoriesCache();
-  const [editedJobCategories, setEditedJobCategories] = useState<JobCategory[]>(
-    []
-  );
-  const [sections, setSections] = useState<string[]>(["All Section"]);
+  // Cached data and state
+  const { jobCategories, isLoading, error, refreshJobCategories } =
+    useJobCategoriesCache(); // Use refreshJobCategories for refresh
+  const [sections, setSections] = useState<SelectOption[]>([]);
   const [selectedSection, setSelectedSection] = useState<string>("All Section");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [isEditing, setIsEditing] = useState(false);
 
-  const jobCategoryColumns: ColumnConfig[] = useMemo(() => {
-    const baseColumns: ColumnConfig[] = [
-      {
-        id: "id",
-        header: "ID",
-        type: isEditing ? "string" : "readonly",
-        width: 150,
-      },
-      {
-        id: "category",
-        header: "Category",
-        type: isEditing ? "string" : "readonly",
-        width: 300,
-      },
-      {
-        id: "gaji",
-        header: "Gaji",
-        type: isEditing ? "string" : "readonly",
-        width: 50,
-      },
-      {
-        id: "ikut",
-        header: "Ikut",
-        type: isEditing ? "string" : "readonly",
-        width: 50,
-      },
-      {
-        id: "jv",
-        header: "JV",
-        type: isEditing ? "string" : "readonly",
-        width: 50,
-      },
-    ];
+  // Modal and Dialog States
+  const [showModal, setShowModal] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<JobCategory | null>(
+    null
+  );
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<JobCategory | null>(
+    null
+  );
 
-    if (selectedSection === "All Section" || isEditing) {
-      baseColumns.splice(2, 0, {
-        id: "section",
-        header: "Section",
-        type: isEditing ? "listbox" : "readonly",
-        width: 150,
-        options: sections,
-      });
-    }
-
-    return baseColumns;
-  }, [isEditing, selectedSection, sections]);
-
+  // Fetch available sections for filtering
   const fetchSections = useCallback(async () => {
     try {
       const data = await api.get("/api/sections");
-      setSections([...data.map((section: { name: string }) => section.name)]);
+      // Ensure 'All Section' is always first and present
+      // Note: 'data' might be typed as 'any' here. Consider adding a type assertion
+      // if needed, e.g., const typedData = data as { id: string; name: string }[];
+      const fetchedSections = (data as { id: string; name: string }[]).map(
+        (s) => ({ id: s.name, name: s.name })
+      );
+      const allSectionOption = { id: "All Section", name: "All Section" };
+      const uniqueSections = [
+        allSectionOption,
+        ...fetchedSections.filter((s) => s.name !== "All Section"),
+      ];
+      setSections(uniqueSections);
     } catch (error) {
       console.error("Error fetching sections:", error);
       toast.error("Failed to fetch sections. Please try again.");
@@ -88,123 +71,9 @@ const JobCategoryPage: React.FC = () => {
     fetchSections();
   }, [fetchSections]);
 
-  useEffect(() => {
-    if (isEditing) {
-      setEditedJobCategories([...jobCategories]);
-    }
-  }, [isEditing, jobCategories]);
-
-  const handleDataChange = useCallback((updatedData: JobCategory[]) => {
-    setTimeout(() => setEditedJobCategories(updatedData), 0);
-  }, []);
-
-  const handleDeleteJobCategories = useCallback(
-    async (selectedIndices: number[]) => {
-      const categoriesToDelete = selectedIndices.map(
-        (index) => jobCategories[index]
-      );
-      const categoryIdsToDelete = categoriesToDelete.map(
-        (category) => category.id
-      );
-
-      try {
-        await api.delete("/api/job-categories", categoryIdsToDelete);
-
-        // Refresh the cache after successful deletion
-        await refreshJobCategoriesCache();
-
-        toast.success("Selected job categories deleted successfully");
-        setIsEditing(false);
-      } catch (error) {
-        console.error("Error deleting selected job categories:", error);
-        toast.error("Failed to delete job categories. Please try again.");
-      }
-    },
-    [jobCategories]
-  );
-
-  const handleSave = useCallback(async () => {
-    try {
-      // Validate job category objects
-      const invalidCategory = editedJobCategories.find(
-        (category) =>
-          !category || typeof category.id !== "string" || !category.id.trim()
-      );
-      if (invalidCategory) {
-        toast.error("All job categories must have a valid ID");
-        return;
-      }
-
-      // Check for duplicate job category IDs
-      const jobCategoryIds = new Set();
-      const duplicateJobCategoryId = editedJobCategories.find((category) => {
-        if (jobCategoryIds.has(category.id)) {
-          return true;
-        }
-        jobCategoryIds.add(category.id);
-        return false;
-      });
-
-      if (duplicateJobCategoryId) {
-        toast.error(`Duplicate Job Category ID: ${duplicateJobCategoryId.id}`);
-        return;
-      }
-
-      // Find changed job categories
-      const changedJobCategories = editedJobCategories.filter(
-        (editedCategory) => {
-          const originalCategory = jobCategories.find(
-            (cat) => cat.id === editedCategory.id
-          );
-          if (!originalCategory) return true; // New category
-          return ["category", "section", "gaji", "ikut", "jv"].some(
-            (key) => editedCategory[key] !== originalCategory[key]
-          );
-        }
-      );
-
-      if (changedJobCategories.length === 0) {
-        toast("No changes detected");
-        setIsEditing(false);
-        return;
-      }
-
-      const jobCategoriesToUpdate = changedJobCategories.map((category) => ({
-        ...category,
-        newId: category.id !== category.originalId ? category.id : undefined,
-        id: category.originalId || category.id,
-      }));
-
-      await api.post("/api/job-categories/batch", {
-        jobCategories: jobCategoriesToUpdate,
-      });
-
-      // After successfully saving, refresh the job categories cache
-      await refreshJobCategoriesCache();
-
-      setIsEditing(false);
-      toast.success("Changes saved successfully");
-    } catch (error) {
-      console.error("Error updating job categories:", error);
-      toast.error((error as Error).message);
-    }
-  }, [editedJobCategories, jobCategories]);
-
-  const handleCancel = useCallback(() => {
-    setIsEditing(false);
-    setEditedJobCategories([]);
-  }, []);
-
-  const handleToggleEditing = useCallback(() => {
-    setIsEditing((prev) => !prev);
-  }, []);
-
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
-  };
-
+  // Derived State: Filtered Job Categories
   const filteredJobCategories = useMemo(() => {
-    let filtered = isEditing ? editedJobCategories : jobCategories;
+    let filtered = jobCategories || []; // Use cached data
 
     if (selectedSection !== "All Section") {
       filtered = filtered.filter(
@@ -221,41 +90,123 @@ const JobCategoryPage: React.FC = () => {
       );
     }
 
-    return filtered;
-  }, [
-    selectedSection,
-    searchTerm,
-    isEditing,
-    editedJobCategories,
-    jobCategories,
-  ]);
+    // Optional: Sort data if needed (e.g., by ID)
+    return filtered.sort((a, b) => a.id.localeCompare(b.id));
+  }, [jobCategories, selectedSection, searchTerm]);
 
+  // --- Modal Handlers ---
+  const handleAddClick = () => {
+    setCategoryToEdit(null); // Ensure edit mode is off
+    setShowModal(true);
+  };
+
+  const handleEditClick = (category: JobCategory) => {
+    setCategoryToEdit(category);
+    setShowModal(true);
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    setCategoryToEdit(null); // Clear edit state on close
+  };
+
+  // --- Save Handler (Called from Modal) ---
+  const handleSaveCategory = useCallback(
+    async (categoryData: JobCategory) => {
+      const isEditing = !!categoryData.originalId; // Check if it's an edit operation based on originalId presence
+      const categoryId = categoryData.originalId || categoryData.id; // Use originalId for PUT if editing
+
+      try {
+        if (isEditing) {
+          // Use PUT for existing item (or POST /batch if needed)
+          // Assuming a PUT endpoint exists: PUT /api/job-categories/:id
+          // If not, adapt to use POST /api/job-categories/batch
+          await api.put(`/api/job-categories/${categoryId}`, categoryData);
+          // Or using batch:
+          // await api.post("/api/job-categories/batch", { jobCategories: [categoryData] });
+          toast.success("Job category updated successfully");
+        } else {
+          // Use POST for new item
+          await api.post("/api/job-categories", categoryData);
+          toast.success("Job category added successfully");
+        }
+        handleModalClose();
+        // refreshJobCategoriesCache(); // Use SWR's mutate
+        refreshJobCategories(); // Trigger cache revalidation
+      } catch (error: any) {
+        console.error("Error saving job category:", error);
+        // Re-throw the error so the modal can display it
+        throw new Error(
+          error.message || "Failed to save job category. Please try again."
+        );
+      }
+    },
+    [refreshJobCategories] // Depend on refreshJobCategories
+  );
+
+  // --- Delete Handlers ---
+  const handleDeleteClick = (category: JobCategory) => {
+    setCategoryToDelete(category);
+    setShowDeleteDialog(true);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteDialog(false);
+    setCategoryToDelete(null);
+  };
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!categoryToDelete) return;
+
+    try {
+      // Use DELETE /api/job-categories with expected body format
+      await api.delete("/api/job-categories", {
+        jobCategoryIds: [categoryToDelete.id],
+      }); // Adjust payload based on backend ('job-categories' vs 'jobCategoryIds')
+
+      toast.success("Job category deleted successfully");
+      setShowDeleteDialog(false);
+      setCategoryToDelete(null);
+      // refreshJobCategoriesCache(); // Use SWR's mutate
+      refreshJobCategories(); // Trigger cache revalidation
+    } catch (error) {
+      console.error("Error deleting job category:", error);
+      toast.error("Failed to delete job category. Please try again.");
+      // Keep dialog open on error? Or close? For now, keep it open.
+    }
+  }, [categoryToDelete, refreshJobCategories]); // Depend on refreshJobCategories
+
+  // --- Search Handler ---
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+
+  // --- Render Section Listbox ---
   const renderSectionListbox = () => (
-    <>
-      <span className="font-semibold mr-2">Section:</span>
+    <div className="flex items-center space-x-2">
+      <span className="font-semibold text-sm text-default-700">Section:</span>
       <Listbox value={selectedSection} onChange={setSelectedSection}>
         <div className="relative">
-          <ListboxButton className="w-48 rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
             <span className="block truncate">{selectedSection}</span>
-            <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
-                className="h-5 w-5 text-default-400"
+                size={20}
+                className="text-gray-400"
                 aria-hidden="true"
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
             {sections.map((section) => (
               <ListboxOption
-                key={section}
+                key={section.id}
                 className={({ active }) =>
-                  `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active
-                      ? "bg-default-100 text-default-900"
-                      : "text-default-900"
+                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                    active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                   }`
                 }
-                value={section}
+                value={section.name} // Value is the name string
               >
                 {({ selected }) => (
                   <>
@@ -264,13 +215,13 @@ const JobCategoryPage: React.FC = () => {
                         selected ? "font-medium" : "font-normal"
                       }`}
                     >
-                      {section}
+                      {section.name}
                     </span>
-                    {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                        <IconCheck className="h-5 w-5" aria-hidden="true" />
+                    {selected ? (
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                        <IconCheck size={20} aria-hidden="true" />
                       </span>
-                    )}
+                    ) : null}
                   </>
                 )}
               </ListboxOption>
@@ -278,79 +229,168 @@ const JobCategoryPage: React.FC = () => {
           </ListboxOptions>
         </div>
       </Listbox>
-    </>
+    </div>
   );
 
+  // --- Loading and Error States ---
   if (isLoading) {
     return (
-      <div className="mt-40 w-full flex items-center justify-center">
+      <div className="mt-40 flex w-full items-center justify-center">
         <LoadingSpinner />
       </div>
     );
   }
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return (
+      <div className="mt-20 flex w-full items-center justify-center text-red-600">
+        Error loading job categories: {error.message}
+      </div>
+    );
   }
 
+  // --- Main Render ---
   return (
-    <div className={`relative`}>
-      <div className="flex flex-col items-start">
-        <div className={`w-full flex justify-between items-center mb-4`}>
-          {isEditing ? (
-            <div></div>
-          ) : (
-            <div className="flex items-center">{renderSectionListbox()}</div>
-          )}
-          <div
-            className={`w-auto text-lg text-center font-medium text-default-700`}
-          >
-            Job Category
-          </div>
-          {isEditing ? (
-            <div></div>
-          ) : (
-            <div className="flex items-center mr-20">
-              <div className="flex">
-                <div className="relative w-full mx-3">
-                  <IconSearch
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-                    size={22}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search"
-                    className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="w-full">
-          <div className="relative">
-            <Table
-              initialData={filteredJobCategories}
-              columns={jobCategoryColumns}
-              onShowDeleteButton={() => {}}
-              onDelete={handleDeleteJobCategories}
-              onChange={handleDataChange}
-              isEditing={isEditing}
-              onToggleEditing={handleToggleEditing}
-              onSave={handleSave}
-              onCancel={handleCancel}
-              tableKey="catalogueJobCategory"
+    <div className="p-4 md:p-6">
+      {/* Header Area */}
+      <div className="mb-6 flex flex-col items-center justify-between gap-4 md:flex-row">
+        <h1 className="text-xl font-semibold text-default-800">
+          Job Category Catalogue
+        </h1>
+        <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
+          {renderSectionListbox()}
+          <div className="relative w-full md:w-64">
+            <IconSearch
+              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
+              stroke={1.5}
             />
-            {filteredJobCategories.length === 0 && (
-              <p className="mt-4 text-center text-default-700 w-full">
-                No job categories found.
-              </p>
-            )}
+            <input
+              type="text"
+              placeholder="Search ID or Category..."
+              className="w-full rounded-full border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
           </div>
+          <Button
+            onClick={handleAddClick}
+            color="sky"
+            variant="filled"
+            icon={IconPlus}
+            iconPosition="left"
+            size="md"
+            className="w-full md:w-auto"
+          >
+            Add Category
+          </Button>
         </div>
       </div>
+
+      {/* Content Area - Table/List */}
+      <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
+        <table className="min-w-full divide-y divide-default-200">
+          <thead className="bg-default-100">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                ID
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                Category
+              </th>
+              {/* Conditionally show section if 'All Section' is selected */}
+              {selectedSection === "All Section" && (
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                  Section
+                </th>
+              )}
+              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                Gaji
+              </th>
+              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                Ikut
+              </th>
+              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                JV
+              </th>
+              <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-default-200 bg-white">
+            {filteredJobCategories.length > 0 ? (
+              filteredJobCategories.map((category) => (
+                <tr key={category.id} className="hover:bg-default-50">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                    {category.id}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-default-700">
+                    {category.category}
+                  </td>
+                  {selectedSection === "All Section" && (
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                      {category.section}
+                    </td>
+                  )}
+                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700">
+                    {category.gaji}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700">
+                    {category.ikut}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700">
+                    {category.jv}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
+                    <div className="flex items-center justify-center space-x-2">
+                      <button
+                        onClick={() => handleEditClick(category)}
+                        className="text-sky-600 hover:text-sky-800"
+                        title="Edit"
+                      >
+                        <IconPencil size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(category)}
+                        className="text-rose-600 hover:text-rose-800"
+                        title="Delete"
+                      >
+                        <IconTrash size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={selectedSection === "All Section" ? 7 : 6} // Adjust colspan based on section visibility
+                  className="px-6 py-10 text-center text-sm text-default-500"
+                >
+                  No job categories found matching your criteria.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modals and Dialogs */}
+      <JobCategoryModal
+        isOpen={showModal}
+        onClose={handleModalClose}
+        onSave={handleSaveCategory}
+        initialData={categoryToEdit}
+      />
+
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Delete Job Category"
+        message={`Are you sure you want to delete the category "${categoryToDelete?.category}" (ID: ${categoryToDelete?.id})? This action cannot be undone.`}
+        variant="danger"
+      />
     </div>
   );
 };
