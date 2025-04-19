@@ -22,11 +22,11 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { Job, JobDetail } from "../../types/types"; // Assuming SelectOption is defined here or imported elsewhere
+import { Job, JobDetail, SelectOption } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import NewJobModal from "../../components/Catalogue/NewJobModal"; // Add Job
-import EditJobModal from "../../components/Catalogue/EditJobModal"; // Edit Job Info
-import JobDetailModal from "../../components/Catalogue/JobDetailModal"; // Add/Edit Job Detail
+import NewJobModal from "../../components/Catalogue/NewJobModal";
+import EditJobModal from "../../components/Catalogue/EditJobModal";
+import JobDetailModal from "../../components/Catalogue/JobDetailModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
 
@@ -37,49 +37,59 @@ const JobPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
-  const [jobType, setJobType] = useState<string>("All"); // Default to 'All'
+  const [jobType, setJobType] = useState<string>("All");
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [query, setQuery] = useState(""); // For job combobox filtering
-  const [hoveredJobId, setHoveredJobId] = useState<string | null>(null); // For delete icon hover
+  // No longer need hoveredJobId for delete button in list
+  // const [hoveredJobId, setHoveredJobId] = useState<string | null>(null);
 
-  // Modal/Dialog States
+  // --- Modal/Dialog States ---
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [showEditJobModal, setShowEditJobModal] = useState(false);
   const [showAddDetailModal, setShowAddDetailModal] = useState(false);
   const [showEditDetailModal, setShowEditDetailModal] = useState(false);
   const [detailToEdit, setDetailToEdit] = useState<JobDetail | null>(null);
   const [showDeleteJobDialog, setShowDeleteJobDialog] = useState(false);
-  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  // No longer need jobToDelete state, will use selectedJob directly
+  // const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [showDeleteDetailDialog, setShowDeleteDetailDialog] = useState(false);
   const [detailToDelete, setDetailToDelete] = useState<JobDetail | null>(null);
 
   // --- Data Fetching ---
-  const fetchJobs = useCallback(async (selectFirst = false) => {
-    setLoadingJobs(true);
-    try {
-      const response = await api.get("/api/jobs");
-      const data = response as Job[]; // Assert the type here
-      // Ensure 'section' is always an array
-      const normalizedJobs = data.map((job) => ({
-        ...job,
-        section: Array.isArray(job.section)
-          ? job.section
-          : job.section
-          ? [job.section] // Convert string to array if it exists
-          : [], // Default to empty array if null/undefined
-      }));
-      setJobs(normalizedJobs);
-      if (selectFirst && normalizedJobs.length > 0) {
-        setSelectedJob(normalizedJobs[0]); // Select the first job after adding
+  const fetchJobs = useCallback(
+    async (selectFirst = false) => {
+      setLoadingJobs(true);
+      try {
+        const response = await api.get("/api/jobs");
+        const data = response as Job[];
+        const normalizedJobs = data.map((job) => ({
+          ...job,
+          section: Array.isArray(job.section)
+            ? job.section
+            : job.section
+            ? [job.section]
+            : [],
+        }));
+        setJobs(normalizedJobs);
+        if (selectFirst && normalizedJobs.length > 0) {
+          setSelectedJob(normalizedJobs[0]);
+        } else if (!selectFirst && selectedJob) {
+          // Reselect the current job after refetch to ensure data consistency
+          const refreshedSelectedJob = normalizedJobs.find(
+            (j) => j.id === selectedJob.id
+          );
+          setSelectedJob(refreshedSelectedJob || null);
+        }
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        toast.error("Failed to fetch jobs. Please try again.");
+      } finally {
+        setLoadingJobs(false);
       }
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-      toast.error("Failed to fetch jobs. Please try again.");
-    } finally {
-      setLoadingJobs(false);
-    }
-  }, []);
+    },
+    [selectedJob]
+  ); // Add selectedJob dependency for re-selection logic
 
   const fetchJobDetails = useCallback(async (jobId: string) => {
     if (!jobId) {
@@ -88,13 +98,12 @@ const JobPage: React.FC = () => {
     }
     setLoadingDetails(true);
     try {
-      // Assume api.get returns data that needs type assertion
       const data = (await api.get(`/api/jobs/${jobId}/details`)) as JobDetail[];
       setAllJobDetails(data);
     } catch (error) {
       console.error("Error fetching job details:", error);
       toast.error("Failed to fetch job details. Please try again.");
-      setAllJobDetails([]); // Clear details on error
+      setAllJobDetails([]);
     } finally {
       setLoadingDetails(false);
     }
@@ -102,19 +111,18 @@ const JobPage: React.FC = () => {
 
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
-  // Fetch details when selectedJob changes
   useEffect(() => {
     if (selectedJob) {
       fetchJobDetails(selectedJob.id);
     } else {
-      setAllJobDetails([]); // Clear details if no job is selected
+      setAllJobDetails([]);
     }
   }, [selectedJob, fetchJobDetails]);
 
   // --- Derived State ---
-  // Filter jobs for Combobox
   const filteredJobs = useMemo(
     () =>
       query === ""
@@ -125,7 +133,6 @@ const JobPage: React.FC = () => {
     [jobs, query]
   );
 
-  // Filter details based on selected jobType
   const filteredJobDetails = useMemo(() => {
     if (jobType === "All") {
       return allJobDetails;
@@ -136,35 +143,23 @@ const JobPage: React.FC = () => {
   // --- Job Handlers ---
   const handleJobSelection = useCallback(
     (selection: Job | null | undefined) => {
-      // Undefined means "+ Add Job" was clicked
       if (selection === undefined) {
         setShowAddJobModal(true);
       } else {
-        // Null or a Job object
         setSelectedJob(selection);
-        // Clear query when a job is selected or deselected
         setQuery("");
       }
     },
-    [] // No dependencies, relies only on setShowAddJobModal and setSelectedJob
+    []
   );
 
   const handleAddJobClickInList = () => {
     setShowAddJobModal(true);
   };
 
-  const handleOptionClick = (e: React.MouseEvent, job: Job) => {
-    // Prevent selection if delete button is clicked
-    if (!(e.target as HTMLElement).closest(".delete-button")) {
-      handleJobSelection(job);
-    }
-  };
-
   const handleJobAdded = useCallback(
-    // Updated to expect ID from modal, matching NewJobModal's onJobAdded prop type
-    async (newJobData: Omit<Job, "id" | "newId"> & { id: string }) => {
+    async (newJobData: Omit<Job, "newId">) => {
       try {
-        // Backend might expect sections as a string (adjust if backend handles array)
         const jobToSend = {
           ...newJobData,
           section: Array.isArray(newJobData.section)
@@ -175,10 +170,9 @@ const JobPage: React.FC = () => {
 
         toast.success("Job added successfully");
         setShowAddJobModal(false);
-        await fetchJobs(true); // Refetch jobs and select the new one (or first)
+        await fetchJobs(true); // Refetch jobs and select the new one
       } catch (error: any) {
         console.error("Error adding job:", error);
-        // Re-throw error for the modal to catch and display
         throw new Error(
           error.message || "Failed to add job. Please try again."
         );
@@ -196,24 +190,21 @@ const JobPage: React.FC = () => {
   const handleJobUpdated = useCallback(
     async (updatedJobData: Job & { newId?: string }) => {
       if (!selectedJob) return;
-
       try {
-        // Backend might expect sections as a string (adjust if backend handles array)
         const jobToSend = {
           ...updatedJobData,
           section: Array.isArray(updatedJobData.section)
             ? updatedJobData.section.join(", ")
             : updatedJobData.section,
         };
-        // Use PUT request, backend handles ID change via newId
         const result = await api.put(`/api/jobs/${selectedJob.id}`, jobToSend);
-        const returnedJob = result.job as Job; // Type assertion
+        const returnedJob = result.job as Job;
 
         toast.success("Job updated successfully");
         setShowEditJobModal(false);
-        await fetchJobs(); // Refetch jobs
-        // Update the selected job state with the potentially new ID/data
-        // Ensure sections are array in the updated state
+        // Fetch jobs again to update the list, but don't automatically select the first
+        await fetchJobs(false);
+        // Explicitly set the selected job state to the returned (potentially updated ID) job
         setSelectedJob({
           ...returnedJob,
           section: Array.isArray(returnedJob.section)
@@ -222,10 +213,7 @@ const JobPage: React.FC = () => {
             ? [returnedJob.section]
             : [],
         });
-        // Refetch details only if ID changed
-        if (returnedJob.id !== selectedJob.id) {
-          await fetchJobDetails(returnedJob.id);
-        }
+        // No details refetch needed here as job ID wasn't changed in *this* call (it was handled by backend)
       } catch (error: any) {
         console.error("Error updating job:", error);
         throw new Error(
@@ -233,24 +221,29 @@ const JobPage: React.FC = () => {
         );
       }
     },
-    [selectedJob, fetchJobs, fetchJobDetails]
+    [selectedJob, fetchJobs] // Removed fetchJobDetails dependency here
   );
 
-  const handleDeleteJobClick = useCallback(
-    async (job: Job, e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation(); // Prevent job selection
+  // --- NEW Delete Handler for the dedicated button ---
+  const handleDeleteSelectedJobClick = useCallback(
+    async () => {
+      if (!selectedJob) {
+        toast.error("No job selected to delete.");
+        return;
+      }
       try {
         // Check if job details exist
-        const response = await api.get(`/api/jobs/${job.id}/details/count`);
-        const { count } = response as { count: number }; // Type assertion
+        const response = await api.get(
+          `/api/jobs/${selectedJob.id}/details/count`
+        );
+        const { count } = response as { count: number };
 
         if (count > 0) {
           toast.error(
-            `Cannot delete job "${job.name}". It has ${count} associated detail(s). Please delete them first.`
+            `Cannot delete job "${selectedJob.name}". It has ${count} associated detail(s). Please delete them first.`
           );
         } else {
-          setJobToDelete(job);
+          // No need for jobToDelete state, show dialog for selectedJob
           setShowDeleteJobDialog(true);
         }
       } catch (error) {
@@ -258,30 +251,30 @@ const JobPage: React.FC = () => {
         toast.error("Could not check for associated job details.");
       }
     },
-    [] // No dependencies
+    [selectedJob] // Depends only on the currently selected job
   );
 
   const confirmDeleteJob = useCallback(async () => {
-    if (!jobToDelete) return;
+    if (!selectedJob) return; // Use selectedJob now
     try {
-      await api.delete(`/api/jobs/${jobToDelete.id}`);
-      toast.success(`Job "${jobToDelete.name}" deleted successfully`);
+      await api.delete(`/api/jobs/${selectedJob.id}`); // Use selectedJob.id
+      toast.success(`Job "${selectedJob.name}" deleted successfully`);
       setShowDeleteJobDialog(false);
-      setJobToDelete(null);
-      await fetchJobs(); // Refetch jobs
-      // If the deleted job was selected, clear selection
-      if (selectedJob && selectedJob.id === jobToDelete.id) {
-        setSelectedJob(null);
-      }
+      // Clear selection FIRST
+      setSelectedJob(null);
+      // THEN refetch jobs
+      await fetchJobs();
     } catch (error) {
       console.error("Error deleting job:", error);
       toast.error("Failed to delete job. Please try again.");
+      // Close dialog even on error? Or let user retry? Closing for now.
+      setShowDeleteJobDialog(false);
     }
-  }, [jobToDelete, selectedJob, fetchJobs]);
+  }, [selectedJob, fetchJobs]); // Depends on selectedJob
 
-  // --- Job Detail Handlers ---
+  // --- Job Detail Handlers (remain largely the same) ---
   const handleAddDetailClick = () => {
-    if (!selectedJob) return; // Should not happen if button is disabled correctly
+    if (!selectedJob) return;
     setDetailToEdit(null);
     setShowAddDetailModal(true);
   };
@@ -294,28 +287,22 @@ const JobPage: React.FC = () => {
   const handleSaveDetail = useCallback(
     async (detailData: JobDetail) => {
       if (!selectedJob) return;
-
       try {
-        // Ensure amount is a number before sending
         const detailToSend = {
           ...detailData,
-          amount: Number(detailData.amount) || 0, // Convert to number, default to 0 if NaN
+          amount: Number(detailData.amount) || 0,
         };
-
-        // Use the batch endpoint for adding/updating single detail
-        // Backend handles upsert logic based on ID
         await api.post("/api/job-details/batch", {
           jobId: selectedJob.id,
-          jobDetails: [detailToSend], // Send as an array
+          jobDetails: [detailToSend],
         });
-
         toast.success(
           `Job detail ${detailToEdit ? "updated" : "added"} successfully`
         );
         setShowAddDetailModal(false);
         setShowEditDetailModal(false);
         setDetailToEdit(null);
-        await fetchJobDetails(selectedJob.id); // Refetch details for the current job
+        await fetchJobDetails(selectedJob.id);
       } catch (error: any) {
         console.error("Error saving job detail:", error);
         throw new Error(
@@ -323,7 +310,7 @@ const JobPage: React.FC = () => {
         );
       }
     },
-    [selectedJob, fetchJobDetails, detailToEdit] // Include detailToEdit to differentiate add/edit toast message context
+    [selectedJob, fetchJobDetails, detailToEdit]
   );
 
   const handleDeleteDetailClick = (detail: JobDetail) => {
@@ -334,22 +321,20 @@ const JobPage: React.FC = () => {
   const confirmDeleteDetail = useCallback(async () => {
     if (!detailToDelete || !selectedJob) return;
     try {
-      // Backend expects array of IDs in 'jobDetailIds' key
       await api.delete("/api/job-details", {
         jobDetailIds: [detailToDelete.id],
       });
-
       toast.success("Job detail deleted successfully");
       setShowDeleteDetailDialog(false);
       setDetailToDelete(null);
-      await fetchJobDetails(selectedJob.id); // Refetch details
+      await fetchJobDetails(selectedJob.id);
     } catch (error) {
       console.error("Error deleting job detail:", error);
       toast.error("Failed to delete job detail. Please try again.");
     }
   }, [detailToDelete, selectedJob, fetchJobDetails]);
 
-  // --- Render Job Type Listbox ---
+  // --- Render Job Type Listbox (remains the same) ---
   const renderJobTypeListbox = () => (
     <div className="flex items-center space-x-2">
       <span className="font-semibold text-sm text-default-700">Type:</span>
@@ -406,7 +391,6 @@ const JobPage: React.FC = () => {
       <h1 className="mb-6 text-center text-xl font-semibold text-default-800">
         Job Catalogue & Details
       </h1>
-
       {/* Job Selection and Info Area */}
       <div className="mb-6 flex flex-wrap items-start gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
         {/* Job Combobox */}
@@ -418,6 +402,7 @@ const JobPage: React.FC = () => {
             <Combobox
               value={selectedJob}
               onChange={handleJobSelection}
+              nullable
             >
               <div className="relative">
                 <ComboboxInput
@@ -443,7 +428,7 @@ const JobPage: React.FC = () => {
                       active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                     }`
                   }
-                  value={undefined} // Special value for Add Job
+                  value={undefined}
                 >
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
                     <IconPlus size={18} />
@@ -467,21 +452,26 @@ const JobPage: React.FC = () => {
                   </div>
                 ) : (
                   filteredJobs.map((job) => (
+                    // **** ComboboxOption CLEANED - NO DELETE BUTTON ****
                     <ComboboxOption
                       key={job.id}
                       className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 pl-10 pr-10 group ${
-                          // Extra pr for delete icon space, added group
+                        `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
+                          // Removed pr-10
                           active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                         }`
                       }
                       value={job}
-                      onMouseEnter={() => setHoveredJobId(job.id)}
-                      onMouseLeave={() => setHoveredJobId(null)}
-                      onClick={(e) => handleOptionClick(e, job)} // Use custom click handler
                     >
-                      {({ selected }) => (
+                      {({ selected, active }) => (
                         <>
+                          {/* Checkmark */}
+                          {selected && (
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                              <IconCheck size={20} aria-hidden="true" />
+                            </span>
+                          )}
+                          {/* Job Name */}
                           <span
                             className={`block truncate ${
                               selected ? "font-medium" : "font-normal"
@@ -489,26 +479,11 @@ const JobPage: React.FC = () => {
                           >
                             {job.name}
                           </span>
-                          {selected ? (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                              <IconCheck size={20} aria-hidden="true" />
-                            </span>
-                          ) : null}
-                          {/* Delete Button */}
-                          <button
-                            onClick={(e) => handleDeleteJobClick(job, e)}
-                            className={`delete-button absolute inset-y-0 right-0 my-auto mr-2 flex h-7 w-7 items-center justify-center rounded-md text-rose-500 hover:bg-rose-100 hover:text-rose-700 ${
-                              hoveredJobId === job.id
-                                ? "opacity-100" // Always show if hovered directly
-                                : "opacity-0 group-hover:opacity-100" // Show on parent hover
-                            } transition-opacity duration-150 z-10`} // Ensure button is clickable
-                            title={`Delete job ${job.name}`}
-                          >
-                            <IconTrash size={18} />
-                          </button>
+                          {/* NO DELETE BUTTON HERE */}
                         </>
                       )}
                     </ComboboxOption>
+                    // **** END CLEANED ComboboxOption ****
                   ))
                 )}
               </ComboboxOptions>
@@ -518,34 +493,52 @@ const JobPage: React.FC = () => {
 
         {/* Selected Job Info */}
         {selectedJob && (
-          <div className="flex flex-grow items-start space-x-4 pt-7">
-            <div className="space-y-1">
+          <div className="flex flex-grow items-start justify-between">
+            {/* Use justify-between */}
+            <div className="space-y-1 pt-7">
+              {" "}
+              {/* Add padding top to align roughly */}
               <p className="text-sm text-default-600">
                 <span className="font-semibold">ID:</span> {selectedJob.id}
               </p>
               <p className="text-sm text-default-600">
                 <span className="font-semibold">Section:</span>{" "}
-                {
-                  Array.isArray(selectedJob.section)
-                    ? selectedJob.section.join(", ")
-                    : selectedJob.section /* Should be array now, but fallback */
-                }
+                {Array.isArray(selectedJob.section)
+                  ? selectedJob.section.join(", ")
+                  : selectedJob.section}
               </p>
             </div>
-            <Button
-              onClick={handleEditJobClick}
-              variant="outline"
-              size="sm"
-              icon={IconPencil}
-              additionalClasses="self-center"
-            >
-              Edit Info
-            </Button>
+            {/* Action Buttons for Selected Job */}
+            <div className="flex space-x-2 pt-6">
+              {" "}
+              {/* Group buttons, add padding top */}
+              <Button
+                onClick={handleEditJobClick}
+                variant="outline"
+                size="sm"
+                icon={IconPencil}
+                aria-label="Edit Job Info"
+              >
+                Edit
+              </Button>
+              {/* **** NEW DELETE BUTTON **** */}
+              <Button
+                onClick={handleDeleteSelectedJobClick}
+                variant="outline"
+                color="rose" // Use rose color for delete actions
+                size="sm"
+                icon={IconTrash}
+                aria-label="Delete Selected Job"
+              >
+                Delete
+              </Button>
+              {/* **** END NEW DELETE BUTTON **** */}
+            </div>
           </div>
         )}
-      </div>
-
-      {/* Job Details Area */}
+      </div>{" "}
+      {/* End Job Selection and Info Area */}
+      {/* Job Details Area (remains the same) */}
       {selectedJob && (
         <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
           <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
@@ -560,14 +553,14 @@ const JobPage: React.FC = () => {
                 variant="filled"
                 icon={IconPlus}
                 size="md"
-                disabled={!selectedJob} // Disable if no job selected
+                disabled={!selectedJob}
               >
                 Add Detail
               </Button>
             </div>
           </div>
 
-          {/* Details List/Table */}
+          {/* Details List/Table (remains the same, includes amount fix) */}
           {loadingDetails ? (
             <div className="flex justify-center py-10">
               <LoadingSpinner />
@@ -586,7 +579,6 @@ const JobPage: React.FC = () => {
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
                       Amount
                     </th>
-                    {/* Show Type column only if 'All' is selected */}
                     {jobType === "All" && (
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
                         Type
@@ -613,7 +605,6 @@ const JobPage: React.FC = () => {
                         >
                           {detail.description}
                         </td>
-                        {/* FIXED TD FOR AMOUNT */}
                         <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
                           {(() => {
                             const amountValue = detail.amount;
@@ -625,10 +616,9 @@ const JobPage: React.FC = () => {
                                 ? "0.00"
                                 : parsedAmount.toFixed(2);
                             }
-                            return "0.00"; // Default for null/undefined/other
+                            return "0.00";
                           })()}
                         </td>
-                        {/* END FIXED TD */}
                         {jobType === "All" && (
                           <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
                             {detail.type}
@@ -663,7 +653,7 @@ const JobPage: React.FC = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={jobType === "All" ? 6 : 5} // Adjust colspan
+                        colSpan={jobType === "All" ? 6 : 5}
                         className="px-6 py-10 text-center text-sm text-default-500"
                       >
                         {allJobDetails.length === 0
@@ -678,8 +668,7 @@ const JobPage: React.FC = () => {
           )}
         </div>
       )}
-
-      {/* Placeholder if no job is selected */}
+      {/* Placeholder */}
       {!selectedJob && !loadingJobs && (
         <div className="mt-10 text-center text-default-500">
           Select a job from the list above or{" "}
@@ -692,14 +681,13 @@ const JobPage: React.FC = () => {
           to view details.
         </div>
       )}
-
       {/* Modals and Dialogs */}
       <NewJobModal
         isOpen={showAddJobModal}
         onClose={() => setShowAddJobModal(false)}
         onJobAdded={handleJobAdded}
       />
-      {selectedJob && ( // Only render EditJobModal if a job is selected
+      {selectedJob && (
         <EditJobModal
           isOpen={showEditJobModal}
           onClose={() => setShowEditJobModal(false)}
@@ -707,7 +695,7 @@ const JobPage: React.FC = () => {
           initialData={selectedJob}
         />
       )}
-      {selectedJob && ( // Only render Detail modals if a job is selected
+      {selectedJob && (
         <>
           <JobDetailModal
             isOpen={showAddDetailModal}
@@ -724,25 +712,24 @@ const JobPage: React.FC = () => {
           />
         </>
       )}
-
       <ConfirmationDialog
         isOpen={showDeleteJobDialog}
         onClose={() => setShowDeleteJobDialog(false)}
+        // Use selectedJob in the message now
         onConfirm={confirmDeleteJob}
         title="Delete Job"
         message={`Are you sure you want to delete the job "${
-          jobToDelete?.name ?? "N/A" // Handle potential null case briefly
+          selectedJob?.name ?? "N/A"
         }"? This action cannot be undone.`}
         variant="danger"
       />
-
       <ConfirmationDialog
         isOpen={showDeleteDetailDialog}
         onClose={() => setShowDeleteDetailDialog(false)}
         onConfirm={confirmDeleteDetail}
         title="Delete Job Detail"
         message={`Are you sure you want to delete the detail "${
-          detailToDelete?.description || detailToDelete?.id || "N/A" // Handle potential null case briefly
+          detailToDelete?.description || detailToDelete?.id || "N/A"
         }"? This action cannot be undone.`}
         variant="danger"
       />
