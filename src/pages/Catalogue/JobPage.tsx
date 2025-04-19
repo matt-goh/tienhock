@@ -22,7 +22,7 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { Job, JobDetail, SelectOption } from "../../types/types"; // Assuming SelectOption is defined here or imported elsewhere
+import { Job, JobDetail } from "../../types/types"; // Assuming SelectOption is defined here or imported elsewhere
 import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal"; // Add Job
 import EditJobModal from "../../components/Catalogue/EditJobModal"; // Edit Job Info
@@ -418,7 +418,6 @@ const JobPage: React.FC = () => {
             <Combobox
               value={selectedJob}
               onChange={handleJobSelection}
-              nullable
             >
               <div className="relative">
                 <ComboboxInput
