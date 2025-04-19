@@ -270,10 +270,29 @@ const JobPage: React.FC = () => {
           ...detailData,
           amount: Number(detailData.amount) || 0,
         };
+
+        // Create a copy of all job details
+        const updatedDetails = [...allJobDetails];
+
+        // Find the index of the detail being edited (if it exists)
+        const existingIndex = updatedDetails.findIndex(
+          (d) => d.id === detailToSend.id
+        );
+
+        if (existingIndex >= 0) {
+          // Update existing detail
+          updatedDetails[existingIndex] = detailToSend;
+        } else {
+          // Add new detail
+          updatedDetails.push(detailToSend);
+        }
+
+        // Send ALL details, not just the one being edited
         await api.post("/api/job-details/batch", {
           jobId: selectedJob.id,
-          jobDetails: [detailToSend],
+          jobDetails: updatedDetails,
         });
+
         toast.success(
           `Job detail ${detailToEdit ? "updated" : "added"} successfully`
         );
@@ -288,7 +307,7 @@ const JobPage: React.FC = () => {
         );
       }
     },
-    [selectedJob, fetchJobDetails, detailToEdit]
+    [selectedJob, fetchJobDetails, detailToEdit, allJobDetails] // Added allJobDetails dependency
   );
 
   const handleDeleteDetailClick = (detail: JobDetail) => {
