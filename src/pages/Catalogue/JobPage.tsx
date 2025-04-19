@@ -18,6 +18,8 @@ import {
   IconTrash,
   IconPencil,
   IconPlus,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 
@@ -53,6 +55,9 @@ const JobPage: React.FC = () => {
   // const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [showDeleteDetailDialog, setShowDeleteDetailDialog] = useState(false);
   const [detailToDelete, setDetailToDelete] = useState<JobDetail | null>(null);
+  // --- Pagination State ---
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(50); // 50 items per page as requested
 
   // --- Data Fetching ---
   const fetchJobs = useCallback(
@@ -138,6 +143,24 @@ const JobPage: React.FC = () => {
     return allJobDetails.filter((detail) => detail.type === jobType);
   }, [jobType, allJobDetails]);
 
+  // Calculate paginated job details
+  const paginatedJobDetails = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredJobDetails.slice(startIndex, endIndex);
+  }, [filteredJobDetails, currentPage, itemsPerPage]);
+
+  // Calculate total pages
+  const totalPages = useMemo(
+    () => Math.ceil(filteredJobDetails.length / itemsPerPage),
+    [filteredJobDetails, itemsPerPage]
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedJob, jobType]);
+
   // --- Job Handlers ---
   const handleJobSelection = useCallback(
     (selection: Job | null | undefined) => {
@@ -179,7 +202,7 @@ const JobPage: React.FC = () => {
     [fetchJobs]
   );
 
-  // --- NEW Delete Handler for the dedicated button ---
+  // --- Delete Handler for the dedicated button ---
   const handleDeleteSelectedJobClick = useCallback(
     async () => {
       if (!selectedJob) {
@@ -340,6 +363,146 @@ const JobPage: React.FC = () => {
     </div>
   );
 
+  // Pagination component
+  const Pagination = () => {
+    // Page navigation handlers
+    const handleNextPage = () => {
+      if (currentPage < totalPages) {
+        setCurrentPage((prev) => prev + 1);
+      }
+    };
+
+    const handlePrevPage = () => {
+      if (currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      }
+    };
+
+    const handlePageChange = (page: number) => {
+      setCurrentPage(page);
+    };
+
+    // Calculate page numbers to show
+    const pageNumbers: number[] = [];
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+
+    // Adjust if we're near the end
+    if (endPage === totalPages && endPage - 4 > 0) {
+      startPage = Math.max(1, endPage - 4);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-default-200">
+        <div>
+          <p className="text-sm text-default-600">
+            Showing{" "}
+            <span className="font-medium">
+              {(currentPage - 1) * itemsPerPage + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-medium">
+              {Math.min(currentPage * itemsPerPage, filteredJobDetails.length)}
+            </span>{" "}
+            of <span className="font-medium">{filteredJobDetails.length}</span>{" "}
+            results
+          </p>
+        </div>
+
+        <div>
+          <nav
+            className="inline-flex rounded-md shadow-sm -space-x-px"
+            aria-label="Pagination"
+          >
+            {/* Previous button */}
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium 
+              ${
+                currentPage === 1
+                  ? "text-default-300 cursor-not-allowed"
+                  : "text-default-500 hover:bg-default-50"
+              }`}
+            >
+              <span className="sr-only">Previous</span>
+              <IconChevronLeft size={18} aria-hidden="true" />
+            </button>
+
+            {/* First page + ellipsis */}
+            {startPage > 1 && (
+              <>
+                <button
+                  onClick={() => handlePageChange(1)}
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                >
+                  1
+                </button>
+                {startPage > 2 && (
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                    ...
+                  </span>
+                )}
+              </>
+            )}
+
+            {/* Page numbers */}
+            {pageNumbers.map((number) => (
+              <button
+                key={number}
+                onClick={() => handlePageChange(number)}
+                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
+                ${
+                  currentPage === number
+                    ? "z-10 bg-sky-50 border-sky-500 text-sky-600"
+                    : "bg-white border-default-300 text-default-700 hover:bg-default-50"
+                }`}
+              >
+                {number}
+              </button>
+            ))}
+
+            {/* Last page + ellipsis */}
+            {endPage < totalPages && (
+              <>
+                {endPage < totalPages - 1 && (
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                    ...
+                  </span>
+                )}
+                <button
+                  onClick={() => handlePageChange(totalPages)}
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
+
+            {/* Next button */}
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium
+              ${
+                currentPage === totalPages
+                  ? "text-default-300 cursor-not-allowed"
+                  : "text-default-500 hover:bg-default-50"
+              }`}
+            >
+              <span className="sr-only">Next</span>
+              <IconChevronRight size={18} aria-hidden="true" />
+            </button>
+          </nav>
+        </div>
+      </div>
+    );
+  };
+
   // --- Main Render ---
   return (
     <div className="relative p-4 md:p-6">
@@ -347,9 +510,9 @@ const JobPage: React.FC = () => {
         Job Catalogue & Details
       </h1>
       {/* Job Selection and Info Area */}
-      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
         {/* Job Combobox */}
-        <div className="flex-shrink-0">
+        <div className="md:flex-shrink-0">
           <label className="block text-sm font-medium text-default-700 mb-1">
             Select Job
           </label>
@@ -361,7 +524,7 @@ const JobPage: React.FC = () => {
             >
               <div className="relative">
                 <ComboboxInput
-                  className="w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                  className="w-full cursor-default rounded-lg border border-default-300 bg-white py-1.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                   displayValue={(job: Job | null) => job?.name || ""}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Select or search..."
@@ -407,12 +570,10 @@ const JobPage: React.FC = () => {
                   </div>
                 ) : (
                   filteredJobs.map((job) => (
-                    // **** ComboboxOption CLEANED - NO DELETE BUTTON ****
                     <ComboboxOption
                       key={job.id}
                       className={({ active }) =>
                         `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                          // Removed pr-10
                           active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                         }`
                       }
@@ -434,11 +595,9 @@ const JobPage: React.FC = () => {
                           >
                             {job.name}
                           </span>
-                          {/* NO DELETE BUTTON HERE */}
                         </>
                       )}
                     </ComboboxOption>
-                    // **** END CLEANED ComboboxOption ****
                   ))
                 )}
               </ComboboxOptions>
@@ -448,22 +607,40 @@ const JobPage: React.FC = () => {
 
         {/* Selected Job Info */}
         {selectedJob && (
-          <div className="flex flex-grow items-center justify-between">
-            {/* Use justify-between */}
-            <div className="flex space-x-2">
-              {/* Add padding top to align roughly */}
-              <p className="text-sm text-default-600">
-                <span className="font-semibold">ID:</span> {selectedJob.id}
-              </p>
-              <p className="text-sm text-default-600">
-                <span className="font-semibold">Section:</span>{" "}
-                {Array.isArray(selectedJob.section)
-                  ? selectedJob.section.join(", ")
-                  : selectedJob.section}
-              </p>
+          <div className="flex-1 flex flex-col md:flex-row md:items-center gap-4">
+            <div className="flex flex-wrap gap-4 flex-1">
+              <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
+                <p className="text-xs uppercase text-default-500 font-medium">
+                  ID
+                </p>
+                <p className="text-default-800 font-semibold">
+                  {selectedJob.id}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
+                <p className="text-xs uppercase text-default-500 font-medium">
+                  Section
+                </p>
+                <p className="text-default-800 font-semibold">
+                  {Array.isArray(selectedJob.section)
+                    ? selectedJob.section.join(", ")
+                    : selectedJob.section}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
+                <p className="text-xs uppercase text-default-500 font-medium">
+                  Name
+                </p>
+                <p className="text-default-800 font-semibold">
+                  {selectedJob.name}
+                </p>
+              </div>
             </div>
+
             {/* Action Buttons for Selected Job */}
-            <div className="flex space-x-2">
+            <div className="md:ml-auto mt-3 md:mt-0">
               <Button
                 onClick={handleDeleteSelectedJobClick}
                 variant="outline"
@@ -533,8 +710,8 @@ const JobPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-default-200 bg-white">
-                  {filteredJobDetails.length > 0 ? (
-                    filteredJobDetails.map((detail) => (
+                  {paginatedJobDetails.length > 0 ? (
+                    paginatedJobDetails.map((detail) => (
                       <tr
                         key={detail.id}
                         className="hover:bg-default-50 cursor-pointer"
@@ -675,6 +852,8 @@ const JobPage: React.FC = () => {
         }"? This action cannot be undone.`}
         variant="danger"
       />
+      {/* Pagination - only show if we have more than one page */}
+      {filteredJobDetails.length > itemsPerPage && <Pagination />}
     </div>
   );
 };

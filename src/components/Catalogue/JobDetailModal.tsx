@@ -31,7 +31,6 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({
   onClose,
   onSave,
   initialData = null,
-  jobId, // Make sure this is passed correctly by the parent
 }) => {
   const [formData, setFormData] = useState<
     Omit<JobDetail, "amount"> & { amount: string }
@@ -47,12 +46,26 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({
 
   const isEditMode = !!initialData;
 
+  // Update the useEffect that handles initialData in JobDetailModal.tsx
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
+        // Handle amount properly regardless of its type
+        let formattedAmount: string;
+
+        if (typeof initialData.amount === "number") {
+          formattedAmount = initialData.amount.toFixed(2);
+        } else {
+          // Try to parse it as a number, default to 0 if parsing fails
+          const parsedAmount = parseFloat(String(initialData.amount));
+          formattedAmount = isNaN(parsedAmount)
+            ? "0.00"
+            : parsedAmount.toFixed(2);
+        }
+
         setFormData({
           ...initialData,
-          amount: initialData.amount.toFixed(2), // Format amount for input
+          amount: formattedAmount, // Now we're sure this is a string
         });
       } else {
         // Reset for add mode, potentially generate a default ID
