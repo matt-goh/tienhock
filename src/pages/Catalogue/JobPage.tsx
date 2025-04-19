@@ -22,10 +22,9 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { Job, JobDetail, SelectOption } from "../../types/types";
+import { Job, JobDetail } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
-import EditJobModal from "../../components/Catalogue/EditJobModal";
 import JobDetailModal from "../../components/Catalogue/JobDetailModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
@@ -46,7 +45,6 @@ const JobPage: React.FC = () => {
 
   // --- Modal/Dialog States ---
   const [showAddJobModal, setShowAddJobModal] = useState(false);
-  const [showEditJobModal, setShowEditJobModal] = useState(false);
   const [showAddDetailModal, setShowAddDetailModal] = useState(false);
   const [showEditDetailModal, setShowEditDetailModal] = useState(false);
   const [detailToEdit, setDetailToEdit] = useState<JobDetail | null>(null);
@@ -179,49 +177,6 @@ const JobPage: React.FC = () => {
       }
     },
     [fetchJobs]
-  );
-
-  const handleEditJobClick = () => {
-    if (selectedJob) {
-      setShowEditJobModal(true);
-    }
-  };
-
-  const handleJobUpdated = useCallback(
-    async (updatedJobData: Job & { newId?: string }) => {
-      if (!selectedJob) return;
-      try {
-        const jobToSend = {
-          ...updatedJobData,
-          section: Array.isArray(updatedJobData.section)
-            ? updatedJobData.section.join(", ")
-            : updatedJobData.section,
-        };
-        const result = await api.put(`/api/jobs/${selectedJob.id}`, jobToSend);
-        const returnedJob = result.job as Job;
-
-        toast.success("Job updated successfully");
-        setShowEditJobModal(false);
-        // Fetch jobs again to update the list, but don't automatically select the first
-        await fetchJobs(false);
-        // Explicitly set the selected job state to the returned (potentially updated ID) job
-        setSelectedJob({
-          ...returnedJob,
-          section: Array.isArray(returnedJob.section)
-            ? returnedJob.section
-            : returnedJob.section
-            ? [returnedJob.section]
-            : [],
-        });
-        // No details refetch needed here as job ID wasn't changed in *this* call (it was handled by backend)
-      } catch (error: any) {
-        console.error("Error updating job:", error);
-        throw new Error(
-          error.message || "Failed to update job. Please try again."
-        );
-      }
-    },
-    [selectedJob, fetchJobs] // Removed fetchJobDetails dependency here
   );
 
   // --- NEW Delete Handler for the dedicated button ---
@@ -392,7 +347,7 @@ const JobPage: React.FC = () => {
         Job Catalogue & Details
       </h1>
       {/* Job Selection and Info Area */}
-      <div className="mb-6 flex flex-wrap items-start gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
         {/* Job Combobox */}
         <div className="flex-shrink-0">
           <label className="block text-sm font-medium text-default-700 mb-1">
@@ -493,10 +448,9 @@ const JobPage: React.FC = () => {
 
         {/* Selected Job Info */}
         {selectedJob && (
-          <div className="flex flex-grow items-start justify-between">
+          <div className="flex flex-grow items-center justify-between">
             {/* Use justify-between */}
-            <div className="space-y-1 pt-7">
-              {" "}
+            <div className="flex space-x-2">
               {/* Add padding top to align roughly */}
               <p className="text-sm text-default-600">
                 <span className="font-semibold">ID:</span> {selectedJob.id}
@@ -509,36 +463,22 @@ const JobPage: React.FC = () => {
               </p>
             </div>
             {/* Action Buttons for Selected Job */}
-            <div className="flex space-x-2 pt-6">
-              {" "}
-              {/* Group buttons, add padding top */}
-              <Button
-                onClick={handleEditJobClick}
-                variant="outline"
-                size="sm"
-                icon={IconPencil}
-                aria-label="Edit Job Info"
-              >
-                Edit
-              </Button>
-              {/* **** NEW DELETE BUTTON **** */}
+            <div className="flex space-x-2">
               <Button
                 onClick={handleDeleteSelectedJobClick}
                 variant="outline"
-                color="rose" // Use rose color for delete actions
+                color="rose"
                 size="sm"
                 icon={IconTrash}
                 aria-label="Delete Selected Job"
               >
                 Delete
               </Button>
-              {/* **** END NEW DELETE BUTTON **** */}
             </div>
           </div>
         )}
-      </div>{" "}
+      </div>
       {/* End Job Selection and Info Area */}
-      {/* Job Details Area (remains the same) */}
       {selectedJob && (
         <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
           <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
@@ -595,7 +535,11 @@ const JobPage: React.FC = () => {
                 <tbody className="divide-y divide-default-200 bg-white">
                   {filteredJobDetails.length > 0 ? (
                     filteredJobDetails.map((detail) => (
-                      <tr key={detail.id} className="hover:bg-default-50">
+                      <tr
+                        key={detail.id}
+                        className="hover:bg-default-50 cursor-pointer"
+                        onClick={() => handleEditDetailClick(detail)}
+                      >
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
                           {detail.id}
                         </td>
@@ -633,14 +577,20 @@ const JobPage: React.FC = () => {
                         <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
                           <div className="flex items-center justify-center space-x-2">
                             <button
-                              onClick={() => handleEditDetailClick(detail)}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
+                                handleEditDetailClick(detail);
+                              }}
                               className="text-sky-600 hover:text-sky-800"
                               title="Edit Detail"
                             >
                               <IconPencil size={18} />
                             </button>
                             <button
-                              onClick={() => handleDeleteDetailClick(detail)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteDetailClick(detail);
+                              }}
                               className="text-rose-600 hover:text-rose-800"
                               title="Delete Detail"
                             >
@@ -687,14 +637,6 @@ const JobPage: React.FC = () => {
         onClose={() => setShowAddJobModal(false)}
         onJobAdded={handleJobAdded}
       />
-      {selectedJob && (
-        <EditJobModal
-          isOpen={showEditJobModal}
-          onClose={() => setShowEditJobModal(false)}
-          onSave={handleJobUpdated}
-          initialData={selectedJob}
-        />
-      )}
       {selectedJob && (
         <>
           <JobDetailModal

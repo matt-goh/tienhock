@@ -113,83 +113,41 @@ export default function (pool) {
   // Update job
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { name, section, newId } = req.body;
+    const { name } = req.body; // Only allow name to be updated, remove section and newId
 
     try {
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
+      // Check if the job exists
+      const existingJobQuery = "SELECT * FROM jobs WHERE id = $1";
+      const existingJobResult = await pool.query(existingJobQuery, [id]);
 
-        // Check if the job exists
-        const existingJobQuery = "SELECT * FROM jobs WHERE id = $1";
-        const existingJobResult = await client.query(existingJobQuery, [id]);
-
-        if (existingJobResult.rows.length === 0) {
-          await client.query("ROLLBACK");
-          return res.status(404).json({ message: "Job not found" });
-        }
-
-        const existingJob = existingJobResult.rows[0];
-
-        // Only check for duplicate name if the name is being changed
-        if (name !== existingJob.name) {
-          const isDuplicateName = await checkDuplicateJobName(name, id);
-          if (isDuplicateName) {
-            await client.query("ROLLBACK");
-            return res
-              .status(400)
-              .json({ message: "A job with this name already exists" });
-          }
-        }
-
-        let updatedId = id;
-        if (newId && newId !== id) {
-          const isDuplicateId = await checkDuplicateJobId(newId);
-          if (isDuplicateId) {
-            await client.query("ROLLBACK");
-            return res
-              .status(400)
-              .json({ message: "A job with this ID already exists" });
-          }
-
-          // Update job ID in jobs table
-          await client.query("UPDATE jobs SET id = $1 WHERE id = $2", [
-            newId,
-            id,
-          ]);
-
-          // Update job ID in jobs_job_details table
-          await client.query(
-            "UPDATE jobs_job_details SET job_id = $1 WHERE job_id = $2",
-            [newId, id]
-          );
-
-          updatedId = newId;
-        }
-
-        // Update other job details
-        const query = `
-          UPDATE jobs
-          SET name = $1, section = $2
-          WHERE id = $3
-          RETURNING *
-        `;
-        const values = [
-          name,
-          Array.isArray(section) ? section.join(", ") : section,
-          updatedId,
-        ];
-
-        const result = await client.query(query, values);
-
-        await client.query("COMMIT");
-        res.json({ message: "Job updated successfully", job: result.rows[0] });
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
+      if (existingJobResult.rows.length === 0) {
+        return res.status(404).json({ message: "Job not found" });
       }
+
+      const existingJob = existingJobResult.rows[0];
+
+      // Only check for duplicate name if the name is being changed
+      if (name !== existingJob.name) {
+        const isDuplicateName = await checkDuplicateJobName(name, id);
+        if (isDuplicateName) {
+          return res
+            .status(400)
+            .json({ message: "A job with this name already exists" });
+        }
+      }
+
+      // Update job name only (not id or section)
+      const query = `
+      UPDATE jobs
+      SET name = $1
+      WHERE id = $2
+      RETURNING *
+    `;
+      const values = [name, id];
+
+      const result = await pool.query(query, values);
+
+      res.json({ message: "Job updated successfully", job: result.rows[0] });
     } catch (error) {
       console.error("Error updating job:", error);
       res
