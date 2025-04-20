@@ -416,7 +416,7 @@ const JobPage: React.FC = () => {
     }
 
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t border-default-200">
+      <div className="flex items-center justify-between py-3 border-t border-default-200">
         <div>
           <p className="text-sm text-default-600">
             Showing{" "}
@@ -524,7 +524,7 @@ const JobPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="relative p-4 md:p-6">
+    <div className="relative w-full mx-4 md:mx-6">
       <h1 className="mb-6 text-center text-xl font-semibold text-default-800">
         Job Catalogue & Details
       </h1>

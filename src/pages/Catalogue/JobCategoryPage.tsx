@@ -302,7 +302,7 @@ const JobCategoryPage: React.FC = () => {
     }
 
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t border-default-200">
+      <div className="flex items-center justify-between py-3 border-t border-default-200">
         <div>
           <p className="text-sm text-default-600">
             Showing{" "}
@@ -414,7 +414,7 @@ const JobCategoryPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="p-4 md:p-6">
+    <div className="relative w-full mx-4 md:mx-6">
       {/* Header Area */}
       <div className="mb-6 flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800">

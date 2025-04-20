@@ -217,7 +217,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({
                     value={formData.id}
                     onChange={handleChange}
                     required
-                    disabled={isSaving} // Allow ID edit for new, maybe disable for existing?
+                    disabled={isSaving || isEditMode} // Disable when in edit mode or while saving
                     placeholder="Unique Detail ID"
                   />
                   <FormInput
