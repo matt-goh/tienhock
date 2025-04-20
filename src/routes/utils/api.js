@@ -69,22 +69,13 @@ export const api = {
   delete: async (endpoint, payload) => {
     const sessionId = sessionService.getSessionId();
     try {
-      // Get the last part of the endpoint (e.g., 'job-details' from '/api/job-details')
-      const routeName = endpoint.split("/").pop() || "";
-
-      // Special case for job-details endpoint
-      const finalPayload =
-        routeName === "job-details"
-          ? { jobDetailIds: payload } // Wrap the IDs array in the expected format
-          : { [IRREGULAR_PLURALS[routeName] || `${routeName}`]: payload };
-
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
           "x-session-id": sessionId,
         },
-        body: JSON.stringify(finalPayload),
+        body: JSON.stringify(payload),
       });
 
       return handleResponse(response);
