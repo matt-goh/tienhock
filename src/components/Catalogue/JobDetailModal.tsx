@@ -70,7 +70,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({
       } else {
         // Reset for add mode, potentially generate a default ID
         setFormData({
-          id: `JD${Date.now()}`, // Consider a more robust temporary ID or leave blank for backend gen
+          id: "",
           description: "",
           amount: "0.00",
           remark: "",
