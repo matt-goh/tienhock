@@ -132,26 +132,36 @@ const JobCategoryPage: React.FC = () => {
   // --- Save Handler (Called from Modal) ---
   const handleSaveCategory = useCallback(
     async (categoryData: JobCategory) => {
-      const isEditing = !!categoryData.originalId; // Check if it's an edit operation based on originalId presence
-      const categoryId = categoryData.originalId || categoryData.id; // Use originalId for PUT if editing
+      const isEditing = !!categoryData.originalId;
+      const categoryId = categoryData.originalId || categoryData.id;
 
       try {
+        let response;
+
         if (isEditing) {
-          // Use PUT for existing item (or POST /batch if needed)
-          // Assuming a PUT endpoint exists: PUT /api/job-categories/:id
-          // If not, adapt to use POST /api/job-categories/batch
-          await api.put(`/api/job-categories/${categoryId}`, categoryData);
-          // Or using batch:
-          // await api.post("/api/job-categories/batch", { jobCategories: [categoryData] });
-          toast.success("Job category updated successfully");
+          // For editing
+          response = await api.put(
+            `/api/job-categories/${categoryId}`,
+            categoryData
+          );
         } else {
-          // Use POST for new item
-          await api.post("/api/job-categories", categoryData);
-          toast.success("Job category added successfully");
+          // For adding new
+          response = await api.post("/api/job-categories", categoryData);
         }
+
+        // Check if the response contains an error message
+        if (response.message && !response.jobCategory) {
+          // This indicates an error from the API (like duplicate ID)
+          throw new Error(response.message);
+        }
+
+        toast.success(
+          isEditing
+            ? "Job category updated successfully"
+            : "Job category added successfully"
+        );
         handleModalClose();
-        // refreshJobCategoriesCache(); // Use SWR's mutate
-        refreshJobCategories(); // Trigger cache revalidation
+        refreshJobCategories();
       } catch (error: any) {
         console.error("Error saving job category:", error);
         // Re-throw the error so the modal can display it
@@ -160,7 +170,7 @@ const JobCategoryPage: React.FC = () => {
         );
       }
     },
-    [refreshJobCategories] // Depend on refreshJobCategories
+    [refreshJobCategories]
   );
 
   // --- Delete Handlers ---
@@ -483,7 +493,11 @@ const JobCategoryPage: React.FC = () => {
           <tbody className="divide-y divide-default-200 bg-white">
             {paginatedJobCategories.length > 0 ? (
               paginatedJobCategories.map((category) => (
-                <tr key={category.id} className="hover:bg-default-50">
+                <tr
+                  key={category.id}
+                  className="hover:bg-default-50 cursor-pointer"
+                  onClick={() => handleEditClick(category)}
+                >
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
                     {category.id}
                   </td>
@@ -507,14 +521,20 @@ const JobCategoryPage: React.FC = () => {
                   <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
                     <div className="flex items-center justify-center space-x-2">
                       <button
-                        onClick={() => handleEditClick(category)}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent row click
+                          handleEditClick(category);
+                        }}
                         className="text-sky-600 hover:text-sky-800"
                         title="Edit"
                       >
                         <IconPencil size={18} />
                       </button>
                       <button
-                        onClick={() => handleDeleteClick(category)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(category);
+                        }}
                         className="text-rose-600 hover:text-rose-800"
                         title="Delete"
                       >
