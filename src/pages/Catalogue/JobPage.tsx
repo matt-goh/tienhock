@@ -538,7 +538,7 @@ const JobPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="relative w-full mx-4 md:mx-6">
+    <div className={`relative ${selectedJob ? "w-full" : ""} mx-4 md:mx-6`}>
       <h1 className="mb-6 text-center text-xl font-semibold text-default-800">
         Job Catalogue & Details
       </h1>
@@ -550,11 +550,7 @@ const JobPage: React.FC = () => {
             Select Job
           </label>
           <Field className="w-64">
-            <Combobox
-              value={selectedJob}
-              onChange={handleJobSelection}
-              nullable
-            >
+            <Combobox value={selectedJob} onChange={handleJobSelection}>
               <div className="relative">
                 <ComboboxInput
                   className="w-full cursor-default rounded-lg border border-default-300 bg-white py-1.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
