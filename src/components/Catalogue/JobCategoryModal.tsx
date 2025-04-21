@@ -192,7 +192,7 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                     value={formData.id}
                     onChange={handleChange}
                     required
-                    disabled={isSaving} // Optionally disable ID edit for existing records: disabled={isEditMode || isSaving}
+                    disabled={isSaving || isEditMode}
                     placeholder="e.g., JC001"
                   />
                   <FormInput
