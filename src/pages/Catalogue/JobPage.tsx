@@ -187,13 +187,21 @@ const JobPage: React.FC = () => {
             ? newJobData.section.join(", ")
             : newJobData.section,
         };
-        await api.post("/api/jobs", jobToSend);
+        const response = await api.post("/api/jobs", jobToSend); // Capture the response
+
+        // Check if the response contains an error message
+        if (response.message && !response.job) {
+          // This indicates an error from the API
+          throw new Error(response.message);
+        }
 
         toast.success("Job added successfully");
         setShowAddJobModal(false);
         await fetchJobs(true); // Refetch jobs and select the new one
       } catch (error: any) {
         console.error("Error adding job:", error);
+        toast.error(error.message || "Failed to add job. Please try again.");
+        // Re-throw so the modal can display the error
         throw new Error(
           error.message || "Failed to add job. Please try again."
         );
@@ -279,8 +287,14 @@ const JobPage: React.FC = () => {
           (d) => d.id === detailToSend.id
         );
 
-        if (existingIndex >= 0) {
-          // Update existing detail
+        // Check if we're adding a new detail but the ID already exists
+        if (existingIndex >= 0 && !detailToEdit) {
+          // We're in add mode and the ID already exists
+          throw new Error(
+            `A job detail with ID "${detailToSend.id}" already exists.`
+          );
+        } else if (existingIndex >= 0) {
+          // Update existing detail (in edit mode)
           updatedDetails[existingIndex] = detailToSend;
         } else {
           // Add new detail
@@ -307,7 +321,7 @@ const JobPage: React.FC = () => {
         );
       }
     },
-    [selectedJob, fetchJobDetails, detailToEdit, allJobDetails] // Added allJobDetails dependency
+    [selectedJob, fetchJobDetails, detailToEdit, allJobDetails]
   );
 
   const handleDeleteDetailClick = (detail: JobDetail) => {
