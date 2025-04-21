@@ -44,19 +44,32 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
   const fetchSections = useCallback(async () => {
     setLoadingSections(true);
     try {
-      // Assuming api.get returns the data directly, adjust type assertion if needed
       const data = (await api.get("/api/sections")) as {
         id: string;
         name: string;
-      }[]; // Assert the type after the call
-      // Ensure 'All Section' is not included if it comes from the API
+      }[];
+      
+      // Check if we need to include "All Section" for the current job category
+      const needsAllSection = initialData?.section === "All Section";
+      
+      // Filter out "All Section" from API results if it exists
       const filteredData = data.filter((s) => s.name !== "All Section");
-      setSections(
-        filteredData.map((section) => ({
-          id: section.name, // Use name as ID for Listbox compatibility if IDs aren't stable/meaningful otherwise
-          name: section.name,
-        }))
-      );
+      
+      // Map sections to the format needed for the dropdown
+      const formattedSections = filteredData.map((section) => ({
+        id: section.name,
+        name: section.name,
+      }));
+      
+      // Add "All Section" back if needed for the current job category
+      if (needsAllSection) {
+        formattedSections.unshift({
+          id: "All Section",
+          name: "All Section"
+        });
+      }
+      
+      setSections(formattedSections);
     } catch (fetchError) {
       console.error("Error fetching sections:", fetchError);
       toast.error("Failed to load sections. Please try again.");
@@ -64,7 +77,7 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
     } finally {
       setLoadingSections(false);
     }
-  }, []);
+  }, [initialData]);
 
   useEffect(() => {
     if (isOpen) {
