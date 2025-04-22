@@ -34,14 +34,10 @@ type JobSelection = Job | null;
 
 const JobPage: React.FC = () => {
   // --- State ---
-  const {
-    jobs,
-    loading: loadingJobs,
-    refreshJobs,
-  } = useJobsCache();
+  const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
-  const [jobType, setJobType] = useState<string>("All");
+  const [jobType] = useState<string>("All");
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
     mappings: jobPayCodeMap,
@@ -59,6 +55,8 @@ const JobPage: React.FC = () => {
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(50); // 50 items per page as requested
+  const [showRemovePayCodeDialog, setShowRemovePayCodeDialog] = useState(false);
+  const [payCodeToRemove, setPayCodeToRemove] = useState<PayCode | null>(null);
 
   // --- Data Fetching ---
   const fetchJobPayCodes = useCallback(
@@ -256,6 +254,20 @@ const JobPage: React.FC = () => {
     },
     [selectedJob] // Depends only on the currently selected job
   );
+
+  const handleConfirmRemovePayCode = useCallback(async () => {
+    if (!payCodeToRemove || !selectedJob) return;
+
+    try {
+      await handleRemovePayCodeFromJob(payCodeToRemove.id);
+      setShowRemovePayCodeDialog(false);
+      setPayCodeToRemove(null);
+    } catch (error) {
+      // Error is already handled in handleRemovePayCodeFromJob
+      setShowRemovePayCodeDialog(false);
+      setPayCodeToRemove(null);
+    }
+  }, [payCodeToRemove, selectedJob, handleRemovePayCodeFromJob]);
 
   const confirmDeleteJob = useCallback(async () => {
     if (!selectedJob) return;
@@ -673,9 +685,10 @@ const JobPage: React.FC = () => {
                         <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
                           <div className="flex items-center justify-center space-x-2">
                             <button
-                              onClick={() =>
-                                handleRemovePayCodeFromJob(payCode.id)
-                              }
+                              onClick={() => {
+                                setPayCodeToRemove(payCode);
+                                setShowRemovePayCodeDialog(true);
+                              }}
                               className="text-rose-600 hover:text-rose-800"
                               title="Remove Pay Code"
                             >
@@ -796,6 +809,17 @@ const JobPage: React.FC = () => {
           </DialogPanel>
         </div>
       </Dialog>
+      {/* Pay Code Removal Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showRemovePayCodeDialog}
+        onClose={() => setShowRemovePayCodeDialog(false)}
+        onConfirm={handleConfirmRemovePayCode}
+        title="Remove Pay Code"
+        message={`Are you sure you want to remove the pay code "${
+          payCodeToRemove?.code || ""
+        }" from this job? This action cannot be undone.`}
+        variant="danger"
+      />
       {/* Pagination - only show if we have more than one page */}
       {filteredJobDetails.length > itemsPerPage && <Pagination />}
     </div>
