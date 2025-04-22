@@ -19,27 +19,34 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { PayCode, Job } from "../../types/types";
+import { PayCode } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PayCodeModal from "../../components/Catalogue/PayCodeModal";
 import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
+import { useJobsCache } from "../../hooks/useJobsCache";
 
 const PayCodePage: React.FC = () => {
   // State
   const [filteredCodes, setFilteredCodes] = useState<PayCode[]>([]);
   const [selectedType, setSelectedType] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<string>("All");
 
+  // Use both hooks for caching
   const {
     mappings: jobPayCodeMap,
     payCodes,
-    loading: loadingData,
-    refreshData,
+    loading: loadingPayCodesData,
+    refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
+
+  // Add the jobs cache hook
+  const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
+
+  // Define a combined loading state
+  const loading = loadingPayCodesData || loadingJobs;
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -99,59 +106,51 @@ const PayCodePage: React.FC = () => {
                 </>
               )}
             </ListboxOption>
-            {jobs.map((job) => (
-              <ListboxOption
-                key={job.id}
-                className={({ active }) =>
-                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                    active ? "bg-sky-100 text-sky-900" : "text-gray-900"
-                  }`
-                }
-                value={job.id}
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${
-                        selected ? "font-medium" : "font-normal"
-                      }`}
-                    >
-                      {job.name}
-                    </span>
-                    {selected ? (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                        <IconCheck size={20} aria-hidden="true" />
+            {/* Show loading indicator if jobs are loading */}
+            {loadingJobs ? (
+              <div className="py-2 px-4 text-gray-500 italic text-sm">
+                Loading jobs...
+              </div>
+            ) : (
+              jobs.map((job) => (
+                <ListboxOption
+                  key={job.id}
+                  className={({ active }) =>
+                    `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                    }`
+                  }
+                  value={job.id}
+                >
+                  {({ selected }) => (
+                    <>
+                      <span
+                        className={`block truncate ${
+                          selected ? "font-medium" : "font-normal"
+                        }`}
+                      >
+                        {job.name}
                       </span>
-                    ) : null}
-                  </>
-                )}
-              </ListboxOption>
-            ))}
+                      {selected ? (
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                          <IconCheck size={20} aria-hidden="true" />
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </ListboxOption>
+              ))
+            )}
           </ListboxOptions>
         </div>
       </Listbox>
     </div>
   );
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const data = await api.get("/api/jobs");
-      setJobs(data);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-      setJobs([]);
-    }
-  }, []);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
-
   // Filter pay codes based on type, job and search term
   useEffect(() => {
     // Don't filter if we're still loading or have no data
-    if (loadingData) return;
+    if (loading) return;
 
     let filtered = [...payCodes];
 
@@ -182,14 +181,7 @@ const PayCodePage: React.FC = () => {
 
     setFilteredCodes(filtered);
     setCurrentPage(1);
-  }, [
-    payCodes,
-    selectedType,
-    selectedJob,
-    searchTerm,
-    jobPayCodeMap,
-    loadingData,
-  ]);
+  }, [payCodes, selectedType, selectedJob, searchTerm, jobPayCodeMap, loading]);
 
   // Calculate paginated data
   const paginatedCodes = useMemo(() => {
@@ -226,7 +218,10 @@ const PayCodePage: React.FC = () => {
       }
 
       setShowAddModal(false);
-      refreshData(); // Use refreshData to refresh both payCodes and mappings
+
+      // Refresh both caches
+      await refreshPayCodeMappings();
+      await refreshJobs();
     } catch (error: any) {
       console.error("Error saving pay code:", error);
       throw new Error(error.message || "Failed to save pay code");
@@ -268,7 +263,10 @@ const PayCodePage: React.FC = () => {
 
       toast.success("Pay code deleted successfully");
       setShowDeleteDialog(false);
-      refreshData();
+
+      // Refresh both caches
+      await refreshPayCodeMappings();
+      await refreshJobs();
     } catch (error: any) {
       console.error("Error deleting pay code:", error);
 
@@ -342,6 +340,146 @@ const PayCodePage: React.FC = () => {
     </div>
   );
 
+  // Pagination component
+  const Pagination = () => {
+    // Page navigation handlers
+    const handleNextPage = () => {
+      if (currentPage < totalPages) {
+        setCurrentPage((prev) => prev + 1);
+      }
+    };
+
+    const handlePrevPage = () => {
+      if (currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      }
+    };
+
+    const handlePageChange = (page: number) => {
+      setCurrentPage(page);
+    };
+
+    // Calculate page numbers to show
+    const pageNumbers: number[] = [];
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+
+    // Adjust if we're near the end
+    if (endPage === totalPages && endPage - 4 > 0) {
+      startPage = Math.max(1, endPage - 4);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <div className="flex items-center justify-between py-3 border-t border-default-200">
+        <div>
+          <p className="text-sm text-default-600">
+            Showing{" "}
+            <span className="font-medium">
+              {(currentPage - 1) * itemsPerPage + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-medium">
+              {Math.min(currentPage * itemsPerPage, filteredCodes.length)}
+            </span>{" "}
+            of <span className="font-medium">{filteredCodes.length}</span>{" "}
+            results
+          </p>
+        </div>
+
+        <div>
+          <nav
+            className="inline-flex rounded-md shadow-sm -space-x-px"
+            aria-label="Pagination"
+          >
+            {/* Previous button */}
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium 
+              ${
+                currentPage === 1
+                  ? "text-default-300 cursor-not-allowed"
+                  : "text-default-500 hover:bg-default-50"
+              }`}
+            >
+              <span className="sr-only">Previous</span>
+              <IconChevronLeft size={18} aria-hidden="true" />
+            </button>
+
+            {/* First page + ellipsis */}
+            {startPage > 1 && (
+              <>
+                <button
+                  onClick={() => handlePageChange(1)}
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                >
+                  1
+                </button>
+                {startPage > 2 && (
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                    ...
+                  </span>
+                )}
+              </>
+            )}
+
+            {/* Page numbers */}
+            {pageNumbers.map((number) => (
+              <button
+                key={number}
+                onClick={() => handlePageChange(number)}
+                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
+                ${
+                  currentPage === number
+                    ? "z-10 bg-sky-50 border-sky-500 text-sky-600"
+                    : "bg-white border-default-300 text-default-700 hover:bg-default-50"
+                }`}
+              >
+                {number}
+              </button>
+            ))}
+
+            {/* Last page + ellipsis */}
+            {endPage < totalPages && (
+              <>
+                {endPage < totalPages - 1 && (
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                    ...
+                  </span>
+                )}
+                <button
+                  onClick={() => handlePageChange(totalPages)}
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
+
+            {/* Next button */}
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium
+              ${
+                currentPage === totalPages
+                  ? "text-default-300 cursor-not-allowed"
+                  : "text-default-500 hover:bg-default-50"
+              }`}
+            >
+              <span className="sr-only">Next</span>
+              <IconChevronRight size={18} aria-hidden="true" />
+            </button>
+          </nav>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="relative w-full mx-4 md:mx-6">
       {/* Header area */}
@@ -385,173 +523,146 @@ const PayCodePage: React.FC = () => {
           </Button>
         </div>
       </div>
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-default-200">
-          <thead className="bg-default-100">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                Code
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 max-w-sm">
-                Description
-              </th>
-              {selectedType === "All" && (
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                  Type
-                </th>
-              )}
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                Unit
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
-                Biasa Rate
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
-                Ahad Rate
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
-                Umum Rate
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                Active
-              </th>
-              <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-default-200 bg-white">
-            {paginatedCodes.length > 0 ? (
-              paginatedCodes.map((code) => (
-                <tr
-                  key={code.id}
-                  className="hover:bg-default-50 cursor-pointer"
-                  onClick={() => handleEditClick(code)}
-                >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                    {code.code}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-default-700 max-w-sm truncate">
-                    {code.description}
-                  </td>
-                  {selectedType === "All" && (
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                      {code.pay_type}
-                    </td>
-                  )}
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                    {code.rate_unit}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
-                    {typeof code.rate_biasa === "number"
-                      ? code.rate_biasa.toFixed(2)
-                      : Number(code.rate_biasa || 0).toFixed(2)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
-                    {typeof code.rate_ahad === "number"
-                      ? code.rate_ahad.toFixed(2)
-                      : Number(code.rate_ahad || 0).toFixed(2)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
-                    {typeof code.rate_umum === "number"
-                      ? code.rate_umum.toFixed(2)
-                      : Number(code.rate_umum || 0).toFixed(2)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-default-700">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        code.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {code.is_active ? "Yes" : "No"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
-                    <div className="flex items-center justify-center space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditClick(code);
-                        }}
-                        className="text-sky-600 hover:text-sky-800"
-                        title="Edit"
-                      >
-                        <IconPencil size={18} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteClick(code);
-                        }}
-                        className="text-rose-600 hover:text-rose-800"
-                        title="Delete"
-                      >
-                        <IconTrash size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={selectedType === "All" ? 9 : 8}
-                  className="px-6 py-10 text-center text-sm text-default-500"
-                >
-                  {filteredCodes.length === 0 &&
-                  searchTerm === "" &&
-                  selectedType === "All"
-                    ? "No pay codes found. Create one to get started."
-                    : "No pay codes match your filters."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {/* Pagination */}
-      {filteredCodes.length > itemsPerPage && (
-        <div className="mt-4 flex justify-between items-center">
-          <div>
-            <p className="text-sm text-default-700">
-              Showing{" "}
-              {Math.min(
-                filteredCodes.length,
-                (currentPage - 1) * itemsPerPage + 1
-              )}{" "}
-              to {Math.min(filteredCodes.length, currentPage * itemsPerPage)} of{" "}
-              {filteredCodes.length} results
-            </p>
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              variant="outline"
-              size="sm"
-              icon={IconChevronLeft}
-            >
-              Previous
-            </Button>
-            {/* Page numbers would go here */}
-            <Button
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
-              disabled={currentPage === totalPages}
-              variant="outline"
-              size="sm"
-              iconPosition="right"
-              icon={IconChevronRight}
-            >
-              Next
-            </Button>
-          </div>
+      {/* Loading indicator */}
+      {loading ? (
+        <div className="flex justify-center my-20">
+          <LoadingSpinner />
         </div>
+      ) : (
+        <>
+          {/* Table */}
+          <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-default-200">
+              <thead className="bg-default-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    Code
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 max-w-sm">
+                    Description
+                  </th>
+                  {selectedType === "All" && (
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Type
+                    </th>
+                  )}
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    Unit
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
+                    Biasa Rate
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
+                    Ahad Rate
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
+                    Umum Rate
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                    Active
+                  </th>
+                  <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-200 bg-white">
+                {paginatedCodes.length > 0 ? (
+                  paginatedCodes.map((code) => (
+                    <tr
+                      key={code.id}
+                      className="hover:bg-default-50 cursor-pointer"
+                      onClick={() => handleEditClick(code)}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                        {code.code}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-default-700 max-w-sm truncate">
+                        {code.description}
+                      </td>
+                      {selectedType === "All" && (
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                          {code.pay_type}
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                        {code.rate_unit}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
+                        {typeof code.rate_biasa === "number"
+                          ? code.rate_biasa.toFixed(2)
+                          : Number(code.rate_biasa || 0).toFixed(2)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
+                        {typeof code.rate_ahad === "number"
+                          ? code.rate_ahad.toFixed(2)
+                          : Number(code.rate_ahad || 0).toFixed(2)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
+                        {typeof code.rate_umum === "number"
+                          ? code.rate_umum.toFixed(2)
+                          : Number(code.rate_umum || 0).toFixed(2)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-default-700">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            code.is_active
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {code.is_active ? "Yes" : "No"}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
+                        <div className="flex items-center justify-center space-x-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditClick(code);
+                            }}
+                            className="text-sky-600 hover:text-sky-800"
+                            title="Edit"
+                          >
+                            <IconPencil size={18} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(code);
+                            }}
+                            className="text-rose-600 hover:text-rose-800"
+                            title="Delete"
+                          >
+                            <IconTrash size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={selectedType === "All" ? 9 : 8}
+                      className="px-6 py-10 text-center text-sm text-default-500"
+                    >
+                      {filteredCodes.length === 0 &&
+                      searchTerm === "" &&
+                      selectedType === "All"
+                        ? "No pay codes found. Create one to get started."
+                        : "No pay codes match your filters."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination - only show if we have more than one page */}
+          {filteredCodes.length > itemsPerPage && <Pagination />}
+        </>
       )}
+
       {/* Modals */}
       <PayCodeModal
         isOpen={showAddModal}
