@@ -6,11 +6,6 @@ import cron from "node-cron";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
-import {
-  NODE_ENV,
-  SERVER_HOST,
-  MYINVOIS_API_BASE_URL,
-} from "./src/configs/config.js";
 import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";

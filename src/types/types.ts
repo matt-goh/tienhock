@@ -577,3 +577,27 @@ export interface SelectOption {
   id: string;
   name: string;
 }
+
+export type PayType =
+  | "Base"
+  | "Tambahan"
+  | "Overtime";
+export type RateUnit = "Hour" | "Day" | "Bag" | "Fixed" | "Percent";
+
+export interface PayCode {
+  id: string;
+  code: string;
+  description: string;
+  pay_type: PayType;
+  rate_unit: RateUnit;
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+  is_active: boolean;
+  requires_units_input: boolean;
+  section_id?: string; // Optional field to indicate the section when used in section_pay_codes
+  override_rate_biasa?: number | null; // Used for section-specific overrides
+  override_rate_ahad?: number | null; // Used for section-specific overrides
+  override_rate_umum?: number | null; // Used for section-specific overrides
+  is_default?: boolean; // Used for section-specific settings
+}

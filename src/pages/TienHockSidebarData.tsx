@@ -28,6 +28,7 @@ import CustomerAddPage from "./Catalogue/CustomerAddPage";
 import CustomerFormPage from "./Catalogue/CustomerFormPage";
 
 // Other catalogues
+import PayCodePage from "./Catalogue/PayCodePage";
 import ProductPage from "./Catalogue/ProductPage";
 import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
@@ -142,6 +143,11 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Job",
         path: "/catalogue/job",
         component: JobPage,
+      },
+      {
+        name: "Pay Codes",
+        path: "/catalogue/pay-codes",
+        component: PayCodePage,
       },
       {
         name: "Job Category",
