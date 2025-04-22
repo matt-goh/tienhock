@@ -1,5 +1,11 @@
 // src/pages/Catalogue/JobPage.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  Fragment,
+} from "react";
 import {
   Combobox,
   ComboboxButton,
@@ -7,9 +13,6 @@ import {
   ComboboxOptions,
   ComboboxOption,
   Field,
-  Dialog,
-  DialogPanel,
-  DialogTitle,
 } from "@headlessui/react";
 import {
   IconCheck,
@@ -18,17 +21,20 @@ import {
   IconPlus,
   IconChevronLeft,
   IconChevronRight,
+  IconPencil, // For Edit Rates button
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { Job, JobDetail, PayCode } from "../../types/types";
+import { Job, PayCode, JobPayCodeDetails } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
 import { useJobsCache } from "../../hooks/useJobsCache";
 import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
+import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal"; // Import Add modal
+import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal"; // Import Edit modal
 
 type JobSelection = Job | null;
 
@@ -36,144 +42,128 @@ const JobPage: React.FC = () => {
   // --- State ---
   const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
-  const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
-  const [jobType] = useState<string>("All");
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
     mappings: jobPayCodeMap,
-    payCodes: availablePayCodes,
+    payCodes: availablePayCodes, // Contains default PayCode info
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
-  const [jobPayCodes, setJobPayCodes] = useState<PayCode[]>([]);
+  const [jobPayCodesDetails, setJobPayCodesDetails] = useState<
+    JobPayCodeDetails[]
+  >([]);
   const [loadingPayCodes, setLoadingPayCodes] = useState(false);
-  const [showAddPayCodeModal, setShowAddPayCodeModal] = useState(false);
-  const [selectedPayCode, setSelectedPayCode] = useState<PayCode | null>(null);
 
-  // --- Modal/Dialog States ---
+  // --- Modal States ---
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [showDeleteJobDialog, setShowDeleteJobDialog] = useState(false);
+  const [showRemovePayCodeDialog, setShowRemovePayCodeDialog] = useState(false);
+  const [payCodeToRemove, setPayCodeToRemove] =
+    useState<JobPayCodeDetails | null>(null); // Store the detail object
+  const [showAddPayCodeModal, setShowAddPayCodeModal] = useState(false); // For NewPayCodeModal
+  const [showEditRatesModal, setShowEditRatesModal] = useState(false); // For EditPayCodeRatesModal
+  const [payCodeDetailToEdit, setPayCodeDetailToEdit] =
+    useState<JobPayCodeDetails | null>(null); // Data for edit modal
+
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(50); // 50 items per page as requested
-  const [showRemovePayCodeDialog, setShowRemovePayCodeDialog] = useState(false);
-  const [payCodeToRemove, setPayCodeToRemove] = useState<PayCode | null>(null);
+  const [itemsPerPage] = useState<number>(15); // Can increase this now
 
   // --- Data Fetching ---
-  const fetchJobPayCodes = useCallback(
-    async (jobId: string) => {
-      if (!jobId) {
-        setJobPayCodes([]);
-        return;
-      }
-      setLoadingPayCodes(true);
-      try {
-        // Check if data exists in cache
-        if (
-          jobPayCodeMap &&
-          jobPayCodeMap[jobId] &&
-          availablePayCodes.length > 0
-        ) {
-          const payCodeIds = jobPayCodeMap[jobId];
-          const matchingPayCodes = availablePayCodes.filter((pc) =>
-            payCodeIds.includes(pc.id)
-          );
+  const fetchJobPayCodesDetails = useCallback(async (jobId: string) => {
+    if (!jobId) {
+      setJobPayCodesDetails([]);
+      return;
+    }
+    setLoadingPayCodes(true);
+    try {
+      const rawData = await api.get(`/api/job-pay-codes/job/${jobId}`);
+      // Parse rates after fetching
+      const parsedData = (rawData || []).map((item: any) => ({
+        ...item,
+        rate_biasa: parseFloat(item.rate_biasa) || 0,
+        rate_ahad: parseFloat(item.rate_ahad) || 0,
+        rate_umum: parseFloat(item.rate_umum) || 0,
+        override_rate_biasa:
+          item.override_rate_biasa === null
+            ? null
+            : parseFloat(item.override_rate_biasa) || null,
+        override_rate_ahad:
+          item.override_rate_ahad === null
+            ? null
+            : parseFloat(item.override_rate_ahad) || null,
+        override_rate_umum:
+          item.override_rate_umum === null
+            ? null
+            : parseFloat(item.override_rate_umum) || null,
+      })) as JobPayCodeDetails[];
+      setJobPayCodesDetails(parsedData);
+    } catch (error) {
+      console.error("Error fetching job pay code details:", error);
+      toast.error("Failed to fetch pay codes & rates for this job.");
+      setJobPayCodesDetails([]);
+    } finally {
+      setLoadingPayCodes(false);
+    }
+  }, []);
 
-          if (matchingPayCodes.length > 0) {
-            setJobPayCodes(matchingPayCodes);
-            setLoadingPayCodes(false);
-            return;
-          }
-        }
-
-        // Fallback to API call if not in cache
-        const data = await api.get(`/api/job-pay-codes/job/${jobId}`);
-        setJobPayCodes(data);
-      } catch (error) {
-        console.error("Error fetching job pay codes:", error);
-        toast.error("Failed to fetch pay codes for this job.");
-        setJobPayCodes([]);
-      } finally {
-        setLoadingPayCodes(false);
-      }
-    },
-    [jobPayCodeMap, availablePayCodes]
-  );
-
-  // Update the useEffect that handles job selection
   useEffect(() => {
     if (selectedJob) {
-      fetchJobPayCodes(selectedJob.id);
+      fetchJobPayCodesDetails(selectedJob.id);
     } else {
-      setAllJobDetails([]);
-      setJobPayCodes([]);
+      setJobPayCodesDetails([]);
     }
-  }, [selectedJob, fetchJobPayCodes]);
+  }, [selectedJob, fetchJobPayCodesDetails]);
 
-  // Create a function to add a pay code to a job
+  // --- Add/Remove Pay Codes ---
+  // Passed to NewPayCodeModal
   const handleAddPayCodeToJob = async (payCodeId: string) => {
-    if (!selectedJob) return;
+    if (!selectedJob) throw new Error("No job selected"); // Modal should prevent this but safety check
 
     try {
       await api.post("/api/job-pay-codes", {
         job_id: selectedJob.id,
         pay_code_id: payCodeId,
-        is_default: true,
+        is_default: true, // Or determine this differently
       });
-
       toast.success("Pay code added to job successfully");
-      await refreshPayCodeMappings();
-      fetchJobPayCodes(selectedJob.id);
-    } catch (error) {
+      await refreshPayCodeMappings(); // Refresh the general map
+      fetchJobPayCodesDetails(selectedJob.id); // Re-fetch details for this job
+    } catch (error: any) {
       console.error("Error adding pay code to job:", error);
-      toast.error("Failed to add pay code to job");
+      const message =
+        error?.response?.data?.message || "Failed to add pay code to job";
+      toast.error(message);
+      throw new Error(message); // Re-throw for modal error handling if needed
     }
   };
 
-  // Create a function to remove a pay code from a job
   const handleRemovePayCodeFromJob = async (payCodeId: string) => {
     if (!selectedJob) return;
-
     try {
       await api.delete(`/api/job-pay-codes/${selectedJob.id}/${payCodeId}`);
       toast.success("Pay code removed from job successfully");
       await refreshPayCodeMappings();
-      fetchJobPayCodes(selectedJob.id);
+      fetchJobPayCodesDetails(selectedJob.id);
     } catch (error) {
       console.error("Error removing pay code from job:", error);
       toast.error("Failed to remove pay code from job");
     }
   };
 
-  // --- Derived State ---
-  const filteredJobs = useMemo(
-    () =>
-      query === ""
-        ? jobs
-        : jobs.filter((job) =>
-            job.name.toLowerCase().includes(query.toLowerCase())
-          ),
-    [jobs, query]
-  );
+  // --- Edit Rates Modal Trigger ---
+  const handleEditRatesClick = (detail: JobPayCodeDetails) => {
+    setPayCodeDetailToEdit(detail);
+    setShowEditRatesModal(true);
+  };
 
-  const filteredJobDetails = useMemo(() => {
-    if (jobType === "All") {
-      return allJobDetails;
+  // --- Callback after saving rates ---
+  const handleRatesSaved = () => {
+    if (selectedJob) {
+      fetchJobPayCodesDetails(selectedJob.id); // Just refresh the details
     }
-    return allJobDetails.filter((detail) => detail.type === jobType);
-  }, [jobType, allJobDetails]);
+  };
 
-  // Calculate total pages
-  const totalPages = useMemo(
-    () => Math.ceil(filteredJobDetails.length / itemsPerPage),
-    [filteredJobDetails, itemsPerPage]
-  );
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedJob, jobType]);
-
-  // --- Job Handlers ---
+  // --- Other Handlers (Job Add/Delete, Confirmations) ---
   const handleJobSelection = useCallback(
     (selection: Job | null | undefined) => {
       if (selection === undefined) {
@@ -181,6 +171,7 @@ const JobPage: React.FC = () => {
       } else {
         setSelectedJob(selection);
         setQuery("");
+        setCurrentPage(1); // Reset pagination on job change
       }
     },
     []
@@ -200,73 +191,43 @@ const JobPage: React.FC = () => {
             : newJobData.section,
         };
         const response = await api.post("/api/jobs", jobToSend);
-
-        if (response.message && !response.job) {
-          throw new Error(response.message);
-        }
+        const createdJob = response.job;
+        if (!createdJob || !createdJob.id)
+          throw new Error(response.message || "Failed to add job");
 
         toast.success("Job added successfully");
         setShowAddJobModal(false);
-        await refreshJobs(); // Use the hook's refresh function
-
-        // Find and select the new job after refresh
-        const foundJob = jobs.find((j) => j.id === newJobData.id);
-        if (foundJob) {
-          setSelectedJob(foundJob);
-        }
+        await refreshJobs();
+        setSelectedJob({
+          ...createdJob,
+          section: Array.isArray(createdJob.section)
+            ? createdJob.section
+            : (createdJob.section || "").split(", ").filter((s: string) => s),
+        });
       } catch (error: any) {
         console.error("Error adding job:", error);
-        toast.error(error.message || "Failed to add job. Please try again.");
-        throw new Error(
-          error.message || "Failed to add job. Please try again."
-        );
+        toast.error(error.message || "Failed to add job");
       }
     },
-    [refreshJobs, jobs]
+    [refreshJobs]
   );
 
-  // --- Delete Handler for the dedicated button ---
-  const handleDeleteSelectedJobClick = useCallback(
-    async () => {
-      if (!selectedJob) {
-        toast.error("No job selected to delete.");
-        return;
-      }
-      try {
-        // Check if job details exist
-        const response = await api.get(
-          `/api/jobs/${selectedJob.id}/details/count`
-        );
-        const { count } = response as { count: number };
-
-        if (count > 0) {
-          toast.error(
-            `Cannot delete job "${selectedJob.name}". It has ${count} associated detail(s). Please delete them first.`
-          );
-        } else {
-          // No need for jobToDelete state, show dialog for selectedJob
-          setShowDeleteJobDialog(true);
-        }
-      } catch (error) {
-        console.error("Error checking job details count:", error);
-        toast.error("Could not check for associated job details.");
-      }
-    },
-    [selectedJob] // Depends only on the currently selected job
-  );
+  const handleDeleteSelectedJobClick = useCallback(async () => {
+    if (!selectedJob) return;
+    if (jobPayCodesDetails.length > 0) {
+      toast.error(
+        `Cannot delete job "${selectedJob.name}". It has ${jobPayCodesDetails.length} associated pay code(s).`
+      );
+    } else {
+      setShowDeleteJobDialog(true);
+    }
+  }, [selectedJob, jobPayCodesDetails]);
 
   const handleConfirmRemovePayCode = useCallback(async () => {
     if (!payCodeToRemove || !selectedJob) return;
-
-    try {
-      await handleRemovePayCodeFromJob(payCodeToRemove.id);
-      setShowRemovePayCodeDialog(false);
-      setPayCodeToRemove(null);
-    } catch (error) {
-      // Error is already handled in handleRemovePayCodeFromJob
-      setShowRemovePayCodeDialog(false);
-      setPayCodeToRemove(null);
-    }
+    await handleRemovePayCodeFromJob(payCodeToRemove.id); // Use id from the stored detail object
+    setShowRemovePayCodeDialog(false);
+    setPayCodeToRemove(null);
   }, [payCodeToRemove, selectedJob, handleRemovePayCodeFromJob]);
 
   const confirmDeleteJob = useCallback(async () => {
@@ -275,55 +236,75 @@ const JobPage: React.FC = () => {
       await api.delete(`/api/jobs/${selectedJob.id}`);
       toast.success(`Job "${selectedJob.name}" deleted successfully`);
       setShowDeleteJobDialog(false);
-
-      // Clear selection FIRST
       setSelectedJob(null);
-
-      // THEN refresh caches
       await refreshJobs();
       await refreshPayCodeMappings();
     } catch (error) {
       console.error("Error deleting job:", error);
-      toast.error("Failed to delete job. Please try again.");
+      toast.error("Failed to delete job");
       setShowDeleteJobDialog(false);
     }
   }, [selectedJob, refreshJobs, refreshPayCodeMappings]);
 
-  // Pagination component
+  // --- Derived State ---
+  const filteredJobs = useMemo(
+    () =>
+      query === ""
+        ? jobs
+        : jobs.filter((job) =>
+            job.name.toLowerCase().includes(query.toLowerCase())
+          ),
+    [jobs, query]
+  );
+  const totalPayCodePages = useMemo(
+    () => Math.ceil(jobPayCodesDetails.length / itemsPerPage),
+    [jobPayCodesDetails, itemsPerPage]
+  );
+  const paginatedPayCodes = useMemo(
+    () =>
+      jobPayCodesDetails.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      ),
+    [jobPayCodesDetails, currentPage, itemsPerPage]
+  );
+  const availablePayCodesToAdd = useMemo(() => {
+    if (!selectedJob) return [];
+    const assignedIds = new Set(jobPayCodesDetails.map((d) => d.id));
+    return availablePayCodes.filter((pc) => !assignedIds.has(pc.id));
+  }, [selectedJob, jobPayCodesDetails, availablePayCodes]);
+
+  // --- Helper Function ---
+  const getDisplayRate = useCallback(
+    (detail: JobPayCodeDetails, type: "biasa" | "ahad" | "umum"): number => {
+      const overrideRate = detail[`override_rate_${type}`];
+      const defaultRate = detail[`rate_${type}`];
+      return overrideRate !== null && typeof overrideRate === "number"
+        ? overrideRate
+        : defaultRate ?? 0;
+    },
+    []
+  ); // No dependencies needed
+
+  // --- Pagination Component ---
   const Pagination = () => {
-    // Page navigation handlers
+    // ... (Pagination component remains the same as previous version) ...
     const handleNextPage = () => {
-      if (currentPage < totalPages) {
-        setCurrentPage((prev) => prev + 1);
-      }
+      if (currentPage < totalPayCodePages) setCurrentPage((prev) => prev + 1);
     };
-
     const handlePrevPage = () => {
-      if (currentPage > 1) {
-        setCurrentPage((prev) => prev - 1);
-      }
+      if (currentPage > 1) setCurrentPage((prev) => prev - 1);
     };
-
-    const handlePageChange = (page: number) => {
-      setCurrentPage(page);
-    };
-
-    // Calculate page numbers to show
+    const handlePageChange = (page: number) => setCurrentPage(page);
     const pageNumbers: number[] = [];
     let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, startPage + 4);
-
-    // Adjust if we're near the end
-    if (endPage === totalPages && endPage - 4 > 0) {
+    let endPage = Math.min(totalPayCodePages, startPage + 4);
+    if (endPage === totalPayCodePages && endPage - 4 > 0)
       startPage = Math.max(1, endPage - 4);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-
+    for (let i = startPage; i <= endPage; i++) pageNumbers.push(i);
+    if (totalPayCodePages <= 1) return null;
     return (
-      <div className="flex items-center justify-between py-3 border-t border-default-200">
+      <div className="flex items-center justify-between py-3 border-t border-default-200 mt-4">
         <div>
           <p className="text-sm text-default-600">
             Showing{" "}
@@ -332,34 +313,28 @@ const JobPage: React.FC = () => {
             </span>{" "}
             to{" "}
             <span className="font-medium">
-              {Math.min(currentPage * itemsPerPage, filteredJobDetails.length)}
+              {Math.min(currentPage * itemsPerPage, jobPayCodesDetails.length)}
             </span>{" "}
-            of <span className="font-medium">{filteredJobDetails.length}</span>{" "}
+            of <span className="font-medium">{jobPayCodesDetails.length}</span>{" "}
             results
           </p>
         </div>
-
         <div>
           <nav
             className="inline-flex rounded-md shadow-sm -space-x-px"
             aria-label="Pagination"
           >
-            {/* Previous button */}
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium 
-              ${
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium ${
                 currentPage === 1
                   ? "text-default-300 cursor-not-allowed"
                   : "text-default-500 hover:bg-default-50"
               }`}
             >
-              <span className="sr-only">Previous</span>
-              <IconChevronLeft size={18} aria-hidden="true" />
+              <IconChevronLeft size={18} />
             </button>
-
-            {/* First page + ellipsis */}
             {startPage > 1 && (
               <>
                 <button
@@ -375,53 +350,44 @@ const JobPage: React.FC = () => {
                 )}
               </>
             )}
-
-            {/* Page numbers */}
-            {pageNumbers.map((number) => (
+            {pageNumbers.map((num) => (
               <button
-                key={number}
-                onClick={() => handlePageChange(number)}
-                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
-                ${
-                  currentPage === number
+                key={num}
+                onClick={() => handlePageChange(num)}
+                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                  currentPage === num
                     ? "z-10 bg-sky-50 border-sky-500 text-sky-600"
                     : "bg-white border-default-300 text-default-700 hover:bg-default-50"
                 }`}
               >
-                {number}
+                {num}
               </button>
             ))}
-
-            {/* Last page + ellipsis */}
-            {endPage < totalPages && (
+            {endPage < totalPayCodePages && (
               <>
-                {endPage < totalPages - 1 && (
+                {endPage < totalPayCodePages - 1 && (
                   <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
                     ...
                   </span>
                 )}
                 <button
-                  onClick={() => handlePageChange(totalPages)}
+                  onClick={() => handlePageChange(totalPayCodePages)}
                   className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
                 >
-                  {totalPages}
+                  {totalPayCodePages}
                 </button>
               </>
             )}
-
-            {/* Next button */}
             <button
               onClick={handleNextPage}
-              disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium
-              ${
-                currentPage === totalPages
+              disabled={currentPage === totalPayCodePages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium ${
+                currentPage === totalPayCodePages
                   ? "text-default-300 cursor-not-allowed"
                   : "text-default-500 hover:bg-default-50"
               }`}
             >
-              <span className="sr-only">Next</span>
-              <IconChevronRight size={18} aria-hidden="true" />
+              <IconChevronRight size={18} />
             </button>
           </nav>
         </div>
@@ -435,12 +401,12 @@ const JobPage: React.FC = () => {
       className={`relative ${selectedJob ? "w-full" : ""} mx-4 mb-2 md:mx-6`}
     >
       <h1 className="mb-6 text-center text-xl font-semibold text-default-800">
-        Job Catalogue & Details
+        Job Catalogue & Pay Codes
       </h1>
-      {/* Job Selection and Info Area */}
+      {/* Job Selection */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-        {/* Job Combobox */}
         <div className="md:flex-shrink-0">
+          {/* ... Job Combobox ... */}
           <label className="block text-sm font-medium text-default-700 mb-1">
             Select Job
           </label>
@@ -455,15 +421,10 @@ const JobPage: React.FC = () => {
                   autoComplete="off"
                 />
                 <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
-                  <IconChevronDown
-                    size={20}
-                    className="text-gray-400"
-                    aria-hidden="true"
-                  />
+                  <IconChevronDown size={20} className="text-gray-400" />
                 </ComboboxButton>
               </div>
               <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-64 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                {/* Add Job Option */}
                 <ComboboxOption
                   className={({ active }) =>
                     `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
@@ -477,22 +438,20 @@ const JobPage: React.FC = () => {
                   </span>
                   Add New Job
                 </ComboboxOption>
-
-                {/* Separator */}
                 {(filteredJobs.length > 0 || loadingJobs) && (
                   <hr className="my-1" />
                 )}
-
-                {/* Job List */}
-                {loadingJobs ? (
+                {loadingJobs && (
                   <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
                     Loading jobs...
                   </div>
-                ) : filteredJobs.length === 0 && query !== "" ? (
+                )}
+                {!loadingJobs && filteredJobs.length === 0 && query !== "" && (
                   <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
                     No jobs found.
                   </div>
-                ) : (
+                )}
+                {!loadingJobs &&
                   filteredJobs.map((job) => (
                     <ComboboxOption
                       key={job.id}
@@ -503,15 +462,8 @@ const JobPage: React.FC = () => {
                       }
                       value={job}
                     >
-                      {({ selected, active }) => (
+                      {({ selected }) => (
                         <>
-                          {/* Checkmark */}
-                          {selected && (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                              <IconCheck size={20} aria-hidden="true" />
-                            </span>
-                          )}
-                          {/* Job Name */}
                           <span
                             className={`block truncate ${
                               selected ? "font-medium" : "font-normal"
@@ -519,19 +471,23 @@ const JobPage: React.FC = () => {
                           >
                             {job.name}
                           </span>
+                          {selected && (
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                              <IconCheck size={20} />
+                            </span>
+                          )}
                         </>
                       )}
                     </ComboboxOption>
-                  ))
-                )}
+                  ))}
               </ComboboxOptions>
             </Combobox>
           </Field>
         </div>
-
-        {/* Selected Job Info */}
+        {/* Selected Job Info & Delete Button */}
         {selectedJob && (
           <div className="flex-1 flex flex-col md:flex-row md:items-center gap-4">
+            {/* ... Info boxes ... */}
             <div className="flex flex-wrap gap-4 flex-1">
               <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
                 <p className="text-xs uppercase text-default-500 font-medium">
@@ -541,7 +497,6 @@ const JobPage: React.FC = () => {
                   {selectedJob.id}
                 </p>
               </div>
-
               <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
                 <p className="text-xs uppercase text-default-500 font-medium">
                   Section
@@ -549,10 +504,9 @@ const JobPage: React.FC = () => {
                 <p className="text-default-800 font-semibold">
                   {Array.isArray(selectedJob.section)
                     ? selectedJob.section.join(", ")
-                    : selectedJob.section}
+                    : selectedJob.section || "N/A"}
                 </p>
               </div>
-
               <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
                 <p className="text-xs uppercase text-default-500 font-medium">
                   Name
@@ -562,8 +516,6 @@ const JobPage: React.FC = () => {
                 </p>
               </div>
             </div>
-
-            {/* Action Buttons for Selected Job */}
             <div className="md:ml-auto mt-3 md:mt-0">
               <Button
                 onClick={handleDeleteSelectedJobClick}
@@ -571,51 +523,35 @@ const JobPage: React.FC = () => {
                 color="rose"
                 size="sm"
                 icon={IconTrash}
-                aria-label="Delete Selected Job"
               >
-                Delete
+                Delete Job
               </Button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Pay Codes Section */}
       {selectedJob && (
         <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          {/* Header + Add Button */}
           <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
             <h2 className="text-lg font-semibold text-default-800">
               Pay Codes for "{selectedJob.name}"
             </h2>
-            <div className="flex w-full items-center justify-end gap-4 md:w-auto">
-              <Button
-                onClick={() => {
-                  setShowAddPayCodeModal(true);
-
-                  // Filter available pay codes to exclude ones already assigned to the job
-                  if (selectedJob && jobPayCodeMap[selectedJob.id]) {
-                    const assignedPayCodeIds = jobPayCodeMap[selectedJob.id];
-                    const filteredPayCodes = availablePayCodes.filter(
-                      (payCode) => !assignedPayCodeIds.includes(payCode.id)
-                    );
-                    // If there's only one unassigned pay code, select it automatically
-                    if (filteredPayCodes.length === 1) {
-                      setSelectedPayCode(filteredPayCodes[0]);
-                    } else {
-                      setSelectedPayCode(null); // Reset selection
-                    }
-                  }
-                }}
-                color="sky"
-                variant="filled"
-                icon={IconPlus}
-                size="md"
-                disabled={!selectedJob}
-              >
-                Add Pay Code
-              </Button>
-            </div>
+            <Button
+              onClick={() => setShowAddPayCodeModal(true)}
+              color="sky"
+              variant="filled"
+              icon={IconPlus}
+              size="md"
+              disabled={!selectedJob}
+            >
+              Add Pay Code
+            </Button>
           </div>
 
-          {/* Pay Codes List/Table */}
+          {/* Table */}
           {loadingPayCodes ? (
             <div className="flex justify-center py-10">
               <LoadingSpinner />
@@ -652,59 +588,99 @@ const JobPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-default-200 bg-white">
-                  {jobPayCodes.length > 0 ? (
-                    jobPayCodes.map((payCode) => (
-                      <tr key={payCode.id} className="hover:bg-default-50">
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                          {payCode.code}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-default-700 max-w-xs truncate">
-                          {payCode.description}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                          {payCode.pay_type}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                          {payCode.rate_unit}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
-                          {typeof payCode.rate_biasa === "number"
-                            ? payCode.rate_biasa.toFixed(2)
-                            : "0.00"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
-                          {typeof payCode.rate_ahad === "number"
-                            ? payCode.rate_ahad.toFixed(2)
-                            : "0.00"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
-                          {typeof payCode.rate_umum === "number"
-                            ? payCode.rate_umum.toFixed(2)
-                            : "0.00"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
-                          <div className="flex items-center justify-center space-x-2">
-                            <button
-                              onClick={() => {
-                                setPayCodeToRemove(payCode);
-                                setShowRemovePayCodeDialog(true);
-                              }}
-                              className="text-rose-600 hover:text-rose-800"
-                              title="Remove Pay Code"
-                            >
-                              <IconTrash size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                  {paginatedPayCodes.length > 0 ? (
+                    paginatedPayCodes.map((detail) => {
+                      const displayBiasa = getDisplayRate(detail, "biasa");
+                      const displayAhad = getDisplayRate(detail, "ahad");
+                      const displayUmum = getDisplayRate(detail, "umum");
+                      return (
+                        <tr
+                          key={detail.id}
+                          className="hover:bg-default-50"
+                          onClick={() => handleEditRatesClick(detail)}
+                        >
+                          {/* Static Columns */}
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                            {detail.code}
+                          </td>
+                          <td
+                            className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
+                            title={detail.description}
+                          >
+                            {detail.description}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                            {detail.pay_type}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                            {detail.rate_unit}
+                          </td>
+                          {/* Read-only Rate Columns */}
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                            <span>{displayBiasa.toFixed(2)}</span>
+                            {detail.override_rate_biasa !== null && (
+                              <span
+                                className="ml-1 text-xs text-sky-600"
+                                title="Override"
+                              >
+                                (O)
+                              </span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                            <span>{displayAhad.toFixed(2)}</span>
+                            {detail.override_rate_ahad !== null && (
+                              <span
+                                className="ml-1 text-xs text-sky-600"
+                                title="Override"
+                              >
+                                (O)
+                              </span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                            <span>{displayUmum.toFixed(2)}</span>
+                            {detail.override_rate_umum !== null && (
+                              <span
+                                className="ml-1 text-xs text-sky-600"
+                                title="Override"
+                              >
+                                (O)
+                              </span>
+                            )}
+                          </td>
+                          {/* Action Buttons */}
+                          <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
+                            <div className="flex items-center justify-center space-x-2">
+                              <button
+                                className="text-sky-600 hover:text-sky-800"
+                                title="Edit Rates"
+                              >
+                                <IconPencil size={18} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPayCodeToRemove(detail);
+                                  setShowRemovePayCodeDialog(true);
+                                }}
+                                className="text-rose-600 hover:text-rose-800"
+                                title="Remove Pay Code"
+                              >
+                                <IconTrash size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td
                         colSpan={8}
                         className="px-6 py-10 text-center text-sm text-default-500"
                       >
-                        No pay codes assigned to this job.
+                        No pay codes assigned.
                       </td>
                     </tr>
                   )}
@@ -712,116 +688,64 @@ const JobPage: React.FC = () => {
               </table>
             </div>
           )}
+          {/* Pagination */}
+          <Pagination />
         </div>
       )}
       {/* Placeholder */}
       {!selectedJob && !loadingJobs && (
         <div className="mt-10 text-center text-default-500">
-          Select a job from the list above or{" "}
+          Select a job or{" "}
           <button
             onClick={handleAddJobClickInList}
             className="text-sky-600 hover:underline"
           >
             add a new job
-          </button>{" "}
-          to view details.
+          </button>
+          .
         </div>
       )}
-      {/* Modals and Dialogs */}
+
+      {/* --- Modals --- */}
       <NewJobModal
         isOpen={showAddJobModal}
         onClose={() => setShowAddJobModal(false)}
         onJobAdded={handleJobAdded}
       />
+      <NewPayCodeModal
+        isOpen={showAddPayCodeModal}
+        onClose={() => setShowAddPayCodeModal(false)}
+        job={selectedJob}
+        availablePayCodesToAdd={availablePayCodesToAdd}
+        onPayCodeAdded={handleAddPayCodeToJob}
+      />
+      <EditPayCodeRatesModal
+        isOpen={showEditRatesModal}
+        onClose={() => setShowEditRatesModal(false)}
+        jobId={selectedJob?.id ?? ""}
+        payCodeDetail={payCodeDetailToEdit}
+        onRatesSaved={handleRatesSaved}
+      />
+
+      {/* --- Dialogs --- */}
       <ConfirmationDialog
         isOpen={showDeleteJobDialog}
         onClose={() => setShowDeleteJobDialog(false)}
-        // Use selectedJob in the message now
         onConfirm={confirmDeleteJob}
         title="Delete Job"
-        message={`Are you sure you want to delete the job "${
-          selectedJob?.name ?? "N/A"
-        }"? This action cannot be undone.`}
+        message={`Delete job "${selectedJob?.name ?? ""}"?`}
         variant="danger"
       />
-      <Dialog
-        open={showAddPayCodeModal}
-        onClose={() => setShowAddPayCodeModal(false)}
-        className="relative z-50"
-      >
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-            <DialogTitle
-              as="h3"
-              className="text-lg font-medium leading-6 text-gray-900"
-            >
-              Add Pay Code to Job
-            </DialogTitle>
-            <div className="mt-4">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">
-                  Select Pay Code
-                </label>
-                <select
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  onChange={(e) => {
-                    const selected = availablePayCodes.find(
-                      (pc) => pc.id === e.target.value
-                    );
-                    setSelectedPayCode(selected || null);
-                  }}
-                  value={selectedPayCode?.id || ""}
-                >
-                  <option value="">Select a pay code</option>
-                  {availablePayCodes.map((pc) => (
-                    <option key={pc.id} value={pc.id}>
-                      {pc.code} - {pc.description}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mt-4 flex justify-end space-x-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAddPayCodeModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  color="sky"
-                  variant="filled"
-                  disabled={!selectedPayCode}
-                  onClick={() => {
-                    if (selectedPayCode) {
-                      handleAddPayCodeToJob(selectedPayCode.id);
-                      setShowAddPayCodeModal(false);
-                      setSelectedPayCode(null);
-                    }
-                  }}
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
-          </DialogPanel>
-        </div>
-      </Dialog>
-      {/* Pay Code Removal Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showRemovePayCodeDialog}
         onClose={() => setShowRemovePayCodeDialog(false)}
         onConfirm={handleConfirmRemovePayCode}
         title="Remove Pay Code"
-        message={`Are you sure you want to remove the pay code "${
+        message={`Remove "${
           payCodeToRemove?.code || ""
-        }" from this job? This action cannot be undone.`}
+        }" from this job? Overrides will be lost.`}
         variant="danger"
       />
-      {/* Pagination - only show if we have more than one page */}
-      {filteredJobDetails.length > itemsPerPage && <Pagination />}
     </div>
   );
 };
