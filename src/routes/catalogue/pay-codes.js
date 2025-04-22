@@ -181,7 +181,9 @@ export default function (pool) {
       const checkResult = await pool.query(checkQuery, [id]);
 
       if (checkResult.rows.length > 0) {
+        // Return a clear error response with a 400 status code
         return res.status(400).json({
+          error: true,
           message:
             "Cannot delete this pay code because it is used in job assignments",
         });
@@ -191,18 +193,23 @@ export default function (pool) {
       const result = await pool.query(query, [id]);
 
       if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Pay code not found" });
+        return res.status(404).json({
+          error: true,
+          message: "Pay code not found",
+        });
       }
 
       res.json({
+        error: false,
         message: "Pay code deleted successfully",
         payCode: result.rows[0],
       });
     } catch (error) {
       console.error("Error deleting pay code:", error);
       res.status(500).json({
+        error: true,
         message: "Error deleting pay code",
-        error: error.message,
+        details: error.message,
       });
     }
   });

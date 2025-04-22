@@ -658,6 +658,7 @@ const CustomerFormPage: React.FC = () => {
                         }}
                         options={idTypeOptions}
                         disabled={isSaving}
+                        optionsPosition="top"
                       />
                     </div>
                     {renderInput(
