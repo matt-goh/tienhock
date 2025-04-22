@@ -6,7 +6,7 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 
 const MeeProductionListPage: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleAddEntry = () => {
