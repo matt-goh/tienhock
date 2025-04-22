@@ -578,10 +578,7 @@ export interface SelectOption {
   name: string;
 }
 
-export type PayType =
-  | "Base"
-  | "Tambahan"
-  | "Overtime";
+export type PayType = "Base" | "Tambahan" | "Overtime";
 export type RateUnit = "Hour" | "Day" | "Bag" | "Fixed" | "Percent";
 
 export interface PayCode {
@@ -600,4 +597,13 @@ export interface PayCode {
   override_rate_ahad?: number | null; // Used for section-specific overrides
   override_rate_umum?: number | null; // Used for section-specific overrides
   is_default?: boolean; // Used for section-specific settings
+}
+
+export interface JobPayCodeDetails extends PayCode {
+  job_id: string; // Added for context if needed
+  pay_code_id: string; // Redundant with id, but aligns with join table
+  is_default_setting: boolean; // The is_default flag from job_pay_codes join table
+  override_rate_biasa: number | null;
+  override_rate_ahad: number | null;
+  override_rate_umum: number | null;
 }
