@@ -37,7 +37,6 @@ const JobPage: React.FC = () => {
   const {
     jobs,
     loading: loadingJobs,
-    error: jobsError,
     refreshJobs,
   } = useJobsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
@@ -47,7 +46,6 @@ const JobPage: React.FC = () => {
   const {
     mappings: jobPayCodeMap,
     payCodes: availablePayCodes,
-    loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const [jobPayCodes, setJobPayCodes] = useState<PayCode[]>([]);
@@ -165,13 +163,6 @@ const JobPage: React.FC = () => {
     }
     return allJobDetails.filter((detail) => detail.type === jobType);
   }, [jobType, allJobDetails]);
-
-  // Calculate paginated job details
-  const paginatedJobDetails = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredJobDetails.slice(startIndex, endIndex);
-  }, [filteredJobDetails, currentPage, itemsPerPage]);
 
   // Calculate total pages
   const totalPages = useMemo(
