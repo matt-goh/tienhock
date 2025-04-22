@@ -35,6 +35,7 @@ import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
 import MeeProductionListPage from "./Payroll/MeeProductionListPage";
+import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 
 export const TienHockSidebarData: SidebarItem[] = [
   {
@@ -55,7 +56,7 @@ export const TienHockSidebarData: SidebarItem[] = [
           {
             name: "New Machine Entry",
             path: "/payroll/mee-machine-entry",
-            component: MeeProductionListPage,
+            component: DailyLogEntryPage,
           },
         ],
       },
