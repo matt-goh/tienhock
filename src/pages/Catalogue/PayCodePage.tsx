@@ -1,3 +1,4 @@
+// src/pages/Catalogue/PayCodePage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   IconCheck,
@@ -23,20 +24,22 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PayCodeModal from "../../components/Catalogue/PayCodeModal";
+import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
 
 const PayCodePage: React.FC = () => {
   // State
-  const [payCodes, setPayCodes] = useState<PayCode[]>([]);
   const [filteredCodes, setFilteredCodes] = useState<PayCode[]>([]);
   const [selectedType, setSelectedType] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<string>("All");
-  const [jobPayCodeMap, setJobPayCodeMap] = useState<Record<string, string[]>>(
-    {}
-  );
+
+  const {
+    mappings: jobPayCodeMap,
+    payCodes,
+    loading: loadingData,
+    refreshData,
+  } = useJobPayCodeMappings();
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -130,27 +133,6 @@ const PayCodePage: React.FC = () => {
     </div>
   );
 
-  // Fetch pay codes
-  const fetchPayCodes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get("/api/pay-codes");
-      // Ensure data is an array before setting state
-      if (Array.isArray(data)) {
-        setPayCodes(data);
-      } else {
-        console.warn("API response for pay codes is not an array:", data);
-        setPayCodes([]); // Set to empty array if response is not as expected
-      }
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching pay codes:", err);
-      setError("Failed to fetch pay codes. Please try again later.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const fetchJobs = useCallback(async () => {
     try {
       const data = await api.get("/api/jobs");
@@ -161,41 +143,17 @@ const PayCodePage: React.FC = () => {
     }
   }, []);
 
-  const fetchJobPayCodeMap = useCallback(async () => {
-    try {
-      // This will create a map of job IDs to arrays of pay code IDs
-      const map: Record<string, string[]> = {};
-
-      // Fetch for each job, this is not the most efficient but works for the initial implementation
-      for (const job of jobs) {
-        const data = await api.get(`/api/job-pay-codes/job/${job.id}`);
-        if (data && data.length > 0) {
-          map[job.id] = data.map((item: any) => item.pay_code_id);
-        }
-      }
-
-      setJobPayCodeMap(map);
-    } catch (error) {
-      console.error("Error fetching job-pay code map:", error);
-    }
-  }, [jobs]);
-
   // Initial fetch
   useEffect(() => {
-    fetchPayCodes();
     fetchJobs();
-  }, [fetchPayCodes, fetchJobs]);
+  }, [fetchJobs]);
 
-  // Add useEffect to fetch job-pay code map when jobs are loaded
+  // Filter pay codes based on type, job and search term
   useEffect(() => {
-    if (jobs.length > 0) {
-      fetchJobPayCodeMap();
-    }
-  }, [jobs, fetchJobPayCodeMap]);
+    // Don't filter if we're still loading or have no data
+    if (loadingData) return;
 
-  // Filter pay codes based on type and search term
-  useEffect(() => {
-    let filtered = payCodes;
+    let filtered = [...payCodes];
 
     // Filter by type if not "All"
     if (selectedType !== "All") {
@@ -204,8 +162,12 @@ const PayCodePage: React.FC = () => {
 
     // Filter by job if not "All"
     if (selectedJob !== "All") {
-      const payCodeIdsForJob = jobPayCodeMap[selectedJob] || [];
-      filtered = filtered.filter((code) => payCodeIdsForJob.includes(code.id));
+      const payCodeIds = jobPayCodeMap[selectedJob] || [];
+      if (payCodeIds.length > 0) {
+        filtered = filtered.filter((code) => payCodeIds.includes(code.id));
+      } else {
+        filtered = [];
+      }
     }
 
     // Filter by search term
@@ -213,14 +175,21 @@ const PayCodePage: React.FC = () => {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (code) =>
-          code.code.toLowerCase().includes(term) ||
-          code.description.toLowerCase().includes(term)
+          (code.code?.toLowerCase() || "").includes(term) ||
+          (code.description?.toLowerCase() || "").includes(term)
       );
     }
 
     setFilteredCodes(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [payCodes, selectedType, selectedJob, searchTerm, jobPayCodeMap]);
+    setCurrentPage(1);
+  }, [
+    payCodes,
+    selectedType,
+    selectedJob,
+    searchTerm,
+    jobPayCodeMap,
+    loadingData,
+  ]);
 
   // Calculate paginated data
   const paginatedCodes = useMemo(() => {
@@ -249,17 +218,15 @@ const PayCodePage: React.FC = () => {
   const handleSavePayCode = async (payCodeData: PayCode) => {
     try {
       if (codeToEdit) {
-        // Update existing code
         await api.put(`/api/pay-codes/${payCodeData.id}`, payCodeData);
         toast.success("Pay code updated successfully");
       } else {
-        // Create new code
         await api.post("/api/pay-codes", payCodeData);
         toast.success("Pay code created successfully");
       }
 
       setShowAddModal(false);
-      fetchPayCodes(); // Refresh the list
+      refreshData(); // Use refreshData to refresh both payCodes and mappings
     } catch (error: any) {
       console.error("Error saving pay code:", error);
       throw new Error(error.message || "Failed to save pay code");
@@ -269,7 +236,9 @@ const PayCodePage: React.FC = () => {
   // Handle delete
   const handleDeleteClick = async (code: PayCode) => {
     // Check if pay code is in use
-    const isInUse = await checkPayCodeUsage(code.id);
+    const isInUse = Object.values(jobPayCodeMap).some((payCodeIds) =>
+      payCodeIds.includes(code.id)
+    );
 
     if (isInUse) {
       toast.error(
@@ -299,7 +268,7 @@ const PayCodePage: React.FC = () => {
 
       toast.success("Pay code deleted successfully");
       setShowDeleteDialog(false);
-      fetchPayCodes(); // Refresh the list
+      refreshData();
     } catch (error: any) {
       console.error("Error deleting pay code:", error);
 
@@ -319,16 +288,6 @@ const PayCodePage: React.FC = () => {
       }
 
       setShowDeleteDialog(false);
-    }
-  };
-
-  const checkPayCodeUsage = async (payCodeId: string): Promise<boolean> => {
-    try {
-      const data = await api.get(`/api/job-pay-codes/paycode/${payCodeId}`);
-      return data.length > 0;
-    } catch (error) {
-      console.error("Error checking pay code usage:", error);
-      return false;
     }
   };
 
@@ -382,24 +341,6 @@ const PayCodePage: React.FC = () => {
       </Listbox>
     </div>
   );
-
-  // Loading state
-  if (loading && payCodes.length === 0) {
-    return (
-      <div className="mt-40 w-full flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  // Error state
-  if (error && payCodes.length === 0) {
-    return (
-      <div className="mt-20 w-full flex items-center justify-center text-red-600">
-        Error: {error}
-      </div>
-    );
-  }
 
   return (
     <div className="relative w-full mx-4 md:mx-6">
@@ -492,8 +433,6 @@ const PayCodePage: React.FC = () => {
                     {code.code}
                   </td>
                   <td className="px-4 py-3 text-sm text-default-700 max-w-sm truncate">
-                    {" "}
-                    {/* Adjusted width and added truncate */}
                     {code.description}
                   </td>
                   {selectedType === "All" && (
@@ -505,22 +444,16 @@ const PayCodePage: React.FC = () => {
                     {code.rate_unit}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
-                    {" "}
-                    {/* Increased width */}
                     {typeof code.rate_biasa === "number"
                       ? code.rate_biasa.toFixed(2)
                       : Number(code.rate_biasa || 0).toFixed(2)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
-                    {" "}
-                    {/* Increased width */}
                     {typeof code.rate_ahad === "number"
                       ? code.rate_ahad.toFixed(2)
                       : Number(code.rate_ahad || 0).toFixed(2)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
-                    {" "}
-                    {/* Increased width */}
                     {typeof code.rate_umum === "number"
                       ? code.rate_umum.toFixed(2)
                       : Number(code.rate_umum || 0).toFixed(2)}
@@ -568,22 +501,17 @@ const PayCodePage: React.FC = () => {
                   colSpan={selectedType === "All" ? 9 : 8}
                   className="px-6 py-10 text-center text-sm text-default-500"
                 >
-                  {loading ? (
-                    <LoadingSpinner size="sm" />
-                  ) : filteredCodes.length === 0 &&
-                    searchTerm === "" &&
-                    selectedType === "All" ? (
-                    "No pay codes found. Create one to get started."
-                  ) : (
-                    "No pay codes match your filters."
-                  )}
+                  {filteredCodes.length === 0 &&
+                  searchTerm === "" &&
+                  selectedType === "All"
+                    ? "No pay codes found. Create one to get started."
+                    : "No pay codes match your filters."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-      </div>{" "}
-      {/* End of Table container */}
+      </div>
       {/* Pagination */}
       {filteredCodes.length > itemsPerPage && (
         <div className="mt-4 flex justify-between items-center">
