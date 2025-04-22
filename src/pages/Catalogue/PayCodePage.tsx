@@ -18,7 +18,7 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { PayCode, PayType } from "../../types/types";
+import { PayCode, Job } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -32,6 +32,11 @@ const PayCodePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [selectedJob, setSelectedJob] = useState<string>("All");
+  const [jobPayCodeMap, setJobPayCodeMap] = useState<Record<string, string[]>>(
+    {}
+  );
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -45,6 +50,85 @@ const PayCodePage: React.FC = () => {
 
   // The pay type options
   const payTypeOptions: string[] = ["All", "Base", "Tambahan", "Overtime"];
+
+  const renderJobFilter = () => (
+    <div className="flex items-center space-x-2">
+      <span className="font-semibold text-sm text-default-700">Job:</span>
+      <Listbox value={selectedJob} onChange={setSelectedJob}>
+        <div className="relative">
+          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+            <span className="block truncate">
+              {selectedJob === "All"
+                ? "All Jobs"
+                : jobs.find((j) => j.id === selectedJob)?.name || selectedJob}
+            </span>
+            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+              <IconChevronDown
+                size={20}
+                className="text-gray-400"
+                aria-hidden="true"
+              />
+            </span>
+          </ListboxButton>
+          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+            <ListboxOption
+              value="All"
+              className={({ active }) =>
+                `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                  active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                }`
+              }
+            >
+              {({ selected }) => (
+                <>
+                  <span
+                    className={`block truncate ${
+                      selected ? "font-medium" : "font-normal"
+                    }`}
+                  >
+                    All Jobs
+                  </span>
+                  {selected ? (
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                      <IconCheck size={20} aria-hidden="true" />
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </ListboxOption>
+            {jobs.map((job) => (
+              <ListboxOption
+                key={job.id}
+                className={({ active }) =>
+                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                    active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                  }`
+                }
+                value={job.id}
+              >
+                {({ selected }) => (
+                  <>
+                    <span
+                      className={`block truncate ${
+                        selected ? "font-medium" : "font-normal"
+                      }`}
+                    >
+                      {job.name}
+                    </span>
+                    {selected ? (
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                        <IconCheck size={20} aria-hidden="true" />
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </ListboxOption>
+            ))}
+          </ListboxOptions>
+        </div>
+      </Listbox>
+    </div>
+  );
 
   // Fetch pay codes
   const fetchPayCodes = useCallback(async () => {
@@ -67,10 +151,47 @@ const PayCodePage: React.FC = () => {
     }
   }, []);
 
+  const fetchJobs = useCallback(async () => {
+    try {
+      const data = await api.get("/api/jobs");
+      setJobs(data);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      setJobs([]);
+    }
+  }, []);
+
+  const fetchJobPayCodeMap = useCallback(async () => {
+    try {
+      // This will create a map of job IDs to arrays of pay code IDs
+      const map: Record<string, string[]> = {};
+
+      // Fetch for each job, this is not the most efficient but works for the initial implementation
+      for (const job of jobs) {
+        const data = await api.get(`/api/job-pay-codes/job/${job.id}`);
+        if (data && data.length > 0) {
+          map[job.id] = data.map((item: any) => item.pay_code_id);
+        }
+      }
+
+      setJobPayCodeMap(map);
+    } catch (error) {
+      console.error("Error fetching job-pay code map:", error);
+    }
+  }, [jobs]);
+
   // Initial fetch
   useEffect(() => {
     fetchPayCodes();
-  }, [fetchPayCodes]);
+    fetchJobs();
+  }, [fetchPayCodes, fetchJobs]);
+
+  // Add useEffect to fetch job-pay code map when jobs are loaded
+  useEffect(() => {
+    if (jobs.length > 0) {
+      fetchJobPayCodeMap();
+    }
+  }, [jobs, fetchJobPayCodeMap]);
 
   // Filter pay codes based on type and search term
   useEffect(() => {
@@ -79,6 +200,12 @@ const PayCodePage: React.FC = () => {
     // Filter by type if not "All"
     if (selectedType !== "All") {
       filtered = filtered.filter((code) => code.pay_type === selectedType);
+    }
+
+    // Filter by job if not "All"
+    if (selectedJob !== "All") {
+      const payCodeIdsForJob = jobPayCodeMap[selectedJob] || [];
+      filtered = filtered.filter((code) => payCodeIdsForJob.includes(code.id));
     }
 
     // Filter by search term
@@ -93,7 +220,7 @@ const PayCodePage: React.FC = () => {
 
     setFilteredCodes(filtered);
     setCurrentPage(1); // Reset to first page when filters change
-  }, [payCodes, selectedType, searchTerm]);
+  }, [payCodes, selectedType, selectedJob, searchTerm, jobPayCodeMap]);
 
   // Calculate paginated data
   const paginatedCodes = useMemo(() => {
@@ -140,7 +267,17 @@ const PayCodePage: React.FC = () => {
   };
 
   // Handle delete
-  const handleDeleteClick = (code: PayCode) => {
+  const handleDeleteClick = async (code: PayCode) => {
+    // Check if pay code is in use
+    const isInUse = await checkPayCodeUsage(code.id);
+
+    if (isInUse) {
+      toast.error(
+        `Cannot delete: Pay code "${code.code}" is used in job assignments`
+      );
+      return;
+    }
+
     setCodeToDelete(code);
     setShowDeleteDialog(true);
   };
@@ -149,13 +286,49 @@ const PayCodePage: React.FC = () => {
     if (!codeToDelete) return;
 
     try {
-      await api.delete(`/api/pay-codes/${codeToDelete.id}`);
+      const response = await api.delete(`/api/pay-codes/${codeToDelete.id}`);
+
+      // Check if response contains an error message (API might return 200 with error content)
+      if (
+        response &&
+        response.message &&
+        response.message.includes("Cannot delete")
+      ) {
+        throw new Error(response.message);
+      }
+
       toast.success("Pay code deleted successfully");
       setShowDeleteDialog(false);
       fetchPayCodes(); // Refresh the list
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting pay code:", error);
-      toast.error("Failed to delete pay code");
+
+      // Extract error message from different possible sources
+      let errorMessage = "Failed to delete pay code";
+
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === "object" && error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      if (errorMessage.includes("used in job assignments")) {
+        toast.error(`Cannot delete: This pay code is used in job assignments`);
+      } else {
+        toast.error(errorMessage);
+      }
+
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const checkPayCodeUsage = async (payCodeId: string): Promise<boolean> => {
+    try {
+      const data = await api.get(`/api/job-pay-codes/paycode/${payCodeId}`);
+      return data.length > 0;
+    } catch (error) {
+      console.error("Error checking pay code usage:", error);
+      return false;
     }
   };
 
@@ -239,6 +412,9 @@ const PayCodePage: React.FC = () => {
           {/* Filter by type */}
           {renderPayTypeFilter()}
 
+          {/* Filter by job */}
+          {renderJobFilter()}
+
           {/* Search */}
           <div className="relative w-full md:w-64">
             <IconSearch
@@ -267,8 +443,7 @@ const PayCodePage: React.FC = () => {
             Add Pay Code
           </Button>
         </div>
-      </div>{" "}
-      {/* End of Header area */}
+      </div>
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-default-200">
@@ -289,13 +464,13 @@ const PayCodePage: React.FC = () => {
                 Unit
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
-                Rate (Normal)
+                Biasa Rate
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
-                Rate (Sunday)
+                Ahad Rate
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
-                Rate (Holiday)
+                Umum Rate
               </th>
               <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
                 Active

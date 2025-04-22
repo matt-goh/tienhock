@@ -7,16 +7,14 @@ import {
   ComboboxOptions,
   ComboboxOption,
   Field,
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
+  Dialog,
+  DialogPanel,
+  DialogTitle,
 } from "@headlessui/react";
 import {
   IconCheck,
   IconChevronDown,
   IconTrash,
-  IconPencil,
   IconPlus,
   IconChevronLeft,
   IconChevronRight,
@@ -24,10 +22,9 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { Job, JobDetail } from "../../types/types";
+import { Job, JobDetail, PayCode } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
-import JobDetailModal from "../../components/Catalogue/JobDetailModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
 
@@ -40,21 +37,16 @@ const JobPage: React.FC = () => {
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
   const [jobType, setJobType] = useState<string>("All");
   const [loadingJobs, setLoadingJobs] = useState(true);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [query, setQuery] = useState(""); // For job combobox filtering
-  // No longer need hoveredJobId for delete button in list
-  // const [hoveredJobId, setHoveredJobId] = useState<string | null>(null);
+  const [jobPayCodes, setJobPayCodes] = useState<PayCode[]>([]);
+  const [availablePayCodes, setAvailablePayCodes] = useState<PayCode[]>([]);
+  const [loadingPayCodes, setLoadingPayCodes] = useState(false);
+  const [showAddPayCodeModal, setShowAddPayCodeModal] = useState(false);
+  const [selectedPayCode, setSelectedPayCode] = useState<PayCode | null>(null);
 
   // --- Modal/Dialog States ---
   const [showAddJobModal, setShowAddJobModal] = useState(false);
-  const [showAddDetailModal, setShowAddDetailModal] = useState(false);
-  const [showEditDetailModal, setShowEditDetailModal] = useState(false);
-  const [detailToEdit, setDetailToEdit] = useState<JobDetail | null>(null);
   const [showDeleteJobDialog, setShowDeleteJobDialog] = useState(false);
-  // No longer need jobToDelete state, will use selectedJob directly
-  // const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
-  const [showDeleteDetailDialog, setShowDeleteDetailDialog] = useState(false);
-  const [detailToDelete, setDetailToDelete] = useState<JobDetail | null>(null);
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(50); // 50 items per page as requested
@@ -94,36 +86,83 @@ const JobPage: React.FC = () => {
     [selectedJob]
   ); // Add selectedJob dependency for re-selection logic
 
-  const fetchJobDetails = useCallback(async (jobId: string) => {
-    if (!jobId) {
-      setAllJobDetails([]);
-      return;
-    }
-    setLoadingDetails(true);
-    try {
-      const data = (await api.get(`/api/jobs/${jobId}/details`)) as JobDetail[];
-      setAllJobDetails(data);
-    } catch (error) {
-      console.error("Error fetching job details:", error);
-      toast.error("Failed to fetch job details. Please try again.");
-      setAllJobDetails([]);
-    } finally {
-      setLoadingDetails(false);
-    }
-  }, []);
-
   useEffect(() => {
     fetchJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
+  const fetchJobPayCodes = useCallback(async (jobId: string) => {
+    if (!jobId) {
+      setJobPayCodes([]);
+      return;
+    }
+    setLoadingPayCodes(true);
+    try {
+      const data = await api.get(`/api/job-pay-codes/job/${jobId}`);
+      setJobPayCodes(data);
+    } catch (error) {
+      console.error("Error fetching job pay codes:", error);
+      toast.error("Failed to fetch pay codes for this job.");
+      setJobPayCodes([]);
+    } finally {
+      setLoadingPayCodes(false);
+    }
+  }, []);
+
+  // Add this function to fetch available pay codes
+  const fetchAvailablePayCodes = useCallback(async () => {
+    try {
+      const data = await api.get("/api/pay-codes");
+      setAvailablePayCodes(data);
+    } catch (error) {
+      console.error("Error fetching available pay codes:", error);
+      toast.error("Failed to fetch available pay codes.");
+      setAvailablePayCodes([]);
+    }
+  }, []);
+
+  // Update the useEffect that handles job selection
   useEffect(() => {
     if (selectedJob) {
-      fetchJobDetails(selectedJob.id);
+      fetchJobPayCodes(selectedJob.id);
     } else {
       setAllJobDetails([]);
+      setJobPayCodes([]);
     }
-  }, [selectedJob, fetchJobDetails]);
+  }, [selectedJob, fetchJobPayCodes]);
+
+  // Create a function to add a pay code to a job
+  const handleAddPayCodeToJob = async (payCodeId: string) => {
+    if (!selectedJob) return;
+
+    try {
+      await api.post("/api/job-pay-codes", {
+        job_id: selectedJob.id,
+        pay_code_id: payCodeId,
+        is_default: true,
+      });
+
+      toast.success("Pay code added to job successfully");
+      fetchJobPayCodes(selectedJob.id);
+    } catch (error) {
+      console.error("Error adding pay code to job:", error);
+      toast.error("Failed to add pay code to job");
+    }
+  };
+
+  // Create a function to remove a pay code from a job
+  const handleRemovePayCodeFromJob = async (payCodeId: string) => {
+    if (!selectedJob) return;
+
+    try {
+      await api.delete(`/api/job-pay-codes/${selectedJob.id}/${payCodeId}`);
+      toast.success("Pay code removed from job successfully");
+      fetchJobPayCodes(selectedJob.id);
+    } catch (error) {
+      console.error("Error removing pay code from job:", error);
+      toast.error("Failed to remove pay code from job");
+    }
+  };
 
   // --- Derived State ---
   const filteredJobs = useMemo(
@@ -257,144 +296,6 @@ const JobPage: React.FC = () => {
       setShowDeleteJobDialog(false);
     }
   }, [selectedJob, fetchJobs]); // Depends on selectedJob
-
-  // --- Job Detail Handlers (remain largely the same) ---
-  const handleAddDetailClick = () => {
-    if (!selectedJob) return;
-    setDetailToEdit(null);
-    setShowAddDetailModal(true);
-  };
-
-  const handleEditDetailClick = (detail: JobDetail) => {
-    setDetailToEdit(detail);
-    setShowEditDetailModal(true);
-  };
-
-  const handleSaveDetail = useCallback(
-    async (detailData: JobDetail) => {
-      if (!selectedJob) return;
-      try {
-        const detailToSend = {
-          ...detailData,
-          amount: Number(detailData.amount) || 0,
-        };
-
-        // Create a copy of all job details
-        const updatedDetails = [...allJobDetails];
-
-        // Find the index of the detail being edited (if it exists)
-        const existingIndex = updatedDetails.findIndex(
-          (d) => d.id === detailToSend.id
-        );
-
-        // Check if we're adding a new detail but the ID already exists
-        if (existingIndex >= 0 && !detailToEdit) {
-          // We're in add mode and the ID already exists
-          throw new Error(
-            `A job detail with ID "${detailToSend.id}" already exists.`
-          );
-        } else if (existingIndex >= 0) {
-          // Update existing detail (in edit mode)
-          updatedDetails[existingIndex] = detailToSend;
-        } else {
-          // Add new detail
-          updatedDetails.push(detailToSend);
-        }
-
-        // Send ALL details, not just the one being edited
-        await api.post("/api/job-details/batch", {
-          jobId: selectedJob.id,
-          jobDetails: updatedDetails,
-        });
-
-        toast.success(
-          `Job detail ${detailToEdit ? "updated" : "added"} successfully`
-        );
-        setShowAddDetailModal(false);
-        setShowEditDetailModal(false);
-        setDetailToEdit(null);
-        await fetchJobDetails(selectedJob.id);
-      } catch (error: any) {
-        console.error("Error saving job detail:", error);
-        throw new Error(
-          error.message || "Failed to save job detail. Please try again."
-        );
-      }
-    },
-    [selectedJob, fetchJobDetails, detailToEdit, allJobDetails]
-  );
-
-  const handleDeleteDetailClick = (detail: JobDetail) => {
-    setDetailToDelete(detail);
-    setShowDeleteDetailDialog(true);
-  };
-
-  const confirmDeleteDetail = useCallback(async () => {
-    if (!detailToDelete || !selectedJob) return;
-    try {
-      await api.delete("/api/job-details", {
-        jobDetailIds: [detailToDelete.id],
-      });
-      toast.success("Job detail deleted successfully");
-      setShowDeleteDetailDialog(false);
-      setDetailToDelete(null);
-      await fetchJobDetails(selectedJob.id);
-    } catch (error) {
-      console.error("Error deleting job detail:", error);
-      toast.error("Failed to delete job detail. Please try again.");
-    }
-  }, [detailToDelete, selectedJob, fetchJobDetails]);
-
-  // --- Render Job Type Listbox (remains the same) ---
-  const renderJobTypeListbox = () => (
-    <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700">Type:</span>
-      <Listbox value={jobType} onChange={setJobType}>
-        <div className="relative">
-          <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
-            <span className="block truncate">{jobType}</span>
-            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <IconChevronDown
-                size={20}
-                className="text-gray-400"
-                aria-hidden="true"
-              />
-            </span>
-          </ListboxButton>
-          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-            {["All", "Gaji", "Tambahan", "Overtime"].map((type) => (
-              <ListboxOption
-                key={type}
-                className={({ active }) =>
-                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                    active ? "bg-sky-100 text-sky-900" : "text-gray-900"
-                  }`
-                }
-                value={type}
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${
-                        selected ? "font-medium" : "font-normal"
-                      }`}
-                    >
-                      {type}
-                    </span>
-                    {selected ? (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                        <IconCheck size={20} aria-hidden="true" />
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </ListboxOption>
-            ))}
-          </ListboxOptions>
-        </div>
-      </Listbox>
-    </div>
-  );
 
   // Pagination component
   const Pagination = () => {
@@ -538,7 +439,9 @@ const JobPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className={`relative ${selectedJob ? "w-full" : ""} mx-4 mb-2 md:mx-6`}>
+    <div
+      className={`relative ${selectedJob ? "w-full" : ""} mx-4 mb-2 md:mx-6`}
+    >
       <h1 className="mb-6 text-center text-xl font-semibold text-default-800">
         Job Catalogue & Details
       </h1>
@@ -684,30 +587,31 @@ const JobPage: React.FC = () => {
           </div>
         )}
       </div>
-      {/* End Job Selection and Info Area */}
       {selectedJob && (
         <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
           <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
             <h2 className="text-lg font-semibold text-default-800">
-              Job Details for "{selectedJob.name}"
+              Pay Codes for "{selectedJob.name}"
             </h2>
             <div className="flex w-full items-center justify-end gap-4 md:w-auto">
-              {renderJobTypeListbox()}
               <Button
-                onClick={handleAddDetailClick}
+                onClick={() => {
+                  fetchAvailablePayCodes();
+                  setShowAddPayCodeModal(true);
+                }}
                 color="sky"
                 variant="filled"
                 icon={IconPlus}
                 size="md"
                 disabled={!selectedJob}
               >
-                Add Detail
+                Add Pay Code
               </Button>
             </div>
           </div>
 
-          {/* Details List/Table (remains the same, includes amount fix) */}
-          {loadingDetails ? (
+          {/* Pay Codes List/Table */}
+          {loadingPayCodes ? (
             <div className="flex justify-center py-10">
               <LoadingSpinner />
             </div>
@@ -717,21 +621,25 @@ const JobPage: React.FC = () => {
                 <thead className="bg-default-100">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                      ID
+                      Code
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
                       Description
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
-                      Amount
-                    </th>
-                    {jobType === "All" && (
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                        Type
-                      </th>
-                    )}
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                      Remark
+                      Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Unit
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      Biasa Rate
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      Ahad Rate
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      Umum Rate
                     </th>
                     <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
                       Actions
@@ -739,66 +647,44 @@ const JobPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-default-200 bg-white">
-                  {paginatedJobDetails.length > 0 ? (
-                    paginatedJobDetails.map((detail) => (
-                      <tr
-                        key={detail.id}
-                        className="hover:bg-default-50 cursor-pointer"
-                        onClick={() => handleEditDetailClick(detail)}
-                      >
+                  {jobPayCodes.length > 0 ? (
+                    jobPayCodes.map((payCode) => (
+                      <tr key={payCode.id} className="hover:bg-default-50">
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                          {detail.id}
+                          {payCode.code}
                         </td>
-                        <td
-                          className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
-                          title={detail.description}
-                        >
-                          {detail.description}
+                        <td className="px-4 py-3 text-sm text-default-700 max-w-xs truncate">
+                          {payCode.description}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                          {payCode.pay_type}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                          {payCode.rate_unit}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
-                          {(() => {
-                            const amountValue = detail.amount;
-                            if (typeof amountValue === "number") {
-                              return amountValue.toFixed(2);
-                            } else if (typeof amountValue === "string") {
-                              const parsedAmount = parseFloat(amountValue);
-                              return isNaN(parsedAmount)
-                                ? "0.00"
-                                : parsedAmount.toFixed(2);
-                            }
-                            return "0.00";
-                          })()}
+                          {typeof payCode.rate_biasa === "number"
+                            ? payCode.rate_biasa.toFixed(2)
+                            : "0.00"}
                         </td>
-                        {jobType === "All" && (
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                            {detail.type}
-                          </td>
-                        )}
-                        <td
-                          className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
-                          title={detail.remark}
-                        >
-                          {detail.remark}
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                          {typeof payCode.rate_ahad === "number"
+                            ? payCode.rate_ahad.toFixed(2)
+                            : "0.00"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                          {typeof payCode.rate_umum === "number"
+                            ? payCode.rate_umum.toFixed(2)
+                            : "0.00"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
                           <div className="flex items-center justify-center space-x-2">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                handleEditDetailClick(detail);
-                              }}
-                              className="text-sky-600 hover:text-sky-800"
-                              title="Edit Detail"
-                            >
-                              <IconPencil size={18} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteDetailClick(detail);
-                              }}
+                              onClick={() =>
+                                handleRemovePayCodeFromJob(payCode.id)
+                              }
                               className="text-rose-600 hover:text-rose-800"
-                              title="Delete Detail"
+                              title="Remove Pay Code"
                             >
                               <IconTrash size={18} />
                             </button>
@@ -809,12 +695,10 @@ const JobPage: React.FC = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={jobType === "All" ? 6 : 5}
+                        colSpan={8}
                         className="px-6 py-10 text-center text-sm text-default-500"
                       >
-                        {allJobDetails.length === 0
-                          ? "No details found for this job."
-                          : "No details match the selected type."}
+                        No pay codes assigned to this job.
                       </td>
                     </tr>
                   )}
@@ -843,23 +727,6 @@ const JobPage: React.FC = () => {
         onClose={() => setShowAddJobModal(false)}
         onJobAdded={handleJobAdded}
       />
-      {selectedJob && (
-        <>
-          <JobDetailModal
-            isOpen={showAddDetailModal}
-            onClose={() => setShowAddDetailModal(false)}
-            onSave={handleSaveDetail}
-            jobId={selectedJob.id}
-          />
-          <JobDetailModal
-            isOpen={showEditDetailModal}
-            onClose={() => setShowEditDetailModal(false)}
-            onSave={handleSaveDetail}
-            initialData={detailToEdit}
-            jobId={selectedJob.id}
-          />
-        </>
-      )}
       <ConfirmationDialog
         isOpen={showDeleteJobDialog}
         onClose={() => setShowDeleteJobDialog(false)}
@@ -871,16 +738,71 @@ const JobPage: React.FC = () => {
         }"? This action cannot be undone.`}
         variant="danger"
       />
-      <ConfirmationDialog
-        isOpen={showDeleteDetailDialog}
-        onClose={() => setShowDeleteDetailDialog(false)}
-        onConfirm={confirmDeleteDetail}
-        title="Delete Job Detail"
-        message={`Are you sure you want to delete the detail "${
-          detailToDelete?.description || detailToDelete?.id || "N/A"
-        }"? This action cannot be undone.`}
-        variant="danger"
-      />
+      <Dialog
+        open={showAddPayCodeModal}
+        onClose={() => setShowAddPayCodeModal(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+            <DialogTitle
+              as="h3"
+              className="text-lg font-medium leading-6 text-gray-900"
+            >
+              Add Pay Code to Job
+            </DialogTitle>
+            <div className="mt-4">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Select Pay Code
+                </label>
+                <select
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  onChange={(e) => {
+                    const selected = availablePayCodes.find(
+                      (pc) => pc.id === e.target.value
+                    );
+                    setSelectedPayCode(selected || null);
+                  }}
+                  value={selectedPayCode?.id || ""}
+                >
+                  <option value="">Select a pay code</option>
+                  {availablePayCodes.map((pc) => (
+                    <option key={pc.id} value={pc.id}>
+                      {pc.code} - {pc.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-4 flex justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddPayCodeModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  color="sky"
+                  variant="filled"
+                  disabled={!selectedPayCode}
+                  onClick={() => {
+                    if (selectedPayCode) {
+                      handleAddPayCodeToJob(selectedPayCode.id);
+                      setShowAddPayCodeModal(false);
+                      setSelectedPayCode(null);
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
       {/* Pagination - only show if we have more than one page */}
       {filteredJobDetails.length > itemsPerPage && <Pagination />}
     </div>
