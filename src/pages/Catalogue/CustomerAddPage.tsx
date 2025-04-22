@@ -19,12 +19,6 @@ import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab"
 import Tab from "../../components/Tab";
 import LoadingSpinner from "../../components/LoadingSpinner"; // Import LoadingSpinner
 
-// Keep SelectOption interface if not imported
-// interface SelectOption {
-//   id: string;
-//   name: string;
-// }
-
 const CustomerAddPage: React.FC = () => {
   const navigate = useNavigate();
   // State for custom products specific to this new customer
@@ -446,6 +440,7 @@ const CustomerAddPage: React.FC = () => {
                         }
                         options={idTypeOptions}
                         disabled={isSaving}
+                        optionsPosition="top"
                       />
                     </div>
                     {renderInput(
@@ -465,7 +460,6 @@ const CustomerAddPage: React.FC = () => {
 
                 {/* === Second tab - Credit & Pricing === */}
                 <div className="space-y-8 mt-5">
-                  {" "}
                   {/* Increased spacing */}
                   {/* --- Credit Management Section --- */}
                   <div className="p-4 border border-default-200 rounded-lg bg-gray-50/50">
