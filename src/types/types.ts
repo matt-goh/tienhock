@@ -583,7 +583,6 @@ export type RateUnit = "Hour" | "Day" | "Bag" | "Fixed" | "Percent";
 
 export interface PayCode {
   id: string;
-  code: string;
   description: string;
   pay_type: PayType;
   rate_unit: RateUnit;
@@ -599,10 +598,17 @@ export interface PayCode {
   is_default?: boolean; // Used for section-specific settings
 }
 
-export interface JobPayCodeDetails extends PayCode {
-  job_id: string; // Added for context if needed
-  pay_code_id: string; // Redundant with id, but aligns with join table
-  is_default_setting: boolean; // The is_default flag from job_pay_codes join table
+export interface JobPayCodeDetails
+  extends Omit<PayCode, "rate_biasa" | "rate_ahad" | "rate_umum"> {
+  // Omit original rates from PayCode base
+  job_id: string;
+  pay_code_id: string; // Same as id from PayCode table
+  is_default_setting: boolean;
+  // Default rates (ensure these are numbers after fetch/parse)
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+  // Override rates
   override_rate_biasa: number | null;
   override_rate_ahad: number | null;
   override_rate_umum: number | null;

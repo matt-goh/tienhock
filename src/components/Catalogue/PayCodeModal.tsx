@@ -6,20 +6,22 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
-import { PayCode, PayType, RateUnit } from "../../types/types";
-import { FormInput, FormListbox } from "../FormComponents";
+import { PayCode, PayType, RateUnit } from "../../types/types"; // PayCode type updated
+import { FormInput, FormListbox } from "../FormComponents"; // Ensure correct import path
 import Button from "../Button";
 
 interface PayCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (payCode: PayCode) => Promise<void>;
-  initialData?: PayCode | null;
+  onSave: (payCode: PayCode) => Promise<void>; // Parameter is the full PayCode (without code)
+  initialData?: PayCode | null; // PayCode object (without code)
+  existingPayCodes: PayCode[]; // Still needed for ID duplicate check
 }
 
-const defaultPayCode: PayCode = {
+// Default state without 'code'
+const defaultPayCode: Omit<PayCode, "code"> = {
+  // Use Omit if PayCode type still has 'code' temporarily
   id: "",
-  code: "",
   description: "",
   pay_type: "Base",
   rate_unit: "Hour",
@@ -35,8 +37,11 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   onClose,
   onSave,
   initialData = null,
+  existingPayCodes,
 }) => {
-  const [formData, setFormData] = useState<PayCode>(defaultPayCode);
+  // State type should match the structure without 'code'
+  const [formData, setFormData] =
+    useState<Omit<PayCode, "code">>(defaultPayCode);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -47,6 +52,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Base", name: "Base" },
     { id: "Tambahan", name: "Tambahan" },
     { id: "Overtime", name: "Overtime" },
+    // Add other PayType options if needed
   ];
 
   const rateUnitOptions = [
@@ -55,15 +61,24 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Bag", name: "Bag" },
     { id: "Fixed", name: "Fixed" },
     { id: "Percent", name: "Percent" },
+    // Add other RateUnit options if needed
   ];
 
   // Initialize form data
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        setFormData(initialData);
+        // If initialData somehow still has 'code', remove it
+        const { code, ...restData } = initialData as any; // Cast temporarily if needed
+        setFormData({
+          ...restData, // Use data without code
+          // Ensure rates are numbers for state consistency (though input is text)
+          rate_biasa: Number(restData.rate_biasa || 0),
+          rate_ahad: Number(restData.rate_ahad || 0),
+          rate_umum: Number(restData.rate_umum || 0),
+        });
       } else {
-        setFormData(defaultPayCode);
+        setFormData(defaultPayCode); // Use default without code
       }
       setError(null);
       setIsSaving(false);
@@ -76,94 +91,98 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   ) => {
     const { name, value, type } = e.target;
 
-    // Handle different input types
     if (type === "checkbox" && e.target instanceof HTMLInputElement) {
-      const { checked } = e.target; // Access checked property safely
-      setFormData((prev) => ({
-        ...prev,
-        [name]: checked,
-      }));
+      const target = e.target as HTMLInputElement; // Cast here
+      setFormData((prev) => ({ ...prev, [name]: target.checked }));
     } else if (
       name === "rate_biasa" ||
       name === "rate_ahad" ||
       name === "rate_umum"
     ) {
-      // Handle numeric inputs
-      const numValue = value === "" ? 0 : parseFloat(value);
+      // Allow empty string, numbers, and single decimal point for rate inputs
+      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+        setFormData((prev) => ({ ...prev, [name]: value })); // Keep as string
+      }
+    } else if (name === "id") {
+      // Convert ID to uppercase and replace spaces for consistency
       setFormData((prev) => ({
         ...prev,
-        [name]: isNaN(numValue) ? 0 : numValue,
+        [name]: value.toUpperCase().replace(/\s+/g, "_"),
       }));
     } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      // For description etc.
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
   // Handle listbox changes
-  const handleListboxChange = (name: keyof PayCode) => (value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // If changing rate_unit to Percent, ensure sensible defaults for rates
-    if (name === "rate_unit" && value === "Percent") {
-      setFormData((prev) => ({
-        ...prev,
-        rate_biasa: prev.rate_biasa > 100 ? 100 : prev.rate_biasa,
-        rate_ahad: prev.rate_ahad > 100 ? 100 : prev.rate_ahad,
-        rate_umum: prev.rate_umum > 100 ? 100 : prev.rate_umum,
-      }));
-    }
-  };
+  const handleListboxChange =
+    (name: keyof Omit<PayCode, "code">) => (value: string) => {
+      // Need to cast value appropriately if PayType/RateUnit are specific string literals
+      setFormData((prev) => ({ ...prev, [name]: value as PayType | RateUnit }));
+    };
 
   // Handle checkbox changes
   const handleCheckboxChange =
-    (name: keyof PayCode) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: e.target.checked,
-      }));
+    (name: keyof Omit<PayCode, "code">) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, [name]: e.target.checked }));
     };
 
   // Validate the form
   const validateForm = (): boolean => {
-    if (!formData.code.trim()) {
-      setError("Code cannot be empty");
+    setError(null); // Clear previous errors
+
+    const currentId = formData.id.trim();
+    const currentDesc = formData.description.trim();
+
+    if (!currentId) {
+      // ID is always required now
+      setError("ID cannot be empty");
       return false;
     }
-
-    if (!formData.description.trim()) {
+    if (!currentDesc) {
       setError("Description cannot be empty");
       return false;
     }
 
-    // Validate rates are not negative
-    if (
-      formData.rate_biasa < 0 ||
-      formData.rate_ahad < 0 ||
-      formData.rate_umum < 0
-    ) {
+    // --- Duplicate ID Check ---
+    // Check only on create mode
+    if (!isEditMode) {
+      if (existingPayCodes.some((pc) => pc.id === currentId)) {
+        setError(`Pay code ID '${currentId}' already exists.`);
+        return false;
+      }
+    }
+    // No duplicate code check
+
+    // --- Rate Validation ---
+    // Use optional chaining and nullish coalescing for safety when accessing formData values
+    const rateBiasaStr = formData.rate_biasa?.toString() ?? "";
+    const rateAhadStr = formData.rate_ahad?.toString() ?? "";
+    const rateUmumStr = formData.rate_umum?.toString() ?? "";
+
+    const rateBiasaNum = rateBiasaStr === "" ? 0 : parseFloat(rateBiasaStr); // Treat empty as 0 for validation
+    const rateAhadNum = rateAhadStr === "" ? 0 : parseFloat(rateAhadStr);
+    const rateUmumNum = rateUmumStr === "" ? 0 : parseFloat(rateUmumStr);
+
+    if (isNaN(rateBiasaNum) || isNaN(rateAhadNum) || isNaN(rateUmumNum)) {
+      setError("Rates must be valid numbers or empty.");
+      return false;
+    }
+
+    if (rateBiasaNum < 0 || rateAhadNum < 0 || rateUmumNum < 0) {
       setError("Rates cannot be negative");
       return false;
     }
 
-    // Percentages should not be greater than 100
     if (formData.rate_unit === "Percent") {
-      if (
-        formData.rate_biasa > 100 ||
-        formData.rate_ahad > 100 ||
-        formData.rate_umum > 100
-      ) {
+      if (rateBiasaNum > 100 || rateAhadNum > 100 || rateUmumNum > 100) {
         setError("Percentage rates cannot exceed 100%");
         return false;
       }
     }
 
-    setError(null);
     return true;
   };
 
@@ -171,35 +190,47 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm() || isSaving) {
+    if (!validateForm()) {
       return;
     }
 
     setIsSaving(true);
     setError(null);
 
-    try {
-      // If this is a new pay code, generate an ID if not provided
-      if (!isEditMode && !formData.id) {
-        setFormData((prev) => ({
-          ...prev,
-          id: prev.code.replace(/\s+/g, "_").toUpperCase(),
-        }));
-      }
+    // Prepare data for saving (ensure rates are numbers or null)
+    const rateBiasaStr = formData.rate_biasa?.toString() ?? "";
+    const rateAhadStr = formData.rate_ahad?.toString() ?? "";
+    const rateUmumStr = formData.rate_umum?.toString() ?? "";
 
-      await onSave(formData);
-      // Modal will be closed by parent component after successful save
+    const dataToSave: PayCode = {
+      ...formData,
+      id: formData.id.trim(), // Ensure trimmed ID
+      // Parse final rate values: empty string -> 0, otherwise parse float
+      rate_biasa: rateBiasaStr === "" ? 0 : parseFloat(rateBiasaStr),
+      rate_ahad: rateAhadStr === "" ? 0 : parseFloat(rateAhadStr),
+      rate_umum: rateUmumStr === "" ? 0 : parseFloat(rateUmumStr),
+    } as PayCode; // Assert type if Omit was used for state
+
+    try {
+      await onSave(dataToSave); // Pass the processed data
+      // Parent (PayCodePage) will close the modal on success
     } catch (error: any) {
       console.error("Error saving pay code:", error);
-      setError(error.message || "Failed to save pay code");
-    } finally {
-      setIsSaving(false);
+      // Display error message from the API or a generic one
+      setError(
+        error.message || "Failed to save pay code. Check console for details."
+      );
+      setIsSaving(false); // Ensure button is re-enabled on error
     }
   };
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="relative z-50"
+        onClose={() => !isSaving && onClose()}
+      >
         {/* Backdrop */}
         <TransitionChild
           as={Fragment}
@@ -233,18 +264,20 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   {isEditMode ? "Edit Pay Code" : "Add New Pay Code"}
                 </DialogTitle>
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  {/* Code */}
+                  {/* ID Input */}
                   <FormInput
-                    label="Code"
-                    name="code"
-                    value={formData.code}
+                    label="ID"
+                    name="id"
+                    value={formData.id}
                     onChange={handleChange}
                     required
-                    disabled={isSaving || isEditMode}
-                    placeholder="e.g., MEE_BIASA"
+                    disabled={isSaving || isEditMode} // Disable ID editing after creation
+                    placeholder="e.g., MEE_BASIC_PAY (Unique)"
                   />
 
-                  {/* Description */}
+                  {/* REMOVED Code Input */}
+
+                  {/* Description Input */}
                   <FormInput
                     label="Description"
                     name="description"
@@ -255,67 +288,71 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     placeholder="e.g., Basic Pay for Mee Section"
                   />
 
-                  {/* Pay Type */}
+                  {/* Pay Type Listbox */}
                   <FormListbox
                     label="Pay Type"
                     name="pay_type"
-                    value={formData.pay_type}
+                    // Ensure value matches one of the option IDs
+                    value={
+                      payTypeOptions.find((opt) => opt.id === formData.pay_type)
+                        ? formData.pay_type
+                        : payTypeOptions[0].id
+                    }
                     onChange={handleListboxChange("pay_type")}
                     options={payTypeOptions}
                     required
                     disabled={isSaving}
                   />
 
-                  {/* Rate Unit */}
+                  {/* Rate Unit Listbox */}
                   <FormListbox
                     label="Rate Unit"
                     name="rate_unit"
-                    value={formData.rate_unit}
+                    // Ensure value matches one of the option IDs
+                    value={
+                      rateUnitOptions.find(
+                        (opt) => opt.id === formData.rate_unit
+                      )
+                        ? formData.rate_unit
+                        : rateUnitOptions[0].id
+                    }
                     onChange={handleListboxChange("rate_unit")}
                     options={rateUnitOptions}
                     required
                     disabled={isSaving}
                   />
 
-                  {/* Rates */}
+                  {/* Rate Inputs */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <FormInput
                       label="Normal Rate"
                       name="rate_biasa"
-                      value={formData.rate_biasa.toString()}
+                      value={formData.rate_biasa?.toString() ?? ""} // Use empty string for placeholder trigger
                       onChange={handleChange}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={formData.rate_unit === "Percent" ? 100 : undefined}
-                      required
+                      type="text"
+                      required={false} // Rates might not be strictly required? Or default to 0?
                       disabled={isSaving}
+                      placeholder="0.00"
                     />
-
                     <FormInput
                       label="Sunday Rate"
                       name="rate_ahad"
-                      value={formData.rate_ahad.toString()}
+                      value={formData.rate_ahad?.toString() ?? ""}
                       onChange={handleChange}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={formData.rate_unit === "Percent" ? 100 : undefined}
-                      required
+                      type="text"
+                      required={false}
                       disabled={isSaving}
+                      placeholder="0.00"
                     />
-
                     <FormInput
                       label="Holiday Rate"
                       name="rate_umum"
-                      value={formData.rate_umum.toString()}
+                      value={formData.rate_umum?.toString() ?? ""}
                       onChange={handleChange}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={formData.rate_unit === "Percent" ? 100 : undefined}
-                      required
+                      type="text"
+                      required={false}
                       disabled={isSaving}
+                      placeholder="0.00"
                     />
                   </div>
 
@@ -326,9 +363,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         type="checkbox"
                         id="is_active"
                         name="is_active"
-                        checked={formData.is_active}
+                        checked={!!formData.is_active}
                         onChange={handleCheckboxChange("is_active")}
-                        className="h-4 w-4 rounded border-default-300 focus:ring-sky-500"
+                        className="h-4 w-4 rounded border-default-300 text-sky-600 focus:ring-sky-500"
                       />
                       <label
                         htmlFor="is_active"
@@ -337,15 +374,14 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         Active
                       </label>
                     </div>
-
                     <div className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         id="requires_units_input"
                         name="requires_units_input"
-                        checked={formData.requires_units_input}
+                        checked={!!formData.requires_units_input}
                         onChange={handleCheckboxChange("requires_units_input")}
-                        className="h-4 w-4 rounded border-default-300 focus:ring-sky-500"
+                        className="h-4 w-4 rounded border-default-300 text-sky-600 focus:ring-sky-500"
                       />
                       <label
                         htmlFor="requires_units_input"
