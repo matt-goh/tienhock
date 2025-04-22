@@ -4,50 +4,87 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get all pay codes
+  // GET / - Remove 'code' from SELECT
   router.get("/", async (req, res) => {
     try {
-      const query = "SELECT * FROM pay_codes ORDER BY code";
+      // Select all columns EXCEPT code
+      const query = `
+        SELECT
+          id, description, pay_type, rate_unit,
+          CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
+          CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
+          CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
+          is_active, requires_units_input, created_at, updated_at
+        FROM pay_codes ORDER BY id`; // Order by ID or description now
       const result = await pool.query(query);
-      res.json(result.rows);
+      // Parse numeric values
+      const payCodes = result.rows.map((pc) => ({
+        ...pc,
+        rate_biasa: pc.rate_biasa === null ? null : parseFloat(pc.rate_biasa),
+        rate_ahad: pc.rate_ahad === null ? null : parseFloat(pc.rate_ahad),
+        rate_umum: pc.rate_umum === null ? null : parseFloat(pc.rate_umum),
+      }));
+      res.json(payCodes);
     } catch (error) {
       console.error("Error fetching pay codes:", error);
-      res.status(500).json({
-        message: "Error fetching pay codes",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error fetching pay codes", error: error.message });
     }
   });
 
-  // Get a specific pay code
+  // GET /:id - Remove 'code' from SELECT
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
+    if (!id)
+      return res.status(400).json({ message: "Pay code ID is required" });
     try {
-      const query = "SELECT * FROM pay_codes WHERE id = $1";
+      // Select all columns EXCEPT code
+      const query = `
+        SELECT
+          id, description, pay_type, rate_unit,
+          CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
+          CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
+          CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
+          is_active, requires_units_input, created_at, updated_at
+        FROM pay_codes WHERE id = $1`;
       const result = await pool.query(query, [id]);
-
-      if (result.rows.length === 0) {
+      if (result.rows.length === 0)
         return res.status(404).json({ message: "Pay code not found" });
-      }
 
-      res.json(result.rows[0]);
+      // Parse numeric values
+      const payCode = {
+        ...result.rows[0],
+        rate_biasa:
+          result.rows[0].rate_biasa === null
+            ? null
+            : parseFloat(result.rows[0].rate_biasa),
+        rate_ahad:
+          result.rows[0].rate_ahad === null
+            ? null
+            : parseFloat(result.rows[0].rate_ahad),
+        rate_umum:
+          result.rows[0].rate_umum === null
+            ? null
+            : parseFloat(result.rows[0].rate_umum),
+      };
+
+      res.json(payCode);
     } catch (error) {
       console.error("Error fetching pay code:", error);
-      res.status(500).json({
-        message: "Error fetching pay code",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error fetching pay code", error: error.message });
     }
   });
 
-  // Create a new pay code
+  // POST / - Remove 'code' from insert and validation
   router.post("/", async (req, res) => {
     const {
       id,
-      code,
       description,
       pay_type,
-      rate_unit,
+      rate_unit, // Removed 'code'
       rate_biasa,
       rate_ahad,
       rate_umum,
@@ -55,62 +92,84 @@ export default function (pool) {
       requires_units_input,
     } = req.body;
 
-    try {
-      // Check if code already exists
-      const checkQuery = "SELECT * FROM pay_codes WHERE code = $1";
-      const checkResult = await pool.query(checkQuery, [code]);
+    // ID is now the main identifier besides description
+    if (!id || !description || !pay_type || !rate_unit) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Missing required fields (id, description, pay_type, rate_unit)",
+        });
+    }
 
-      if (checkResult.rows.length > 0) {
+    try {
+      // Check if ID already exists
+      const checkIdQuery = "SELECT 1 FROM pay_codes WHERE id = $1";
+      const checkIdResult = await pool.query(checkIdQuery, [id]);
+      if (checkIdResult.rows.length > 0) {
         return res
-          .status(400)
-          .json({ message: "A pay code with this code already exists" });
+          .status(409)
+          .json({ message: `A pay code with ID '${id}' already exists` });
       }
 
       const query = `
         INSERT INTO pay_codes (
-          id, code, description, pay_type, rate_unit, 
-          rate_biasa, rate_ahad, rate_umum, 
+          id, description, pay_type, rate_unit,
+          rate_biasa, rate_ahad, rate_umum,
           is_active, requires_units_input
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) -- Adjusted parameter count
         RETURNING *
       `;
-
       const values = [
         id,
-        code,
         description,
         pay_type,
         rate_unit,
-        rate_biasa,
-        rate_ahad,
-        rate_umum,
-        is_active,
-        requires_units_input,
+        rate_biasa === null ? null : parseFloat(rate_biasa) || 0,
+        rate_ahad === null ? null : parseFloat(rate_ahad) || 0,
+        rate_umum === null ? null : parseFloat(rate_umum) || 0,
+        is_active === undefined ? true : !!is_active,
+        requires_units_input === undefined ? false : !!requires_units_input,
       ];
 
       const result = await pool.query(query, values);
-      res.status(201).json({
-        message: "Pay code created successfully",
-        payCode: result.rows[0],
-      });
+      // Parse numeric values in returned object
+      const newPayCode = {
+        ...result.rows[0],
+        rate_biasa:
+          result.rows[0].rate_biasa === null
+            ? null
+            : parseFloat(result.rows[0].rate_biasa),
+        rate_ahad:
+          result.rows[0].rate_ahad === null
+            ? null
+            : parseFloat(result.rows[0].rate_ahad),
+        rate_umum:
+          result.rows[0].rate_umum === null
+            ? null
+            : parseFloat(result.rows[0].rate_umum),
+      };
+      res
+        .status(201)
+        .json({
+          message: "Pay code created successfully",
+          payCode: newPayCode,
+        });
     } catch (error) {
       console.error("Error creating pay code:", error);
-      res.status(500).json({
-        message: "Error creating pay code",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error creating pay code", error: error.message });
     }
   });
 
-  // Update a pay code
+  // PUT /:id - Remove 'code' from update and validation
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const {
-      code,
       description,
       pay_type,
-      rate_unit,
+      rate_unit, // Removed 'code'
       rate_biasa,
       rate_ahad,
       rate_umum,
@@ -118,99 +177,138 @@ export default function (pool) {
       requires_units_input,
     } = req.body;
 
-    try {
-      // Check if the pay code exists
-      const checkQuery = "SELECT * FROM pay_codes WHERE id = $1";
-      const checkResult = await pool.query(checkQuery, [id]);
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "Pay code ID is required in the URL" });
+    }
+    if (!description || !pay_type || !rate_unit) {
+      // Code removed from validation
+      return res
+        .status(400)
+        .json({
+          message: "Missing required fields (description, pay_type, rate_unit)",
+        });
+    }
 
-      if (checkResult.rows.length === 0) {
-        return res.status(404).json({ message: "Pay code not found" });
+    try {
+      // 1. Check existence
+      const checkExistQuery = "SELECT 1 FROM pay_codes WHERE id = $1";
+      const checkExistResult = await pool.query(checkExistQuery, [id]);
+      if (checkExistResult.rows.length === 0) {
+        return res
+          .status(404)
+          .json({ message: `Pay code with ID '${id}' not found` });
       }
 
+      // 2. Optional: Check duplicate description if needed
+      // const checkDescQuery = "SELECT id FROM pay_codes WHERE description = $1 AND id != $2";
+      // const checkDescResult = await pool.query(checkDescQuery, [description, id]);
+      // if (checkDescResult.rows.length > 0) {
+      //     return res.status(409).json({ message: `Another pay code uses description '${description}'.` });
+      // }
+
+      // 3. Update (excluding code)
       const query = `
         UPDATE pay_codes
-        SET 
-          code = $1,
-          description = $2, 
-          pay_type = $3, 
-          rate_unit = $4, 
-          rate_biasa = $5, 
-          rate_ahad = $6, 
-          rate_umum = $7, 
-          is_active = $8, 
-          requires_units_input = $9
-        WHERE id = $10
+        SET
+          description = $1,
+          pay_type = $2,
+          rate_unit = $3,
+          rate_biasa = $4,
+          rate_ahad = $5,
+          rate_umum = $6,
+          is_active = $7,
+          requires_units_input = $8
+        WHERE id = $9 -- Adjusted parameter count
         RETURNING *
       `;
-
       const values = [
-        code,
         description,
         pay_type,
         rate_unit,
-        rate_biasa,
-        rate_ahad,
-        rate_umum,
-        is_active,
-        requires_units_input,
+        rate_biasa === null ? null : parseFloat(rate_biasa) || 0,
+        rate_ahad === null ? null : parseFloat(rate_ahad) || 0,
+        rate_umum === null ? null : parseFloat(rate_umum) || 0,
+        is_active === undefined ? true : !!is_active,
+        requires_units_input === undefined ? false : !!requires_units_input,
         id,
       ];
 
       const result = await pool.query(query, values);
+      if (result.rows.length === 0) {
+        console.error(`Pay code ${id} found initially but failed to update.`);
+        return res.status(500).json({ message: "Update failed unexpectedly." });
+      }
+      // Parse numeric values in returned object
+      const updatedPayCode = {
+        ...result.rows[0],
+        rate_biasa:
+          result.rows[0].rate_biasa === null
+            ? null
+            : parseFloat(result.rows[0].rate_biasa),
+        rate_ahad:
+          result.rows[0].rate_ahad === null
+            ? null
+            : parseFloat(result.rows[0].rate_ahad),
+        rate_umum:
+          result.rows[0].rate_umum === null
+            ? null
+            : parseFloat(result.rows[0].rate_umum),
+      };
       res.json({
         message: "Pay code updated successfully",
-        payCode: result.rows[0],
+        payCode: updatedPayCode,
       });
     } catch (error) {
       console.error("Error updating pay code:", error);
-      res.status(500).json({
-        message: "Error updating pay code",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Error updating pay code", error: error.message });
     }
   });
 
-  // Delete a pay code
+  // DELETE /:id - No changes needed here, but constraint check still valid
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
-
+    if (!id)
+      return res.status(400).json({ message: "Pay code ID is required" });
     try {
-      // First check if this pay code is used in job_pay_codes
+      // Check if used in job assignments
       const checkQuery =
-        "SELECT * FROM job_pay_codes WHERE pay_code_id = $1 LIMIT 1";
+        "SELECT 1 FROM job_pay_codes WHERE pay_code_id = $1 LIMIT 1";
       const checkResult = await pool.query(checkQuery, [id]);
-
       if (checkResult.rows.length > 0) {
-        // Return a clear error response with a 400 status code
-        return res.status(400).json({
-          error: true,
-          message:
-            "Cannot delete this pay code because it is used in job assignments",
-        });
+        return res
+          .status(400)
+          .json({
+            error: true,
+            message: "Cannot delete: Pay code is used in job assignments",
+          });
       }
 
-      const query = "DELETE FROM pay_codes WHERE id = $1 RETURNING *";
+      // Proceed with deletion
+      const query = "DELETE FROM pay_codes WHERE id = $1 RETURNING id"; // Only need ID back
       const result = await pool.query(query, [id]);
-
       if (result.rows.length === 0) {
-        return res.status(404).json({
-          error: true,
-          message: "Pay code not found",
-        });
+        return res
+          .status(404)
+          .json({ error: true, message: "Pay code not found" });
       }
-
       res.json({
         error: false,
         message: "Pay code deleted successfully",
-        payCode: result.rows[0],
+        payCode: { id: result.rows[0].id },
       });
     } catch (error) {
       console.error("Error deleting pay code:", error);
-      res.status(500).json({
-        error: true,
-        message: "Error deleting pay code",
-        details: error.message,
-      });
+      res
+        .status(500)
+        .json({
+          error: true,
+          message: "Error deleting pay code",
+          details: error.message,
+        });
     }
   });
 

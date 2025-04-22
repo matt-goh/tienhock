@@ -4,7 +4,6 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
-  Fragment,
 } from "react";
 import {
   Combobox,
@@ -26,7 +25,7 @@ import {
 import toast from "react-hot-toast";
 
 import { api } from "../../routes/utils/api";
-import { Job, PayCode, JobPayCodeDetails } from "../../types/types";
+import { Job, JobPayCodeDetails } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -44,7 +43,6 @@ const JobPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
-    mappings: jobPayCodeMap,
     payCodes: availablePayCodes, // Contains default PayCode info
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
@@ -601,7 +599,7 @@ const JobPage: React.FC = () => {
                         >
                           {/* Static Columns */}
                           <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
-                            {detail.code}
+                            {detail.id}
                           </td>
                           <td
                             className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
@@ -742,7 +740,7 @@ const JobPage: React.FC = () => {
         onConfirm={handleConfirmRemovePayCode}
         title="Remove Pay Code"
         message={`Remove "${
-          payCodeToRemove?.code || ""
+          payCodeToRemove?.id || ""
         }" from this job? Overrides will be lost.`}
         variant="danger"
       />

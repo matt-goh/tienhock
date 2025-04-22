@@ -4,22 +4,21 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get all job-pay code mappings and all pay codes for cache initialization
+  // Get all job-pay code mappings and all pay codes (without 'code') for cache initialization
   router.get("/all-mappings", async (req, res) => {
     try {
-      // First get all pay codes
-      // Ensure rates are parsed as numbers or null appropriately if DB driver returns strings
+      // Get all pay codes (excluding 'code')
       const payCodeQuery = `
         SELECT
-          id, code, description, pay_type, rate_unit,
+          id, description, pay_type, rate_unit,
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
           is_active, requires_units_input
-        FROM pay_codes ORDER BY code
+        FROM pay_codes ORDER BY id -- Order by ID or description
       `;
       const payCodeResult = await pool.query(payCodeQuery);
-      // Ensure nulls are preserved if casting fails or original is null (DB driver might handle this)
+      // Ensure nulls are preserved and numbers are parsed
       const allPayCodes = payCodeResult.rows.map((pc) => ({
         ...pc,
         rate_biasa: pc.rate_biasa === null ? null : parseFloat(pc.rate_biasa),
@@ -27,7 +26,7 @@ export default function (pool) {
         rate_umum: pc.rate_umum === null ? null : parseFloat(pc.rate_umum),
       }));
 
-      // Then get all job-pay code mappings (just IDs for the map)
+      // Get all job-pay code mappings (just IDs for the map)
       const mappingQuery = `
         SELECT jpc.job_id, jpc.pay_code_id
         FROM job_pay_codes jpc
@@ -43,10 +42,9 @@ export default function (pool) {
         mappings[row.job_id].push(row.pay_code_id);
       });
 
-      // Return both datasets
       res.json({
         mappings: mappings,
-        payCodes: allPayCodes, // Return parsed pay codes
+        payCodes: allPayCodes, // Return parsed pay codes (without 'code')
       });
     } catch (error) {
       console.error("Error fetching pay code mapping data:", error);
@@ -57,18 +55,17 @@ export default function (pool) {
     }
   });
 
-  // Get detailed pay codes (including overrides) for a specific job
+  // Get detailed pay codes (excluding 'code', including overrides) for a specific job
   router.get("/job/:jobId", async (req, res) => {
     const { jobId } = req.params;
     if (!jobId) {
       return res.status(400).json({ message: "Job ID is required" });
     }
     try {
-      // Join pay_codes and job_pay_codes to get defaults and overrides
+      // Join pay_codes and job_pay_codes to get defaults and overrides (exclude pc.code)
       const query = `
         SELECT
           pc.id, -- Use pay_code ID as the primary identifier
-          pc.code,
           pc.description,
           pc.pay_type,
           pc.rate_unit,
@@ -78,7 +75,7 @@ export default function (pool) {
           pc.is_active,
           pc.requires_units_input,
           jpc.job_id,
-          jpc.pay_code_id, -- Can be useful for reference
+          jpc.pay_code_id, -- Can be useful for reference, same as pc.id
           jpc.is_default AS is_default_setting,
           CAST(jpc.override_rate_biasa AS NUMERIC(10, 2)) AS override_rate_biasa,
           CAST(jpc.override_rate_ahad AS NUMERIC(10, 2)) AS override_rate_ahad,
@@ -86,7 +83,7 @@ export default function (pool) {
         FROM job_pay_codes jpc
         JOIN pay_codes pc ON jpc.pay_code_id = pc.id
         WHERE jpc.job_id = $1
-        ORDER BY pc.code -- Consistent ordering
+        ORDER BY pc.id -- Consistent ordering (or description)
       `;
       const result = await pool.query(query, [jobId]);
 
@@ -195,11 +192,9 @@ export default function (pool) {
     const addUpdateField = (fieldName, value) => {
       if (value !== undefined) {
         // Check if the key exists in the body
-        // Allow null to clear the override, otherwise validate it's a non-negative number
         const parsedValue =
           value === null || value === "" ? null : parseFloat(value);
         if (parsedValue !== null && (isNaN(parsedValue) || parsedValue < 0)) {
-          // Return an error immediately if validation fails for this field
           throw new Error(
             `Invalid value provided for ${fieldName}. Must be null or a non-negative number.`
           );
@@ -214,20 +209,12 @@ export default function (pool) {
       addUpdateField("override_rate_biasa", override_rate_biasa);
       addUpdateField("override_rate_ahad", override_rate_ahad);
       addUpdateField("override_rate_umum", override_rate_umum);
-
-      // Add more fields here if needed (e.g., is_default_setting)
-      // if (req.body.is_default_setting !== undefined) {
-      //     fieldsToUpdate.push(`is_default = $${valueIndex++}`);
-      //     values.push(!!req.body.is_default_setting); // Ensure boolean
-      // }
     } catch (validationError) {
       // Catch validation errors from addUpdateField
       return res.status(400).json({ message: validationError.message });
     }
 
     if (fieldsToUpdate.length === 0) {
-      // Nothing to update, maybe return 200 OK or 304 Not Modified? Or 400 Bad Request?
-      // Let's return 400 for now, indicating nothing was provided to update.
       return res
         .status(400)
         .json({ message: "No update fields provided in the request body" });
@@ -299,23 +286,20 @@ export default function (pool) {
       const query = `
         DELETE FROM job_pay_codes
         WHERE job_id = $1 AND pay_code_id = $2
-        RETURNING *
+        RETURNING job_id, pay_code_id -- Return identifiers
       `;
 
       const result = await pool.query(query, [jobId, payCodeId]);
 
       if (result.rows.length === 0) {
-        // It wasn't found, which might be okay depending on idempotency requirements
-        // Let's return 404 for clarity that it didn't exist to be deleted
         return res
           .status(404)
           .json({ message: "Job-PayCode association not found" });
       }
 
       res.status(200).json({
-        // 200 OK or 204 No Content are appropriate here
         message: "Pay code removed from job successfully",
-        removed: result.rows[0], // Optionally return the deleted record
+        removed: result.rows[0], // Return the IDs of the removed association
       });
     } catch (error) {
       console.error("Error removing pay code from job:", error);
@@ -325,10 +309,6 @@ export default function (pool) {
       });
     }
   });
-
-  // Note: Endpoint GET /paycode/:payCodeId (Get jobs for a specific pay code)
-  // was present in original context but not modified here as per request.
-  // If needed, it should also be reviewed.
 
   return router;
 }

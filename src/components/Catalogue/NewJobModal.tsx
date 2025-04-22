@@ -1,5 +1,4 @@
 // src/components/Catalogue/NewJobModal.tsx
-
 "use client";
 
 import React, { useState, Fragment, useEffect, useCallback } from "react";
@@ -7,8 +6,6 @@ import {
   Dialog,
   Transition,
   TransitionChild,
-  Fieldset,
-  Legend,
   Field,
   Label,
   Input,
@@ -21,7 +18,7 @@ import {
 } from "@headlessui/react";
 import clsx from "clsx";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
-import { Job, SelectOption } from "../../types/types"; // Assuming SelectOption is defined in types
+import { Job } from "../../types/types"; // Assuming SelectOption is defined in types
 import { api } from "../../routes/utils/api";
 import Button from "../Button"; // Assuming Button component exists
 import toast from "react-hot-toast"; // For potential API errors

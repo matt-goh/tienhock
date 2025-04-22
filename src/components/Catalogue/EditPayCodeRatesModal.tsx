@@ -199,7 +199,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                   as="h3"
                   className="text-lg font-semibold leading-6 text-gray-900"
                 >
-                  Edit Rates for {payCodeDetail?.code}
+                  Edit Rates for {payCodeDetail?.id}
                 </DialogTitle>
                 <p className="mt-1 text-sm text-gray-600">
                   {payCodeDetail?.description}

@@ -50,7 +50,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
       query === ""
         ? availablePayCodesToAdd
         : availablePayCodesToAdd.filter((pc) =>
-            `${pc.code.toLowerCase()} ${pc.description.toLowerCase()}`.includes(
+            `${pc.id.toLowerCase()} ${pc.description.toLowerCase()}`.includes(
               query.toLowerCase()
             )
           ),
@@ -127,7 +127,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                           <ComboboxInput
                             className="w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                             displayValue={(pc: PayCode | null) =>
-                              pc ? `${pc.code} - ${pc.description}` : ""
+                              pc ? `${pc.id} - ${pc.description}` : ""
                             }
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder="Search code or description..."
@@ -182,7 +182,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                                             : "font-normal"
                                         }`}
                                       >
-                                        {pc.code} - {pc.description}
+                                        {pc.id} - {pc.description}
                                       </span>
                                       {selected ? (
                                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
