@@ -27,19 +27,30 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
+import { useJobsCache } from "../../hooks/useJobsCache";
+import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
 
 type JobSelection = Job | null;
 
 const JobPage: React.FC = () => {
   // --- State ---
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const {
+    jobs,
+    loading: loadingJobs,
+    error: jobsError,
+    refreshJobs,
+  } = useJobsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [allJobDetails, setAllJobDetails] = useState<JobDetail[]>([]);
   const [jobType, setJobType] = useState<string>("All");
-  const [loadingJobs, setLoadingJobs] = useState(true);
   const [query, setQuery] = useState(""); // For job combobox filtering
+  const {
+    mappings: jobPayCodeMap,
+    payCodes: availablePayCodes,
+    loading: loadingPayCodeMappings,
+    refreshData: refreshPayCodeMappings,
+  } = useJobPayCodeMappings();
   const [jobPayCodes, setJobPayCodes] = useState<PayCode[]>([]);
-  const [availablePayCodes, setAvailablePayCodes] = useState<PayCode[]>([]);
   const [loadingPayCodes, setLoadingPayCodes] = useState(false);
   const [showAddPayCodeModal, setShowAddPayCodeModal] = useState(false);
   const [selectedPayCode, setSelectedPayCode] = useState<PayCode | null>(null);
@@ -52,74 +63,45 @@ const JobPage: React.FC = () => {
   const [itemsPerPage] = useState<number>(50); // 50 items per page as requested
 
   // --- Data Fetching ---
-  const fetchJobs = useCallback(
-    async (selectFirst = false) => {
-      setLoadingJobs(true);
+  const fetchJobPayCodes = useCallback(
+    async (jobId: string) => {
+      if (!jobId) {
+        setJobPayCodes([]);
+        return;
+      }
+      setLoadingPayCodes(true);
       try {
-        const response = await api.get("/api/jobs");
-        const data = response as Job[];
-        const normalizedJobs = data.map((job) => ({
-          ...job,
-          section: Array.isArray(job.section)
-            ? job.section
-            : job.section
-            ? [job.section]
-            : [],
-        }));
-        setJobs(normalizedJobs);
-        if (selectFirst && normalizedJobs.length > 0) {
-          setSelectedJob(normalizedJobs[0]);
-        } else if (!selectFirst && selectedJob) {
-          // Reselect the current job after refetch to ensure data consistency
-          const refreshedSelectedJob = normalizedJobs.find(
-            (j) => j.id === selectedJob.id
+        // Check if data exists in cache
+        if (
+          jobPayCodeMap &&
+          jobPayCodeMap[jobId] &&
+          availablePayCodes.length > 0
+        ) {
+          const payCodeIds = jobPayCodeMap[jobId];
+          const matchingPayCodes = availablePayCodes.filter((pc) =>
+            payCodeIds.includes(pc.id)
           );
-          setSelectedJob(refreshedSelectedJob || null);
+
+          if (matchingPayCodes.length > 0) {
+            setJobPayCodes(matchingPayCodes);
+            setLoadingPayCodes(false);
+            return;
+          }
         }
+
+        // Fallback to API call if not in cache
+        const data = await api.get(`/api/job-pay-codes/job/${jobId}`);
+        setJobPayCodes(data);
       } catch (error) {
-        console.error("Error fetching jobs:", error);
-        toast.error("Failed to fetch jobs. Please try again.");
+        console.error("Error fetching job pay codes:", error);
+        toast.error("Failed to fetch pay codes for this job.");
+        setJobPayCodes([]);
       } finally {
-        setLoadingJobs(false);
+        setLoadingPayCodes(false);
       }
     },
-    [selectedJob]
-  ); // Add selectedJob dependency for re-selection logic
-
-  useEffect(() => {
-    fetchJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
-
-  const fetchJobPayCodes = useCallback(async (jobId: string) => {
-    if (!jobId) {
-      setJobPayCodes([]);
-      return;
-    }
-    setLoadingPayCodes(true);
-    try {
-      const data = await api.get(`/api/job-pay-codes/job/${jobId}`);
-      setJobPayCodes(data);
-    } catch (error) {
-      console.error("Error fetching job pay codes:", error);
-      toast.error("Failed to fetch pay codes for this job.");
-      setJobPayCodes([]);
-    } finally {
-      setLoadingPayCodes(false);
-    }
-  }, []);
-
-  // Add this function to fetch available pay codes
-  const fetchAvailablePayCodes = useCallback(async () => {
-    try {
-      const data = await api.get("/api/pay-codes");
-      setAvailablePayCodes(data);
-    } catch (error) {
-      console.error("Error fetching available pay codes:", error);
-      toast.error("Failed to fetch available pay codes.");
-      setAvailablePayCodes([]);
-    }
-  }, []);
+    [jobPayCodeMap, availablePayCodes]
+  );
 
   // Update the useEffect that handles job selection
   useEffect(() => {
@@ -143,6 +125,7 @@ const JobPage: React.FC = () => {
       });
 
       toast.success("Pay code added to job successfully");
+      await refreshPayCodeMappings();
       fetchJobPayCodes(selectedJob.id);
     } catch (error) {
       console.error("Error adding pay code to job:", error);
@@ -157,6 +140,7 @@ const JobPage: React.FC = () => {
     try {
       await api.delete(`/api/job-pay-codes/${selectedJob.id}/${payCodeId}`);
       toast.success("Pay code removed from job successfully");
+      await refreshPayCodeMappings();
       fetchJobPayCodes(selectedJob.id);
     } catch (error) {
       console.error("Error removing pay code from job:", error);
@@ -226,27 +210,30 @@ const JobPage: React.FC = () => {
             ? newJobData.section.join(", ")
             : newJobData.section,
         };
-        const response = await api.post("/api/jobs", jobToSend); // Capture the response
+        const response = await api.post("/api/jobs", jobToSend);
 
-        // Check if the response contains an error message
         if (response.message && !response.job) {
-          // This indicates an error from the API
           throw new Error(response.message);
         }
 
         toast.success("Job added successfully");
         setShowAddJobModal(false);
-        await fetchJobs(true); // Refetch jobs and select the new one
+        await refreshJobs(); // Use the hook's refresh function
+
+        // Find and select the new job after refresh
+        const foundJob = jobs.find((j) => j.id === newJobData.id);
+        if (foundJob) {
+          setSelectedJob(foundJob);
+        }
       } catch (error: any) {
         console.error("Error adding job:", error);
         toast.error(error.message || "Failed to add job. Please try again.");
-        // Re-throw so the modal can display the error
         throw new Error(
           error.message || "Failed to add job. Please try again."
         );
       }
     },
-    [fetchJobs]
+    [refreshJobs, jobs]
   );
 
   // --- Delete Handler for the dedicated button ---
@@ -280,22 +267,24 @@ const JobPage: React.FC = () => {
   );
 
   const confirmDeleteJob = useCallback(async () => {
-    if (!selectedJob) return; // Use selectedJob now
+    if (!selectedJob) return;
     try {
-      await api.delete(`/api/jobs/${selectedJob.id}`); // Use selectedJob.id
+      await api.delete(`/api/jobs/${selectedJob.id}`);
       toast.success(`Job "${selectedJob.name}" deleted successfully`);
       setShowDeleteJobDialog(false);
+
       // Clear selection FIRST
       setSelectedJob(null);
-      // THEN refetch jobs
-      await fetchJobs();
+
+      // THEN refresh caches
+      await refreshJobs();
+      await refreshPayCodeMappings();
     } catch (error) {
       console.error("Error deleting job:", error);
       toast.error("Failed to delete job. Please try again.");
-      // Close dialog even on error? Or let user retry? Closing for now.
       setShowDeleteJobDialog(false);
     }
-  }, [selectedJob, fetchJobs]); // Depends on selectedJob
+  }, [selectedJob, refreshJobs, refreshPayCodeMappings]);
 
   // Pagination component
   const Pagination = () => {
@@ -596,8 +585,21 @@ const JobPage: React.FC = () => {
             <div className="flex w-full items-center justify-end gap-4 md:w-auto">
               <Button
                 onClick={() => {
-                  fetchAvailablePayCodes();
                   setShowAddPayCodeModal(true);
+
+                  // Filter available pay codes to exclude ones already assigned to the job
+                  if (selectedJob && jobPayCodeMap[selectedJob.id]) {
+                    const assignedPayCodeIds = jobPayCodeMap[selectedJob.id];
+                    const filteredPayCodes = availablePayCodes.filter(
+                      (payCode) => !assignedPayCodeIds.includes(payCode.id)
+                    );
+                    // If there's only one unassigned pay code, select it automatically
+                    if (filteredPayCodes.length === 1) {
+                      setSelectedPayCode(filteredPayCodes[0]);
+                    } else {
+                      setSelectedPayCode(null); // Reset selection
+                    }
+                  }
                 }}
                 color="sky"
                 variant="filled"

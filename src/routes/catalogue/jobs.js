@@ -90,9 +90,6 @@ export default function (pool) {
     try {
       await pool.query("BEGIN");
 
-      // Delete associated records in the jobs_job_details table
-      await pool.query("DELETE FROM jobs_job_details WHERE job_id = $1", [id]);
-
       // Delete the job
       const deleteJobQuery = "DELETE FROM jobs WHERE id = $1";
       await pool.query(deleteJobQuery, [id]);
@@ -100,7 +97,7 @@ export default function (pool) {
       await pool.query("COMMIT");
       res
         .status(200)
-        .json({ message: "Job and associated details deleted successfully" });
+        .json({ message: "Job deleted successfully" });
     } catch (error) {
       await pool.query("ROLLBACK");
       console.error("Error deleting job:", error);
@@ -156,44 +153,26 @@ export default function (pool) {
     }
   });
 
-  // Get all job details for a specific job
-  router.get("/:jobId/details", async (req, res) => {
-    const { jobId } = req.params;
-
-    try {
-      const query = `
-        SELECT jd.* 
-        FROM job_details jd
-        JOIN jobs_job_details jjd ON jd.id = jjd.job_detail_id
-        WHERE jjd.job_id = $1
-      `;
-      const result = await pool.query(query, [jobId]);
-      res.json(result.rows);
-    } catch (error) {
-      console.error("Error fetching job details for job:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching job details", error: error.message });
-    }
-  });
-
-  // Get job details count
+  // Get job pay codes count
   router.get("/:jobId/details/count", async (req, res) => {
     const { jobId } = req.params;
 
     try {
       const query = `
-        SELECT COUNT(*) 
-        FROM jobs_job_details
-        WHERE job_id = $1
-      `;
+      SELECT COUNT(*) 
+      FROM job_pay_codes
+      WHERE job_id = $1
+    `;
       const result = await pool.query(query, [jobId]);
       res.json({ count: parseInt(result.rows[0].count) });
     } catch (error) {
-      console.error("Error counting job details:", error);
+      console.error("Error counting job pay codes:", error);
       res
         .status(500)
-        .json({ message: "Error counting job details", error: error.message });
+        .json({
+          message: "Error counting job pay codes",
+          error: error.message,
+        });
     }
   });
 
