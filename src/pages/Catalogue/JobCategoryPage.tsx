@@ -424,7 +424,7 @@ const JobCategoryPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="relative w-full mx-4 md:mx-6">
+    <div className="relative w-full mx-4 mb-2 md:mx-6">
       {/* Header Area */}
       <div className="mb-6 flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800">

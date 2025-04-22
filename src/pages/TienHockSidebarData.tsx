@@ -33,6 +33,7 @@ import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
+import MeeProductionListPage from "./Payroll/MeeProductionListPage";
 
 export const TienHockSidebarData: SidebarItem[] = [
   {
@@ -44,7 +45,20 @@ export const TienHockSidebarData: SidebarItem[] = [
   {
     name: "Payroll",
     icon: IconUserDollar,
-    subItems: [],
+    subItems: [
+      {
+        name: "Mee Production",
+        path: "/payroll/mee-production",
+        component: MeeProductionListPage,
+        subItems: [
+          {
+            name: "New Machine Entry",
+            path: "/payroll/mee-machine-entry",
+            component: MeeProductionListPage,
+          },
+        ],
+      },
+    ],
   },
   {
     name: "Sales",
