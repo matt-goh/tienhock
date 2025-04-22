@@ -4,6 +4,45 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Get all job-pay code mappings and all pay codes
+  router.get("/all-mappings", async (req, res) => {
+    try {
+      // First get all pay codes
+      const payCodeQuery = "SELECT * FROM pay_codes ORDER BY code";
+      const payCodeResult = await pool.query(payCodeQuery);
+      const allPayCodes = payCodeResult.rows;
+
+      // Then get all job-pay code mappings
+      const mappingQuery = `
+      SELECT jpc.job_id, jpc.pay_code_id, jpc.is_default
+      FROM job_pay_codes jpc
+    `;
+      const mappingResult = await pool.query(mappingQuery);
+
+      // Create a map of job IDs to pay code IDs
+      const mappings = {};
+
+      mappingResult.rows.forEach((row) => {
+        if (!mappings[row.job_id]) {
+          mappings[row.job_id] = [];
+        }
+        mappings[row.job_id].push(row.pay_code_id);
+      });
+
+      // Return both datasets
+      res.json({
+        mappings: mappings,
+        payCodes: allPayCodes,
+      });
+    } catch (error) {
+      console.error("Error fetching pay code data:", error);
+      res.status(500).json({
+        message: "Error fetching pay code data",
+        error: error.message,
+      });
+    }
+  });
+
   // Get pay codes for a specific job
   router.get("/job/:jobId", async (req, res) => {
     const { jobId } = req.params;
