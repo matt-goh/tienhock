@@ -1,10 +1,5 @@
 // src/pages/Catalogue/JobPage.tsx
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Combobox,
   ComboboxButton,
@@ -23,7 +18,7 @@ import {
   IconPencil, // For Edit Rates button
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
-
+import { useLocation } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import { Job, JobPayCodeDetails } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -39,6 +34,7 @@ type JobSelection = Job | null;
 
 const JobPage: React.FC = () => {
   // --- State ---
+  const location = useLocation();
   const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [query, setQuery] = useState(""); // For job combobox filtering
@@ -111,6 +107,24 @@ const JobPage: React.FC = () => {
       setJobPayCodesDetails([]);
     }
   }, [selectedJob, fetchJobPayCodesDetails]);
+
+  useEffect(() => {
+    // Extract job ID from URL query parameter
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get("id");
+
+    // If we have a job ID and no job is currently selected
+    if (jobId && !selectedJob) {
+      // Find the job in our jobs array
+      const jobToSelect = jobs.find((job) => job.id === jobId);
+      if (jobToSelect) {
+        // Select this job
+        setSelectedJob(jobToSelect);
+        // Fetch its details
+        fetchJobPayCodesDetails(jobToSelect.id);
+      }
+    }
+  }, [location.search, jobs, selectedJob, fetchJobPayCodesDetails]);
 
   // --- Add/Remove Pay Codes ---
   // Passed to NewPayCodeModal

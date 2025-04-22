@@ -31,6 +31,7 @@ import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PayCodeModal from "../../components/Catalogue/PayCodeModal"; // Imports the updated modal
 import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
+import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCodeTooltip";
 import { useJobsCache } from "../../hooks/useJobsCache";
 
 const PayCodePage: React.FC = () => {
@@ -106,6 +107,24 @@ const PayCodePage: React.FC = () => {
   }, [payCodes, selectedType, selectedJob, searchTerm, jobPayCodeMap, loading]);
 
   // --- Derived State ---
+  const payCodeToJobsMap = useMemo(() => {
+    // Create reverse mapping: payCodeId -> jobIds[]
+    const reverseMap: Record<string, string[]> = {};
+
+    // Go through each job in the map
+    Object.entries(jobPayCodeMap).forEach(([jobId, payCodeIds]) => {
+      // For each pay code used by this job
+      payCodeIds.forEach((payCodeId) => {
+        if (!reverseMap[payCodeId]) {
+          reverseMap[payCodeId] = [];
+        }
+        reverseMap[payCodeId].push(jobId);
+      });
+    });
+
+    return reverseMap;
+  }, [jobPayCodeMap]);
+
   const paginatedCodes = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredCodes.slice(startIndex, startIndex + itemsPerPage);
@@ -522,8 +541,14 @@ const PayCodePage: React.FC = () => {
                         className="hover:bg-default-50 cursor-pointer"
                         onClick={() => handleEditClick(pc)}
                       >
-                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-500">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-500 flex items-center">
                           {pc.id}
+                          <JobsUsingPayCodeTooltip
+                            payCodeId={pc.id}
+                            jobsMap={payCodeToJobsMap}
+                            jobsList={jobs}
+                            className="ml-1"
+                          />
                         </td>
                         <td className="px-4 py-3 text-sm text-default-700 max-w-sm truncate">
                           {pc.description}
