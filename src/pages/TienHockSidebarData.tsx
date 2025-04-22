@@ -3,6 +3,7 @@ import {
   IconBookmark,
   IconFileInvoice,
   IconListDetails,
+  IconUserDollar,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -39,6 +40,11 @@ export const TienHockSidebarData: SidebarItem[] = [
     icon: IconBookmark,
     subItems: [],
     defaultOpen: true,
+  },
+  {
+    name: "Payroll",
+    icon: IconUserDollar,
+    subItems: [],
   },
   {
     name: "Sales",
