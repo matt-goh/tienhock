@@ -11,6 +11,8 @@ import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormCombobox, FormInput } from "../../components/FormComponents";
 import { useStaffsCache } from "../../hooks/useStaffsCache";
+import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
+import { useJobsCache } from "../../hooks/useJobsCache";
 
 interface SelectOption {
   id: string;
@@ -21,8 +23,6 @@ const StaffFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  const { refreshStaffs } = useStaffsCache();
-
   const [formData, setFormData] = useState<Employee>({
     id: "",
     name: "",
@@ -55,16 +55,14 @@ const StaffFormPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
-  const [nationalities, setNationalities] = useState<SelectOption[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [races, setRaces] = useState<SelectOption[]>([]);
-  const [agamas, setAgamas] = useState<SelectOption[]>([]);
-  const [jobs, setJobs] = useState<SelectOption[]>([]);
-  const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const { options } = useStaffFormOptions();
+  const { jobs } = useJobsCache();
+  const { refreshStaffs, staffs, loading: loadingStaffs } = useStaffsCache();
 
   const genderOptions = [
     { id: "male", name: "Male" },
@@ -96,21 +94,38 @@ const StaffFormPage: React.FC = () => {
     setIsFormChanged(hasChanged);
   }, [formData, initialFormData]);
 
-  const fetchStaffDetails = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get(`/api/staffs/${id}`);
+  const fetchStaffDetails = useCallback(() => {
+    if (!id) return;
 
-      setFormData(data);
-      setInitialFormData(data);
-      setError(null);
-    } catch (err) {
-      setError("Failed to fetch staff details. Please try again later.");
-      console.error("Error fetching staff details:", err);
-    } finally {
-      setLoading(false);
+    // If staffs are still loading, don't proceed yet
+    if (loadingStaffs) {
+      return;
     }
-  };
+
+    setLoading(true);
+    // Find the staff in the cache
+    const staffData = staffs.find((staff) => staff.id === id);
+
+    if (staffData) {
+      setFormData(staffData);
+      setInitialFormData(staffData);
+      setError(null);
+    } else {
+      // Fallback to API if not in cache
+      api
+        .get(`/api/staffs/${id}`)
+        .then((data) => {
+          setFormData(data);
+          setInitialFormData(data);
+          setError(null);
+        })
+        .catch((err) => {
+          setError("Failed to fetch staff details. Please try again later.");
+          console.error("Error fetching staff details:", err);
+        });
+    }
+    setLoading(false);
+  }, [id, staffs]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -118,24 +133,8 @@ const StaffFormPage: React.FC = () => {
     } else {
       setInitialFormData({ ...formData });
     }
-    fetchOptions("nationalities", setNationalities);
-    fetchOptions("races", setRaces);
-    fetchOptions("agama", setAgamas);
-    fetchOptions("jobs", setJobs);
-    fetchOptions("locations", setLocations);
-  }, []);
-
-  const fetchOptions = async (
-    endpoint: string,
-    setter: React.Dispatch<React.SetStateAction<SelectOption[]>>
-  ) => {
-    try {
-      const data = await api.get(`/api/${endpoint}`);
-      setter(data);
-    } catch (error) {
-      console.error(`Error fetching ${endpoint}:`, error);
-    }
-  };
+    // Add any other initialization here
+  }, [isEditMode, fetchStaffDetails, loadingStaffs]);
 
   const handleDeleteClick = () => {
     setIsDeleteDialogOpen(true);
@@ -280,7 +279,7 @@ const StaffFormPage: React.FC = () => {
     <FormInput
       name={name}
       label={label}
-      value={formData[name].toString()}
+      value={(formData[name] as string) ?? ""}
       onChange={handleInputChange}
       type={type}
       disabled={isEditMode && name === "id"}
@@ -371,7 +370,11 @@ const StaffFormPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderListbox("gender", "Gender", genderOptions)}
-                  {renderListbox("nationality", "Nationality", nationalities)}
+                  {renderListbox(
+                    "nationality",
+                    "Nationality",
+                    options.nationalities
+                  )}
                   {renderInput("birthdate", "Birthdate", "date")}
                 </div>
                 <div className="grid grid-cols-1 gap-6">
@@ -384,7 +387,7 @@ const StaffFormPage: React.FC = () => {
                   {renderCombobox(
                     "location",
                     "Location",
-                    locations,
+                    options.locations,
                     locationQuery,
                     setLocationQuery
                   )}
@@ -413,8 +416,8 @@ const StaffFormPage: React.FC = () => {
                     "Payment Preference",
                     paymentPreferenceOptions
                   )}
-                  {renderListbox("race", "Race", races)}
-                  {renderListbox("agama", "Agama", agamas)}
+                  {renderListbox("race", "Race", options.races)}
+                  {renderListbox("agama", "Agama", options.agama)}
                   {renderInput("dateResigned", "Date Resigned", "date")}
                 </div>
               </div>
