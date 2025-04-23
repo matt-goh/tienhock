@@ -283,6 +283,7 @@ const StaffFormPage: React.FC = () => {
       value={formData[name].toString()}
       onChange={handleInputChange}
       type={type}
+      disabled={isEditMode && name === "id"}
     />
   );
 
