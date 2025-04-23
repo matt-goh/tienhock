@@ -12,10 +12,10 @@ import {
   FormCombobox,
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
-import { useStaffsCache } from "../../hooks/useStaffsCache";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
-import { useJobsCache } from "../../hooks/useJobsCache";
 import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 interface SelectOption {
   id: string;

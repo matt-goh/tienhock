@@ -1,22 +1,26 @@
-// src/hooks/useJobsCache.ts
+// src/hooks/useJobPayCodeMappings.ts
 import { useState, useEffect, useCallback } from "react";
-import { api } from "../routes/utils/api";
-import { Job } from "../types/types";
+import { api } from "../../routes/utils/api";
+import { PayCode } from "../../types/types";
+
+type JobPayCodeMap = Record<string, string[]>; // Map job ID to array of pay code IDs
 
 interface CacheData {
-  jobs: Job[];
+  mappings: JobPayCodeMap;
+  payCodes: PayCode[];
   timestamp: number;
 }
 
-export const useJobsCache = () => {
-  const [jobs, setJobs] = useState<Job[]>([]);
+export const useJobPayCodeMappings = () => {
+  const [mappings, setMappings] = useState<JobPayCodeMap>({});
+  const [payCodes, setPayCodes] = useState<PayCode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const CACHE_KEY = "jobsData";
+  const CACHE_KEY = "payCodeData";
   const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
-  const fetchJobs = useCallback(async (force = false) => {
+  const fetchData = useCallback(async (force = false) => {
     // Try to load from cache first
     if (!force) {
       try {
@@ -26,7 +30,8 @@ export const useJobsCache = () => {
           const now = Date.now();
 
           if (now - parsedData.timestamp < CACHE_DURATION) {
-            setJobs(parsedData.jobs);
+            setMappings(parsedData.mappings);
+            setPayCodes(parsedData.payCodes);
             setLoading(false);
             return;
           }
@@ -38,25 +43,18 @@ export const useJobsCache = () => {
 
     setLoading(true);
     try {
-      const response = await api.get("/api/jobs");
+      // Make a single API call
+      const response = await api.get("/api/job-pay-codes/all-mappings");
 
-      if (response) {
-        // Convert job section to array if it's a string
-        const normalizedJobs = response.map((job: Job) => ({
-          ...job,
-          section: Array.isArray(job.section)
-            ? job.section
-            : job.section
-            ? String(job.section).split(", ")
-            : [],
-        }));
-
-        setJobs(normalizedJobs);
+      if (response && response.payCodes && response.mappings) {
+        setPayCodes(response.payCodes);
+        setMappings(response.mappings);
 
         // Cache the data
         try {
           const cacheData: CacheData = {
-            jobs: normalizedJobs,
+            mappings: response.mappings,
+            payCodes: response.payCodes,
             timestamp: Date.now(),
           };
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -69,8 +67,8 @@ export const useJobsCache = () => {
 
       setError(null);
     } catch (err: any) {
-      console.error("Error fetching jobs data:", err);
-      setError(err);
+      console.error("Error fetching pay code data:", err);
+      setError(err.message || "Failed to fetch pay code data");
     } finally {
       setLoading(false);
     }
@@ -78,13 +76,14 @@ export const useJobsCache = () => {
 
   // Load data on initial render
   useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+    fetchData();
+  }, [fetchData]);
 
   return {
-    jobs,
+    mappings,
+    payCodes,
     loading,
     error,
-    refreshJobs: () => fetchJobs(true),
+    refreshData: () => fetchData(true),
   };
 };

@@ -1,27 +1,22 @@
-// src/hooks/useStaffsCache.ts
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { api } from "../routes/utils/api";
-import { Employee } from "../types/types";
+// src/hooks/useJobsCache.ts
+import { useState, useEffect, useCallback } from "react";
+import { Job } from "../../types/types";
+import { api } from "../../routes/utils/api";
 
 interface CacheData {
-  allStaffs: Employee[];
+  jobs: Job[];
   timestamp: number;
 }
 
-export const useStaffsCache = () => {
-  const [allStaffs, setAllStaffs] = useState<Employee[]>([]);
+export const useJobsCache = () => {
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const CACHE_KEY = "allStaffsData";
+  const CACHE_KEY = "jobsData";
   const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
-  // Filter active staff members (no resignation date)
-  const staffs = useMemo(() => {
-    return allStaffs.filter((staff) => !staff.dateResigned);
-  }, [allStaffs]);
-
-  const fetchStaffs = useCallback(async (force = false) => {
+  const fetchJobs = useCallback(async (force = false) => {
     // Try to load from cache first
     if (!force) {
       try {
@@ -31,7 +26,7 @@ export const useStaffsCache = () => {
           const now = Date.now();
 
           if (now - parsedData.timestamp < CACHE_DURATION) {
-            setAllStaffs(parsedData.allStaffs);
+            setJobs(parsedData.jobs);
             setLoading(false);
             return;
           }
@@ -43,23 +38,25 @@ export const useStaffsCache = () => {
 
     setLoading(true);
     try {
-      // Fetch all staff (API now returns all by default)
-      const response = await api.get("/api/staffs");
+      const response = await api.get("/api/jobs");
 
       if (response) {
-        // Ensure job and location arrays are always arrays
-        const normalizedStaffs = response.map((staff: Employee) => ({
-          ...staff,
-          job: Array.isArray(staff.job) ? staff.job : [],
-          location: Array.isArray(staff.location) ? staff.location : [],
+        // Convert job section to array if it's a string
+        const normalizedJobs = response.map((job: Job) => ({
+          ...job,
+          section: Array.isArray(job.section)
+            ? job.section
+            : job.section
+            ? String(job.section).split(", ")
+            : [],
         }));
 
-        setAllStaffs(normalizedStaffs);
+        setJobs(normalizedJobs);
 
         // Cache the data
         try {
           const cacheData: CacheData = {
-            allStaffs: normalizedStaffs,
+            jobs: normalizedJobs,
             timestamp: Date.now(),
           };
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -72,7 +69,7 @@ export const useStaffsCache = () => {
 
       setError(null);
     } catch (err: any) {
-      console.error("Error fetching staffs data:", err);
+      console.error("Error fetching jobs data:", err);
       setError(err);
     } finally {
       setLoading(false);
@@ -81,14 +78,13 @@ export const useStaffsCache = () => {
 
   // Load data on initial render
   useEffect(() => {
-    fetchStaffs();
-  }, [fetchStaffs]);
+    fetchJobs();
+  }, [fetchJobs]);
 
   return {
-    staffs, // Active staff only
-    allStaffs, // All staff including resigned
+    jobs,
     loading,
     error,
-    refreshStaffs: () => fetchStaffs(true),
+    refreshJobs: () => fetchJobs(true),
   };
 };

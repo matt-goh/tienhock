@@ -30,9 +30,9 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PayCodeModal from "../../components/Catalogue/PayCodeModal"; // Imports the updated modal
-import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
+import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCodeTooltip";
-import { useJobsCache } from "../../hooks/useJobsCache";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 const PayCodePage: React.FC = () => {
   // State
@@ -221,7 +221,8 @@ const PayCodePage: React.FC = () => {
             <span className="block truncate">
               {selectedJob === "All"
                 ? "All Jobs"
-                : jobs.find((j) => j.id === selectedJob)?.name || selectedJob}
+                : jobs.find((j: { id: string }) => j.id === selectedJob)
+                    ?.name || selectedJob}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown size={20} className="text-gray-400" />
@@ -258,34 +259,50 @@ const PayCodePage: React.FC = () => {
                 Loading jobs...
               </div>
             ) : (
-              jobs.map((job) => (
-                <ListboxOption
-                  key={job.id}
-                  className={({ active }) =>
-                    `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
-                    }`
-                  }
-                  value={job.id}
-                >
-                  {({ selected }) => (
-                    <>
-                      <span
-                        className={`block truncate ${
-                          selected ? "font-medium" : "font-normal"
-                        }`}
+              jobs.map(
+                (job: {
+                  id: unknown;
+                  name:
+                    | string
+                    | number
+                    | boolean
+                    | React.ReactElement<
+                        any,
+                        string | React.JSXElementConstructor<any>
                       >
-                        {job.name}
-                      </span>
-                      {selected && (
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
-                          <IconCheck size={20} />
+                    | Iterable<React.ReactNode>
+                    | React.ReactPortal
+                    | null
+                    | undefined;
+                }) => (
+                  <ListboxOption
+                    key={String(job.id)} // Ensure key is a string
+                    className={({ active }) =>
+                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                      }`
+                    }
+                    value={job.id}
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : "font-normal"
+                          }`}
+                        >
+                          {job.name}
                         </span>
-                      )}
-                    </>
-                  )}
-                </ListboxOption>
-              ))
+                        {selected && (
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                            <IconCheck size={20} />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ListboxOption>
+                )
+              )
             )}
           </ListboxOptions>
         </div>
