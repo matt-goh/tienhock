@@ -10,6 +10,7 @@ import { StaffListbox } from "../../components/Catalogue/StaffListbox";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormCombobox, FormInput } from "../../components/FormComponents";
+import { useStaffsCache } from "../../hooks/useStaffsCache";
 
 interface SelectOption {
   id: string;
@@ -20,6 +21,7 @@ const StaffFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  const { refreshStaffs } = useStaffsCache();
 
   const [formData, setFormData] = useState<Employee>({
     id: "",
@@ -143,6 +145,10 @@ const StaffFormPage: React.FC = () => {
     if (id) {
       try {
         await api.delete(`/api/staffs/${id}`);
+
+        // Refresh the cache
+        refreshStaffs();
+
         setIsDeleteDialogOpen(false);
         toast.success("Staff member deleted successfully");
         navigate("/catalogue/staff");
@@ -247,6 +253,9 @@ const StaffFormPage: React.FC = () => {
         // Create new staff member
         await api.post("/api/staffs", dataToSend);
       }
+
+      // Refresh the cache after successful save
+      refreshStaffs();
 
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`

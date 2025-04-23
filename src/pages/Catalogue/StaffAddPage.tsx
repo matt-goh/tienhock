@@ -12,6 +12,7 @@ import {
   FormCombobox,
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
+import { useStaffsCache } from "../../hooks/useStaffsCache";
 
 interface SelectOption {
   id: string;
@@ -57,6 +58,7 @@ const StaffAddPage: React.FC = () => {
   const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
+  const { refreshStaffs } = useStaffsCache();
 
   const genderOptions = [
     { id: "male", name: "Male" },
@@ -205,7 +207,11 @@ const StaffAddPage: React.FC = () => {
     };
 
     try {
-      const data = await api.post("/api/staffs", dataToSend);
+      await api.post("/api/staffs", dataToSend);
+
+      // Refresh the cache after successful creation
+      refreshStaffs();
+
       toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
     } catch (error) {
