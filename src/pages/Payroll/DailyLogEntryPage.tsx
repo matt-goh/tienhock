@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useJobsCache } from "../../hooks/useJobsCache";
 import { useStaffsCache } from "../../hooks/useStaffsCache";
+import Checkbox from "../../components/Checkbox";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -84,16 +85,6 @@ const DailyLogEntryPage: React.FC = () => {
       }));
   }, [allJobs]);
 
-  // Set default job when jobs are loaded
-  useEffect(() => {
-    if (jobs.length > 0) {
-      setFormData((prev) => ({
-        ...prev,
-        jobId: jobs[0].id,
-      }));
-    }
-  }, [jobs]);
-
   const availableEmployees = useMemo(() => {
     return allStaffs
       .filter((staff) => {
@@ -103,7 +94,6 @@ const DailyLogEntryPage: React.FC = () => {
       .map((staff) => ({
         ...staff,
         hours: 7,
-        selected: false,
       }));
   }, [allStaffs]);
 
@@ -345,23 +335,24 @@ const DailyLogEntryPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-default-200">
                   {expandedEmployees.map((row) => {
-                    // Find the full employee to get access to the selection tracking properties
+                    // Determine selection and hours from the central state
                     const isSelected =
                       employeeSelectionState.selectedJobs[row.id]?.includes(
                         row.jobType
                       ) || false;
                     const hours =
-                      employeeSelectionState.jobHours[row.id]?.[row.jobType] ||
-                      7;
+                      employeeSelectionState.jobHours[row.id]?.[row.jobType] ?? 7; // Default to 7 if no hours recorded yet
 
                     return (
                       <tr key={row.rowKey}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
+                        <td className="px-6 py-4 whitespace-nowrap align-middle">
+                          <Checkbox
                             checked={isSelected}
                             onChange={() => handleEmployeeSelection(row.rowKey)}
-                            className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-default-300 rounded"
+                            size={20}
+                            checkedColor="text-sky-600"
+                            ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                            buttonClassName="p-1 rounded-lg"
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
@@ -380,30 +371,31 @@ const DailyLogEntryPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <input
-                            id="employee-hours"
-                            name="employee-hours"
+                            id={`employee-hours-${row.rowKey}`} // Use unique ID
+                            name={`employee-hours-${row.rowKey}`} // Use unique name
                             type="number"
-                            value={isSelected ? hours || "" : ""}
+                            value={isSelected ? hours.toString() : ""}
                             onChange={(e) =>
                               handleEmployeeHoursChange(
                                 row.rowKey,
                                 e.target.value
                               )
                             }
-                            // Add the 'show-spinner' class here
-                            className="show-spinner max-w-[80px] py-1 text-sm text-right border border-default-300 rounded-md"
+                            className="max-w-[80px] py-1 text-sm text-right border border-default-300 rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed"
                             step="0.5"
                             min="0"
                             max="24"
                             disabled={!isSelected}
-                            placeholder="0"
+                            placeholder={isSelected ? "0" : "-"} // Placeholder indicates disabled state
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            className="text-sky-600 hover:text-sky-900 disabled:text-default-300"
+                            className="text-sky-600 hover:text-sky-900 disabled:text-default-300 disabled:cursor-not-allowed"
                             disabled={!isSelected}
-                            onClick={() => {}}
+                            onClick={() => {
+                              /* Implement manage activities logic */
+                            }}
                           >
                             Manage Activities
                           </button>
@@ -422,7 +414,13 @@ const DailyLogEntryPage: React.FC = () => {
           <Button variant="outline" onClick={handleBack}>
             Cancel
           </Button>
-          <Button color="sky" variant="filled" onClick={() => {}}>
+          <Button
+            color="sky"
+            variant="filled"
+            onClick={() => {
+              /* Implement save logic */
+            }}
+          >
             Save as Draft
           </Button>
         </div>
