@@ -8,7 +8,6 @@ import { api } from "../../routes/utils/api";
 import BackButton from "../../components/BackButton";
 import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import toast from "react-hot-toast";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -30,15 +29,17 @@ interface JobOption {
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
-  jobName?: string; // Optional job name for display purposes
+  jobName?: string; // Job name for display purposes
+  jobType?: string; // Specific job type for this row
   hours?: number;
   selected?: boolean;
+  selectedJobs?: string[]; // Track which jobs are selected for this employee
+  jobHours?: { [jobType: string]: number }; // Track hours for each job type
 }
 
 interface DailyLogFormData {
   logDate: string;
   shift: string;
-  jobId: string;
   foremanId: string;
   contextData: {
     totalBags?: number;
@@ -50,7 +51,6 @@ interface DailyLogFormData {
 
 const DailyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [availableEmployees, setAvailableEmployees] = useState<
@@ -63,7 +63,6 @@ const DailyLogEntryPage: React.FC = () => {
   const [formData, setFormData] = useState<DailyLogFormData>({
     logDate: format(new Date(), "yyyy-MM-dd"),
     shift: "day",
-    jobId: "",
     foremanId: "",
     contextData: {},
     dayType: determineDayType(new Date()),
@@ -74,7 +73,6 @@ const DailyLogEntryPage: React.FC = () => {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        setLoading(true);
         const response = await api.get("/api/jobs");
         // Filter only MEE jobs
         const filteredJobs = response
@@ -95,8 +93,6 @@ const DailyLogEntryPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Error fetching jobs:", error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -110,7 +106,7 @@ const DailyLogEntryPage: React.FC = () => {
         setLoadingEmployees(true);
         const response = await api.get("/api/staffs");
 
-        // Filter employees by job to only include those working in MEE jobs
+        // Filter employees to only include those working in MEE jobs
         const filteredEmployees = response
           .filter((staff: any) => {
             if (!staff.job || !Array.isArray(staff.job)) return false;
@@ -122,7 +118,7 @@ const DailyLogEntryPage: React.FC = () => {
             id: staff.id,
             name: staff.name,
             job: staff.job,
-            hours: 0,
+            hours: 7,
             selected: false,
           }));
 
@@ -149,17 +145,6 @@ const DailyLogEntryPage: React.FC = () => {
     });
   };
 
-  // Handle input changes
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-
   // Handle context data changes
   const handleContextDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -172,49 +157,88 @@ const DailyLogEntryPage: React.FC = () => {
     });
   };
 
-  // Handle job selection
-  const handleJobChange = (jobId: string) => {
-    setFormData({
-      ...formData,
-      jobId,
-    });
-  };
-
   const handleBack = () => {
     navigate("/payroll/mee-production");
   };
 
-  // Toggle employee selection
-  const handleEmployeeSelection = (employeeId: string) => {
-    setAvailableEmployees((prev) =>
-      prev.map((emp) =>
-        emp.id === employeeId ? { ...emp, selected: !emp.selected } : emp
-      )
-    );
+  // Toggle employee selection by employee+job combination
+  const handleEmployeeSelection = (rowKey: string | undefined) => {
+    // Ensure rowKey is defined before proceeding
+    if (!rowKey) {
+      console.error("Attempted to toggle selection with undefined rowKey");
+      return; // Exit if rowKey is missing
+    }
+
+    setAvailableEmployees((prev) => {
+      const updatedEmployees = [...prev];
+
+      // Find the employee and update the specific job type selection
+      const [employeeId, jobType] = rowKey.split("-");
+      const employee = updatedEmployees.find((e) => e.id === employeeId);
+
+      if (employee) {
+        // Create a new property to track selected job types if it doesn't exist
+        if (!employee.selectedJobs) {
+          employee.selectedJobs = [];
+        }
+
+        // Toggle the job selection
+        if (employee.selectedJobs.includes(jobType)) {
+          employee.selectedJobs = employee.selectedJobs.filter(
+            (j) => j !== jobType
+          );
+        } else {
+          employee.selectedJobs.push(jobType);
+        }
+      }
+
+      return updatedEmployees;
+    });
   };
 
-  // Update employee hours
-  const handleEmployeeHoursChange = (employeeId: string, hours: string) => {
+  // Update employee hours by employee+job combination
+  const handleEmployeeHoursChange = (
+    rowKey: string | undefined,
+    hours: string
+  ) => {
     const hoursNum = hours === "" ? 0 : parseFloat(hours);
 
-    setAvailableEmployees((prev) =>
-      prev.map((emp) =>
-        emp.id === employeeId ? { ...emp, hours: hoursNum } : emp
-      )
-    );
+    setAvailableEmployees((prev) => {
+      // Ensure rowKey is defined before proceeding
+      if (!rowKey) {
+        console.error("Attempted to update hours with undefined rowKey");
+        return prev; // Return previous state if rowKey is missing
+      }
+
+      // Assign to a new const after the check to help type inference
+      const validRowKey = rowKey;
+      const updatedEmployees = [...prev];
+
+      // Parse the row key to get employee ID and job type
+      const [employeeId, jobType] = validRowKey.split("-");
+      const employee = updatedEmployees.find((e) => e.id === employeeId);
+
+      if (employee) {
+        // Create a new property to track hours by job if it doesn't exist
+        if (!employee.jobHours) {
+          employee.jobHours = {};
+        }
+
+        // Update hours for this specific job
+        employee.jobHours[jobType] = hoursNum;
+      }
+
+      return updatedEmployees;
+    });
   };
 
-  // Replace the sortedEmployees useMemo with expandedEmployees that creates multiple rows
   const expandedEmployees = useMemo(() => {
-    // First filter to only include employees with at least one MEE job
-    const filteredEmployees = availableEmployees.filter(
-      (emp) => emp.job && emp.job.some((jobId) => MEE_JOB_IDS.includes(jobId))
-    );
+    // Create a new array with an entry for each employee-job combination
+    const expanded: Array<
+      EmployeeWithHours & { jobType: string; jobName: string }
+    > = [];
 
-    // Then create a new array with an entry for each employee-job combination
-    const expanded: Array<EmployeeWithHours & { jobType: string }> = [];
-
-    filteredEmployees.forEach((employee) => {
+    availableEmployees.forEach((employee) => {
       // Filter to only include MEE job types
       const meeJobs = (employee.job || []).filter((jobId) =>
         MEE_JOB_IDS.includes(jobId)
@@ -234,25 +258,16 @@ const DailyLogEntryPage: React.FC = () => {
       });
     });
 
-    // Sort by job name first, then employee name
+    // Sort by employee name first, then job name
     return expanded.sort((a, b) => {
-      // First by selected job
-      if (formData.jobId) {
-        const aHasSelected = a.jobType === formData.jobId;
-        const bHasSelected = b.jobType === formData.jobId;
-        if (aHasSelected !== bHasSelected) {
-          return aHasSelected ? -1 : 1;
-        }
-      }
+      // First by employee name
+      const nameCompare = a.name.localeCompare(b.name);
+      if (nameCompare !== 0) return nameCompare;
 
       // Then by job name
-      const jobCompare = (a.jobName || "").localeCompare(b.jobName || "");
-      if (jobCompare !== 0) return jobCompare;
-
-      // Then by employee name
-      return a.name.localeCompare(b.name);
+      return (a.jobName || "").localeCompare(b.jobName || "");
     });
-  }, [availableEmployees, jobs, formData.jobId]);
+  }, [availableEmployees, jobs]);
 
   return (
     <div className="relative w-full mx-4 md:mx-6">
@@ -304,17 +319,6 @@ const DailyLogEntryPage: React.FC = () => {
               { id: "night", name: "Night Shift" },
             ]}
             required
-          />
-
-          {/* Job Selection - Only MEE jobs */}
-          <FormListbox
-            name="jobId"
-            label="Mee Job Type"
-            value={formData.jobId}
-            onChange={handleJobChange}
-            options={jobs}
-            required
-            placeholder={loading ? "Loading jobs..." : "Select a job"}
           />
 
           {/* Context Data - Example for Mee Production */}
@@ -391,83 +395,67 @@ const DailyLogEntryPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-default-200">
-                  {expandedEmployees.map((employee) => (
-                    <tr
-                      key={employee.rowKey}
-                      className={
-                        formData.jobId === employee.jobType ? "bg-sky-50" : ""
-                      }
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={
-                            employee.selected &&
-                            formData.jobId === employee.jobType
-                          }
-                          onChange={() => {
-                            // Only allow selection if the job type matches the selected job
-                            if (formData.jobId === employee.jobType) {
-                              handleEmployeeSelection(employee.id);
-                            } else {
-                              // Optionally show a message that they need to select matching job type first
-                              toast(
-                                `Please select job type "${employee.jobName}" first to assign this employee`
-                              );
-                            }
-                          }}
-                          disabled={formData.jobId !== employee.jobType}
-                          className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-default-300 rounded"
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
-                        {employee.id}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                        {employee.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                        {employee.jobName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
+                  {expandedEmployees.map((row) => {
+                    // Find the full employee to get access to the selection tracking properties
+                    const employee = availableEmployees.find(
+                      (e) => e.id === row.id
+                    );
+                    const isSelected =
+                      employee?.selectedJobs?.includes(row.jobType) || false;
+                    const hours = employee?.jobHours?.[row.jobType] || 7;
+
+                    return (
+                      <tr key={row.rowKey}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleEmployeeSelection(row.rowKey)}
+                            className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-default-300 rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
+                          {row.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                          {row.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                          {row.jobName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                          id="employee-hours"
+                          name="employee-hours"
                           type="number"
-                          value={
-                            employee.selected &&
-                            formData.jobId === employee.jobType
-                              ? employee.hours || ""
-                              : ""
-                          }
+                          value={isSelected ? hours || "" : ""}
                           onChange={(e) =>
                             handleEmployeeHoursChange(
-                              employee.id,
-                              e.target.value
+                            row.rowKey,
+                            e.target.value
                             )
                           }
-                          className="max-w-[80px] px-2 py-1 text-sm border border-default-300 rounded-md"
+                          // Add the 'show-spinner' class here
+                          className="show-spinner max-w-[80px] px-2 py-1 text-sm border border-default-300 rounded-md"
                           step="0.5"
                           min="0"
-                          disabled={
-                            !employee.selected ||
-                            formData.jobId !== employee.jobType
-                          }
+                          max="24"
+                          disabled={!isSelected}
                           placeholder="0"
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          className="text-sky-600 hover:text-sky-900 disabled:text-default-300"
-                          disabled={
-                            !employee.selected ||
-                            formData.jobId !== employee.jobType
-                          }
-                          onClick={() => {}}
-                        >
-                          Manage Activities
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            className="text-sky-600 hover:text-sky-900 disabled:text-default-300"
+                            disabled={!isSelected}
+                            onClick={() => {}}
+                          >
+                            Manage Activities
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
