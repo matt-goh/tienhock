@@ -29,6 +29,7 @@ const EmployeeCard = ({
 }) => {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isTrashHovered, setIsTrashHovered] = useState(false);
+  const [expandedJobs, setExpandedJobs] = useState(false);
   const navigate = useNavigate();
 
   const handleClick = () => {
@@ -39,6 +40,11 @@ const EmployeeCard = ({
     e.preventDefault();
     e.stopPropagation();
     onDeleteClick(employee);
+  };
+
+  const handleMoreJobsClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card navigation
+    setExpandedJobs(!expandedJobs);
   };
 
   return (
@@ -91,24 +97,31 @@ const EmployeeCard = ({
           />
           <div className="text-sm text-default-700 flex-1">
             <div className="flex flex-wrap gap-1.5">
-              {employee.job && employee.job.length > 0 ? (
-                employee.job.slice(0, 2).map((job, idx) => (
+              {(expandedJobs ? employee.job : employee.job.slice(0, 2)).map(
+                (job, idx) => (
                   <span
                     key={idx}
                     className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800"
                   >
                     {job}
                   </span>
-                ))
-              ) : (
-                <span className="text-default-500 italic text-xs">
-                  No job assigned
-                </span>
+                )
               )}
-              {employee.job && employee.job.length > 2 && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-700">
+              {!expandedJobs && employee.job.length > 2 && (
+                <button
+                  onClick={handleMoreJobsClick}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-700 hover:bg-default-200 transition-colors"
+                >
                   +{employee.job.length - 2} more
-                </span>
+                </button>
+              )}
+              {expandedJobs && (
+                <button
+                  onClick={handleMoreJobsClick}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-700 hover:bg-default-200 transition-colors"
+                >
+                  Show less
+                </button>
               )}
             </div>
           </div>
@@ -197,9 +210,12 @@ const StaffPage = () => {
             .toLowerCase()
             .includes(searchTerm.toLowerCase()));
 
+      // In the filteredEmployees useMemo:
       const matchesResignedFilter = filters.showResigned
-        ? true
-        : !employee.dateResigned;
+        ? true // If showResigned is true, include all employees regardless of resignation date
+        : employee.dateResigned === null ||
+          employee.dateResigned === "" ||
+          !employee.dateResigned;
 
       const matchesJobFilter =
         !filters.applyJobFilter ||
@@ -351,7 +367,7 @@ const StaffPage = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl text-default-800 font-bold flex items-center">
           Staff Directory
