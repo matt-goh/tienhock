@@ -13,6 +13,7 @@ import { FormCombobox, FormInput } from "../../components/FormComponents";
 import { useStaffsCache } from "../../hooks/useStaffsCache";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 import { useJobsCache } from "../../hooks/useJobsCache";
+import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
 
 interface SelectOption {
   id: string;
@@ -146,7 +147,7 @@ const StaffFormPage: React.FC = () => {
         await api.delete(`/api/staffs/${id}`);
 
         // Refresh the cache
-        refreshStaffs();
+        await refreshStaffs();
 
         setIsDeleteDialogOpen(false);
         toast.success("Staff member deleted successfully");
@@ -254,7 +255,7 @@ const StaffFormPage: React.FC = () => {
       }
 
       // Refresh the cache after successful save
-      refreshStaffs();
+      await refreshStaffs();
 
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`
@@ -314,22 +315,41 @@ const StaffFormPage: React.FC = () => {
     query: string,
     setQuery: React.Dispatch<React.SetStateAction<string>>
   ) => (
-    <FormCombobox
-      name={name}
-      label={label}
-      value={formData[name] as string[]}
-      onChange={(value) => {
-        if (typeof value === "string") {
-          handleComboboxChange(name, [value]);
-        } else {
-          handleComboboxChange(name, value);
-        }
-      }}
-      options={options}
-      query={query}
-      setQuery={setQuery}
-    />
+    <div>
+      <FormCombobox
+        name={name}
+        label={label}
+        value={formData[name] as string[]}
+        onChange={(value) => {
+          if (typeof value === "string") {
+            handleComboboxChange(name, [value]);
+          } else {
+            handleComboboxChange(name, value);
+          }
+        }}
+        options={options}
+        query={query}
+        setQuery={setQuery}
+      />
+      {name === "location" ? (
+        <div>
+          <SelectedTagsDisplay
+            selectedItems={(formData[name] as string[]).map((locId) => {
+              const locationOption = options.find((opt) => opt.id === locId);
+              return locationOption ? `${locationOption.name}` : locId;
+            })}
+            label={label}
+          />
+        </div>
+      ) : (
+        <SelectedTagsDisplay
+          selectedItems={formData[name] as string[]}
+          label={label}
+        />
+      )}
+    </div>
   );
+
   if (loading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
