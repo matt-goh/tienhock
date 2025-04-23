@@ -56,7 +56,7 @@ const StaffAddPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
-  const { refreshStaffs } = useStaffsCache();
+  const { staffs, refreshStaffs } = useStaffsCache();
   const { options } = useStaffFormOptions();
   const { jobs } = useJobsCache();
 
@@ -147,7 +147,19 @@ const StaffAddPage: React.FC = () => {
     []
   );
 
-  const validateForm = (): boolean => {
+  const checkDuplicateId = async (id: string): Promise<boolean> => {
+    try {
+      // You can create a lightweight API endpoint for this check
+      // or check against the cached staff list
+      const existingStaff = staffs.find((staff) => staff.id === id);
+      return !!existingStaff;
+    } catch (error) {
+      console.error("Error checking ID:", error);
+      return false; // Continue with submission on check error
+    }
+  };
+
+  const validateForm = async (): Promise<boolean> => {
     const requiredFields: (keyof Employee)[] = ["id", "name"];
 
     for (const field of requiredFields) {
@@ -157,6 +169,20 @@ const StaffAddPage: React.FC = () => {
         );
         return false;
       }
+    }
+
+    // Check for duplicate ID before submission
+    const isDuplicate = await checkDuplicateId(formData.id);
+    if (isDuplicate) {
+      toast.error("A staff member with this ID already exists");
+
+      // Focus on the ID field
+      const idField = document.getElementById("id");
+      if (idField) {
+        idField.focus();
+      }
+
+      return false;
     }
 
     // Email validation (only if email is not empty)
@@ -174,7 +200,7 @@ const StaffAddPage: React.FC = () => {
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
-    if (!validateForm()) {
+    if (!(await validateForm())) {
       return;
     }
 
