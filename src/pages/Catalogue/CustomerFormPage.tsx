@@ -280,10 +280,6 @@ const CustomerFormPage: React.FC = () => {
       toast.error("Customer ID and Name are required fields.");
       return false;
     }
-    if (formData.id.includes(" ")) {
-      toast.error("Customer ID cannot contain spaces.");
-      return false;
-    }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       toast.error("Please enter a valid email address or leave it empty.");

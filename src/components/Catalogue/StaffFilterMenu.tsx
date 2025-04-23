@@ -154,7 +154,6 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                 <IconSquare
                   width={18}
                   height={18}
-                  stroke={2}
                   className="text-default-400"
                 />
               )}
