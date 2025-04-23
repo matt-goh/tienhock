@@ -8,7 +8,6 @@ import {
   IconBriefcase,
   IconPhone,
   IconId,
-  IconMapPin,
 } from "@tabler/icons-react";
 import { Employee, FilterOptions } from "../../types/types";
 import { useNavigate } from "react-router-dom";
@@ -28,7 +27,6 @@ const EmployeeCard = ({
   onDeleteClick: (employee: Employee) => void;
 }) => {
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const [isTrashHovered, setIsTrashHovered] = useState(false);
   const [expandedJobs, setExpandedJobs] = useState(false);
   const navigate = useNavigate();
 
@@ -72,8 +70,6 @@ const EmployeeCard = ({
             {isCardHovered && (
               <button
                 onClick={handleDeleteClick}
-                onMouseEnter={() => setIsTrashHovered(true)}
-                onMouseLeave={() => setIsTrashHovered(false)}
                 className="p-1.5 rounded-full bg-white hover:bg-rose-50 text-default-500 hover:text-rose-600 transition-colors duration-150 shadow-sm"
                 title="Delete employee"
               >
@@ -158,7 +154,12 @@ const EmployeeCard = ({
 };
 
 const StaffPage = () => {
-  const { staffs: employees, loading, error, refreshStaffs } = useStaffsCache();
+  const {
+    allStaffs: employees,
+    loading,
+    error,
+    refreshStaffs,
+  } = useStaffsCache();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

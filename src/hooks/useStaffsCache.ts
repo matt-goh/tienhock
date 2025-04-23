@@ -1,20 +1,25 @@
 // src/hooks/useStaffsCache.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "../routes/utils/api";
 import { Employee } from "../types/types";
 
 interface CacheData {
-  staffs: Employee[];
+  allStaffs: Employee[];
   timestamp: number;
 }
 
 export const useStaffsCache = () => {
-  const [staffs, setStaffs] = useState<Employee[]>([]);
+  const [allStaffs, setAllStaffs] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const CACHE_KEY = "staffsData";
+  const CACHE_KEY = "allStaffsData";
   const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
+
+  // Filter active staff members (no resignation date)
+  const staffs = useMemo(() => {
+    return allStaffs.filter((staff) => !staff.dateResigned);
+  }, [allStaffs]);
 
   const fetchStaffs = useCallback(async (force = false) => {
     // Try to load from cache first
@@ -26,7 +31,7 @@ export const useStaffsCache = () => {
           const now = Date.now();
 
           if (now - parsedData.timestamp < CACHE_DURATION) {
-            setStaffs(parsedData.staffs);
+            setAllStaffs(parsedData.allStaffs);
             setLoading(false);
             return;
           }
@@ -38,6 +43,7 @@ export const useStaffsCache = () => {
 
     setLoading(true);
     try {
+      // Fetch all staff (API now returns all by default)
       const response = await api.get("/api/staffs");
 
       if (response) {
@@ -48,12 +54,12 @@ export const useStaffsCache = () => {
           location: Array.isArray(staff.location) ? staff.location : [],
         }));
 
-        setStaffs(normalizedStaffs);
+        setAllStaffs(normalizedStaffs);
 
         // Cache the data
         try {
           const cacheData: CacheData = {
-            staffs: normalizedStaffs,
+            allStaffs: normalizedStaffs,
             timestamp: Date.now(),
           };
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -79,7 +85,8 @@ export const useStaffsCache = () => {
   }, [fetchStaffs]);
 
   return {
-    staffs,
+    staffs, // Active staff only
+    allStaffs, // All staff including resigned
     loading,
     error,
     refreshStaffs: () => fetchStaffs(true),
