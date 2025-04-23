@@ -13,10 +13,10 @@ import {
   FormInput,
   FormListbox,
 } from "../../components/FormComponents";
-import { useStaffsCache } from "../../hooks/useStaffsCache";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
-import { useJobsCache } from "../../hooks/useJobsCache";
 import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 
 interface SelectOption {
   id: string;

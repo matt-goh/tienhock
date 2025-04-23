@@ -25,10 +25,10 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
-import { useJobsCache } from "../../hooks/useJobsCache";
-import { useJobPayCodeMappings } from "../../hooks/useJobPayCodeMappings";
+import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal"; // Import Add modal
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal"; // Import Edit modal
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 type JobSelection = Job | null;
 

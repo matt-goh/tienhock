@@ -7,11 +7,11 @@ import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { useJobsCache } from "../../hooks/useJobsCache";
-import { useStaffsCache } from "../../hooks/useStaffsCache";
 import Checkbox from "../../components/Checkbox";
 import ManageActivitiesModal from "../../components/Payroll/ManageActivitiesModal";
 import toast from "react-hot-toast";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -90,7 +90,7 @@ const DailyLogEntryPage: React.FC = () => {
     return allStaffs
       .filter((staff) => {
         if (!staff.job || !Array.isArray(staff.job)) return false;
-        return staff.job.some((jobId) => MEE_JOB_IDS.includes(jobId));
+        return staff.job.some((jobId: string) => MEE_JOB_IDS.includes(jobId));
       })
       .map((staff) => ({
         ...staff,
@@ -259,12 +259,12 @@ const DailyLogEntryPage: React.FC = () => {
 
     availableEmployees.forEach((employee) => {
       // Filter to only include MEE job types
-      const meeJobs = (employee.job || []).filter((jobId) =>
+      const meeJobs = (employee.job || []).filter((jobId: string) =>
         MEE_JOB_IDS.includes(jobId)
       );
 
       // Create a row for each job type this employee has
-      meeJobs.forEach((jobId) => {
+      meeJobs.forEach((jobId: any) => {
         const jobName = jobs.find((j) => j.id === jobId)?.name || jobId;
 
         expanded.push({

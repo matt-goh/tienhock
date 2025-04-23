@@ -17,7 +17,7 @@ import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { useStaffsCache } from "../../hooks/useStaffsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 
 const EmployeeCard = ({
   employee,
@@ -225,14 +225,14 @@ const StaffPage = () => {
         !filters.applyJobFilter ||
         !filters.jobFilter ||
         filters.jobFilter.length === 0 ||
-        employee.job.some((job) => filters.jobFilter?.includes(job));
+        employee.job.some((job: string) => filters.jobFilter?.includes(job));
 
       const matchesLocationFilter =
         !filters.applyLocationFilter ||
         !filters.locationFilter ||
         filters.locationFilter.length === 0 ||
         (Array.isArray(employee.location)
-          ? employee.location.some((loc) =>
+          ? employee.location.some((loc: string) =>
               filters.locationFilter?.includes(loc)
             )
           : filters.locationFilter?.includes(employee.location));

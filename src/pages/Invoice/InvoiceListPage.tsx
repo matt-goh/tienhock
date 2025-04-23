@@ -45,7 +45,7 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { useCustomerNames } from "../../hooks/useCustomerNames";
+import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 // Import the specific utilities needed
 import {
   getInvoices,
