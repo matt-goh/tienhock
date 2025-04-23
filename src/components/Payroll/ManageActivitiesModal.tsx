@@ -1,0 +1,406 @@
+// src/components/Payroll/ManageActivitiesModal.tsx
+import React, { useState, useEffect, Fragment, useMemo } from "react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
+import Button from "../Button";
+import { JobPayCodeDetails, Employee } from "../../types/types";
+import Checkbox from "../Checkbox";
+import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../LoadingSpinner";
+
+interface ActivityItem {
+  payCodeId: string;
+  description: string;
+  payType: string;
+  rateUnit: string;
+  rate: number;
+  isDefault: boolean;
+  isSelected: boolean;
+  unitsProduced?: number;
+  calculatedAmount: number;
+}
+
+interface ManageActivitiesModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  employee: Employee | null;
+  jobId: string;
+  jobName: string;
+  employeeHours: number;
+  dayType: "Biasa" | "Ahad" | "Umum";
+  onActivitiesUpdated: (activities: ActivityItem[]) => void;
+}
+
+const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
+  isOpen,
+  onClose,
+  employee,
+  jobId,
+  jobName,
+  employeeHours,
+  dayType,
+  onActivitiesUpdated,
+}) => {
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch available pay codes for this job when modal opens
+  useEffect(() => {
+    const fetchJobPayCodes = async () => {
+      if (!isOpen || !jobId) return;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.get(`/api/job-pay-codes/job/${jobId}`);
+
+        // Transform response into ActivityItem[]
+        const jobPayCodes = response || [];
+        const transformedActivities: ActivityItem[] = jobPayCodes.map(
+          (payCode: JobPayCodeDetails) => {
+            // Determine which rate to use based on day type
+            let rate = 0;
+            if (dayType === "Ahad") {
+              rate =
+                payCode.override_rate_ahad !== null
+                  ? payCode.override_rate_ahad
+                  : payCode.rate_ahad;
+            } else if (dayType === "Umum") {
+              rate =
+                payCode.override_rate_umum !== null
+                  ? payCode.override_rate_umum
+                  : payCode.rate_umum;
+            } else {
+              // Biasa (default)
+              rate =
+                payCode.override_rate_biasa !== null
+                  ? payCode.override_rate_biasa
+                  : payCode.rate_biasa;
+            }
+
+            return {
+              payCodeId: payCode.id,
+              description: payCode.description,
+              payType: payCode.pay_type,
+              rateUnit: payCode.rate_unit,
+              rate: rate,
+              isDefault: payCode.is_default_setting,
+              isSelected: payCode.is_default_setting, // Default to selected if it's a default pay code
+              unitsProduced: payCode.requires_units_input ? 0 : undefined,
+              calculatedAmount: 0, // Will be calculated below
+            };
+          }
+        );
+
+        // Pre-calculate amounts
+        const activitiesWithAmounts = calculateAmounts(
+          transformedActivities,
+          employeeHours
+        );
+
+        setActivities(activitiesWithAmounts);
+      } catch (err: any) {
+        console.error("Error fetching job pay codes:", err);
+        setError(err.message || "Failed to load pay codes");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobPayCodes();
+  }, [isOpen, jobId, dayType, employeeHours]);
+
+  // Calculate amounts based on rate type, hours, and units
+  const calculateAmounts = (
+    acts: ActivityItem[],
+    hours: number
+  ): ActivityItem[] => {
+    return acts.map((activity) => {
+      let calculatedAmount = 0;
+
+      if (activity.isSelected) {
+        switch (activity.rateUnit) {
+          case "Hour":
+            calculatedAmount = activity.rate * hours;
+            break;
+          case "Day":
+            calculatedAmount = activity.rate; // Daily rate is fixed regardless of hours
+            break;
+          case "Bag":
+          case "Fixed":
+            calculatedAmount = activity.rate * (activity.unitsProduced || 0);
+            break;
+          case "Percent":
+            // Percentage of some base amount (would need implementation details)
+            calculatedAmount = 0; // Placeholder
+            break;
+          default:
+            calculatedAmount = 0;
+        }
+      }
+
+      return {
+        ...activity,
+        calculatedAmount: Number(calculatedAmount.toFixed(2)),
+      };
+    });
+  };
+
+  // Toggle selection of an activity
+  const handleToggleActivity = (index: number) => {
+    const newActivities = [...activities];
+    newActivities[index].isSelected = !newActivities[index].isSelected;
+
+    // Recalculate amounts after toggling
+    const updatedActivities = calculateAmounts(newActivities, employeeHours);
+    setActivities(updatedActivities);
+  };
+
+  // Update units produced
+  const handleUnitsChange = (index: number, value: string) => {
+    const newActivities = [...activities];
+    newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
+
+    // Recalculate amounts after changing units
+    const updatedActivities = calculateAmounts(newActivities, employeeHours);
+    setActivities(updatedActivities);
+  };
+
+  // Calculate total amount
+  const totalAmount = useMemo(() => {
+    return activities.reduce(
+      (sum, activity) =>
+        activity.isSelected ? sum + activity.calculatedAmount : sum,
+      0
+    );
+  }, [activities]);
+
+  // Save activities
+  const handleSave = () => {
+    // Only include selected activities
+    const selectedActivities = activities.filter(
+      (activity) => activity.isSelected
+    );
+    onActivitiesUpdated(selectedActivities);
+    onClose();
+  };
+
+  return (
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        <TransitionChild
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        </TransitionChild>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <DialogTitle
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-gray-900"
+                >
+                  Manage Activities for {employee?.name}
+                </DialogTitle>
+
+                <div className="mt-2">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Job</p>
+                      <p className="font-medium">{jobName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Hours</p>
+                      <p className="font-medium">{employeeHours} hours</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Day Type</p>
+                      <p className="font-medium">{dayType}</p>
+                    </div>
+                  </div>
+
+                  {loading ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner />
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-4 text-red-600">{error}</div>
+                  ) : (
+                    <>
+                      <div className="mt-4 overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Apply
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Pay Code
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Type
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Unit
+                              </th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Rate
+                              </th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Units
+                              </th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Amount
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {activities.length === 0 ? (
+                              <tr>
+                                <td
+                                  colSpan={7}
+                                  className="px-6 py-4 text-center text-sm text-gray-500"
+                                >
+                                  No pay codes available for this job.
+                                </td>
+                              </tr>
+                            ) : (
+                              activities.map((activity, index) => (
+                                <tr
+                                  key={activity.payCodeId}
+                                  className={
+                                    activity.isSelected ? "bg-sky-50" : ""
+                                  }
+                                >
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <Checkbox
+                                      checked={activity.isSelected}
+                                      onChange={() =>
+                                        handleToggleActivity(index)
+                                      }
+                                      size={20}
+                                      checkedColor="text-sky-600"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {activity.description}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {activity.payType}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {activity.rateUnit}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                    {activity.rate.toFixed(2)}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                                    {activity.rateUnit === "Bag" ||
+                                    activity.rateUnit === "Fixed" ? (
+                                      <input
+                                        type="number"
+                                        className="w-20 text-right border border-gray-300 rounded p-1 text-sm disabled:bg-gray-100"
+                                        value={
+                                          activity.unitsProduced?.toString() ||
+                                          "0"
+                                        }
+                                        onChange={(e) =>
+                                          handleUnitsChange(
+                                            index,
+                                            e.target.value
+                                          )
+                                        }
+                                        disabled={!activity.isSelected}
+                                        min="0"
+                                        step="1"
+                                      />
+                                    ) : (
+                                      <span className="text-sm text-gray-500">
+                                        —
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                                    {activity.isSelected ? (
+                                      <span className="text-gray-900">
+                                        {activity.calculatedAmount.toFixed(2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">
+                                        0.00
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-gray-50">
+                              <td
+                                colSpan={6}
+                                className="px-6 py-3 text-right text-sm font-medium text-gray-900"
+                              >
+                                Total
+                              </td>
+                              <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                {totalAmount.toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    color="sky"
+                    variant="filled"
+                    onClick={handleSave}
+                    disabled={loading}
+                  >
+                    Apply Activities
+                  </Button>
+                </div>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+};
+
+export default ManageActivitiesModal;
