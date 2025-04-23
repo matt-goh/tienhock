@@ -61,8 +61,8 @@ const StaffAddPage: React.FC = () => {
   const { jobs } = useJobsCache();
 
   const genderOptions = [
-    { id: "male", name: "Male" },
-    { id: "female", name: "Female" },
+    { id: "Male", name: "Male" },
+    { id: "Female", name: "Female" },
   ];
 
   const documentOptions = [
@@ -83,6 +83,20 @@ const StaffAddPage: React.FC = () => {
     { id: "Cash", name: "Cash" },
     { id: "Cheque", name: "Cheque" },
   ];
+
+  // Utility function: Convert option ID to display name
+  const mapIdToDisplayName = (
+    id: string | undefined,
+    options: SelectOption[]
+  ): string => {
+    if (!id || id === "") return "";
+
+    const option = options.find((opt) => opt.id === id);
+    if (option) return option.name;
+
+    console.warn(`Could not map ID "${id}" to any option name`);
+    return "";
+  };
 
   useEffect(() => {
     // Check if form data has changed by comparing with the initial ref
@@ -166,8 +180,17 @@ const StaffAddPage: React.FC = () => {
 
     setIsSaving(true);
 
+    // Convert option IDs back to display names for storage
     const dataToSend = {
       ...formData,
+      // Convert IDs back to display names for database storage
+      nationality: mapIdToDisplayName(
+        formData.nationality,
+        options.nationalities
+      ),
+      race: mapIdToDisplayName(formData.race, options.races),
+      agama: mapIdToDisplayName(formData.agama, options.agama),
+      // Handle date fields
       birthdate: formData.birthdate || null,
       dateJoined: formData.dateJoined || null,
       dateResigned: formData.dateResigned || null,
@@ -244,8 +267,8 @@ const StaffAddPage: React.FC = () => {
       {name === "location" ? (
         <div>
           <SelectedTagsDisplay
-            selectedItems={(formData[name] as string[]).map(locId => {
-              const locationOption = options.find(opt => opt.id === locId);
+            selectedItems={(formData[name] as string[]).map((locId) => {
+              const locationOption = options.find((opt) => opt.id === locId);
               return locationOption ? `${locationOption.name}` : locId;
             })}
             label={label}

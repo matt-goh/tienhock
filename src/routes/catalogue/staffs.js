@@ -24,9 +24,24 @@ export default function (pool) {
            s.name, 
            s.ic_no as "icNo", 
            s.telephone_no as "telephoneNo",
+           s.email,
+           s.gender,
+           s.nationality,
+           s.birthdate,
+           s.address,
+           s.date_joined as "dateJoined",
+           s.bank_account_number as "bankAccountNumber",
+           s.epf_no as "epfNo",
+           s.income_tax_no as "incomeTaxNo",
+           s.socso_no as "socsoNo",
+           s.document,
+           s.payment_type as "paymentType",
+           s.payment_preference as "paymentPreference",
+           s.race,
+           s.agama,
+           s.date_resigned as "dateResigned",
            s.job,
-           s.location,
-           s.date_resigned as "dateResigned"`;
+           s.location`;
 
       let query = `
       SELECT ${columns}
@@ -49,9 +64,16 @@ export default function (pool) {
               ...staff,
               job: Array.isArray(staff.job) ? staff.job : [],
               location: Array.isArray(staff.location) ? staff.location : [],
+              // Format dates
+              birthdate: staff.birthdate
+                ? staff.birthdate.toISOString().split("T")[0]
+                : "",
+              dateJoined: staff.dateJoined
+                ? staff.dateJoined.toISOString().split("T")[0]
+                : "",
               dateResigned: staff.dateResigned
                 ? staff.dateResigned.toISOString().split("T")[0]
-                : null,
+                : "",
             }));
 
       res.json(staffs);
