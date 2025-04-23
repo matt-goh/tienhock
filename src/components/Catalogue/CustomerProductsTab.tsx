@@ -5,13 +5,12 @@ import { CustomProduct } from "../../types/types";
 import Button from "../Button";
 import {
   IconPlus,
-  IconSquare,
-  IconSquareCheckFilled,
   IconTrash,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { FormListbox } from "../FormComponents";
 import clsx from "clsx";
+import Checkbox from "../Checkbox";
 
 interface CustomerProductsTabProps {
   products: CustomProduct[]; // Receive products directly
@@ -292,46 +291,20 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                     />
                   </td>
                   {/* Is Available */}
-                  <td className="px-4 py-2 whitespace-nowrap text-center align-top">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleAvailabilityChange(
-                          product.uid,
-                          !product.is_available
-                        )
+                  <td className="px-4 py-2 whitespace-nowrap text-center align-center">
+                    <Checkbox
+                      checked={product.is_available}
+                      onChange={(checked) =>
+                        handleAvailabilityChange(product.uid, checked)
                       }
-                      className={clsx(
-                        "p-1 rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500",
-                        disabled
-                          ? "cursor-not-allowed opacity-50"
-                          : "hover:bg-gray-100"
-                      )}
-                      aria-checked={product.is_available}
-                      role="switch"
                       disabled={disabled}
-                      aria-label={`Toggle availability for ${
+                      ariaLabel={`Toggle availability for ${
                         productDescriptions[product.product_id] ||
                         product.product_id
                       }`}
-                    >
-                      {product.is_available ? (
-                        <IconSquareCheckFilled
-                          aria-hidden="true"
-                          width={20}
-                          height={20}
-                          className="text-blue-600"
-                        />
-                      ) : (
-                        <IconSquare
-                          aria-hidden="true"
-                          width={20}
-                          height={20}
-                          stroke={1.5}
-                          className="text-default-400"
-                        />
-                      )}
-                    </button>
+                      role="switch"
+                      buttonClassName="p-1 rounded"
+                    />
                   </td>
                   {/* Action */}
                   <td className="px-4 py-2 whitespace-nowrap text-center align-top">
