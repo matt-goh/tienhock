@@ -14,6 +14,7 @@ import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useStaffsCache } from "../../hooks/useStaffsCache";
 
 const EmployeeCard = ({
   employee,
@@ -170,10 +171,8 @@ const EmployeeCard = ({
 };
 
 const StaffPage = () => {
+  const { staffs: employees, loading, error, refreshStaffs } = useStaffsCache();
   const [searchTerm, setSearchTerm] = useState("");
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
@@ -190,33 +189,16 @@ const StaffPage = () => {
 
   const ITEMS_PER_PAGE = 12;
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get("/api/staffs");
-      setEmployees(data);
-      setError(null);
-    } catch (err) {
-      setError("Failed to fetch employees. Please try again later.");
-      console.error("Error fetching employees:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleConfirmDelete = async () => {
     if (employeeToDelete) {
       try {
         await api.delete(`/api/staffs/${employeeToDelete.id}`);
-
-        setEmployees(employees.filter((emp) => emp.id !== employeeToDelete.id));
         setIsDeleteDialogOpen(false);
         setEmployeeToDelete(null);
         toast.success("Employee deleted successfully");
+
+        // Refresh the cache instead of updating local state
+        refreshStaffs();
       } catch (err) {
         console.error("Error deleting employee:", err);
         toast.error("Failed to delete employee. Please try again.");
@@ -384,7 +366,7 @@ const StaffPage = () => {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Error: {error.message}</div>;
   }
 
   return (
