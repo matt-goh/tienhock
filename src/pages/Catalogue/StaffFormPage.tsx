@@ -6,10 +6,13 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Employee } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import { StaffListbox } from "../../components/Catalogue/StaffListbox";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { FormCombobox, FormInput } from "../../components/FormComponents";
+import {
+  FormCombobox,
+  FormInput,
+  FormListbox,
+} from "../../components/FormComponents";
 import { useStaffsCache } from "../../hooks/useStaffsCache";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 import { useJobsCache } from "../../hooks/useJobsCache";
@@ -292,15 +295,14 @@ const StaffFormPage: React.FC = () => {
     label: string,
     options: SelectOption[]
   ) => {
-    // Value can be name or ID, StaffListbox handles it
     const currentValue = formData[name];
 
     return (
-      <StaffListbox // Use the new component
+      <FormListbox // Use the new component
         key={name}
         name={name}
         label={label}
-        value={currentValue} // Pass the raw value from formData
+        value={currentValue as string} // Cast to string, assuming listbox fields are strings
         onChange={(value) => handleListboxChange(name, value)} // Receives string ID
         options={options}
         placeholder={`Select ${label}...`}
