@@ -45,9 +45,9 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
         <div className="flex items-center justify-end">
           <span className="mr-1 text-gray-800 font-medium">RM</span>
           <input
-            type="text"
+            type="number"
             value={formatCurrency(subtotal)}
-            className="w-[75px] px-2 py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
+            className="w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
             disabled
           />
         </div>
@@ -59,9 +59,9 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
         <div className="flex items-center justify-end">
           <span className="mr-1 text-gray-800 font-medium">RM</span>
           <input
-            type="text"
+            type="number"
             value={formatCurrency(taxTotal)}
-            className="w-[75px] px-2 py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
+            className="w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
             disabled
           />
         </div>
@@ -85,7 +85,11 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
               const finalValue = parseFloat(e.target.value) || 0;
               onRoundingChange(finalValue);
             }}
-            className="w-[75px] px-2 py-0.5 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right font-medium text-gray-800"
+            className={`w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800 ${
+              !readOnly
+                ? "hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded"
+                : ""
+            }`}
             disabled={readOnly}
           />
         </div>
@@ -100,9 +104,9 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
         <div className="flex items-center justify-end">
           <span className="mr-1 font-semibold text-base text-gray-900">RM</span>
           <input
-            type="text"
+            type="number"
             value={formatCurrency(grandTotal)}
-            className="w-[75px] px-2 py-0.5 border border-transparent bg-transparent text-right font-semibold text-base text-gray-900"
+            className="w-[75px] py-0.5 border border-transparent bg-transparent text-right font-semibold text-base text-gray-900"
             disabled
           />
         </div>

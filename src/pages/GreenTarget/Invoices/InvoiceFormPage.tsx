@@ -931,7 +931,7 @@ const InvoiceFormPage: React.FC = () => {
                     value={formData.amount_before_tax}
                     onChange={handleInputChange}
                     min="0"
-                    step="0.01"
+                    step="1"
                     required
                     className={clsx(
                       "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
@@ -958,7 +958,7 @@ const InvoiceFormPage: React.FC = () => {
                     value={formData.tax_amount}
                     onChange={handleInputChange}
                     min="0"
-                    step="0.01"
+                    step="1"
                     className={clsx(
                       "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm bg-default-50"
