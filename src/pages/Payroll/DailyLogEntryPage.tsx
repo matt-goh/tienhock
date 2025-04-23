@@ -9,6 +9,7 @@ import BackButton from "../../components/BackButton";
 import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useJobsCache } from "../../hooks/useJobsCache";
+import { useStaffsCache } from "../../hooks/useStaffsCache";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -52,11 +53,15 @@ interface DailyLogFormData {
 
 const DailyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [loadingEmployees, setLoadingEmployees] = useState(true);
   const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
-  const [availableEmployees, setAvailableEmployees] = useState<
-    EmployeeWithHours[]
-  >([]);
+  const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
+  const [employeeSelectionState, setEmployeeSelectionState] = useState<{
+    selectedJobs: Record<string, string[]>; // employeeId -> list of selected jobIds
+    jobHours: Record<string, Record<string, number>>; // employeeId -> jobId -> hours
+  }>({
+    selectedJobs: {},
+    jobHours: {},
+  });
 
   const [formData, setFormData] = useState<DailyLogFormData>({
     logDate: format(new Date(), "yyyy-MM-dd"),
@@ -89,39 +94,18 @@ const DailyLogEntryPage: React.FC = () => {
     }
   }, [jobs]);
 
-  // Fetch staff/employees
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        setLoadingEmployees(true);
-        const response = await api.get("/api/staffs");
-
-        // Filter employees to only include those working in MEE jobs
-        const filteredEmployees = response
-          .filter((staff: any) => {
-            if (!staff.job || !Array.isArray(staff.job)) return false;
-            return staff.job.some((jobId: string) =>
-              MEE_JOB_IDS.includes(jobId)
-            );
-          })
-          .map((staff: any) => ({
-            id: staff.id,
-            name: staff.name,
-            job: staff.job,
-            hours: 7,
-            selected: false,
-          }));
-
-        setAvailableEmployees(filteredEmployees);
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
-
-    fetchEmployees();
-  }, []);
+  const availableEmployees = useMemo(() => {
+    return allStaffs
+      .filter((staff) => {
+        if (!staff.job || !Array.isArray(staff.job)) return false;
+        return staff.job.some((jobId) => MEE_JOB_IDS.includes(jobId));
+      })
+      .map((staff) => ({
+        ...staff,
+        hours: 7,
+        selected: false,
+      }));
+  }, [allStaffs]);
 
   // Update day type when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,36 +137,23 @@ const DailyLogEntryPage: React.FC = () => {
 
   // Toggle employee selection by employee+job combination
   const handleEmployeeSelection = (rowKey: string | undefined) => {
-    // Ensure rowKey is defined before proceeding
-    if (!rowKey) {
-      console.error("Attempted to toggle selection with undefined rowKey");
-      return; // Exit if rowKey is missing
-    }
+    if (!rowKey) return;
 
-    setAvailableEmployees((prev) => {
-      const updatedEmployees = [...prev];
+    const [employeeId, jobType] = rowKey.split("-");
 
-      // Find the employee and update the specific job type selection
-      const [employeeId, jobType] = rowKey.split("-");
-      const employee = updatedEmployees.find((e) => e.id === employeeId);
+    setEmployeeSelectionState((prev) => {
+      const currentSelectedJobs = prev.selectedJobs[employeeId] || [];
+      const isSelected = currentSelectedJobs.includes(jobType);
 
-      if (employee) {
-        // Create a new property to track selected job types if it doesn't exist
-        if (!employee.selectedJobs) {
-          employee.selectedJobs = [];
-        }
-
-        // Toggle the job selection
-        if (employee.selectedJobs.includes(jobType)) {
-          employee.selectedJobs = employee.selectedJobs.filter(
-            (j) => j !== jobType
-          );
-        } else {
-          employee.selectedJobs.push(jobType);
-        }
-      }
-
-      return updatedEmployees;
+      return {
+        ...prev,
+        selectedJobs: {
+          ...prev.selectedJobs,
+          [employeeId]: isSelected
+            ? currentSelectedJobs.filter((j) => j !== jobType)
+            : [...currentSelectedJobs, jobType],
+        },
+      };
     });
   };
 
@@ -191,34 +162,22 @@ const DailyLogEntryPage: React.FC = () => {
     rowKey: string | undefined,
     hours: string
   ) => {
+    if (!rowKey) return;
+
+    const [employeeId, jobType] = rowKey.split("-");
     const hoursNum = hours === "" ? 0 : parseFloat(hours);
 
-    setAvailableEmployees((prev) => {
-      // Ensure rowKey is defined before proceeding
-      if (!rowKey) {
-        console.error("Attempted to update hours with undefined rowKey");
-        return prev; // Return previous state if rowKey is missing
-      }
-
-      // Assign to a new const after the check to help type inference
-      const validRowKey = rowKey;
-      const updatedEmployees = [...prev];
-
-      // Parse the row key to get employee ID and job type
-      const [employeeId, jobType] = validRowKey.split("-");
-      const employee = updatedEmployees.find((e) => e.id === employeeId);
-
-      if (employee) {
-        // Create a new property to track hours by job if it doesn't exist
-        if (!employee.jobHours) {
-          employee.jobHours = {};
-        }
-
-        // Update hours for this specific job
-        employee.jobHours[jobType] = hoursNum;
-      }
-
-      return updatedEmployees;
+    setEmployeeSelectionState((prev) => {
+      return {
+        ...prev,
+        jobHours: {
+          ...prev.jobHours,
+          [employeeId]: {
+            ...(prev.jobHours[employeeId] || {}),
+            [jobType]: hoursNum,
+          },
+        },
+      };
     });
   };
 
@@ -333,7 +292,7 @@ const DailyLogEntryPage: React.FC = () => {
             </p>
           </div>
 
-          {loadingEmployees || loadingJobs ? (
+          {loadingJobs || loadingStaffs ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>
@@ -387,12 +346,13 @@ const DailyLogEntryPage: React.FC = () => {
                 <tbody className="bg-white divide-y divide-default-200">
                   {expandedEmployees.map((row) => {
                     // Find the full employee to get access to the selection tracking properties
-                    const employee = availableEmployees.find(
-                      (e) => e.id === row.id
-                    );
                     const isSelected =
-                      employee?.selectedJobs?.includes(row.jobType) || false;
-                    const hours = employee?.jobHours?.[row.jobType] || 7;
+                      employeeSelectionState.selectedJobs[row.id]?.includes(
+                        row.jobType
+                      ) || false;
+                    const hours =
+                      employeeSelectionState.jobHours[row.id]?.[row.jobType] ||
+                      7;
 
                     return (
                       <tr key={row.rowKey}>
