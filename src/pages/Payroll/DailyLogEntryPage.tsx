@@ -1,6 +1,6 @@
 // src/pages/Payroll/DailyLogEntryPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { Job, Employee } from "../../types/types";
@@ -56,15 +56,14 @@ const DailyLogEntryPage: React.FC = () => {
   const [availableEmployees, setAvailableEmployees] = useState<
     EmployeeWithHours[]
   >([]);
-  const [selectedEmployees, setSelectedEmployees] = useState<
-    EmployeeWithHours[]
-  >([]);
 
   const [formData, setFormData] = useState<DailyLogFormData>({
     logDate: format(new Date(), "yyyy-MM-dd"),
     shift: "day",
     foremanId: "",
-    contextData: {},
+    contextData: {
+      totalBags: 50, // Set default value for totalBags
+    },
     dayType: determineDayType(new Date()),
     employees: [],
   });
@@ -324,7 +323,7 @@ const DailyLogEntryPage: React.FC = () => {
           {/* Context Data - Example for Mee Production */}
           <FormInput
             name="totalBags"
-            label="Total Bags Produced"
+            label="Jumlah Tepung (Bags)"
             type="number"
             value={formData.contextData.totalBags?.toString() || ""}
             onChange={handleContextDataChange}
@@ -382,7 +381,7 @@ const DailyLogEntryPage: React.FC = () => {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Hours
                     </th>
@@ -415,7 +414,12 @@ const DailyLogEntryPage: React.FC = () => {
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
-                          {row.id}
+                          <Link
+                            to={`/catalogue/staff/${row.id}`}
+                            className="hover:underline hover:text-sky-600"
+                          >
+                            {row.id}
+                          </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                           {row.name}
@@ -423,25 +427,25 @@ const DailyLogEntryPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                           {row.jobName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
                           <input
-                          id="employee-hours"
-                          name="employee-hours"
-                          type="number"
-                          value={isSelected ? hours || "" : ""}
-                          onChange={(e) =>
-                            handleEmployeeHoursChange(
-                            row.rowKey,
-                            e.target.value
-                            )
-                          }
-                          // Add the 'show-spinner' class here
-                          className="show-spinner max-w-[80px] px-2 py-1 text-sm border border-default-300 rounded-md"
-                          step="0.5"
-                          min="0"
-                          max="24"
-                          disabled={!isSelected}
-                          placeholder="0"
+                            id="employee-hours"
+                            name="employee-hours"
+                            type="number"
+                            value={isSelected ? hours || "" : ""}
+                            onChange={(e) =>
+                              handleEmployeeHoursChange(
+                                row.rowKey,
+                                e.target.value
+                              )
+                            }
+                            // Add the 'show-spinner' class here
+                            className="show-spinner max-w-[80px] py-1 text-sm text-right border border-default-300 rounded-md"
+                            step="0.5"
+                            min="0"
+                            max="24"
+                            disabled={!isSelected}
+                            placeholder="0"
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

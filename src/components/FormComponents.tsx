@@ -76,10 +76,9 @@ export const FormInput: React.FC<InputProps> = ({
       max={max?.toString()}
       required={required}
       className={clsx(
-        "block w-full py-2 border border-default-300 rounded-lg shadow-sm",
+        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed",
-        type !== "number" && "px-3" // Conditionally add padding-x
+        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
       )}
     />
   </div>
