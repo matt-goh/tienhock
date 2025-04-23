@@ -46,7 +46,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
   );
 
   const buttonClasses = clsx(
-    "flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-colors duration-200",
+    "flex items-center justify-center focus:outline-none transition-colors duration-200",
     !disabled && "hover:bg-gray-100",
     buttonClassName
   );
