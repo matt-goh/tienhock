@@ -56,7 +56,7 @@ const StaffAddPage: React.FC = () => {
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
   const { refreshStaffs } = useStaffsCache();
-  const { options, loading: loadingOptions } = useStaffFormOptions();
+  const { options } = useStaffFormOptions();
   const { jobs } = useJobsCache();
 
   const genderOptions = [

@@ -66,17 +66,17 @@ const EmployeeCard = ({
           <h3 className="font-semibold text-default-800 truncate">
             {employee.name}
           </h3>
-          <div className="relative">
+            <div className="absolute top-3 right-3">
             {isCardHovered && (
               <button
-                onClick={handleDeleteClick}
-                className="p-1.5 rounded-full bg-white hover:bg-rose-50 text-default-500 hover:text-rose-600 transition-colors duration-150 shadow-sm"
-                title="Delete employee"
+              onClick={handleDeleteClick}
+              className="p-1.5 rounded-full bg-white hover:bg-rose-50 text-default-500 hover:text-rose-600 transition-colors duration-150 shadow-sm"
+              title="Delete employee"
               >
-                <IconTrash size={16} stroke={1.5} />
+              <IconTrash size={16} stroke={1.5} />
               </button>
             )}
-          </div>
+            </div>
         </div>
         <div className="text-sm text-default-500 mt-0.5 flex items-center">
           <span className="truncate">{employee.id}</span>
