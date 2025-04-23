@@ -105,7 +105,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
       <input
         type="number"
         min={min}
-        step={field === "price" || field === "tax" ? "0.01" : "1"}
+        step={field === "price" || field === "tax" ? "0.1" : "1"}
         // Use local state for display during editing
         value={localValue}
         // Update local state only without triggering parent updates
@@ -118,7 +118,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
             e.target.value === "" ? undefined : parseFloat(e.target.value);
           handleItemChange(rowIndex, field, newValue);
         }}
-        className="w-full px-2 py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right text-sm"
+        className="w-full py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right text-sm"
         disabled={readOnly}
       />
     );
@@ -226,13 +226,13 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
       <table className="min-w-full divide-y divide-gray-200 border border-default-200 rounded-lg table-fixed">
         <colgroup>
           <col className="w-[10%]" />{/* Code */}
-          <col className="w-[35%]" />{/* Product */}
+          <col className="w-[38%]" />{/* Product */}
           <col className="w-[8%]" />{/* QTY */}
           <col className="w-[10%]" />{/* Price */}
           <col className="w-[8%]" />{/* FOC */}
           <col className="w-[8%]" />{/* RTN */}
-          <col className="w-[10%]" />{/* Tax */}
-          <col className="w-[11%]" />{/* Total */}
+          <col className="w-[8%]" />{/* Tax */}
+          <col className="w-[10%]" />{/* Total */}
           {!readOnly && <col className="w-[40px]" />}{/* Delete */}
         </colgroup>
         <thead className="bg-gray-50">
@@ -243,19 +243,19 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Product
             </th>
-            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               QTY
             </th>
-            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Price
             </th>
-            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               FOC
             </th>
-            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               RTN
             </th>
-            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Tax
             </th>
             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
