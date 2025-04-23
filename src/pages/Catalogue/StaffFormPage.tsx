@@ -23,6 +23,15 @@ interface SelectOption {
   name: string;
 }
 
+/**
+ * This form handles a special case with select dropdowns:
+ * - Database stores display names (e.g., "Buddhist", "Malaysian")
+ * - Form works with IDs ("B", "MAL") for selection components
+ *
+ * We convert between these formats:
+ * - When loading: Convert display names to IDs (for form selection)
+ * - When saving: Convert IDs back to display names (for database storage)
+ */
 const StaffFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -69,8 +78,8 @@ const StaffFormPage: React.FC = () => {
   const { refreshStaffs, staffs, loading: loadingStaffs } = useStaffsCache();
 
   const genderOptions = [
-    { id: "male", name: "Male" },
-    { id: "female", name: "Female" },
+    { id: "Male", name: "Male" },
+    { id: "Female", name: "Female" },
   ];
 
   const documentOptions = [
@@ -92,6 +101,54 @@ const StaffFormPage: React.FC = () => {
     { id: "Cheque", name: "Cheque" },
   ];
 
+  // Utility function: Convert display name to option ID
+  const mapDisplayNameToId = (
+    displayName: string | undefined,
+    options: SelectOption[]
+  ): string => {
+    if (!displayName || displayName === "") return "";
+
+    // First try exact name match (case insensitive)
+    const exactNameMatch = options.find(
+      (opt) => opt.name.toLowerCase() === displayName.toLowerCase()
+    );
+    if (exactNameMatch) return exactNameMatch.id;
+
+    // Then try partial name match
+    const partialMatch = options.find(
+      (opt) =>
+        opt.name.toLowerCase().includes(displayName.toLowerCase()) ||
+        displayName.toLowerCase().includes(opt.name.toLowerCase())
+    );
+    if (partialMatch) return partialMatch.id;
+
+    // If we can't find a match, consider it might already be an ID
+    const exactIdMatch = options.find((opt) => opt.id === displayName);
+    if (exactIdMatch) return displayName;
+
+    // If all else fails, return empty string
+    console.warn(`Could not map "${displayName}" to any option ID`);
+    return "";
+  };
+
+  // Utility function: Convert option ID to display name
+  const mapIdToDisplayName = (
+    id: string | undefined,
+    options: SelectOption[]
+  ): string => {
+    if (!id || id === "") return "";
+
+    const option = options.find((opt) => opt.id === id);
+    if (option) return option.name;
+
+    // If we can't find the ID, it might already be a display name
+    const nameMatch = options.find((opt) => opt.name === id);
+    if (nameMatch) return id;
+
+    console.warn(`Could not map ID "${id}" to any option name`);
+    return "";
+  };
+
   useEffect(() => {
     const hasChanged =
       JSON.stringify(formData) !== JSON.stringify(initialFormData);
@@ -110,26 +167,59 @@ const StaffFormPage: React.FC = () => {
     // Find the staff in the cache
     const staffData = staffs.find((staff) => staff.id === id);
 
+    // Helper function to normalize data (from cache or API)
+    const normalizeData = (data: Employee): Employee => {
+      return {
+        ...data,
+        nationality: mapDisplayNameToId(
+          data.nationality,
+          options.nationalities
+        ),
+        race: mapDisplayNameToId(data.race, options.races),
+        agama: mapDisplayNameToId(data.agama, options.agama),
+        // Ensure arrays for multi-selects
+        job: Array.isArray(data.job) ? data.job : [],
+        location: Array.isArray(data.location) ? data.location : [],
+        // Ensure date fields are strings or empty strings for input type="date"
+        birthdate: data.birthdate || "",
+        dateJoined: data.dateJoined || "",
+        dateResigned: data.dateResigned || "",
+      };
+    };
+
     if (staffData) {
-      setFormData(staffData);
-      setInitialFormData(staffData);
+      const normalizedData = normalizeData(staffData);
+      setFormData(normalizedData);
+      setInitialFormData(normalizedData);
       setError(null);
+      setLoading(false); // Set loading false here for cache hit
     } else {
       // Fallback to API if not in cache
       api
         .get(`/api/staffs/${id}`)
         .then((data) => {
-          setFormData(data);
-          setInitialFormData(data);
+          // Convert display names to option IDs for form selection
+          const normalizedData = normalizeData(data);
+          setFormData(normalizedData);
+          setInitialFormData(normalizedData);
           setError(null);
         })
         .catch((err) => {
           setError("Failed to fetch staff details. Please try again later.");
           console.error("Error fetching staff details:", err);
+        })
+        .finally(() => {
+          setLoading(false); // Use finally to ensure setLoading(false) is called
         });
     }
-    setLoading(false);
-  }, [id, staffs]);
+  }, [
+    id,
+    staffs,
+    loadingStaffs,
+    options.nationalities,
+    options.races,
+    options.agama,
+  ]); // Updated dependencies
 
   useEffect(() => {
     if (isEditMode) {
@@ -137,7 +227,6 @@ const StaffFormPage: React.FC = () => {
     } else {
       setInitialFormData({ ...formData });
     }
-    // Add any other initialization here
   }, [isEditMode, fetchStaffDetails, loadingStaffs]);
 
   const handleDeleteClick = () => {
@@ -235,8 +324,17 @@ const StaffFormPage: React.FC = () => {
 
     setIsSaving(true);
 
+    // Convert option IDs back to display names for storage
     const dataToSend = {
       ...formData,
+      // Convert option IDs back to display names for database
+      nationality: mapIdToDisplayName(
+        formData.nationality,
+        options.nationalities
+      ),
+      race: mapIdToDisplayName(formData.race, options.races),
+      agama: mapIdToDisplayName(formData.agama, options.agama),
+      // Handle date fields
       birthdate: formData.birthdate || null,
       dateJoined: formData.dateJoined || null,
       dateResigned: formData.dateResigned || null,
@@ -246,8 +344,8 @@ const StaffFormPage: React.FC = () => {
       if (isEditMode) {
         if (id !== formData.id) {
           // ID has changed, use PUT method with the new ID
-          await api.put(`/api/staffs/${id}`, dataToSend);
           dataToSend.newId = formData.id;
+          await api.put(`/api/staffs/${id}`, dataToSend);
         } else {
           // ID hasn't changed, use regular PUT
           await api.put(`/api/staffs/${id}`, dataToSend);
@@ -298,12 +396,12 @@ const StaffFormPage: React.FC = () => {
     const currentValue = formData[name];
 
     return (
-      <FormListbox // Use the new component
+      <FormListbox
         key={name}
         name={name}
         label={label}
-        value={currentValue as string} // Cast to string, assuming listbox fields are strings
-        onChange={(value) => handleListboxChange(name, value)} // Receives string ID
+        value={currentValue as string}
+        onChange={(value) => handleListboxChange(name, value)}
         options={options}
         placeholder={`Select ${label}...`}
       />
