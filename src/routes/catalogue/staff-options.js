@@ -18,12 +18,14 @@ export default function (pool) {
           agamaResult,
           locationsResult,
           banksResult,
+          sectionsResult,
         ] = await Promise.all([
           client.query("SELECT * FROM nationalities ORDER BY name"),
           client.query("SELECT * FROM races ORDER BY name"),
           client.query("SELECT * FROM agama ORDER BY name"),
           client.query("SELECT * FROM locations ORDER BY name"),
           client.query("SELECT * FROM banks ORDER BY name"),
+          client.query("SELECT * FROM sections ORDER BY name"),
         ]);
 
         // Combine results into a single response object
@@ -33,6 +35,7 @@ export default function (pool) {
           agama: agamaResult.rows,
           locations: locationsResult.rows,
           banks: banksResult.rows,
+          sections: sectionsResult.rows,
         };
 
         res.json(response);

@@ -8,6 +8,7 @@ interface FormOptions {
   agama: SelectOption[];
   locations: SelectOption[];
   banks: SelectOption[];
+  sections?: SelectOption[];
 }
 
 interface SelectOption {
@@ -27,6 +28,7 @@ export const useStaffFormOptions = () => {
     agama: [],
     locations: [],
     banks: [],
+    sections: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
