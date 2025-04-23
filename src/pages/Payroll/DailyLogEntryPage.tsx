@@ -3,11 +3,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
-import { Job, Employee } from "../../types/types";
+import { Employee } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import BackButton from "../../components/BackButton";
 import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useJobsCache } from "../../hooks/useJobsCache";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -52,7 +53,7 @@ interface DailyLogFormData {
 const DailyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
   const [loadingEmployees, setLoadingEmployees] = useState(true);
-  const [jobs, setJobs] = useState<JobOption[]>([]);
+  const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
   const [availableEmployees, setAvailableEmployees] = useState<
     EmployeeWithHours[]
   >([]);
@@ -68,35 +69,25 @@ const DailyLogEntryPage: React.FC = () => {
     employees: [],
   });
 
-  // Fetch jobs on component mount
+  // Use useMemo to filter only MEE jobs
+  const jobs = useMemo(() => {
+    return allJobs
+      .filter((job) => MEE_JOB_IDS.includes(job.id))
+      .map((job) => ({
+        id: job.id,
+        name: job.name,
+      }));
+  }, [allJobs]);
+
+  // Set default job when jobs are loaded
   useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        const response = await api.get("/api/jobs");
-        // Filter only MEE jobs
-        const filteredJobs = response
-          .filter((job: Job) => MEE_JOB_IDS.includes(job.id))
-          .map((job: Job) => ({
-            id: job.id,
-            name: job.name,
-          }));
-
-        setJobs(filteredJobs);
-
-        // If we have any jobs, set the first one as default
-        if (filteredJobs.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            jobId: filteredJobs[0].id,
-          }));
-        }
-      } catch (error) {
-        console.error("Error fetching jobs:", error);
-      }
-    };
-
-    fetchJobs();
-  }, []);
+    if (jobs.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        jobId: jobs[0].id,
+      }));
+    }
+  }, [jobs]);
 
   // Fetch staff/employees
   useEffect(() => {
@@ -342,7 +333,7 @@ const DailyLogEntryPage: React.FC = () => {
             </p>
           </div>
 
-          {loadingEmployees ? (
+          {loadingEmployees || loadingJobs ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>
