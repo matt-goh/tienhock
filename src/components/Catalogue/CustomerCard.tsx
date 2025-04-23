@@ -42,7 +42,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
     <div
       className={`relative overflow-hidden rounded-lg border ${
         isCardHovered ? "border-sky-200 shadow-md" : "border-default-200"
-      } transition-all duration-200 cursor-pointer bg-white font-sans`}
+      } transition-all duration-200 cursor-pointer bg-white`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -56,7 +56,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
         } transition-colors duration-200`}
       >
         <div className="flex justify-between items-center">
-          <h3 className="font-semibold text-default-800 truncate tracking-tight text-base">
+          <h3 className="font-semibold text-default-800 truncate pr-6">
             {customer.name}
           </h3>
           <div className="absolute top-3 right-3">
@@ -77,7 +77,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
       </div>
 
       {/* Card Body */}
-      <div className="p-4 space-y-3.5">
+      <div className="p-4 space-y-3">
         {/* Salesman field - Always show */}
         <div className="flex items-start">
           <IconUser
@@ -85,7 +85,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             className="text-default-400 mt-0.5 flex-shrink-0 mr-2"
           />
           <div className="text-sm text-default-700 flex-1">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800 tracking-wide">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">
               {customer.salesman || "Unassigned"}
             </span>
           </div>
@@ -98,7 +98,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
               size={16}
               className="text-default-400 flex-shrink-0 mr-2"
             />
-            <div className="text-sm text-default-700 flex-1 truncate font-medium tracking-tight">
+            <div className="text-sm text-default-700 flex-1 truncate">
               {customer.phone_number}
             </div>
           </div>
@@ -108,7 +108,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
         {customer.id_number && (
           <div className="flex items-center">
             <IconId size={16} className="text-default-400 flex-shrink-0 mr-2" />
-            <div className="text-sm text-default-700 flex-1 truncate font-medium tracking-tight">
+            <div className="text-sm text-default-700 flex-1 truncate">
               {customer.id_number}
             </div>
           </div>
@@ -121,9 +121,9 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
               size={16}
               className="text-default-400 flex-shrink-0 mr-2"
             />
-            <div className="flex items-center font-medium">
+            <div className="flex items-center">
               <span className="text-sm text-default-700 mr-1">e-Invoice:</span>
-              <span className="inline-flex items-center text-xs text-green-700 bg-green-100 rounded-full px-2 py-0.5 tracking-wide">
+              <span className="inline-flex items-center text-xs font-medium text-green-700 bg-green-100 rounded-full px-2 py-0.5">
                 <IconCheck size={12} className="mr-1" /> Ready
               </span>
             </div>

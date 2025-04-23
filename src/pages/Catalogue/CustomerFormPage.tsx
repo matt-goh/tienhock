@@ -674,20 +674,14 @@ const CustomerFormPage: React.FC = () => {
 
                 {/* === Second tab - Credit & Pricing === */}
                 <div className="space-y-8 mt-5">
-                  {" "}
-                  {/* Increased spacing */}
                   {/* --- Credit Management Section --- */}
                   <div className="p-4 border border-default-200 rounded-lg bg-gray-50/50">
-                    {" "}
                     {/* Subtle background */}
                     <h3 className="text-lg font-medium text-default-900 mb-4">
-                      {" "}
                       {/* Increased bottom margin */}
                       Credit Management
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                      {" "}
-                      {/* Align items end */}
                       {/* Credit Limit Input */}
                       <div>
                         <label
@@ -741,7 +735,6 @@ const CustomerFormPage: React.FC = () => {
                           Credit Used
                         </label>
                         <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          {" "}
                           {/* Match height */}
                           <span className="font-medium text-default-700">
                             RM {Number(formData.credit_used ?? 0).toFixed(2)}
@@ -754,7 +747,6 @@ const CustomerFormPage: React.FC = () => {
                           Available Credit
                         </label>
                         <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          {" "}
                           {/* Match height */}
                           <span className="font-medium text-default-700">
                             {formData.credit_limit === 0
