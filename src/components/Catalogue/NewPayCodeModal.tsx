@@ -36,6 +36,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
   const [selectedPayCodeToAdd, setSelectedPayCodeToAdd] =
     useState<PayCode | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [loadedItemCount, setLoadedItemCount] = useState(20);
 
   // Reset selection when modal opens or available codes change
   useEffect(() => {
@@ -45,17 +46,45 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
     }
   }, [isOpen]);
 
-  const filteredPayCodes = useMemo(
-    () =>
+  const filteredPayCodes = useMemo(() => {
+    const filtered =
       query === ""
         ? availablePayCodesToAdd
         : availablePayCodesToAdd.filter((pc) =>
             `${pc.id.toLowerCase()} ${pc.description.toLowerCase()}`.includes(
               query.toLowerCase()
             )
-          ),
-    [availablePayCodesToAdd, query]
-  );
+          );
+
+    // Only return the first loadedItemCount items
+    return filtered.slice(0, loadedItemCount);
+  }, [availablePayCodesToAdd, query, loadedItemCount]);
+
+  const hasMoreItems = useMemo(() => {
+    const totalFiltered =
+      query === ""
+        ? availablePayCodesToAdd.length
+        : availablePayCodesToAdd.filter((pc) =>
+            `${pc.id.toLowerCase()} ${pc.description.toLowerCase()}`.includes(
+              query.toLowerCase()
+            )
+          ).length;
+
+    return totalFiltered > loadedItemCount;
+  }, [availablePayCodesToAdd, query, loadedItemCount]);
+
+  const handleLoadMore = (e: {
+    preventDefault: () => void;
+    stopPropagation: () => void;
+  }) => {
+    e.preventDefault(); // Prevent closing the dropdown
+    e.stopPropagation();
+    setLoadedItemCount((prev) => prev + 20);
+  };
+
+  useEffect(() => {
+    setLoadedItemCount(20);
+  }, [query]);
 
   const handleAdd = async () => {
     if (!selectedPayCodeToAdd || isAdding) return;
@@ -196,6 +225,20 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                                   )}
                                 </ComboboxOption>
                               ))
+                            )}
+                            {hasMoreItems && (
+                              <div className="py-2 text-center border-t border-default-100">
+                                <button
+                                  type="button"
+                                  onClick={handleLoadMore}
+                                  className="w-full py-2 text-sm text-sky-600 hover:text-sky-800 hover:bg-sky-50"
+                                >
+                                  Load more results (
+                                  {availablePayCodesToAdd.length -
+                                    loadedItemCount}{" "}
+                                  remaining)
+                                </button>
+                              </div>
                             )}
                           </ComboboxOptions>
                         </Transition>
