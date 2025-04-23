@@ -117,7 +117,7 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
         if (
           ["nationalities", "races", "agama", "locations"].includes(apiEndpoint)
         ) {
-          refreshOptions();
+          await refreshOptions();
         }
       } catch (error) {
         console.error(`Error deleting selected ${apiEndpoint}:`, error);
@@ -209,7 +209,7 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
       if (
         ["nationalities", "races", "agama", "locations"].includes(apiEndpoint)
       ) {
-        refreshOptions();
+        await refreshOptions();
       }
     } catch (error) {
       console.error(`Error updating ${apiEndpoint}:`, error);

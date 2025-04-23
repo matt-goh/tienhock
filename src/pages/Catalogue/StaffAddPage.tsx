@@ -15,6 +15,7 @@ import { api } from "../../routes/utils/api";
 import { useStaffsCache } from "../../hooks/useStaffsCache";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 import { useJobsCache } from "../../hooks/useJobsCache";
+import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
 
 interface SelectOption {
   id: string;
@@ -176,7 +177,7 @@ const StaffAddPage: React.FC = () => {
       await api.post("/api/staffs", dataToSend);
 
       // Refresh the cache after successful creation
-      refreshStaffs();
+      await refreshStaffs();
 
       toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
@@ -224,21 +225,39 @@ const StaffAddPage: React.FC = () => {
     query: string,
     setQuery: React.Dispatch<React.SetStateAction<string>>
   ) => (
-    <FormCombobox
-      name={name}
-      label={label}
-      value={formData[name] as string[]}
-      onChange={(value) => {
-        if (typeof value === "string") {
-          handleComboboxChange(name, [value]);
-        } else {
-          handleComboboxChange(name, value);
-        }
-      }}
-      options={options}
-      query={query}
-      setQuery={setQuery}
-    />
+    <div>
+      <FormCombobox
+        name={name}
+        label={label}
+        value={formData[name] as string[]}
+        onChange={(value) => {
+          if (typeof value === "string") {
+            handleComboboxChange(name, [value]);
+          } else {
+            handleComboboxChange(name, value);
+          }
+        }}
+        options={options}
+        query={query}
+        setQuery={setQuery}
+      />
+      {name === "location" ? (
+        <div>
+          <SelectedTagsDisplay
+            selectedItems={(formData[name] as string[]).map(locId => {
+              const locationOption = options.find(opt => opt.id === locId);
+              return locationOption ? `${locationOption.name}` : locId;
+            })}
+            label={label}
+          />
+        </div>
+      ) : (
+        <SelectedTagsDisplay
+          selectedItems={formData[name] as string[]}
+          label={label}
+        />
+      )}
+    </div>
   );
 
   return (

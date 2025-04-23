@@ -189,7 +189,7 @@ const StaffPage = () => {
         toast.success("Employee deleted successfully");
 
         // Refresh the cache instead of updating local state
-        refreshStaffs();
+        await refreshStaffs();
       } catch (err) {
         console.error("Error deleting employee:", err);
         toast.error("Failed to delete employee. Please try again.");
