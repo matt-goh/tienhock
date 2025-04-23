@@ -1,7 +1,6 @@
 // src/pages/Payroll/DailyLogEntryPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronLeft, IconUserPlus } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { Job, Employee } from "../../types/types";
@@ -9,6 +8,7 @@ import { api } from "../../routes/utils/api";
 import BackButton from "../../components/BackButton";
 import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import toast from "react-hot-toast";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -29,6 +29,8 @@ interface JobOption {
 }
 
 interface EmployeeWithHours extends Employee {
+  rowKey?: string; // Unique key for each row
+  jobName?: string; // Optional job name for display purposes
   hours?: number;
   selected?: boolean;
 }
@@ -202,15 +204,55 @@ const DailyLogEntryPage: React.FC = () => {
     );
   };
 
-  // Filtered employees for the selected job
-  const filteredEmployees = useMemo(() => {
-    if (!formData.jobId) return [];
-
-    return availableEmployees.filter(
-      (emp) =>
-        emp.job && Array.isArray(emp.job) && emp.job.includes(formData.jobId)
+  // Replace the sortedEmployees useMemo with expandedEmployees that creates multiple rows
+  const expandedEmployees = useMemo(() => {
+    // First filter to only include employees with at least one MEE job
+    const filteredEmployees = availableEmployees.filter(
+      (emp) => emp.job && emp.job.some((jobId) => MEE_JOB_IDS.includes(jobId))
     );
-  }, [availableEmployees, formData.jobId]);
+
+    // Then create a new array with an entry for each employee-job combination
+    const expanded: Array<EmployeeWithHours & { jobType: string }> = [];
+
+    filteredEmployees.forEach((employee) => {
+      // Filter to only include MEE job types
+      const meeJobs = (employee.job || []).filter((jobId) =>
+        MEE_JOB_IDS.includes(jobId)
+      );
+
+      // Create a row for each job type this employee has
+      meeJobs.forEach((jobId) => {
+        const jobName = jobs.find((j) => j.id === jobId)?.name || jobId;
+
+        expanded.push({
+          ...employee,
+          jobType: jobId,
+          jobName,
+          // Use a compound key for each row
+          rowKey: `${employee.id}-${jobId}`,
+        });
+      });
+    });
+
+    // Sort by job name first, then employee name
+    return expanded.sort((a, b) => {
+      // First by selected job
+      if (formData.jobId) {
+        const aHasSelected = a.jobType === formData.jobId;
+        const bHasSelected = b.jobType === formData.jobId;
+        if (aHasSelected !== bHasSelected) {
+          return aHasSelected ? -1 : 1;
+        }
+      }
+
+      // Then by job name
+      const jobCompare = (a.jobName || "").localeCompare(b.jobName || "");
+      if (jobCompare !== 0) return jobCompare;
+
+      // Then by employee name
+      return a.name.localeCompare(b.name);
+    });
+  }, [availableEmployees, jobs, formData.jobId]);
 
   return (
     <div className="relative w-full mx-4 md:mx-6">
@@ -301,11 +343,9 @@ const DailyLogEntryPage: React.FC = () => {
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>
-          ) : filteredEmployees.length === 0 ? (
+          ) : expandedEmployees.length === 0 ? (
             <div className="text-center py-8 text-default-500">
-              {!formData.jobId
-                ? "Select a job type to see available employees"
-                : "No employees found for this job type"}
+              No employees found with Mee Production job types
             </div>
           ) : (
             <div className="overflow-x-auto mt-4">
@@ -334,6 +374,12 @@ const DailyLogEntryPage: React.FC = () => {
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
+                      Job Type
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
                       Hours
                     </th>
                     <th
@@ -345,13 +391,32 @@ const DailyLogEntryPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-default-200">
-                  {filteredEmployees.map((employee) => (
-                    <tr key={employee.id}>
+                  {expandedEmployees.map((employee) => (
+                    <tr
+                      key={employee.rowKey}
+                      className={
+                        formData.jobId === employee.jobType ? "bg-sky-50" : ""
+                      }
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
-                          checked={employee.selected}
-                          onChange={() => handleEmployeeSelection(employee.id)}
+                          checked={
+                            employee.selected &&
+                            formData.jobId === employee.jobType
+                          }
+                          onChange={() => {
+                            // Only allow selection if the job type matches the selected job
+                            if (formData.jobId === employee.jobType) {
+                              handleEmployeeSelection(employee.id);
+                            } else {
+                              // Optionally show a message that they need to select matching job type first
+                              toast(
+                                `Please select job type "${employee.jobName}" first to assign this employee`
+                              );
+                            }
+                          }}
+                          disabled={formData.jobId !== employee.jobType}
                           className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-default-300 rounded"
                         />
                       </td>
@@ -361,10 +426,18 @@ const DailyLogEntryPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                         {employee.name}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                        {employee.jobName}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="number"
-                          value={employee.hours || ""}
+                          value={
+                            employee.selected &&
+                            formData.jobId === employee.jobType
+                              ? employee.hours || ""
+                              : ""
+                          }
                           onChange={(e) =>
                             handleEmployeeHoursChange(
                               employee.id,
@@ -374,14 +447,20 @@ const DailyLogEntryPage: React.FC = () => {
                           className="max-w-[80px] px-2 py-1 text-sm border border-default-300 rounded-md"
                           step="0.5"
                           min="0"
-                          disabled={!employee.selected}
+                          disabled={
+                            !employee.selected ||
+                            formData.jobId !== employee.jobType
+                          }
                           placeholder="0"
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           className="text-sky-600 hover:text-sky-900 disabled:text-default-300"
-                          disabled={!employee.selected}
+                          disabled={
+                            !employee.selected ||
+                            formData.jobId !== employee.jobType
+                          }
                           onClick={() => {}}
                         >
                           Manage Activities
