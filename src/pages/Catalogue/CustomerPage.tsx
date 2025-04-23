@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { CustomerList, Employee } from "../../types/types";
+import { CustomerList } from "../../types/types";
 import {
   IconSearch,
   IconChevronLeft,
