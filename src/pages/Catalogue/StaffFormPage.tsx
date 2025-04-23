@@ -293,7 +293,7 @@ const StaffFormPage: React.FC = () => {
   );
 
   const validateForm = (): boolean => {
-    const requiredFields: (keyof Employee)[] = ["id", "name"];
+    const requiredFields: (keyof Employee)[] = ["name"];
 
     for (const field of requiredFields) {
       if (!formData[field]) {
