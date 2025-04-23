@@ -13,6 +13,8 @@ import {
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import { useStaffsCache } from "../../hooks/useStaffsCache";
+import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
+import { useJobsCache } from "../../hooks/useJobsCache";
 
 interface SelectOption {
   id: string;
@@ -51,14 +53,11 @@ const StaffAddPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
-  const [nationalities, setNationalities] = useState<SelectOption[]>([]);
-  const [races, setRaces] = useState<SelectOption[]>([]);
-  const [agamas, setAgamas] = useState<SelectOption[]>([]);
-  const [jobs, setJobs] = useState<SelectOption[]>([]);
-  const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
   const { refreshStaffs } = useStaffsCache();
+  const { options, loading: loadingOptions } = useStaffFormOptions();
+  const { jobs } = useJobsCache();
 
   const genderOptions = [
     { id: "male", name: "Male" },
@@ -91,20 +90,6 @@ const StaffAddPage: React.FC = () => {
     setIsFormChanged(hasChanged);
   }, [formData]);
 
-  useEffect(() => {
-    const fetchAllOptions = async () => {
-      await Promise.all([
-        fetchOptions("nationalities", setNationalities),
-        fetchOptions("races", setRaces),
-        fetchOptions("agama", setAgamas),
-        fetchOptions("jobs", setJobs),
-        fetchOptions("locations", setLocations),
-      ]);
-    };
-
-    fetchAllOptions();
-  }, []);
-
   const handleBackClick = () => {
     if (isFormChanged) {
       setShowBackConfirmation(true);
@@ -116,25 +101,6 @@ const StaffAddPage: React.FC = () => {
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
     navigate("/catalogue/staff");
-  };
-
-  const fetchOptions = async (
-    endpoint: string,
-    setter: {
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (arg0: any): void;
-    }
-  ) => {
-    try {
-      const data = await api.get(`/api/${endpoint}`);
-      setter(data);
-    } catch (error) {
-      console.error(`Error fetching ${endpoint}:`, error);
-    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,7 +268,7 @@ const StaffAddPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderListbox("gender", "Gender", genderOptions)}
-                  {renderListbox("nationality", "Nationality", nationalities)}
+                  {renderListbox("nationality", "Nationality", options.nationalities)}
                   {renderInput("birthdate", "Birthdate", "date")}
                 </div>
                 <div className="grid grid-cols-1 gap-6">
@@ -315,7 +281,7 @@ const StaffAddPage: React.FC = () => {
                   {renderCombobox(
                     "location",
                     "Location",
-                    locations,
+                    options.locations,
                     locationQuery,
                     setLocationQuery
                   )}
@@ -344,8 +310,8 @@ const StaffAddPage: React.FC = () => {
                     "Payment Preference",
                     paymentPreferenceOptions
                   )}
-                  {renderListbox("race", "Race", races)}
-                  {renderListbox("agama", "Agama", agamas)}
+                  {renderListbox("race", "Race", options.races)}
+                  {renderListbox("agama", "Agama", options.agama)}
                   {renderInput("dateResigned", "Date Resigned", "date")}
                 </div>
               </div>
