@@ -1,3 +1,4 @@
+// src/pages/Catalogue/BasicPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import _ from "lodash";
 import Table from "../../components/Table/Table";
@@ -5,6 +6,7 @@ import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 
 interface CatalogueItem {
   originalId: string;
@@ -30,6 +32,9 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
+  // Add this line to get the refreshOptions function
+  const { options, refreshOptions } = useStaffFormOptions();
+
   const columns: ColumnConfig[] = [
     { id: "id", header: "ID", type: "readonly", width: 200 },
     { id: "name", header: "Name", type: "readonly", width: 300 },
@@ -40,24 +45,41 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
     type: "string",
   }));
 
-  const fetchItems = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await api.get(`/api/${apiEndpoint}`);
-      setItems(
-        data.map((item: CatalogueItem) => ({ ...item, originalId: item.id }))
+  useEffect(() => {
+    // Set loading true when options or apiEndpoint changes
+    setLoading(true);
+    // Check if options are loaded and the specific endpoint data exists
+    if (options && apiEndpoint in options) {
+      // Type assertion to access options property dynamically
+      const data = options[apiEndpoint as keyof typeof options];
+      // Ensure the data is an array before processing
+      if (Array.isArray(data)) {
+        setItems(
+          // Map the data from options to the CatalogueItem structure
+          data.map((item: { id: string; name: string }) => ({
+            ...item, // Spread existing properties (id, name)
+            originalId: item.id, // Set originalId
+          }))
+        );
+        setLoading(false); // Data loaded from options
+      } else {
+        // Handle case where options[apiEndpoint] is not an array
+        console.error(
+          `Data for ${apiEndpoint} in options is not an array:`,
+          data
+        );
+        toast.error(`Invalid data format for ${apiEndpoint}.`);
+        setItems([]); // Set items to empty array
+        setLoading(false); // Stop loading
+      }
+    } else if (options) {
+      console.warn(
+        `API endpoint "${apiEndpoint}" not found in staff form options. Displaying empty list.`
       );
-    } catch (error) {
-      console.error(`Error fetching ${apiEndpoint}:`, error);
-      toast.error(`Failed to fetch ${apiEndpoint}. Please try again.`);
-    } finally {
+      setItems([]);
       setLoading(false);
     }
-  }, [apiEndpoint]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  }, [options, apiEndpoint]);
 
   useEffect(() => {
     if (isEditing) {
@@ -90,12 +112,19 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
 
         toast.success(`Selected ${apiEndpoint} deleted successfully`);
         setIsEditing(false);
+
+        // Add this block to refresh options when certain entities are updated
+        if (
+          ["nationalities", "races", "agama", "locations"].includes(apiEndpoint)
+        ) {
+          refreshOptions();
+        }
       } catch (error) {
         console.error(`Error deleting selected ${apiEndpoint}:`, error);
         toast.error(`Failed to delete ${apiEndpoint}. Please try again.`);
       }
     },
-    [items, apiEndpoint]
+    [items, apiEndpoint, refreshOptions]
   );
 
   const handleSave = useCallback(async () => {
@@ -175,11 +204,18 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
 
       setIsEditing(false);
       toast.success("Changes saved successfully");
+
+      // Add this block to refresh options when certain entities are updated
+      if (
+        ["nationalities", "races", "agama", "locations"].includes(apiEndpoint)
+      ) {
+        refreshOptions();
+      }
     } catch (error) {
       console.error(`Error updating ${apiEndpoint}:`, error);
       toast.error((error as Error).message);
     }
-  }, [editedItems, originalItems, apiEndpoint]);
+  }, [editedItems, originalItems, apiEndpoint, refreshOptions]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
