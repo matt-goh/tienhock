@@ -242,10 +242,10 @@ const StaffAddPage: React.FC = () => {
   );
 
   return (
-    <div className="container mx-auto px-4">
-      <BackButton onClick={handleBackClick} className="ml-5" />
-      <div className="bg-white rounded-lg">
-        <div className="pl-6">
+    <div className="container mx-auto px-4 pb-10">
+      <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
+      <div className="bg-white rounded-lg shadow-sm border border-default-200">
+        <div className="p-6 border-b border-default-200">
           <h1 className="text-xl font-semibold text-default-900">
             Add New Staff
           </h1>
@@ -255,7 +255,7 @@ const StaffAddPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit}>
-          <div className="pl-6 pt-5">
+          <div className="p-6">
             <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -268,7 +268,11 @@ const StaffAddPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderListbox("gender", "Gender", genderOptions)}
-                  {renderListbox("nationality", "Nationality", options.nationalities)}
+                  {renderListbox(
+                    "nationality",
+                    "Nationality",
+                    options.nationalities
+                  )}
                   {renderInput("birthdate", "Birthdate", "date")}
                 </div>
                 <div className="grid grid-cols-1 gap-6">
@@ -317,7 +321,7 @@ const StaffAddPage: React.FC = () => {
               </div>
             </Tab>
           </div>
-          <div className="mt-8 py-3 text-right">
+          <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200">
             <Button
               type="submit"
               variant="boldOutline"
