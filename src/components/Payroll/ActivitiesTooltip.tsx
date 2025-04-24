@@ -98,31 +98,36 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
         activities.length > 0 &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform -translate-y-full opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform -translate-y-full opacity-0 transition-opacity duration-200 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
               maxHeight: "400px",
-              overflowY: "auto",
               opacity: isVisible ? 1 : 0,
               transform: `translate(-100%, -100%)`,
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <div className="text-sm font-medium text-default-700 mb-1 flex justify-between items-center">
-              <span className="text-base">Applied Activities</span>
-              <span className="text-xs text-default-500">
-                ({activities.length} total)
-              </span>
-            </div>
-            {employeeName && (
-              <div className="text-sm text-default-600 mb-2">
-                Employee: <span className="font-medium">{employeeName}</span>
+            {/* --- Sticky Header --- */}
+            <div className="flex-shrink-0">
+              <div className="text-sm font-medium text-default-700 mb-1 flex justify-between items-center">
+                <span className="text-base">Applied Activities</span>
+                <span className="text-xs text-default-500">
+                  ({activities.length} total)
+                </span>
               </div>
-            )}
+              {employeeName && (
+                <div className="text-sm text-default-600 mb-2">
+                  Employee: <span className="font-medium">{employeeName}</span>
+                </div>
+              )}
+              {/* Separator line */}
+              <div className="border-t border-default-200"></div>
+            </div>
 
-            <div className="border-t border-default-200 pt-3 space-y-3">
+            {/* --- Scrollable Content --- */}
+            <div className="flex-grow overflow-y-auto py-3 space-y-3 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
               {activities.map((activity, index) => (
                 <div
                   key={index}
@@ -152,8 +157,11 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
 
-              <div className="border-t border-default-200 pt-3 mt-3 flex justify-between items-center">
+            {/* --- Sticky Footer --- */}
+            <div className="flex-shrink-0">
+              <div className="border-t border-default-200 pt-3 flex justify-between items-center">
                 <span className="font-medium text-default-800">Total</span>
                 <span className="font-semibold text-default-900 text-base">
                   RM{totalAmount.toFixed(2)}
