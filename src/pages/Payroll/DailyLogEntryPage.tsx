@@ -161,6 +161,14 @@ const DailyLogEntryPage: React.FC = () => {
     });
   };
 
+  // Handle hours blur event
+  const handleHoursBlur = (rowKey: string | undefined) => {
+    if (!rowKey) return;
+
+    // Recalculate activities when hours change
+    fetchAndApplyActivities();
+  };
+
   // Handle context data changes
   const handleContextDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -349,6 +357,7 @@ const DailyLogEntryPage: React.FC = () => {
     }
   }, [
     employeeSelectionState.selectedJobs,
+    employeeSelectionState.jobHours,
     formData.dayType,
     loadingPayCodeMappings,
   ]);
@@ -641,8 +650,8 @@ const DailyLogEntryPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <input
-                            id={`employee-hours-${row.rowKey}`} // Use unique ID
-                            name={`employee-hours-${row.rowKey}`} // Use unique name
+                            id={`employee-hours-${row.rowKey}`}
+                            name={`employee-hours-${row.rowKey}`}
                             type="number"
                             value={isSelected ? hours.toString() : ""}
                             onChange={(e) =>
@@ -651,12 +660,13 @@ const DailyLogEntryPage: React.FC = () => {
                                 e.target.value
                               )
                             }
+                            onBlur={() => handleHoursBlur(row.rowKey)} // Add this line
                             className="max-w-[80px] py-1 text-sm text-right border border-default-300 rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed"
                             step="0.5"
                             min="0"
                             max="24"
                             disabled={!isSelected}
-                            placeholder={isSelected ? "0" : "-"} // Placeholder indicates disabled state
+                            placeholder={isSelected ? "0" : "-"}
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
