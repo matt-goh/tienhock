@@ -43,7 +43,7 @@ const PayCodePage: React.FC = () => {
 
   // Hooks for data and caching
   const {
-    mappings: jobPayCodeMap,
+    detailedMappings,
     payCodes, // This is the full list (without 'code')
     loading: loadingPayCodesData,
     refreshData: refreshPayCodeMappings,
@@ -77,7 +77,7 @@ const PayCodePage: React.FC = () => {
     if (selectedType !== "All")
       filtered = filtered.filter((pc) => pc.pay_type === selectedType);
     if (selectedJob !== "All") {
-      const payCodeIds = jobPayCodeMap[selectedJob] || [];
+      const payCodeIds = (detailedMappings[selectedJob] || []).map((d) => d.id);
       filtered =
         payCodeIds.length > 0
           ? filtered.filter((pc) => payCodeIds.includes(pc.id))
@@ -87,8 +87,8 @@ const PayCodePage: React.FC = () => {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (pc) =>
-          (pc.id?.toLowerCase() || "").includes(term) || // Search ID
-          (pc.description?.toLowerCase() || "").includes(term) // Search Description
+          (pc.id?.toLowerCase() || "").includes(term) ||
+          (pc.description?.toLowerCase() || "").includes(term)
       );
     }
     setFilteredCodes(filtered);
@@ -104,17 +104,25 @@ const PayCodePage: React.FC = () => {
     selectedTypeRef.current = selectedType;
     selectedJobRef.current = selectedJob;
     searchTermRef.current = searchTerm;
-  }, [payCodes, selectedType, selectedJob, searchTerm, jobPayCodeMap, loading]);
+  }, [
+    payCodes,
+    selectedType,
+    selectedJob,
+    searchTerm,
+    detailedMappings,
+    loading,
+  ]);
 
   // --- Derived State ---
   const payCodeToJobsMap = useMemo(() => {
     // Create reverse mapping: payCodeId -> jobIds[]
     const reverseMap: Record<string, string[]> = {};
 
-    // Go through each job in the map
-    Object.entries(jobPayCodeMap).forEach(([jobId, payCodeIds]) => {
+    // Go through each job in the detailed mappings
+    Object.entries(detailedMappings).forEach(([jobId, payCodeDetails]) => {
       // For each pay code used by this job
-      payCodeIds.forEach((payCodeId) => {
+      payCodeDetails.forEach((detail) => {
+        const payCodeId = detail.id;
         if (!reverseMap[payCodeId]) {
           reverseMap[payCodeId] = [];
         }
@@ -123,7 +131,7 @@ const PayCodePage: React.FC = () => {
     });
 
     return reverseMap;
-  }, [jobPayCodeMap]);
+  }, [detailedMappings]);
 
   const paginatedCodes = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -173,10 +181,9 @@ const PayCodePage: React.FC = () => {
       toast.error("Invalid pay code data.");
       return;
     }
-    const isInUse = Object.values(jobPayCodeMap).some((ids) =>
-      ids.includes(pc.id)
+    const isInUse = Object.values(detailedMappings).some((details) =>
+      details.some((d) => d.id === pc.id)
     );
-    // Use description or ID in the toast message
     const displayName = pc.description || pc.id;
     if (isInUse) {
       toast.error(

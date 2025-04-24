@@ -28,6 +28,7 @@ interface ManageActivitiesModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
+  jobType: string;
   jobName: string;
   employeeHours: number;
   dayType: "Biasa" | "Ahad" | "Umum";
@@ -39,6 +40,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   isOpen,
   onClose,
   employee,
+  jobType,
   jobName,
   employeeHours,
   dayType,
@@ -52,13 +54,17 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
   // Fetch available pay codes for this job when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && employee) {
+      // Only update if we have new activities or if it's the first open
       if (existingActivities && existingActivities.length > 0) {
         setActivities(existingActivities);
+      } else {
+        // Reset to empty if no activities
+        setActivities([]);
       }
       setError(null);
     }
-  }, [isOpen, existingActivities]);
+  }, [isOpen, employee?.id, employee?.jobType, existingActivities]);
 
   useEffect(() => {
     const allSelected =
@@ -149,11 +155,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
   // Save activities
   const handleSave = () => {
-    // Only include selected activities with their current state
-    const selectedActivities = activities.filter(
-      (activity) => activity.isSelected
-    );
-    onActivitiesUpdated(selectedActivities);
+    // Pass all activities back, not just selected ones
+    onActivitiesUpdated(activities);
     onClose();
   };
 
@@ -222,7 +225,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50 sticky top-0 z-10">
                                 <tr>
-                                  <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase flex items-center tracking-wider">
                                     <Checkbox
                                       checked={selectAll}
                                       onChange={handleSelectAll}
