@@ -271,7 +271,6 @@ const DailyLogEntryPage: React.FC = () => {
       logDate: formData.logDate,
       shift: formData.shift,
       dayType: formData.dayType,
-      jobId: "MEE", // For now just hardcode to MEE section
       contextData: formData.contextData,
       status: "Submitted",
       employeeEntries: selectedEmployeeData,

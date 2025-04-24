@@ -6,21 +6,14 @@ export default function (pool) {
 
   // Create a new daily work log
   router.post("/", async (req, res) => {
-    const {
-      logDate,
-      shift,
-      dayType,
-      jobId,
-      contextData,
-      status,
-      employeeEntries,
-    } = req.body;
+    const { logDate, shift, dayType, contextData, status, employeeEntries } =
+      req.body;
 
     // Validation
-    if (!logDate || !shift || !dayType || !jobId) {
+    if (!logDate || !shift || !dayType) {
       return res.status(400).json({
         message:
-          "Missing required fields: logDate, shift, dayType, and jobId are required",
+          "Missing required fields: logDate, shift, and dayType are required",
       });
     }
 
@@ -36,16 +29,15 @@ export default function (pool) {
       // Insert main work log
       const workLogQuery = `
         INSERT INTO daily_work_logs (
-          log_date, shift, job_id, day_type, 
+          log_date, shift, day_type, 
           context_data, status
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ) VALUES ($1, $2, $3, $4, $5)
         RETURNING id
       `;
 
       const workLogResult = await pool.query(workLogQuery, [
         logDate,
         shift,
-        jobId,
         dayType,
         contextData || {},
         status,
@@ -60,14 +52,15 @@ export default function (pool) {
         // Insert employee entry
         const entryQuery = `
           INSERT INTO daily_work_log_entries (
-            work_log_id, employee_id, total_hours
-          ) VALUES ($1, $2, $3)
+            work_log_id, employee_id, job_id, total_hours
+          ) VALUES ($1, $2, $3, $4)
           RETURNING id
         `;
 
         const entryResult = await pool.query(entryQuery, [
           workLogId,
           employeeId,
+          jobType,
           hours,
         ]);
 
