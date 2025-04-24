@@ -218,7 +218,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
@@ -250,29 +250,20 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     <div className="text-center py-4 text-red-600">{error}</div>
                   ) : (
                     <>
-                      <div className="mt-4 overflow-x-auto">
+                      <div className="mt-4">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Apply
+                              <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <span className="sr-only">Apply</span>
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Pay Code
+                              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Pay Code & Details
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Type
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Unit
-                              </th>
-                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Rate
-                              </th>
-                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Units
                               </th>
-                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Amount
                               </th>
                             </tr>
@@ -281,8 +272,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             {activities.length === 0 ? (
                               <tr>
                                 <td
-                                  colSpan={7}
-                                  className="px-6 py-4 text-center text-sm text-gray-500"
+                                  colSpan={4}
+                                  className="px-3 py-4 text-center text-sm text-gray-500"
                                 >
                                   No pay codes available for this job.
                                 </td>
@@ -295,7 +286,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                     activity.isSelected ? "bg-sky-50" : ""
                                   }
                                 >
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-3 py-4">
                                     <Checkbox
                                       checked={activity.isSelected}
                                       onChange={() =>
@@ -305,24 +296,31 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       checkedColor="text-sky-600"
                                     />
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {activity.description}
+                                  <td className="px-3 py-4">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {activity.description}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {activity.payType} • {activity.rateUnit}
+                                      {activity.rateUnit !== "Day" && (
+                                        <span className="ml-1">
+                                          @ RM{activity.rate.toFixed(2)}/
+                                          {activity.rateUnit}
+                                        </span>
+                                      )}
+                                      {activity.rateUnit === "Day" && (
+                                        <span className="ml-1">
+                                          @ RM{activity.rate.toFixed(2)}/Day
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {activity.payType}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {activity.rateUnit}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                    {activity.rate.toFixed(2)}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                                  <td className="px-3 py-4 text-center">
                                     {activity.rateUnit === "Bag" ||
                                     activity.rateUnit === "Fixed" ? (
                                       <input
                                         type="number"
-                                        className="w-20 text-right border border-gray-300 rounded p-1 text-sm disabled:bg-gray-100"
+                                        className="w-16 text-center border border-gray-300 rounded p-1 text-sm disabled:bg-gray-100"
                                         value={
                                           activity.unitsProduced?.toString() ||
                                           "0"
@@ -343,14 +341,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       </span>
                                     )}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                                  <td className="px-3 py-4 text-right">
                                     {activity.isSelected ? (
-                                      <span className="text-gray-900">
-                                        {activity.calculatedAmount.toFixed(2)}
+                                      <span className="text-sm font-medium text-gray-900">
+                                        RM{activity.calculatedAmount.toFixed(2)}
                                       </span>
                                     ) : (
-                                      <span className="text-gray-400">
-                                        0.00
+                                      <span className="text-sm text-gray-400">
+                                        RM0.00
                                       </span>
                                     )}
                                   </td>
@@ -361,13 +359,13 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                           <tfoot>
                             <tr className="bg-gray-50">
                               <td
-                                colSpan={6}
-                                className="px-6 py-3 text-right text-sm font-medium text-gray-900"
+                                colSpan={3}
+                                className="px-3 py-3 text-right text-sm font-medium text-gray-900"
                               >
                                 Total
                               </td>
-                              <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
-                                {totalAmount.toFixed(2)}
+                              <td className="px-3 py-3 text-right text-sm font-medium text-gray-900">
+                                RM{totalAmount.toFixed(2)}
                               </td>
                             </tr>
                           </tfoot>
