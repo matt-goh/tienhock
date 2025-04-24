@@ -117,92 +117,96 @@ const HolidayCalendarPage: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-default-200 shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-default-200">
-            <thead className="bg-default-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                  Day
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                  Description
-                </th>
-                <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-default-200 bg-white">
-              {holidays.length > 0 ? (
-                holidays.map((holiday) => {
-                  const date = new Date(holiday.holiday_date);
-                  const dayOfWeek = date.toLocaleDateString("en-US", {
-                    weekday: "long",
-                  });
-                  const isSunday = date.getDay() === 0;
+          <div className="relative overflow-hidden">
+            <div className="max-h-[650px] overflow-y-auto">
+              <table className="min-w-full divide-y divide-default-200">
+                <thead className="bg-default-100 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Day
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Description
+                    </th>
+                    <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default-200 bg-white">
+                  {holidays.length > 0 ? (
+                    holidays.map((holiday) => {
+                      const date = new Date(holiday.holiday_date);
+                      const dayOfWeek = date.toLocaleDateString("en-US", {
+                        weekday: "long",
+                      });
+                      const isSunday = date.getDay() === 0;
 
-                  return (
-                    <tr
-                      key={holiday.id}
-                      className="hover:bg-default-50 cursor-pointer"
-                      onClick={() => {
-                        setHolidayToEdit(holiday);
-                        setShowEditModal(true);
-                      }}
-                    >
-                      <td className="px-4 py-3 text-sm text-default-700">
-                        {format(date, "dd MMM yyyy")}
-                      </td>
+                      return (
+                        <tr
+                          key={holiday.id}
+                          className="hover:bg-default-50 cursor-pointer"
+                          onClick={() => {
+                            setHolidayToEdit(holiday);
+                            setShowEditModal(true);
+                          }}
+                        >
+                          <td className="px-4 py-3 text-sm text-default-700">
+                            {format(date, "dd MMM yyyy")}
+                          </td>
+                          <td
+                            className={`px-4 py-3 text-sm ${
+                              isSunday
+                                ? "text-amber-600 font-medium"
+                                : "text-default-700"
+                            }`}
+                          >
+                            {dayOfWeek}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-default-700">
+                            {holiday.description || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-center text-sm">
+                            <div className="flex items-center justify-center space-x-2">
+                              <button
+                                className="text-sky-600 hover:text-sky-800"
+                                title="Edit"
+                              >
+                                <IconPencil size={18} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent row click event
+                                  setHolidayToDelete(holiday);
+                                  setShowDeleteDialog(true);
+                                }}
+                                className="text-rose-600 hover:text-rose-800"
+                                title="Delete"
+                              >
+                                <IconTrash size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
                       <td
-                        className={`px-4 py-3 text-sm ${
-                          isSunday
-                            ? "text-amber-600 font-medium"
-                            : "text-default-700"
-                        }`}
+                        colSpan={4}
+                        className="px-6 py-10 text-center text-sm text-default-500"
                       >
-                        {dayOfWeek}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-default-700">
-                        {holiday.description || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm">
-                        <div className="flex items-center justify-center space-x-2">
-                          <button
-                            className="text-sky-600 hover:text-sky-800"
-                            title="Edit"
-                          >
-                            <IconPencil size={18} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent row click event
-                              setHolidayToDelete(holiday);
-                              setShowDeleteDialog(true);
-                            }}
-                            className="text-rose-600 hover:text-rose-800"
-                            title="Delete"
-                          >
-                            <IconTrash size={18} />
-                          </button>
-                        </div>
+                        No holidays recorded for {selectedYear}
                       </td>
                     </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-10 text-center text-sm text-default-500"
-                  >
-                    No holidays recorded for {selectedYear}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
