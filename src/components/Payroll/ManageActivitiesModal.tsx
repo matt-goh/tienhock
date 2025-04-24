@@ -52,8 +52,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
   // Fetch available pay codes for this job when modal opens
   useEffect(() => {
-    if (isOpen && existingActivities.length > 0) {
-      setActivities(existingActivities);
+    if (isOpen) {
+      if (existingActivities && existingActivities.length > 0) {
+        setActivities(existingActivities);
+      }
+      setError(null);
     }
   }, [isOpen, existingActivities]);
 
@@ -146,7 +149,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
   // Save activities
   const handleSave = () => {
-    // Only include selected activities
+    // Only include selected activities with their current state
     const selectedActivities = activities.filter(
       (activity) => activity.isSelected
     );
