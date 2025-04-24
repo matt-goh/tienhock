@@ -55,11 +55,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   // Fetch available pay codes for this job when modal opens
   useEffect(() => {
     if (isOpen && employee) {
-      // Only update if we have new activities or if it's the first open
       if (existingActivities && existingActivities.length > 0) {
-        setActivities(existingActivities);
+        // Create a deep copy of existing activities to prevent mutations
+        const activitiesCopy = existingActivities.map((activity) => ({
+          ...activity,
+          // If there are any nested objects/arrays, spread them too
+        }));
+        setActivities(activitiesCopy);
       } else {
-        // Reset to empty if no activities
         setActivities([]);
       }
       setError(null);
@@ -166,9 +169,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     onClose();
   };
 
+  const handleClose = () => {
+    // Reset activities to original state when closing without saving
+    if (existingActivities && existingActivities.length > 0) {
+      const activitiesCopy = existingActivities.map((activity) => ({
+        ...activity,
+      }));
+      setActivities(activitiesCopy);
+    } else {
+      setActivities([]);
+    }
+    onClose();
+  };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"
@@ -382,7 +398,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                 <div className="mt-6 flex justify-end space-x-3">
                   <Button
                     variant="outline"
-                    onClick={onClose}
+                    onClick={handleClose}
                     disabled={loading}
                   >
                     Cancel
