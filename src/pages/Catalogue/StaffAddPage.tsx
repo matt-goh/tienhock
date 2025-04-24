@@ -247,7 +247,7 @@ const StaffAddPage: React.FC = () => {
     <FormInput
       name={name}
       label={label}
-      value={formData[name].toString()}
+      value={formData[name]?.toString() ?? ""}
       onChange={handleInputChange}
       type={type}
     />
@@ -261,7 +261,7 @@ const StaffAddPage: React.FC = () => {
     <FormListbox
       name={name}
       label={label}
-      value={formData[name].toString()}
+      value={formData[name]?.toString() ?? ""}
       onChange={(value) => handleListboxChange(name, value)}
       options={options}
     />

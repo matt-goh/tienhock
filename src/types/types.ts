@@ -416,6 +416,7 @@ export interface Employee {
   birthdate: string;
   address: string;
   job: string[];
+  jobType?: string;
   location: string[];
   dateJoined: string;
   icNo: string;

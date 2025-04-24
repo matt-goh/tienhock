@@ -1,5 +1,11 @@
 // src/pages/Payroll/DailyLogEntryPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -13,7 +19,7 @@ import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { api } from "../../routes/utils/api";
+import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -78,6 +84,11 @@ const DailyLogEntryPage: React.FC = () => {
     employees: [],
   });
   const [loadingPayCodes, setLoadingPayCodes] = useState(false);
+  const {
+    detailedMappings: jobPayCodeDetails,
+    loading: loadingPayCodeMappings,
+    refreshData: refreshPayCodeMappings,
+  } = useJobPayCodeMappings();
 
   // Use useMemo to filter only MEE jobs
   const jobs = useMemo(() => {
@@ -100,6 +111,43 @@ const DailyLogEntryPage: React.FC = () => {
         hours: 7,
       }));
   }, [allStaffs]);
+
+  const expandedEmployees = useMemo(() => {
+    // Create a new array with an entry for each employee-job combination
+    const expanded: Array<
+      EmployeeWithHours & { jobType: string; jobName: string }
+    > = [];
+
+    availableEmployees.forEach((employee) => {
+      // Filter to only include MEE job types
+      const meeJobs = (employee.job || []).filter((jobId: string) =>
+        MEE_JOB_IDS.includes(jobId)
+      );
+
+      // Create a row for each job type this employee has
+      meeJobs.forEach((jobId: any) => {
+        const jobName = jobs.find((j) => j.id === jobId)?.name || jobId;
+
+        expanded.push({
+          ...employee,
+          jobType: jobId,
+          jobName,
+          // Use a compound key for each row
+          rowKey: `${employee.id}-${jobId}`,
+        });
+      });
+    });
+
+    // Sort by employee name first, then job name
+    return expanded.sort((a, b) => {
+      // First by employee name
+      const nameCompare = a.name.localeCompare(b.name);
+      if (nameCompare !== 0) return nameCompare;
+
+      // Then by job name
+      return (a.jobName || "").localeCompare(b.jobName || "");
+    });
+  }, [availableEmployees, jobs]);
 
   // Update day type when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,21 +228,6 @@ const DailyLogEntryPage: React.FC = () => {
     setShowActivitiesModal(true);
   };
 
-  const handleActivitiesUpdated = (activities: any[]) => {
-    if (!selectedEmployee?.rowKey) return;
-
-    const rowKey = selectedEmployee.rowKey; // Capture the non-null value
-
-    // Store activities for this employee/job combination
-    setEmployeeActivities((prev) => ({
-      ...prev,
-      [rowKey]: activities,
-    }));
-
-    // Show a success toast
-    toast.success(`Activities updated for ${selectedEmployee.name}`);
-  };
-
   const handleSaveForm = async (asDraft = true) => {
     // Validate form
     if (!formData.logDate) {
@@ -254,159 +287,7 @@ const DailyLogEntryPage: React.FC = () => {
     */
   };
 
-  const fetchAndApplyActivities = async () => {
-    setLoadingPayCodes(true);
-    try {
-      // Get all unique job types from selected employees
-      const jobTypes = Array.from(
-        new Set(
-          Object.entries(employeeSelectionState.selectedJobs).flatMap(
-            ([_, jobTypes]) => jobTypes
-          )
-        )
-      );
-
-      if (jobTypes.length === 0) return;
-
-      // Fetch pay codes for all job types at once
-      const response = await api.post("/api/job-pay-codes/by-jobs", {
-        jobIds: jobTypes,
-      });
-      const payCodesByJob = response || {};
-
-      // Apply activities for each employee/job combination
-      const newEmployeeActivities: Record<string, any[]> = {};
-
-      Object.entries(employeeSelectionState.selectedJobs).forEach(
-        ([employeeId, jobTypes]) => {
-          jobTypes.forEach((jobType) => {
-            const rowKey = `${employeeId}-${jobType}`;
-            const hours =
-              employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-            const jobPayCodes = payCodesByJob[jobType] || [];
-
-            const activities = jobPayCodes
-              .filter(
-                (pc: { is_default_setting: any }) => pc.is_default_setting
-              ) // Only apply default activities
-              .map(
-                (payCode: {
-                  override_rate_ahad: number | null;
-                  rate_ahad: number;
-                  override_rate_umum: number | null;
-                  rate_umum: number;
-                  override_rate_biasa: number | null;
-                  rate_biasa: number;
-                  rate_unit: any;
-                  requires_units_input: any;
-                  id: any;
-                  description: any;
-                  pay_type: any;
-                  is_default_setting: any;
-                }) => {
-                  // Determine rate based on day type
-                  let rate = 0;
-                  if (formData.dayType === "Ahad") {
-                    rate =
-                      payCode.override_rate_ahad !== null
-                        ? payCode.override_rate_ahad
-                        : payCode.rate_ahad;
-                  } else if (formData.dayType === "Umum") {
-                    rate =
-                      payCode.override_rate_umum !== null
-                        ? payCode.override_rate_umum
-                        : payCode.rate_umum;
-                  } else {
-                    rate =
-                      payCode.override_rate_biasa !== null
-                        ? payCode.override_rate_biasa
-                        : payCode.rate_biasa;
-                  }
-
-                  // Calculate amount
-                  let calculatedAmount = 0;
-                  switch (payCode.rate_unit) {
-                    case "Hour":
-                      calculatedAmount = rate * hours;
-                      break;
-                    case "Day":
-                      calculatedAmount = rate;
-                      break;
-                    case "Bag":
-                    case "Fixed":
-                      calculatedAmount =
-                        rate * (payCode.requires_units_input ? 0 : 1);
-                      break;
-                    default:
-                      calculatedAmount = 0;
-                  }
-
-                  return {
-                    payCodeId: payCode.id,
-                    description: payCode.description,
-                    payType: payCode.pay_type,
-                    rateUnit: payCode.rate_unit,
-                    rate: rate,
-                    isDefault: payCode.is_default_setting,
-                    isSelected: true,
-                    unitsProduced: payCode.requires_units_input ? 0 : undefined,
-                    calculatedAmount: Number(calculatedAmount.toFixed(2)),
-                  };
-                }
-              );
-
-            newEmployeeActivities[rowKey] = activities;
-          });
-        }
-      );
-
-      setEmployeeActivities(newEmployeeActivities);
-    } catch (error) {
-      console.error("Error fetching and applying activities:", error);
-      toast.error("Failed to load default activities");
-    } finally {
-      setLoadingPayCodes(false);
-    }
-  };
-
-  const expandedEmployees = useMemo(() => {
-    // Create a new array with an entry for each employee-job combination
-    const expanded: Array<
-      EmployeeWithHours & { jobType: string; jobName: string }
-    > = [];
-
-    availableEmployees.forEach((employee) => {
-      // Filter to only include MEE job types
-      const meeJobs = (employee.job || []).filter((jobId: string) =>
-        MEE_JOB_IDS.includes(jobId)
-      );
-
-      // Create a row for each job type this employee has
-      meeJobs.forEach((jobId: any) => {
-        const jobName = jobs.find((j) => j.id === jobId)?.name || jobId;
-
-        expanded.push({
-          ...employee,
-          jobType: jobId,
-          jobName,
-          // Use a compound key for each row
-          rowKey: `${employee.id}-${jobId}`,
-        });
-      });
-    });
-
-    // Sort by employee name first, then job name
-    return expanded.sort((a, b) => {
-      // First by employee name
-      const nameCompare = a.name.localeCompare(b.name);
-      if (nameCompare !== 0) return nameCompare;
-
-      // Then by job name
-      return (a.jobName || "").localeCompare(b.jobName || "");
-    });
-  }, [availableEmployees, jobs]);
-
-  useEffect(() => {
+  const initializeDefaultSelections = useCallback(() => {
     if (!loadingStaffs && !loadingJobs && expandedEmployees.length > 0) {
       // Create a new selection state that selects all employees
       const newSelectedJobs: Record<string, string[]> = {};
@@ -436,20 +317,160 @@ const DailyLogEntryPage: React.FC = () => {
         selectedJobs: newSelectedJobs,
         jobHours: newJobHours,
       });
-
-      // Fetch and apply activities after a short delay to ensure state is updated
-      setTimeout(() => {
-        fetchAndApplyActivities();
-      }, 100);
     }
   }, [expandedEmployees, loadingStaffs, loadingJobs]);
 
+  // Use a one-time initialization effect
+  const initializedRef = useRef(false);
   useEffect(() => {
-    // Skip initial mount
-    if (Object.keys(employeeSelectionState.selectedJobs).length > 0) {
+    if (
+      !initializedRef.current &&
+      !loadingStaffs &&
+      !loadingJobs &&
+      expandedEmployees.length > 0
+    ) {
+      initializedRef.current = true;
+      initializeDefaultSelections();
+    }
+  }, [
+    expandedEmployees,
+    loadingStaffs,
+    loadingJobs,
+    initializeDefaultSelections,
+  ]);
+
+  // Separate effect for fetching activities after selection changes
+  useEffect(() => {
+    if (
+      Object.keys(employeeSelectionState.selectedJobs).length > 0 &&
+      !loadingPayCodeMappings
+    ) {
       fetchAndApplyActivities();
     }
-  }, [employeeSelectionState.selectedJobs, formData.dayType]);
+  }, [
+    employeeSelectionState.selectedJobs,
+    formData.dayType,
+    loadingPayCodeMappings,
+  ]);
+
+  // Update the fetchAndApplyActivities function to properly handle existing state:
+  const fetchAndApplyActivities = () => {
+    // Get all unique job types from selected employees
+    const jobTypes = Array.from(
+      new Set(
+        Object.entries(employeeSelectionState.selectedJobs).flatMap(
+          ([_, jobTypes]) => jobTypes
+        )
+      )
+    );
+
+    if (jobTypes.length === 0) return;
+
+    // Apply activities for each employee/job combination using cached data
+    const newEmployeeActivities: Record<string, any[]> = {};
+
+    Object.entries(employeeSelectionState.selectedJobs).forEach(
+      ([employeeId, jobTypes]) => {
+        jobTypes.forEach((jobType) => {
+          const rowKey = `${employeeId}-${jobType}`;
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+
+          // Get pay codes from cache
+          const jobPayCodes = jobPayCodeDetails[jobType] || [];
+
+          // Check if we already have activities for this employee/job
+          const existingActivities = employeeActivities[rowKey] || [];
+
+          const activities = jobPayCodes.map((payCode) => {
+            // Check if this activity already exists
+            const existingActivity = existingActivities.find(
+              (a) => a.payCodeId === payCode.id
+            );
+
+            // Determine rate based on day type
+            let rate = 0;
+            if (formData.dayType === "Ahad") {
+              rate =
+                payCode.override_rate_ahad !== null
+                  ? payCode.override_rate_ahad
+                  : payCode.rate_ahad;
+            } else if (formData.dayType === "Umum") {
+              rate =
+                payCode.override_rate_umum !== null
+                  ? payCode.override_rate_umum
+                  : payCode.rate_umum;
+            } else {
+              rate =
+                payCode.override_rate_biasa !== null
+                  ? payCode.override_rate_biasa
+                  : payCode.rate_biasa;
+            }
+
+            // Use existing state if available, otherwise use defaults
+            const isSelected = existingActivity
+              ? existingActivity.isSelected
+              : payCode.is_default_setting;
+            const unitsProduced = existingActivity
+              ? existingActivity.unitsProduced
+              : payCode.requires_units_input
+              ? 0
+              : undefined;
+
+            // Calculate amount
+            let calculatedAmount = 0;
+            if (isSelected) {
+              switch (payCode.rate_unit) {
+                case "Hour":
+                  calculatedAmount = rate * hours;
+                  break;
+                case "Day":
+                  calculatedAmount = rate;
+                  break;
+                case "Bag":
+                case "Fixed":
+                  calculatedAmount = rate * (unitsProduced || 0);
+                  break;
+                default:
+                  calculatedAmount = 0;
+              }
+            }
+
+            return {
+              payCodeId: payCode.id,
+              description: payCode.description,
+              payType: payCode.pay_type,
+              rateUnit: payCode.rate_unit,
+              rate: rate,
+              isDefault: payCode.is_default_setting,
+              isSelected: isSelected,
+              unitsProduced: unitsProduced,
+              calculatedAmount: Number(calculatedAmount.toFixed(2)),
+            };
+          });
+
+          newEmployeeActivities[rowKey] = activities;
+        });
+      }
+    );
+
+    setEmployeeActivities(newEmployeeActivities);
+  };
+
+  // Update handleActivitiesUpdated to store all activities, not just selected:
+  const handleActivitiesUpdated = (activities: any[]) => {
+    if (!selectedEmployee?.rowKey) return;
+
+    const rowKey = selectedEmployee.rowKey;
+
+    // Store all activities (both selected and unselected)
+    setEmployeeActivities((prev) => ({
+      ...prev,
+      [rowKey]: activities,
+    }));
+
+    toast.success(`Activities updated for ${selectedEmployee.name}`);
+  };
 
   return (
     <div className="relative w-full mx-4 md:mx-6">
@@ -690,6 +711,7 @@ const DailyLogEntryPage: React.FC = () => {
         isOpen={showActivitiesModal}
         onClose={() => setShowActivitiesModal(false)}
         employee={selectedEmployee}
+        jobType={selectedEmployee?.jobType || ""}
         jobName={selectedEmployee?.jobName || ""}
         employeeHours={
           employeeSelectionState.jobHours[selectedEmployee?.id || ""]?.[
