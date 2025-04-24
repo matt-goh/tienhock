@@ -8,9 +8,8 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "../Button";
-import { JobPayCodeDetails, Employee } from "../../types/types";
+import { Employee } from "../../types/types";
 import Checkbox from "../Checkbox";
-import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../LoadingSpinner";
 
 interface ActivityItem {
@@ -34,6 +33,7 @@ interface ManageActivitiesModalProps {
   employeeHours: number;
   dayType: "Biasa" | "Ahad" | "Umum";
   onActivitiesUpdated: (activities: ActivityItem[]) => void;
+  existingActivities?: ActivityItem[];
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -45,77 +45,18 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   employeeHours,
   dayType,
   onActivitiesUpdated,
+  existingActivities = [],
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch available pay codes for this job when modal opens
   useEffect(() => {
-    const fetchJobPayCodes = async () => {
-      if (!isOpen || !jobId) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await api.get(`/api/job-pay-codes/job/${jobId}`);
-
-        // Transform response into ActivityItem[]
-        const jobPayCodes = response || [];
-        const transformedActivities: ActivityItem[] = jobPayCodes.map(
-          (payCode: JobPayCodeDetails) => {
-            // Determine which rate to use based on day type
-            let rate = 0;
-            if (dayType === "Ahad") {
-              rate =
-                payCode.override_rate_ahad !== null
-                  ? payCode.override_rate_ahad
-                  : payCode.rate_ahad;
-            } else if (dayType === "Umum") {
-              rate =
-                payCode.override_rate_umum !== null
-                  ? payCode.override_rate_umum
-                  : payCode.rate_umum;
-            } else {
-              // Biasa (default)
-              rate =
-                payCode.override_rate_biasa !== null
-                  ? payCode.override_rate_biasa
-                  : payCode.rate_biasa;
-            }
-
-            return {
-              payCodeId: payCode.id,
-              description: payCode.description,
-              payType: payCode.pay_type,
-              rateUnit: payCode.rate_unit,
-              rate: rate,
-              isDefault: payCode.is_default_setting,
-              isSelected: payCode.is_default_setting, // Default to selected if it's a default pay code
-              unitsProduced: payCode.requires_units_input ? 0 : undefined,
-              calculatedAmount: 0, // Will be calculated below
-            };
-          }
-        );
-
-        // Pre-calculate amounts
-        const activitiesWithAmounts = calculateAmounts(
-          transformedActivities,
-          employeeHours
-        );
-
-        setActivities(activitiesWithAmounts);
-      } catch (err: any) {
-        console.error("Error fetching job pay codes:", err);
-        setError(err.message || "Failed to load pay codes");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchJobPayCodes();
-  }, [isOpen, jobId, dayType, employeeHours]);
+    if (isOpen && existingActivities.length > 0) {
+      setActivities(existingActivities);
+    }
+  }, [isOpen, existingActivities]);
 
   // Calculate amounts based on rate type, hours, and units
   const calculateAmounts = (

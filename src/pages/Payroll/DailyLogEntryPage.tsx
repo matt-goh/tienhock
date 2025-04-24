@@ -699,6 +699,7 @@ const DailyLogEntryPage: React.FC = () => {
         }
         dayType={formData.dayType}
         onActivitiesUpdated={handleActivitiesUpdated}
+        existingActivities={employeeActivities[selectedEmployee?.rowKey || ""]}
       />
     </div>
   );
