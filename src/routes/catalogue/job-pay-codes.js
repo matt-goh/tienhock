@@ -4,21 +4,19 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get all job-pay code mappings and all pay codes (without 'code') for cache initialization
   router.get("/all-mappings", async (req, res) => {
     try {
       // Get all pay codes (excluding 'code')
       const payCodeQuery = `
-        SELECT
-          id, description, pay_type, rate_unit,
-          CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
-          CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
-          CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input
-        FROM pay_codes ORDER BY id -- Order by ID or description
-      `;
+      SELECT
+        id, description, pay_type, rate_unit,
+        CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
+        CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
+        CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
+        is_active, requires_units_input
+      FROM pay_codes ORDER BY id
+    `;
       const payCodeResult = await pool.query(payCodeQuery);
-      // Ensure nulls are preserved and numbers are parsed
       const allPayCodes = payCodeResult.rows.map((pc) => ({
         ...pc,
         rate_biasa: pc.rate_biasa === null ? null : parseFloat(pc.rate_biasa),
@@ -26,25 +24,65 @@ export default function (pool) {
         rate_umum: pc.rate_umum === null ? null : parseFloat(pc.rate_umum),
       }));
 
-      // Get all job-pay code mappings (just IDs for the map)
+      // Get all job-pay code mappings WITH FULL DETAILS
       const mappingQuery = `
-        SELECT jpc.job_id, jpc.pay_code_id
+        SELECT
+          pc.id,
+          pc.description,
+          pc.pay_type,
+          pc.rate_unit,
+          CAST(pc.rate_biasa AS NUMERIC(10, 2)) AS rate_biasa,
+          CAST(pc.rate_ahad AS NUMERIC(10, 2)) AS rate_ahad,
+          CAST(pc.rate_umum AS NUMERIC(10, 2)) AS rate_umum,
+          pc.is_active,
+          pc.requires_units_input,
+          jpc.job_id,
+          jpc.pay_code_id,
+          jpc.is_default AS is_default_setting,
+          CAST(jpc.override_rate_biasa AS NUMERIC(10, 2)) AS override_rate_biasa,
+          CAST(jpc.override_rate_ahad AS NUMERIC(10, 2)) AS override_rate_ahad,
+          CAST(jpc.override_rate_umum AS NUMERIC(10, 2)) AS override_rate_umum
         FROM job_pay_codes jpc
+        JOIN pay_codes pc ON jpc.pay_code_id = pc.id
+        ORDER BY jpc.job_id, pc.id
       `;
       const mappingResult = await pool.query(mappingQuery);
 
-      // Create a map of job IDs to pay code IDs
-      const mappings = {};
+      // Process the detailed mappings into job-based structure
+      const detailedMappings = {};
+
       mappingResult.rows.forEach((row) => {
-        if (!mappings[row.job_id]) {
-          mappings[row.job_id] = [];
+        // Parse numeric values
+        const parsedRow = {
+          ...row,
+          rate_biasa:
+            row.rate_biasa === null ? null : parseFloat(row.rate_biasa),
+          rate_ahad: row.rate_ahad === null ? null : parseFloat(row.rate_ahad),
+          rate_umum: row.rate_umum === null ? null : parseFloat(row.rate_umum),
+          override_rate_biasa:
+            row.override_rate_biasa === null
+              ? null
+              : parseFloat(row.override_rate_biasa),
+          override_rate_ahad:
+            row.override_rate_ahad === null
+              ? null
+              : parseFloat(row.override_rate_ahad),
+          override_rate_umum:
+            row.override_rate_umum === null
+              ? null
+              : parseFloat(row.override_rate_umum),
+        };
+
+        // Create detailed mappings
+        if (!detailedMappings[row.job_id]) {
+          detailedMappings[row.job_id] = [];
         }
-        mappings[row.job_id].push(row.pay_code_id);
+        detailedMappings[row.job_id].push(parsedRow);
       });
 
       res.json({
-        mappings: mappings,
-        payCodes: allPayCodes, // Return parsed pay codes (without 'code')
+        detailedMappings: detailedMappings,
+        payCodes: allPayCodes,
       });
     } catch (error) {
       console.error("Error fetching pay code mapping data:", error);

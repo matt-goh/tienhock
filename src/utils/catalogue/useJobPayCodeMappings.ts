@@ -1,24 +1,25 @@
-// src/hooks/useJobPayCodeMappings.ts
+// In src/utils/catalogue/useJobPayCodeMappings.ts
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../../routes/utils/api";
-import { PayCode } from "../../types/types";
+import { PayCode, JobPayCodeDetails } from "../../types/types";
 
-type JobPayCodeMap = Record<string, string[]>; // Map job ID to array of pay code IDs
+type DetailedJobPayCodeMap = Record<string, JobPayCodeDetails[]>;
 
 interface CacheData {
-  mappings: JobPayCodeMap;
+  detailedMappings: DetailedJobPayCodeMap;
   payCodes: PayCode[];
   timestamp: number;
 }
 
 export const useJobPayCodeMappings = () => {
-  const [mappings, setMappings] = useState<JobPayCodeMap>({});
+  const [detailedMappings, setDetailedMappings] =
+    useState<DetailedJobPayCodeMap>({});
   const [payCodes, setPayCodes] = useState<PayCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const CACHE_KEY = "payCodeData";
-  const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
+  const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000;
 
   const fetchData = useCallback(async (force = false) => {
     // Try to load from cache first
@@ -30,7 +31,7 @@ export const useJobPayCodeMappings = () => {
           const now = Date.now();
 
           if (now - parsedData.timestamp < CACHE_DURATION) {
-            setMappings(parsedData.mappings);
+            setDetailedMappings(parsedData.detailedMappings);
             setPayCodes(parsedData.payCodes);
             setLoading(false);
             return;
@@ -43,17 +44,16 @@ export const useJobPayCodeMappings = () => {
 
     setLoading(true);
     try {
-      // Make a single API call
       const response = await api.get("/api/job-pay-codes/all-mappings");
 
-      if (response && response.payCodes && response.mappings) {
+      if (response && response.payCodes && response.detailedMappings) {
         setPayCodes(response.payCodes);
-        setMappings(response.mappings);
+        setDetailedMappings(response.detailedMappings);
 
         // Cache the data
         try {
           const cacheData: CacheData = {
-            mappings: response.mappings,
+            detailedMappings: response.detailedMappings,
             payCodes: response.payCodes,
             timestamp: Date.now(),
           };
@@ -80,7 +80,7 @@ export const useJobPayCodeMappings = () => {
   }, [fetchData]);
 
   return {
-    mappings,
+    detailedMappings,
     payCodes,
     loading,
     error,
