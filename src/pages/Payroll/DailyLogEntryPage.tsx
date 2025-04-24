@@ -550,7 +550,7 @@ const DailyLogEntryPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full mx-4 md:mx-6">
+    <div className="relative w-full mx-4 md:mx-6 -mt-8">
       <BackButton onClick={handleBack} />
 
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
@@ -633,148 +633,155 @@ const DailyLogEntryPage: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto mt-4">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-100">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      <Checkbox
-                        checked={selectAll}
-                        onChange={handleSelectAll}
-                        size={20}
-                        checkedColor="text-sky-600"
-                        ariaLabel="Select all employees"
-                        buttonClassName="p-1 rounded-lg"
-                      />
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      ID
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Name
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Job Type
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Hours
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-default-200">
-                  {expandedEmployees.map((row) => {
-                    // Determine selection and hours from the central state
-                    const isSelected =
-                      employeeSelectionState.selectedJobs[row.id]?.includes(
-                        row.jobType
-                      ) || false;
-                    const hours =
-                      employeeSelectionState.jobHours[row.id]?.[row.jobType] ??
-                      7; // Default to 7 if no hours recorded yet
-
-                    return (
-                      <tr key={row.rowKey}>
-                        <td className="px-6 py-4 whitespace-nowrap align-middle">
+              <div className="relative border border-default-200 rounded-lg overflow-hidden">
+                <div className="max-h-[600px] overflow-y-auto">
+                  <table className="min-w-full divide-y divide-default-200">
+                    <thead className="bg-default-100 sticky top-0 z-10">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
                           <Checkbox
-                            checked={isSelected}
-                            onChange={() => handleEmployeeSelection(row.rowKey)}
+                            checked={selectAll}
+                            onChange={handleSelectAll}
                             size={20}
                             checkedColor="text-sky-600"
-                            ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                            ariaLabel="Select all employees"
                             buttonClassName="p-1 rounded-lg"
                           />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
-                          <Link
-                            to={`/catalogue/staff/${row.id}`}
-                            className="hover:underline hover:text-sky-600"
-                          >
-                            {row.id}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                          {row.name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                          <Link
-                            to={`/catalogue/job?id=${row.jobType}`}
-                            className="hover:underline hover:text-sky-600"
-                          >
-                            {row.jobName}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            {hours > 8 && isSelected && (
-                              <span className="text-xs text-amber-600 font-medium">
-                                OT
-                              </span>
-                            )}
-                            <input
-                              id={`employee-hours-${row.rowKey}`}
-                              name={`employee-hours-${row.rowKey}`}
-                              type="number"
-                              value={isSelected ? hours.toString() : ""}
-                              onChange={(e) =>
-                                handleEmployeeHoursChange(
-                                  row.rowKey,
-                                  e.target.value
-                                )
-                              }
-                              onBlur={() => handleHoursBlur(row.rowKey)}
-                              className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
-                                hours > 8
-                                  ? "border-amber-400 bg-amber-50"
-                                  : "border-default-300"
-                              }`}
-                              step="0.5"
-                              min="0"
-                              max="24"
-                              disabled={!isSelected}
-                              placeholder={isSelected ? "0" : "-"}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <ActivitiesTooltip
-                            activities={(
-                              employeeActivities[row.rowKey || ""] || []
-                            ).filter((activity) => activity.isSelected)}
-                            employeeName={row.name}
-                            className={
-                              !isSelected
-                                ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                : ""
-                            }
-                            disabled={!isSelected}
-                            onClick={() => handleManageActivities(row)}
-                          />
-                        </td>
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          ID
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Name
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Job Type
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Hours
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Actions
+                        </th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-default-200">
+                      {expandedEmployees.map((row) => {
+                        // Determine selection and hours from the central state
+                        const isSelected =
+                          employeeSelectionState.selectedJobs[row.id]?.includes(
+                            row.jobType
+                          ) || false;
+                        const hours =
+                          employeeSelectionState.jobHours[row.id]?.[
+                            row.jobType
+                          ] ?? 7; // Default to 7 if no hours recorded yet
+
+                        return (
+                          <tr key={row.rowKey}>
+                            <td className="px-6 py-4 whitespace-nowrap align-middle">
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() =>
+                                  handleEmployeeSelection(row.rowKey)
+                                }
+                                size={20}
+                                checkedColor="text-sky-600"
+                                ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                                buttonClassName="p-1 rounded-lg"
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
+                              <Link
+                                to={`/catalogue/staff/${row.id}`}
+                                className="hover:underline hover:text-sky-600"
+                              >
+                                {row.id}
+                              </Link>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                              {row.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                              <Link
+                                to={`/catalogue/job?id=${row.jobType}`}
+                                className="hover:underline hover:text-sky-600"
+                              >
+                                {row.jobName}
+                              </Link>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                {hours > 8 && isSelected && (
+                                  <span className="text-xs text-amber-600 font-medium">
+                                    OT
+                                  </span>
+                                )}
+                                <input
+                                  id={`employee-hours-${row.rowKey}`}
+                                  name={`employee-hours-${row.rowKey}`}
+                                  type="number"
+                                  value={isSelected ? hours.toString() : ""}
+                                  onChange={(e) =>
+                                    handleEmployeeHoursChange(
+                                      row.rowKey,
+                                      e.target.value
+                                    )
+                                  }
+                                  onBlur={() => handleHoursBlur(row.rowKey)}
+                                  className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
+                                    hours > 8
+                                      ? "border-amber-400 bg-amber-50"
+                                      : "border-default-300"
+                                  }`}
+                                  step="0.5"
+                                  min="0"
+                                  max="24"
+                                  disabled={!isSelected}
+                                  placeholder={isSelected ? "0" : "-"}
+                                />
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <ActivitiesTooltip
+                                activities={(
+                                  employeeActivities[row.rowKey || ""] || []
+                                ).filter((activity) => activity.isSelected)}
+                                employeeName={row.name}
+                                className={
+                                  !isSelected
+                                    ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                    : ""
+                                }
+                                disabled={!isSelected}
+                                onClick={() => handleManageActivities(row)}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </div>
