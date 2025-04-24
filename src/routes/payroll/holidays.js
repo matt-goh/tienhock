@@ -47,19 +47,6 @@ export default function (pool) {
     }
 
     try {
-      // Check if holiday already exists
-      const checkQuery = `
-      SELECT 1 FROM holiday_calendar 
-      WHERE holiday_date = $1
-    `;
-      const checkResult = await pool.query(checkQuery, [holiday_date]);
-
-      if (checkResult.rows.length > 0) {
-        return res.status(409).json({
-          message: "A holiday already exists for this date",
-        });
-      }
-
       const query = `
       INSERT INTO holiday_calendar (holiday_date, description, is_active)
       VALUES ($1, $2, true)

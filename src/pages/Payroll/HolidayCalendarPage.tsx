@@ -237,6 +237,7 @@ const HolidayCalendarPage: React.FC = () => {
           setHolidayToEdit(null);
         }}
         holiday={holidayToEdit}
+        existingHolidays={allHolidays}
         onSave={() => {
           // The cache will be refreshed by HolidayFormModal
           // This is just to close the modal and reset states
