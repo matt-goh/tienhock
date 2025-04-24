@@ -393,7 +393,15 @@ const DailyLogEntryPage: React.FC = () => {
           // Check if we already have activities for this employee/job
           const existingActivities = employeeActivities[rowKey] || [];
 
-          const activities = jobPayCodes.map((payCode) => {
+          // Filter pay codes based on hours
+          const filteredPayCodes =
+            hours > 8
+              ? jobPayCodes // If overtime, include all pay codes
+              : jobPayCodes.filter(
+                  (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
+                ); // Otherwise, only Base and Tambahan
+
+          const activities = filteredPayCodes.map((payCode) => {
             // Check if this activity already exists
             const existingActivity = existingActivities.find(
               (a) => a.payCodeId === payCode.id
@@ -418,10 +426,15 @@ const DailyLogEntryPage: React.FC = () => {
                   : payCode.rate_biasa;
             }
 
+            // For overtime pay codes, determine if they should be auto-selected
+            const isOvertimeCode = payCode.pay_type === "Overtime";
+            const shouldAutoSelect = isOvertimeCode && hours > 8;
+
             // Use existing state if available, otherwise use defaults
             const isSelected = existingActivity
               ? existingActivity.isSelected
-              : payCode.is_default_setting;
+              : shouldAutoSelect || payCode.is_default_setting;
+
             const unitsProduced = existingActivity
               ? existingActivity.unitsProduced
               : payCode.requires_units_input
@@ -433,7 +446,13 @@ const DailyLogEntryPage: React.FC = () => {
             if (isSelected) {
               switch (payCode.rate_unit) {
                 case "Hour":
-                  calculatedAmount = rate * hours;
+                  // For overtime pay codes, only apply to hours beyond 8
+                  if (isOvertimeCode) {
+                    const overtimeHours = Math.max(0, hours - 8);
+                    calculatedAmount = rate * overtimeHours;
+                  } else {
+                    calculatedAmount = rate * hours;
+                  }
                   break;
                 case "Day":
                   calculatedAmount = rate;
@@ -651,31 +670,42 @@ const DailyLogEntryPage: React.FC = () => {
                           </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <input
-                            id={`employee-hours-${row.rowKey}`}
-                            name={`employee-hours-${row.rowKey}`}
-                            type="number"
-                            value={isSelected ? hours.toString() : ""}
-                            onChange={(e) =>
-                              handleEmployeeHoursChange(
-                                row.rowKey,
-                                e.target.value
-                              )
-                            }
-                            onBlur={() => handleHoursBlur(row.rowKey)} // Add this line
-                            className="max-w-[80px] py-1 text-sm text-right border border-default-300 rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed"
-                            step="0.5"
-                            min="0"
-                            max="24"
-                            disabled={!isSelected}
-                            placeholder={isSelected ? "0" : "-"}
-                          />
+                          <div className="flex items-center justify-end space-x-2">
+                            {hours > 8 && isSelected && (
+                              <span className="text-xs text-amber-600 font-medium">
+                                OT
+                              </span>
+                            )}
+                            <input
+                              id={`employee-hours-${row.rowKey}`}
+                              name={`employee-hours-${row.rowKey}`}
+                              type="number"
+                              value={isSelected ? hours.toString() : ""}
+                              onChange={(e) =>
+                                handleEmployeeHoursChange(
+                                  row.rowKey,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={() => handleHoursBlur(row.rowKey)}
+                              className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
+                                hours > 8
+                                  ? "border-amber-400 bg-amber-50"
+                                  : "border-default-300"
+                              }`}
+                              step="0.5"
+                              min="0"
+                              max="24"
+                              disabled={!isSelected}
+                              placeholder={isSelected ? "0" : "-"}
+                            />
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <ActivitiesTooltip
-                            activities={
+                            activities={(
                               employeeActivities[row.rowKey || ""] || []
-                            }
+                            ).filter((activity) => activity.isSelected)}
                             employeeName={row.name}
                             className={
                               !isSelected

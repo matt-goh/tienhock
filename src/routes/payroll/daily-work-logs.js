@@ -31,12 +31,6 @@ export default function (pool) {
       });
     }
 
-    if (!["Draft", "Submitted"].includes(status)) {
-      return res.status(400).json({
-        message: "Status must be either 'Draft' or 'Submitted'",
-      });
-    }
-
     try {
       await pool.query("BEGIN");
 
@@ -85,22 +79,33 @@ export default function (pool) {
         if (activities && activities.length > 0) {
           for (const activity of activities) {
             if (activity.isSelected) {
+              let hoursApplied = null;
+
+              if (activity.rateUnit === "Hour") {
+                // For overtime activities, only apply to hours beyond 8
+                if (activity.payType === "Overtime") {
+                  hoursApplied = Math.max(0, hours - 8);
+                } else {
+                  hoursApplied = hours;
+                }
+              }
+
               const activityQuery = `
                 INSERT INTO daily_work_log_activities (
-                  log_entry_id, pay_code_id, hours_applied, 
-                  units_produced, rate_used, calculated_amount,
-                  is_manually_added
+                log_entry_id, pay_code_id, hours_applied, 
+                units_produced, rate_used, calculated_amount,
+                is_manually_added
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
               await pool.query(activityQuery, [
                 entryId,
                 activity.payCodeId,
-                activity.rateUnit === "Hour" ? hours : null,
+                hoursApplied,
                 activity.unitsProduced || null,
                 activity.rate,
                 activity.calculatedAmount,
-                false, // not manually added
+                false,
               ]);
             }
           }
@@ -110,9 +115,7 @@ export default function (pool) {
       await pool.query("COMMIT");
 
       res.status(201).json({
-        message: `Work log ${
-          status === "Draft" ? "saved as draft" : "submitted"
-        } successfully`,
+        message: `Work log submitted successfully`,
         workLogId,
       });
     } catch (error) {
