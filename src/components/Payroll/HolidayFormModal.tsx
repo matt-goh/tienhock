@@ -24,6 +24,7 @@ interface HolidayFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   holiday?: Holiday | null;
+  existingHolidays: Holiday[];
   onSave: () => void;
 }
 
@@ -31,6 +32,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
   isOpen,
   onClose,
   holiday,
+  existingHolidays,
   onSave,
 }) => {
   const [formData, setFormData] = useState({
@@ -64,8 +66,28 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
     setError(null);
+
+    // Check for duplicate dates
+    const isDuplicate = existingHolidays.some((existing) => {
+      // If in edit mode, don't compare with the current holiday being edited
+      if (isEditMode && existing.id === holiday?.id) {
+        return false;
+      }
+
+      // Compare the dates
+      const existingDate = new Date(existing.holiday_date)
+        .toISOString()
+        .split("T")[0];
+      return existingDate === formData.holiday_date;
+    });
+
+    if (isDuplicate) {
+      setError("A holiday already exists for this date");
+      return;
+    }
+
+    setIsSaving(true);
 
     try {
       if (isEditMode) {
@@ -78,7 +100,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
 
       // Refresh the cache after successful save
       await refreshHolidaysCache();
-      
+
       onSave();
       onClose();
     } catch (error: any) {
