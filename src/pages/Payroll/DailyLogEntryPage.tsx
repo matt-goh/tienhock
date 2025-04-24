@@ -9,9 +9,11 @@ import { format } from "date-fns";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Checkbox from "../../components/Checkbox";
 import ManageActivitiesModal from "../../components/Payroll/ManageActivitiesModal";
+import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { api } from "../../routes/utils/api";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -75,6 +77,7 @@ const DailyLogEntryPage: React.FC = () => {
     dayType: determineDayType(new Date()),
     employees: [],
   });
+  const [loadingPayCodes, setLoadingPayCodes] = useState(false);
 
   // Use useMemo to filter only MEE jobs
   const jobs = useMemo(() => {
@@ -251,6 +254,121 @@ const DailyLogEntryPage: React.FC = () => {
     */
   };
 
+  const fetchAndApplyActivities = async () => {
+    setLoadingPayCodes(true);
+    try {
+      // Get all unique job types from selected employees
+      const jobTypes = Array.from(
+        new Set(
+          Object.entries(employeeSelectionState.selectedJobs).flatMap(
+            ([_, jobTypes]) => jobTypes
+          )
+        )
+      );
+
+      if (jobTypes.length === 0) return;
+
+      // Fetch pay codes for all job types at once
+      const response = await api.post("/api/job-pay-codes/by-jobs", {
+        jobIds: jobTypes,
+      });
+      const payCodesByJob = response || {};
+
+      // Apply activities for each employee/job combination
+      const newEmployeeActivities: Record<string, any[]> = {};
+
+      Object.entries(employeeSelectionState.selectedJobs).forEach(
+        ([employeeId, jobTypes]) => {
+          jobTypes.forEach((jobType) => {
+            const rowKey = `${employeeId}-${jobType}`;
+            const hours =
+              employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+            const jobPayCodes = payCodesByJob[jobType] || [];
+
+            const activities = jobPayCodes
+              .filter(
+                (pc: { is_default_setting: any }) => pc.is_default_setting
+              ) // Only apply default activities
+              .map(
+                (payCode: {
+                  override_rate_ahad: number | null;
+                  rate_ahad: number;
+                  override_rate_umum: number | null;
+                  rate_umum: number;
+                  override_rate_biasa: number | null;
+                  rate_biasa: number;
+                  rate_unit: any;
+                  requires_units_input: any;
+                  id: any;
+                  description: any;
+                  pay_type: any;
+                  is_default_setting: any;
+                }) => {
+                  // Determine rate based on day type
+                  let rate = 0;
+                  if (formData.dayType === "Ahad") {
+                    rate =
+                      payCode.override_rate_ahad !== null
+                        ? payCode.override_rate_ahad
+                        : payCode.rate_ahad;
+                  } else if (formData.dayType === "Umum") {
+                    rate =
+                      payCode.override_rate_umum !== null
+                        ? payCode.override_rate_umum
+                        : payCode.rate_umum;
+                  } else {
+                    rate =
+                      payCode.override_rate_biasa !== null
+                        ? payCode.override_rate_biasa
+                        : payCode.rate_biasa;
+                  }
+
+                  // Calculate amount
+                  let calculatedAmount = 0;
+                  switch (payCode.rate_unit) {
+                    case "Hour":
+                      calculatedAmount = rate * hours;
+                      break;
+                    case "Day":
+                      calculatedAmount = rate;
+                      break;
+                    case "Bag":
+                    case "Fixed":
+                      calculatedAmount =
+                        rate * (payCode.requires_units_input ? 0 : 1);
+                      break;
+                    default:
+                      calculatedAmount = 0;
+                  }
+
+                  return {
+                    payCodeId: payCode.id,
+                    description: payCode.description,
+                    payType: payCode.pay_type,
+                    rateUnit: payCode.rate_unit,
+                    rate: rate,
+                    isDefault: payCode.is_default_setting,
+                    isSelected: true,
+                    unitsProduced: payCode.requires_units_input ? 0 : undefined,
+                    calculatedAmount: Number(calculatedAmount.toFixed(2)),
+                  };
+                }
+              );
+
+            newEmployeeActivities[rowKey] = activities;
+          });
+        }
+      );
+
+      setEmployeeActivities(newEmployeeActivities);
+    } catch (error) {
+      console.error("Error fetching and applying activities:", error);
+      toast.error("Failed to load default activities");
+    } finally {
+      setLoadingPayCodes(false);
+    }
+  };
+
   const expandedEmployees = useMemo(() => {
     // Create a new array with an entry for each employee-job combination
     const expanded: Array<
@@ -318,8 +436,20 @@ const DailyLogEntryPage: React.FC = () => {
         selectedJobs: newSelectedJobs,
         jobHours: newJobHours,
       });
+
+      // Fetch and apply activities after a short delay to ensure state is updated
+      setTimeout(() => {
+        fetchAndApplyActivities();
+      }, 100);
     }
   }, [expandedEmployees, loadingStaffs, loadingJobs]);
+
+  useEffect(() => {
+    // Skip initial mount
+    if (Object.keys(employeeSelectionState.selectedJobs).length > 0) {
+      fetchAndApplyActivities();
+    }
+  }, [employeeSelectionState.selectedJobs, formData.dayType]);
 
   return (
     <div className="relative w-full mx-4 md:mx-6">
@@ -395,7 +525,7 @@ const DailyLogEntryPage: React.FC = () => {
             </p>
           </div>
 
-          {loadingJobs || loadingStaffs ? (
+          {loadingJobs || loadingStaffs || loadingPayCodes ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>
@@ -504,13 +634,19 @@ const DailyLogEntryPage: React.FC = () => {
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            className="text-sky-600 hover:text-sky-900 disabled:text-default-300 disabled:cursor-not-allowed"
+                          <ActivitiesTooltip
+                            activities={
+                              employeeActivities[row.rowKey || ""] || []
+                            }
+                            employeeName={row.name}
+                            className={
+                              !isSelected
+                                ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                : ""
+                            }
                             disabled={!isSelected}
                             onClick={() => handleManageActivities(row)}
-                          >
-                            Manage Activities
-                          </button>
+                          />
                         </td>
                       </tr>
                     );
@@ -530,6 +666,7 @@ const DailyLogEntryPage: React.FC = () => {
             color="sky"
             variant="filled"
             onClick={() => handleSaveForm(true)}
+            disabled={loadingPayCodes}
           >
             Save as Draft
           </Button>
@@ -537,6 +674,7 @@ const DailyLogEntryPage: React.FC = () => {
             color="sky"
             variant="boldOutline"
             onClick={() => handleSaveForm(false)}
+            disabled={loadingPayCodes}
           >
             Submit
           </Button>

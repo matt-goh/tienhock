@@ -55,6 +55,79 @@ export default function (pool) {
     }
   });
 
+  router.post("/by-jobs", async (req, res) => {
+    const { jobIds } = req.body;
+
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json({ message: "jobIds array is required" });
+    }
+
+    try {
+      const query = `
+        SELECT
+          pc.id,
+          pc.description,
+          pc.pay_type,
+          pc.rate_unit,
+          CAST(pc.rate_biasa AS NUMERIC(10, 2)) AS rate_biasa,
+          CAST(pc.rate_ahad AS NUMERIC(10, 2)) AS rate_ahad,
+          CAST(pc.rate_umum AS NUMERIC(10, 2)) AS rate_umum,
+          pc.is_active,
+          pc.requires_units_input,
+          jpc.job_id,
+          jpc.pay_code_id,
+          jpc.is_default AS is_default_setting,
+          CAST(jpc.override_rate_biasa AS NUMERIC(10, 2)) AS override_rate_biasa,
+          CAST(jpc.override_rate_ahad AS NUMERIC(10, 2)) AS override_rate_ahad,
+          CAST(jpc.override_rate_umum AS NUMERIC(10, 2)) AS override_rate_umum
+        FROM job_pay_codes jpc
+        JOIN pay_codes pc ON jpc.pay_code_id = pc.id
+        WHERE jpc.job_id = ANY($1::varchar[])
+        ORDER BY jpc.job_id, pc.id
+      `;
+
+      const result = await pool.query(query, [jobIds]);
+
+      // Group results by job ID for easier consumption
+      const payCodesByJob = result.rows.reduce((acc, row) => {
+        if (!acc[row.job_id]) {
+          acc[row.job_id] = [];
+        }
+
+        // Parse numeric values
+        acc[row.job_id].push({
+          ...row,
+          rate_biasa:
+            row.rate_biasa === null ? null : parseFloat(row.rate_biasa),
+          rate_ahad: row.rate_ahad === null ? null : parseFloat(row.rate_ahad),
+          rate_umum: row.rate_umum === null ? null : parseFloat(row.rate_umum),
+          override_rate_biasa:
+            row.override_rate_biasa === null
+              ? null
+              : parseFloat(row.override_rate_biasa),
+          override_rate_ahad:
+            row.override_rate_ahad === null
+              ? null
+              : parseFloat(row.override_rate_ahad),
+          override_rate_umum:
+            row.override_rate_umum === null
+              ? null
+              : parseFloat(row.override_rate_umum),
+        });
+
+        return acc;
+      }, {});
+
+      res.json(payCodesByJob);
+    } catch (error) {
+      console.error("Error fetching pay codes for multiple jobs:", error);
+      res.status(500).json({
+        message: "Error fetching pay codes for multiple jobs",
+        error: error.message,
+      });
+    }
+  });
+
   // Get detailed pay codes (excluding 'code', including overrides) for a specific job
   router.get("/job/:jobId", async (req, res) => {
     const { jobId } = req.params;
@@ -149,12 +222,10 @@ export default function (pool) {
         pay_code_id,
         is_default,
       ]);
-      res
-        .status(201)
-        .json({
-          message: "Pay code assigned to job successfully",
-          jobPayCode: result.rows[0],
-        });
+      res.status(201).json({
+        message: "Pay code assigned to job successfully",
+        jobPayCode: result.rows[0],
+      });
     } catch (error) {
       console.error("Error assigning pay code to job:", error);
       // Check for specific DB errors like foreign key violations
@@ -263,12 +334,10 @@ export default function (pool) {
       });
     } catch (error) {
       console.error("Error updating override rates:", error);
-      res
-        .status(500)
-        .json({
-          message: "Error updating override rates",
-          error: error.message,
-        });
+      res.status(500).json({
+        message: "Error updating override rates",
+        error: error.message,
+      });
     }
   });
 
