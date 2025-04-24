@@ -144,6 +144,21 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       <span>{activity.payType}</span>
                       <span>•</span>
                       <span>{activity.rateUnit}</span>
+                      {/* Add rate display */}
+                      {activity.rateUnit !== "Day" && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            @ RM{activity.rate.toFixed(2)}/{activity.rateUnit}
+                          </span>
+                        </>
+                      )}
+                      {activity.rateUnit === "Day" && (
+                        <>
+                          <span>•</span>
+                          <span>@ RM{activity.rate.toFixed(2)}/Day</span>
+                        </>
+                      )}
                       {activity.unitsProduced !== undefined && (
                         <>
                           <span>•</span>

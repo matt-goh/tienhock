@@ -168,7 +168,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                 </DialogTitle>
 
                 <div className="mt-2">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-500">Job</p>
                       <p className="font-medium">{jobName}</p>
@@ -192,125 +192,138 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                   ) : (
                     <>
                       <div className="mt-4">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <span className="sr-only">Apply</span>
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Pay Code & Details
-                              </th>
-                              <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Units
-                              </th>
-                              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Amount
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {activities.length === 0 ? (
-                              <tr>
-                                <td
-                                  colSpan={4}
-                                  className="px-3 py-4 text-center text-sm text-gray-500"
-                                >
-                                  No pay codes available for this job.
-                                </td>
-                              </tr>
-                            ) : (
-                              activities.map((activity, index) => (
-                                <tr
-                                  key={activity.payCodeId}
-                                  className={
-                                    activity.isSelected ? "bg-sky-50" : ""
-                                  }
-                                >
-                                  <td className="px-3 py-4">
-                                    <Checkbox
-                                      checked={activity.isSelected}
-                                      onChange={() =>
-                                        handleToggleActivity(index)
-                                      }
-                                      size={20}
-                                      checkedColor="text-sky-600"
-                                    />
-                                  </td>
-                                  <td className="px-3 py-4">
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {activity.description}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {activity.payType} • {activity.rateUnit}
-                                      {activity.rateUnit !== "Day" && (
-                                        <span className="ml-1">
-                                          @ RM{activity.rate.toFixed(2)}/
-                                          {activity.rateUnit}
-                                        </span>
-                                      )}
-                                      {activity.rateUnit === "Day" && (
-                                        <span className="ml-1">
-                                          @ RM{activity.rate.toFixed(2)}/Day
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-4 text-center">
-                                    {activity.rateUnit === "Bag" ||
-                                    activity.rateUnit === "Fixed" ? (
-                                      <input
-                                        type="number"
-                                        className="w-16 text-center border border-gray-300 rounded p-1 text-sm disabled:bg-gray-100"
-                                        value={
-                                          activity.unitsProduced?.toString() ||
-                                          "0"
-                                        }
-                                        onChange={(e) =>
-                                          handleUnitsChange(
-                                            index,
-                                            e.target.value
-                                          )
-                                        }
-                                        disabled={!activity.isSelected}
-                                        min="0"
-                                        step="1"
-                                      />
-                                    ) : (
-                                      <span className="text-sm text-gray-500">
-                                        —
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-4 text-right">
-                                    {activity.isSelected ? (
-                                      <span className="text-sm font-medium text-gray-900">
-                                        RM{activity.calculatedAmount.toFixed(2)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-sm text-gray-400">
-                                        RM0.00
-                                      </span>
-                                    )}
-                                  </td>
+                        <div className="overflow-x-auto border rounded-lg">
+                          {/* Table wrapper with max height and scrollbar */}
+                          <div className="max-h-[30rem] overflow-y-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50 sticky top-0 z-10">
+                                <tr>
+                                  <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <span className="sr-only">Apply</span>
+                                  </th>
+                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Pay Code & Details
+                                  </th>
+                                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Units
+                                  </th>
+                                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Amount
+                                  </th>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-gray-50">
-                              <td
-                                colSpan={3}
-                                className="px-3 py-3 text-right text-sm font-medium text-gray-900"
-                              >
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {activities.length === 0 ? (
+                                  <tr>
+                                    <td
+                                      colSpan={4}
+                                      className="px-3 py-4 text-center text-sm text-gray-500"
+                                    >
+                                      No pay codes available for this job.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  activities.map((activity, index) => (
+                                    <tr
+                                      key={activity.payCodeId}
+                                      className={`${
+                                        activity.isSelected ? "bg-sky-50" : ""
+                                      } cursor-pointer`}
+                                      onClick={(e) => {
+                                        // Prevent toggle when clicking the input
+                                        if (
+                                          e.target instanceof HTMLInputElement
+                                        )
+                                          return;
+                                        handleToggleActivity(index);
+                                      }}
+                                    >
+                                      <td className="px-3 py-4">
+                                        <Checkbox
+                                          checked={activity.isSelected}
+                                          onChange={() => {}} // Empty handler as the row handles the toggle
+                                          size={20}
+                                          checkedColor="text-sky-600"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-4">
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {activity.description}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {activity.payType} •{" "}
+                                          {activity.rateUnit}
+                                          {activity.rateUnit !== "Day" && (
+                                            <span className="ml-1">
+                                              @ RM{activity.rate.toFixed(2)}/
+                                              {activity.rateUnit}
+                                            </span>
+                                          )}
+                                          {activity.rateUnit === "Day" && (
+                                            <span className="ml-1">
+                                              @ RM{activity.rate.toFixed(2)}/Day
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-4 text-center">
+                                        {activity.rateUnit === "Bag" ||
+                                        activity.rateUnit === "Fixed" ? (
+                                          <input
+                                            type="number"
+                                            className="w-16 text-center border border-gray-300 rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={
+                                              activity.unitsProduced?.toString() ||
+                                              "0"
+                                            }
+                                            onChange={(e) =>
+                                              handleUnitsChange(
+                                                index,
+                                                e.target.value
+                                              )
+                                            }
+                                            onClick={(e) => e.stopPropagation()}
+                                            disabled={!activity.isSelected}
+                                            min="0"
+                                            step="1"
+                                          />
+                                        ) : (
+                                          <span className="text-sm text-gray-500">
+                                            —
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-4 text-right">
+                                        {activity.isSelected ? (
+                                          <span className="text-sm font-medium text-gray-900">
+                                            RM
+                                            {activity.calculatedAmount.toFixed(
+                                              2
+                                            )}
+                                          </span>
+                                        ) : (
+                                          <span className="text-sm text-gray-400">
+                                            RM0.00
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="bg-gray-50 border-t border-gray-200">
+                            <div className="px-3 py-3 flex justify-between">
+                              <span className="text-sm font-medium text-gray-900">
                                 Total
-                              </td>
-                              <td className="px-3 py-3 text-right text-sm font-medium text-gray-900">
+                              </span>
+                              <span className="text-sm font-medium text-gray-900">
                                 RM{totalAmount.toFixed(2)}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </>
                   )}
