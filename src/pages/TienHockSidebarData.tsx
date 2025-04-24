@@ -4,6 +4,7 @@ import {
   IconFileInvoice,
   IconListDetails,
   IconUserDollar,
+  IconCalendarEvent,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -15,6 +16,11 @@ import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 // Sales related imports
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
+
+// Payroll related imports
+import MeeProductionListPage from "./Payroll/MeeProductionListPage";
+import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
+import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
 
 // Catalogue related imports
 // Staff
@@ -34,8 +40,6 @@ import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
-import MeeProductionListPage from "./Payroll/MeeProductionListPage";
-import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 
 export const TienHockSidebarData: SidebarItem[] = [
   {
@@ -59,6 +63,12 @@ export const TienHockSidebarData: SidebarItem[] = [
             component: DailyLogEntryPage,
           },
         ],
+      },
+      {
+        name: "Holiday Calendar",
+        path: "/payroll/holiday-calendar",
+        component: HolidayCalendarPage,
+        icon: IconCalendarEvent,
       },
     ],
   },

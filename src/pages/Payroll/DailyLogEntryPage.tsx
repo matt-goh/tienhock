@@ -21,19 +21,10 @@ import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../routes/utils/api";
+import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
-
-// Helper function to determine day type based on date
-const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
-  // For now, just check if it's Sunday (0)
-  const dayOfWeek = date.getDay();
-  if (dayOfWeek === 0) return "Ahad";
-
-  // Will implement holiday check later
-  return "Biasa";
-};
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -73,6 +64,21 @@ const DailyLogEntryPage: React.FC = () => {
   const [employeeActivities, setEmployeeActivities] = useState<
     Record<string, any[]>
   >({});
+
+  const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
+
+  // Helper function to determine day type based on date
+  const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
+    // Check if it's a holiday first
+    if (isHoliday(date)) return "Umum";
+
+    // Then check if it's Sunday
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0) return "Ahad";
+
+    return "Biasa";
+  };
+
   const [formData, setFormData] = useState<DailyLogFormData>({
     logDate: format(new Date(), "yyyy-MM-dd"),
     shift: "1",
@@ -160,6 +166,20 @@ const DailyLogEntryPage: React.FC = () => {
       dayType: newDayType,
     });
   };
+
+  useEffect(() => {
+    if (formData.logDate) {
+      const currentDate = new Date(formData.logDate);
+      const newDayType = determineDayType(currentDate);
+
+      if (newDayType !== formData.dayType) {
+        setFormData((prev) => ({
+          ...prev,
+          dayType: newDayType,
+        }));
+      }
+    }
+  }, [holidays, formData.logDate]);
 
   // Handle hours blur event
   const handleHoursBlur = (rowKey: string | undefined) => {
@@ -587,6 +607,12 @@ const DailyLogEntryPage: React.FC = () => {
                 }`}
               >
                 {formData.dayType}
+                {formData.dayType === "Umum" &&
+                  getHolidayDescription(new Date(formData.logDate)) && (
+                    <span className="ml-1 font-normal">
+                      ({getHolidayDescription(new Date(formData.logDate))})
+                    </span>
+                  )}
               </span>
             </div>
           </div>
