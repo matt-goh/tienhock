@@ -4,9 +4,9 @@ import {
   IconPlus,
   IconPencil,
   IconTrash,
-  IconCalendarEvent,
   IconChevronLeft,
   IconChevronRight,
+  IconFileImport,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -16,6 +16,7 @@ import toast from "react-hot-toast";
 import { format } from "date-fns";
 import HolidayFormModal from "../../components/Payroll/HolidayFormModal";
 import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
+import ImportHolidaysModal from "../../components/Payroll/ImportHolidaysModal";
 
 interface Holiday {
   id: number;
@@ -32,6 +33,7 @@ const HolidayCalendarPage: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [holidayToEdit, setHolidayToEdit] = useState<Holiday | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const {
     holidays: allHolidays,
@@ -91,6 +93,14 @@ const HolidayCalendarPage: React.FC = () => {
           </div>
 
           <Button
+            onClick={() => setShowImportModal(true)}
+            icon={IconFileImport}
+            variant="outline"
+          >
+            Import
+          </Button>
+
+          <Button
             onClick={() => setShowAddModal(true)}
             icon={IconPlus}
             color="sky"
@@ -134,7 +144,14 @@ const HolidayCalendarPage: React.FC = () => {
                   const isSunday = date.getDay() === 0;
 
                   return (
-                    <tr key={holiday.id} className="hover:bg-default-50">
+                    <tr
+                      key={holiday.id}
+                      className="hover:bg-default-50 cursor-pointer"
+                      onClick={() => {
+                        setHolidayToEdit(holiday);
+                        setShowEditModal(true);
+                      }}
+                    >
                       <td className="px-4 py-3 text-sm text-default-700">
                         {format(date, "dd MMM yyyy")}
                       </td>
@@ -153,17 +170,14 @@ const HolidayCalendarPage: React.FC = () => {
                       <td className="px-4 py-3 text-center text-sm">
                         <div className="flex items-center justify-center space-x-2">
                           <button
-                            onClick={() => {
-                              setHolidayToEdit(holiday);
-                              setShowEditModal(true);
-                            }}
                             className="text-sky-600 hover:text-sky-800"
                             title="Edit"
                           >
                             <IconPencil size={18} />
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click event
                               setHolidayToDelete(holiday);
                               setShowDeleteDialog(true);
                             }}
@@ -207,6 +221,13 @@ const HolidayCalendarPage: React.FC = () => {
             : ""
         }?`}
         variant="danger"
+      />
+      <ImportHolidaysModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={refreshHolidays}
+        existingHolidays={allHolidays}
+        selectedYear={selectedYear}
       />
       <HolidayFormModal
         isOpen={showAddModal || showEditModal}

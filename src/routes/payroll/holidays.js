@@ -61,8 +61,8 @@ export default function (pool) {
       }
 
       const query = `
-      INSERT INTO holiday_calendar (holiday_date, description, is_active, created_at, updated_at)
-      VALUES ($1, $2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO holiday_calendar (holiday_date, description, is_active)
+      VALUES ($1, $2, true)
       RETURNING *
     `;
 
@@ -75,6 +75,73 @@ export default function (pool) {
       console.error("Error creating holiday:", error);
       res.status(500).json({
         message: "Error creating holiday",
+        error: error.message,
+      });
+    }
+  });
+
+  // Batch import endpoint
+  router.post("/batch", async (req, res) => {
+    const { holidays, overwrite = false } = req.body;
+
+    if (!holidays || !Array.isArray(holidays) || holidays.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "No holidays provided for import" });
+    }
+
+    try {
+      await pool.query("BEGIN");
+
+      let insertedCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+
+      for (const holiday of holidays) {
+        const { holiday_date, description } = holiday;
+
+        // Check if holiday already exists
+        const checkQuery = `SELECT id FROM holiday_calendar WHERE holiday_date = $1`;
+        const checkResult = await pool.query(checkQuery, [holiday_date]);
+
+        if (checkResult.rows.length > 0) {
+          if (overwrite) {
+            // Update existing holiday
+            const updateQuery = `
+            UPDATE holiday_calendar
+            SET description = $1
+            WHERE holiday_date = $2
+          `;
+            await pool.query(updateQuery, [description, holiday_date]);
+            updatedCount++;
+          } else {
+            // Skip duplicate
+            skippedCount++;
+          }
+        } else {
+          // Insert new holiday
+          const insertQuery = `
+          INSERT INTO holiday_calendar (holiday_date, description, is_active)
+          VALUES ($1, $2, true)
+        `;
+          await pool.query(insertQuery, [holiday_date, description]);
+          insertedCount++;
+        }
+      }
+
+      await pool.query("COMMIT");
+
+      res.status(201).json({
+        message: "Holidays imported successfully",
+        inserted: insertedCount,
+        updated: updatedCount,
+        skipped: skippedCount,
+      });
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error importing holidays:", error);
+      res.status(500).json({
+        message: "Error importing holidays",
         error: error.message,
       });
     }
@@ -105,7 +172,7 @@ export default function (pool) {
 
       const query = `
         UPDATE holiday_calendar
-        SET holiday_date = $1, description = $2, updated_at = CURRENT_TIMESTAMP
+        SET holiday_date = $1, description = $2
         WHERE id = $3
         RETURNING *
       `;
