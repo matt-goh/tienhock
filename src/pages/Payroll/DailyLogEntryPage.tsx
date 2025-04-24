@@ -75,7 +75,7 @@ const DailyLogEntryPage: React.FC = () => {
   >({});
   const [formData, setFormData] = useState<DailyLogFormData>({
     logDate: format(new Date(), "yyyy-MM-dd"),
-    shift: "day",
+    shift: "1",
     contextData: {
       totalBags: 50, // Set default value for totalBags
     },
@@ -545,8 +545,8 @@ const DailyLogEntryPage: React.FC = () => {
             value={formData.shift}
             onChange={(value) => setFormData({ ...formData, shift: value })}
             options={[
-              { id: "day", name: "Day Shift" },
-              { id: "night", name: "Night Shift" },
+              { id: "1", name: "Day Shift" },
+              { id: "2", name: "Night Shift" },
             ]}
             required
           />
