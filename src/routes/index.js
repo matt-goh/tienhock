@@ -38,6 +38,9 @@ import invoiceRouter from "./sales/invoices/invoices.js";
 import paymentsRouter from "./sales/invoices/payments.js";
 import eInvoiceRouter from "./sales/invoices/e-invoices.js";
 
+// Payroll routes
+import dailyWorkLogsRouter from "./payroll/daily-work-logs.js";
+
 // Green Target routes
 import greenTargetCustomerRouter from "./greentarget/customers.js";
 import greenTargetLocationRouter from "./greentarget/locations.js";
@@ -107,6 +110,9 @@ export default function setupRoutes(app, pool) {
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/payments", paymentsRouter(pool));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
+
+  // Payroll routes
+  app.use("/api/daily-work-logs", dailyWorkLogsRouter(pool));
 
   // Green Target routes
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));

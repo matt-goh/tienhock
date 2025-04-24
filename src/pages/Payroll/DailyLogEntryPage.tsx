@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { api } from "../../routes/utils/api";
 
 // MEE-specific job IDs that we want to filter for
 const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
@@ -83,12 +84,11 @@ const DailyLogEntryPage: React.FC = () => {
     dayType: determineDayType(new Date()),
     employees: [],
   });
-  const [loadingPayCodes, setLoadingPayCodes] = useState(false);
   const {
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
-    refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
+  const [isSaving, setIsSaving] = useState(false);
 
   // Use useMemo to filter only MEE jobs
   const jobs = useMemo(() => {
@@ -236,7 +236,7 @@ const DailyLogEntryPage: React.FC = () => {
     setShowActivitiesModal(true);
   };
 
-  const handleSaveForm = async (asDraft = true) => {
+  const handleSaveForm = async () => {
     // Validate form
     if (!formData.logDate) {
       toast.error("Please select a date");
@@ -275,24 +275,26 @@ const DailyLogEntryPage: React.FC = () => {
       jobId: "MEE", // For now just hardcode to MEE section
       foremanId: formData.foremanId || null,
       contextData: formData.contextData,
-      status: asDraft ? "Draft" : "Submitted",
+      status: "Submitted",
       employeeEntries: selectedEmployeeData,
     };
 
-    console.log("Form data to save:", payload);
-    toast.success(asDraft ? "Saved as draft" : "Submitted successfully");
+    setIsSaving(true);
 
-    // In a real implementation, you would send this to the backend:
-    /*
     try {
-      const response = await api.post('/api/daily-work-logs', payload);
-      toast.success(asDraft ? 'Saved as draft' : 'Submitted successfully');
-      navigate('/payroll/mee-production');
-    } catch (error) {
-      console.error('Error saving work log:', error);
-      toast.error('Failed to save work log');
+      await api.post("/api/daily-work-logs", payload);
+      toast.success("Work log submitted successfully");
+      navigate("/payroll/mee-production");
+    } catch (error: any) {
+      console.error("Error saving work log:", error);
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to save work log"
+      );
+    } finally {
+      setIsSaving(false);
     }
-    */
   };
 
   const initializeDefaultSelections = useCallback(() => {
@@ -555,7 +557,7 @@ const DailyLogEntryPage: React.FC = () => {
             </p>
           </div>
 
-          {loadingJobs || loadingStaffs || loadingPayCodes ? (
+          {loadingJobs || loadingStaffs ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>
@@ -695,24 +697,16 @@ const DailyLogEntryPage: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="border-t border-default-200 pt-4 mt-4 flex justify-end space-x-3">
-          <Button variant="outline" onClick={handleBack}>
+          <Button variant="outline" onClick={handleBack} disabled={isSaving}>
             Cancel
           </Button>
           <Button
             color="sky"
-            variant="filled"
-            onClick={() => handleSaveForm(true)}
-            disabled={loadingPayCodes}
-          >
-            Save as Draft
-          </Button>
-          <Button
-            color="sky"
             variant="boldOutline"
-            onClick={() => handleSaveForm(false)}
-            disabled={loadingPayCodes}
+            onClick={() => handleSaveForm()}
+            disabled={isSaving}
           >
-            Submit
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
