@@ -87,6 +87,7 @@ const DailyLogEntryPage: React.FC = () => {
     loading: loadingPayCodeMappings,
   } = useJobPayCodeMappings();
   const [isSaving, setIsSaving] = useState(false);
+  const [selectAll, setSelectAll] = useState(false);
 
   // Use useMemo to filter only MEE jobs
   const jobs = useMemo(() => {
@@ -326,6 +327,55 @@ const DailyLogEntryPage: React.FC = () => {
       });
     }
   }, [expandedEmployees, loadingStaffs, loadingJobs]);
+
+  // Handle select all/deselect all employees
+  const handleSelectAll = () => {
+    setEmployeeSelectionState((prev) => {
+      if (selectAll) {
+        // Deselect all - clear all selections
+        return {
+          selectedJobs: {},
+          jobHours: {},
+        };
+      } else {
+        // Select all employees with default hours
+        const newSelectedJobs: Record<string, string[]> = {};
+        const newJobHours: Record<string, Record<string, number>> = {};
+
+        expandedEmployees.forEach((employee) => {
+          const employeeId = employee.id;
+          const jobType = employee.jobType;
+
+          if (!newSelectedJobs[employeeId]) {
+            newSelectedJobs[employeeId] = [];
+          }
+          if (!newJobHours[employeeId]) {
+            newJobHours[employeeId] = {};
+          }
+
+          newSelectedJobs[employeeId].push(jobType);
+          newJobHours[employeeId][jobType] = 7; // Default hours
+        });
+
+        return {
+          selectedJobs: newSelectedJobs,
+          jobHours: newJobHours,
+        };
+      }
+    });
+
+    setSelectAll(!selectAll);
+  };
+
+  // Update select all state based on individual selections
+  useEffect(() => {
+    const totalRows = expandedEmployees.length;
+    const selectedRows = Object.entries(
+      employeeSelectionState.selectedJobs
+    ).flatMap(([_, jobTypes]) => jobTypes).length;
+
+    setSelectAll(totalRows > 0 && totalRows === selectedRows);
+  }, [employeeSelectionState.selectedJobs, expandedEmployees]);
 
   // Use a one-time initialization effect
   const initializedRef = useRef(false);
@@ -590,7 +640,14 @@ const DailyLogEntryPage: React.FC = () => {
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
-                      Select
+                      <Checkbox
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        size={20}
+                        checkedColor="text-sky-600"
+                        ariaLabel="Select all employees"
+                        buttonClassName="p-1 rounded-lg"
+                      />
                     </th>
                     <th
                       scope="col"
