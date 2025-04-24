@@ -12,6 +12,7 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format, parse } from "date-fns";
 import { IconAlertTriangle } from "@tabler/icons-react";
+import Checkbox from "../Checkbox";
 
 interface ImportHolidaysModalProps {
   isOpen: boolean;
@@ -211,19 +212,15 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                             {duplicateCount > 1 ? "s" : ""} found
                           </p>
                           <div className="mt-2">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={overwriteDuplicates}
-                                onChange={(e) =>
-                                  setOverwriteDuplicates(e.target.checked)
-                                }
-                                className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-amber-700">
-                                Overwrite existing holidays
-                              </span>
-                            </label>
+                            <Checkbox
+                              checked={overwriteDuplicates}
+                              onChange={setOverwriteDuplicates}
+                              label="Overwrite existing holidays"
+                              size={18}
+                              checkedColor="text-sky-600"
+                              uncheckedColor="text-gray-400"
+                              className="text-amber-700"
+                            />
                           </div>
                         </div>
                       </div>
