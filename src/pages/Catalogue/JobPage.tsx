@@ -39,13 +39,14 @@ const JobPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
+    detailedMappings,
     payCodes: availablePayCodes, // Contains default PayCode info
+    loading: loadingPayCodeMappings,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const [jobPayCodesDetails, setJobPayCodesDetails] = useState<
     JobPayCodeDetails[]
   >([]);
-  const [loadingPayCodes, setLoadingPayCodes] = useState(false);
 
   // --- Modal States ---
   const [showAddJobModal, setShowAddJobModal] = useState(false);
@@ -63,50 +64,14 @@ const JobPage: React.FC = () => {
   const [itemsPerPage] = useState<number>(15); // Can increase this now
 
   // --- Data Fetching ---
-  const fetchJobPayCodesDetails = useCallback(async (jobId: string) => {
-    if (!jobId) {
-      setJobPayCodesDetails([]);
-      return;
-    }
-    setLoadingPayCodes(true);
-    try {
-      const rawData = await api.get(`/api/job-pay-codes/job/${jobId}`);
-      // Parse rates after fetching
-      const parsedData = (rawData || []).map((item: any) => ({
-        ...item,
-        rate_biasa: parseFloat(item.rate_biasa) || 0,
-        rate_ahad: parseFloat(item.rate_ahad) || 0,
-        rate_umum: parseFloat(item.rate_umum) || 0,
-        override_rate_biasa:
-          item.override_rate_biasa === null
-            ? null
-            : parseFloat(item.override_rate_biasa) || null,
-        override_rate_ahad:
-          item.override_rate_ahad === null
-            ? null
-            : parseFloat(item.override_rate_ahad) || null,
-        override_rate_umum:
-          item.override_rate_umum === null
-            ? null
-            : parseFloat(item.override_rate_umum) || null,
-      })) as JobPayCodeDetails[];
-      setJobPayCodesDetails(parsedData);
-    } catch (error) {
-      console.error("Error fetching job pay code details:", error);
-      toast.error("Failed to fetch pay codes & rates for this job.");
-      setJobPayCodesDetails([]);
-    } finally {
-      setLoadingPayCodes(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (selectedJob) {
-      fetchJobPayCodesDetails(selectedJob.id);
+    if (selectedJob && !loadingPayCodeMappings) {
+      const jobPayCodes = detailedMappings[selectedJob.id] || [];
+      setJobPayCodesDetails(jobPayCodes);
     } else {
       setJobPayCodesDetails([]);
     }
-  }, [selectedJob, fetchJobPayCodesDetails]);
+  }, [selectedJob, detailedMappings, loadingPayCodeMappings]);
 
   useEffect(() => {
     // Extract job ID from URL query parameter
@@ -114,20 +79,17 @@ const JobPage: React.FC = () => {
     const jobId = params.get("id");
 
     // If we have a job ID and no job is currently selected
-    if (jobId && !selectedJob) {
+    if (jobId && !selectedJob && !loadingJobs) {
       // Find the job in our jobs array
       const jobToSelect = jobs.find((job) => job.id === jobId);
       if (jobToSelect) {
         // Select this job
         setSelectedJob(jobToSelect);
-        // Fetch its details
-        fetchJobPayCodesDetails(jobToSelect.id);
       }
     }
-  }, [location.search, jobs, selectedJob, fetchJobPayCodesDetails]);
+  }, [location.search, jobs, selectedJob, loadingJobs]);
 
   // --- Add/Remove Pay Codes ---
-  // Passed to NewPayCodeModal
   const handleAddPayCodeToJob = async (payCodeId: string) => {
     if (!selectedJob) throw new Error("No job selected"); // Modal should prevent this but safety check
 
@@ -139,7 +101,6 @@ const JobPage: React.FC = () => {
       });
       toast.success("Pay code added to job successfully");
       await refreshPayCodeMappings(); // Refresh the general map
-      fetchJobPayCodesDetails(selectedJob.id); // Re-fetch details for this job
     } catch (error: any) {
       console.error("Error adding pay code to job:", error);
       const message =
@@ -155,7 +116,6 @@ const JobPage: React.FC = () => {
       await api.delete(`/api/job-pay-codes/${selectedJob.id}/${payCodeId}`);
       toast.success("Pay code removed from job successfully");
       await refreshPayCodeMappings();
-      fetchJobPayCodesDetails(selectedJob.id);
     } catch (error) {
       console.error("Error removing pay code from job:", error);
       toast.error("Failed to remove pay code from job");
@@ -170,9 +130,8 @@ const JobPage: React.FC = () => {
 
   // --- Callback after saving rates ---
   const handleRatesSaved = () => {
-    if (selectedJob) {
-      fetchJobPayCodesDetails(selectedJob.id); // Just refresh the details
-    }
+    // Refresh the pay code mappings cache
+    refreshPayCodeMappings();
   };
 
   // --- Other Handlers (Job Add/Delete, Confirmations) ---
@@ -210,6 +169,7 @@ const JobPage: React.FC = () => {
         toast.success("Job added successfully");
         setShowAddJobModal(false);
         await refreshJobs();
+        await refreshPayCodeMappings();
         setSelectedJob({
           ...createdJob,
           section: Array.isArray(createdJob.section)
@@ -221,7 +181,7 @@ const JobPage: React.FC = () => {
         toast.error(error.message || "Failed to add job");
       }
     },
-    [refreshJobs]
+    [refreshJobs, refreshPayCodeMappings]
   );
 
   const handleDeleteSelectedJobClick = useCallback(async () => {
@@ -564,7 +524,7 @@ const JobPage: React.FC = () => {
           </div>
 
           {/* Table */}
-          {loadingPayCodes ? (
+          {loadingPayCodeMappings ? (
             <div className="flex justify-center py-10">
               <LoadingSpinner />
             </div>
