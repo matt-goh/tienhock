@@ -611,7 +611,12 @@ const DailyLogEntryPage: React.FC = () => {
                           {row.name}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                          {row.jobName}
+                          <Link
+                            to={`/catalogue/job?id=${row.jobType}`}
+                            className="hover:underline hover:text-sky-600"
+                          >
+                            {row.jobName}
+                          </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <input
