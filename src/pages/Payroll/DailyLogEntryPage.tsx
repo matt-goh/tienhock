@@ -96,6 +96,7 @@ const DailyLogEntryPage: React.FC = () => {
       .map((job) => ({
         id: job.id,
         name: job.name,
+        section: job.section,
       }));
   }, [allJobs]);
 
@@ -266,11 +267,14 @@ const DailyLogEntryPage: React.FC = () => {
       return;
     }
 
+    const section = jobs[0]?.section?.[0];
+
     // Build the payload
     const payload = {
       logDate: formData.logDate,
       shift: formData.shift,
       dayType: formData.dayType,
+      section: section,
       contextData: formData.contextData,
       status: "Submitted",
       employeeEntries: selectedEmployeeData,
