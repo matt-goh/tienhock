@@ -83,7 +83,13 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
       if (activity.isSelected) {
         switch (activity.rateUnit) {
           case "Hour":
-            calculatedAmount = activity.rate * hours;
+            // For overtime pay codes, only apply to hours beyond 8
+            if (activity.payType === "Overtime") {
+              const overtimeHours = Math.max(0, hours - 8);
+              calculatedAmount = activity.rate * overtimeHours;
+            } else {
+              calculatedAmount = activity.rate * hours;
+            }
             break;
           case "Day":
             calculatedAmount = activity.rate; // Daily rate is fixed regardless of hours
@@ -282,6 +288,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       <td className="px-3 py-4">
                                         <div className="text-sm font-medium text-gray-900">
                                           {activity.description}
+                                          {activity.payType === "Overtime" && (
+                                            <span className="ml-2 text-xs text-amber-600">
+                                              (OT)
+                                            </span>
+                                          )}
                                         </div>
                                         <div className="text-xs text-gray-500">
                                           {activity.payType} •{" "}
@@ -297,6 +308,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                               @ RM{activity.rate.toFixed(2)}/Day
                                             </span>
                                           )}
+                                          {activity.payType === "Overtime" &&
+                                            activity.rateUnit === "Hour" && (
+                                              <span className="ml-1 text-amber-600">
+                                                (Hours {">"} 8)
+                                              </span>
+                                            )}
                                         </div>
                                       </td>
                                       <td className="px-3 py-4 text-center">
@@ -304,7 +321,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         activity.rateUnit === "Fixed" ? (
                                           <input
                                             type="number"
-                                            className="w-16 text-center border border-gray-300 rounded p-1 text-sm disabled:bg-gray-100"
+                                            className="w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm disabled:bg-gray-100"
                                             value={
                                               activity.unitsProduced?.toString() ||
                                               "0"
