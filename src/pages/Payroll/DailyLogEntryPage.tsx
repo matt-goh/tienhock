@@ -690,7 +690,6 @@ const DailyLogEntryPage: React.FC = () => {
         isOpen={showActivitiesModal}
         onClose={() => setShowActivitiesModal(false)}
         employee={selectedEmployee}
-        jobId={selectedEmployee?.jobType || ""}
         jobName={selectedEmployee?.jobName || ""}
         employeeHours={
           employeeSelectionState.jobHours[selectedEmployee?.id || ""]?.[

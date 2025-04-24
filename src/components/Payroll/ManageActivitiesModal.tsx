@@ -28,7 +28,6 @@ interface ManageActivitiesModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  jobId: string;
   jobName: string;
   employeeHours: number;
   dayType: "Biasa" | "Ahad" | "Umum";
@@ -40,7 +39,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   isOpen,
   onClose,
   employee,
-  jobId,
   jobName,
   employeeHours,
   dayType,
@@ -50,6 +48,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectAll, setSelectAll] = useState(false);
 
   // Fetch available pay codes for this job when modal opens
   useEffect(() => {
@@ -57,6 +56,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
       setActivities(existingActivities);
     }
   }, [isOpen, existingActivities]);
+
+  useEffect(() => {
+    const allSelected =
+      activities.length > 0 && activities.every((a) => a.isSelected);
+    setSelectAll(allSelected);
+  }, [activities]);
 
   // Calculate amounts based on rate type, hours, and units
   const calculateAmounts = (
@@ -92,6 +97,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         calculatedAmount: Number(calculatedAmount.toFixed(2)),
       };
     });
+  };
+
+  const handleSelectAll = () => {
+    const newSelectAll = !selectAll;
+    setSelectAll(newSelectAll);
+
+    const updatedActivities = activities.map((activity) => ({
+      ...activity,
+      isSelected: newSelectAll,
+    }));
+
+    const recalculatedActivities = calculateAmounts(
+      updatedActivities,
+      employeeHours
+    );
+    setActivities(recalculatedActivities);
   };
 
   // Toggle selection of an activity
@@ -199,7 +220,13 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                               <thead className="bg-gray-50 sticky top-0 z-10">
                                 <tr>
                                   <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    <span className="sr-only">Apply</span>
+                                    <Checkbox
+                                      checked={selectAll}
+                                      onChange={handleSelectAll}
+                                      size={20}
+                                      checkedColor="text-sky-600"
+                                      ariaLabel="Select all activities"
+                                    />
                                   </th>
                                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Pay Code & Details
