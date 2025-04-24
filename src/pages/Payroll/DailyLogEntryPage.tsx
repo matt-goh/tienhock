@@ -48,6 +48,7 @@ interface EmployeeWithHours extends Employee {
 interface DailyLogFormData {
   logDate: string;
   shift: string;
+  employeeId: string;
   contextData: {
     totalBags?: number;
     [key: string]: any;
@@ -76,6 +77,7 @@ const DailyLogEntryPage: React.FC = () => {
   const [formData, setFormData] = useState<DailyLogFormData>({
     logDate: format(new Date(), "yyyy-MM-dd"),
     shift: "day",
+    employeeId: "",
     contextData: {
       totalBags: 50, // Set default value for totalBags
     },
@@ -271,6 +273,7 @@ const DailyLogEntryPage: React.FC = () => {
       shift: formData.shift,
       dayType: formData.dayType,
       jobId: "MEE", // For now just hardcode to MEE section
+      employeeId: formData.employeeId || null,
       contextData: formData.contextData,
       status: "Submitted",
       employeeEntries: selectedEmployeeData,

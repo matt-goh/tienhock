@@ -11,6 +11,7 @@ export default function (pool) {
       shift,
       dayType,
       jobId,
+      employeeId,
       contextData,
       status,
       employeeEntries,
@@ -36,9 +37,9 @@ export default function (pool) {
       // Insert main work log
       const workLogQuery = `
         INSERT INTO daily_work_logs (
-          log_date, shift, job_id, day_type, 
+          log_date, shift, job_id, employee_id, day_type, 
           context_data, status
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
       `;
 
@@ -46,6 +47,7 @@ export default function (pool) {
         logDate,
         shift,
         jobId,
+        employeeId || null,
         dayType,
         contextData || {},
         status,
