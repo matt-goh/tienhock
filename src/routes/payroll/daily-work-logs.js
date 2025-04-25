@@ -21,7 +21,7 @@ export default function (pool) {
       SELECT 
         dwl.*,
         COUNT(DISTINCT dwle.employee_id) as total_workers,
-        COALESCE(SUM(dwle.total_hours), 0) as total_hours
+        CAST(COALESCE(SUM(dwle.total_hours), 0) AS NUMERIC(10, 2)) as total_hours
       FROM daily_work_logs dwl
       LEFT JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
       WHERE 1=1
@@ -79,10 +79,13 @@ export default function (pool) {
 
       // Apply pagination
       const offset = (page - 1) * limit;
-      const paginatedLogs = dataResult.rows.slice(
-        offset,
-        offset + parseInt(limit)
-      );
+      const paginatedLogs = dataResult.rows
+        .slice(offset, offset + parseInt(limit))
+        .map((log) => ({
+          ...log,
+          total_hours: parseFloat(log.total_hours),
+          total_workers: parseInt(log.total_workers),
+        }));
 
       res.json({
         logs: paginatedLogs,
@@ -121,13 +124,14 @@ export default function (pool) {
       const entriesQuery = `
       SELECT 
         dwle.*,
+        CAST(dwle.total_hours AS NUMERIC(10, 2)) as total_hours,
         s.name as employee_name,
         j.name as job_name
       FROM daily_work_log_entries dwle
       LEFT JOIN staffs s ON dwle.employee_id = s.id
       LEFT JOIN jobs j ON dwle.job_id = j.id
       WHERE dwle.work_log_id = $1
-    `;
+      `;
       const entriesResult = await pool.query(entriesQuery, [id]);
 
       // Get activities for each entry
@@ -136,6 +140,10 @@ export default function (pool) {
           const activitiesQuery = `
           SELECT 
             dwla.*,
+            CAST(dwla.hours_applied AS NUMERIC(10, 2)) as hours_applied,
+            CAST(dwla.units_produced AS NUMERIC(10, 2)) as units_produced,
+            CAST(dwla.rate_used AS NUMERIC(10, 2)) as rate_used,
+            CAST(dwla.calculated_amount AS NUMERIC(10, 2)) as calculated_amount,
             pc.description,
             pc.pay_type,
             pc.rate_unit
@@ -149,7 +157,18 @@ export default function (pool) {
 
           return {
             ...entry,
-            activities: activitiesResult.rows,
+            total_hours: parseFloat(entry.total_hours),
+            activities: activitiesResult.rows.map((activity) => ({
+              ...activity,
+              hours_applied: activity.hours_applied
+                ? parseFloat(activity.hours_applied)
+                : null,
+              units_produced: activity.units_produced
+                ? parseFloat(activity.units_produced)
+                : null,
+              rate_used: parseFloat(activity.rate_used),
+              calculated_amount: parseFloat(activity.calculated_amount),
+            })),
           };
         })
       );
@@ -279,9 +298,11 @@ export default function (pool) {
                 entryId,
                 activity.payCodeId,
                 hoursApplied,
-                activity.unitsProduced || null,
-                activity.rate,
-                activity.calculatedAmount,
+                activity.unitsProduced
+                  ? parseFloat(activity.unitsProduced)
+                  : null,
+                parseFloat(activity.rate),
+                parseFloat(activity.calculatedAmount),
                 false,
               ]);
             }
@@ -432,9 +453,11 @@ export default function (pool) {
                 entryId,
                 activity.payCodeId,
                 hoursApplied,
-                activity.unitsProduced || null,
-                activity.rate,
-                activity.calculatedAmount,
+                activity.unitsProduced
+                  ? parseFloat(activity.unitsProduced)
+                  : null,
+                parseFloat(activity.rate),
+                parseFloat(activity.calculatedAmount),
                 false,
               ]);
             }
