@@ -299,6 +299,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                           onChange={() => {}} // Empty handler as the row handles the toggle
                                           size={20}
                                           checkedColor="text-sky-600"
+                                          className="align-middle"
                                         />
                                       </td>
                                       <td className="px-3 py-4 truncate">
