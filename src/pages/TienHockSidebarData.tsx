@@ -20,6 +20,8 @@ import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
 // Payroll related imports
 import MeeProductionListPage from "./Payroll/MeeProductionListPage";
 import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
+import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
+import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
 
 // Catalogue related imports
@@ -61,6 +63,16 @@ export const TienHockSidebarData: SidebarItem[] = [
             name: "New Machine Entry",
             path: "/payroll/mee-machine-entry",
             component: DailyLogEntryPage,
+          },
+          {
+            name: "View Log",
+            path: "/payroll/mee-production/:id",
+            component: DailyLogDetailsPage,
+          },
+          {
+            name: "Edit Log",
+            path: "/payroll/mee-production/:id/edit",
+            component: DailyLogEditPage,
           },
         ],
       },
