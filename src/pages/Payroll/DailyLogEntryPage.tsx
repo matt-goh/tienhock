@@ -448,7 +448,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   ]);
 
   useEffect(() => {
-    if (mode === "edit" && existingWorkLog && !loadingStaffs && !loadingJobs) {
+    if (
+      mode === "edit" &&
+      existingWorkLog &&
+      !loadingStaffs &&
+      !loadingJobs &&
+      !loadingPayCodeMappings
+    ) {
       // Restore selection state for employees
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
@@ -472,19 +478,46 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         newJobHours[employeeId][jobId] = parseFloat(entry.total_hours);
 
         const rowKey = `${employeeId}-${jobId}`;
-        newEmployeeActivities[rowKey] = entry.activities.map(
-          (activity: any) => ({
-            ...activity,
-            isSelected: true,
-            payCodeId: activity.pay_code_id,
-            calculatedAmount: activity.calculated_amount,
-            rate: activity.rate_used,
-            rateUnit: activity.rate_unit,
-            payType: activity.pay_type,
-            description: activity.description,
-            unitsProduced: activity.units_produced,
-          })
-        );
+
+        // Get all possible pay codes for this job
+        const jobPayCodes = jobPayCodeDetails[jobId] || [];
+
+        // Create a map of existing activities for quick lookup
+        const existingActivityMap = new Map<string, any>();
+        entry.activities.forEach((activity: any) => {
+          existingActivityMap.set(activity.pay_code_id, activity);
+        });
+
+        // Map all pay codes, marking the ones that were selected
+        newEmployeeActivities[rowKey] = jobPayCodes.map((payCode) => {
+          const existingActivity = existingActivityMap.get(payCode.id);
+
+          if (existingActivity) {
+            // This was a selected activity
+            return {
+              payCodeId: existingActivity.pay_code_id,
+              description: existingActivity.description || payCode.description,
+              payType: existingActivity.pay_type || payCode.pay_type,
+              rateUnit: existingActivity.rate_unit || payCode.rate_unit,
+              rate: existingActivity.rate_used || payCode.rate_biasa,
+              isSelected: true,
+              calculatedAmount: existingActivity.calculated_amount,
+              unitsProduced: existingActivity.units_produced,
+            };
+          } else {
+            // This was not selected
+            return {
+              payCodeId: payCode.id,
+              description: payCode.description,
+              payType: payCode.pay_type,
+              rateUnit: payCode.rate_unit,
+              rate: payCode.rate_biasa,
+              isSelected: false,
+              calculatedAmount: 0,
+              unitsProduced: payCode.requires_units_input ? 0 : undefined,
+            };
+          }
+        });
       });
 
       setEmployeeSelectionState({
@@ -493,13 +526,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
       setEmployeeActivities(newEmployeeActivities);
     }
-  }, [mode, existingWorkLog, availableEmployees, loadingStaffs, loadingJobs]);
+  }, [
+    mode,
+    existingWorkLog,
+    availableEmployees,
+    loadingStaffs,
+    loadingJobs,
+    loadingPayCodeMappings,
+    jobPayCodeDetails,
+  ]);
 
   // Separate effect for fetching activities after selection changes
   useEffect(() => {
     if (
       Object.keys(employeeSelectionState.selectedJobs).length > 0 &&
-      !loadingPayCodeMappings
+      !loadingPayCodeMappings &&
+      mode !== "edit" // Don't run this in edit mode if activities are already loaded
     ) {
       fetchAndApplyActivities();
     }
@@ -508,10 +550,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     employeeSelectionState.jobHours,
     formData.dayType,
     loadingPayCodeMappings,
+    mode,
   ]);
 
-  // Update the fetchAndApplyActivities function to properly handle existing state:
   const fetchAndApplyActivities = () => {
+    // Skip if we're in edit mode and have already loaded activities
+    if (mode === "edit" && Object.keys(employeeActivities).length > 0) {
+      return;
+    }
+
     // Get all unique job types from selected employees
     const jobTypes = Array.from(
       new Set(
