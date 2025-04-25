@@ -47,7 +47,17 @@ interface DailyLogFormData {
   employees: EmployeeWithHours[];
 }
 
-const DailyLogEntryPage: React.FC = () => {
+interface DailyLogEntryPageProps {
+  mode?: "create" | "edit";
+  existingWorkLog?: any;
+  onCancel?: () => void;
+}
+
+const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
+  mode = "create",
+  existingWorkLog,
+  onCancel,
+}) => {
   const navigate = useNavigate();
   const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
@@ -79,14 +89,23 @@ const DailyLogEntryPage: React.FC = () => {
     return "Biasa";
   };
 
-  const [formData, setFormData] = useState<DailyLogFormData>({
-    logDate: format(new Date(), "yyyy-MM-dd"),
-    shift: "1",
-    contextData: {
-      totalBags: 50, // Set default value for totalBags
-    },
-    dayType: determineDayType(new Date()),
-    employees: [],
+  const [formData, setFormData] = useState<DailyLogFormData>(() => {
+    if (mode === "edit" && existingWorkLog) {
+      return {
+        logDate: existingWorkLog.log_date.split("T")[0],
+        shift: existingWorkLog.shift.toString(),
+        contextData: existingWorkLog.context_data || { totalBags: 50 },
+        dayType: existingWorkLog.day_type,
+        employees: [],
+      };
+    }
+    return {
+      logDate: format(new Date(), "yyyy-MM-dd"),
+      shift: "1",
+      contextData: { totalBags: 50 },
+      dayType: determineDayType(new Date()),
+      employees: [],
+    };
   });
   const {
     detailedMappings: jobPayCodeDetails,
@@ -303,8 +322,15 @@ const DailyLogEntryPage: React.FC = () => {
     setIsSaving(true);
 
     try {
-      await api.post("/api/daily-work-logs", payload);
-      toast.success("Work log submitted successfully");
+      if (mode === "edit" && existingWorkLog) {
+        // Update existing work log
+        await api.put(`/api/daily-work-logs/${existingWorkLog.id}`, payload);
+        toast.success("Work log updated successfully");
+      } else {
+        // Create new work log
+        await api.post("/api/daily-work-logs", payload);
+        toast.success("Work log submitted successfully");
+      }
       navigate("/payroll/mee-production");
     } catch (error: any) {
       console.error("Error saving work log:", error);
@@ -353,7 +379,7 @@ const DailyLogEntryPage: React.FC = () => {
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
-    setEmployeeSelectionState((prev) => {
+    setEmployeeSelectionState(() => {
       if (selectAll) {
         // Deselect all - clear all selections
         return {
@@ -407,7 +433,8 @@ const DailyLogEntryPage: React.FC = () => {
       !initializedRef.current &&
       !loadingStaffs &&
       !loadingJobs &&
-      expandedEmployees.length > 0
+      expandedEmployees.length > 0 &&
+      mode === "create"
     ) {
       initializedRef.current = true;
       initializeDefaultSelections();
@@ -417,7 +444,56 @@ const DailyLogEntryPage: React.FC = () => {
     loadingStaffs,
     loadingJobs,
     initializeDefaultSelections,
+    mode,
   ]);
+
+  useEffect(() => {
+    if (mode === "edit" && existingWorkLog && !loadingStaffs && !loadingJobs) {
+      // Restore selection state for employees
+      const newSelectedJobs: Record<string, string[]> = {};
+      const newJobHours: Record<string, Record<string, number>> = {};
+      const newEmployeeActivities: Record<string, any[]> = {};
+
+      existingWorkLog.employeeEntries.forEach((entry: any) => {
+        const employeeId = entry.employee_id;
+
+        // Find the correct job ID from the employee's data
+        const employee = availableEmployees.find((e) => e.id === employeeId);
+        const jobId = employee?.job?.find((j) => MEE_JOB_IDS.includes(j)) || "";
+
+        if (!newSelectedJobs[employeeId]) {
+          newSelectedJobs[employeeId] = [];
+        }
+        newSelectedJobs[employeeId].push(jobId);
+
+        if (!newJobHours[employeeId]) {
+          newJobHours[employeeId] = {};
+        }
+        newJobHours[employeeId][jobId] = parseFloat(entry.total_hours);
+
+        const rowKey = `${employeeId}-${jobId}`;
+        newEmployeeActivities[rowKey] = entry.activities.map(
+          (activity: any) => ({
+            ...activity,
+            isSelected: true,
+            payCodeId: activity.pay_code_id,
+            calculatedAmount: activity.calculated_amount,
+            rate: activity.rate_used,
+            rateUnit: activity.rate_unit,
+            payType: activity.pay_type,
+            description: activity.description,
+            unitsProduced: activity.units_produced,
+          })
+        );
+      });
+
+      setEmployeeSelectionState({
+        selectedJobs: newSelectedJobs,
+        jobHours: newJobHours,
+      });
+      setEmployeeActivities(newEmployeeActivities);
+    }
+  }, [mode, existingWorkLog, availableEmployees, loadingStaffs, loadingJobs]);
 
   // Separate effect for fetching activities after selection changes
   useEffect(() => {
@@ -578,7 +654,9 @@ const DailyLogEntryPage: React.FC = () => {
 
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
-          New Mee Production Entry
+          {mode === "edit"
+            ? "Edit Mee Production Entry"
+            : "New Mee Production Entry"}
         </h1>
 
         {/* Header Section */}
@@ -817,7 +895,11 @@ const DailyLogEntryPage: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="border-t border-default-200 pt-4 mt-4 flex justify-end space-x-3">
-          <Button variant="outline" onClick={handleBack} disabled={isSaving}>
+          <Button
+            variant="outline"
+            onClick={mode === "edit" && onCancel ? onCancel : handleBack}
+            disabled={isSaving}
+          >
             Cancel
           </Button>
           <Button
@@ -826,7 +908,7 @@ const DailyLogEntryPage: React.FC = () => {
             onClick={() => handleSaveForm()}
             disabled={isSaving}
           >
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
           </Button>
         </div>
       </div>
