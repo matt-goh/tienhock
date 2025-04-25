@@ -80,17 +80,6 @@ const DailyLogDetailsPage: React.FC = () => {
     navigate(`/payroll/mee-production/${id}/edit`);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Submitted":
-        return "bg-sky-100 text-sky-700";
-      case "Processed":
-        return "bg-emerald-100 text-emerald-700";
-      default:
-        return "bg-default-100 text-default-700";
-    }
-  };
-
   const getDayTypeColor = (dayType: string) => {
     switch (dayType) {
       case "Biasa":
@@ -172,7 +161,7 @@ const DailyLogDetailsPage: React.FC = () => {
 
         {/* Overview Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-default-50 rounded-lg p-4">
+          <div className="border rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
                 <IconCalendar className="w-5 h-5 text-sky-600" />
@@ -188,7 +177,7 @@ const DailyLogDetailsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-default-50 rounded-lg p-4">
+          <div className="border rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                 <IconClock className="w-5 h-5 text-amber-600" />
@@ -202,20 +191,14 @@ const DailyLogDetailsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-default-50 rounded-lg p-4">
+          <div className="border rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
                 <IconInfoCircle className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
                 <p className="text-sm text-default-500">Status</p>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                    workLog.status
-                  )}`}
-                >
-                  {workLog.status}
-                </span>
+                <p className="font-medium text-default-800">{workLog.status}</p>
               </div>
             </div>
           </div>
@@ -228,7 +211,7 @@ const DailyLogDetailsPage: React.FC = () => {
               <h2 className="text-lg font-semibold text-default-800 mb-4">
                 Production Details
               </h2>
-              <div className="bg-default-50 rounded-lg p-4">
+              <div className="border rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {Object.entries(workLog.context_data).map(([key, value]) => (
                     <div key={key}>
