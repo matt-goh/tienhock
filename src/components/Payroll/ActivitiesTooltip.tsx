@@ -159,7 +159,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                           <span>@ RM{activity.rate.toFixed(2)}/Day</span>
                         </>
                       )}
-                      {activity.unitsProduced !== undefined && (
+                      {activity.unitsProduced !== null && (
                         <>
                           <span>•</span>
                           <span>{activity.unitsProduced} units</span>
