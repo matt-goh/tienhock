@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import BackButton from "../../components/BackButton";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import DailyLogEntryPage from "./DailyLogEntryPage";
