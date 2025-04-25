@@ -1,15 +1,15 @@
 // src/pages/Payroll/MeeProductionListPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconPlus, IconPencil, IconTrash, IconEye } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import DateRangePicker from "../../components/DateRangePicker";
-import { FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
+import StyledListbox from "../../components/StyledListbox";
 
 interface WorkLogFilters {
   dateRange: {
@@ -49,6 +49,30 @@ const MeeProductionListPage: React.FC = () => {
   const [totalLogs, setTotalLogs] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<WorkLog | null>(null);
+  const monthOptions = useMemo(() => {
+    return [
+      { id: 0, name: "January" },
+      { id: 1, name: "February" },
+      { id: 2, name: "March" },
+      { id: 3, name: "April" },
+      { id: 4, name: "May" },
+      { id: 5, name: "June" },
+      { id: 6, name: "July" },
+      { id: 7, name: "August" },
+      { id: 8, name: "September" },
+      { id: 9, name: "October" },
+      { id: 10, name: "November" },
+      { id: 11, name: "December" },
+    ];
+  }, []);
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const [selectedMonth, setSelectedMonth] = useState<{
+    id: number;
+    name: string;
+  }>(() => {
+    return monthOptions[currentMonth];
+  });
 
   const navigate = useNavigate();
 
@@ -100,6 +124,24 @@ const MeeProductionListPage: React.FC = () => {
   useEffect(() => {
     fetchWorkLogs();
   }, [filters, currentPage]);
+
+  const handleMonthChange = (monthId: string | number) => {
+    const month = monthOptions.find((m) => m.id === Number(monthId));
+    if (!month) return;
+
+    setSelectedMonth(month);
+
+    // Create start date (1st of the selected month)
+    const startDate = new Date(currentDate.getFullYear(), month.id, 1);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Create end date (last day of the selected month)
+    const endDate = new Date(currentDate.getFullYear(), month.id + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Update date range
+    setFilters({ ...filters, dateRange: { start: startDate, end: endDate } });
+  };
 
   const handleAddEntry = () => {
     navigate("/payroll/mee-machine-entry");
@@ -156,8 +198,8 @@ const MeeProductionListPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full mx-4 md:mx-6">
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-center">
+    <div className="relative w-full space-y-4 mx-4 md:mx-6">
+      <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           Mee Production Records
         </h1>
@@ -174,28 +216,43 @@ const MeeProductionListPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 bg-white p-4 rounded-lg border border-default-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-4 rounded-lg border border-default-200">
+        <div className="flex flex-wrap gap-4 items-center">
+          {/* Date Range Picker */}
           <DateRangePicker
             dateRange={filters.dateRange}
             onDateChange={(newRange) =>
               setFilters({ ...filters, dateRange: newRange })
             }
           />
-          <FormListbox
-            name="shift"
-            label=""
-            value={filters.shift || "all"}
-            onChange={(value) => setFilters({ ...filters, shift: value })}
-            options={shiftOptions}
-          />
-          <FormListbox
-            name="status"
-            label=""
-            value={filters.status || "all"}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            options={statusOptions}
-          />
+          {/* Month Listbox */}
+          <div className="w-40">
+            <StyledListbox
+              value={selectedMonth.id}
+              onChange={handleMonthChange}
+              options={monthOptions}
+            />
+          </div>
+          {/* Shift Listbox */}
+          <div className="w-40">
+            <StyledListbox
+              value={filters.shift || "all"}
+              onChange={(value) =>
+                setFilters({ ...filters, shift: value.toString() })
+              }
+              options={shiftOptions}
+            />
+          </div>
+          {/* Status Listbox */}
+          <div className="w-40">
+            <StyledListbox
+              value={filters.status || "all"}
+              onChange={(value) =>
+                setFilters({ ...filters, status: value.toString() })
+              }
+              options={statusOptions}
+            />
+          </div>
         </div>
       </div>
 
