@@ -568,7 +568,7 @@ const JobPage: React.FC = () => {
                       return (
                         <tr
                           key={detail.id}
-                          className="hover:bg-default-50"
+                          className="hover:bg-default-50 cursor-pointer"
                           onClick={() => handleEditRatesClick(detail)}
                         >
                           {/* Static Columns */}
