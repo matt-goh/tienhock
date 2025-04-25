@@ -514,7 +514,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               rate: payCode.rate_biasa,
               isSelected: false,
               calculatedAmount: 0,
-              unitsProduced: payCode.requires_units_input ? 0 : undefined,
+              unitsProduced: payCode.requires_units_input ? 0 : null,
             };
           }
         });
@@ -632,7 +632,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               ? existingActivity.unitsProduced
               : payCode.requires_units_input
               ? 0
-              : undefined;
+              : null;
 
             // Calculate amount
             let calculatedAmount = 0;
