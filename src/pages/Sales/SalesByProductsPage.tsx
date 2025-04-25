@@ -862,7 +862,6 @@ const SalesByProductsPage: React.FC = () => {
             </h2>
             {filteredAndSortedData.length > 0 ? (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                {" "}
                 {/* Added fixed height and vertical scroll */}
                 <table className="min-w-full divide-y divide-default-200">
                   <thead className="bg-default-100 sticky top-0">
