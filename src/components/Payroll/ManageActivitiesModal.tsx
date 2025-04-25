@@ -301,8 +301,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                           checkedColor="text-sky-600"
                                         />
                                       </td>
-                                      <td className="px-3 py-4">
-                                        <div className="text-sm font-medium text-gray-900">
+                                      <td className="px-3 py-4 truncate">
+                                        <div
+                                          className="text-sm font-medium text-gray-900 w-fit"
+                                          title={activity.payCodeId}
+                                        >
                                           {activity.description}
                                           {activity.payType === "Overtime" && (
                                             <span className="ml-2 text-xs text-amber-600">
