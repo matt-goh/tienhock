@@ -105,10 +105,15 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
         setFormData((prev) => ({ ...prev, [name]: value })); // Keep as string
       }
     } else if (name === "id") {
-      // Convert ID to uppercase and replace spaces for consistency
+      // Remove problematic characters as the user types
+      const sanitizedValue = value
+        .toUpperCase()
+        .replace(/\s+/g, "_")
+        .replace(/[%#&?$^()*!@/\\]/g, ""); // Remove problematic characters
+
       setFormData((prev) => ({
         ...prev,
-        [name]: value.toUpperCase().replace(/\s+/g, "_"),
+        [name]: sanitizedValue,
       }));
     } else {
       // For description etc.
