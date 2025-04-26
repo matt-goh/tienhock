@@ -34,7 +34,7 @@ interface InputProps {
   placeholder?: string;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   step?: string;
-  min?: string;
+  min?: number;
   max?: number;
   required?: boolean;
 }
@@ -57,7 +57,8 @@ export const FormInput: React.FC<InputProps> = ({
     {label && (
       <label
         htmlFor={name}
-        className="block text-sm font-medium text-default-700"
+        className="block text-sm font-medium text-default-700 truncate"
+        title={label}
       >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
@@ -103,12 +104,12 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   required = false,
 }) => (
   <div className={`${label ? "space-y-2" : ""}`}>
-    {" "}
     <div className="flex items-center justify-between">
       {label && (
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 truncate"
+          title={label}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -178,7 +179,8 @@ export const FormListbox: React.FC<ListboxProps> = ({
       {label && (
         <label
           htmlFor={`${name}-button`}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 truncate"
+          title={label}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -364,7 +366,8 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
       {label && (
         <label
           htmlFor={`${name}-input`}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 truncate"
+          title={label}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>

@@ -779,7 +779,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 value={paymentFormData.amount_paid}
                 onChange={handlePaymentFormChange}
                 step="0.01"
-                min="0.01"
+                min={0.01}
                 max={invoiceData.balance_due}
                 disabled={isProcessingPayment}
               />
