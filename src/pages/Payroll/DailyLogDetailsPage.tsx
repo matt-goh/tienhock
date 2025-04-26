@@ -1,4 +1,4 @@
-// src/pages/Payroll/DailyLogDetailsPage.tsx
+// src/pages/Payroll/ProductionDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
@@ -13,45 +13,20 @@ import BackButton from "../../components/BackButton";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
+import { getJobConfig } from "../../configs/payrollJobConfigs";
 
-interface WorkLogDetails {
-  id: number;
-  log_date: string;
-  shift: number;
-  section: string;
-  day_type: "Biasa" | "Ahad" | "Umum";
-  status: "Submitted" | "Processed";
-  context_data: any;
-  employeeEntries: EmployeeEntry[];
+interface DailyLogDetailsPageProps {
+  jobType: string;
 }
 
-interface EmployeeEntry {
-  id: number;
-  employee_id: string;
-  employee_name: string;
-  job_id: string;
-  job_name: string;
-  total_hours: number;
-  activities: Activity[];
-}
-
-interface Activity {
-  id: number;
-  pay_code_id: string;
-  description: string;
-  pay_type: string;
-  rate_unit: string;
-  hours_applied: number | null;
-  units_produced: number | null;
-  rate_used: number;
-  calculated_amount: number;
-}
-
-const DailyLogDetailsPage: React.FC = () => {
+const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
+  jobType,
+}) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [workLog, setWorkLog] = useState<WorkLogDetails | null>(null);
+  const [workLog, setWorkLog] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const jobConfig = getJobConfig(jobType);
 
   useEffect(() => {
     fetchWorkLogDetails();
@@ -73,11 +48,11 @@ const DailyLogDetailsPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate("/payroll/mee-production");
+    navigate(`/payroll/${jobType.toLowerCase()}-production`);
   };
 
   const handleEdit = () => {
-    navigate(`/payroll/mee-production/${id}/edit`);
+    navigate(`/payroll/${jobType.toLowerCase()}-production/${id}/edit`);
   };
 
   const getDayTypeColor = (dayType: string) => {
@@ -91,6 +66,26 @@ const DailyLogDetailsPage: React.FC = () => {
       default:
         return "text-default-700";
     }
+  };
+
+  // Separate context-linked activities from regular activities
+  const separateActivities = (activities: any[]) => {
+    const contextLinked: any[] = [];
+    const regular: any[] = [];
+
+    activities.forEach((activity) => {
+      const isContextLinked = jobConfig?.contextFields.some(
+        (field) => field.linkedPayCode === activity.pay_code_id
+      );
+
+      if (isContextLinked) {
+        contextLinked.push(activity);
+      } else {
+        regular.push(activity);
+      }
+    });
+
+    return { contextLinked, regular };
   };
 
   if (isLoading) {
@@ -114,14 +109,14 @@ const DailyLogDetailsPage: React.FC = () => {
 
   const totalEmployees = workLog.employeeEntries.length;
   const totalHours = workLog.employeeEntries.reduce(
-    (sum, entry) => sum + entry.total_hours,
+    (sum: number, entry: any) => sum + entry.total_hours,
     0
   );
   const totalAmount = workLog.employeeEntries.reduce(
-    (sum, entry) =>
+    (sum: number, entry: any) =>
       sum +
       entry.activities.reduce(
-        (actSum, activity) => actSum + activity.calculated_amount,
+        (actSum: number, activity: any) => actSum + activity.calculated_amount,
         0
       ),
     0
@@ -135,7 +130,7 @@ const DailyLogDetailsPage: React.FC = () => {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-xl font-semibold text-default-800">
-              Work Log Details
+              {jobConfig?.name} Details
             </h1>
             <p className="text-sm text-default-500 mt-1">
               {format(new Date(workLog.log_date), "EEEE, dd MMM yyyy")}
@@ -204,7 +199,7 @@ const DailyLogDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Context Data */}
+        {/* Production Details / Context Data */}
         {workLog.context_data &&
           Object.keys(workLog.context_data).length > 0 && (
             <div className="mb-8">
@@ -213,16 +208,24 @@ const DailyLogDetailsPage: React.FC = () => {
               </h2>
               <div className="border rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {Object.entries(workLog.context_data).map(([key, value]) => (
-                    <div key={key}>
-                      <p className="text-sm text-default-500 capitalize">
-                        {key.replace(/_/g, " ")}
-                      </p>
-                      <p className="font-medium text-default-800">
-                        {String(value)}
-                      </p>
-                    </div>
-                  ))}
+                  {jobConfig?.contextFields.map((field) => {
+                    const value = workLog.context_data[field.id];
+                    if (value === undefined) return null;
+
+                    return (
+                      <div key={field.id}>
+                        <p className="text-sm text-default-500">
+                          {field.label}
+                        </p>
+                        <p className="font-medium text-default-800">
+                          {field.type === "select"
+                            ? field.options?.find((opt) => opt.id === value)
+                                ?.label || value
+                            : String(value)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -258,10 +261,15 @@ const DailyLogDetailsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-default-200">
-                {workLog.employeeEntries.map((entry) => {
+                {workLog.employeeEntries.map((entry: any) => {
                   const employeeTotal = entry.activities.reduce(
-                    (sum, activity) => sum + activity.calculated_amount,
+                    (sum: number, activity: any) =>
+                      sum + activity.calculated_amount,
                     0
+                  );
+
+                  const { contextLinked, regular } = separateActivities(
+                    entry.activities
                   );
 
                   return (
@@ -281,31 +289,78 @@ const DailyLogDetailsPage: React.FC = () => {
                         {entry.total_hours.toFixed(1)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="space-y-2">
-                          {entry.activities.map((activity) => (
-                            <div
-                              key={activity.id}
-                              className="flex justify-between text-sm"
-                            >
-                              <div>
-                                <span className="font-medium">
-                                  {activity.description}
-                                </span>
-                                <span className="text-default-500 ml-2">
-                                  ({activity.pay_type})
-                                </span>
-                                {activity.units_produced && (
-                                  <span className="text-default-500 ml-2">
-                                    • {activity.units_produced}{" "}
-                                    {activity.rate_unit}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="font-medium">
-                                RM{activity.calculated_amount.toFixed(2)}
+                        <div className="space-y-4">
+                          {/* Context-linked activities */}
+                          {contextLinked.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-sky-600 mb-1">
+                                Production Activities
+                              </p>
+                              <div className="space-y-1">
+                                {contextLinked.map((activity: any) => (
+                                  <div
+                                    key={activity.id}
+                                    className="flex justify-between text-sm"
+                                  >
+                                    <div>
+                                      <span className="font-medium">
+                                        {activity.description}
+                                      </span>
+                                      <span className="text-default-500 ml-2">
+                                        ({activity.pay_type})
+                                      </span>
+                                      {activity.units_produced && (
+                                        <span className="text-default-500 ml-2">
+                                          • {activity.units_produced}{" "}
+                                          {activity.rate_unit}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="font-medium">
+                                      RM{activity.calculated_amount.toFixed(2)}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          ))}
+                          )}
+
+                          {/* Regular activities */}
+                          {regular.length > 0 && (
+                            <div>
+                              {contextLinked.length > 0 && (
+                                <p className="text-xs font-medium text-default-600 mb-1">
+                                  Standard Activities
+                                </p>
+                              )}
+                              <div className="space-y-1">
+                                {regular.map((activity: any) => (
+                                  <div
+                                    key={activity.id}
+                                    className="flex justify-between text-sm"
+                                  >
+                                    <div>
+                                      <span className="font-medium">
+                                        {activity.description}
+                                      </span>
+                                      <span className="text-default-500 ml-2">
+                                        ({activity.pay_type})
+                                      </span>
+                                      {activity.units_produced && (
+                                        <span className="text-default-500 ml-2">
+                                          • {activity.units_produced}{" "}
+                                          {activity.rate_unit}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="font-medium">
+                                      RM{activity.calculated_amount.toFixed(2)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-medium">

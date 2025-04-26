@@ -22,9 +22,12 @@ import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../routes/utils/api";
 import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
-
-// MEE-specific job IDs that we want to filter for
-const MEE_JOB_IDS = ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"];
+import {
+  getJobConfig,
+  getContextLinkedPayCodes,
+  getJobIds,
+} from "../../configs/payrollJobConfigs";
+import DynamicContextForm from "../../components/Payroll/DynamicContextForm";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -51,12 +54,14 @@ interface DailyLogEntryPageProps {
   mode?: "create" | "edit";
   existingWorkLog?: any;
   onCancel?: () => void;
+  jobType?: string;
 }
 
 const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   mode = "create",
   existingWorkLog,
   onCancel,
+  jobType = "MEE",
 }) => {
   const navigate = useNavigate();
   const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
@@ -77,6 +82,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
 
+  const JOB_IDS = getJobIds(jobType);
+
+  // Get job configuration
+  const jobConfig = getJobConfig(jobType);
+  const contextLinkedPayCodes = jobConfig
+    ? getContextLinkedPayCodes(jobConfig)
+    : {};
+
   // Helper function to determine day type based on date
   const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
     // Check if it's a holiday first
@@ -89,20 +102,28 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     return "Biasa";
   };
 
+  // Initialize form data with dynamic context fields
   const [formData, setFormData] = useState<DailyLogFormData>(() => {
     if (mode === "edit" && existingWorkLog) {
       return {
         logDate: existingWorkLog.log_date.split("T")[0],
         shift: existingWorkLog.shift.toString(),
-        contextData: existingWorkLog.context_data || { totalBags: 50 },
+        contextData: existingWorkLog.context_data || {},
         dayType: existingWorkLog.day_type,
         employees: [],
       };
     }
+
+    // Initialize with default values from config
+    const defaultContextData: Record<string, any> = {};
+    jobConfig?.contextFields.forEach((field) => {
+      defaultContextData[field.id] = field.defaultValue;
+    });
+
     return {
       logDate: format(new Date(), "yyyy-MM-dd"),
       shift: "1",
-      contextData: { totalBags: 50 },
+      contextData: defaultContextData,
       dayType: determineDayType(new Date()),
       employees: [],
     };
@@ -114,50 +135,105 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
 
-  // Use useMemo to filter only MEE jobs
+  // Update activities when context values change for linked pay codes
+  useEffect(() => {
+    if (!jobConfig) return;
+
+    // For each context field that has a linked pay code
+    jobConfig.contextFields.forEach((field) => {
+      if (field.linkedPayCode) {
+        const contextValue = formData.contextData[field.id];
+
+        // Update all employee activities for this pay code
+        setEmployeeActivities((prev) => {
+          const updatedActivities = { ...prev };
+
+          Object.keys(updatedActivities).forEach((rowKey) => {
+            updatedActivities[rowKey] = updatedActivities[rowKey].map(
+              (activity) => {
+                if (activity.payCodeId === field.linkedPayCode) {
+                  // Auto-update units for context-linked pay codes
+                  const newActivity = {
+                    ...activity,
+                    unitsProduced: contextValue || 0,
+                    isContextLinked: true,
+                  };
+
+                  // Recalculate amount
+                  if (activity.isSelected) {
+                    let calculatedAmount = 0;
+                    switch (activity.rateUnit) {
+                      case "Bag":
+                      case "Fixed":
+                        calculatedAmount = activity.rate * (contextValue || 0);
+                        break;
+                      case "Percent":
+                        calculatedAmount =
+                          (activity.rate * (contextValue || 0)) / 100;
+                        break;
+                      // ... other rate units
+                    }
+                    newActivity.calculatedAmount = Number(
+                      calculatedAmount.toFixed(2)
+                    );
+                  }
+
+                  return newActivity;
+                }
+                return activity;
+              }
+            );
+          });
+
+          return updatedActivities;
+        });
+      }
+    });
+  }, [formData.contextData, jobConfig]);
+
+  // Update the jobs filter based on dynamic configuration
   const jobs = useMemo(() => {
     return allJobs
-      .filter((job) => MEE_JOB_IDS.includes(job.id))
+      .filter((job) => JOB_IDS.includes(job.id))
       .map((job) => ({
         id: job.id,
         name: job.name,
         section: job.section,
       }));
-  }, [allJobs]);
+  }, [allJobs, JOB_IDS]);
 
+  // Update available employees based on dynamic job types
   const availableEmployees = useMemo(() => {
     return allStaffs
       .filter((staff) => {
         if (!staff.job || !Array.isArray(staff.job)) return false;
-        return staff.job.some((jobId: string) => MEE_JOB_IDS.includes(jobId));
+        return staff.job.some((jobId: string) => JOB_IDS.includes(jobId));
       })
       .map((staff) => ({
         ...staff,
-        hours: 7,
+        hours: jobConfig?.defaultHours || 7,
       }));
-  }, [allStaffs]);
+  }, [allStaffs, JOB_IDS, jobConfig]);
 
   const expandedEmployees = useMemo(() => {
-    // Create a new array with an entry for each employee-job combination
     const expanded: Array<
       EmployeeWithHours & { jobType: string; jobName: string }
     > = [];
 
     availableEmployees.forEach((employee) => {
-      // Filter to only include MEE job types
-      const meeJobs = (employee.job || []).filter((jobId: string) =>
-        MEE_JOB_IDS.includes(jobId)
+      // Filter to only include job types from the current job configuration
+      const configJobs = (employee.job || []).filter((jobId: string) =>
+        JOB_IDS.includes(jobId)
       );
 
       // Create a row for each job type this employee has
-      meeJobs.forEach((jobId: any) => {
+      configJobs.forEach((jobId: any) => {
         const jobName = jobs.find((j) => j.id === jobId)?.name || jobId;
 
         expanded.push({
           ...employee,
           jobType: jobId,
           jobName,
-          // Use a compound key for each row
           rowKey: `${employee.id}-${jobId}`,
         });
       });
@@ -165,14 +241,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     // Sort by employee name first, then job name
     return expanded.sort((a, b) => {
-      // First by employee name
       const nameCompare = a.name.localeCompare(b.name);
       if (nameCompare !== 0) return nameCompare;
-
-      // Then by job name
       return (a.jobName || "").localeCompare(b.jobName || "");
     });
-  }, [availableEmployees, jobs]);
+  }, [availableEmployees, jobs, JOB_IDS]);
 
   // Update day type when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,19 +282,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   // Handle context data changes
-  const handleContextDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
+  const handleContextChange = (fieldId: string, value: any) => {
+    setFormData((prev) => ({
+      ...prev,
       contextData: {
-        ...formData.contextData,
-        [name]: value === "" ? "" : Number(value), // Convert to number if not empty
+        ...prev.contextData,
+        [fieldId]: value,
       },
-    });
+    }));
   };
 
   const handleBack = () => {
-    navigate("/payroll/mee-production");
+    navigate(`/payroll/${jobType.toLowerCase()}-production`);
   };
 
   // Toggle employee selection by employee+job combination
@@ -306,7 +378,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       return;
     }
 
-    const section = jobs[0]?.section?.[0];
+    const section = jobConfig?.section?.[0];
 
     // Build the payload
     const payload = {
@@ -323,15 +395,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     try {
       if (mode === "edit" && existingWorkLog) {
-        // Update existing work log
         await api.put(`/api/daily-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Work log updated successfully");
       } else {
-        // Create new work log
         await api.post("/api/daily-work-logs", payload);
         toast.success("Work log submitted successfully");
       }
-      navigate("/payroll/mee-production");
+      navigate(`/payroll/${jobType.toLowerCase()}-production`);
     } catch (error: any) {
       console.error("Error saving work log:", error);
       toast.error(
@@ -465,7 +535,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
         // Find the correct job ID from the employee's data
         const employee = availableEmployees.find((e) => e.id === employeeId);
-        const jobId = employee?.job?.find((j) => MEE_JOB_IDS.includes(j)) || "";
+        const jobId = employee?.job?.find((j) => JOB_IDS.includes(j)) || "";
 
         if (!newSelectedJobs[employeeId]) {
           newSelectedJobs[employeeId] = [];
@@ -619,16 +689,25 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   : payCode.rate_biasa;
             }
 
+            // Check if this pay code is linked to a context field
+            const contextField = contextLinkedPayCodes[payCode.id];
+            const isContextLinked = !!contextField;
+
             // For overtime pay codes, determine if they should be auto-selected
             const isOvertimeCode = payCode.pay_type === "Overtime";
             const shouldAutoSelect = isOvertimeCode && hours > 8;
 
-            // Use existing state if available, otherwise use defaults
+            // For context-linked pay codes, don't auto-select
             const isSelected = existingActivity
               ? existingActivity.isSelected
+              : isContextLinked
+              ? false // Don't auto-select context-linked pay codes
               : shouldAutoSelect || payCode.is_default_setting;
 
-            const unitsProduced = existingActivity
+            // For context-linked pay codes, use context value as units
+            const unitsProduced = isContextLinked
+              ? formData.contextData[contextField.id] || 0
+              : existingActivity
               ? existingActivity.unitsProduced
               : payCode.requires_units_input
               ? 0
@@ -654,6 +733,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 case "Fixed":
                   calculatedAmount = rate * (unitsProduced || 0);
                   break;
+                case "Percent":
+                  calculatedAmount = (rate * (unitsProduced || 0)) / 100;
+                  break;
                 default:
                   calculatedAmount = 0;
               }
@@ -669,6 +751,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               isSelected: isSelected,
               unitsProduced: unitsProduced,
               calculatedAmount: Number(calculatedAmount.toFixed(2)),
+              isContextLinked: isContextLinked, // Flag for special handling
             };
           });
 
@@ -696,7 +779,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   return (
-    <div className="relative w-full mx-4 md:mx-6 -mt-8">
+    <div className="relative w-full mx-4 md:mx-6 -mt-12">
       <BackButton onClick={handleBack} />
 
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
@@ -755,14 +838,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             required
           />
 
-          {/* Context Data - Example for Mee Production */}
-          <FormInput
-            name="totalBags"
-            label="Jumlah Tepung (Bags)"
-            type="number"
-            value={formData.contextData.totalBags?.toString() || ""}
-            onChange={handleContextDataChange}
-          />
+          {/* Context Data */}
+          <div className="mb-6">
+            <DynamicContextForm
+              contextFields={jobConfig?.contextFields || []}
+              contextData={formData.contextData}
+              onChange={handleContextChange}
+              disabled={isSaving}
+            />
+          </div>
         </div>
 
         {/* Employees Section */}
@@ -847,7 +931,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         const hours =
                           employeeSelectionState.jobHours[row.id]?.[
                             row.jobType
-                          ] ?? 7; // Default to 7 if no hours recorded yet
+                          ] ??
+                          jobConfig?.defaultHours ??
+                          7; // Use config default hours
 
                         return (
                           <tr key={row.rowKey}>
@@ -884,11 +970,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end space-x-2">
-                                {hours > 8 && isSelected && (
-                                  <span className="text-xs text-amber-600 font-medium">
-                                    OT
-                                  </span>
-                                )}
+                                {hours > 8 &&
+                                  isSelected &&
+                                  jobConfig?.requiresOvertimeCalc && (
+                                    <span className="text-xs text-amber-600 font-medium">
+                                      OT
+                                    </span>
+                                  )}
                                 <input
                                   id={`employee-hours-${row.rowKey}`}
                                   name={`employee-hours-${row.rowKey}`}
@@ -902,7 +990,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   }
                                   onBlur={() => handleHoursBlur(row.rowKey)}
                                   className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
-                                    hours > 8
+                                    hours > 8 && jobConfig?.requiresOvertimeCalc
                                       ? "border-amber-400 bg-amber-50"
                                       : "border-default-300"
                                   }`}
@@ -974,6 +1062,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         dayType={formData.dayType}
         onActivitiesUpdated={handleActivitiesUpdated}
         existingActivities={employeeActivities[selectedEmployee?.rowKey || ""]}
+        contextLinkedPayCodes={contextLinkedPayCodes} // Pass context info
+        contextData={formData.contextData} // Pass current context values
       />
     </div>
   );

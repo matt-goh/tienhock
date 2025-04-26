@@ -6,12 +6,18 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import DailyLogEntryPage from "./DailyLogEntryPage";
 import Button from "../../components/Button";
+import { getJobConfig } from "../../configs/payrollJobConfigs";
 
-const DailyLogEditPage: React.FC = () => {
+interface DailyLogEditPageProps {
+  jobType: string;
+}
+
+const DailyLogEditPage: React.FC<DailyLogEditPageProps> = ({ jobType }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [workLog, setWorkLog] = useState<any>(null);
+  const jobConfig = getJobConfig(jobType);
 
   useEffect(() => {
     fetchWorkLogDetails();
@@ -25,21 +31,21 @@ const DailyLogEditPage: React.FC = () => {
       const response = await api.get(`/api/daily-work-logs/${id}`);
       if (response.status === "Processed") {
         toast.error("Cannot edit processed work log");
-        navigate(`/payroll/mee-production/${id}`);
+        navigate(`/payroll/${jobType.toLowerCase()}-production/${id}`);
         return;
       }
       setWorkLog(response);
     } catch (error) {
       console.error("Error fetching work log details:", error);
       toast.error("Failed to fetch work log details");
-      navigate("/payroll/mee-production");
+      navigate(`/payroll/${jobType.toLowerCase()}-production`);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleBack = () => {
-    navigate(`/payroll/mee-production/${id}`);
+    navigate(`/payroll/${jobType.toLowerCase()}-production/${id}`);
   };
 
   if (isLoading) {
@@ -67,6 +73,7 @@ const DailyLogEditPage: React.FC = () => {
       mode="edit"
       existingWorkLog={workLog}
       onCancel={handleBack}
+      jobType={jobType}
     />
   );
 };
