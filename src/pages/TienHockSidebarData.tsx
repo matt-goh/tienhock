@@ -7,6 +7,7 @@ import {
   IconCalendarEvent,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
+import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -18,7 +19,7 @@ import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
 
 // Payroll related imports
-import MeeProductionListPage from "./Payroll/MeeProductionListPage";
+import DailyLogListPage from "./Payroll/DailyLogListPage";
 import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
@@ -43,6 +44,57 @@ import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
 
+// Function to generate payroll subitems for each job type
+const generatePayrollSubItems = (): SidebarItem[] => {
+  const payrollSubItems: SidebarItem[] = [];
+
+  // Add each production type dynamically
+  Object.values(JOB_CONFIGS).forEach((jobConfig) => {
+    const jobTypeLower = jobConfig.id.toLowerCase();
+
+    payrollSubItems.push({
+      name: jobConfig.name,
+      path: `/payroll/${jobTypeLower}-production`,
+      component: (props: any) => (
+        <DailyLogListPage jobType={jobConfig.id} {...props} />
+      ),
+      subItems: [
+        {
+          name: `New ${jobConfig.name} Entry`,
+          path: `/payroll/${jobTypeLower}-entry`,
+          component: (props: any) => (
+            <DailyLogEntryPage jobType={jobConfig.id} {...props} />
+          ),
+        },
+        {
+          name: "View Log",
+          path: `/payroll/${jobTypeLower}-production/:id`,
+          component: (props: any) => (
+            <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
+          ),
+        },
+        {
+          name: "Edit Log",
+          path: `/payroll/${jobTypeLower}-production/:id/edit`,
+          component: (props: any) => (
+            <DailyLogEditPage jobType={jobConfig.id} {...props} />
+          ),
+        },
+      ],
+    });
+  });
+
+  // Add Holiday Calendar at the end
+  payrollSubItems.push({
+    name: "Holiday Calendar",
+    path: "/payroll/holiday-calendar",
+    component: HolidayCalendarPage,
+    icon: IconCalendarEvent,
+  });
+
+  return payrollSubItems;
+};
+
 export const TienHockSidebarData: SidebarItem[] = [
   {
     name: "Bookmarks",
@@ -53,36 +105,7 @@ export const TienHockSidebarData: SidebarItem[] = [
   {
     name: "Payroll",
     icon: IconUserDollar,
-    subItems: [
-      {
-        name: "Mee Production",
-        path: "/payroll/mee-production",
-        component: MeeProductionListPage,
-        subItems: [
-          {
-            name: "New Machine Entry",
-            path: "/payroll/mee-machine-entry",
-            component: DailyLogEntryPage,
-          },
-          {
-            name: "View Log",
-            path: "/payroll/mee-production/:id",
-            component: DailyLogDetailsPage,
-          },
-          {
-            name: "Edit Log",
-            path: "/payroll/mee-production/:id/edit",
-            component: DailyLogEditPage,
-          },
-        ],
-      },
-      {
-        name: "Holiday Calendar",
-        path: "/payroll/holiday-calendar",
-        component: HolidayCalendarPage,
-        icon: IconCalendarEvent,
-      },
-    ],
+    subItems: generatePayrollSubItems(),
   },
   {
     name: "Sales",
