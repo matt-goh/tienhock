@@ -93,7 +93,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     const { name, value, type } = e.target;
 
     if (type === "checkbox" && e.target instanceof HTMLInputElement) {
-      const target = e.target as HTMLInputElement; // Cast here
+      const target = e.target as HTMLInputElement;
       setFormData((prev) => ({ ...prev, [name]: target.checked }));
     } else if (
       name === "rate_biasa" ||
@@ -102,21 +102,28 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     ) {
       // Allow empty string, numbers, and single decimal point for rate inputs
       if (value === "" || /^\d*\.?\d*$/.test(value)) {
-        setFormData((prev) => ({ ...prev, [name]: value })); // Keep as string
+        // For percentage rate unit, validate it doesn't exceed 100
+        if (formData.rate_unit === "Percent" && value !== "") {
+          const numValue = parseFloat(value);
+          if (!isNaN(numValue) && numValue > 100) {
+            // Don't update if it exceeds 100
+            return;
+          }
+        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
       }
     } else if (name === "id") {
       // Remove problematic characters as the user types
       const sanitizedValue = value
         .toUpperCase()
         .replace(/\s+/g, "_")
-        .replace(/[%#&?$^()*!@/\\]/g, ""); // Remove problematic characters
+        .replace(/[%#&?$^()*!@/\\]/g, "");
 
       setFormData((prev) => ({
         ...prev,
         [name]: sanitizedValue,
       }));
     } else {
-      // For description etc.
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
@@ -124,15 +131,19 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   // Handle listbox changes
   const handleListboxChange =
     (name: keyof Omit<PayCode, "code">) => (value: string) => {
-      // Need to cast value appropriately if PayType/RateUnit are specific string literals
-      setFormData((prev) => ({ ...prev, [name]: value as PayType | RateUnit }));
-    };
-
-  // Handle checkbox changes
-  const handleCheckboxChange =
-    (name: keyof Omit<PayCode, "code">) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [name]: e.target.checked }));
+      if (name === "rate_unit" && value === "Percent") {
+        // When rate unit is Percent, automatically set requires_units_input to true
+        setFormData((prev) => ({
+          ...prev,
+          [name]: value as RateUnit,
+          requires_units_input: true,
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          [name]: value as PayType | RateUnit,
+        }));
+      }
     };
 
   // Validate the form
@@ -182,6 +193,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
       return false;
     }
 
+    // Percentage validation when rate_unit is "Percent"
     if (formData.rate_unit === "Percent") {
       if (rateBiasaNum > 100 || rateAhadNum > 100 || rateUmumNum > 100) {
         setError("Percentage rates cannot exceed 100%");
@@ -331,34 +343,49 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   {/* Rate Inputs */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <FormInput
-                      label="Normal Rate"
+                      label={`Normal Rate${
+                        formData.rate_unit === "Percent" ? " (%)" : ""
+                      }`}
                       name="rate_biasa"
-                      value={formData.rate_biasa?.toString() ?? ""} // Use empty string for placeholder trigger
+                      value={formData.rate_biasa?.toString() ?? ""}
                       onChange={handleChange}
                       type="text"
-                      required={false} // Rates might not be strictly required? Or default to 0?
+                      required={false}
                       disabled={isSaving}
-                      placeholder="0.00"
+                      placeholder={
+                        formData.rate_unit === "Percent" ? "0-100" : "0.00"
+                      }
+                      max={formData.rate_unit === "Percent" ? 100 : undefined}
                     />
                     <FormInput
-                      label="Sunday Rate"
+                      label={`Sunday Rate${
+                        formData.rate_unit === "Percent" ? " (%)" : ""
+                      }`}
                       name="rate_ahad"
                       value={formData.rate_ahad?.toString() ?? ""}
                       onChange={handleChange}
                       type="text"
                       required={false}
                       disabled={isSaving}
-                      placeholder="0.00"
+                      placeholder={
+                        formData.rate_unit === "Percent" ? "0-100" : "0.00"
+                      }
+                      max={formData.rate_unit === "Percent" ? 100 : undefined}
                     />
                     <FormInput
-                      label="Holiday Rate"
+                      label={`Holiday Rate${
+                        formData.rate_unit === "Percent" ? " (%)" : ""
+                      }`}
                       name="rate_umum"
                       value={formData.rate_umum?.toString() ?? ""}
                       onChange={handleChange}
                       type="text"
                       required={false}
                       disabled={isSaving}
-                      placeholder="0.00"
+                      placeholder={
+                        formData.rate_unit === "Percent" ? "0-100" : "0.00"
+                      }
+                      max={formData.rate_unit === "Percent" ? 100 : undefined}
                     />
                   </div>
 
@@ -366,19 +393,25 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        checked={!!formData.is_active}
+                        checked={!!formData.requires_units_input}
                         onChange={(checked) =>
+                          // Only allow changes if rate_unit is not Percent
+                          formData.rate_unit !== "Percent" &&
                           setFormData((prev) => ({
                             ...prev,
-                            is_active: checked,
+                            requires_units_input: checked,
                           }))
                         }
                         size={20}
                         checkedColor="text-sky-600"
                         uncheckedColor="text-default-400"
-                        disabled={isSaving}
+                        disabled={isSaving || formData.rate_unit === "Percent"} // Disable if rate_unit is Percent
                         labelPosition="right"
-                        label="Active"
+                        label={
+                          formData.rate_unit === "Percent"
+                            ? "Requires Units Input (Required for Percentage)"
+                            : "Requires Units Input"
+                        }
                       />
                     </div>
                     <div className="flex items-center space-x-2">
