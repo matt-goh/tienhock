@@ -9,6 +9,7 @@ import {
 import { PayCode, PayType, RateUnit } from "../../types/types"; // PayCode type updated
 import { FormInput, FormListbox } from "../FormComponents"; // Ensure correct import path
 import Button from "../Button";
+import Checkbox from "../Checkbox";
 
 interface PayCodeModalProps {
   isOpen: boolean;
@@ -359,36 +360,38 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   {/* Checkboxes */}
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="is_active"
-                        name="is_active"
+                      <Checkbox
                         checked={!!formData.is_active}
-                        onChange={handleCheckboxChange("is_active")}
-                        className="h-4 w-4 rounded border-default-300 text-sky-600 focus:ring-sky-500"
+                        onChange={(checked) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            is_active: checked,
+                          }))
+                        }
+                        size={20}
+                        checkedColor="text-sky-600"
+                        uncheckedColor="text-default-400"
+                        disabled={isSaving}
+                        labelPosition="right"
+                        label="Active"
                       />
-                      <label
-                        htmlFor="is_active"
-                        className="text-sm font-medium text-default-700"
-                      >
-                        Active
-                      </label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="requires_units_input"
-                        name="requires_units_input"
+                      <Checkbox
                         checked={!!formData.requires_units_input}
-                        onChange={handleCheckboxChange("requires_units_input")}
-                        className="h-4 w-4 rounded border-default-300 text-sky-600 focus:ring-sky-500"
+                        onChange={(checked) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            requires_units_input: checked,
+                          }))
+                        }
+                        size={20}
+                        checkedColor="text-sky-600"
+                        uncheckedColor="text-default-400"
+                        disabled={isSaving}
+                        labelPosition="right"
+                        label="Requires Units Input"
                       />
-                      <label
-                        htmlFor="requires_units_input"
-                        className="text-sm font-medium text-default-700"
-                      >
-                        Requires Units Input
-                      </label>
                     </div>
                   </div>
 
