@@ -78,13 +78,13 @@ export default function (pool) {
     }
   });
 
-  // POST / - Remove 'code' from insert and validation
+  // POST
   router.post("/", async (req, res) => {
     const {
       id,
       description,
       pay_type,
-      rate_unit, // Removed 'code'
+      rate_unit,
       rate_biasa,
       rate_ahad,
       rate_umum,

@@ -431,21 +431,49 @@ export default function (pool) {
           for (const activity of activities) {
             if (activity.isSelected) {
               let hoursApplied = null;
+              let calculatedAmount = 0;
 
-              if (activity.rateUnit === "Hour") {
-                // For overtime activities, only apply to hours beyond 8
-                if (activity.payType === "Overtime") {
-                  hoursApplied = Math.max(0, hours - 8);
-                } else {
-                  hoursApplied = hours;
+              // Get pay code details to check rate unit
+              const payCodeQuery =
+                "SELECT rate_unit FROM pay_codes WHERE id = $1";
+              const payCodeResult = await pool.query(payCodeQuery, [
+                activity.payCodeId,
+              ]);
+              const payCode = payCodeResult.rows[0];
+
+              if (payCode) {
+                switch (payCode.rate_unit) {
+                  case "Hour":
+                    if (activity.payType === "Overtime") {
+                      hoursApplied = Math.max(0, hours - 8);
+                    } else {
+                      hoursApplied = hours;
+                    }
+                    calculatedAmount = parseFloat(activity.rate) * hoursApplied;
+                    break;
+                  case "Day":
+                    calculatedAmount = parseFloat(activity.rate);
+                    break;
+                  case "Bag":
+                  case "Fixed":
+                    calculatedAmount =
+                      parseFloat(activity.rate) * (activity.unitsProduced || 0);
+                    break;
+                  case "Percent":
+                    // For percentage: (percentage rate * units input) / 100
+                    calculatedAmount =
+                      (parseFloat(activity.rate) *
+                        (activity.unitsProduced || 0)) /
+                      100;
+                    break;
                 }
               }
 
               const activityQuery = `
                 INSERT INTO daily_work_log_activities (
-                log_entry_id, pay_code_id, hours_applied, 
-                units_produced, rate_used, calculated_amount,
-                is_manually_added
+                  log_entry_id, pay_code_id, hours_applied, 
+                  units_produced, rate_used, calculated_amount,
+                  is_manually_added
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
@@ -457,7 +485,7 @@ export default function (pool) {
                   ? parseFloat(activity.unitsProduced)
                   : null,
                 parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount),
+                calculatedAmount,
                 false,
               ]);
             }

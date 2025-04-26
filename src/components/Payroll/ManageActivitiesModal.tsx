@@ -11,6 +11,7 @@ import Button from "../Button";
 import { Employee } from "../../types/types";
 import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
+import { ContextField } from "../../configs/payrollJobConfigs";
 
 interface ActivityItem {
   payCodeId: string;
@@ -34,6 +35,8 @@ interface ManageActivitiesModalProps {
   dayType: "Biasa" | "Ahad" | "Umum";
   onActivitiesUpdated: (activities: ActivityItem[]) => void;
   existingActivities?: ActivityItem[];
+  contextLinkedPayCodes?: Record<string, ContextField>;
+  contextData?: Record<string, any>;
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -46,28 +49,44 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   dayType,
   onActivitiesUpdated,
   existingActivities = [],
+  contextLinkedPayCodes = {},
+  contextData = {},
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectAll, setSelectAll] = useState(false);
 
-  // Fetch available pay codes for this job when modal opens
+  // When initializing activities, handle context-linked pay codes
   useEffect(() => {
     if (isOpen && employee) {
       if (existingActivities && existingActivities.length > 0) {
-        // Create a deep copy of existing activities to prevent mutations
-        const activitiesCopy = existingActivities.map((activity) => ({
-          ...activity,
-          // If there are any nested objects/arrays, spread them too
-        }));
-        setActivities(activitiesCopy);
+        // Check for context-linked pay codes and update their units
+        const activitiesWithContext = existingActivities.map((activity) => {
+          const contextField = contextLinkedPayCodes[activity.payCodeId];
+          if (contextField && contextData[contextField.id] !== undefined) {
+            return {
+              ...activity,
+              unitsProduced: contextData[contextField.id],
+              isContextLinked: true,
+            };
+          }
+          return activity;
+        });
+        setActivities(activitiesWithContext);
       } else {
         setActivities([]);
       }
       setError(null);
     }
-  }, [isOpen, employee?.id, employee?.jobType, existingActivities]);
+  }, [
+    isOpen,
+    employee?.id,
+    employee?.jobType,
+    existingActivities,
+    contextLinkedPayCodes,
+    contextData,
+  ]);
 
   useEffect(() => {
     const allSelected =
@@ -102,8 +121,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             calculatedAmount = activity.rate * (activity.unitsProduced || 0);
             break;
           case "Percent":
-            // Percentage of some base amount (would need implementation details)
-            calculatedAmount = 0; // Placeholder
+            calculatedAmount =
+              (activity.rate * (activity.unitsProduced || 0)) / 100;
             break;
           default:
             calculatedAmount = 0;
@@ -317,15 +336,21 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         <div className="text-xs text-gray-500">
                                           {activity.payType} •{" "}
                                           {activity.rateUnit}
-                                          {activity.rateUnit !== "Day" && (
-                                            <span className="ml-1">
-                                              @ RM{activity.rate.toFixed(2)}/
-                                              {activity.rateUnit}
-                                            </span>
-                                          )}
+                                          {activity.rateUnit !== "Day" &&
+                                            activity.rateUnit !== "Percent" && (
+                                              <span className="ml-1">
+                                                @ RM{activity.rate.toFixed(2)}/
+                                                {activity.rateUnit}
+                                              </span>
+                                            )}
                                           {activity.rateUnit === "Day" && (
                                             <span className="ml-1">
                                               @ RM{activity.rate.toFixed(2)}/Day
+                                            </span>
+                                          )}
+                                          {activity.rateUnit === "Percent" && (
+                                            <span className="ml-1">
+                                              @ {activity.rate}%
                                             </span>
                                           )}
                                           {activity.payType === "Overtime" &&
