@@ -430,41 +430,20 @@ export default function (pool) {
         if (activities && activities.length > 0) {
           for (const activity of activities) {
             if (activity.isSelected) {
+              // Determine hours_applied based on the rate unit and activity type
               let hoursApplied = null;
-              let calculatedAmount = 0;
 
-              // Get pay code details to check rate unit
-              const payCodeQuery =
-                "SELECT rate_unit FROM pay_codes WHERE id = $1";
-              const payCodeResult = await pool.query(payCodeQuery, [
-                activity.payCodeId,
-              ]);
-              const payCode = payCodeResult.rows[0];
-
-              if (payCode) {
-                switch (payCode.rate_unit) {
-                  case "Hour":
-                    if (activity.payType === "Overtime") {
-                      hoursApplied = Math.max(0, hours - 8);
-                    } else {
-                      hoursApplied = hours;
-                    }
-                    calculatedAmount = parseFloat(activity.rate) * hoursApplied;
-                    break;
-                  case "Bag":
-                  case "Fixed":
-                    calculatedAmount = parseFloat(activity.rate); // Simply use the rate directly
-                    break;
-                  case "Percent":
-                    // For percentage: (percentage rate * units input) / 100
-                    calculatedAmount =
-                      (parseFloat(activity.rate) *
-                        (activity.unitsProduced || 0)) /
-                      100;
-                    break;
+              // Only set hours_applied for Hour-based activities
+              if (activity.rateUnit === "Hour") {
+                // For overtime activities, only apply to hours beyond 8
+                if (activity.payType === "Overtime") {
+                  hoursApplied = Math.max(0, hours - 8);
+                } else {
+                  hoursApplied = hours;
                 }
               }
 
+              // Trust the calculated amount from the frontend
               const activityQuery = `
                 INSERT INTO daily_work_log_activities (
                   log_entry_id, pay_code_id, hours_applied, 
@@ -481,7 +460,7 @@ export default function (pool) {
                   ? parseFloat(activity.unitsProduced)
                   : null,
                 parseFloat(activity.rate),
-                calculatedAmount,
+                parseFloat(activity.calculatedAmount), // Use frontend calculation
                 false,
               ]);
             }

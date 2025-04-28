@@ -28,6 +28,10 @@ import {
   getJobIds,
 } from "../../configs/payrollJobConfigs";
 import DynamicContextForm from "../../components/Payroll/DynamicContextForm";
+import {
+  calculateActivityAmount,
+  calculateActivitiesAmounts,
+} from "../../utils/payroll/calculateActivityAmount";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -149,38 +153,31 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const updatedActivities = { ...prev };
 
           Object.keys(updatedActivities).forEach((rowKey) => {
-            updatedActivities[rowKey] = updatedActivities[rowKey].map(
+            // First update the units for context-linked activities
+            const updatedRowActivities = updatedActivities[rowKey].map(
               (activity) => {
                 if (activity.payCodeId === field.linkedPayCode) {
                   // Auto-update units for context-linked pay codes
-                  const newActivity = {
+                  return {
                     ...activity,
                     unitsProduced: contextValue || 0,
                     isContextLinked: true,
                   };
-
-                  // Recalculate amount
-                  if (activity.isSelected) {
-                    let calculatedAmount = 0;
-                    switch (activity.rateUnit) {
-                      case "Bag":
-                      case "Fixed":
-                        calculatedAmount = activity.rate * (contextValue || 0);
-                        break;
-                      case "Percent":
-                        calculatedAmount =
-                          (activity.rate * (contextValue || 0)) / 100;
-                        break;
-                    }
-                    newActivity.calculatedAmount = Number(
-                      calculatedAmount.toFixed(2)
-                    );
-                  }
-
-                  return newActivity;
                 }
                 return activity;
               }
+            );
+
+            // Get the employee's hours for this row
+            const [employeeId, jobType] = rowKey.split("-");
+            const hours =
+              employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+
+            // Then recalculate all activities using our centralized function
+            updatedActivities[rowKey] = calculateActivitiesAmounts(
+              updatedRowActivities,
+              hours,
+              formData.contextData
             );
           });
 
@@ -188,7 +185,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       }
     });
-  }, [formData.contextData, jobConfig]);
+  }, [formData.contextData, jobConfig, employeeSelectionState.jobHours]);
 
   // Update the jobs filter based on dynamic configuration
   const jobs = useMemo(() => {
@@ -726,45 +723,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               ? 0
               : null;
 
-            // Calculate amount
-            let calculatedAmount = 0;
-            if (isSelected) {
-              switch (payCode.rate_unit) {
-                case "Hour":
-                  // For overtime pay codes, only apply to hours beyond 8
-                  if (isOvertimeCode) {
-                    const overtimeHours = Math.max(0, hours - 8);
-                    calculatedAmount = rate * overtimeHours;
-                  } else {
-                    calculatedAmount = rate * hours;
-                  }
-                  break;
-                case "Bag":
-                  calculatedAmount = rate * (unitsProduced || 0);
-                  break;
-                case "Percent":
-                  calculatedAmount = (rate * (unitsProduced || 0)) / 100;
-                  break;
-                case "Fixed":
-                  // Fixed amount - just use the rate directly
-                  calculatedAmount = rate;
-                  break;
-                default:
-                  calculatedAmount = 0;
-              }
-            }
-
-            // Add auto-deselection for zero amount activities
-            // Don't deselect context-linked activities automatically
-            const shouldAutoDeselect =
-              calculatedAmount === 0 &&
-              !isContextLinked &&
-              payCode.rate_unit !== "Bag";
-
-            if (shouldAutoDeselect) {
-              isSelected = false;
-            }
-
+            // After creating the activity object, calculate the amount using the shared function
             return {
               payCodeId: payCode.id,
               description: payCode.description,
@@ -774,12 +733,28 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               isDefault: payCode.is_default_setting,
               isSelected: isSelected,
               unitsProduced: unitsProduced,
-              calculatedAmount: Number(calculatedAmount.toFixed(2)),
               isContextLinked: isContextLinked, // Flag for special handling
+              calculatedAmount: calculateActivityAmount(
+                {
+                  isSelected,
+                  payType: payCode.pay_type,
+                  rateUnit: payCode.rate_unit,
+                  rate,
+                  unitsProduced,
+                },
+                hours,
+                formData.contextData
+              ),
             };
           });
 
-          newEmployeeActivities[rowKey] = activities;
+          // Then apply auto-deselection logic to all activities
+          const processedActivities = calculateActivitiesAmounts(
+            activities,
+            hours,
+            formData.contextData
+          );
+          newEmployeeActivities[rowKey] = processedActivities;
         });
       }
     );
