@@ -710,12 +710,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             // For overtime pay codes, determine if they should be auto-selected
             const isOvertimeCode = payCode.pay_type === "Overtime";
             const shouldAutoSelect = isOvertimeCode && hours > 8;
-
-            // For context-linked pay codes, don't auto-select
+            
+            // For context-linked pay codes or Bag rate units, don't auto-select
             let isSelected = existingActivity
               ? existingActivity.isSelected
-              : isContextLinked
-              ? false // Don't auto-select context-linked pay codes
+              : isContextLinked || payCode.rate_unit === "Bag"
+              ? false // Don't auto-select context-linked pay codes or Bag rate units
               : shouldAutoSelect || payCode.is_default_setting;
 
             // For context-linked pay codes, use context value as units
