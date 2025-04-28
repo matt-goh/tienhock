@@ -1,15 +1,7 @@
+import { IconLink } from "@tabler/icons-react";
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-
-interface ActivityItem {
-  payCodeId: string;
-  description: string;
-  payType: string;
-  rateUnit: string;
-  rate: number;
-  unitsProduced?: number;
-  calculatedAmount: number;
-}
+import { ActivityItem } from "./ManageActivitiesModal";
 
 interface ActivitiesTooltipProps {
   activities: ActivityItem[];
@@ -139,6 +131,12 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       title={activity.payCodeId}
                     >
                       {activity.description}
+                      {activity.isContextLinked && (
+                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                          <IconLink size={10} className="mr-0.5" />
+                          Auto
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-2 text-default-500 text-xs mt-0.5">
                       <span>{activity.payType}</span>
