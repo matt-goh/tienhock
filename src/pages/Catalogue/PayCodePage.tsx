@@ -500,7 +500,7 @@ const PayCodePage: React.FC = () => {
       {/* Header */}
       <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800">
-          Pay Code Catalogue
+          Pay Code
         </h1>
         <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
           {renderPayTypeFilter()}

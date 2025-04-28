@@ -373,7 +373,7 @@ const JobPage: React.FC = () => {
       className={`relative ${selectedJob ? "w-full" : ""} mx-4 mb-2 md:mx-6`}
     >
       <h1 className="mb-6 text-center text-xl font-semibold text-default-800">
-        Job Catalogue & Pay Codes
+        Job & Pay Codes
       </h1>
       {/* Job Selection */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
