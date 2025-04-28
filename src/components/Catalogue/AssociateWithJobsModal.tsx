@@ -77,21 +77,40 @@ const AssociateWithJobsModal: React.FC<AssociateWithJobsModalProps> = ({
         (id) => !selectedJobIds.has(id)
       );
 
-      // Handle additions
-      const addPromises = jobsToAdd.map((jobId) =>
-        api.post("/api/job-pay-codes", {
+      // Use batch endpoints instead of individual calls
+      const promises = [];
+
+      // Handle additions with batch endpoint
+      if (jobsToAdd.length > 0) {
+        const associations = jobsToAdd.map((jobId) => ({
           job_id: jobId,
           pay_code_id: payCode.id,
-          is_default: false, // Set the appropriate default value
-        })
-      );
+          is_default: false,
+        }));
 
-      // Handle removals
-      const removePromises = jobsToRemove.map((jobId) =>
-        api.delete(`/api/job-pay-codes/${jobId}/${payCode.id}`)
-      );
+        promises.push(api.post("/api/job-pay-codes/batch", { associations }));
+      }
 
-      await Promise.all([...addPromises, ...removePromises]);
+      // Handle removals with batch endpoint
+      if (jobsToRemove.length > 0) {
+        const items = jobsToRemove.map((jobId) => ({
+          job_id: jobId,
+          pay_code_id: payCode.id,
+        }));
+
+        promises.push(api.post("/api/job-pay-codes/batch-delete", { items }));
+      }
+
+      // Wait for all batch operations to complete
+      const results = await Promise.all(promises);
+
+      // Check results for any errors
+      const errors = results.filter(
+        (result) => result.errors && result.errors.length > 0
+      );
+      if (errors.length > 0) {
+        console.warn("Some associations had errors:", errors);
+      }
 
       await onAssociationComplete();
       toast.success(
