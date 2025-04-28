@@ -15,6 +15,7 @@ import { ContextField } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
 import { IconLink } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
+import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
 
 export interface ActivityItem {
   payCodeId: string;
@@ -81,10 +82,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
           return activity;
         });
 
-        // Apply the auto-deselect logic when initializing
-        const calculatedActivities = calculateAmounts(
+        // Use our centralized calculation function instead
+        const calculatedActivities = calculateActivitiesAmounts(
           activitiesWithContext,
-          employeeHours
+          employeeHours,
+          contextData
         );
 
         setActivities(calculatedActivities);
@@ -172,7 +174,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
       isSelected: newSelectAll,
     }));
 
-    const recalculatedActivities = calculateAmounts(
+    const recalculatedActivities = calculateActivitiesAmounts(
       updatedActivities,
       employeeHours
     );
@@ -185,7 +187,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     newActivities[index].isSelected = !newActivities[index].isSelected;
 
     // Recalculate amounts after toggling
-    const updatedActivities = calculateAmounts(newActivities, employeeHours);
+    const updatedActivities = calculateActivitiesAmounts(
+      newActivities,
+      employeeHours
+    );
     setActivities(updatedActivities);
   };
 
@@ -195,7 +200,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
 
     // Recalculate amounts after changing units
-    const updatedActivities = calculateAmounts(newActivities, employeeHours);
+    const updatedActivities = calculateActivitiesAmounts(
+      newActivities,
+      employeeHours
+    );
     setActivities(updatedActivities);
   };
 
