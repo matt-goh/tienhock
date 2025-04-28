@@ -42,7 +42,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
       const rect = iconRef.current.getBoundingClientRect();
       setPosition({
         top: rect.top - 10,
-        left: rect.left + rect.width / 2,
+        left: rect.left, // Simply use left position of the icon
       });
     }
   }, [isVisible]);
@@ -91,7 +91,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-80 transform -translate-x-1/2 -translate-y-full opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-80 transform -translate-y-full opacity-0 transition-opacity duration-200"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,

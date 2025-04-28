@@ -3,6 +3,7 @@ import React, { useState, useRef } from "react";
 import { ContextField } from "../../configs/payrollJobConfigs";
 import { createPortal } from "react-dom";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { Link } from "react-router-dom";
 
 interface ContextLinkMessagesProps {
   contextFields: ContextField[];
@@ -30,7 +31,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
       const rect = labelRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 5,
-        left: rect.left + rect.width / 2,
+        left: rect.left, // Changed from rect.left + rect.width / 2
       });
     }
     if (timeoutRef.current) {
@@ -77,7 +78,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-3 w-auto transform -translate-x-1/2 opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-3 w-auto opacity-0 transition-opacity duration-200"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -99,8 +100,16 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                         <span className="mr-1">•</span>
                         <span>
                           <span className="font-medium">{field.label}</span> ➝{" "}
-                          <span className="font-medium">
-                            {payCodeInfo?.description || field.linkedPayCode}
+                          <span
+                            className="font-medium"
+                            title={field.linkedPayCode}
+                          >
+                            <Link
+                              to={`/catalogue/pay-codes?desc=${field.linkedPayCode}`}
+                              className="hover:text-sky-600 hover:underline"
+                            >
+                              {payCodeInfo?.description || field.linkedPayCode}
+                            </Link>
                           </span>
                         </span>
                       </div>
@@ -138,8 +147,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                           </div>
                           {payCodeInfo?.rateUnit === "Percent" && (
                             <div className="text-xs italic mt-1">
-                              Percent rates are multiplied by the{" "}
-                              {payCodeInfo?.description || field.linkedPayCode}{" "}
+                              Percent rates are multiplied by the {field.label}{" "}
                               value
                             </div>
                           )}
