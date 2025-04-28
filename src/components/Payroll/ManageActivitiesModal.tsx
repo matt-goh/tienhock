@@ -60,6 +60,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectAll, setSelectAll] = useState(false);
+  const [originalActivities, setOriginalActivities] = useState<ActivityItem[]>(
+    []
+  );
 
   // When initializing activities, handle context-linked pay codes
   useEffect(() => {
@@ -77,9 +80,19 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
           }
           return activity;
         });
-        setActivities(activitiesWithContext);
+
+        // Apply the auto-deselect logic when initializing
+        const calculatedActivities = calculateAmounts(
+          activitiesWithContext,
+          employeeHours
+        );
+
+        setActivities(calculatedActivities);
+        // Store original state for cancellation
+        setOriginalActivities(JSON.parse(JSON.stringify(calculatedActivities)));
       } else {
         setActivities([]);
+        setOriginalActivities([]);
       }
       setError(null);
     }
@@ -90,6 +103,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     existingActivities,
     contextLinkedPayCodes,
     contextData,
+    employeeHours,
   ]);
 
   useEffect(() => {
@@ -117,11 +131,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               calculatedAmount = activity.rate * hours;
             }
             break;
-          case "Day":
-            calculatedAmount = activity.rate; // Daily rate is fixed regardless of hours
-            break;
           case "Bag":
-          case "Fixed":
             calculatedAmount = activity.rate * (activity.unitsProduced || 0);
             break;
           case "Percent":
@@ -133,9 +143,15 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         }
       }
 
+      // Add automatic deselection for zero amount activities
+      // Don't deselect context-linked activities automatically
+      const shouldAutoDeselect =
+        calculatedAmount === 0 && !activity.isContextLinked;
+
       return {
         ...activity,
         calculatedAmount: Number(calculatedAmount.toFixed(2)),
+        isSelected: shouldAutoDeselect ? false : activity.isSelected,
       };
     });
   };
@@ -193,24 +209,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   };
 
   const handleClose = () => {
-    // Reset activities to original state when closing without saving
-    if (existingActivities && existingActivities.length > 0) {
-      // Create deep copy but preserve context-linked status
-      const activitiesWithContext = existingActivities.map((activity) => {
-        const contextField = contextLinkedPayCodes[activity.payCodeId];
-        if (contextField && contextData[contextField.id] !== undefined) {
-          return {
-            ...activity,
-            unitsProduced: contextData[contextField.id],
-            isContextLinked: true,
-          };
-        }
-        return { ...activity };
-      });
-      setActivities(activitiesWithContext);
-    } else {
-      setActivities([]);
-    }
+    // Reset to original activities state
+    setActivities([...originalActivities]);
     onClose();
   };
 
