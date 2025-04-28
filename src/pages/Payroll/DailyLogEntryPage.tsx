@@ -28,8 +28,6 @@ import {
   getJobIds,
 } from "../../configs/payrollJobConfigs";
 import DynamicContextForm from "../../components/Payroll/DynamicContextForm";
-import ContextValidationMessages from "../../components/Payroll/ContextValidationMessages";
-import ContextLinkMessages from "../../components/Payroll/ContextLinkMessages";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -861,15 +859,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               contextData={formData.contextData}
               onChange={handleContextChange}
               disabled={isSaving}
-            />
-            <ContextValidationMessages
-              contextFields={jobConfig?.contextFields || []}
-              contextData={formData.contextData}
-              linkedPayCodes={contextLinkedPayCodes}
-            />
-            <ContextLinkMessages
-              contextFields={jobConfig?.contextFields || []}
-              linkedPayCodes={contextLinkedPayCodes}
             />
           </div>
         </div>

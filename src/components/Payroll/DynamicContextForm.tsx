@@ -2,6 +2,7 @@
 import React from "react";
 import { FormInput, FormListbox } from "../FormComponents";
 import { ContextField } from "../../configs/payrollJobConfigs";
+import ContextLinkMessages from "./ContextLinkMessages";
 
 interface DynamicContextFormProps {
   contextFields: ContextField[];
@@ -19,13 +20,25 @@ const DynamicContextForm: React.FC<DynamicContextFormProps> = ({
   const renderField = (field: ContextField) => {
     const value = contextData[field.id] ?? field.defaultValue;
 
+    const fieldLabel = (
+      <>
+        {field.label}{" "}
+        {field.linkedPayCode && (
+          <ContextLinkMessages
+            contextFields={[field]}
+            linkedPayCodes={{ [field.linkedPayCode]: field }}
+          />
+        )}
+      </>
+    );
+
     switch (field.type) {
       case "number":
         return (
           <FormInput
             key={field.id}
             name={field.id}
-            label={field.label}
+            label={fieldLabel}
             type="number"
             value={value?.toString() || ""}
             onChange={(e) => onChange(field.id, Number(e.target.value))}

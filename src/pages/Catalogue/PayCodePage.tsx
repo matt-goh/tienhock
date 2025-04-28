@@ -1,11 +1,5 @@
 // src/pages/Catalogue/PayCodePage.tsx
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconCheck,
   IconChevronDown,
@@ -23,6 +17,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import toast from "react-hot-toast";
+import { useLocation } from "react-router-dom";
 
 import { api } from "../../routes/utils/api";
 import { PayCode } from "../../types/types"; // Type updated to exclude 'code'
@@ -35,6 +30,7 @@ import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCode
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 const PayCodePage: React.FC = () => {
+  const location = useLocation();
   // State
   const [filteredCodes, setFilteredCodes] = useState<PayCode[]>([]);
   const [selectedType, setSelectedType] = useState<string>("All");
@@ -112,6 +108,15 @@ const PayCodePage: React.FC = () => {
     detailedMappings,
     loading,
   ]);
+
+  // Initialization effect to set search from URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const idParam = params.get("desc");
+    if (idParam) {
+      setSearchTerm(idParam);
+    }
+  }, [location.search]);
 
   // --- Derived State ---
   const payCodeToJobsMap = useMemo(() => {

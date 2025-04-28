@@ -26,7 +26,7 @@ export interface SelectOption {
 // --- FormInput ---
 interface InputProps {
   name: string;
-  label: string;
+  label: string | React.ReactNode;
   value: string | number | undefined;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
@@ -58,7 +58,7 @@ export const FormInput: React.FC<InputProps> = ({
       <label
         htmlFor={name}
         className="block text-sm font-medium text-default-700 truncate"
-        title={label}
+        title={typeof label === "string" ? label : undefined}
       >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
@@ -109,7 +109,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
         <label
           htmlFor={name}
           className="block text-sm font-medium text-default-700 truncate"
-          title={label}
+          title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -139,7 +139,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
 // --- FormListbox ---
 interface ListboxProps {
   name: string;
-  label: string;
+  label: string | React.ReactNode;
   value: string | number | undefined;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -180,7 +180,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
         <label
           htmlFor={`${name}-button`}
           className="block text-sm font-medium text-default-700 truncate"
-          title={label}
+          title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -367,7 +367,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
         <label
           htmlFor={`${name}-input`}
           className="block text-sm font-medium text-default-700 truncate"
-          title={label}
+          title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>

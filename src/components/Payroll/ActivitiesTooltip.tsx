@@ -2,6 +2,7 @@ import { IconLink } from "@tabler/icons-react";
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ActivityItem } from "./ManageActivitiesModal";
+import { Link } from "react-router-dom";
 
 interface ActivitiesTooltipProps {
   activities: ActivityItem[];
@@ -130,7 +131,18 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       className="font-medium text-default-800 truncate"
                       title={activity.payCodeId}
                     >
-                      {activity.description}
+                      <Link
+                        to={`/catalogue/pay-codes?desc=${activity.description}`}
+                        className="hover:text-sky-600 hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (typeof onClick === "function") {
+                            onClick();
+                          }
+                        }}
+                      >
+                        {activity.description}
+                      </Link>
                       {activity.isContextLinked && (
                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
                           <IconLink size={10} className="mr-0.5" />
@@ -142,7 +154,6 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       <span>{activity.payType}</span>
                       <span>•</span>
                       <span>{activity.rateUnit}</span>
-                      {/* Add rate display */}
                       {activity.rateUnit !== "Day" && (
                         <>
                           <span>•</span>
