@@ -134,7 +134,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       {activity.isContextLinked && (
                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
                           <IconLink size={10} className="mr-0.5" />
-                          Auto
+                          Linked
                         </span>
                       )}
                     </div>
