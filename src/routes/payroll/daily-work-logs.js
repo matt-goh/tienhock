@@ -451,13 +451,9 @@ export default function (pool) {
                     }
                     calculatedAmount = parseFloat(activity.rate) * hoursApplied;
                     break;
-                  case "Day":
-                    calculatedAmount = parseFloat(activity.rate);
-                    break;
                   case "Bag":
                   case "Fixed":
-                    calculatedAmount =
-                      parseFloat(activity.rate) * (activity.unitsProduced || 0);
+                    calculatedAmount = parseFloat(activity.rate); // Simply use the rate directly
                     break;
                   case "Percent":
                     // For percentage: (percentage rate * units input) / 100

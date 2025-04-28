@@ -580,7 +580,7 @@ export interface SelectOption {
 }
 
 export type PayType = "Base" | "Tambahan" | "Overtime";
-export type RateUnit = "Hour" | "Bag" | "Percent";
+export type RateUnit = "Hour" | "Bag" | "Percent" | "Fixed";
 
 export interface PayCode {
   id: string;

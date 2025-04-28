@@ -60,6 +60,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Hour", name: "Hour" },
     { id: "Bag", name: "Bag" },
     { id: "Percent", name: "Percent" },
+    { id: "Fixed", name: "Fixed" },
   ];
 
   // Initialize form data
@@ -217,13 +218,24 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     const rateAhadStr = formData.rate_ahad?.toString() ?? "";
     const rateUmumStr = formData.rate_umum?.toString() ?? "";
 
+    // Parse rate values
+    const rateBiasa = rateBiasaStr === "" ? 0 : parseFloat(rateBiasaStr);
+    const rateAhad = rateAhadStr === "" ? 0 : parseFloat(rateAhadStr);
+    const rateUmum = rateUmumStr === "" ? 0 : parseFloat(rateUmumStr);
+
+    // Auto-fill Sunday and holiday rates if they're zero and normal rate is non-zero
+    const finalRateAhad =
+      rateAhad === 0 && rateBiasa > 0 ? rateBiasa : rateAhad;
+    const finalRateUmum =
+      rateUmum === 0 && rateBiasa > 0 ? rateBiasa : rateUmum;
+
     const dataToSave: PayCode = {
       ...formData,
       id: formData.id.trim(), // Ensure trimmed ID
-      // Parse final rate values: empty string -> 0, otherwise parse float
-      rate_biasa: rateBiasaStr === "" ? 0 : parseFloat(rateBiasaStr),
-      rate_ahad: rateAhadStr === "" ? 0 : parseFloat(rateAhadStr),
-      rate_umum: rateUmumStr === "" ? 0 : parseFloat(rateUmumStr),
+      // Use auto-filled rates where appropriate
+      rate_biasa: rateBiasa,
+      rate_ahad: finalRateAhad,
+      rate_umum: finalRateUmum,
     } as PayCode; // Assert type if Omit was used for state
 
     try {
@@ -340,9 +352,13 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   {/* Rate Inputs */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <FormInput
-                      label={`Normal Rate${
-                        formData.rate_unit === "Percent" ? " (%)" : ""
-                      }`}
+                      label={
+                        formData.rate_unit === "Fixed"
+                          ? "Normal Amount"
+                          : `Normal Rate${
+                              formData.rate_unit === "Percent" ? " (%)" : ""
+                            }`
+                      }
                       name="rate_biasa"
                       value={formData.rate_biasa?.toString() ?? ""}
                       onChange={handleChange}
@@ -355,9 +371,13 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       max={formData.rate_unit === "Percent" ? 100 : undefined}
                     />
                     <FormInput
-                      label={`Sunday Rate${
-                        formData.rate_unit === "Percent" ? " (%)" : ""
-                      }`}
+                      label={
+                        formData.rate_unit === "Fixed"
+                          ? "Sunday Amount"
+                          : `Sunday Rate${
+                              formData.rate_unit === "Percent" ? " (%)" : ""
+                            }`
+                      }
                       name="rate_ahad"
                       value={formData.rate_ahad?.toString() ?? ""}
                       onChange={handleChange}
@@ -370,9 +390,13 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       max={formData.rate_unit === "Percent" ? 100 : undefined}
                     />
                     <FormInput
-                      label={`Holiday Rate${
-                        formData.rate_unit === "Percent" ? " (%)" : ""
-                      }`}
+                      label={
+                        formData.rate_unit === "Fixed"
+                          ? "Holiday Amount"
+                          : `Holiday Rate${
+                              formData.rate_unit === "Percent" ? " (%)" : ""
+                            }`
+                      }
                       name="rate_umum"
                       value={formData.rate_umum?.toString() ?? ""}
                       onChange={handleChange}
@@ -390,36 +414,49 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                      checked={formData.rate_unit === "Hour" ? false : !!formData.requires_units_input}
-                      onChange={(checked) => {
-                        // Only allow changes if rate_unit is not Percent, Bag, or Hour
-                        if (formData.rate_unit !== "Percent" && 
-                          formData.rate_unit !== "Bag" && 
-                          formData.rate_unit !== "Hour") {
-                        setFormData((prev) => ({
-                          ...prev,
-                          requires_units_input: checked,
-                        }));
+                        checked={
+                          formData.rate_unit === "Hour" ||
+                          formData.rate_unit === "Fixed"
+                            ? false
+                            : !!formData.requires_units_input
                         }
-                      }}
-                      size={20}
-                      checkedColor="text-sky-600"
-                      uncheckedColor="text-default-400"
-                      // Disable for Percent, Bag, and Hour
-                      disabled={isSaving || 
-                         formData.rate_unit === "Percent" || 
-                         formData.rate_unit === "Bag" ||
-                         formData.rate_unit === "Hour"}
-                      labelPosition="right"
-                      label={
-                        formData.rate_unit === "Percent"
-                        ? "Requires Units Input (Required for Percentage)"
-                        : formData.rate_unit === "Bag"
-                        ? "Requires Units Input (Required for Bag)"
-                        : formData.rate_unit === "Hour"
-                        ? "Requires Units Input (Not Applicable for Hour)"
-                        : "Requires Units Input"
-                      }
+                        onChange={(checked) => {
+                          // Only allow changes if rate_unit is not Percent, Bag, or Hour
+                          if (
+                            formData.rate_unit !== "Percent" &&
+                            formData.rate_unit !== "Bag" &&
+                            formData.rate_unit !== "Hour" &&
+                            formData.rate_unit !== "Fixed"
+                          ) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              requires_units_input: checked,
+                            }));
+                          }
+                        }}
+                        size={20}
+                        checkedColor="text-sky-600"
+                        uncheckedColor="text-default-400"
+                        // Disable for Percent, Bag, and Hour
+                        disabled={
+                          isSaving ||
+                          formData.rate_unit === "Percent" ||
+                          formData.rate_unit === "Bag" ||
+                          formData.rate_unit === "Hour" ||
+                          formData.rate_unit === "Fixed"
+                        }
+                        labelPosition="right"
+                        label={
+                          formData.rate_unit === "Percent"
+                            ? "Requires Units Input (Required for Percentage)"
+                            : formData.rate_unit === "Bag"
+                            ? "Requires Units Input (Required for Bag)"
+                            : formData.rate_unit === "Hour"
+                            ? "Requires Units Input (Not Applicable for Hour)"
+                            : formData.rate_unit === "Fixed"
+                            ? "Requires Units Input (Not Applicable for Fixed Amount)"
+                            : "Requires Units Input"
+                        }
                       />
                     </div>
                   </div>

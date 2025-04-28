@@ -171,7 +171,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         calculatedAmount =
                           (activity.rate * (contextValue || 0)) / 100;
                         break;
-                      // ... other rate units
                     }
                     newActivity.calculatedAmount = Number(
                       calculatedAmount.toFixed(2)
@@ -710,7 +709,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             // For overtime pay codes, determine if they should be auto-selected
             const isOvertimeCode = payCode.pay_type === "Overtime";
             const shouldAutoSelect = isOvertimeCode && hours > 8;
-            
+
             // For context-linked pay codes or Bag rate units, don't auto-select
             let isSelected = existingActivity
               ? existingActivity.isSelected
@@ -745,6 +744,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   break;
                 case "Percent":
                   calculatedAmount = (rate * (unitsProduced || 0)) / 100;
+                  break;
+                case "Fixed":
+                  // Fixed amount - just use the rate directly
+                  calculatedAmount = rate;
                   break;
                 default:
                   calculatedAmount = 0;
