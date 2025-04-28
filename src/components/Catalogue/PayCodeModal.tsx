@@ -58,11 +58,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
   const rateUnitOptions = [
     { id: "Hour", name: "Hour" },
-    { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
-    { id: "Fixed", name: "Fixed" },
     { id: "Percent", name: "Percent" },
-    // Add other RateUnit options if needed
   ];
 
   // Initialize form data
@@ -393,42 +390,36 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        checked={!!formData.requires_units_input}
-                        onChange={(checked) =>
-                          // Only allow changes if rate_unit is not Percent
-                          formData.rate_unit !== "Percent" &&
-                          setFormData((prev) => ({
-                            ...prev,
-                            requires_units_input: checked,
-                          }))
+                      checked={formData.rate_unit === "Hour" ? false : !!formData.requires_units_input}
+                      onChange={(checked) => {
+                        // Only allow changes if rate_unit is not Percent, Bag, or Hour
+                        if (formData.rate_unit !== "Percent" && 
+                          formData.rate_unit !== "Bag" && 
+                          formData.rate_unit !== "Hour") {
+                        setFormData((prev) => ({
+                          ...prev,
+                          requires_units_input: checked,
+                        }));
                         }
-                        size={20}
-                        checkedColor="text-sky-600"
-                        uncheckedColor="text-default-400"
-                        disabled={isSaving || formData.rate_unit === "Percent"} // Disable if rate_unit is Percent
-                        labelPosition="right"
-                        label={
-                          formData.rate_unit === "Percent"
-                            ? "Requires Units Input (Required for Percentage)"
-                            : "Requires Units Input"
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={!!formData.requires_units_input}
-                        onChange={(checked) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            requires_units_input: checked,
-                          }))
-                        }
-                        size={20}
-                        checkedColor="text-sky-600"
-                        uncheckedColor="text-default-400"
-                        disabled={isSaving}
-                        labelPosition="right"
-                        label="Requires Units Input"
+                      }}
+                      size={20}
+                      checkedColor="text-sky-600"
+                      uncheckedColor="text-default-400"
+                      // Disable for Percent, Bag, and Hour
+                      disabled={isSaving || 
+                         formData.rate_unit === "Percent" || 
+                         formData.rate_unit === "Bag" ||
+                         formData.rate_unit === "Hour"}
+                      labelPosition="right"
+                      label={
+                        formData.rate_unit === "Percent"
+                        ? "Requires Units Input (Required for Percentage)"
+                        : formData.rate_unit === "Bag"
+                        ? "Requires Units Input (Required for Bag)"
+                        : formData.rate_unit === "Hour"
+                        ? "Requires Units Input (Not Applicable for Hour)"
+                        : "Requires Units Input"
+                      }
                       />
                     </div>
                   </div>
