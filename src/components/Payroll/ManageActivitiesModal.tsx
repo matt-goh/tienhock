@@ -12,8 +12,10 @@ import { Employee } from "../../types/types";
 import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
 import { ContextField } from "../../configs/payrollJobConfigs";
+import ContextLinkedBadge from "./ContextLinkedBadge";
+import { IconLink } from "@tabler/icons-react";
 
-interface ActivityItem {
+export interface ActivityItem {
   payCodeId: string;
   description: string;
   payType: string;
@@ -23,6 +25,7 @@ interface ActivityItem {
   isSelected: boolean;
   unitsProduced?: number;
   calculatedAmount: number;
+  isContextLinked?: boolean;
 }
 
 interface ManageActivitiesModalProps {
@@ -322,66 +325,119 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         />
                                       </td>
                                       <td className="px-3 py-4 truncate">
-                                        <div
-                                          className="text-sm font-medium text-gray-900 w-fit"
-                                          title={activity.payCodeId}
-                                        >
-                                          {activity.description}
-                                          {activity.payType === "Overtime" && (
-                                            <span className="ml-2 text-xs text-amber-600">
-                                              (OT)
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="text-xs text-gray-500">
-                                          {activity.payType} •{" "}
-                                          {activity.rateUnit}
-                                          {activity.rateUnit !== "Day" &&
-                                            activity.rateUnit !== "Percent" && (
+                                        <div className="flex flex-col">
+                                          <div
+                                            className="text-sm font-medium text-gray-900 w-fit"
+                                            title={activity.payCodeId}
+                                          >
+                                            {activity.description}
+                                            {activity.payType ===
+                                              "Overtime" && (
+                                              <span className="ml-2 text-xs text-amber-600">
+                                                (OT)
+                                              </span>
+                                            )}
+                                            {activity.isContextLinked && (
+                                              <ContextLinkedBadge
+                                                className="ml-2"
+                                                contextFieldLabel={
+                                                  Object.values(
+                                                    contextLinkedPayCodes
+                                                  ).find(
+                                                    (field) =>
+                                                      field.linkedPayCode ===
+                                                      activity.payCodeId
+                                                  )?.label || "Context"
+                                                }
+                                                contextValue={
+                                                  contextData[
+                                                    Object.values(
+                                                      contextLinkedPayCodes
+                                                    ).find(
+                                                      (field) =>
+                                                        field.linkedPayCode ===
+                                                        activity.payCodeId
+                                                    )?.id || ""
+                                                  ]
+                                                }
+                                              />
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {activity.payType} •{" "}
+                                            {activity.rateUnit}
+                                            {activity.rateUnit !== "Day" &&
+                                              activity.rateUnit !==
+                                                "Percent" && (
+                                                <span className="ml-1">
+                                                  @ RM{activity.rate.toFixed(2)}
+                                                  /{activity.rateUnit}
+                                                </span>
+                                              )}
+                                            {activity.rateUnit === "Day" && (
                                               <span className="ml-1">
-                                                @ RM{activity.rate.toFixed(2)}/
-                                                {activity.rateUnit}
+                                                @ RM{activity.rate.toFixed(2)}
+                                                /Day
                                               </span>
                                             )}
-                                          {activity.rateUnit === "Day" && (
-                                            <span className="ml-1">
-                                              @ RM{activity.rate.toFixed(2)}/Day
-                                            </span>
-                                          )}
-                                          {activity.rateUnit === "Percent" && (
-                                            <span className="ml-1">
-                                              @ {activity.rate}%
-                                            </span>
-                                          )}
-                                          {activity.payType === "Overtime" &&
-                                            activity.rateUnit === "Hour" && (
-                                              <span className="ml-1 text-amber-600">
-                                                (Hours {">"} 8)
+                                            {activity.rateUnit ===
+                                              "Percent" && (
+                                              <span className="ml-1">
+                                                @ {activity.rate}%
                                               </span>
                                             )}
+                                            {activity.payType === "Overtime" &&
+                                              activity.rateUnit === "Hour" && (
+                                                <span className="ml-1 text-amber-600">
+                                                  (Hours {">"} 8)
+                                                </span>
+                                              )}
+                                          </div>
                                         </div>
                                       </td>
                                       <td className="px-3 py-4 text-center">
                                         {activity.rateUnit === "Bag" ||
                                         activity.rateUnit === "Fixed" ? (
-                                          <input
-                                            type="number"
-                                            className="w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm disabled:bg-gray-100"
-                                            value={
-                                              activity.unitsProduced?.toString() ||
-                                              "0"
-                                            }
-                                            onChange={(e) =>
-                                              handleUnitsChange(
-                                                index,
-                                                e.target.value
-                                              )
-                                            }
-                                            onClick={(e) => e.stopPropagation()}
-                                            disabled={!activity.isSelected}
-                                            min="0"
-                                            step="1"
-                                          />
+                                          <div className="relative">
+                                            <input
+                                              type="number"
+                                              className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                activity.isContextLinked
+                                                  ? "bg-gray-100 cursor-not-allowed"
+                                                  : "disabled:bg-gray-100"
+                                              }`}
+                                              value={
+                                                activity.unitsProduced?.toString() ||
+                                                "0"
+                                              }
+                                              onChange={(e) =>
+                                                handleUnitsChange(
+                                                  index,
+                                                  e.target.value
+                                                )
+                                              }
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                              disabled={
+                                                !activity.isSelected ||
+                                                activity.isContextLinked
+                                              }
+                                              min="0"
+                                              step="1"
+                                              readOnly={
+                                                activity.isContextLinked
+                                              }
+                                            />
+                                            {activity.isContextLinked && (
+                                              <span className="absolute -right-5 top-1/2 -translate-y-1/2">
+                                                <IconLink
+                                                  size={14}
+                                                  className="text-sky-600"
+                                                />
+                                              </span>
+                                            )}
+                                          </div>
                                         ) : (
                                           <span className="text-sm text-gray-500">
                                             —

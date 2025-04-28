@@ -28,6 +28,8 @@ import {
   getJobIds,
 } from "../../configs/payrollJobConfigs";
 import DynamicContextForm from "../../components/Payroll/DynamicContextForm";
+import ContextValidationMessages from "../../components/Payroll/ContextValidationMessages";
+import ContextLinkMessages from "../../components/Payroll/ContextLinkMessages";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -269,6 +271,20 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           ...prev,
           dayType: newDayType,
         }));
+      }
+
+      // Validate required context fields
+      if (jobConfig) {
+        const requiredContextFields = jobConfig.contextFields.filter(
+          (field) => field.required
+        );
+        for (const field of requiredContextFields) {
+          const value = formData.contextData[field.id];
+          if (value === undefined || value === null || value === "") {
+            toast.error(`${field.label} is required`);
+            return;
+          }
+        }
       }
     }
   }, [holidays, formData.logDate]);
@@ -845,6 +861,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               contextData={formData.contextData}
               onChange={handleContextChange}
               disabled={isSaving}
+            />
+            <ContextValidationMessages
+              contextFields={jobConfig?.contextFields || []}
+              contextData={formData.contextData}
+              linkedPayCodes={contextLinkedPayCodes}
+            />
+            <ContextLinkMessages
+              contextFields={jobConfig?.contextFields || []}
+              linkedPayCodes={contextLinkedPayCodes}
             />
           </div>
         </div>
