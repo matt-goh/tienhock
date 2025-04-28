@@ -9,6 +9,7 @@ import {
   IconTrash,
   IconChevronLeft,
   IconChevronRight,
+  IconLink,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -28,6 +29,7 @@ import PayCodeModal from "../../components/Catalogue/PayCodeModal"; // Imports t
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCodeTooltip";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import AssociateWithJobsModal from "../../components/Catalogue/AssociateWithJobsModal";
 
 const PayCodePage: React.FC = () => {
   const location = useLocation();
@@ -45,6 +47,7 @@ const PayCodePage: React.FC = () => {
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const { jobs, loading: loadingJobs } = useJobsCache();
+  const [codeToAssociate, setCodeToAssociate] = useState<PayCode | null>(null);
 
   const loading = loadingPayCodesData || loadingJobs;
 
@@ -53,6 +56,7 @@ const PayCodePage: React.FC = () => {
   const [codeToEdit, setCodeToEdit] = useState<PayCode | null>(null); // Holds PayCode object (without 'code')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [codeToDelete, setCodeToDelete] = useState<PayCode | null>(null); // Holds PayCode object (without 'code')
+  const [showAssociateModal, setShowAssociateModal] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -138,6 +142,14 @@ const PayCodePage: React.FC = () => {
     return reverseMap;
   }, [detailedMappings]);
 
+  const getAssociatedJobIds = (payCodeId: string): string[] => {
+    return Object.entries(detailedMappings)
+      .filter(([_jobId, details]) =>
+        details.some((detail) => detail.id === payCodeId)
+      )
+      .map(([jobId]) => jobId);
+  };
+
   const paginatedCodes = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredCodes.slice(startIndex, startIndex + itemsPerPage);
@@ -156,6 +168,11 @@ const PayCodePage: React.FC = () => {
   const handleEditClick = (pc: PayCode) => {
     setCodeToEdit(pc);
     setShowAddModal(true);
+  };
+
+  const handleAssociateWithJobs = (pc: PayCode) => {
+    setCodeToAssociate(pc);
+    setShowAssociateModal(true);
   };
 
   const handleSavePayCode = async (payCodeData: PayCode) => {
@@ -625,6 +642,16 @@ const PayCodePage: React.FC = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                handleAssociateWithJobs(pc);
+                              }}
+                              className="text-amber-600 hover:text-amber-800"
+                              title="Link to Jobs"
+                            >
+                              <IconLink size={18} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 handleDeleteClick(pc);
                               }}
                               className="text-rose-600 hover:text-rose-800"
@@ -668,6 +695,17 @@ const PayCodePage: React.FC = () => {
         onSave={handleSavePayCode}
         initialData={codeToEdit}
         existingPayCodes={payCodes} // Pass full list for ID check
+      />
+      {/* Associate with Jobs Modal */}
+      <AssociateWithJobsModal
+        isOpen={showAssociateModal}
+        onClose={() => setShowAssociateModal(false)}
+        payCode={codeToAssociate}
+        availableJobs={jobs}
+        currentJobIds={
+          codeToAssociate ? getAssociatedJobIds(codeToAssociate.id) : []
+        }
+        onAssociationComplete={refreshPayCodeMappings}
       />
       <ConfirmationDialog
         isOpen={showDeleteDialog}
