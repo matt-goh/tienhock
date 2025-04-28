@@ -146,7 +146,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
       // Add automatic deselection for zero amount activities
       // Don't deselect context-linked activities automatically
       const shouldAutoDeselect =
-        calculatedAmount === 0 && !activity.isContextLinked;
+        calculatedAmount === 0 &&
+        !activity.isContextLinked &&
+        activity.rateUnit !== "Bag";
 
       return {
         ...activity,

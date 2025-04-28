@@ -754,7 +754,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             // Add auto-deselection for zero amount activities
             // Don't deselect context-linked activities automatically
             const shouldAutoDeselect =
-              calculatedAmount === 0 && !isContextLinked;
+              calculatedAmount === 0 &&
+              !isContextLinked &&
+              payCode.rate_unit !== "Bag";
 
             if (shouldAutoDeselect) {
               isSelected = false;
