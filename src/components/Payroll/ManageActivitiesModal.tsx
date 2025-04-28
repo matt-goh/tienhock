@@ -14,6 +14,7 @@ import LoadingSpinner from "../LoadingSpinner";
 import { ContextField } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
 import { IconLink } from "@tabler/icons-react";
+import { Link } from "react-router-dom";
 
 export interface ActivityItem {
   payCodeId: string;
@@ -194,10 +195,19 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const handleClose = () => {
     // Reset activities to original state when closing without saving
     if (existingActivities && existingActivities.length > 0) {
-      const activitiesCopy = existingActivities.map((activity) => ({
-        ...activity,
-      }));
-      setActivities(activitiesCopy);
+      // Create deep copy but preserve context-linked status
+      const activitiesWithContext = existingActivities.map((activity) => {
+        const contextField = contextLinkedPayCodes[activity.payCodeId];
+        if (contextField && contextData[contextField.id] !== undefined) {
+          return {
+            ...activity,
+            unitsProduced: contextData[contextField.id],
+            isContextLinked: true,
+          };
+        }
+        return { ...activity };
+      });
+      setActivities(activitiesWithContext);
     } else {
       setActivities([]);
     }
@@ -326,11 +336,19 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       </td>
                                       <td className="px-3 py-4 truncate">
                                         <div className="flex flex-col">
-                                          <div
+                                          <span
                                             className="text-sm font-medium text-gray-900 w-fit"
                                             title={activity.payCodeId}
                                           >
-                                            {activity.description}
+                                            <Link
+                                              to={`/catalogue/pay-codes?desc=${activity.description}`}
+                                              className="hover:text-sky-600 hover:underline"
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            >
+                                              {activity.description}
+                                            </Link>
                                             {activity.payType ===
                                               "Overtime" && (
                                               <span className="ml-2 text-xs text-amber-600">
@@ -362,7 +380,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 }
                                               />
                                             )}
-                                          </div>
+                                          </span>
                                           <div className="text-xs text-gray-500">
                                             {activity.payType} •{" "}
                                             {activity.rateUnit}
