@@ -280,6 +280,110 @@ export default function (pool) {
     }
   });
 
+  // Batch insert multiple pay code associations to jobs
+  router.post("/batch", async (req, res) => {
+    const { associations } = req.body;
+
+    if (
+      !associations ||
+      !Array.isArray(associations) ||
+      associations.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({ message: "An array of associations is required" });
+    }
+
+    try {
+      // Validate all entries first
+      for (const entry of associations) {
+        const { job_id, pay_code_id } = entry;
+        if (!job_id || !pay_code_id) {
+          return res.status(400).json({
+            message: "All entries must have job_id and pay_code_id",
+            invalid_entry: entry,
+          });
+        }
+      }
+
+      const results = [];
+      const errors = [];
+      let successCount = 0;
+
+      // Use a transaction for atomicity
+      await pool.query("BEGIN");
+
+      for (const entry of associations) {
+        const { job_id, pay_code_id, is_default = false } = entry;
+
+        try {
+          // Check if the association already exists
+          const checkQuery =
+            "SELECT 1 FROM job_pay_codes WHERE job_id = $1 AND pay_code_id = $2";
+          const checkResult = await pool.query(checkQuery, [
+            job_id,
+            pay_code_id,
+          ]);
+
+          if (checkResult.rows.length > 0) {
+            errors.push({
+              job_id,
+              pay_code_id,
+              message: "Association already exists",
+            });
+            continue; // Skip this one and continue with the next
+          }
+
+          // Insert with default NULL overrides
+          const insertQuery = `
+          INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
+          VALUES ($1, $2, $3, NULL, NULL, NULL)
+          RETURNING *
+        `;
+          const result = await pool.query(insertQuery, [
+            job_id,
+            pay_code_id,
+            is_default,
+          ]);
+          results.push(result.rows[0]);
+          successCount++;
+        } catch (error) {
+          // Handle individual entry errors
+          errors.push({
+            job_id,
+            pay_code_id,
+            message:
+              error.code === "23503"
+                ? "Invalid job_id or pay_code_id"
+                : error.message,
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        await pool.query("COMMIT");
+        return res.status(201).json({
+          message: `Successfully added ${successCount} of ${associations.length} associations`,
+          added: results,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } else {
+        await pool.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Failed to add any associations",
+          errors,
+        });
+      }
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error in batch association:", error);
+      res.status(500).json({
+        message: "Error processing batch association",
+        error: error.message,
+      });
+    }
+  });
+
   // Update override rates for a specific job-pay code association
   router.put("/:jobId/:payCodeId", async (req, res) => {
     const { jobId, payCodeId } = req.params;
@@ -412,6 +516,88 @@ export default function (pool) {
       console.error("Error removing pay code from job:", error);
       res.status(500).json({
         message: "Error removing pay code from job",
+        error: error.message,
+      });
+    }
+  });
+
+  // Batch delete multiple pay code associations
+  router.post("/batch-delete", async (req, res) => {
+    const { items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "An array of items to delete is required" });
+    }
+
+    try {
+      // Validate all entries first
+      for (const item of items) {
+        const { job_id, pay_code_id } = item;
+        if (!job_id || !pay_code_id) {
+          return res.status(400).json({
+            message: "All items must have job_id and pay_code_id",
+            invalid_item: item,
+          });
+        }
+      }
+
+      await pool.query("BEGIN");
+
+      const results = [];
+      const errors = [];
+      let successCount = 0;
+
+      for (const item of items) {
+        const { job_id, pay_code_id } = item;
+
+        try {
+          const query = `
+          DELETE FROM job_pay_codes
+          WHERE job_id = $1 AND pay_code_id = $2
+          RETURNING job_id, pay_code_id
+        `;
+          const result = await pool.query(query, [job_id, pay_code_id]);
+
+          if (result.rows.length > 0) {
+            results.push(result.rows[0]);
+            successCount++;
+          } else {
+            errors.push({
+              job_id,
+              pay_code_id,
+              message: "Association not found",
+            });
+          }
+        } catch (error) {
+          errors.push({
+            job_id,
+            pay_code_id,
+            message: error.message,
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        await pool.query("COMMIT");
+        return res.status(200).json({
+          message: `Successfully removed ${successCount} of ${items.length} associations`,
+          removed: results,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } else {
+        await pool.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Failed to remove any associations",
+          errors,
+        });
+      }
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error in batch deletion:", error);
+      res.status(500).json({
+        message: "Error processing batch deletion",
         error: error.message,
       });
     }
