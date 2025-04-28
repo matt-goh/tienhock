@@ -143,6 +143,11 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       >
                         {activity.description}
                       </Link>
+                      {activity.payType === "Overtime" && (
+                        <span className="ml-2 text-xs text-amber-600">
+                          (OT)
+                        </span>
+                      )}
                       {activity.isContextLinked && (
                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
                           <IconLink size={10} className="mr-0.5" />
@@ -154,26 +159,33 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       <span>{activity.payType}</span>
                       <span>•</span>
                       <span>{activity.rateUnit}</span>
-                      {activity.rateUnit !== "Day" && (
+                      {activity.rateUnit !== "Percent" &&
+                        activity.rateUnit !== "Fixed" && (
+                          <>
+                            <span>•</span>
+                            <span>
+                              @ RM{activity.rate.toFixed(2)}/{activity.rateUnit}
+                            </span>
+                          </>
+                        )}
+                      {activity.rateUnit === "Percent" && (
                         <>
                           <span>•</span>
-                          <span>
-                            @ RM{activity.rate.toFixed(2)}/{activity.rateUnit}
+                          <span>@ {activity.rate}%</span>
+                        </>
+                      )}
+                      {activity.rateUnit === "Fixed" && (
+                        <>
+                          <span>•</span>
+                          <span>@ RM{activity.rate.toFixed(2)}</span>
+                        </>
+                      )}
+                      {activity.payType === "Overtime" &&
+                        activity.rateUnit === "Hour" && (
+                          <span className="ml-1 text-amber-600">
+                            (Hours {">"} 8)
                           </span>
-                        </>
-                      )}
-                      {activity.rateUnit === "Day" && (
-                        <>
-                          <span>•</span>
-                          <span>@ RM{activity.rate.toFixed(2)}/Day</span>
-                        </>
-                      )}
-                      {activity.unitsProduced !== null && (
-                        <>
-                          <span>•</span>
-                          <span>{activity.unitsProduced} units</span>
-                        </>
-                      )}
+                        )}
                     </div>
                   </div>
                   <div className="font-medium text-default-900 whitespace-nowrap">

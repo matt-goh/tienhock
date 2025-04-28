@@ -309,18 +309,23 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       <span className="text-default-500 ml-2">
                                         ({activity.pay_type})
                                       </span>
-                                      {activity.units_produced &&
-                                        activity.rate_unit !== "Percent" && (
+                                      {/* Display rate used for all activity types */}
+                                      <span className="text-default-500 ml-2">
+                                        •{" "}
+                                        {activity.rate_unit === "Percent"
+                                          ? `${activity.rate_used}%`
+                                          : `RM${activity.rate_used}`}
+                                      </span>
+                                      {/* Show units produced for non-Hour units or when explicitly available */}
+                                      {activity.units_produced !== null &&
+                                        activity.rate_unit !== "Hour" && (
                                           <span className="text-default-500 ml-2">
                                             • {activity.units_produced}{" "}
-                                            {activity.rate_unit}
+                                            {activity.rate_unit === "Percent"
+                                              ? "Units"
+                                              : activity.rate_unit}
                                           </span>
                                         )}
-                                      {activity.rate_unit === "Percent" && (
-                                        <span className="text-default-500 ml-2">
-                                          • {activity.rate_used}%
-                                        </span>
-                                      )}
                                     </div>
                                     <div className="font-medium">
                                       RM{activity.calculated_amount.toFixed(2)}
@@ -352,12 +357,23 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       <span className="text-default-500 ml-2">
                                         ({activity.pay_type})
                                       </span>
-                                      {activity.units_produced && (
-                                        <span className="text-default-500 ml-2">
-                                          • {activity.units_produced}{" "}
-                                          {activity.rate_unit}
-                                        </span>
-                                      )}
+                                      {/* Display rate used for all activity types */}
+                                      <span className="text-default-500 ml-2">
+                                        •{" "}
+                                        {activity.rate_unit === "Percent"
+                                          ? `${activity.rate_used}%`
+                                          : `RM${activity.rate_used}`}
+                                      </span>
+                                      {/* Show units produced for non-Hour units or when explicitly available */}
+                                      {activity.units_produced !== null &&
+                                        activity.rate_unit !== "Hour" && (
+                                          <span className="text-default-500 ml-2">
+                                            • {activity.units_produced}{" "}
+                                            {activity.rate_unit === "Percent"
+                                              ? "Units"
+                                              : activity.rate_unit}
+                                          </span>
+                                        )}
                                     </div>
                                     <div className="font-medium">
                                       RM{activity.calculated_amount.toFixed(2)}
