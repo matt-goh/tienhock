@@ -712,7 +712,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             const shouldAutoSelect = isOvertimeCode && hours > 8;
 
             // For context-linked pay codes, don't auto-select
-            const isSelected = existingActivity
+            let isSelected = existingActivity
               ? existingActivity.isSelected
               : isContextLinked
               ? false // Don't auto-select context-linked pay codes
@@ -749,6 +749,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 default:
                   calculatedAmount = 0;
               }
+            }
+
+            // Add auto-deselection for zero amount activities
+            // Don't deselect context-linked activities automatically
+            const shouldAutoDeselect =
+              calculatedAmount === 0 && !isContextLinked;
+
+            if (shouldAutoDeselect) {
+              isSelected = false;
             }
 
             return {
