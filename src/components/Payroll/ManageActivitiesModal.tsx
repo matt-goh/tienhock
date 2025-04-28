@@ -135,8 +135,13 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             calculatedAmount = activity.rate * (activity.unitsProduced || 0);
             break;
           case "Percent":
+            // For percentage-based rates, calculate based on units produced
             calculatedAmount =
               (activity.rate * (activity.unitsProduced || 0)) / 100;
+            break;
+          case "Fixed":
+            // Fixed rate - just use the rate value directly
+            calculatedAmount = activity.rate;
             break;
           default:
             calculatedAmount = 0;
@@ -242,7 +247,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-5xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
@@ -386,24 +391,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                           <div className="text-xs text-gray-500">
                                             {activity.payType} •{" "}
                                             {activity.rateUnit}
-                                            {activity.rateUnit !== "Day" &&
-                                              activity.rateUnit !==
-                                                "Percent" && (
+                                            {activity.rateUnit !== "Percent" &&
+                                              activity.rateUnit !== "Fixed" && (
                                                 <span className="ml-1">
                                                   @ RM{activity.rate.toFixed(2)}
                                                   /{activity.rateUnit}
                                                 </span>
                                               )}
-                                            {activity.rateUnit === "Day" && (
-                                              <span className="ml-1">
-                                                @ RM{activity.rate.toFixed(2)}
-                                                /Day
-                                              </span>
-                                            )}
                                             {activity.rateUnit ===
                                               "Percent" && (
                                               <span className="ml-1">
                                                 @ {activity.rate}%
+                                              </span>
+                                            )}
+                                            {activity.rateUnit === "Fixed" && (
+                                              <span className="ml-1">
+                                                @ RM{activity.rate.toFixed(2)}
                                               </span>
                                             )}
                                             {activity.payType === "Overtime" &&
@@ -417,7 +420,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       </td>
                                       <td className="px-3 py-4 text-center">
                                         {activity.rateUnit === "Bag" ||
-                                        activity.rateUnit === "Fixed" ? (
+                                        (activity.rateUnit === "Percent" &&
+                                          activity.isContextLinked) ? (
                                           <div className="relative">
                                             <input
                                               type="number"

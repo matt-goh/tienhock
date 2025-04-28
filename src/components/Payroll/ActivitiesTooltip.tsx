@@ -50,7 +50,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true);
-    }, 10); // Short delay before showing
+    }, 0);
   };
 
   const handleMouseLeave = () => {
@@ -59,7 +59,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(false);
-    }, 10); // Longer delay before hiding
+    }, 100); // Longer delay before hiding
   };
 
   // Calculate total amount
