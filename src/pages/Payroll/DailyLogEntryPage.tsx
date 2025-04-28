@@ -740,11 +740,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     calculatedAmount = rate * hours;
                   }
                   break;
-                case "Day":
-                  calculatedAmount = rate;
-                  break;
                 case "Bag":
-                case "Fixed":
                   calculatedAmount = rate * (unitsProduced || 0);
                   break;
                 case "Percent":
