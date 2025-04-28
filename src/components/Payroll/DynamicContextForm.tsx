@@ -20,15 +20,16 @@ const DynamicContextForm: React.FC<DynamicContextFormProps> = ({
   const renderField = (field: ContextField) => {
     const value = contextData[field.id] ?? field.defaultValue;
 
-    const fieldLabel = (
+    const fieldLabel = field.linkedPayCode ? (
+      <ContextLinkMessages
+        contextFields={[field]}
+        linkedPayCodes={{ [field.linkedPayCode]: field }}
+      >
+        {field.label}
+      </ContextLinkMessages>
+    ) : (
       <>
-        {field.label}{" "}
-        {field.linkedPayCode && (
-          <ContextLinkMessages
-            contextFields={[field]}
-            linkedPayCodes={{ [field.linkedPayCode]: field }}
-          />
-        )}
+        {field.label}
       </>
     );
 
