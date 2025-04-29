@@ -19,6 +19,10 @@ import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
+import {
+  IconBuildingSkyscraper,
+  IconBuildingStore,
+} from "@tabler/icons-react";
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -72,6 +76,13 @@ const CustomerFormPage: React.FC = () => {
   const [loading, setLoading] = useState(isEditMode); // Only true initially if editing
   const [error, setError] = useState<string | null>(null);
   const { salesmen: salesmenData } = useSalesmanCache();
+  const [branchInfo, setBranchInfo] = useState<{
+    isInBranchGroup: boolean;
+    isMainBranch: boolean;
+    groupName: string;
+    groupId: number;
+    branches: { id: string; name: string; isMain: boolean }[];
+  } | null>(null);
 
   // Options
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
@@ -185,16 +196,55 @@ const CustomerFormPage: React.FC = () => {
     }
   }, [id]); // Dependency is only id
 
+  const fetchBranchInfo = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const response = await api.get(`/api/customer-branches/${id}`);
+
+      if (response.groups && response.groups.length > 0) {
+        const group = response.groups[0]; // Get first group (customers should only be in one group)
+        const branch = group.branches.find(
+          (b: { customer_id: string }) => b.customer_id === id
+        );
+
+        setBranchInfo({
+          isInBranchGroup: true,
+          isMainBranch: branch?.is_main_branch || false,
+          groupName: group.group_name,
+          groupId: group.id,
+          branches: group.branches.map(
+            (b: {
+              customer_id: any;
+              customer_name: any;
+              is_main_branch: any;
+            }) => ({
+              id: b.customer_id,
+              name: b.customer_name,
+              isMain: b.is_main_branch,
+            })
+          ),
+        });
+      } else {
+        setBranchInfo(null);
+      }
+    } catch (error) {
+      console.error("Error fetching branch info:", error);
+      setBranchInfo(null);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (isEditMode) {
       fetchCustomerDetailsAndProducts();
+      fetchBranchInfo();
     } else {
       // For new customer, ensure initial refs are set for change detection
       initialFormDataRef.current = { ...formData };
       initialCustomProductsRef.current = [...customProducts];
       setLoading(false); // Not loading if creating new
     }
-  }, [isEditMode, fetchCustomerDetailsAndProducts]); // Run only when mode changes or fetch function updates
+  }, [isEditMode, fetchCustomerDetailsAndProducts, fetchBranchInfo]); // Run only when mode changes or fetch function updates
 
   // --- Populate Salesmen Options ---
   useEffect(() => {
@@ -580,8 +630,6 @@ const CustomerFormPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 pb-10">
-      {" "}
-      {/* Added pb-10 */}
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
@@ -670,6 +718,62 @@ const CustomerFormPage: React.FC = () => {
                       "Company TIN"
                     )}
                   </div>
+
+                  {isEditMode && branchInfo && (
+                    <div className="mt-6 p-4 border border-indigo-100 rounded-lg bg-indigo-50/30">
+                      <div className="flex items-center mb-3">
+                        {branchInfo.isMainBranch ? (
+                          <IconBuildingSkyscraper
+                            size={20}
+                            className="text-indigo-600 mr-2"
+                          />
+                        ) : (
+                          <IconBuildingStore
+                            size={20}
+                            className="text-indigo-500 mr-2"
+                          />
+                        )}
+                        <h3 className="text-base font-medium text-indigo-700">
+                          {branchInfo.isMainBranch
+                            ? "Main Branch"
+                            : "Branch Location"}{" "}
+                          - {branchInfo.groupName}
+                        </h3>
+                      </div>
+
+                      <p className="text-sm text-indigo-600 mb-2">
+                        {branchInfo.isMainBranch
+                          ? "This is the main branch. Changes to pricing or e-Invoice information will affect all branches."
+                          : "This is a branch location. Pricing and e-Invoice information are synchronized with the main branch."}
+                      </p>
+
+                      {branchInfo.branches.length > 1 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-indigo-500 mb-1">
+                            Connected branches:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {branchInfo.branches
+                              .filter((b) => b.id !== id) // Don't show current branch
+                              .map((branch) => (
+                                <span
+                                  key={branch.id}
+                                  className="inline-flex items-center text-xs bg-white border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full"
+                                >
+                                  {branch.isMain && (
+                                    <IconBuildingSkyscraper
+                                      size={12}
+                                      className="mr-1"
+                                    />
+                                  )}
+                                  {branch.name}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* === Second tab - Credit & Pricing === */}
