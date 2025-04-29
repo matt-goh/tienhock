@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CustomerList } from "../../types/types";
 import {
@@ -45,6 +45,16 @@ const CustomerPage: React.FC = () => {
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [branchGroups, setBranchGroups] = useState<
+    Record<
+      string,
+      {
+        groupId: number;
+        groupName: string;
+        isMainBranch: boolean;
+      }
+    >
+  >({});
 
   useEffect(() => {
     if (salesmenData.length > 0) {
@@ -57,6 +67,45 @@ const CustomerPage: React.FC = () => {
     setCustomerToDelete(customer);
     setIsDeleteDialogOpen(true);
   };
+
+  const fetchAllBranchInfo = useCallback(async () => {
+    try {
+      const response = await api.get("/api/customer-branches/all");
+
+      // Process branch data to create a lookup object
+      const customerBranchMap: Record<
+        string,
+        {
+          groupId: number;
+          groupName: string;
+          isMainBranch: boolean;
+        }
+      > = {};
+
+      response.groups.forEach(
+        (group: { branches: any[]; id: any; group_name: any }) => {
+          group.branches.forEach(
+            (branch: { customer_id: string | number; is_main_branch: any }) => {
+              customerBranchMap[branch.customer_id] = {
+                groupId: group.id,
+                groupName: group.group_name,
+                isMainBranch: branch.is_main_branch,
+              };
+            }
+          );
+        }
+      );
+
+      setBranchGroups(customerBranchMap);
+    } catch (error) {
+      console.error("Error fetching branch info:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Add this to your existing useEffect that fetches customers or create a new one
+    fetchAllBranchInfo();
+  }, [fetchAllBranchInfo]);
 
   const handleConfirmDelete = async () => {
     if (customerToDelete) {
@@ -314,6 +363,15 @@ const CustomerPage: React.FC = () => {
               key={customer.id}
               customer={customer}
               onDeleteClick={handleDeleteClick}
+              branchInfo={
+                branchGroups[customer.id]
+                  ? {
+                      isInBranchGroup: true,
+                      isMainBranch: branchGroups[customer.id].isMainBranch,
+                      groupName: branchGroups[customer.id].groupName,
+                    }
+                  : undefined
+              }
             />
           ))}
         </div>

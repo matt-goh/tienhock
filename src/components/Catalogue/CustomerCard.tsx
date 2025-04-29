@@ -9,17 +9,24 @@ import {
   IconId,
   IconFileInvoice,
   IconCheck,
-  IconX,
+  IconBuildingStore,
+  IconBuildingSkyscraper,
 } from "@tabler/icons-react";
 
 interface CustomerCardProps {
   customer: CustomerList;
   onDeleteClick: (customer: CustomerList) => void;
+  branchInfo?: {
+    isInBranchGroup: boolean;
+    isMainBranch: boolean;
+    groupName?: string;
+  };
 }
 
 const CustomerCard: React.FC<CustomerCardProps> = ({
   customer,
   onDeleteClick,
+  branchInfo,
 }) => {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const navigate = useNavigate();
@@ -129,6 +136,42 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             </div>
           </div>
         ) : null}
+
+        {/* Branch Status - Only show if part of a branch group */}
+        {branchInfo?.isInBranchGroup && (
+          <div className="flex items-center">
+            {branchInfo.isMainBranch ? (
+              <IconBuildingSkyscraper
+                size={16}
+                className="text-indigo-500 flex-shrink-0 mr-2"
+              />
+            ) : (
+              <IconBuildingStore
+                size={16}
+                className="text-indigo-400 flex-shrink-0 mr-2"
+              />
+            )}
+            <div className="flex items-center space-x-1">
+              <span className="text-sm text-default-700 mr-1">Branch:</span>
+              <span
+                className={`inline-flex items-center text-xs font-medium rounded-full px-2 py-0.5 ${
+                  branchInfo.isMainBranch
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "bg-indigo-50 text-indigo-600"
+                }`}
+              >
+                {branchInfo.groupName}
+              </span>
+              {branchInfo.isMainBranch && (
+                <span
+                  className={`inline-flex items-center text-xs font-medium rounded-full px-2 py-0.5 bg-indigo-100 text-indigo-700`}
+                >
+                  Main
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
