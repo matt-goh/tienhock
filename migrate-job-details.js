@@ -40,7 +40,7 @@ function determineRateUnit(remark) {
 
   const remarkLower = remark.toLowerCase();
   if (remarkLower.includes("bag")) return "Bag";
-  if (remarkLower.includes("day")) return "Day";
+  if (remarkLower.includes("day") || remarkLower.includes("hari")) return "Day";
   if (remarkLower.includes("percent") || remarkLower.includes("%"))
     return "Percent";
   if (remarkLower.includes("fixed")) return "Fixed";

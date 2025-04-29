@@ -4,6 +4,46 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // After updating the customer, sync e-Invoice fields to all branch customers
+  const syncEInvoiceFields = async (
+    clientObj,
+    customerId,
+    tinNumber,
+    idNumber,
+    idType
+  ) => {
+    // Find all branch relationships
+    const branchQuery = `
+    SELECT cbg.id AS group_id, cm.customer_id
+    FROM customer_branch_mappings cm
+    JOIN customer_branch_groups cbg ON cm.group_id = cbg.id
+    WHERE EXISTS (
+      SELECT 1 FROM customer_branch_mappings 
+      WHERE group_id = cbg.id AND customer_id = $1
+    ) AND cm.customer_id != $1  
+  `;
+
+    const branchResult = await clientObj.query(branchQuery, [customerId]);
+
+    if (branchResult.rows.length > 0) {
+      // Update e-Invoice info for all related branches
+      const updateQuery = `
+      UPDATE customers 
+      SET tin_number = $1, id_number = $2, id_type = $3
+      WHERE id = $4
+    `;
+
+      for (const row of branchResult.rows) {
+        await clientObj.query(updateQuery, [
+          tinNumber,
+          idNumber,
+          idType,
+          row.customer_id,
+        ]);
+      }
+    }
+  };
+
   // Get customers infos for front page display
   router.get("/", async (req, res) => {
     try {
@@ -68,7 +108,7 @@ export default function (pool) {
       });
     }
   });
-  
+
   // Create a new customer
   router.post("/", async (req, res) => {
     const {
@@ -154,7 +194,69 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // First delete associated customer products
+      // First check if the customer is part of any branch groups
+      const branchQuery = `
+      SELECT cbg.id AS group_id, cbm.is_main_branch
+      FROM customer_branch_mappings cbm
+      JOIN customer_branch_groups cbg ON cbm.group_id = cbg.id
+      WHERE cbm.customer_id = $1
+    `;
+      const branchResult = await client.query(branchQuery, [id]);
+
+      // Handle branch relationships before deletion
+      for (const row of branchResult.rows) {
+        const { group_id, is_main_branch } = row;
+
+        if (is_main_branch) {
+          // Case 1: This is a main branch - find another branch to promote or delete the group
+          const countQuery = `
+          SELECT COUNT(*) FROM customer_branch_mappings
+          WHERE group_id = $1
+        `;
+          const countResult = await client.query(countQuery, [group_id]);
+          const memberCount = parseInt(countResult.rows[0].count);
+
+          if (memberCount > 1) {
+            // Promote another branch to main
+            const nextMainQuery = `
+            UPDATE customer_branch_mappings
+            SET is_main_branch = true
+            WHERE group_id = $1 AND customer_id != $2
+            LIMIT 1
+          `;
+            await client.query(nextMainQuery, [group_id, id]);
+
+            // Now remove this branch from the group
+            const removeQuery = `
+            DELETE FROM customer_branch_mappings
+            WHERE group_id = $1 AND customer_id = $2
+          `;
+            await client.query(removeQuery, [group_id, id]);
+          } else {
+            // This is the only member, delete the entire group
+            const deleteMapQuery = `
+            DELETE FROM customer_branch_mappings
+            WHERE group_id = $1
+          `;
+            await client.query(deleteMapQuery, [group_id]);
+
+            const deleteGroupQuery = `
+            DELETE FROM customer_branch_groups
+            WHERE id = $1
+          `;
+            await client.query(deleteGroupQuery, [group_id]);
+          }
+        } else {
+          // Case 2: This is a regular branch member - just remove it from the group
+          const removeQuery = `
+          DELETE FROM customer_branch_mappings
+          WHERE group_id = $1 AND customer_id = $2
+        `;
+          await client.query(removeQuery, [group_id, id]);
+        }
+      }
+
+      // Delete associated customer products
       await client.query(
         "DELETE FROM customer_products WHERE customer_id = $1",
         [id]
@@ -173,6 +275,7 @@ export default function (pool) {
       res.json({
         message: "Customer deleted successfully",
         customer: result.rows[0],
+        branchesUpdated: branchResult.rows.length > 0,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -449,6 +552,16 @@ export default function (pool) {
 
           if (result.rows.length === 0) {
             throw new Error("Customer not found");
+          }
+
+          if (tin_number !== null || id_number !== null || id_type !== null) {
+            await syncEInvoiceFields(
+              client,
+              id,
+              tin_number,
+              id_number,
+              id_type
+            );
           }
 
           await client.query("COMMIT");

@@ -11,7 +11,10 @@ import Button from "../Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
-import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import {
+  useCustomersCache,
+  refreshCustomersCache,
+} from "../../utils/catalogue/useCustomerCache";
 import { CustomerCombobox } from "../Invoice/CustomerCombobox";
 import { FormInput } from "../FormComponents";
 import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
@@ -334,6 +337,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       toast.success("Branch group created successfully");
       await fetchBranchGroups(); // Refresh data
       await fetchAllBranchGroups(); // Refresh all groups
+      await refreshCustomersCache(); // Refresh customer cache
       setIsAddingNew(false);
       setNewGroupName("");
       setSelectedCustomerIds([]);
@@ -357,6 +361,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       toast.success("Branches added successfully");
       await fetchBranchGroups(); // Refresh data
       await fetchAllBranchGroups(); // Refresh all groups
+      await refreshCustomersCache(); // Refresh customer cache
       setSelectedCustomerIds([]);
     } catch (error) {
       console.error("Error adding branches:", error);
@@ -414,6 +419,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       // Refresh data
       await fetchBranchGroups();
       await fetchAllBranchGroups();
+      await refreshCustomersCache(); // Refresh customer cache
       setActiveGroup(null);
       setIsDeleteGroupDialogOpen(false);
     } catch (error) {

@@ -138,6 +138,43 @@ export default function (pool) {
         ]);
       }
 
+      // After creating the branch group and setting up mappings:
+      // Find the main branch
+      const mainBranch = branches.find((b) => b.is_main_branch);
+      if (mainBranch) {
+        // Get e-Invoice information from main branch
+        const mainBranchQuery = `
+    SELECT tin_number, id_number, id_type
+    FROM customers
+    WHERE id = $1
+  `;
+        const mainBranchResult = await client.query(mainBranchQuery, [
+          mainBranch.customer_id,
+        ]);
+
+        if (mainBranchResult.rows.length > 0) {
+          const { tin_number, id_number, id_type } = mainBranchResult.rows[0];
+
+          // Apply to all other branches in the group
+          const updateQuery = `
+      UPDATE customers
+      SET tin_number = $1, id_number = $2, id_type = $3
+      WHERE id = $4
+    `;
+
+          for (const branch of branches) {
+            if (branch.customer_id !== mainBranch.customer_id) {
+              await client.query(updateQuery, [
+                tin_number,
+                id_number,
+                id_type,
+                branch.customer_id,
+              ]);
+            }
+          }
+        }
+      }
+
       await client.query("COMMIT");
 
       res.status(201).json({
@@ -185,13 +222,33 @@ export default function (pool) {
         throw new Error(`Branch group with ID ${groupId} not found`);
       }
 
+      // Find the main branch for this group to get e-Invoice info
+      const mainBranchQuery = `
+      SELECT c.tin_number, c.id_number, c.id_type, cbm.customer_id
+      FROM customer_branch_mappings cbm
+      JOIN customers c ON cbm.customer_id = c.id
+      WHERE cbm.group_id = $1 AND cbm.is_main_branch = true
+    `;
+
+      const mainBranchResult = await client.query(mainBranchQuery, [groupId]);
+
+      let tin_number = null;
+      let id_number = null;
+      let id_type = null;
+
+      if (mainBranchResult.rows.length > 0) {
+        tin_number = mainBranchResult.rows[0].tin_number;
+        id_number = mainBranchResult.rows[0].id_number;
+        id_type = mainBranchResult.rows[0].id_type;
+      }
+
       // Add each customer to the group
       for (const customerId of customer_ids) {
         // Check if mapping already exists
         const checkMappingQuery = `
-          SELECT 1 FROM customer_branch_mappings
-          WHERE group_id = $1 AND customer_id = $2
-        `;
+        SELECT 1 FROM customer_branch_mappings
+        WHERE group_id = $1 AND customer_id = $2
+      `;
 
         const mappingResult = await client.query(checkMappingQuery, [
           groupId,
@@ -200,11 +257,66 @@ export default function (pool) {
 
         if (mappingResult.rows.length === 0) {
           const addMappingQuery = `
-            INSERT INTO customer_branch_mappings (group_id, customer_id, is_main_branch)
-            VALUES ($1, $2, false)
-          `;
+          INSERT INTO customer_branch_mappings (group_id, customer_id, is_main_branch)
+          VALUES ($1, $2, false)
+        `;
 
           await client.query(addMappingQuery, [groupId, customerId]);
+
+          // Update e-Invoice info if available
+          if (tin_number !== null || id_number !== null || id_type !== null) {
+            const updateQuery = `
+            UPDATE customers
+            SET tin_number = $1, id_number = $2, id_type = $3
+            WHERE id = $4
+          `;
+
+            await client.query(updateQuery, [
+              tin_number,
+              id_number,
+              id_type,
+              customerId,
+            ]);
+          }
+        }
+      }
+
+      // Sync custom products from main branch to all new branches
+      if (mainBranchResult.rows.length > 0) {
+        const mainBranchId = mainBranchResult.rows[0].customer_id;
+
+        // Get all custom products from main branch
+        const productsQuery = `
+        SELECT product_id, custom_price, is_available 
+        FROM customer_products
+        WHERE customer_id = $1
+      `;
+
+        const productsResult = await client.query(productsQuery, [
+          mainBranchId,
+        ]);
+
+        if (productsResult.rows.length > 0) {
+          // For each new customer, copy all custom products
+          for (const customerId of customer_ids) {
+            for (const product of productsResult.rows) {
+              const upsertQuery = `
+              INSERT INTO customer_products (customer_id, product_id, custom_price, is_available)
+              VALUES ($1, $2, $3, $4)
+              ON CONFLICT (customer_id, product_id) 
+              DO UPDATE SET
+                custom_price = EXCLUDED.custom_price,
+                is_available = EXCLUDED.is_available
+            `;
+
+              await client.query(upsertQuery, [
+                customerId,
+                product.product_id,
+                product.custom_price,
+                product.is_available,
+              ]);
+            }
+          }
         }
       }
 
