@@ -19,6 +19,7 @@ import { CustomerCombobox } from "../Invoice/CustomerCombobox";
 import { FormCombobox, FormInput, SelectOption } from "../FormComponents";
 import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
 import { CustomerList } from "../../types/types";
+import { MultiCustomerCombobox } from "../Invoice/MultiCustomerCombobox";
 
 interface BranchGroup {
   id: number;
@@ -67,6 +68,18 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   );
   const [hasMoreCustomers, setHasMoreCustomers] = useState(false);
   const ITEMS_PER_PAGE = 30;
+  const [addBranchQuery, setAddBranchQuery] = useState("");
+  const [additionalBranchQuery, setAdditionalBranchQuery] = useState("");
+
+  const [availableBranchPage, setAvailableBranchPage] = useState(1);
+  const [filteredAvailableBranches, setFilteredAvailableBranches] = useState<
+    CustomerList[]
+  >([]);
+  const [paginatedAvailableBranches, setPaginatedAvailableBranches] = useState<
+    CustomerList[]
+  >([]);
+  const [hasMoreAvailableBranches, setHasMoreAvailableBranches] =
+    useState(false);
 
   // Filter out customers already in the active group
   const availableCustomers = customers.filter(
@@ -130,9 +143,93 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
     );
   }, [filteredCustomers, customerPage]);
 
+  // Filter available branches when search query changes
+  useEffect(() => {
+    if (!activeGroup) return;
+
+    const filtered = addBranchQuery
+      ? availableCustomers.filter(
+          (customer) =>
+            customer.name
+              .toLowerCase()
+              .includes(addBranchQuery.toLowerCase()) ||
+            customer.id.toLowerCase().includes(addBranchQuery.toLowerCase()) ||
+            (customer.phone_number &&
+              customer.phone_number
+                .toLowerCase()
+                .includes(addBranchQuery.toLowerCase()))
+        )
+      : [...availableCustomers];
+
+    setFilteredAvailableBranches(filtered);
+    setAvailableBranchPage(1); // Reset to first page
+
+    // Calculate initial page
+    const firstPageItems = filtered.slice(0, ITEMS_PER_PAGE);
+    setPaginatedAvailableBranches(firstPageItems);
+    setHasMoreAvailableBranches(filtered.length > ITEMS_PER_PAGE);
+  }, [addBranchQuery, availableCustomers, activeGroup]);
+
+  // Update pagination for available branches
+  useEffect(() => {
+    const items = filteredAvailableBranches.slice(
+      0,
+      availableBranchPage * ITEMS_PER_PAGE
+    );
+    setPaginatedAvailableBranches(items);
+    setHasMoreAvailableBranches(
+      filteredAvailableBranches.length > availableBranchPage * ITEMS_PER_PAGE
+    );
+  }, [filteredAvailableBranches, availableBranchPage]);
+
+  // Create a filtered available customers list for the create new group form
+  const [newGroupAvailableCustomers, setNewGroupAvailableCustomers] = useState<
+    CustomerList[]
+  >([]);
+  const [newGroupPage, setNewGroupPage] = useState(1);
+  const [hasMoreNewGroupCustomers, setHasMoreNewGroupCustomers] =
+    useState(false);
+
+  useEffect(() => {
+    if (!selectedCustomerId) return;
+
+    const customerList = customers.filter((c) => c.id !== selectedCustomerId);
+    const filtered = additionalBranchQuery
+      ? customerList.filter(
+          (customer) =>
+            customer.name
+              .toLowerCase()
+              .includes(additionalBranchQuery.toLowerCase()) ||
+            customer.id
+              .toLowerCase()
+              .includes(additionalBranchQuery.toLowerCase()) ||
+            (customer.phone_number &&
+              customer.phone_number
+                .toLowerCase()
+                .includes(additionalBranchQuery.toLowerCase()))
+        )
+      : customerList;
+
+    const paged = filtered.slice(0, newGroupPage * ITEMS_PER_PAGE);
+    setNewGroupAvailableCustomers(paged);
+    setHasMoreNewGroupCustomers(filtered.length > paged.length);
+  }, [additionalBranchQuery, customers, selectedCustomerId, newGroupPage]);
+
   const loadMoreCustomers = () => {
     if (hasMoreCustomers) {
       setCustomerPage((prev) => prev + 1);
+    }
+  };
+
+  const loadMoreAvailableBranches = () => {
+    if (hasMoreAvailableBranches) {
+      setAvailableBranchPage((prev) => prev + 1);
+    }
+  };
+
+  const loadMoreNewGroupCustomers = () => {
+    if (hasMoreNewGroupCustomers) {
+      setNewGroupPage((prev) => prev + 1);
     }
   };
 
@@ -486,23 +583,22 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                             </h5>
                             <div className="flex items-end gap-2">
                               <div className="flex-1">
-                                <FormCombobox
+                                <MultiCustomerCombobox
                                   name="add-branches"
                                   label="Select Customers"
                                   value={selectedCustomerIds}
-                                  onChange={(value) =>
-                                    setSelectedCustomerIds(value as string[])
-                                  }
-                                  options={availableCustomers.map(
+                                  onChange={setSelectedCustomerIds}
+                                  options={paginatedAvailableBranches.map(
                                     (customer) => ({
                                       id: customer.id,
-                                      name: `${customer.name} (${customer.id})`,
-                                      phone_number: customer.phone_number,
+                                      name: customer.name,
                                     })
                                   )}
-                                  query={searchQuery}
-                                  setQuery={setSearchQuery}
-                                  mode="multiple"
+                                  query={addBranchQuery}
+                                  setQuery={setAddBranchQuery}
+                                  onLoadMore={loadMoreAvailableBranches}
+                                  hasMore={hasMoreAvailableBranches}
+                                  isLoading={false}
                                   disabled={saving}
                                 />
                               </div>
@@ -541,26 +637,22 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                 />
 
                                 <div>
-                                  <FormCombobox
+                                  <MultiCustomerCombobox
                                     name="branch-customers"
                                     label="Select Additional Branches"
                                     value={selectedCustomerIds}
-                                    onChange={(value) =>
-                                      setSelectedCustomerIds(value as string[])
-                                    }
-                                    options={availableCustomers
-                                      .filter(
-                                        (customer) =>
-                                          customer.id !== selectedCustomerId
-                                      )
-                                      .map((customer) => ({
+                                    onChange={setSelectedCustomerIds}
+                                    options={newGroupAvailableCustomers.map(
+                                      (customer) => ({
                                         id: customer.id,
-                                        name: `${customer.name} (${customer.id})`,
-                                        phone_number: customer.phone_number,
-                                      }))}
-                                    query={searchQuery}
-                                    setQuery={setSearchQuery}
-                                    mode="multiple"
+                                        name: customer.name,
+                                      })
+                                    )}
+                                    query={additionalBranchQuery}
+                                    setQuery={setAdditionalBranchQuery}
+                                    onLoadMore={loadMoreNewGroupCustomers}
+                                    hasMore={hasMoreNewGroupCustomers}
+                                    isLoading={false}
                                     disabled={saving}
                                     placeholder="Select customers to add as branches"
                                   />
