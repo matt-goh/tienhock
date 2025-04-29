@@ -163,7 +163,12 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         activity.rateUnit !== "Fixed" && (
                           <>
                             <span>•</span>
-                            <span>
+                            <span
+                              className="truncate"
+                              title={`RM${activity.rate.toFixed(2)}/${
+                                activity.rateUnit
+                              }`}
+                            >
                               @ RM{activity.rate.toFixed(2)}/{activity.rateUnit}
                             </span>
                           </>
@@ -171,18 +176,23 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       {activity.rateUnit === "Percent" && (
                         <>
                           <span>•</span>
-                          <span>@ {activity.rate}%</span>
+                          <span className="truncate">@ {activity.rate}%</span>
                         </>
                       )}
                       {activity.rateUnit === "Fixed" && (
                         <>
                           <span>•</span>
-                          <span>@ RM{activity.rate.toFixed(2)}</span>
+                          <span className="truncate">
+                            @ RM{activity.rate.toFixed(2)}
+                          </span>
                         </>
                       )}
                       {activity.payType === "Overtime" &&
                         activity.rateUnit === "Hour" && (
-                          <span className="ml-1 text-amber-600">
+                          <span
+                            className="ml-1 text-amber-600 truncate"
+                            title={`(Hours > 8)`}
+                          >
                             (Hours {">"} 8)
                           </span>
                         )}
