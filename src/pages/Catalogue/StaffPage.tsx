@@ -403,7 +403,6 @@ const StaffPage = () => {
             <Button
               onClick={() => navigate("/catalogue/staff/new")}
               icon={IconPlus}
-              variant="filled"
               color="sky"
             >
               Add Staff

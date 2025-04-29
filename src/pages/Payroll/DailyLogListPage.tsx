@@ -220,7 +220,6 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
             onClick={handleAddEntry}
             icon={IconPlus}
             color="sky"
-            variant="filled"
           >
             New {jobConfig?.name} Entry
           </Button>

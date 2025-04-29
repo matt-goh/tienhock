@@ -4,6 +4,44 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Get all branch groups
+  router.get("/all", async (req, res) => {
+    try {
+      const query = `
+      SELECT 
+        cbg.id,
+        cbg.group_name,
+        COALESCE(
+          (SELECT json_agg(
+            json_build_object(
+              'customer_id', c.id,
+              'customer_name', c.name,
+              'is_main_branch', cbm.is_main_branch
+            )
+          )
+          FROM customer_branch_mappings cbm
+          JOIN customers c ON cbm.customer_id = c.id
+          WHERE cbm.group_id = cbg.id), 
+          '[]'::json
+        ) AS branches
+      FROM customer_branch_groups cbg
+      ORDER BY cbg.group_name;
+    `;
+
+      const result = await pool.query(query);
+
+      res.json({
+        groups: result.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching all branch groups:", error);
+      res.status(500).json({
+        message: "Error fetching all branch groups",
+        error: error.message,
+      });
+    }
+  });
+
   // Get branch groups for a customer
   router.get("/:customerId", async (req, res) => {
     const { customerId } = req.params;
@@ -332,6 +370,48 @@ export default function (pool) {
       console.error("Error removing customer from branch group:", error);
       res.status(500).json({
         message: "Error removing customer from branch group",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // Delete an entire branch group with cascade
+  router.delete("/:groupId", async (req, res) => {
+    const { groupId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // First check if the group exists
+      const checkGroupQuery = `SELECT 1 FROM customer_branch_groups WHERE id = $1`;
+      const groupResult = await client.query(checkGroupQuery, [groupId]);
+
+      if (groupResult.rows.length === 0) {
+        throw new Error(`Branch group with ID ${groupId} not found`);
+      }
+
+      // Delete all mappings for this group
+      const deleteMapQuery = `DELETE FROM customer_branch_mappings WHERE group_id = $1`;
+      await client.query(deleteMapQuery, [groupId]);
+
+      // Delete the group itself
+      const deleteGroupQuery = `DELETE FROM customer_branch_groups WHERE id = $1`;
+      await client.query(deleteGroupQuery, [groupId]);
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Branch group deleted successfully",
+        group_id: groupId,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error deleting branch group:", error);
+      res.status(500).json({
+        message: "Error deleting branch group",
         error: error.message,
       });
     } finally {

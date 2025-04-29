@@ -28,7 +28,7 @@ import {
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 20;
 
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
@@ -268,7 +268,7 @@ const CustomerPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-20">
+    <div className="relative w-full mx-20 -mt-12 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-6">
           <h1 className="text-2xl text-default-700 font-bold">
@@ -290,17 +290,13 @@ const CustomerPage: React.FC = () => {
             />
           </div>
           {renderSalesmanListbox()}
-          <Button
-            onClick={() => setIsBranchModalOpen(true)}
-            variant="outline"
-            color="sky"
-          >
+          <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
             Branch Pricing
           </Button>
           <Button
             onClick={() => navigate("/catalogue/customer/new")}
             icon={IconPlus}
-            variant="outline"
+            color="sky"
           >
             Add Customer
           </Button>
