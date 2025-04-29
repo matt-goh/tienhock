@@ -7,7 +7,7 @@ import {
   ComboboxOption,
   Transition,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconArrowDown } from "@tabler/icons-react";
 import { useState, useEffect, Fragment } from "react";
 import clsx from "clsx";
 
@@ -163,7 +163,8 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          {option.name}
+                          {option.name}{" "}
+                          <span className="text-gray-500">({option.id})</span>
                         </span>
                         {selected ? (
                           <span
@@ -179,16 +180,17 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                   </ComboboxOption>
                 ))
               )}
-              {/* Load More Button */}
+              {/* Load More Button - Prettier Version */}
               {!isLoading && hasMore && (
-                <div className="border-t border-gray-200 px-4 py-2">
+                <div className="border-t border-gray-200 p-2">
                   <button
                     type="button"
                     onClick={onLoadMore}
-                    className="w-full text-center text-sm text-sky-600 hover:text-sky-700 disabled:opacity-50"
+                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
                     disabled={isLoading}
                   >
-                    Load More...
+                    <IconArrowDown size={16} className="mr-1.5" />
+                    <span>Load More Customers</span>
                   </button>
                 </div>
               )}
