@@ -14,6 +14,7 @@ import sidebarRouter from "./user/sidebar.js";
 // Catalogue routes
 import customerValidationRouter from "./catalogue/customer-validation.js";
 import customerProductsRouter from "./catalogue/customer-products.js";
+import customerBranchesRouter from "./catalogue/customer-branches.js";
 import jobCategoriesRouter from "./catalogue/job-categories.js";
 import staffOptionsRouter from "./catalogue/staff-options.js";
 import jobPayCodesRouter from "./catalogue/job-pay-codes.js";
@@ -150,6 +151,7 @@ export default function setupRoutes(app, pool) {
   );
   app.use("/api/customers", customerRouter(pool));
   app.use("/api/customer-products", customerProductsRouter(pool));
+  app.use("/api/customer-branches", customerBranchesRouter(pool));
   app.use("/api/products", productRouter(pool));
   app.use("/api/taxes", taxRouter(pool));
   app.use("/api/jobs", jobRouter(pool));
