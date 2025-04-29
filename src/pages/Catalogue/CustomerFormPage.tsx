@@ -523,7 +523,7 @@ const CustomerFormPage: React.FC = () => {
         type={type}
         placeholder={placeholder}
         required={required}
-        disabled={isSaving} // Disable when saving
+        disabled={name === "id" ? true : isSaving} // Disable when saving
       />
     );
   };
