@@ -291,7 +291,7 @@ const CustomerPage: React.FC = () => {
           </div>
           {renderSalesmanListbox()}
           <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
-            Branch Pricing
+            Branch
           </Button>
           <Button
             onClick={() => navigate("/catalogue/customer/new")}
