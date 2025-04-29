@@ -26,6 +26,7 @@ import {
   useCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -43,6 +44,7 @@ const CustomerPage: React.FC = () => {
   );
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
 
   useEffect(() => {
     if (salesmenData.length > 0) {
@@ -289,6 +291,13 @@ const CustomerPage: React.FC = () => {
           </div>
           {renderSalesmanListbox()}
           <Button
+            onClick={() => setIsBranchModalOpen(true)}
+            variant="outline"
+            color="sky"
+          >
+            Branch Pricing
+          </Button>
+          <Button
             onClick={() => navigate("/catalogue/customer/new")}
             icon={IconPlus}
             variant="outline"
@@ -341,6 +350,10 @@ const CustomerPage: React.FC = () => {
         title="Delete Customer"
         message={`Are you sure you want to remove ${customerToDelete?.name} from the customer list? This action cannot be undone.`}
         confirmButtonText="Delete"
+      />
+      <BranchLinkageModal
+        isOpen={isBranchModalOpen}
+        onClose={() => setIsBranchModalOpen(false)}
       />
     </div>
   );

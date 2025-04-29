@@ -153,31 +153,80 @@ export default function (pool) {
 
       // Process upserts
       if (products && products.length > 0) {
-        for (const product of products) {
-          const { productId, customPrice, isAvailable } = product;
+        // Find any branch groups this customer belongs to
+        const branchQuery = `
+          SELECT cbg.id AS group_id, cm.customer_id
+          FROM customer_branch_mappings cm
+          JOIN customer_branch_groups cbg ON cm.group_id = cbg.id
+          WHERE EXISTS (
+            SELECT 1 FROM customer_branch_mappings 
+            WHERE group_id = cbg.id AND customer_id = $1
+          ) AND cm.customer_id != $1
+        `;
 
-          if (!productId) {
-            console.warn("Skipping product with no ID");
-            continue;
+        const branchResult = await client.query(branchQuery, [customerId]);
+
+        if (branchResult.rows.length > 0) {
+          // Map of customers by group ID
+          const branchCustomersByGroup = branchResult.rows.reduce(
+            (acc, row) => {
+              if (!acc[row.group_id]) {
+                acc[row.group_id] = [];
+              }
+              acc[row.group_id].push(row.customer_id);
+              return acc;
+            },
+            {}
+          );
+
+          // For each product updated, apply to all branch customers
+          for (const product of products) {
+            const { productId, customPrice, isAvailable } = product;
+
+            // For each group
+            for (const [groupId, branchCustomers] of Object.entries(
+              branchCustomersByGroup
+            )) {
+              // For each customer in the group
+              for (const branchCustomerId of branchCustomers) {
+                const upsertQuery = `
+                  INSERT INTO customer_products 
+                    (customer_id, product_id, custom_price, is_available) 
+                  VALUES 
+                    ($1, $2, $3, $4)
+                  ON CONFLICT (customer_id, product_id) 
+                  DO UPDATE SET
+                    custom_price = EXCLUDED.custom_price,
+                    is_available = EXCLUDED.is_available
+                `;
+
+                await client.query(upsertQuery, [
+                  branchCustomerId,
+                  productId,
+                  customPrice || 0,
+                  isAvailable === undefined ? true : isAvailable,
+                ]);
+              }
+            }
           }
 
-          const upsertQuery = `
-            INSERT INTO customer_products 
-              (customer_id, product_id, custom_price, is_available) 
-            VALUES 
-              ($1, $2, $3, $4)
-            ON CONFLICT (customer_id, product_id) 
-            DO UPDATE SET
-              custom_price = EXCLUDED.custom_price,
-              is_available = EXCLUDED.is_available
-          `;
-
-          await client.query(upsertQuery, [
-            customerId,
-            productId,
-            customPrice || 0,
-            isAvailable === undefined ? true : isAvailable,
-          ]);
+          // Also propagate deletions if any
+          if (deletedProductIds && deletedProductIds.length > 0) {
+            for (const [groupId, branchCustomers] of Object.entries(
+              branchCustomersByGroup
+            )) {
+              for (const branchCustomerId of branchCustomers) {
+                const deleteQuery = `
+                  DELETE FROM customer_products 
+                  WHERE customer_id = $1 AND product_id = ANY($2)
+                `;
+                await client.query(deleteQuery, [
+                  branchCustomerId,
+                  deletedProductIds,
+                ]);
+              }
+            }
+          }
         }
       }
 
