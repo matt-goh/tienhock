@@ -109,7 +109,9 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                 disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
               )}
               // Display value based on the internal selectedOption state
-              displayValue={(option: SelectOption | null) => option?.name ?? ""}
+              displayValue={(option: SelectOption | null) =>
+                option ? `${option.name} (${option.id})` : ""
+              }
               onChange={(event) => setQuery(event.target.value)} // Update parent query state on input change
               placeholder={placeholder}
               disabled={disabled}

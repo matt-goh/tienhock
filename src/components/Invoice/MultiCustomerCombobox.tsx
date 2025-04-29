@@ -1,4 +1,3 @@
-// src/components/Invoice/MultiCustomerCombobox.tsx
 import {
   Combobox,
   ComboboxInput,
@@ -8,7 +7,7 @@ import {
   Transition,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck, IconArrowDown } from "@tabler/icons-react";
-import { Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import clsx from "clsx";
 
 interface SelectOption {
@@ -45,8 +44,41 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
   placeholder = "Search or select customers...",
   disabled = false,
 }) => {
-  // Find selected options based on IDs
-  const selectedOptions = options.filter((option) => value.includes(option.id));
+  // Track all options we've seen to ensure we can display selected items
+  const [seenOptions, setSeenOptions] = useState<Record<string, SelectOption>>(
+    {}
+  );
+
+  // Add current options to our seen options record
+  useEffect(() => {
+    const newSeenOptions = { ...seenOptions };
+    let hasNewOptions = false;
+
+    options.forEach((option) => {
+      if (!newSeenOptions[option.id]) {
+        newSeenOptions[option.id] = option;
+        hasNewOptions = true;
+      }
+    });
+
+    // Only update state if we have new options
+    if (hasNewOptions) {
+      setSeenOptions(newSeenOptions);
+    }
+  }, [options]);
+
+  // Combine current options with all previously seen selected options
+  const selectedOptions = value.map((id) => {
+    // Find in current options first
+    const option = options.find((opt) => opt.id === id);
+    if (option) return option;
+
+    // Then look in our seen options record
+    if (seenOptions[id]) return seenOptions[id];
+
+    // If we still don't have it, use a fallback
+    return { id, name: id };
+  });
 
   const filteredOptions =
     query === ""
