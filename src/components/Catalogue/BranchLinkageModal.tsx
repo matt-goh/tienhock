@@ -664,7 +664,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                             <h5 className="font-medium mb-2">
                               Add More Branches
                             </h5>
-                            <div className="flex items-end gap-2">
+                            <div className="flex items-center gap-2">
                               <div className="flex-1">
                                 <MultiCustomerCombobox
                                   name="add-branches"
@@ -685,17 +685,17 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   disabled={saving}
                                 />
                               </div>
-                              <Button
-                                variant="filled"
-                                color="sky"
-                                icon={IconPlus}
-                                onClick={handleAddToBranch}
-                                disabled={
-                                  saving || selectedCustomerIds.length === 0
-                                }
-                              >
-                                Add
-                              </Button>
+                                <Button
+                                  variant="filled"
+                                  color="sky"
+                                  icon={IconPlus}
+                                  onClick={handleAddToBranch}
+                                  disabled={
+                                    saving || selectedCustomerIds.length === 0
+                                  }
+                                >
+                                  Add
+                                </Button>
                             </div>
                           </div>
                         </div>
