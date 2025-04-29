@@ -307,7 +307,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                     />
                   </td>
                   {/* Action */}
-                  <td className="px-4 py-2 whitespace-nowrap text-center align-top">
+                  <td className="px-4 py-2 whitespace-nowrap text-center align-middle">
                     <Button
                       onClick={() => handleDeleteRow(product.uid)}
                       variant="outline"
