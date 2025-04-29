@@ -657,8 +657,9 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                     placeholder="Select customers to add as branches"
                                   />
                                   <p className="text-xs text-gray-500 mt-1">
-                                    Current customer ({selectedCustomer?.name})
-                                    will be added as the main branch
+                                    Current customer ({selectedCustomer?.name},{" "}
+                                    {selectedCustomer?.id}) will be added as the
+                                    main branch
                                   </p>
                                 </div>
 
