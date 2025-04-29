@@ -13,10 +13,9 @@ import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
 import {
   useCustomersCache,
-  refreshCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
 import { CustomerCombobox } from "../Invoice/CustomerCombobox";
-import { FormCombobox, FormInput, SelectOption } from "../FormComponents";
+import { FormInput } from "../FormComponents";
 import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
 import { CustomerList } from "../../types/types";
 import { MultiCustomerCombobox } from "../Invoice/MultiCustomerCombobox";
@@ -49,7 +48,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   const [customerGroups, setCustomerGroups] = useState<BranchGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<BranchGroup | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
@@ -290,13 +288,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         }
       });
 
-      const response = await api.post("/api/customer-branches", {
+      await api.post("/api/customer-branches", {
         group_name: newGroupName,
         branches,
       });
 
       toast.success("Branch group created successfully");
-      await refreshCustomersCache(); // Refresh customer cache
       fetchBranchGroups(); // Refresh data
       setIsAddingNew(false);
       setNewGroupName("");
@@ -314,7 +311,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
     setSaving(true);
     try {
-      const response = await api.post(
+      await api.post(
         `/api/customer-branches/${activeGroup.id}/add`,
         {
           customer_ids: selectedCustomerIds,
@@ -322,7 +319,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       );
 
       toast.success("Branches added successfully");
-      await refreshCustomersCache(); // Refresh customer cache
       fetchBranchGroups(); // Refresh data
       setSelectedCustomerIds([]);
     } catch (error) {
@@ -342,7 +338,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/remove/${branchCustomerId}`
       );
       toast.success("Branch removed successfully");
-      await refreshCustomersCache(); // Refresh customer cache
       fetchBranchGroups(); // Refresh data
     } catch (error) {
       console.error("Error removing branch:", error);
@@ -361,7 +356,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/main/${branchCustomerId}`
       );
       toast.success("Main branch updated successfully");
-      await refreshCustomersCache(); // Refresh customer cache
       fetchBranchGroups(); // Refresh data
     } catch (error) {
       console.error("Error setting main branch:", error);
@@ -380,7 +374,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/remove/${selectedCustomerId}`
       );
       toast.success("Left branch group successfully");
-      await refreshCustomersCache(); // Refresh customer cache
       fetchBranchGroups(); // Refresh data
     } catch (error) {
       console.error("Error leaving group:", error);
@@ -416,7 +409,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-3xl transform rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-5xl transform rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
