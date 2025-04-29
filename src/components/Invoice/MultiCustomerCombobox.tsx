@@ -8,7 +8,7 @@ import {
   Transition,
 } from "@headlessui/react";
 import { IconChevronDown, IconCheck, IconArrowDown } from "@tabler/icons-react";
-import { useState, useEffect, Fragment } from "react";
+import { Fragment } from "react";
 import clsx from "clsx";
 
 interface SelectOption {
@@ -57,14 +57,9 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
             option.id.toLowerCase().includes(query.toLowerCase())
         );
 
-  const toggleOption = (option: SelectOption) => {
-    if (value.includes(option.id)) {
-      // Remove if already selected
-      onChange(value.filter((id) => id !== option.id));
-    } else {
-      // Add if not selected
-      onChange([...value, option.id]);
-    }
+  // Handle removing an option from the selected pills
+  const removeOption = (optionId: string) => {
+    onChange(value.filter((id) => id !== optionId));
   };
 
   return (
@@ -78,9 +73,9 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
       <div className="relative">
         <Combobox
           value={selectedOptions}
-          onChange={(selectedOptions: SelectOption[]) => {
+          onChange={(newSelectedOptions: SelectOption[]) => {
             // Extract IDs from the selected options array
-            onChange(selectedOptions.map((option) => option.id));
+            onChange(newSelectedOptions.map((option) => option.id));
           }}
           multiple
         >
@@ -145,25 +140,26 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
                         active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                       }`
                     }
-                    onClick={() => toggleOption(option)}
                   >
-                    <div className="flex items-center">
-                      <div
-                        className={`w-4 h-4 mr-2 border ${
-                          value.includes(option.id)
-                            ? "bg-sky-500 border-sky-500"
-                            : "border-gray-300"
-                        } rounded flex items-center justify-center`}
-                      >
-                        {value.includes(option.id) && (
-                          <IconCheck size={12} className="text-white" />
-                        )}
+                    {({ selected }) => (
+                      <div className="flex items-center">
+                        <div
+                          className={`w-4 h-4 mr-2 border ${
+                            selected
+                              ? "bg-sky-500 border-sky-500"
+                              : "border-gray-300"
+                          } rounded flex items-center justify-center`}
+                        >
+                          {selected && (
+                            <IconCheck size={12} className="text-white" />
+                          )}
+                        </div>
+                        <span className="block truncate">{option.name}</span>
+                        <span className="text-xs ml-2 text-gray-500">
+                          ({option.id})
+                        </span>
                       </div>
-                      <span className="block truncate">{option.name}</span>
-                      <span className="text-xs ml-2 text-gray-500">
-                        ({option.id})
-                      </span>
-                    </div>
+                    )}
                   </ComboboxOption>
                 ))
               )}
@@ -192,10 +188,12 @@ export const MultiCustomerCombobox: React.FC<ComboboxProps> = ({
               key={option.id}
               className="bg-sky-100 text-sky-800 text-xs px-2 py-1 rounded-full flex items-center"
             >
-              <span className="truncate max-w-[150px]">{option.name}</span>
+              <span className="truncate max-w-[150px]" title={option.name}>
+                {option.name}
+              </span>
               <button
                 className="ml-1 text-sky-500 hover:text-sky-700"
-                onClick={() => toggleOption(option)}
+                onClick={() => removeOption(option.id)}
                 type="button"
               >
                 ×
