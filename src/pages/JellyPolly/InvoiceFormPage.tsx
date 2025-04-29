@@ -8,6 +8,7 @@ import {
   Customer,
   CustomProduct,
   Payment,
+  CustomerList,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
@@ -18,7 +19,7 @@ import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
-import { useCustomerData } from "../../hooks/useCustomerData";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import {
   checkDuplicateInvoiceNo,
   createInvoice,
@@ -72,16 +73,21 @@ const InvoiceFormPage: React.FC = () => {
     useProductsCache("jp");
   const { salesmen: salesmenCache, isLoading: salesmenLoading } =
     useSalesmanCache();
-  const {
-    customers,
-    selectedCustomer,
-    setSelectedCustomer,
-    customerQuery,
-    setCustomerQuery,
-    loadMoreCustomers,
-    hasMoreCustomers,
-    isFetchingCustomers,
-  } = useCustomerData(invoiceData?.customerid);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerPage, setCustomerPage] = useState(1);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
+  const ITEMS_PER_PAGE = 30;
+  const { customers: allCustomers, isLoading: isCustomersLoading } =
+    useCustomersCache();
+  const [filteredCustomers, setFilteredCustomers] = useState<CustomerList[]>(
+    []
+  );
+  const [paginatedCustomers, setPaginatedCustomers] = useState<CustomerList[]>(
+    []
+  );
+  const [hasMoreCustomers, setHasMoreCustomers] = useState(false);
 
   // --- Memoized Values (remain the same) ---
   const lineItems = useMemo(
@@ -231,6 +237,60 @@ const InvoiceFormPage: React.FC = () => {
       );
     }
   }, [invoiceData?.products, invoiceData?.rounding]);
+
+  // Filter customers when search query changes
+  useEffect(() => {
+    const filtered = customerQuery
+      ? allCustomers.filter(
+          (customer) =>
+            customer.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
+            customer.id.toLowerCase().includes(customerQuery.toLowerCase()) ||
+            (customer.phone_number &&
+              customer.phone_number
+                .toLowerCase()
+                .includes(customerQuery.toLowerCase()))
+        )
+      : [...allCustomers];
+
+    setFilteredCustomers(filtered);
+    setCustomerPage(1); // Reset to first page on new search
+
+    // Calculate initial page
+    const firstPageItems = filtered.slice(0, ITEMS_PER_PAGE);
+    setPaginatedCustomers(firstPageItems);
+    setHasMoreCustomers(filtered.length > ITEMS_PER_PAGE);
+  }, [customerQuery, allCustomers]);
+
+  // Update pagination when page changes
+  useEffect(() => {
+    const items = filteredCustomers.slice(0, customerPage * ITEMS_PER_PAGE);
+    setPaginatedCustomers(items);
+    setHasMoreCustomers(
+      filteredCustomers.length > customerPage * ITEMS_PER_PAGE
+    );
+  }, [filteredCustomers, customerPage]);
+
+  // Initialize selected customer based on invoiceData.customerid
+  useEffect(() => {
+    if (
+      allCustomers.length > 0 &&
+      invoiceData?.customerid &&
+      !selectedCustomer
+    ) {
+      const found = allCustomers.find((c) => c.id === invoiceData.customerid);
+      if (found) {
+        // Cast to Customer type as CustomerList lacks some properties
+        setSelectedCustomer(found as unknown as Customer);
+      }
+    }
+  }, [allCustomers, invoiceData?.customerid, selectedCustomer]);
+
+  // Function to load more customers
+  const loadMoreCustomers = useCallback(() => {
+    if (hasMoreCustomers) {
+      setCustomerPage((prev) => prev + 1);
+    }
+  }, [hasMoreCustomers]);
 
   // --- Input & Action Handlers (mostly same) ---
 
@@ -671,7 +731,7 @@ const InvoiceFormPage: React.FC = () => {
             invoice={invoiceData}
             onInputChange={handleHeaderInputChange}
             isNewInvoice={true}
-            customers={customers}
+            customers={paginatedCustomers as unknown as Customer[]}
             salesmen={salesmenOptions}
             selectedCustomer={selectedCustomer}
             onCustomerChange={handleCustomerSelectionChange}
@@ -679,8 +739,8 @@ const InvoiceFormPage: React.FC = () => {
             setCustomerQuery={setCustomerQuery}
             onLoadMoreCustomers={loadMoreCustomers}
             hasMoreCustomers={hasMoreCustomers}
-            isFetchingCustomers={isFetchingCustomers}
-            readOnly={isSaving} // Make header read-only while saving
+            isFetchingCustomers={isCustomersLoading}
+            readOnly={isSaving}
           />
         </section>
 
