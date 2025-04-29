@@ -11,14 +11,13 @@ import Button from "../Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
-import {
-  useCustomersCache,
-} from "../../utils/catalogue/useCustomerCache";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { CustomerCombobox } from "../Invoice/CustomerCombobox";
 import { FormInput } from "../FormComponents";
 import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
 import { CustomerList } from "../../types/types";
 import { MultiCustomerCombobox } from "../Invoice/MultiCustomerCombobox";
+import ConfirmationDialog from "../ConfirmationDialog";
 
 interface BranchGroup {
   id: number;
@@ -78,14 +77,53 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   >([]);
   const [hasMoreAvailableBranches, setHasMoreAvailableBranches] =
     useState(false);
+  const [allBranchGroups, setAllBranchGroups] = useState<BranchGroup[]>([]);
+  const [fetchingAllGroups, setFetchingAllGroups] = useState(false);
+  const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
+
+  const fetchAllBranchGroups = async () => {
+    setFetchingAllGroups(true);
+    try {
+      const response = await api.get("/api/customer-branches/all");
+      setAllBranchGroups(response.groups || []);
+    } catch (error) {
+      console.error("Error fetching all branch groups:", error);
+      toast.error("Failed to load all branch groups");
+    } finally {
+      setFetchingAllGroups(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchAllBranchGroups();
+    }
+  }, [isOpen]);
+
+  const selectBranchGroup = (group: BranchGroup) => {
+    setActiveGroup(group);
+    // Optional: Find the main branch and set it as selected customer
+    const mainBranch = group.branches.find((branch) => branch.is_main_branch);
+    if (mainBranch) {
+      setSelectedCustomerId(mainBranch.customer_id);
+    }
+  };
 
   // Filter out customers already in the active group
-  const availableCustomers = customers.filter(
-    (customer) =>
-      !activeGroup?.branches.some(
-        (branch) => branch.customer_id === customer.id
-      ) && customer.id !== selectedCustomerId
+  const [availableCustomers, setAvailableCustomers] = useState<CustomerList[]>(
+    []
   );
+
+  // Calculate available customers when dependencies change
+  useEffect(() => {
+    const filtered = customers.filter(
+      (customer) =>
+        !activeGroup?.branches.some(
+          (branch) => branch.customer_id === customer.id
+        ) && customer.id !== selectedCustomerId
+    );
+    setAvailableCustomers(filtered);
+  }, [customers, activeGroup, selectedCustomerId]);
 
   useEffect(() => {
     if (initialCustomerId) {
@@ -257,7 +295,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         setActiveGroup(null);
         // If no groups, pre-fill new group name with customer name + Branches
         if (selectedCustomer) {
-          setNewGroupName(`${selectedCustomer.name} Branches`);
+          setNewGroupName(`${selectedCustomer.id} Branches`);
         }
       }
     } catch (error) {
@@ -294,7 +332,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       });
 
       toast.success("Branch group created successfully");
-      fetchBranchGroups(); // Refresh data
+      await fetchBranchGroups(); // Refresh data
+      await fetchAllBranchGroups(); // Refresh all groups
       setIsAddingNew(false);
       setNewGroupName("");
       setSelectedCustomerIds([]);
@@ -311,15 +350,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
     setSaving(true);
     try {
-      await api.post(
-        `/api/customer-branches/${activeGroup.id}/add`,
-        {
-          customer_ids: selectedCustomerIds,
-        }
-      );
+      await api.post(`/api/customer-branches/${activeGroup.id}/add`, {
+        customer_ids: selectedCustomerIds,
+      });
 
       toast.success("Branches added successfully");
-      fetchBranchGroups(); // Refresh data
+      await fetchBranchGroups(); // Refresh data
+      await fetchAllBranchGroups(); // Refresh all groups
       setSelectedCustomerIds([]);
     } catch (error) {
       console.error("Error adding branches:", error);
@@ -338,7 +375,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/remove/${branchCustomerId}`
       );
       toast.success("Branch removed successfully");
-      fetchBranchGroups(); // Refresh data
+      await fetchBranchGroups(); // Refresh data
+      await fetchAllBranchGroups(); // Refresh all groups
     } catch (error) {
       console.error("Error removing branch:", error);
       toast.error("Failed to remove branch");
@@ -356,7 +394,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/main/${branchCustomerId}`
       );
       toast.success("Main branch updated successfully");
-      fetchBranchGroups(); // Refresh data
+      await fetchBranchGroups(); // Refresh data
     } catch (error) {
       console.error("Error setting main branch:", error);
       toast.error("Failed to update main branch");
@@ -365,19 +403,22 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
     }
   };
 
-  const handleLeaveGroup = async () => {
-    if (!activeGroup || !selectedCustomerId) return;
+  const handleDeleteGroup = async () => {
+    if (!activeGroup) return;
 
     setSaving(true);
     try {
-      await api.delete(
-        `/api/customer-branches/${activeGroup.id}/remove/${selectedCustomerId}`
-      );
-      toast.success("Left branch group successfully");
-      fetchBranchGroups(); // Refresh data
+      await api.delete(`/api/customer-branches/${activeGroup.id}`);
+      toast.success("Branch group deleted successfully");
+
+      // Refresh data
+      await fetchBranchGroups();
+      await fetchAllBranchGroups();
+      setActiveGroup(null);
+      setIsDeleteGroupDialogOpen(false);
     } catch (error) {
-      console.error("Error leaving group:", error);
-      toast.error("Failed to leave branch group");
+      console.error("Error deleting branch group:", error);
+      toast.error("Failed to delete branch group");
     } finally {
       setSaving(false);
     }
@@ -417,12 +458,52 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                   Branch Pricing Management
                 </DialogTitle>
 
-                <div className="mt-4">
+                <div className="mt-2">
                   <p className="text-sm text-gray-500 mb-4">
                     Link multiple customer branches to share pricing. Any price
                     change in one branch will update pricing for all linked
                     branches.
                   </p>
+
+                  {/* List of All Branch Groups */}
+                  <div className="mb-4 border rounded-lg p-4">
+                    {fetchingAllGroups ? (
+                      <>
+                        <h4 className="font-medium mb-3">All Branch Groups</h4>
+                        <div className="flex justify-center py-4">
+                          <LoadingSpinner size="sm" />
+                        </div>
+                      </>
+                    ) : allBranchGroups.length === 0 ? (
+                      <p className="text-gray-500 text-center py-3">
+                        No branch groups found
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {allBranchGroups.map((group) => (
+                          <div
+                            key={group.id}
+                            className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-gray-50 ${
+                              activeGroup?.id === group.id
+                                ? "border-sky-500 bg-sky-50"
+                                : ""
+                            }`}
+                            onClick={() => selectBranchGroup(group)}
+                          >
+                            <h5 className="font-medium text-gray-900">
+                              {group.group_name}
+                            </h5>
+                            <p className="text-sm text-gray-500">
+                              {group.branches.length}{" "}
+                              {group.branches.length === 1
+                                ? "branch"
+                                : "branches"}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Customer selection */}
                   <div className="mb-6">
@@ -480,10 +561,10 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                               variant="outline"
                               color="rose"
                               size="sm"
-                              onClick={handleLeaveGroup}
+                              onClick={() => setIsDeleteGroupDialogOpen(true)} // We'll add this state
                               disabled={saving}
                             >
-                              Leave Group
+                              Delete Group
                             </Button>
                           </div>
 
@@ -492,85 +573,87 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                               Linked Branches
                             </h5>
                             <div className="border rounded-lg overflow-hidden">
-                              <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                  <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Customer ID
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Name
-                                    </th>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Main Branch
-                                    </th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Actions
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                  {activeGroup.branches.map((branch) => (
-                                    <tr key={branch.customer_id}>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {branch.customer_id}
-                                      </td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {branch.customer_name}
-                                      </td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-center">
-                                        {branch.is_main_branch ? (
-                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <IconCheck
-                                              size={12}
-                                              className="mr-1"
-                                            />
-                                            Main
-                                          </span>
-                                        ) : (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                              handleSetMainBranch(
-                                                branch.customer_id
-                                              )
-                                            }
-                                            disabled={saving}
-                                            className="text-xs py-1"
-                                          >
-                                            Set as Main
-                                          </Button>
-                                        )}
-                                      </td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                                        {!branch.is_main_branch && (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            color="rose"
-                                            icon={IconTrash}
-                                            onClick={() =>
-                                              handleRemoveBranch(
-                                                branch.customer_id
-                                              )
-                                            }
-                                            disabled={saving}
-                                            className="text-xs py-1"
-                                          >
-                                            Remove
-                                          </Button>
-                                        )}
-                                      </td>
+                              <div className="max-h-80 overflow-y-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-50 sticky top-0 z-10">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Customer ID
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Name
+                                      </th>
+                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Main Branch
+                                      </th>
+                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                      </th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {activeGroup.branches.map((branch) => (
+                                      <tr key={branch.customer_id}>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                          {branch.customer_id}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                          {branch.customer_name}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                                          {branch.is_main_branch ? (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                              <IconCheck
+                                                size={12}
+                                                className="mr-1"
+                                              />
+                                              Main
+                                            </span>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() =>
+                                                handleSetMainBranch(
+                                                  branch.customer_id
+                                                )
+                                              }
+                                              disabled={saving}
+                                              className="text-xs py-1"
+                                            >
+                                              Set as Main
+                                            </Button>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+                                          {!branch.is_main_branch && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              color="rose"
+                                              icon={IconTrash}
+                                              onClick={() =>
+                                                handleRemoveBranch(
+                                                  branch.customer_id
+                                                )
+                                              }
+                                              disabled={saving}
+                                              className="text-xs py-1"
+                                            >
+                                              Remove
+                                            </Button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </div>
 
                           {/* Add more branches */}
-                          <div className="mt-4">
+                          <div className="mt-2">
                             <h5 className="font-medium mb-2">
                               Add More Branches
                             </h5>
@@ -707,6 +790,14 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
           </div>
         </div>
       </Dialog>
+      <ConfirmationDialog
+        isOpen={isDeleteGroupDialogOpen}
+        onClose={() => setIsDeleteGroupDialogOpen(false)}
+        onConfirm={handleDeleteGroup}
+        title="Delete Branch Group"
+        message={`Are you sure you want to delete the branch group "${activeGroup?.group_name}"? This will remove all branch relationships and shared pricing.`}
+        confirmButtonText="Delete Group"
+      />
     </Transition>
   );
 };
