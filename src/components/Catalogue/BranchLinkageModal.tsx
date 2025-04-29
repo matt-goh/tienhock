@@ -455,14 +455,15 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
                 >
-                  Branch Pricing Management
+                  Branch Management
                 </DialogTitle>
 
                 <div className="mt-2">
                   <p className="text-sm text-gray-500 mb-4">
-                    Link multiple customer branches to share pricing. Any price
-                    change in one branch will update pricing for all linked
-                    branches.
+                    Link multiple customer branches to share pricing and
+                    e-Invoice information. Any price change in one branch will
+                    update pricing for all linked branches. All branches will
+                    also share the same e-Invoice information.
                   </p>
 
                   {/* List of All Branch Groups */}
