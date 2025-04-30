@@ -84,7 +84,7 @@ const CustomerFormPage: React.FC = () => {
     groupId: number;
     branches: { id: string; name: string; isMain: boolean }[];
   } | null>(null);
-  const { customers } = useCustomersCache();
+  const { customers, isLoading } = useCustomersCache();
 
   // Options
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
@@ -227,14 +227,18 @@ const CustomerFormPage: React.FC = () => {
 
   useEffect(() => {
     if (isEditMode) {
-      fetchFromCache();
+      // Only proceed with fetchFromCache when the cache is loaded
+      if (!isLoading) {
+        fetchFromCache();
+      }
+      // Don't set loading to false here, as we're now waiting for fetchFromCache
     } else {
       // For new customer, ensure initial refs are set for change detection
       initialFormDataRef.current = { ...formData };
       initialCustomProductsRef.current = [...customProducts];
       setLoading(false); // Not loading if creating new
     }
-  }, [isEditMode, fetchFromCache]);
+  }, [isEditMode, fetchFromCache, isLoading]); // Add isLoading to dependencies
 
   // --- Populate Salesmen Options ---
   useEffect(() => {
