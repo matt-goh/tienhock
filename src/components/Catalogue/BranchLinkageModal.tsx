@@ -21,6 +21,10 @@ import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
 import { CustomerList } from "../../types/types";
 import { MultiCustomerCombobox } from "../Invoice/MultiCustomerCombobox";
 import ConfirmationDialog from "../ConfirmationDialog";
+import {
+  useBranchGroupsCache,
+  refreshBranchGroupsCache,
+} from "../../utils/catalogue/useBranchGroupsCache";
 
 interface BranchGroup {
   id: number;
@@ -80,28 +84,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   >([]);
   const [hasMoreAvailableBranches, setHasMoreAvailableBranches] =
     useState(false);
-  const [allBranchGroups, setAllBranchGroups] = useState<BranchGroup[]>([]);
-  const [fetchingAllGroups, setFetchingAllGroups] = useState(false);
+  const {
+    branchGroups: allBranchGroups,
+    isLoading: fetchingAllGroups,
+    refreshBranchGroups,
+  } = useBranchGroupsCache();
   const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
-
-  const fetchAllBranchGroups = async () => {
-    setFetchingAllGroups(true);
-    try {
-      const response = await api.get("/api/customer-branches/all");
-      setAllBranchGroups(response.groups || []);
-    } catch (error) {
-      console.error("Error fetching all branch groups:", error);
-      toast.error("Failed to load all branch groups");
-    } finally {
-      setFetchingAllGroups(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchAllBranchGroups();
-    }
-  }, [isOpen]);
 
   const selectBranchGroup = (group: BranchGroup) => {
     setActiveGroup(group);
@@ -277,32 +265,26 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
     setLoading(true);
     try {
-      // API call to fetch branch groups for the current customer
-      const response = await api.get(
-        `/api/customer-branches/${selectedCustomerId}`
-      );
-      setCustomerGroups(response.groups || []);
-
-      // Set active group if current customer is part of any group
-      const customerGroup = response.groups?.find(
-        (group: { branches: { customer_id: string }[] }) =>
-          group.branches.some(
-            (branch: { customer_id: string }) =>
-              branch.customer_id === selectedCustomerId
-          )
+      // Find branch groups containing this customer from our cache
+      const customerGroup = allBranchGroups.find((group) =>
+        group.branches.some(
+          (branch) => branch.customer_id === selectedCustomerId
+        )
       );
 
       if (customerGroup) {
         setActiveGroup(customerGroup);
+        setCustomerGroups([customerGroup]);
       } else {
         setActiveGroup(null);
+        setCustomerGroups([]);
         // If no groups, pre-fill new group name with customer name + Branches
         if (selectedCustomer) {
           setNewGroupName(`${selectedCustomer.id} Branches`);
         }
       }
     } catch (error) {
-      console.error("Error fetching branch groups:", error);
+      console.error("Error processing branch groups:", error);
       toast.error("Failed to load branch information");
     } finally {
       setLoading(false);
@@ -335,8 +317,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       });
 
       toast.success("Branch group created successfully");
-      await fetchBranchGroups(); // Refresh data
-      await fetchAllBranchGroups(); // Refresh all groups
+      await refreshBranchGroupsCache(); // Refresh data
+      await refreshBranchGroups(); // Refresh all groups
       await refreshCustomersCache(); // Refresh customer cache
       setIsAddingNew(false);
       setNewGroupName("");
@@ -359,8 +341,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       });
 
       toast.success("Branches added successfully");
-      await fetchBranchGroups(); // Refresh data
-      await fetchAllBranchGroups(); // Refresh all groups
+      await refreshBranchGroupsCache(); // Refresh data
+      await refreshBranchGroups(); // Refresh all groups
       await refreshCustomersCache(); // Refresh customer cache
       setSelectedCustomerIds([]);
     } catch (error) {
@@ -380,8 +362,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/remove/${branchCustomerId}`
       );
       toast.success("Branch removed successfully");
-      await fetchBranchGroups(); // Refresh data
-      await fetchAllBranchGroups(); // Refresh all groups
+      await refreshBranchGroupsCache(); // Refresh data
+      await refreshBranchGroups(); // Refresh all groups
     } catch (error) {
       console.error("Error removing branch:", error);
       toast.error("Failed to remove branch");
@@ -399,7 +381,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/main/${branchCustomerId}`
       );
       toast.success("Main branch updated successfully");
-      await fetchBranchGroups(); // Refresh data
+      await refreshBranchGroupsCache(); // Refresh data
     } catch (error) {
       console.error("Error setting main branch:", error);
       toast.error("Failed to update main branch");
@@ -417,8 +399,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       toast.success("Branch group deleted successfully");
 
       // Refresh data
-      await fetchBranchGroups();
-      await fetchAllBranchGroups();
+      await refreshBranchGroupsCache();
+      await refreshBranchGroups();
       await refreshCustomersCache(); // Refresh customer cache
       setActiveGroup(null);
       setIsDeleteGroupDialogOpen(false);
@@ -685,17 +667,17 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   disabled={saving}
                                 />
                               </div>
-                                <Button
-                                  variant="filled"
-                                  color="sky"
-                                  icon={IconPlus}
-                                  onClick={handleAddToBranch}
-                                  disabled={
-                                    saving || selectedCustomerIds.length === 0
-                                  }
-                                >
-                                  Add
-                                </Button>
+                              <Button
+                                variant="filled"
+                                color="sky"
+                                icon={IconPlus}
+                                onClick={handleAddToBranch}
+                                disabled={
+                                  saving || selectedCustomerIds.length === 0
+                                }
+                              >
+                                Add
+                              </Button>
                             </div>
                           </div>
                         </div>

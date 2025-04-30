@@ -19,10 +19,11 @@ import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
+import { IconBuildingSkyscraper, IconBuildingStore } from "@tabler/icons-react";
 import {
-  IconBuildingSkyscraper,
-  IconBuildingStore,
-} from "@tabler/icons-react";
+  useBranchGroupsCache,
+  refreshBranchGroupsCache,
+} from "../../utils/catalogue/useBranchGroupsCache";
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -83,6 +84,7 @@ const CustomerFormPage: React.FC = () => {
     groupId: number;
     branches: { id: string; name: string; isMain: boolean }[];
   } | null>(null);
+  const { getCustomerBranchInfo } = useBranchGroupsCache();
 
   // Options
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
@@ -198,41 +200,8 @@ const CustomerFormPage: React.FC = () => {
 
   const fetchBranchInfo = useCallback(async () => {
     if (!id) return;
-
-    try {
-      const response = await api.get(`/api/customer-branches/${id}`);
-
-      if (response.groups && response.groups.length > 0) {
-        const group = response.groups[0]; // Get first group (customers should only be in one group)
-        const branch = group.branches.find(
-          (b: { customer_id: string }) => b.customer_id === id
-        );
-
-        setBranchInfo({
-          isInBranchGroup: true,
-          isMainBranch: branch?.is_main_branch || false,
-          groupName: group.group_name,
-          groupId: group.id,
-          branches: group.branches.map(
-            (b: {
-              customer_id: any;
-              customer_name: any;
-              is_main_branch: any;
-            }) => ({
-              id: b.customer_id,
-              name: b.customer_name,
-              isMain: b.is_main_branch,
-            })
-          ),
-        });
-      } else {
-        setBranchInfo(null);
-      }
-    } catch (error) {
-      console.error("Error fetching branch info:", error);
-      setBranchInfo(null);
-    }
-  }, [id]);
+    setBranchInfo(getCustomerBranchInfo(id));
+  }, [id, getCustomerBranchInfo]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -309,6 +278,7 @@ const CustomerFormPage: React.FC = () => {
     try {
       await api.delete(`/api/customers/${id}`);
       await refreshCustomersCache(); // Refresh cache
+      await refreshBranchGroupsCache(); // Refresh branch groups cache
       setIsDeleteDialogOpen(false);
       toast.success("Customer deleted successfully");
       navigate("/catalogue/customer");
@@ -519,6 +489,7 @@ const CustomerFormPage: React.FC = () => {
 
       // --- Post-Save Actions ---
       await refreshCustomersCache(); // Refresh cache regardless of product save outcome
+      await refreshBranchGroupsCache(); // Refresh branch groups cache
       toast.success(successMessage);
       navigate("/catalogue/customer");
     } catch (error: any) {
