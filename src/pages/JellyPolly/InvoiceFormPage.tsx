@@ -80,12 +80,8 @@ const InvoiceFormPage: React.FC = () => {
   const ITEMS_PER_PAGE = 30;
   const { customers: allCustomers, isLoading: isCustomersLoading } =
     useCustomersCache();
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>(
-    []
-  );
-  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>(
-    []
-  );
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
   const [hasMoreCustomers, setHasMoreCustomers] = useState(false);
 
   // --- Memoized Values (remain the same) ---
@@ -148,48 +144,87 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [invoiceData?.paymenttype, isPaid]);
 
-  const fetchCustomerProducts = useCallback(async (customerId: string) => {
-    if (!customerId) {
-      setCustomerProducts([]);
-      setCustomerTinNumber(null);
-      setCustomerIdNumber(null);
-      setSubmitAsEinvoice(false); // Reset e-invoice flag if customer cleared
-      return [];
-    }
-    try {
-      const response = await api.get(`/api/customer-products/${customerId}`);
-      if (response.products) {
-        setCustomerProducts(response.products);
-        if (response.customer) {
-          const hasTin = !!response.customer.tin_number;
-          const hasId = !!response.customer.id_number;
-          setCustomerTinNumber(hasTin ? response.customer.tin_number : null);
-          setCustomerIdNumber(hasId ? response.customer.id_number : null);
-          // Only keep e-invoice checked if both are present after fetch
-          setSubmitAsEinvoice(hasTin && hasId);
-        } else {
-          setCustomerTinNumber(null);
-          setCustomerIdNumber(null);
-          setSubmitAsEinvoice(false); // Disable if customer data structure is wrong
-        }
-        return response.products;
-      } else {
-        setCustomerProducts(response);
-        setCustomerTinNumber(null); // Legacy handling, assume no TIN/ID
+  const fetchCustomerProducts = useCallback(
+    async (customerId: string) => {
+      if (!customerId) {
+        setCustomerProducts([]);
+        setCustomerTinNumber(null);
         setCustomerIdNumber(null);
-        setSubmitAsEinvoice(false);
-        return response;
+        setSubmitAsEinvoice(false); // Reset e-invoice flag if customer cleared
+        return [];
       }
-    } catch (error) {
-      console.error("Error fetching customer products:", error);
-      toast.error("Could not load custom product prices.");
-      setCustomerProducts([]);
-      setCustomerTinNumber(null);
-      setCustomerIdNumber(null);
-      setSubmitAsEinvoice(false); // Disable on error
-      return [];
-    }
-  }, []); // No dependencies needed if api is stable
+
+      // First, check if the customer is in the cache
+      const cachedCustomer = allCustomers.find((c) => c.id === customerId);
+
+      if (cachedCustomer) {
+        // We found the customer in the cache
+        console.debug(`Using cached customer data for ${customerId}`);
+
+        // Handle custom products
+        if (
+          cachedCustomer.customProducts &&
+          cachedCustomer.customProducts.length > 0
+        ) {
+          setCustomerProducts(cachedCustomer.customProducts);
+        } else {
+          setCustomerProducts([]);
+        }
+
+        // Handle TIN and ID numbers for e-invoice
+        const hasTin = !!cachedCustomer.tin_number;
+        const hasId = !!cachedCustomer.id_number;
+        setCustomerTinNumber(hasTin ? cachedCustomer.tin_number || null : null);
+        setCustomerIdNumber(hasId ? cachedCustomer.id_number || null : null);
+        setSubmitAsEinvoice(hasTin && hasId);
+
+        return cachedCustomer.customProducts || [];
+      }
+
+      // If not in cache, fallback to API call
+      console.debug(
+        `Customer ${customerId} not found in cache, fetching from API`
+      );
+      try {
+        const response = await api.get(`/api/customer-products/${customerId}`);
+        if (response.products) {
+          setCustomerProducts(response.products);
+          if (response.customer) {
+            const hasTin = !!response.customer.tin_number;
+            const hasId = !!response.customer.id_number;
+            setCustomerTinNumber(
+              hasTin ? response.customer.tin_number || null : null
+            );
+            setCustomerIdNumber(
+              hasId ? response.customer.id_number || null : null
+            );
+            // Only keep e-invoice checked if both are present after fetch
+            setSubmitAsEinvoice(hasTin && hasId);
+          } else {
+            setCustomerTinNumber(null);
+            setCustomerIdNumber(null);
+            setSubmitAsEinvoice(false); // Disable if customer data structure is wrong
+          }
+          return response.products;
+        } else {
+          setCustomerProducts(response);
+          setCustomerTinNumber(null); // Legacy handling, assume no TIN/ID
+          setCustomerIdNumber(null);
+          setSubmitAsEinvoice(false);
+          return response;
+        }
+      } catch (error) {
+        console.error("Error fetching customer products:", error);
+        toast.error("Could not load custom product prices.");
+        setCustomerProducts([]);
+        setCustomerTinNumber(null);
+        setCustomerIdNumber(null);
+        setSubmitAsEinvoice(false); // Disable on error
+        return [];
+      }
+    },
+    [allCustomers]
+  );
 
   useEffect(() => {
     if (invoiceData?.customerid) {
