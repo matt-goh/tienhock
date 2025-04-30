@@ -18,7 +18,7 @@ import {
   IconPencil, // For Edit Rates button
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import { Job, JobPayCodeDetails } from "../../types/types";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -412,7 +412,7 @@ const JobPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className={`relative w-full mx-4 mb-2 md:mx-6 -mt-12`}>
+    <div className={`relative w-full px-4 mb-2 md:mx-6 -mt-12`}>
       <h1 className="mb-4 text-center text-xl font-semibold text-default-800">
         Job & Pay Codes
       </h1>
@@ -671,8 +671,15 @@ const JobPage: React.FC = () => {
                             <td
                               className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
                               title={detail.description}
+                              onClick={(e) => e.stopPropagation()} // Prevent row click when clicking inside this cell
                             >
-                              {detail.description}
+                              <Link
+                                to={`/catalogue/pay-codes?desc=${detail.description}`}
+                                className="hover:text-sky-600 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {detail.description}
+                              </Link>
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
                               {detail.pay_type}

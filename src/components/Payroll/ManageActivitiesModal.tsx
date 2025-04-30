@@ -216,7 +216,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-500">Job</p>
-                      <p className="font-medium">{jobName}</p>
+                      <Link
+                        to={`/catalogue/job?id=${jobType}`}
+                        className="hover:underline hover:text-sky-600"
+                      >
+                        {jobName}
+                      </Link>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Hours</p>
