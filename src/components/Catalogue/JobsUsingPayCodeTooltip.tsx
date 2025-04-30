@@ -41,8 +41,8 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
     if (isVisible && iconRef.current) {
       const rect = iconRef.current.getBoundingClientRect();
       setPosition({
-        top: rect.top - 10,
-        left: rect.left, // Simply use left position of the icon
+        top: rect.top,
+        left: rect.right + 5, // Simply use left position of the icon
       });
     }
   }, [isVisible]);
@@ -62,7 +62,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true);
-    }, 100); // Short delay before showing
+    }, 0); // Short delay before showing
   };
 
   const handleMouseLeave = () => {
@@ -71,7 +71,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(false);
-    }, 500); // Longer delay before hiding
+    }, 100); // Longer delay before hiding
   };
 
   // Hide tooltip completely if no jobs use this pay code
@@ -91,7 +91,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-80 transform -translate-y-full opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-80 transform opacity-0 transition-opacity duration-200"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
