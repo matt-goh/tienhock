@@ -365,9 +365,7 @@ const CustomerAddPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="container mx-auto px-4 pb-10">
-      {" "}
-      {/* Added pb-10 */}
+    <div className="container mx-auto px-4 pb-4 -mt-16">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
