@@ -30,7 +30,6 @@ import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 // --- MODAL IMPORT ---
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal"; // Adjust path if needed
-import { CustomTransformer } from "typescript";
 
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -101,7 +100,7 @@ const InvoiceFormPage: React.FC = () => {
       // Initialize new invoice data (logic remains the same)
       const newInv: ExtendedInvoiceData = {
         id: "", // User must input
-        salespersonid: salesmenCache.length > 0 ? salesmenCache[0].id : "", // Default salesman
+        salespersonid: salesmenCache.length > 0 ? "KILANG" : "", // Default salesman
         customerid: "",
         createddate: Date.now().toString(),
         paymenttype: "INVOICE", // Default type
