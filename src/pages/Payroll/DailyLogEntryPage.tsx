@@ -707,7 +707,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             // For context-linked pay codes or Bag rate units, don't auto-select
             let isSelected = existingActivity
               ? existingActivity.isSelected
-              : isContextLinked || payCode.rate_unit === "Bag"
+              : isContextLinked ||
+                payCode.rate_unit === "Bag" ||
+                payCode.rate_unit === "Trip" ||
+                payCode.rate_unit === "Day" ||
+                payCode.pay_type === "Tambahan"
               ? false // Don't auto-select context-linked pay codes or Bag rate units
               : shouldAutoSelect || payCode.is_default_setting;
 
