@@ -44,18 +44,118 @@ export default function (pool) {
     }
   };
 
-  // Get customers infos for front page display
+  // Get all customers with products and branch info
   router.get("/", async (req, res) => {
+    const client = await pool.connect();
+
     try {
-      const query = "SELECT * FROM customers ORDER BY name";
-      const result = await pool.query(query);
-      res.json(result.rows);
+      await client.query("BEGIN");
+
+      // 1. Get all customers
+      const customersQuery = "SELECT * FROM customers ORDER BY name";
+      const customersResult = await client.query(customersQuery);
+      const customers = customersResult.rows;
+
+      // 2. Get all customer products in one query
+      const productsQuery = `
+        SELECT 
+          cp.customer_id,
+          cp.product_id,
+          cp.custom_price,
+          cp.is_available,
+          p.description
+        FROM customer_products cp
+        JOIN products p ON cp.product_id = p.id
+      `;
+      const productsResult = await client.query(productsQuery);
+
+      // Group products by customer_id
+      const productsByCustomer = {};
+      productsResult.rows.forEach((product) => {
+        if (!productsByCustomer[product.customer_id]) {
+          productsByCustomer[product.customer_id] = [];
+        }
+        productsByCustomer[product.customer_id].push({
+          ...product,
+          uid: crypto.randomUUID(),
+          custom_price:
+            product.custom_price !== null ? Number(product.custom_price) : 0,
+        });
+      });
+
+      // 3. Get all branch group mappings
+      const branchQuery = `
+        SELECT 
+          cbg.id AS group_id,
+          cbg.group_name,
+          cbm.customer_id,
+          cbm.is_main_branch
+        FROM customer_branch_mappings cbm
+        JOIN customer_branch_groups cbg ON cbm.group_id = cbg.id
+      `;
+      const branchResult = await client.query(branchQuery);
+
+      // Group branch info by customer
+      const branchesByGroup = {};
+      const branchInfoByCustomer = {};
+
+      // First, organize branches by group
+      branchResult.rows.forEach((branch) => {
+        if (!branchesByGroup[branch.group_id]) {
+          branchesByGroup[branch.group_id] = {
+            id: branch.group_id,
+            name: branch.group_name,
+            branches: [],
+          };
+        }
+
+        branchesByGroup[branch.group_id].branches.push({
+          id: branch.customer_id,
+          isMain: branch.is_main_branch,
+        });
+      });
+
+      // Then build customer branch info
+      branchResult.rows.forEach((branch) => {
+        const groupId = branch.group_id;
+        const groupInfo = branchesByGroup[groupId];
+        const customerBranches = groupInfo.branches.map((b) => ({
+          id: b.id,
+          name: customers.find((c) => c.id === b.id)?.name || b.id,
+          isMain: b.isMain,
+        }));
+
+        branchInfoByCustomer[branch.customer_id] = {
+          isInBranchGroup: true,
+          isMainBranch: branch.is_main_branch,
+          groupName: branch.group_name,
+          groupId: branch.group_id,
+          branches: customerBranches,
+        };
+      });
+
+      // 4. Combine all data
+      const enhancedCustomers = customers.map((customer) => ({
+        ...customer,
+        credit_used:
+          customer.credit_used !== null ? Number(customer.credit_used) : null,
+        credit_limit:
+          customer.credit_limit !== null ? Number(customer.credit_limit) : null,
+        customProducts: productsByCustomer[customer.id] || [],
+        branchInfo: branchInfoByCustomer[customer.id] || null,
+      }));
+
+      await client.query("COMMIT");
+      res.json(enhancedCustomers);
     } catch (error) {
-      console.error("Error fetching customers:", error);
+      await client.query("ROLLBACK");
+      console.error("Error fetching enhanced customers:", error);
       res.status(500).json({
-        message: "Error fetching customers",
+        message: "Error fetching enhanced customers",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 
@@ -308,89 +408,6 @@ export default function (pool) {
         message: "Error fetching customer names",
         error: error.message,
       });
-    }
-  });
-
-  // Get customer details AND their custom products for the form page
-  router.get("/:id/details", async (req, res) => {
-    const { id } = req.params;
-    const client = await pool.connect();
-
-    try {
-      await client.query("BEGIN"); // Start transaction
-
-      // Fetch customer details
-      const customerQuery = "SELECT * FROM customers WHERE id = $1";
-      const customerResult = await client.query(customerQuery, [id]);
-
-      if (customerResult.rows.length === 0) {
-        await client.query("ROLLBACK"); // Rollback if customer not found
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      const customerData = customerResult.rows[0];
-
-      // Convert money-related fields in customer data to numbers
-      const formattedCustomerData = {
-        ...customerData,
-        credit_used:
-          customerData.credit_used !== null
-            ? Number(customerData.credit_used)
-            : null,
-        credit_limit:
-          customerData.credit_limit !== null
-            ? Number(customerData.credit_limit)
-            : null,
-        // Ensure empty strings are handled if needed, though SELECT * usually returns null
-        tin_number: customerData.tin_number || "",
-        phone_number: customerData.phone_number || "",
-        email: customerData.email || "",
-        address: customerData.address || "",
-        city: customerData.city || "KOTA KINABALU", // Default if needed
-        state: customerData.state || "12", // Default if needed
-        id_number: customerData.id_number || "",
-        id_type: customerData.id_type || "",
-      };
-
-      // Fetch associated custom products
-      const productsQuery = `
-      SELECT 
-        cp.id, 
-        cp.customer_id, 
-        cp.product_id, 
-        cp.custom_price, 
-        cp.is_available,
-        p.description -- Get product description too
-      FROM customer_products cp
-      JOIN products p ON cp.product_id = p.id
-      WHERE cp.customer_id = $1
-      ORDER BY p.description -- Or however you want to sort them
-    `;
-      const productsResult = await client.query(productsQuery, [id]);
-
-      // Convert custom_price to a number for products
-      const customProducts = productsResult.rows.map((cp) => ({
-        ...cp,
-        custom_price: cp.custom_price !== null ? Number(cp.custom_price) : 0, // Default to 0 or handle as needed
-        is_available: cp.is_available !== undefined ? cp.is_available : true, // Default to true
-      }));
-
-      await client.query("COMMIT"); // Commit transaction
-
-      // Combine results
-      res.json({
-        customer: formattedCustomerData,
-        customProducts: customProducts,
-      });
-    } catch (error) {
-      await client.query("ROLLBACK"); // Rollback on any error
-      console.error("Error fetching customer details and products:", error);
-      res.status(500).json({
-        message: "Error fetching customer details and products",
-        error: error.message,
-      });
-    } finally {
-      client.release();
     }
   });
 

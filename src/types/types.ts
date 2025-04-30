@@ -456,16 +456,13 @@ export interface InvoiceFilters {
   consolidation: "all" | "individual" | "consolidated";
 }
 
-export interface CustomerList {
+export interface Customer {
   id: string;
   name: string;
   salesman: string;
   phone_number?: string;
   tin_number?: string;
   id_number?: string;
-}
-
-export interface Customer extends CustomerList {
   closeness: string;
   email?: string;
   address?: string;

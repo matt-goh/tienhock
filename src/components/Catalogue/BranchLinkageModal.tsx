@@ -1,5 +1,5 @@
 // src/components/Catalogue/BranchLinkageModal.tsx
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useMemo } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -14,17 +14,14 @@ import toast from "react-hot-toast";
 import {
   useCustomersCache,
   refreshCustomersCache,
+  EnhancedCustomerList,
 } from "../../utils/catalogue/useCustomerCache";
 import { CustomerCombobox } from "../Invoice/CustomerCombobox";
 import { FormInput } from "../FormComponents";
 import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
-import { CustomerList } from "../../types/types";
+import { Customer } from "../../types/types";
 import { MultiCustomerCombobox } from "../Invoice/MultiCustomerCombobox";
 import ConfirmationDialog from "../ConfirmationDialog";
-import {
-  useBranchGroupsCache,
-  refreshBranchGroupsCache,
-} from "../../utils/catalogue/useBranchGroupsCache";
 
 interface BranchGroup {
   id: number;
@@ -61,15 +58,11 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   );
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
-  const { customers } = useCustomersCache();
+  const { customers, isLoading: fetchingCustomers } = useCustomersCache();
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const [customerPage, setCustomerPage] = useState(1);
-  const [filteredCustomers, setFilteredCustomers] = useState<CustomerList[]>(
-    []
-  );
-  const [paginatedCustomers, setPaginatedCustomers] = useState<CustomerList[]>(
-    []
-  );
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
   const [hasMoreCustomers, setHasMoreCustomers] = useState(false);
   const ITEMS_PER_PAGE = 30;
   const [addBranchQuery, setAddBranchQuery] = useState("");
@@ -77,18 +70,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
   const [availableBranchPage, setAvailableBranchPage] = useState(1);
   const [filteredAvailableBranches, setFilteredAvailableBranches] = useState<
-    CustomerList[]
+    Customer[]
   >([]);
   const [paginatedAvailableBranches, setPaginatedAvailableBranches] = useState<
-    CustomerList[]
+    Customer[]
   >([]);
   const [hasMoreAvailableBranches, setHasMoreAvailableBranches] =
     useState(false);
-  const {
-    branchGroups: allBranchGroups,
-    isLoading: fetchingAllGroups,
-    refreshBranchGroups,
-  } = useBranchGroupsCache();
   const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
 
   const selectBranchGroup = (group: BranchGroup) => {
@@ -101,9 +89,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   };
 
   // Filter out customers already in the active group
-  const [availableCustomers, setAvailableCustomers] = useState<CustomerList[]>(
-    []
-  );
+  const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
 
   // Calculate available customers when dependencies change
   useEffect(() => {
@@ -211,7 +197,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
   // Create a filtered available customers list for the create new group form
   const [newGroupAvailableCustomers, setNewGroupAvailableCustomers] = useState<
-    CustomerList[]
+    Customer[]
   >([]);
   const [newGroupPage, setNewGroupPage] = useState(1);
   const [hasMoreNewGroupCustomers, setHasMoreNewGroupCustomers] =
@@ -260,27 +246,69 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
     }
   };
 
+  const getAllBranchGroups = useMemo(() => {
+    const groupsMap: { [key: number]: BranchGroup } = {};
+
+    // Extract branch groups from customers with branch info
+    customers.forEach((customer) => {
+      if (customer.branchInfo && customer.branchInfo.isInBranchGroup && customer.branchInfo.groupId) {
+        const { groupId, groupName } = customer.branchInfo;
+
+        // Skip if we already processed this group
+        if (groupId && groupsMap[groupId]) return;
+
+        // Find all customers in this group
+        const branchCustomers = customers.filter(
+          (c) => c.branchInfo && c.branchInfo.groupId === groupId
+        );
+
+        // Create group structure
+        groupsMap[groupId] = {
+          id: groupId,
+          group_name: groupName || `Group ${groupId}`,
+          branches: branchCustomers.map((c) => ({
+            customer_id: c.id,
+            customer_name: c.name,
+            is_main_branch: c.branchInfo?.isMainBranch || false,
+          })),
+        };
+      }
+    });
+
+    return Object.values(groupsMap);
+  }, [customers]);
+
   const fetchBranchGroups = async () => {
     if (!selectedCustomerId) return;
 
     setLoading(true);
     try {
-      // Find branch groups containing this customer from our cache
-      const customerGroup = allBranchGroups.find((group) =>
-        group.branches.some(
-          (branch) => branch.customer_id === selectedCustomerId
-        )
-      );
+      // Find customer in the cache
+      const customer = customers.find((c) => c.id === selectedCustomerId);
 
-      if (customerGroup) {
-        setActiveGroup(customerGroup);
-        setCustomerGroups([customerGroup]);
+      if (!customer) {
+        setActiveGroup(null);
+        setCustomerGroups([]);
+        return;
+      }
+
+      // Check if customer is in a branch group
+      if (customer.branchInfo && customer.branchInfo.isInBranchGroup) {
+        // Find the group from our processed groups
+          const customerGroup = getAllBranchGroups.find(
+          (group: any) => group.id === customer.branchInfo?.groupId
+        );
+
+        if (customerGroup) {
+          setActiveGroup(customerGroup as BranchGroup);
+          setCustomerGroups([customerGroup as BranchGroup]);
+        }
       } else {
         setActiveGroup(null);
         setCustomerGroups([]);
         // If no groups, pre-fill new group name with customer name + Branches
-        if (selectedCustomer) {
-          setNewGroupName(`${selectedCustomer.id} Branches`);
+        if (customer) {
+          setNewGroupName(`${customer.id} Branches`);
         }
       }
     } catch (error) {
@@ -317,8 +345,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       });
 
       toast.success("Branch group created successfully");
-      await refreshBranchGroupsCache(); // Refresh data
-      await refreshBranchGroups(); // Refresh all groups
       await refreshCustomersCache(); // Refresh customer cache
       setIsAddingNew(false);
       setNewGroupName("");
@@ -341,8 +367,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       });
 
       toast.success("Branches added successfully");
-      await refreshBranchGroupsCache(); // Refresh data
-      await refreshBranchGroups(); // Refresh all groups
       await refreshCustomersCache(); // Refresh customer cache
       setSelectedCustomerIds([]);
     } catch (error) {
@@ -362,8 +386,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/remove/${branchCustomerId}`
       );
       toast.success("Branch removed successfully");
-      await refreshBranchGroupsCache(); // Refresh data
-      await refreshBranchGroups(); // Refresh all groups
+      await refreshCustomersCache(); // Refresh customer cache
     } catch (error) {
       console.error("Error removing branch:", error);
       toast.error("Failed to remove branch");
@@ -381,7 +404,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         `/api/customer-branches/${activeGroup.id}/main/${branchCustomerId}`
       );
       toast.success("Main branch updated successfully");
-      await refreshBranchGroupsCache(); // Refresh data
+      await refreshCustomersCache(); // Refresh customer cache
     } catch (error) {
       console.error("Error setting main branch:", error);
       toast.error("Failed to update main branch");
@@ -397,10 +420,6 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
     try {
       await api.delete(`/api/customer-branches/${activeGroup.id}`);
       toast.success("Branch group deleted successfully");
-
-      // Refresh data
-      await refreshBranchGroupsCache();
-      await refreshBranchGroups();
       await refreshCustomersCache(); // Refresh customer cache
       setActiveGroup(null);
       setIsDeleteGroupDialogOpen(false);
@@ -456,20 +475,20 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
                   {/* List of All Branch Groups */}
                   <div className="mb-4 border rounded-lg p-4">
-                    {fetchingAllGroups ? (
+                    {fetchingCustomers ? (
                       <>
                         <h4 className="font-medium mb-3">All Branch Groups</h4>
                         <div className="flex justify-center py-4">
                           <LoadingSpinner size="sm" />
                         </div>
                       </>
-                    ) : allBranchGroups.length === 0 ? (
+                    ) : getAllBranchGroups.length === 0 ? (
                       <p className="text-gray-500 text-center py-3">
                         No branch groups found
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {allBranchGroups.map((group) => (
+                        {getAllBranchGroups.map((group: any) => (
                           <div
                             key={group.id}
                             className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-gray-50 ${

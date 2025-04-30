@@ -8,7 +8,6 @@ import {
   Customer,
   CustomProduct,
   Payment,
-  CustomerList,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
@@ -81,10 +80,10 @@ const InvoiceFormPage: React.FC = () => {
   const ITEMS_PER_PAGE = 30;
   const { customers: allCustomers, isLoading: isCustomersLoading } =
     useCustomersCache();
-  const [filteredCustomers, setFilteredCustomers] = useState<CustomerList[]>(
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>(
     []
   );
-  const [paginatedCustomers, setPaginatedCustomers] = useState<CustomerList[]>(
+  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>(
     []
   );
   const [hasMoreCustomers, setHasMoreCustomers] = useState(false);
