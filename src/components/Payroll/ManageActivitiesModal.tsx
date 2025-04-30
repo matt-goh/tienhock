@@ -114,57 +114,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     setSelectAll(allSelected);
   }, [activities]);
 
-  // Calculate amounts based on rate type, hours, and units
-  const calculateAmounts = (
-    acts: ActivityItem[],
-    hours: number
-  ): ActivityItem[] => {
-    return acts.map((activity) => {
-      let calculatedAmount = 0;
-
-      if (activity.isSelected) {
-        switch (activity.rateUnit) {
-          case "Hour":
-            // For overtime pay codes, only apply to hours beyond 8
-            if (activity.payType === "Overtime") {
-              const overtimeHours = Math.max(0, hours - 8);
-              calculatedAmount = activity.rate * overtimeHours;
-            } else {
-              calculatedAmount = activity.rate * hours;
-            }
-            break;
-          case "Bag":
-            calculatedAmount = activity.rate * (activity.unitsProduced || 0);
-            break;
-          case "Percent":
-            // For percentage-based rates, calculate based on units produced
-            calculatedAmount =
-              (activity.rate * (activity.unitsProduced || 0)) / 100;
-            break;
-          case "Fixed":
-            // Fixed rate - just use the rate value directly
-            calculatedAmount = activity.rate;
-            break;
-          default:
-            calculatedAmount = 0;
-        }
-      }
-
-      // Add automatic deselection for zero amount activities
-      // Don't deselect context-linked activities automatically
-      const shouldAutoDeselect =
-        calculatedAmount === 0 &&
-        !activity.isContextLinked &&
-        activity.rateUnit !== "Bag";
-
-      return {
-        ...activity,
-        calculatedAmount: Number(calculatedAmount.toFixed(2)),
-        isSelected: shouldAutoDeselect ? false : activity.isSelected,
-      };
-    });
-  };
-
   const handleSelectAll = () => {
     const newSelectAll = !selectAll;
     setSelectAll(newSelectAll);

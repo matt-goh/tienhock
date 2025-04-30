@@ -18,7 +18,14 @@ export function calculateActivityAmount(
         calculatedAmount = activity.rate * hours;
       }
       break;
+    case "Day":
+      calculatedAmount = activity.rate * (activity.unitsProduced || 0);
+      break;
     case "Bag":
+      calculatedAmount = activity.rate * (activity.unitsProduced || 0);
+      break;
+    case "Trip":
+      // Trip is calculated based on number of trips (stored in unitsProduced)
       calculatedAmount = activity.rate * (activity.unitsProduced || 0);
       break;
     case "Percent":
