@@ -542,10 +542,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
       existingWorkLog.employeeEntries.forEach((entry: any) => {
         const employeeId = entry.employee_id;
-
-        // Find the correct job ID from the employee's data
-        const employee = availableEmployees.find((e) => e.id === employeeId);
-        const jobId = employee?.job?.find((j) => JOB_IDS.includes(j)) || "";
+        const jobId = entry.job_id;
 
         if (!newSelectedJobs[employeeId]) {
           newSelectedJobs[employeeId] = [];
