@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { CustomerList } from "../../types/types";
+import { Customer } from "../../types/types";
 import {
   IconSearch,
   IconChevronLeft,
@@ -22,15 +22,12 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import {
+  EnhancedCustomerList,
   refreshCustomersCache,
   useCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
-import {
-  refreshBranchGroupsCache,
-  useBranchGroupsCache,
-} from "../../utils/catalogue/useBranchGroupsCache";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -43,13 +40,12 @@ const CustomerPage: React.FC = () => {
   const [selectedSalesman, setSelectedSalesman] =
     useState<string>("All Salesmen");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [customerToDelete, setCustomerToDelete] = useState<CustomerList | null>(
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
-  const { customerBranchMap: branchGroups } = useBranchGroupsCache();
 
   useEffect(() => {
     if (salesmenData.length > 0) {
@@ -58,7 +54,7 @@ const CustomerPage: React.FC = () => {
     }
   }, [salesmenData]);
 
-  const handleDeleteClick = (customer: CustomerList) => {
+  const handleDeleteClick = (customer: Customer) => {
     setCustomerToDelete(customer);
     setIsDeleteDialogOpen(true);
   };
@@ -70,7 +66,6 @@ const CustomerPage: React.FC = () => {
 
         // Refresh the cache after deletion
         await refreshCustomersCache();
-        await refreshBranchGroupsCache();
 
         setIsDeleteDialogOpen(false);
         setCustomerToDelete(null);
@@ -315,20 +310,12 @@ const CustomerPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {paginatedCustomers.map((customer: CustomerList) => (
+          {paginatedCustomers.map((customer: EnhancedCustomerList) => (
             <CustomerCard
               key={customer.id}
               customer={customer}
               onDeleteClick={handleDeleteClick}
-              branchInfo={
-                branchGroups[customer.id]
-                  ? {
-                      isInBranchGroup: true,
-                      isMainBranch: branchGroups[customer.id].isMainBranch,
-                      groupName: branchGroups[customer.id].groupName,
-                    }
-                  : undefined
-              }
+              branchInfo={customer.branchInfo}
             />
           ))}
         </div>

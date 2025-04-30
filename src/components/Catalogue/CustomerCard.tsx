@@ -1,7 +1,7 @@
 // src/components/Catalogue/CustomerCard.tsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CustomerList } from "../../types/types";
+import { Customer } from "../../types/types";
 import {
   IconTrash,
   IconUser,
@@ -14,8 +14,8 @@ import {
 } from "@tabler/icons-react";
 
 interface CustomerCardProps {
-  customer: CustomerList;
-  onDeleteClick: (customer: CustomerList) => void;
+  customer: Customer;
+  onDeleteClick: (customer: Customer) => void;
   branchInfo?: {
     isInBranchGroup: boolean;
     isMainBranch: boolean;
