@@ -58,7 +58,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
   const rateUnitOptions = [
     { id: "Hour", name: "Hour" },
+    { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
+    { id: "Trip", name: "Trip" },
     { id: "Percent", name: "Percent" },
     { id: "Fixed", name: "Fixed" },
   ];
@@ -129,8 +131,11 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   // Handle listbox changes
   const handleListboxChange =
     (name: keyof Omit<PayCode, "code">) => (value: string) => {
-      if (name === "rate_unit" && value === "Percent") {
-        // When rate unit is Percent, automatically set requires_units_input to true
+      if (
+        name === "rate_unit" &&
+        ["Percent", "Trip", "Day", "Bag"].includes(value)
+      ) {
+        // When rate unit is Percent, Trip, Day, or Bag, automatically set requires_units_input to true
         setFormData((prev) => ({
           ...prev,
           [name]: value as RateUnit,
@@ -140,6 +145,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
         setFormData((prev) => ({
           ...prev,
           [name]: value as PayType | RateUnit,
+          // Reset requires_units_input to false for Hour and Fixed
+          ...(name === "rate_unit" ? { requires_units_input: false } : {}),
         }));
       }
     };
@@ -414,49 +421,42 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        checked={
-                          formData.rate_unit === "Hour" ||
-                          formData.rate_unit === "Fixed"
-                            ? false
-                            : !!formData.requires_units_input
-                        }
-                        onChange={(checked) => {
-                          // Only allow changes if rate_unit is not Percent, Bag, or Hour
-                          if (
-                            formData.rate_unit !== "Percent" &&
-                            formData.rate_unit !== "Bag" &&
-                            formData.rate_unit !== "Hour" &&
-                            formData.rate_unit !== "Fixed"
-                          ) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              requires_units_input: checked,
-                            }));
-                          }
-                        }}
-                        size={20}
-                        checkedColor="text-sky-600"
-                        uncheckedColor="text-default-400"
-                        // Disable for Percent, Bag, and Hour
-                        disabled={
-                          isSaving ||
-                          formData.rate_unit === "Percent" ||
-                          formData.rate_unit === "Bag" ||
-                          formData.rate_unit === "Hour" ||
-                          formData.rate_unit === "Fixed"
-                        }
-                        labelPosition="right"
-                        label={
-                          formData.rate_unit === "Percent"
-                            ? "Requires Units Input (Required for Percentage)"
-                            : formData.rate_unit === "Bag"
-                            ? "Requires Units Input (Required for Bag)"
-                            : formData.rate_unit === "Hour"
-                            ? "Requires Units Input (Not Applicable for Hour)"
-                            : formData.rate_unit === "Fixed"
-                            ? "Requires Units Input (Not Applicable for Fixed Amount)"
-                            : "Requires Units Input"
-                        }
+                      checked={
+                        formData.rate_unit === "Hour" ||
+                        formData.rate_unit === "Fixed"
+                        ? false
+                        : !!formData.requires_units_input
+                      }
+                      onChange={() => {}}
+                      size={20}
+                      checkedColor="text-sky-600"
+                      uncheckedColor="text-default-400"
+                      // Disable for Percent, Bag, Day, Trip, Hour, and Fixed
+                      disabled={
+                        isSaving ||
+                        formData.rate_unit === "Percent" ||
+                        formData.rate_unit === "Bag" ||
+                        formData.rate_unit === "Hour" ||
+                        formData.rate_unit === "Fixed" ||
+                        formData.rate_unit === "Day" ||
+                        formData.rate_unit === "Trip"
+                      }
+                      labelPosition="right"
+                      label={
+                        formData.rate_unit === "Percent"
+                        ? "Requires Units Input (Required for Percentage)"
+                        : formData.rate_unit === "Bag"
+                        ? "Requires Units Input (Required for Bag)"
+                        : formData.rate_unit === "Day"
+                        ? "Requires Units Input (Required for Day)"
+                        : formData.rate_unit === "Trip"
+                        ? "Requires Units Input (Required for Trip)"
+                        : formData.rate_unit === "Hour"
+                        ? "Requires Units Input (Not Applicable for Hour)"
+                        : formData.rate_unit === "Fixed"
+                        ? "Requires Units Input (Not Applicable for Fixed Amount)"
+                        : "Requires Units Input"
+                      }
                       />
                     </div>
                   </div>
