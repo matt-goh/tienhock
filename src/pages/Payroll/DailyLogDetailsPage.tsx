@@ -27,6 +27,9 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   const [workLog, setWorkLog] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const jobConfig = getJobConfig(jobType);
+  const [expandedEntries, setExpandedEntries] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     fetchWorkLogDetails();
@@ -66,6 +69,13 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       default:
         return "text-default-700";
     }
+  };
+
+  const toggleExpansion = (entryId: string) => {
+    setExpandedEntries((prev) => ({
+      ...prev,
+      [entryId]: !prev[entryId],
+    }));
   };
 
   // Separate context-linked activities from regular activities
@@ -272,6 +282,34 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                     entry.activities
                   );
 
+                  // Calculate total activities count
+                  const totalActivities = contextLinked.length + regular.length;
+                  // Determine if we need to show the expand/collapse button
+                  const needsExpansion = totalActivities > 10;
+                  // Check if this entry is expanded
+                  const isExpanded = expandedEntries[entry.id] || false;
+
+                  // Prepare activities to display based on expansion state
+                  const displayContextLinked = isExpanded
+                    ? contextLinked
+                    : needsExpansion && contextLinked.length > 0
+                    ? contextLinked.slice(0, Math.min(contextLinked.length, 10))
+                    : contextLinked;
+
+                  const displayRegular = isExpanded
+                    ? regular
+                    : needsExpansion && displayContextLinked.length < 10
+                    ? regular.slice(
+                        0,
+                        Math.min(
+                          regular.length,
+                          10 - displayContextLinked.length
+                        )
+                      )
+                    : needsExpansion
+                    ? []
+                    : regular;
+
                   return (
                     <tr key={entry.id}>
                       <td className="px-4 py-3">
@@ -289,15 +327,15 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                         {entry.total_hours.toFixed(1)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="space-y-4">
+                        <div className="space-y-1">
                           {/* Context-linked activities */}
-                          {contextLinked.length > 0 && (
+                          {displayContextLinked.length > 0 && (
                             <div>
                               <p className="text-xs font-medium text-sky-600 mb-1">
                                 Production Activities
                               </p>
-                              <div className="space-y-1">
-                                {contextLinked.map((activity: any) => (
+                              <div className="space-y-2">
+                                {displayContextLinked.map((activity: any) => (
                                   <div
                                     key={activity.id}
                                     className="flex justify-between text-sm"
@@ -337,15 +375,15 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           )}
 
                           {/* Regular activities */}
-                          {regular.length > 0 && (
+                          {displayRegular.length > 0 && (
                             <div>
-                              {contextLinked.length > 0 && (
+                              {displayContextLinked.length > 0 && (
                                 <p className="text-xs font-medium text-default-600 mb-1">
                                   Standard Activities
                                 </p>
                               )}
                               <div className="space-y-1">
-                                {regular.map((activity: any) => (
+                                {displayRegular.map((activity: any) => (
                                   <div
                                     key={activity.id}
                                     className="flex justify-between text-sm"
@@ -382,6 +420,22 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                 ))}
                               </div>
                             </div>
+                          )}
+
+                          {/* Show more/less button when needed */}
+                          {needsExpansion && (
+                            <button
+                              onClick={() => toggleExpansion(entry.id)}
+                              className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
+                            >
+                              {isExpanded
+                                ? "Show Less"
+                                : `Show ${
+                                    totalActivities -
+                                    (displayContextLinked.length +
+                                      displayRegular.length)
+                                  } More...`}
+                            </button>
                           )}
                         </div>
                       </td>
