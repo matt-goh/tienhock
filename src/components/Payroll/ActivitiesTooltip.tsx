@@ -160,7 +160,9 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       <span>•</span>
                       <span>{activity.rateUnit}</span>
                       {activity.rateUnit !== "Percent" &&
-                        activity.rateUnit !== "Fixed" && (
+                        activity.rateUnit !== "Fixed" &&
+                        activity.rateUnit !== "Trip" &&
+                        activity.rateUnit !== "Day" && (
                           <>
                             <span>•</span>
                             <span
@@ -179,7 +181,9 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                           <span className="truncate">@ {activity.rate}%</span>
                         </>
                       )}
-                      {activity.rateUnit === "Fixed" && (
+                      {(activity.rateUnit === "Fixed" ||
+                        activity.rateUnit === "Trip" ||
+                        activity.rateUnit === "Day") && (
                         <>
                           <span>•</span>
                           <span className="truncate">
@@ -187,10 +191,21 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                           </span>
                         </>
                       )}
+                      {/* Show units produced for non-Hour units or when explicitly available */}
+                      {activity.unitsProduced !== null &&
+                        activity.rateUnit !== "Hour" &&
+                        activity.rateUnit !== "Fixed" && (
+                          <span className="text-default-500">
+                            • {activity.unitsProduced}{" "}
+                            {activity.rateUnit === "Percent"
+                              ? "Units"
+                              : activity.rateUnit}
+                          </span>
+                        )}
                       {activity.payType === "Overtime" &&
                         activity.rateUnit === "Hour" && (
                           <span
-                            className="ml-1 text-amber-600 truncate"
+                            className="text-amber-600 truncate"
                             title={`(Hours > 8)`}
                           >
                             (Hours {">"} 8)

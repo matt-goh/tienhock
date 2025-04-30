@@ -371,6 +371,18 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 @ RM{activity.rate.toFixed(2)}
                                               </span>
                                             )}
+                                            {/* Show units produced for non-Hour units or when explicitly available */}
+                                            {activity.unitsProduced !== null &&
+                                              activity.rateUnit !== "Hour" &&
+                                              activity.rateUnit !== "Fixed" && (
+                                                <span className="text-default-500 ml-2">
+                                                  • {activity.unitsProduced}{" "}
+                                                  {activity.rateUnit ===
+                                                  "Percent"
+                                                    ? "Units"
+                                                    : activity.rateUnit}
+                                                </span>
+                                              )}
                                             {activity.payType === "Overtime" &&
                                               activity.rateUnit === "Hour" && (
                                                 <span className="ml-1 text-amber-600">
@@ -382,6 +394,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       </td>
                                       <td className="px-3 py-4 text-center">
                                         {activity.rateUnit === "Bag" ||
+                                        activity.rateUnit === "Trip" ||
+                                        activity.rateUnit === "Day" ||
                                         (activity.rateUnit === "Percent" &&
                                           activity.isContextLinked) ? (
                                           <div className="relative">
