@@ -356,7 +356,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       </span>
                                       {/* Show units produced for non-Hour units or when explicitly available */}
                                       {activity.units_produced !== null &&
-                                        activity.rate_unit !== "Hour" && (
+                                        activity.rate_unit !== "Day" &&
+                                        activity.rate_unit !== "Fixed" && (
                                           <span className="text-default-500 ml-2">
                                             • {activity.units_produced}{" "}
                                             {activity.rate_unit === "Percent"

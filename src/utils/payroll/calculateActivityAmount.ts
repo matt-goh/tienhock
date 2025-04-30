@@ -58,7 +58,9 @@ export function calculateActivitiesAmounts(
     const shouldAutoDeselect =
       calculatedAmount === 0 &&
       !activity.isContextLinked &&
-      activity.rateUnit !== "Bag";
+      activity.rateUnit !== "Bag" &&
+      activity.rateUnit !== "Trip" &&
+      activity.rateUnit !== "Day";
 
     return {
       ...activity,
