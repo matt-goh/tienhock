@@ -60,7 +60,7 @@ const PayCodePage: React.FC = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(15);
 
   // Pay type options
   const payTypeOptions: string[] = ["All", "Base", "Tambahan", "Overtime"]; // Add more if needed
@@ -496,7 +496,7 @@ const PayCodePage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="relative w-full mx-4 md:mx-6">
+    <div className="relative w-full mx-4 md:mx-6 -mt-12">
       {/* Header */}
       <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800">
