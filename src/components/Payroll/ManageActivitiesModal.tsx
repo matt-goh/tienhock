@@ -353,7 +353,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         <div className="flex flex-col">
                                           <span
                                             className="text-sm font-medium text-gray-900 w-fit"
-                                            title={activity.payCodeId}
+                                            title={activity.description}
                                           >
                                             <Link
                                               to={`/catalogue/pay-codes?desc=${activity.description}`}
@@ -362,7 +362,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 e.stopPropagation()
                                               }
                                             >
-                                              {activity.description}
+                                              {activity.description.length > 85
+                                                ? `${activity.description.substring(
+                                                    0,
+                                                    85
+                                                  )}...`
+                                                : activity.description}
                                             </Link>
                                             {activity.payType ===
                                               "Overtime" && (
