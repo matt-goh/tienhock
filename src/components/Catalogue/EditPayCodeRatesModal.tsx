@@ -12,11 +12,13 @@ import toast from "react-hot-toast";
 import Button from "../Button";
 import { JobPayCodeDetails } from "../../types/types";
 import { api } from "../../routes/utils/api";
+import Checkbox from "../Checkbox";
 
 interface EditRatesState {
   biasa: string; // Use string for input control
   ahad: string;
   umum: string;
+  is_default: boolean;
 }
 
 interface EditPayCodeRatesModalProps {
@@ -38,6 +40,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
     biasa: "",
     ahad: "",
     umum: "",
+    is_default: false,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +52,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
         biasa: payCodeDetail.override_rate_biasa?.toString() ?? "",
         ahad: payCodeDetail.override_rate_ahad?.toString() ?? "",
         umum: payCodeDetail.override_rate_umum?.toString() ?? "",
+        is_default: payCodeDetail.is_default_setting || false,
       });
       setError(null); // Clear previous errors
       setIsSaving(false);
@@ -64,6 +68,13 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
         [name]: value,
       }));
     }
+  };
+
+  const handleDefaultChange = (isChecked: boolean) => {
+    setEditRates((prev) => ({
+      ...prev,
+      is_default: isChecked,
+    }));
   };
 
   // Reset specific rate override input to empty string (meaning use default)
@@ -102,8 +113,8 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
       return;
     }
 
-    // Determine which rates actually changed compared to existing overrides
-    const payload: Record<string, number | null> = {};
+    // Determine which fields actually changed compared to existing values
+    const payload: Record<string, number | null | boolean> = {};
     let changed = false;
 
     if (newBiasa !== payCodeDetail.override_rate_biasa) {
@@ -118,6 +129,11 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
       payload.override_rate_umum = newUmum;
       changed = true;
     }
+    // Add is_default to payload if changed
+    if (editRates.is_default !== payCodeDetail.is_default_setting) {
+      payload.is_default = editRates.is_default;
+      changed = true;
+    }
 
     if (!changed) {
       toast.success("No changes detected.");
@@ -128,13 +144,13 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
 
     try {
       await api.put(`/api/job-pay-codes/${jobId}/${payCodeDetail.id}`, payload);
-      toast.success("Override rates updated successfully");
+      toast.success("Pay code settings updated successfully");
       onRatesSaved(); // Trigger refresh in parent
       onClose();
     } catch (err: any) {
-      console.error("Error updating override rates:", err);
-      setError(err?.response?.data?.message || "Failed to update rates");
-      toast.error(err?.response?.data?.message || "Failed to update rates");
+      console.error("Error updating pay code settings:", err);
+      setError(err?.response?.data?.message || "Failed to update settings");
+      toast.error(err?.response?.data?.message || "Failed to update settings");
     } finally {
       setIsSaving(false);
     }
@@ -149,7 +165,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
 
   const renderRateInput = (
     label: string,
-    name: keyof EditRatesState,
+    name: "biasa" | "ahad" | "umum",
     defaultValue: number | undefined | null
   ) => (
     <div className="flex items-end space-x-2">
@@ -194,7 +210,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <TransitionChild as={Fragment} /* Panel */>
-              <DialogPanel className="w-full max-w-xs transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-semibold leading-6 text-gray-900"
@@ -226,6 +242,26 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                       )}
                     </>
                   )}
+
+                  <div className="mt-4 border-t pt-4 border-gray-100">
+                    <Checkbox
+                      checked={editRates.is_default}
+                      onChange={handleDefaultChange}
+                      label={
+                        <span>
+                          <span className="font-medium">Default</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            (Auto-select this pay code when creating new
+                            entries)
+                          </span>
+                        </span>
+                      }
+                      size={18}
+                      checkedColor="text-sky-600"
+                      uncheckedColor="text-gray-400"
+                      disabled={isSaving}
+                    />
+                  </div>
 
                   {error && (
                     <p className="text-sm text-red-600 text-center">{error}</p>

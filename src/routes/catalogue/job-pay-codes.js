@@ -388,8 +388,12 @@ export default function (pool) {
   router.put("/:jobId/:payCodeId", async (req, res) => {
     const { jobId, payCodeId } = req.params;
     // Extract potential override fields from the request body
-    const { override_rate_biasa, override_rate_ahad, override_rate_umum } =
-      req.body;
+    const {
+      override_rate_biasa,
+      override_rate_ahad,
+      override_rate_umum,
+      is_default,
+    } = req.body;
 
     if (!jobId || !payCodeId) {
       return res
@@ -417,11 +421,20 @@ export default function (pool) {
       }
     };
 
+    // Helper to add boolean fields
+    const addBooleanField = (fieldName, value) => {
+      if (value !== undefined) {
+        fieldsToUpdate.push(`${fieldName} = $${valueIndex++}`);
+        values.push(!!value); // Convert to boolean
+      }
+    };
+
     try {
       // Validate and add each field present in the request body
       addUpdateField("override_rate_biasa", override_rate_biasa);
       addUpdateField("override_rate_ahad", override_rate_ahad);
       addUpdateField("override_rate_umum", override_rate_umum);
+      addBooleanField("is_default", is_default);
     } catch (validationError) {
       // Catch validation errors from addUpdateField
       return res.status(400).json({ message: validationError.message });
@@ -439,11 +452,11 @@ export default function (pool) {
 
     try {
       const query = `
-        UPDATE job_pay_codes
-        SET ${fieldsToUpdate.join(", ")}
-        WHERE job_id = $${valueIndex++} AND pay_code_id = $${valueIndex++}
-        RETURNING *
-      `;
+      UPDATE job_pay_codes
+      SET ${fieldsToUpdate.join(", ")}
+      WHERE job_id = $${valueIndex++} AND pay_code_id = $${valueIndex++}
+      RETURNING *
+    `;
 
       const result = await pool.query(query, values);
 
@@ -468,16 +481,17 @@ export default function (pool) {
           result.rows[0].override_rate_umum === null
             ? null
             : parseFloat(result.rows[0].override_rate_umum),
+        is_default: !!result.rows[0].is_default, // Ensure boolean
       };
 
       res.json({
-        message: "Override rates updated successfully",
+        message: "Settings updated successfully",
         updated: updatedRecord,
       });
     } catch (error) {
-      console.error("Error updating override rates:", error);
+      console.error("Error updating job-pay code settings:", error);
       res.status(500).json({
-        message: "Error updating override rates",
+        message: "Error updating job-pay code settings",
         error: error.message,
       });
     }
