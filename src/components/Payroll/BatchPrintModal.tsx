@@ -18,6 +18,7 @@ import {
 import PaySlipPreview from "./PaySlipPreview";
 import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
+import { BatchPaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
 
 interface EmployeePayroll {
   id: number;
@@ -284,7 +285,10 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
   };
 
   const selectedCount = Object.values(selectedEmployees).filter(Boolean).length;
-
+  const selectedPayrolls = payrolls.filter(
+    (payroll) => selectedEmployees[payroll.id]
+  );
+  
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -333,6 +337,12 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
                         ? "Preparing..."
                         : `Print Selected (${selectedCount})`}
                     </Button>
+                    <BatchPaySlipPDFButton
+                      payrolls={selectedPayrolls}
+                      buttonText={`Download (${selectedCount})`}
+                      disabled={selectedCount === 0}
+                      size="sm"
+                    />
                   </div>
                 </div>
 

@@ -1,4 +1,4 @@
-// src/components/Payroll/PaySlipModal.tsx
+// src/components/Payroll/PaySlipModal.tsx (updated)
 import React, { Fragment, useRef } from "react";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 import Button from "../Button";
 import { IconPrinter, IconDownload } from "@tabler/icons-react";
 import PaySlipPreview from "./PaySlipPreview";
+import { SinglePaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
 
 interface PayrollItem {
   id: number;
@@ -163,6 +164,12 @@ const PaySlipModal: React.FC<PaySlipModalProps> = ({
                     >
                       Print
                     </Button>
+                    <SinglePaySlipPDFButton
+                      payroll={payroll}
+                      buttonText="Download PDF"
+                      size="sm"
+                      variant="outline"
+                    />
                     <Button onClick={onClose} variant="outline" size="sm">
                       Close
                     </Button>
