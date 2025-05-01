@@ -77,10 +77,17 @@ export class PayrollCalculationService {
 
     // Process each work log
     targetLogs.forEach((log) => {
+      // Skip logs with missing employeeEntries
+      if (!log.employeeEntries || !Array.isArray(log.employeeEntries)) {
+        return;
+      }
+
       // Find entries for this employee and job type
-      const employeeEntries = log.employeeEntries.filter(
-        (entry) => entry.employee_id === employeeId && entry.job_id === jobType
-      );
+      const employeeEntries =
+        log.employeeEntries?.filter(
+          (entry) =>
+            entry.employee_id === employeeId && entry.job_id === jobType
+        ) || [];
 
       employeeEntries.forEach((entry) => {
         // Process each activity in the entry
