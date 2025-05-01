@@ -713,7 +713,7 @@ const RentalFormPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 -mt-8 pb-10">
-      <BackButton onClick={handleBackClick} className="ml-5 mb-2" />
+      <BackButton onClick={handleBackClick} className="mb-2" />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
           {" "}
@@ -1291,7 +1291,7 @@ const RentalFormPage: React.FC = () => {
             </div>
           </div>
           {/* --- Action Buttons --- */}
-          <div className="mt-6 flex items-center justify-end gap-x-4 pb-6">
+          <div className="mt-6 flex items-center justify-end gap-x-4">
             {isEditMode && (
               <Button
                 type="button"

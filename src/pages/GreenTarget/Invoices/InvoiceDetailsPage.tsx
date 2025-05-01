@@ -782,7 +782,7 @@ const InvoiceDetailsPage: React.FC = () => {
     : "Select Payment Method";
 
   return (
-    <div className="container mx-auto px-8 pb-8 -mt-8">
+    <div className="container mx-auto px-8 pb-8 -mt-6">
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
         <div>
@@ -1215,9 +1215,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     Type:
                   </td>
                   <td className="py-2 font-medium text-default-900">
-                    {invoice.type === "regular"
-                      ? "Regular Invoice"
-                      : "Statement"}
+                    Regular Invoice
                   </td>
                 </tr>
                 <tr>
@@ -1228,17 +1226,6 @@ const InvoiceDetailsPage: React.FC = () => {
                     {formatDate(invoice.date_issued)}
                   </td>
                 </tr>
-                {invoice.type === "statement" && (
-                  <tr>
-                    <td className="py-2 pr-4 text-default-500 font-medium align-top">
-                      Statement Period:
-                    </td>
-                    <td className="py-2 font-medium text-default-900 truncate max-w-[200px] md:max-w-none">
-                      {formatDate(invoice.statement_period_start || "")} to
-                      {formatDate(invoice.statement_period_end || "")}
-                    </td>
-                  </tr>
-                )}
                 <tr>
                   <td className="py-2 pr-4 text-default-500 font-medium align-top">
                     Customer:

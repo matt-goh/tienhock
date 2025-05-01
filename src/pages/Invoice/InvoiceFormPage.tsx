@@ -725,7 +725,7 @@ const InvoiceFormPage: React.FC = () => {
 
   // --- JSX Output ---
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-full -mt-12">
+    <div className="px-4 md:px-6 pb-8 max-w-full -mt-8">
       <BackButton onClick={handleBackClick} disabled={isSaving} />
 
       {/* Header Area */}

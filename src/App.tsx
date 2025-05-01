@@ -101,7 +101,7 @@ const Layout: React.FC = () => {
       <main
         className={`
     flex justify-center w-full transition-all duration-300 ease-in-out
-    ${!isPDFRoute && location.pathname !== "/login" ? "mt-[84px]" : ""} 
+    ${!isPDFRoute && location.pathname !== "/login" ? "mt-[60px]" : ""} 
     ${
       isAuthenticated && isVisible && !isPDFRoute && !isMobile
         ? "ml-[254px]"
