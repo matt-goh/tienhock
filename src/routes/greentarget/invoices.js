@@ -10,10 +10,7 @@ export default function (pool, defaultConfig) {
   // Generate a unique invoice number
   async function generateInvoiceNumber(client, type) {
     const year = new Date().getFullYear();
-    const sequenceName =
-      type === "regular"
-        ? "greentarget.regular_invoice_seq"
-        : "greentarget.statement_invoice_seq";
+    const sequenceName = "greentarget.regular_invoice_seq";
 
     try {
       const result = await client.query(
@@ -398,8 +395,6 @@ export default function (pool, defaultConfig) {
       amount_before_tax,
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
-      statement_period_start,
-      statement_period_end,
     } = req.body;
 
     const client = await pool.connect();
@@ -413,19 +408,11 @@ export default function (pool, defaultConfig) {
           "Missing required fields: type, customer_id, amount_before_tax, date_issued."
         );
       }
-      if (!["regular", "statement"].includes(type)) {
+      if (!["regular"].includes(type)) {
         throw new Error("Invalid invoice type specified.");
       }
       if (type === "regular" && !rental_id) {
         throw new Error("Rental ID is required for regular invoices.");
-      }
-      if (
-        type === "statement" &&
-        (!statement_period_start || !statement_period_end)
-      ) {
-        throw new Error(
-          "Statement period start and end dates are required for statement invoices."
-        );
       }
       const numAmountBeforeTax = parseFloat(amount_before_tax);
       const numTaxAmount = parseFloat(tax_amount);
@@ -444,10 +431,9 @@ export default function (pool, defaultConfig) {
         INSERT INTO greentarget.invoices (
           invoice_number, type, customer_id, rental_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
-          balance_due, -- Initially balance equals total
-          statement_period_start, statement_period_end
+          balance_due
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *;
       `;
 
@@ -461,8 +447,6 @@ export default function (pool, defaultConfig) {
         total_amount.toFixed(2),
         date_issued,
         total_amount.toFixed(2), // Initial balance_due
-        type === "statement" ? statement_period_start : null,
-        type === "statement" ? statement_period_end : null,
       ]);
 
       // Update customer last_activity_date

@@ -24,6 +24,10 @@ import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
+import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
+import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
+import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
+import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 
 // Catalogue related imports
 // Staff
@@ -82,6 +86,30 @@ const generatePayrollSubItems = (): SidebarItem[] => {
         },
       ],
     });
+  });
+
+  // Add Monthly Payrolls
+  payrollSubItems.push({
+    name: "Monthly Payrolls",
+    path: "/payroll/monthly-payrolls",
+    component: MonthlyPayrollsPage,
+    subItems: [
+      {
+        name: "Payroll Details",
+        path: "/payroll/monthly-payrolls/:id",
+        component: MonthlyPayrollDetailsPage,
+      },
+      {
+        name: "Process Payroll",
+        path: "/payroll/monthly-payrolls/:id/process",
+        component: PayrollProcessingPage,
+      },
+      {
+        name: "Employee Payroll Details",
+        path: "/payroll/employee-payroll/:id",
+        component: EmployeePayrollDetailsPage,
+      },
+    ],
   });
 
   // Add Holiday Calendar at the end
