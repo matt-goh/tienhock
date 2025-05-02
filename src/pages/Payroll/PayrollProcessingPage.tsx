@@ -25,6 +25,7 @@ import toast from "react-hot-toast";
 import EmployeeSelectionTooltip from "../../components/Payroll/EmployeeSelectionTooltip";
 import { Link } from "react-router-dom";
 import { EmployeePayroll } from "../../types/types";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 interface MonthlyPayroll {
   id: number;
@@ -63,6 +64,7 @@ const PayrollProcessingPage: React.FC = () => {
     Record<string, "pending" | "processing" | "success" | "error">
   >({});
 
+  const { jobs, loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
 
   useEffect(() => {
@@ -218,9 +220,9 @@ const PayrollProcessingPage: React.FC = () => {
           try {
             setProcessingStatus((prev) => ({ ...prev, [key]: "processing" }));
 
-            // Find section for this employee/job
-            const employee = staffs.find((e) => e.id === employeeId);
-            const section = employee?.location?.[0] || "Unknown";
+            // Get section from job data
+            const job = jobs.find((j) => j.id === jobType);
+            const section = job?.section?.[0] || "Unknown";
 
             // Calculate employee payroll
             const employeePayroll =
@@ -291,7 +293,7 @@ const PayrollProcessingPage: React.FC = () => {
     navigate(`/payroll/monthly-payrolls/${id}`);
   };
 
-  if (isLoading || loadingStaffs) {
+  if (isLoading || loadingStaffs || loadingJobs) {
     return (
       <div className="flex justify-center items-center h-96">
         <LoadingSpinner />
