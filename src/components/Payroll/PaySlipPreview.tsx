@@ -21,7 +21,6 @@ interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  end_month_payment: number;
   year: number;
   month: number;
   items: PayrollItem[];
@@ -288,13 +287,6 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
             <span className="font-medium">Net Pay:</span>
             <span className="font-medium">
               {formatCurrency(payroll.net_pay)}
-            </span>
-          </div>
-
-          <div className="flex justify-between py-2 mt-4 border-t border-dashed border-default-200">
-            <span className="font-medium">End Month Payment:</span>
-            <span className="font-medium">
-              {formatCurrency(payroll.end_month_payment)}
             </span>
           </div>
         </div>

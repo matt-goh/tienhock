@@ -184,7 +184,6 @@ interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  end_month_payment: number;
   year: number;
   month: number;
   items: PayrollItem[];
@@ -424,13 +423,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             <Text style={styles.totalLabel}>Net Pay:</Text>
             <Text style={styles.totalValue}>
               {formatCurrency(payroll.net_pay)}
-            </Text>
-          </View>
-
-          <View style={[styles.totalRow, { borderBottomStyle: "dashed" }]}>
-            <Text style={styles.totalLabel}>End Month Payment:</Text>
-            <Text style={styles.totalValue}>
-              {formatCurrency(payroll.end_month_payment)}
             </Text>
           </View>
         </View>

@@ -28,7 +28,6 @@ interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  end_month_payment: number;
   year: number;
   month: number;
   items: any[];
@@ -201,13 +200,6 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
           <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid #e5e7eb; margin-top: 8px;">
             <span style="font-weight: 500;">Net Pay:</span>
             <span style="font-weight: 500;">RM ${payroll.net_pay.toFixed(
-              2
-            )}</span>
-          </div>
-          
-          <div style="display: flex; justify-content: space-between; padding: 8px 0; margin-top: 16px; border-top: 1px dashed #e5e7eb;">
-            <span style="font-weight: 500;">End Month Payment:</span>
-            <span style="font-weight: 500;">RM ${payroll.end_month_payment.toFixed(
               2
             )}</span>
           </div>

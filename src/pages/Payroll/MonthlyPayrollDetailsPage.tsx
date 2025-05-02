@@ -34,7 +34,6 @@ interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  end_month_payment: number;
   status: string;
 }
 
@@ -152,11 +151,9 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
         return {
           grossPay: acc.grossPay + parseFloat(curr.gross_pay.toString()),
           netPay: acc.netPay + parseFloat(curr.net_pay.toString()),
-          endMonthPayment:
-            acc.endMonthPayment + parseFloat(curr.end_month_payment.toString()),
         };
       },
-      { grossPay: 0, netPay: 0, endMonthPayment: 0 }
+      { grossPay: 0, netPay: 0 }
     );
   };
 
@@ -454,12 +451,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                           </th>
                           <th
                             scope="col"
-                            className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                          >
-                            End Month
-                          </th>
-                          <th
-                            scope="col"
                             className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
                           >
                             Actions
@@ -504,15 +495,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                               <div className="text-sm font-medium text-default-900">
                                 {formatCurrency(
                                   parseFloat(employeePayroll.net_pay.toString())
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div className="text-sm font-medium text-default-900">
-                                {formatCurrency(
-                                  parseFloat(
-                                    employeePayroll.end_month_payment.toString()
-                                  )
                                 )}
                               </div>
                             </td>

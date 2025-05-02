@@ -45,7 +45,6 @@ export interface EmployeePayroll {
   section: string;
   grossPay: number;
   netPay: number;
-  endMonthPayment: number;
   payrollItems: PayrollItem[];
 }
 
@@ -205,17 +204,12 @@ export class PayrollCalculationService {
     // Calculate totals
     const { grossPay, netPay } = this.calculatePayrollTotals(payrollItems);
 
-    // Default to half of net pay for end month payment
-    // This could be adjusted based on business rules
-    const endMonthPayment = Number((netPay / 2).toFixed(2));
-
     return {
       employeeId,
       jobType,
       section,
       grossPay,
       netPay,
-      endMonthPayment,
       payrollItems,
     };
   }
