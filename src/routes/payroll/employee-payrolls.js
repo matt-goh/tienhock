@@ -82,11 +82,12 @@ export default function (pool) {
       // Check if employee payroll exists
       const checkQuery = `
         SELECT id FROM employee_payrolls 
-        WHERE monthly_payroll_id = $1 AND employee_id = $2
+        WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
       `;
       const checkResult = await pool.query(checkQuery, [
         monthly_payroll_id,
         employee_id,
+        job_type,
       ]);
 
       let employeePayrollId;
