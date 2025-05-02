@@ -639,3 +639,14 @@ export interface PayrollItem {
   amount: number;
   is_manual: boolean;
 }
+
+export interface MonthlyPayroll {
+  id: number;
+  year: number;
+  month: number;
+  status: "Processing" | "Completed" | "Finalized";
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  employeePayrolls: EmployeePayroll[];
+}

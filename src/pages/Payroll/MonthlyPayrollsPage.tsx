@@ -12,16 +12,7 @@ import {
 } from "../../utils/payroll/payrollUtils";
 import CreatePayrollModal from "../../components/Payroll/CreatePayrollModal";
 import toast from "react-hot-toast";
-
-interface MonthlyPayroll {
-  id: number;
-  year: number;
-  month: number;
-  status: "Processing" | "Completed" | "Finalized";
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-}
+import { MonthlyPayroll } from "../../types/types";
 
 const MonthlyPayrollsPage: React.FC = () => {
   const [payrolls, setPayrolls] = useState<MonthlyPayroll[]>([]);
