@@ -1,16 +1,10 @@
 // src/utils/payroll/payrollCalculationService.ts
-import { RateUnit, PayType } from "../../types/types";
-
-// Define interfaces for our service
-export interface PayrollItem {
-  payCodeId: string;
-  description: string;
-  rate: number;
-  rateUnit: RateUnit;
-  quantity: number;
-  amount: number;
-  isManual: boolean;
-}
+import {
+  RateUnit,
+  PayType,
+  EmployeePayroll,
+  PayrollItem,
+} from "../../types/types";
 
 export interface WorkLogActivity {
   pay_code_id: string;
@@ -37,15 +31,6 @@ export interface WorkLog {
   day_type: "Biasa" | "Ahad" | "Umum";
   section: string;
   employee_entries: WorkLogEntry[];
-}
-
-export interface EmployeePayroll {
-  employeeId: string;
-  jobType: string;
-  section: string;
-  grossPay: number;
-  netPay: number;
-  payrollItems: PayrollItem[];
 }
 
 export class PayrollCalculationService {
@@ -91,7 +76,7 @@ export class PayrollCalculationService {
       employeeEntries.forEach((entry) => {
         // Process each activity in the entry
         entry.activities.forEach((activity) => {
-          const payCodeId = activity.pay_code_id;
+          const pay_code_id = activity.pay_code_id;
 
           // Determine quantity based on rate unit
           let quantity = 0;
@@ -113,21 +98,21 @@ export class PayrollCalculationService {
           }
 
           // Initialize or update aggregated item
-          if (!aggregatedItems[payCodeId]) {
-            aggregatedItems[payCodeId] = {
-              payCodeId,
+          if (!aggregatedItems[pay_code_id]) {
+            aggregatedItems[pay_code_id] = {
+              pay_code_id,
               description: activity.description,
               rate: activity.rate_used,
-              rateUnit: activity.rate_unit,
+              rate_unit: activity.rate_unit,
               quantity: 0,
               amount: 0,
-              isManual: false,
+              is_manual: false,
             };
           }
 
           // Add to existing quantity and amount
-          aggregatedItems[payCodeId].quantity += quantity;
-          aggregatedItems[payCodeId].amount += activity.calculated_amount;
+          aggregatedItems[pay_code_id].quantity += quantity;
+          aggregatedItems[pay_code_id].amount += activity.calculated_amount;
         });
       });
     });
@@ -140,20 +125,20 @@ export class PayrollCalculationService {
    * Calculates amount based on rate, quantity, rate unit and day type
    * @param rate The rate amount
    * @param quantity The quantity (hours, bags, etc.)
-   * @param rateUnit The rate unit (Hour, Day, Bag, Fixed, Percent)
+   * @param rate_unit The rate unit (Hour, Day, Bag, Fixed, Percent)
    * @param dayType The day type (Biasa, Ahad, Umum)
    * @returns The calculated amount
    */
   static calculateAmount(
     rate: number,
     quantity: number,
-    rateUnit: RateUnit,
+    rate_unit: RateUnit,
     dayType: "Biasa" | "Ahad" | "Umum" = "Biasa"
   ): number {
     let amount = 0;
 
     // Basic calculation based on rate unit
-    switch (rateUnit) {
+    switch (rate_unit) {
       case "Hour":
       case "Day":
       case "Bag":
@@ -177,8 +162,8 @@ export class PayrollCalculationService {
   /**
    * Processes a single employee's monthly payroll
    * @param workLogs Array of work logs for the month
-   * @param employeeId Employee ID
-   * @param jobType Job type
+   * @param employee_id Employee ID
+   * @param job_type Job type
    * @param section Section
    * @param month Month (1-12)
    * @param year Year
@@ -186,31 +171,31 @@ export class PayrollCalculationService {
    */
   static processEmployeePayroll(
     workLogs: WorkLog[],
-    employeeId: string,
-    jobType: string,
+    employee_id: string,
+    job_type: string,
     section: string,
     month: number,
     year: number
   ): EmployeePayroll {
     // Aggregate work logs to get payroll items
-    const payrollItems = this.aggregateWorkLogs(
+    const payrollItem = this.aggregateWorkLogs(
       workLogs,
-      employeeId,
-      jobType,
+      employee_id,
+      job_type,
       month,
       year
     );
 
     // Calculate totals
-    const { grossPay, netPay } = this.calculatePayrollTotals(payrollItems);
+    const { gross_pay, net_pay } = this.calculatePayrollTotals(payrollItem);
 
     return {
-      employeeId,
-      jobType,
+      employee_id,
+      job_type,
       section,
-      grossPay,
-      netPay,
-      payrollItems,
+      gross_pay,
+      net_pay,
+      items: payrollItem,
     };
   }
 
@@ -220,8 +205,8 @@ export class PayrollCalculationService {
    * @returns Object with grossPay and netPay
    */
   static calculatePayrollTotals(items: PayrollItem[]): {
-    grossPay: number;
-    netPay: number;
+    gross_pay: number;
+    net_pay: number;
   } {
     // Sum all amounts to get gross pay
     const grossPay = items.reduce((sum, item) => sum + item.amount, 0);
@@ -231,8 +216,8 @@ export class PayrollCalculationService {
     const netPay = grossPay;
 
     return {
-      grossPay: Number(grossPay.toFixed(2)),
-      netPay: Number(netPay.toFixed(2)),
+      gross_pay: Number(grossPay.toFixed(2)),
+      net_pay: Number(netPay.toFixed(2)),
     };
   }
 
@@ -244,20 +229,20 @@ export class PayrollCalculationService {
    */
   static addManualPayrollItem(
     items: PayrollItem[],
-    newItem: Omit<PayrollItem, "amount" | "isManual">
+    newItem: Omit<PayrollItem, "amount" | "is_manual"> & { rate_unit: RateUnit }
   ): PayrollItem[] {
     // Calculate amount for the new item
     const amount = this.calculateAmount(
       newItem.rate,
       newItem.quantity,
-      newItem.rateUnit
+      newItem.rate_unit
     );
 
     // Create new item with calculated amount and manual flag
     const completeItem: PayrollItem = {
       ...newItem,
       amount,
-      isManual: true,
+      is_manual: true,
     };
 
     // Return new array with added item

@@ -1,5 +1,5 @@
 // src/pages/Payroll/PayrollProcessingPage.tsx
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   IconClock,
@@ -20,11 +20,11 @@ import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
   PayrollCalculationService,
   WorkLog,
-  EmployeePayroll,
 } from "../../utils/payroll/payrollCalculationService";
 import toast from "react-hot-toast";
 import EmployeeSelectionTooltip from "../../components/Payroll/EmployeeSelectionTooltip";
 import { Link } from "react-router-dom";
+import { EmployeePayroll } from "../../types/types";
 
 interface MonthlyPayroll {
   id: number;

@@ -10,28 +10,13 @@ import {
 import Button from "../Button";
 import {
   IconPrinter,
-  IconDownload,
   IconChevronDown,
   IconChevronUp,
-  IconChecks,
 } from "@tabler/icons-react";
-import PaySlipPreview from "./PaySlipPreview";
 import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
 import { BatchPaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
-
-interface EmployeePayroll {
-  id: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  year: number;
-  month: number;
-  items: any[];
-}
+import { EmployeePayroll } from "../../types/types";
 
 interface BatchPrintModalProps {
   isOpen: boolean;
@@ -89,7 +74,9 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
       // Initialize with all employees selected
       const initialSelection: Record<number, boolean> = {};
       payrolls.forEach((payroll) => {
-        initialSelection[payroll.id] = true;
+        if (payroll.id !== undefined) {
+          initialSelection[payroll.id] = true;
+        }
       });
       setSelectedEmployees(initialSelection);
       setSelectAll(true);
@@ -107,7 +94,9 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
     });
   };
 
-  const toggleEmployeeSelection = (id: number) => {
+  const toggleEmployeeSelection = (id: number | undefined) => {
+    if (id === undefined) return;
+
     setSelectedEmployees((prev) => {
       const updated = { ...prev };
       updated[id] = !updated[id];
@@ -122,7 +111,9 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
     // Select or deselect all employees
     const updatedSelection: Record<number, boolean> = {};
     payrolls.forEach((payroll) => {
-      updatedSelection[payroll.id] = newSelectAll;
+      if (payroll.id !== undefined) {
+        updatedSelection[payroll.id] = newSelectAll;
+      }
     });
     setSelectedEmployees(updatedSelection);
   };
@@ -139,7 +130,9 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
     }
 
     // Filter selected payrolls
-    const selectedPayrolls = payrolls.filter((p) => selectedEmployees[p.id]);
+    const selectedPayrolls = payrolls.filter(
+      (p) => p.id !== undefined && selectedEmployees[p.id]
+    );
 
     // Get the HTML for selected pay slips
     let paySlipsHtml = "";
@@ -278,9 +271,9 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
 
   const selectedCount = Object.values(selectedEmployees).filter(Boolean).length;
   const selectedPayrolls = payrolls.filter(
-    (payroll) => selectedEmployees[payroll.id]
+    (payroll) => payroll.id !== undefined && selectedEmployees[payroll.id]
   );
-  
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -427,6 +420,7 @@ const BatchPrintModal: React.FC<BatchPrintModalProps> = ({
                                       >
                                         <Checkbox
                                           checked={
+                                            employee.id !== undefined &&
                                             !!selectedEmployees[employee.id]
                                           }
                                           onChange={() =>

@@ -25,17 +25,7 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import BatchPrintModal from "../../components/Payroll/BatchPrintModal";
-
-interface EmployeePayroll {
-  id: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  status: string;
-}
+import { EmployeePayroll } from "../../types/types";
 
 interface MonthlyPayroll {
   id: number;
@@ -161,7 +151,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     navigate("/payroll/monthly-payrolls/list");
   };
 
-  const handleViewEmployeePayroll = (employeePayrollId: number) => {
+  const handleViewEmployeePayroll = (employeePayrollId: number| undefined) => {
     navigate(`/payroll/employee-payroll/${employeePayrollId}`);
   };
 

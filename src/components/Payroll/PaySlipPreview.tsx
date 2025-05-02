@@ -1,5 +1,6 @@
 // src/components/Payroll/PaySlipPreview.tsx
 import React from "react";
+import { EmployeePayroll } from "../../types/types";
 
 interface PayrollItem {
   id: number;
@@ -10,20 +11,6 @@ interface PayrollItem {
   quantity: number;
   amount: number;
   is_manual: boolean;
-}
-
-interface EmployeePayroll {
-  id: number;
-  monthly_payroll_id: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  year: number;
-  month: number;
-  items: PayrollItem[];
 }
 
 interface PaySlipPreviewProps {
@@ -66,7 +53,12 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
     return grouped;
   };
 
-  const groupedItems = groupItemsByType(payroll.items);
+  const groupedItems = groupItemsByType(
+    payroll.items.map((item) => ({
+      ...item,
+      id: item.id || 0, // Ensure id is always a number
+    }))
+  );
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-MY", {
@@ -77,7 +69,8 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
     }).format(amount);
   };
 
-  const getMonthName = (month: number) => {
+  const getMonthName = (month: number | undefined) => {
+    if (month === undefined) return "Unknown Month";
     return new Date(2000, month - 1, 1).toLocaleString("default", {
       month: "long",
     });

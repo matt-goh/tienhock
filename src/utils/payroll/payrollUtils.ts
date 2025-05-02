@@ -1,10 +1,9 @@
 // src/utils/payroll/payrollUtils.ts
 import { api } from "../../routes/utils/api";
+import { EmployeePayroll, PayrollItem, RateUnit } from "../../types/types";
 import {
   PayrollCalculationService,
-  PayrollItem,
   WorkLog,
-  EmployeePayroll,
 } from "./payrollCalculationService";
 
 /**
@@ -151,19 +150,19 @@ export const saveEmployeePayroll = async (
     // Transform the employeePayroll object to match API expectations
     const payload = {
       monthly_payroll_id: monthlyPayrollId,
-      employee_id: employeePayroll.employeeId,
-      job_type: employeePayroll.jobType,
+      employee_id: employeePayroll.employee_id,
+      job_type: employeePayroll.job_type,
       section: employeePayroll.section,
-      gross_pay: employeePayroll.grossPay,
-      net_pay: employeePayroll.netPay,
-      items: employeePayroll.payrollItems.map((item) => ({
-        pay_code_id: item.payCodeId,
+      gross_pay: employeePayroll.gross_pay,
+      net_pay: employeePayroll.net_pay,
+      items: employeePayroll.items.map((item) => ({
+        pay_code_id: item.pay_code_id,
         description: item.description,
         rate: item.rate,
-        rate_unit: item.rateUnit,
+        rate_unit: item.rate_unit,
         quantity: item.quantity,
         amount: item.amount,
-        is_manual: item.isManual,
+        is_manual: item.is_manual,
       })),
     };
 
@@ -198,21 +197,21 @@ export const getEmployeePayrollDetails = async (id: number) => {
  */
 export const addManualPayrollItem = async (
   employeePayrollId: number,
-  item: Omit<PayrollItem, "amount" | "isManual">
+  item: Omit<PayrollItem, "amount" | "is_manual">
 ) => {
   try {
     // Calculate the amount using our calculation service
     const amount = PayrollCalculationService.calculateAmount(
       item.rate,
       item.quantity,
-      item.rateUnit
+      item.rate_unit as RateUnit
     );
 
     const payload = {
-      pay_code_id: item.payCodeId,
+      pay_code_id: item.pay_code_id,
       description: item.description,
       rate: item.rate,
-      rate_unit: item.rateUnit,
+      rate_unit: item.rate_unit,
       quantity: item.quantity,
       amount: amount,
     };
