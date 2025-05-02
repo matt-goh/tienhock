@@ -1,33 +1,7 @@
 // src/utils/payroll/generatePaySlipPDF.tsx
-import React from "react";
 import { pdf } from "@react-pdf/renderer";
 import PaySlipPDF from "./PaySlipPDF";
-
-// Interface for employee payroll data
-interface PayrollItem {
-  id: number;
-  pay_code_id: string;
-  description: string;
-  rate: number;
-  rate_unit: string;
-  quantity: number;
-  amount: number;
-  is_manual: boolean;
-}
-
-interface EmployeePayroll {
-  id?: number;
-  monthly_payroll_id?: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  year: number;
-  month: number;
-  items: PayrollItem[];
-}
+import { EmployeePayroll } from "../../types/types";
 
 /**
  * Generate a PDF blob for a single employee payroll

@@ -1,12 +1,7 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-} from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { EmployeePayroll, PayrollItem } from "../../types/types";
 
 // Create styles
 const styles = StyleSheet.create({
@@ -164,31 +159,6 @@ const getMonthName = (month: number) => {
   });
 };
 
-interface PayrollItem {
-  id: number;
-  pay_code_id: string;
-  description: string;
-  rate: number;
-  rate_unit: string;
-  quantity: number;
-  amount: number;
-  is_manual: boolean;
-}
-
-interface EmployeePayroll {
-  id?: number;
-  monthly_payroll_id?: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  year: number;
-  month: number;
-  items: PayrollItem[];
-}
-
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
@@ -234,7 +204,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         <View style={styles.header}>
           <Text style={styles.companyName}>{companyName}</Text>
           <Text style={styles.payslipTitle}>
-            Pay Slip for {getMonthName(payroll.month)} {payroll.year}
+            Pay Slip for{" "}
+            {getMonthName(payroll.month ?? new Date().getMonth() + 1)}{" "}
+            {payroll.year}
           </Text>
 
           {/* Employee Information */}

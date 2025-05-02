@@ -611,3 +611,30 @@ export interface JobPayCodeDetails
   override_rate_ahad: number | null;
   override_rate_umum: number | null;
 }
+
+export interface EmployeePayroll {
+  id?: number;
+  monthly_payroll_id?: number;
+  employee_id: string;
+  employee_name?: string;
+  job_type: string;
+  section: string;
+  gross_pay: number;
+  net_pay: number;
+  status?: string;
+  payroll_status?: string;
+  year?: number;
+  month?: number;
+  items: PayrollItem[];
+}
+
+export interface PayrollItem {
+  id?: number;
+  pay_code_id: string;
+  description: string;
+  rate: number;
+  rate_unit: string;
+  quantity: number;
+  amount: number;
+  is_manual: boolean;
+}

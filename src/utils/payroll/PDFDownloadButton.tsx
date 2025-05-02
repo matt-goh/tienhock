@@ -1,40 +1,14 @@
 // src/utils/payroll/PDFDownloadButton.tsx
 import React, { useState } from "react";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import PaySlipPDF from "./PaySlipPDF";
 import Button from "../../components/Button";
-import { IconDownload, IconPrinter } from "@tabler/icons-react";
+import { IconDownload } from "@tabler/icons-react";
 import {
   downloadSinglePaySlip,
   downloadBatchPaySlips,
 } from "./generatePaySlipPDF";
+import { EmployeePayroll } from "../../types/types";
 
 // Define interfaces
-interface PayrollItem {
-  id: number;
-  pay_code_id: string;
-  description: string;
-  rate: number;
-  rate_unit: string;
-  quantity: number;
-  amount: number;
-  is_manual: boolean;
-}
-
-interface EmployeePayroll {
-  id?: number;
-  monthly_payroll_id?: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  year: number;
-  month: number;
-  items: PayrollItem[];
-}
-
 interface SinglePDFButtonProps {
   payroll: EmployeePayroll;
   companyName?: string;

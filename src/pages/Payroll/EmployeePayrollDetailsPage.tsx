@@ -16,6 +16,7 @@ import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import PaySlipModal from "../../components/Payroll/PaySlipModal";
 import PaySlipPreview from "../../components/Payroll/PaySlipPreview";
 import Tab from "../../components/Tab";
+import { EmployeePayroll } from "../../types/types";
 
 interface PayrollItem {
   id: number;
@@ -27,22 +28,6 @@ interface PayrollItem {
   amount: number;
   is_manual: boolean;
   pay_type?: string;
-}
-
-interface EmployeePayroll {
-  id: number;
-  monthly_payroll_id: number;
-  employee_id: string;
-  employee_name: string;
-  job_type: string;
-  section: string;
-  gross_pay: number;
-  net_pay: number;
-  status: string;
-  payroll_status: string;
-  year: number;
-  month: number;
-  items: PayrollItem[];
 }
 
 const EmployeePayrollDetailsPage: React.FC = () => {
@@ -109,7 +94,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }).format(amount);
   };
 
-  const getMonthName = (month: number) => {
+  const getMonthName = (month: number | undefined) => {
+    if (month === undefined) return "Unknown Month";
     return new Date(2000, month - 1, 1).toLocaleString("default", {
       month: "long",
     });
@@ -171,7 +157,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   }
 
   const isEditable = payroll.payroll_status !== "Finalized";
-  const groupedItems = groupItemsByType(payroll.items);
+  const groupedItems = groupItemsByType(
+    payroll.items.map((item) => ({
+      ...item,
+      id: item.id || 0, // Ensure id is always a number
+    }))
+  );
 
   return (
     <div className="relative w-full mx-4 md:mx-6 -mt-6">

@@ -167,10 +167,10 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
 
     try {
       await addManualPayrollItem(employeePayrollId, {
-        payCodeId: selectedPayCode,
+        pay_code_id: selectedPayCode,
         description: customDescription.trim(),
         rate: parseFloat(rate),
-        rateUnit: selectedPayCodeDetails.rate_unit,
+        rate_unit: selectedPayCodeDetails.rate_unit,
         quantity: parseFloat(quantity),
       });
 
