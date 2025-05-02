@@ -216,11 +216,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
           {jobConfig?.name} Records
         </h1>
         <div className="mt-4 md:mt-0">
-          <Button
-            onClick={handleAddEntry}
-            icon={IconPlus}
-            color="sky"
-          >
+          <Button onClick={handleAddEntry} icon={IconPlus} color="sky">
             New {jobConfig?.name} Entry
           </Button>
         </div>
@@ -314,7 +310,11 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
               </thead>
               <tbody className="divide-y divide-default-200 bg-white">
                 {workLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-default-50">
+                  <tr
+                    key={log.id}
+                    className="hover:bg-default-50 cursor-pointer"
+                    onClick={() => handleViewLog(log)}
+                  >
                     <td className="px-4 py-3 text-sm text-default-700">
                       {format(new Date(log.log_date), "dd MMM yyyy")}
                     </td>
@@ -357,23 +357,27 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                     <td className="px-4 py-3 text-center text-sm">
                       <div className="flex items-center justify-center space-x-2">
                         <button
-                          onClick={() => handleViewLog(log)}
                           className="text-sky-600 hover:text-sky-800"
                           title="View"
+                          onClick={() => {}}
                         >
                           <IconEye size={18} />
                         </button>
                         {log.status !== "Processed" && (
                           <>
                             <button
-                              onClick={() => handleEditLog(log)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditLog(log);
+                              }}
                               className="text-emerald-600 hover:text-emerald-800"
                               title="Edit"
                             >
                               <IconPencil size={18} />
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setLogToDelete(log);
                                 setShowDeleteDialog(true);
                               }}
