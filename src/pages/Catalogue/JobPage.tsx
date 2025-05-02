@@ -671,7 +671,6 @@ const JobPage: React.FC = () => {
                             <td
                               className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
                               title={detail.description}
-                              onClick={(e) => e.stopPropagation()} // Prevent row click when clicking inside this cell
                             >
                               <Link
                                 to={`/catalogue/pay-codes?desc=${detail.description}`}
