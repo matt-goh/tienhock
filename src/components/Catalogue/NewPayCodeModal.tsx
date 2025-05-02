@@ -227,18 +227,18 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                                 </ComboboxOption>
                               ))
                             )}
+                            {/* Load More Button */}
                             {hasMoreItems && (
-                              <div className="py-2 text-center border-t border-default-100">
-                                <button
-                                  type="button"
-                                  onClick={handleLoadMore}
-                                  className="w-full py-2 text-sm text-sky-600 hover:text-sky-800 hover:bg-sky-50"
-                                >
-                                  Load more results (
-                                  {availablePayCodesToAdd.length -
-                                    loadedItemCount}{" "}
-                                  remaining)
-                                </button>
+                              <div className="border-t border-gray-200 p-2">
+                              <button
+                                type="button"
+                                onClick={handleLoadMore}
+                                className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
+                                disabled={isAdding}
+                              >
+                                <IconChevronDown size={16} className="mr-1.5" />
+                                <span>Load More Pay Codes ({availablePayCodesToAdd.length - loadedItemCount} remaining)</span>
+                              </button>
                               </div>
                             )}
                           </ComboboxOptions>
