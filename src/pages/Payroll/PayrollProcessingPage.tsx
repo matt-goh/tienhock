@@ -4,7 +4,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   IconClock,
   IconUsers,
-  IconBriefcase,
   IconCheck,
   IconAlertTriangle,
 } from "@tabler/icons-react";
