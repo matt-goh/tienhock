@@ -195,7 +195,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
           <HeadlessListboxButton
             id={`${name}-button`}
             className={clsx(
-              "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+              "relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
               "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
               disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
             )}
@@ -227,7 +227,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
                   key={option.id}
                   className={({ active }) =>
                     clsx(
-                      "relative cursor-default select-none py-2 pl-3 pr-10",
+                      "relative cursor-pointer select-none py-2 pl-3 pr-10",
                       active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                     )
                   }
