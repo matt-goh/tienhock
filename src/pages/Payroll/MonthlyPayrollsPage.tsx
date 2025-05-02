@@ -150,7 +150,7 @@ const MonthlyPayrollsPage: React.FC = () => {
                   <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
                     Actions
                   </th>
                 </tr>
@@ -178,7 +178,7 @@ const MonthlyPayrollsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center space-x-3">
+                      <div className="flex items-center justify-end space-x-3">
                         <button
                           onClick={() =>
                             navigate(`/payroll/monthly-payrolls/${payroll.id}`)

@@ -24,7 +24,6 @@ interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  end_month_payment: number;
   year: number;
   month: number;
   items: PayrollItem[];

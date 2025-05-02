@@ -156,7 +156,6 @@ export const saveEmployeePayroll = async (
       section: employeePayroll.section,
       gross_pay: employeePayroll.grossPay,
       net_pay: employeePayroll.netPay,
-      end_month_payment: employeePayroll.endMonthPayment,
       items: employeePayroll.payrollItems.map((item) => ({
         pay_code_id: item.payCodeId,
         description: item.description,

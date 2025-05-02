@@ -38,7 +38,6 @@ interface EmployeePayroll {
   section: string;
   gross_pay: number;
   net_pay: number;
-  end_month_payment: number;
   status: string;
   payroll_status: string;
   year: number;

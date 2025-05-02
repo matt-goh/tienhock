@@ -65,7 +65,6 @@ export default function (pool) {
       section,
       gross_pay,
       net_pay,
-      end_month_payment,
       status = "Processing",
       items = [],
     } = req.body;
@@ -100,9 +99,8 @@ export default function (pool) {
 
         const updateQuery = `
           UPDATE employee_payrolls
-          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, 
-              end_month_payment = $5, status = $6
-          WHERE id = $7
+          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5
+          WHERE id = $6
           RETURNING *
         `;
 
@@ -111,7 +109,6 @@ export default function (pool) {
           section,
           gross_pay || 0,
           net_pay || 0,
-          end_month_payment || 0,
           status,
           employeePayrollId,
         ]);
@@ -126,9 +123,9 @@ export default function (pool) {
         const insertQuery = `
           INSERT INTO employee_payrolls (
             monthly_payroll_id, employee_id, job_type, section,
-            gross_pay, net_pay, end_month_payment, status
+            gross_pay, net_pay, status
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
         `;
 
@@ -139,7 +136,6 @@ export default function (pool) {
           section,
           gross_pay || 0,
           net_pay || 0,
-          end_month_payment || 0,
           status,
         ]);
 
