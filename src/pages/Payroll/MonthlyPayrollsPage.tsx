@@ -203,6 +203,7 @@ const MonthlyPayrollsPage: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreatePayroll={handleCreatePayroll}
+        existingPayrolls={payrolls}
       />
     </div>
   );

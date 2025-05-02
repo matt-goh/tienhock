@@ -9,17 +9,20 @@ import {
 } from "@headlessui/react";
 import Button from "../Button";
 import { FormListbox } from "../FormComponents";
+import { useNavigate } from "react-router-dom";
 
 interface CreatePayrollModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreatePayroll: (year: number, month: number) => void;
+  existingPayrolls: Array<{ year: number; month: number; id: number }>;
 }
 
 const CreatePayrollModal: React.FC<CreatePayrollModalProps> = ({
   isOpen,
   onClose,
   onCreatePayroll,
+  existingPayrolls,
 }) => {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1; // JavaScript months are 0-indexed
@@ -27,6 +30,7 @@ const CreatePayrollModal: React.FC<CreatePayrollModalProps> = ({
   const [year, setYear] = useState<number>(currentYear);
   const [month, setMonth] = useState<number>(currentMonth);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   // Generate year options (current year and 2 previous years)
   const yearOptions = Array.from({ length: 3 }, (_, i) => ({
@@ -42,10 +46,39 @@ const CreatePayrollModal: React.FC<CreatePayrollModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if payroll for this month/year already exists
+    const existingPayroll = existingPayrolls.find(
+      (p) => p.year === year && p.month === month
+    );
+
+    if (existingPayroll) {
+      // If exists, show error and offer to navigate
+      const getMonthName = (monthNumber: number): string => {
+        return new Date(2000, monthNumber - 1, 1).toLocaleString("default", {
+          month: "long",
+        });
+      };
+
+      const confirmed = window.confirm(
+        `A payroll already exists for ${getMonthName(
+          month
+        )} ${year}. Would you like to view it instead?`
+      );
+
+      if (confirmed) {
+        // Close modal and navigate to existing payroll
+        onClose();
+        navigate(`/payroll/monthly-payrolls/${existingPayroll.id}`);
+        return;
+      }
+      return; // Don't proceed with creation
+    }
+
     setIsSubmitting(true);
 
     try {
-      await onCreatePayroll(year, month);
+      onCreatePayroll(year, month);
     } finally {
       setIsSubmitting(false);
     }
