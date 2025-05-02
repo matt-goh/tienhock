@@ -395,78 +395,29 @@ const PayrollProcessingPage: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Payroll Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-default-200 p-4">
-            <div className="flex items-center">
-              <div className="bg-sky-100 p-2 rounded-full mr-3">
-                <IconUsers className="text-sky-600" size={20} />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">Eligible Employees</p>
-                <p className="text-lg font-semibold text-default-800">
-                  {totalEligibleEmployees}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-default-200 p-4">
-            <div className="flex items-center">
-              <div className="bg-amber-100 p-2 rounded-full mr-3">
-                <IconBriefcase className="text-amber-600" size={20} />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">Job Types</p>
-                <p className="text-lg font-semibold text-default-800">
-                  {eligibleData.eligibleJobs.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-default-200 p-4">
-            <div className="flex items-center">
-              <div className="bg-emerald-100 p-2 rounded-full mr-3">
-                <IconCheck className="text-emerald-600" size={20} />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">
-                  Selected for Processing
-                </p>
-                <p className="text-lg font-semibold text-default-800">
-                  {totalSelectedEmployees} / {totalEligibleEmployees}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Job Types Section */}
-        <div className="">
+        <div>
           {eligibleData.eligibleJobs.length === 0 ? (
-            <div className="text-center py-8 text-default-500 border rounded-lg">
-              No eligible jobs found. There may be no work logs for this month.
+            <div className="text-center py-8 text-default-500 border rounded-lg bg-default-50">
+              <IconAlertTriangle className="mx-auto h-10 w-10 text-default-400 mb-2" />
+              <p className="font-medium">No eligible jobs found</p>
+              <p className="text-sm mt-1">
+                There may be no work logs for this month.
+              </p>
             </div>
           ) : (
-            <div className="border border-default-200 rounded-lg overflow-hidden">
+            <div className="border border-default-200 rounded-lg overflow-hidden shadow-sm">
               <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                <thead>
+                  <tr className="bg-default-50">
+                    <th className="px-6 py-3.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                       Job Type
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                      Eligible Employees
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                      Selected
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3.5 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
                       Status
+                    </th>
+                    <th className="px-6 py-3.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -478,35 +429,86 @@ const PayrollProcessingPage: React.FC = () => {
                     ).length;
 
                     return (
-                      <tr key={jobId} className="hover:bg-default-50">
+                      <tr
+                        key={jobId}
+                        className="hover:bg-default-50 transition-colors duration-150"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-default-900">
-                            <Link
-                              to={`/catalogue/job?id=${jobId}`}
-                              className="hover:text-sky-600 hover:underline"
-                            >
-                              {getJobName(jobId)}
-                            </Link>
+                          <div className="flex items-center">
+                            <div>
+                              <div className="text-sm font-medium text-default-900">
+                                <Link
+                                  to={`/catalogue/job?id=${jobId}`}
+                                  className="hover:text-sky-600 hover:underline"
+                                >
+                                  {getJobName(jobId)}
+                                </Link>
+                              </div>
+                              <div className="text-xs text-default-500">
+                                {jobId}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-xs text-default-500">
-                            {jobId}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                          {employees.length}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                          <span
-                            className={
-                              selectedCount > 0
-                                ? "text-emerald-600 font-medium"
-                                : "text-default-500"
-                            }
-                          >
-                            {selectedCount} / {employees.length}
-                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {isProcessing && (
+                            <div className="flex flex-col items-center gap-1">
+                              {employees
+                                .filter(
+                                  (emp) => selectedEmployees[jobId]?.[emp.id]
+                                )
+                                .map((emp) => {
+                                  const key = `${emp.id}-${jobId}`;
+                                  const status =
+                                    processingStatus[key] || "pending";
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit mx-auto"
+                                      style={{
+                                        backgroundColor:
+                                          status === "pending"
+                                            ? "#f3f4f6"
+                                            : status === "processing"
+                                            ? "#e0f2fe"
+                                            : status === "success"
+                                            ? "#d1fae5"
+                                            : "#fee2e2",
+                                        color:
+                                          status === "pending"
+                                            ? "#6b7280"
+                                            : status === "processing"
+                                            ? "#0284c7"
+                                            : status === "success"
+                                            ? "#047857"
+                                            : "#b91c1c",
+                                      }}
+                                    >
+                                      {status === "pending" && (
+                                        <IconClock size={12} className="mr-1" />
+                                      )}
+                                      {status === "processing" && (
+                                        <span className="w-2 h-2 bg-sky-500 rounded-full mr-1.5 animate-pulse"></span>
+                                      )}
+                                      {status === "success" && (
+                                        <IconCheck size={12} className="mr-1" />
+                                      )}
+                                      {status === "error" && (
+                                        <IconAlertTriangle
+                                          size={12}
+                                          className="mr-1"
+                                        />
+                                      )}
+                                      <span className="truncate max-w-[80px]">
+                                        {emp.name.split(" ")[0]}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 mt-0.5 whitespace-nowrap flex justify-end items-center">
                           <EmployeeSelectionTooltip
                             jobName={getJobName(jobId)}
                             employees={employees}
@@ -523,31 +525,6 @@ const PayrollProcessingPage: React.FC = () => {
                             }
                             disabled={isProcessing}
                           />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {isProcessing && (
-                            <div className="flex flex-col items-center">
-                              {employees
-                                .filter(
-                                  (emp) => selectedEmployees[jobId]?.[emp.id]
-                                )
-                                .map((emp) => {
-                                  const key = `${emp.id}-${jobId}`;
-                                  const status =
-                                    processingStatus[key] || "pending";
-                                  return (
-                                    <div
-                                      key={key}
-                                      className={`text-xs mb-1 ${getProcessingStatusColor(
-                                        status
-                                      )}`}
-                                    >
-                                      {emp.name.split(" ")[0]}: {status}
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
                         </td>
                       </tr>
                     );
