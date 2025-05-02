@@ -448,7 +448,7 @@ const PayrollProcessingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center mt-4">
               <Button onClick={handleViewDetails} color="sky" variant="filled">
                 View Payroll Details
               </Button>
