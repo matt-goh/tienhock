@@ -121,6 +121,23 @@ export const calculateEmployeePayroll = (
 };
 
 /**
+ * Fetches eligible employees for a monthly payroll
+ * @param id Monthly payroll ID
+ * @returns API response with eligible employees
+ */
+export const getEligibleEmployees = async (id: number) => {
+  try {
+    const response = await api.get(
+      `/api/monthly-payrolls/${id}/eligible-employees`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching eligible employees:", error);
+    throw error;
+  }
+};
+
+/**
  * Saves an employee payroll to the database
  * @param monthlyPayrollId Monthly payroll ID
  * @param employeePayroll Employee payroll data

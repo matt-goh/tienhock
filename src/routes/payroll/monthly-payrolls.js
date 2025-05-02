@@ -22,6 +22,66 @@ export default function (pool) {
     }
   });
 
+  // Add this new endpoint to monthly-payrolls.js
+  router.get("/:id/eligible-employees", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // Get payroll details to verify year and month
+      const payrollQuery = `
+      SELECT year, month FROM monthly_payrolls
+      WHERE id = $1
+    `;
+      const payrollResult = await pool.query(payrollQuery, [id]);
+
+      if (payrollResult.rows.length === 0) {
+        return res.status(404).json({ message: "Monthly payroll not found" });
+      }
+
+      const { year, month } = payrollResult.rows[0];
+
+      // Get all work logs for this month and year
+      const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
+      const endDate = new Date(year, month, 0).toISOString().split("T")[0]; // Last day of month
+
+      // Query work logs and extract unique employee-job combinations
+      const eligibleEmployeesQuery = `
+      SELECT DISTINCT dwle.employee_id, dwle.job_id
+      FROM daily_work_logs dwl
+      JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
+      WHERE dwl.log_date BETWEEN $1 AND $2
+      AND dwl.status = 'Submitted'
+    `;
+
+      const eligibleEmployeesResult = await pool.query(eligibleEmployeesQuery, [
+        startDate,
+        endDate,
+      ]);
+
+      // Group employees by job type
+      const jobEmployeeMap = {};
+      eligibleEmployeesResult.rows.forEach((row) => {
+        if (!jobEmployeeMap[row.job_id]) {
+          jobEmployeeMap[row.job_id] = [];
+        }
+        jobEmployeeMap[row.job_id].push(row.employee_id);
+      });
+
+      res.json({
+        month,
+        year,
+        eligibleJobs: Object.keys(jobEmployeeMap),
+        jobEmployeeMap,
+      });
+    } catch (error) {
+      console.error("Error fetching eligible employees:", error);
+      res.status(500).json({
+        message: "Error fetching eligible employees",
+        error: error.message,
+      });
+    }
+  });
+
   // Get specific monthly payroll by ID
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
