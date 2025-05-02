@@ -54,7 +54,6 @@ const PayrollProcessingPage: React.FC = () => {
     useState<EligibleEmployeesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<
     Record<string, Record<string, boolean>>
   >({});
@@ -158,7 +157,6 @@ const PayrollProcessingPage: React.FC = () => {
     try {
       // Fetch work logs for this month/year
       const processResponse = await processMonthlyPayroll(Number(id));
-      setWorkLogs(processResponse.work_logs);
 
       if (processResponse.work_logs.length === 0) {
         toast.error("No work logs found for this month");
@@ -284,21 +282,6 @@ const PayrollProcessingPage: React.FC = () => {
       ...prev,
       [jobId]: newSelections,
     }));
-  };
-
-  const getProcessingStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "text-default-400";
-      case "processing":
-        return "text-sky-500 animate-pulse";
-      case "success":
-        return "text-emerald-500";
-      case "error":
-        return "text-rose-500";
-      default:
-        return "text-default-400";
-    }
   };
 
   const handleBack = () => {
@@ -474,9 +457,6 @@ const PayrollProcessingPage: React.FC = () => {
                     <th className="px-6 py-3.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                       Job Type
                     </th>
-                    <th className="px-6 py-3.5 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                      Status
-                    </th>
                     <th className="px-6 py-3.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -510,64 +490,6 @@ const PayrollProcessingPage: React.FC = () => {
                               </div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {isProcessing && (
-                            <div className="flex flex-col items-center gap-1">
-                              {employees
-                                .filter(
-                                  (emp) => selectedEmployees[jobId]?.[emp.id]
-                                )
-                                .map((emp) => {
-                                  const key = `${emp.id}-${jobId}`;
-                                  const status =
-                                    processingStatus[key] || "pending";
-                                  return (
-                                    <div
-                                      key={key}
-                                      className="flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit mx-auto"
-                                      style={{
-                                        backgroundColor:
-                                          status === "pending"
-                                            ? "#f3f4f6"
-                                            : status === "processing"
-                                            ? "#e0f2fe"
-                                            : status === "success"
-                                            ? "#d1fae5"
-                                            : "#fee2e2",
-                                        color:
-                                          status === "pending"
-                                            ? "#6b7280"
-                                            : status === "processing"
-                                            ? "#0284c7"
-                                            : status === "success"
-                                            ? "#047857"
-                                            : "#b91c1c",
-                                      }}
-                                    >
-                                      {status === "pending" && (
-                                        <IconClock size={12} className="mr-1" />
-                                      )}
-                                      {status === "processing" && (
-                                        <span className="w-2 h-2 bg-sky-500 rounded-full mr-1.5 animate-pulse"></span>
-                                      )}
-                                      {status === "success" && (
-                                        <IconCheck size={12} className="mr-1" />
-                                      )}
-                                      {status === "error" && (
-                                        <IconAlertTriangle
-                                          size={12}
-                                          className="mr-1"
-                                        />
-                                      )}
-                                      <span className="truncate max-w-[80px]">
-                                        {emp.name.split(" ")[0]}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
                         </td>
                         <td className="px-6 py-4 mt-0.5 whitespace-nowrap flex justify-end items-center">
                           <EmployeeSelectionTooltip
