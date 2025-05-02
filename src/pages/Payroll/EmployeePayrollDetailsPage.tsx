@@ -26,6 +26,7 @@ interface PayrollItem {
   quantity: number;
   amount: number;
   is_manual: boolean;
+  pay_type?: string;
 }
 
 interface EmployeePayroll {
@@ -116,8 +117,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const groupItemsByType = (items: PayrollItem[]) => {
-    // Group items by pay type (Base, Tambahan, Overtime) based on naming conventions
-    // This is a simple grouping function that would be replaced with actual pay types
     const grouped: Record<string, PayrollItem[]> = {
       Base: [],
       Tambahan: [],
@@ -125,19 +124,28 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     };
 
     items.forEach((item) => {
-      // Very simple logic based on description - should be replaced with actual pay types
-      if (
-        item.description.toLowerCase().includes("overtime") ||
-        item.description.toLowerCase().includes("ot")
-      ) {
+      // Use the pay_type returned from the backend
+      if (item.pay_type === "Overtime") {
         grouped["Overtime"].push(item);
-      } else if (
-        item.is_manual ||
-        item.description.toLowerCase().includes("tambahan")
-      ) {
+      } else if (item.pay_type === "Tambahan") {
         grouped["Tambahan"].push(item);
-      } else {
+      } else if (item.pay_type === "Base") {
         grouped["Base"].push(item);
+      } else {
+        // Fallback for items without pay_type (using previous logic)
+        if (
+          item.description.toLowerCase().includes("overtime") ||
+          item.description.toLowerCase().includes("ot")
+        ) {
+          grouped["Overtime"].push(item);
+        } else if (
+          item.is_manual ||
+          item.description.toLowerCase().includes("tambahan")
+        ) {
+          grouped["Tambahan"].push(item);
+        } else {
+          grouped["Base"].push(item);
+        }
       }
     });
 
@@ -615,7 +623,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         employeePayrollId={Number(id)}
         onItemAdded={fetchEmployeePayroll}
       />
-      
+
       {/* Pay Slip Modal */}
       <PaySlipModal
         isOpen={showPaySlipModal}

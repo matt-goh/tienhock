@@ -25,10 +25,12 @@ export default function (pool) {
 
       // Get payroll items
       const itemsQuery = `
-        SELECT id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual
-        FROM payroll_items
-        WHERE employee_payroll_id = $1
-        ORDER BY id
+        SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
+              pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+        FROM payroll_items pi
+        LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+        WHERE pi.employee_payroll_id = $1
+        ORDER BY pi.id
       `;
       const itemsResult = await pool.query(itemsQuery, [id]);
 
