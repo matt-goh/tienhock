@@ -15,6 +15,7 @@ import {
   processMonthlyPayroll,
   saveEmployeePayroll,
   getEligibleEmployees,
+  getMonthName,
 } from "../../utils/payroll/payrollUtils";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
@@ -311,12 +312,6 @@ const PayrollProcessingPage: React.FC = () => {
       </div>
     );
   }
-
-  const getMonthName = (month: number) => {
-    return new Date(2000, month - 1, 1).toLocaleString("default", {
-      month: "long",
-    });
-  };
 
   // Calculate total employees eligible for processing
   const totalEligibleEmployees = Object.values(

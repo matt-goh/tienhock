@@ -19,6 +19,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
   getMonthlyPayrollDetails,
+  getMonthName,
   updateMonthlyPayrollStatus,
 } from "../../utils/payroll/payrollUtils";
 import { format } from "date-fns";
@@ -157,12 +158,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
 
   const handleProcessPayroll = () => {
     navigate(`/payroll/monthly-payrolls/${id}/process`);
-  };
-
-  const getMonthName = (month: number) => {
-    return new Date(2000, month - 1, 1).toLocaleString("default", {
-      month: "long",
-    });
   };
 
   const formatCurrency = (amount: number) => {

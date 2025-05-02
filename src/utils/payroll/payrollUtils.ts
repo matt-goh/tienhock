@@ -241,3 +241,58 @@ export const deletePayrollItem = async (itemId: number) => {
     throw error;
   }
 };
+
+// Add these to src/utils/payroll/payrollUtils.ts
+
+/**
+ * Groups payroll items by pay type (Base, Tambahan, Overtime)
+ * @param items Array of payroll items
+ * @returns Object with items grouped by pay type
+ */
+export const groupItemsByType = (items: PayrollItem[]) => {
+  const grouped: Record<string, PayrollItem[]> = {
+    Base: [],
+    Tambahan: [],
+    Overtime: [],
+  };
+
+  items.forEach((item) => {
+    // Use the pay_type returned from the backend
+    if (item.pay_type === "Overtime") {
+      grouped["Overtime"].push(item);
+    } else if (item.pay_type === "Tambahan") {
+      grouped["Tambahan"].push(item);
+    } else if (item.pay_type === "Base") {
+      grouped["Base"].push(item);
+    } else {
+      // Fallback for items without pay_type (using previous logic)
+      if (
+        item.description.toLowerCase().includes("overtime") ||
+        item.description.toLowerCase().includes("ot")
+      ) {
+        grouped["Overtime"].push(item);
+      } else if (
+        item.is_manual ||
+        item.description.toLowerCase().includes("tambahan")
+      ) {
+        grouped["Tambahan"].push(item);
+      } else {
+        grouped["Base"].push(item);
+      }
+    }
+  });
+
+  return grouped;
+};
+
+/**
+ * Gets the full month name from a month number (1-12)
+ * @param month Month number (1-12)
+ * @returns Full month name
+ */
+export const getMonthName = (month: number | undefined) => {
+  if (month === undefined) return "Unknown Month";
+  return new Date(2000, month - 1, 1).toLocaleString("default", {
+    month: "long",
+  });
+};

@@ -12,6 +12,7 @@ import { IconPrinter } from "@tabler/icons-react";
 import PaySlipPreview from "./PaySlipPreview";
 import { SinglePaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
 import { EmployeePayroll } from "../../types/types";
+import { getMonthName } from "../../utils/payroll/payrollUtils";
 
 interface PayrollItem {
   id: number;
@@ -97,13 +98,6 @@ const PaySlipModal: React.FC<PaySlipModalProps> = ({
       printWindow.print();
       printWindow.close();
     };
-  };
-
-  const getMonthName = (month: number | undefined) => {
-    if (!month) return "Unknown Month";
-    return new Date(2000, month - 1, 1).toLocaleString("default", {
-      month: "long",
-    });
   };
 
   return (

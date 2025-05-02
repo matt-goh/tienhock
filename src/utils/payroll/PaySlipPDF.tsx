@@ -1,7 +1,8 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { EmployeePayroll, PayrollItem } from "../../types/types";
+import { EmployeePayroll } from "../../types/types";
+import { groupItemsByType, getMonthName } from "./payrollUtils";
 
 // Create styles
 const styles = StyleSheet.create({
@@ -152,44 +153,10 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-// Helper to get month name
-const getMonthName = (month: number) => {
-  return new Date(2000, month - 1, 1).toLocaleString("default", {
-    month: "long",
-  });
-};
-
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
 }
-
-// Group items by pay type
-const groupItemsByType = (items: PayrollItem[]) => {
-  const grouped: Record<string, PayrollItem[]> = {
-    Base: [],
-    Tambahan: [],
-    Overtime: [],
-  };
-
-  items.forEach((item) => {
-    if (
-      item.description.toLowerCase().includes("overtime") ||
-      item.description.toLowerCase().includes("ot")
-    ) {
-      grouped["Overtime"].push(item);
-    } else if (
-      item.is_manual ||
-      item.description.toLowerCase().includes("tambahan")
-    ) {
-      grouped["Tambahan"].push(item);
-    } else {
-      grouped["Base"].push(item);
-    }
-  });
-
-  return grouped;
-};
 
 const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   payroll,
