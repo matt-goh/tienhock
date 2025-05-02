@@ -25,19 +25,8 @@ import {
 import toast from "react-hot-toast";
 import EmployeeSelectionTooltip from "../../components/Payroll/EmployeeSelectionTooltip";
 import { Link } from "react-router-dom";
-import { EmployeePayroll } from "../../types/types";
+import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-
-interface MonthlyPayroll {
-  id: number;
-  year: number;
-  month: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-  employeePayrolls?: any[];
-}
 
 interface EligibleEmployeesResponse {
   month: number;

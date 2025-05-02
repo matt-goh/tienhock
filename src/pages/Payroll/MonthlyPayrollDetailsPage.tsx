@@ -6,7 +6,6 @@ import {
   IconChevronsDown,
   IconChevronsUp,
   IconEye,
-  IconPrinter,
   IconBriefcase,
   IconCash,
   IconCircleCheck,
@@ -26,18 +25,7 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import BatchPrintModal from "../../components/Payroll/BatchPrintModal";
-import { EmployeePayroll } from "../../types/types";
-
-interface MonthlyPayroll {
-  id: number;
-  year: number;
-  month: number;
-  status: "Processing" | "Completed" | "Finalized";
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-  employeePayrolls: EmployeePayroll[];
-}
+import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 
 const MonthlyPayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -436,7 +424,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                           </th>
                           <th
                             scope="col"
-                            className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                            className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                           >
                             Actions
                           </th>
@@ -483,8 +471,8 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <div className="flex justify-center space-x-2">
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <div className="flex justify-end space-x-2">
                                 <button
                                   onClick={() =>
                                     handleViewEmployeePayroll(
@@ -496,14 +484,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                 >
                                   <IconEye size={18} />
                                 </button>
-                                <Button
-                                  onClick={() => setShowBatchPrintModal(true)}
-                                  icon={IconPrinter}
-                                  variant="outline"
-                                  disabled={payroll.status !== "Finalized"}
-                                >
-                                  Print All Slips
-                                </Button>
                               </div>
                             </td>
                           </tr>
