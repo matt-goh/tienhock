@@ -1,3 +1,4 @@
+// src/components/Checkbox.tsx
 import React from "react";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import clsx from "clsx";
@@ -51,6 +52,11 @@ const Checkbox: React.FC<CheckboxProps> = ({
     buttonClassName
   );
 
+  const labelClasses = clsx(
+    "text-sm font-medium text-default-700",
+    !disabled && "hover:text-default-900"
+  );
+
   const renderCheckbox = () => (
     <div className="flex-shrink-0">
       {checked ? (
@@ -76,15 +82,17 @@ const Checkbox: React.FC<CheckboxProps> = ({
   );
 
   return (
-    <div className={containerClasses}>
+    <div className={containerClasses} onClick={handleClick}>
       {label && labelPosition === "left" && (
-        <span className="mr-2 text-sm font-medium text-default-700">
-          {label}
-        </span>
+        <span className={clsx("mr-2", labelClasses)}>{label}</span>
       )}
       <button
         type="button"
-        onClick={handleClick}
+        onClick={(e) => {
+          // Prevent double triggering from container onClick
+          e.stopPropagation();
+          handleClick();
+        }}
         className={buttonClasses}
         disabled={disabled}
         role={role}
@@ -94,9 +102,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
         {renderCheckbox()}
       </button>
       {label && labelPosition === "right" && (
-        <span className="ml-2 text-sm font-medium text-default-700">
-          {label}
-        </span>
+        <span className={clsx("ml-2", labelClasses)}>{label}</span>
       )}
     </div>
   );

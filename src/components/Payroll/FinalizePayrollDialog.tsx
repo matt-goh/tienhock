@@ -8,10 +8,8 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "../Button";
-import {
-  IconAlertTriangle,
-  IconLock,
-} from "@tabler/icons-react";
+import { IconAlertTriangle, IconLock } from "@tabler/icons-react";
+import Checkbox from "../Checkbox";
 
 interface FinalizePayrollDialogProps {
   isOpen: boolean;
@@ -33,8 +31,7 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
   totalGrossPay,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
-  const expectedConfirmText = "FINALIZE";
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-MY", {
@@ -46,7 +43,7 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
   };
 
   const handleConfirm = async () => {
-    if (confirmText !== expectedConfirmText) return;
+    if (!isConfirmed) return;
 
     setIsProcessing(true);
     try {
@@ -126,19 +123,20 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
                 </div>
 
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    Type "{expectedConfirmText}" to confirm
-                  </label>
-                  <input
-                    type="text"
-                    value={confirmText}
-                    onChange={(e) =>
-                      setConfirmText(e.target.value.toUpperCase())
-                    }
-                    className="w-full p-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    placeholder={expectedConfirmText}
-                    autoComplete="off"
-                    disabled={isProcessing}
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <p className="text-amber-800 text-sm">
+                      Finalizing a payroll locks it for normal editing. While
+                      you can still revert it to the Processing state if needed,
+                      finalizing indicates that this payroll data is approved
+                      and ready for payment.
+                    </p>
+                  </div>
+
+                  <Checkbox
+                    checked={isConfirmed}
+                    onChange={setIsConfirmed}
+                    label="I confirm that I want to finalize this payroll"
+                    className="mt-2"
                   />
                 </div>
 
@@ -157,9 +155,7 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
                     variant="filled"
                     color="amber"
                     onClick={handleConfirm}
-                    disabled={
-                      confirmText !== expectedConfirmText || isProcessing
-                    }
+                    disabled={!isConfirmed || isProcessing}
                     className="order-1 md:order-2"
                     icon={isProcessing ? undefined : IconLock}
                   >
