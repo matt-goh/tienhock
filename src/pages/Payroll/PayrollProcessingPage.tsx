@@ -1,10 +1,10 @@
 // src/pages/Payroll/PayrollProcessingPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  IconArrowLeft,
   IconClock,
   IconUsers,
+  IconBriefcase,
   IconCheck,
   IconAlertTriangle,
 } from "@tabler/icons-react";
@@ -14,8 +14,8 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   getMonthlyPayrollDetails,
   processMonthlyPayroll,
-  calculateEmployeePayroll,
   saveEmployeePayroll,
+  getEligibleEmployees,
 } from "../../utils/payroll/payrollUtils";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
@@ -24,6 +24,8 @@ import {
   EmployeePayroll,
 } from "../../utils/payroll/payrollCalculationService";
 import toast from "react-hot-toast";
+import EmployeeSelectionTooltip from "../../components/Payroll/EmployeeSelectionTooltip";
+import { Link } from "react-router-dom";
 
 interface MonthlyPayroll {
   id: number;
@@ -36,11 +38,11 @@ interface MonthlyPayroll {
   employeePayrolls?: any[];
 }
 
-interface EmployeeWithJobs {
-  id: string;
-  name: string;
-  job: string[];
-  section?: string;
+interface EligibleEmployeesResponse {
+  month: number;
+  year: number;
+  eligibleJobs: string[];
+  jobEmployeeMap: Record<string, string[]>;
 }
 
 const PayrollProcessingPage: React.FC = () => {
@@ -48,11 +50,13 @@ const PayrollProcessingPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [payroll, setPayroll] = useState<MonthlyPayroll | null>(null);
+  const [eligibleData, setEligibleData] =
+    useState<EligibleEmployeesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<
-    Record<string, boolean>
+    Record<string, Record<string, boolean>>
   >({});
   const [processedPayrolls, setProcessedPayrolls] = useState<EmployeePayroll[]>(
     []
@@ -61,70 +65,91 @@ const PayrollProcessingPage: React.FC = () => {
     Record<string, "pending" | "processing" | "success" | "error">
   >({});
 
-  const { staffs } = useStaffsCache();
-
-  // Group staff by job types for efficient processing
-  const staffsByJob = useMemo(() => {
-    const grouped: Record<string, EmployeeWithJobs[]> = {};
-
-    staffs.forEach((staff) => {
-      if (staff.job && Array.isArray(staff.job)) {
-        staff.job.forEach((jobType) => {
-          if (!grouped[jobType]) {
-            grouped[jobType] = [];
-          }
-          grouped[jobType].push({
-            id: staff.id,
-            name: staff.name,
-            job: staff.job,
-            section:
-              Array.isArray(staff.location) && staff.location.length > 0
-                ? staff.location[0]
-                : undefined,
-          });
-        });
-      }
-    });
-
-    return grouped;
-  }, [staffs]);
+  const { staffs, loading: loadingStaffs } = useStaffsCache();
 
   useEffect(() => {
-    fetchPayrollDetails();
+    Promise.all([fetchPayrollDetails(), fetchEligibleEmployees()])
+      .then(() => {
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
   }, [id]);
 
   const fetchPayrollDetails = async () => {
     if (!id) return;
 
-    setIsLoading(true);
     try {
       const response = await getMonthlyPayrollDetails(Number(id));
       setPayroll(response);
-
-      if (response.employeePayrolls && response.employeePayrolls.length > 0) {
-        // Pre-select employees who already have payrolls
-        const preSelected: Record<string, boolean> = {};
-        response.employeePayrolls.forEach((ep: any) => {
-          preSelected[`${ep.employee_id}-${ep.job_type}`] = true;
-        });
-        setSelectedEmployees(preSelected);
-      } else {
-        // Default to selecting all employees
-        const allSelected: Record<string, boolean> = {};
-        Object.entries(staffsByJob).forEach(([jobType, employees]) => {
-          employees.forEach((emp) => {
-            allSelected[`${emp.id}-${jobType}`] = true;
-          });
-        });
-        setSelectedEmployees(allSelected);
-      }
     } catch (error) {
       console.error("Error fetching payroll details:", error);
       toast.error("Failed to load payroll details");
-    } finally {
-      setIsLoading(false);
     }
   };
+
+  const fetchEligibleEmployees = async () => {
+    if (!id) return;
+
+    try {
+      const response = await getEligibleEmployees(Number(id));
+      setEligibleData(response);
+
+      // Initialize employee selection state with all selected
+      const initialSelection: Record<string, Record<string, boolean>> = {};
+
+      Object.entries(response.jobEmployeeMap).forEach(
+        ([jobId, employeeIds]) => {
+          initialSelection[jobId] = {};
+          (employeeIds as string[]).forEach((empId) => {
+            initialSelection[jobId][empId] = true; // All selected by default
+          });
+        }
+      );
+
+      setSelectedEmployees(initialSelection);
+    } catch (error) {
+      console.error("Error fetching eligible employees:", error);
+      toast.error("Failed to load eligible employees");
+    }
+  };
+
+  // Get filtered employees for a specific job
+  const getEmployeesForJob = useCallback(
+    (jobId: string) => {
+      if (!eligibleData || !eligibleData.jobEmployeeMap[jobId]) {
+        return [];
+      }
+
+      const eligibleEmployeeIds = eligibleData.jobEmployeeMap[jobId];
+      return staffs
+        .filter((staff) => eligibleEmployeeIds.includes(staff.id))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+    [eligibleData, staffs]
+  );
+
+  // Get job name by ID
+  const getJobName = useCallback(
+    (jobId: string) => {
+      // Try to find a staff with this job to get the job name
+      const staffWithJob = staffs.find(
+        (staff) => Array.isArray(staff.job) && staff.job.includes(jobId)
+      );
+
+      if (staffWithJob) {
+        // Find which job in the array matches
+        const jobIndex = staffWithJob.job.indexOf(jobId);
+        if (jobIndex >= 0 && Array.isArray(staffWithJob.jobType)) {
+          return staffWithJob.jobType[jobIndex] || jobId;
+        }
+      }
+
+      return jobId; // Fallback to ID if name not found
+    },
+    [staffs]
+  );
 
   const handleProcessPayroll = async () => {
     if (!id || !payroll) return;
@@ -154,31 +179,41 @@ const PayrollProcessingPage: React.FC = () => {
   };
 
   const processSelectedEmployees = async (logs: WorkLog[]) => {
-    if (!payroll) return;
+    if (!payroll || !eligibleData) return;
 
-    const selected = Object.entries(selectedEmployees)
-      .filter(([_, selected]) => selected)
-      .map(([key]) => {
-        const [employeeId, jobType] = key.split("-");
-        return { employeeId, jobType };
+    // Gather all selected employee-job combinations
+    const selectedCombinations: Array<{ employeeId: string; jobType: string }> =
+      [];
+
+    Object.entries(selectedEmployees).forEach(([jobId, employees]) => {
+      Object.entries(employees).forEach(([empId, isSelected]) => {
+        if (isSelected) {
+          selectedCombinations.push({
+            employeeId: empId,
+            jobType: jobId,
+          });
+        }
       });
+    });
 
     // Set initial processing status
     const initialStatus: Record<
       string,
       "pending" | "processing" | "success" | "error"
     > = {};
-    selected.forEach(({ employeeId, jobType }) => {
+
+    selectedCombinations.forEach(({ employeeId, jobType }) => {
       initialStatus[`${employeeId}-${jobType}`] = "pending";
     });
+
     setProcessingStatus(initialStatus);
 
     const processingResults: EmployeePayroll[] = [];
 
     // Process in batches to avoid locking the UI
     const batchSize = 5;
-    for (let i = 0; i < selected.length; i += batchSize) {
-      const batch = selected.slice(i, i + batchSize);
+    for (let i = 0; i < selectedCombinations.length; i += batchSize) {
+      const batch = selectedCombinations.slice(i, i + batchSize);
 
       await Promise.all(
         batch.map(async ({ employeeId, jobType }) => {
@@ -187,13 +222,8 @@ const PayrollProcessingPage: React.FC = () => {
             setProcessingStatus((prev) => ({ ...prev, [key]: "processing" }));
 
             // Find section for this employee/job
-            let section = "Unknown";
-            const employee = staffsByJob[jobType]?.find(
-              (e) => e.id === employeeId
-            );
-            if (employee && employee.section) {
-              section = employee.section;
-            }
+            const employee = staffs.find((e) => e.id === employeeId);
+            const section = employee?.location?.[0] || "Unknown";
 
             // Calculate employee payroll
             const employeePayroll =
@@ -228,26 +258,32 @@ const PayrollProcessingPage: React.FC = () => {
     await fetchPayrollDetails();
   };
 
-  const toggleEmployeeSelection = (employeeId: string, jobType: string) => {
-    const key = `${employeeId}-${jobType}`;
+  const handleEmployeeSelection = (
+    jobId: string,
+    employeeId: string,
+    selected: boolean
+  ) => {
     setSelectedEmployees((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [jobId]: {
+        ...prev[jobId],
+        [employeeId]: selected,
+      },
     }));
   };
 
-  const handleSelectAll = (jobType: string, selected: boolean) => {
-    setSelectedEmployees((prev) => {
-      const newSelection = { ...prev };
+  const handleSelectAllForJob = (jobId: string, selected: boolean) => {
+    const employees = getEmployeesForJob(jobId);
+    const newSelections: Record<string, boolean> = {};
 
-      // Find all employees with this job type
-      staffsByJob[jobType]?.forEach((employee) => {
-        const key = `${employee.id}-${jobType}`;
-        newSelection[key] = selected;
-      });
-
-      return newSelection;
+    employees.forEach((emp) => {
+      newSelections[emp.id] = selected;
     });
+
+    setSelectedEmployees((prev) => ({
+      ...prev,
+      [jobId]: newSelections,
+    }));
   };
 
   const getProcessingStatusColor = (status: string) => {
@@ -273,7 +309,7 @@ const PayrollProcessingPage: React.FC = () => {
     navigate(`/payroll/monthly-payrolls/${id}`);
   };
 
-  if (isLoading) {
+  if (isLoading || loadingStaffs) {
     return (
       <div className="flex justify-center items-center h-96">
         <LoadingSpinner />
@@ -281,7 +317,7 @@ const PayrollProcessingPage: React.FC = () => {
     );
   }
 
-  if (!payroll) {
+  if (!payroll || !eligibleData) {
     return (
       <div className="text-center py-12">
         <p className="text-default-500">Payroll not found</p>
@@ -298,12 +334,25 @@ const PayrollProcessingPage: React.FC = () => {
     });
   };
 
+  // Calculate total employees eligible for processing
+  const totalEligibleEmployees = Object.values(
+    eligibleData.jobEmployeeMap
+  ).reduce((sum, employees) => sum + employees.length, 0);
+
+  // Calculate total selected employees
+  const totalSelectedEmployees = Object.entries(selectedEmployees).reduce(
+    (sum, [jobId, employees]) => {
+      return sum + Object.values(employees).filter(Boolean).length;
+    },
+    0
+  );
+
   return (
     <div className="relative w-full mx-4 md:mx-6 -mt-6">
       <BackButton onClick={handleBack} />
 
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
-        <div className="flex justify-between items-start mb-6">
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm space-y-4 p-6">
+        <div className="flex justify-between items-start">
           <div>
             <h1 className="text-xl font-semibold text-default-800">
               Process Payroll: {getMonthName(payroll.month)} {payroll.year}
@@ -325,7 +374,7 @@ const PayrollProcessingPage: React.FC = () => {
               icon={IconClock}
               color="sky"
               variant="filled"
-              disabled={isProcessing}
+              disabled={isProcessing || totalSelectedEmployees === 0}
             >
               {isProcessing ? "Processing..." : "Process Payroll"}
             </Button>
@@ -333,7 +382,7 @@ const PayrollProcessingPage: React.FC = () => {
         </div>
 
         {isProcessing ? (
-          <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 mb-6">
+          <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
             <div className="flex items-center">
               <IconClock className="text-sky-500 mr-3" size={24} />
               <div>
@@ -346,134 +395,168 @@ const PayrollProcessingPage: React.FC = () => {
           </div>
         ) : null}
 
-        {Object.keys(staffsByJob).length === 0 ? (
-          <div className="text-center py-8 text-default-500">
-            No job types or employees found. Please set up employee job
-            assignments first.
-          </div>
-        ) : (
-          <div>
-            {Object.entries(staffsByJob).map(([jobType, employees]) => (
-              <div key={jobType} className="mb-8">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-medium text-default-700">
-                    {jobType}
-                  </h2>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSelectAll(jobType, true)}
-                      disabled={isProcessing}
-                    >
-                      Select All
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSelectAll(jobType, false)}
-                      disabled={isProcessing}
-                    >
-                      Deselect All
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="border border-default-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Employee
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          ID
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Section
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Include
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-default-200">
-                      {employees.map((employee) => {
-                        const key = `${employee.id}-${jobType}`;
-                        const isSelected = selectedEmployees[key] || false;
-                        const processing = processingStatus[key] || "pending";
-
-                        return (
-                          <tr key={key} className="hover:bg-default-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-default-900">
-                                {employee.name}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-default-500">
-                                {employee.id}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-default-500">
-                                {employee.section || "Unknown"}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() =>
-                                  toggleEmployeeSelection(employee.id, jobType)
-                                }
-                                disabled={isProcessing}
-                                className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer disabled:opacity-50"
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              {isProcessing ? (
-                                <div
-                                  className={`text-sm ${getProcessingStatusColor(
-                                    processing
-                                  )}`}
-                                >
-                                  {processing === "pending" && "Pending"}
-                                  {processing === "processing" &&
-                                    "Processing..."}
-                                  {processing === "success" && "Success"}
-                                  {processing === "error" && "Error"}
-                                </div>
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+        {/* Payroll Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg border border-default-200 p-4">
+            <div className="flex items-center">
+              <div className="bg-sky-100 p-2 rounded-full mr-3">
+                <IconUsers className="text-sky-600" size={20} />
               </div>
-            ))}
+              <div>
+                <p className="text-sm text-default-500">Eligible Employees</p>
+                <p className="text-lg font-semibold text-default-800">
+                  {totalEligibleEmployees}
+                </p>
+              </div>
+            </div>
           </div>
-        )}
+
+          <div className="bg-white rounded-lg border border-default-200 p-4">
+            <div className="flex items-center">
+              <div className="bg-amber-100 p-2 rounded-full mr-3">
+                <IconBriefcase className="text-amber-600" size={20} />
+              </div>
+              <div>
+                <p className="text-sm text-default-500">Job Types</p>
+                <p className="text-lg font-semibold text-default-800">
+                  {eligibleData.eligibleJobs.length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-default-200 p-4">
+            <div className="flex items-center">
+              <div className="bg-emerald-100 p-2 rounded-full mr-3">
+                <IconCheck className="text-emerald-600" size={20} />
+              </div>
+              <div>
+                <p className="text-sm text-default-500">
+                  Selected for Processing
+                </p>
+                <p className="text-lg font-semibold text-default-800">
+                  {totalSelectedEmployees} / {totalEligibleEmployees}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Job Types Section */}
+        <div className="">
+          {eligibleData.eligibleJobs.length === 0 ? (
+            <div className="text-center py-8 text-default-500 border rounded-lg">
+              No eligible jobs found. There may be no work logs for this month.
+            </div>
+          ) : (
+            <div className="border border-default-200 rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-default-200">
+                <thead className="bg-default-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Job Type
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Eligible Employees
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Selected
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-default-200">
+                  {eligibleData.eligibleJobs.map((jobId) => {
+                    const employees = getEmployeesForJob(jobId);
+                    const selectedCount = employees.filter(
+                      (emp) => selectedEmployees[jobId]?.[emp.id]
+                    ).length;
+
+                    return (
+                      <tr key={jobId} className="hover:bg-default-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-default-900">
+                            <Link
+                              to={`/catalogue/job?id=${jobId}`}
+                              className="hover:text-sky-600 hover:underline"
+                            >
+                              {getJobName(jobId)}
+                            </Link>
+                          </div>
+                          <div className="text-xs text-default-500">
+                            {jobId}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                          {employees.length}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                          <span
+                            className={
+                              selectedCount > 0
+                                ? "text-emerald-600 font-medium"
+                                : "text-default-500"
+                            }
+                          >
+                            {selectedCount} / {employees.length}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <EmployeeSelectionTooltip
+                            jobName={getJobName(jobId)}
+                            employees={employees}
+                            selectedEmployees={selectedEmployees[jobId] || {}}
+                            onEmployeeSelectionChange={(employeeId, selected) =>
+                              handleEmployeeSelection(
+                                jobId,
+                                employeeId,
+                                selected
+                              )
+                            }
+                            onSelectAll={(selected) =>
+                              handleSelectAllForJob(jobId, selected)
+                            }
+                            disabled={isProcessing}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {isProcessing && (
+                            <div className="flex flex-col items-center">
+                              {employees
+                                .filter(
+                                  (emp) => selectedEmployees[jobId]?.[emp.id]
+                                )
+                                .map((emp) => {
+                                  const key = `${emp.id}-${jobId}`;
+                                  const status =
+                                    processingStatus[key] || "pending";
+                                  return (
+                                    <div
+                                      key={key}
+                                      className={`text-xs mb-1 ${getProcessingStatusColor(
+                                        status
+                                      )}`}
+                                    >
+                                      {emp.name.split(" ")[0]}: {status}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         {processedPayrolls.length > 0 && !isProcessing && (
           <div className="mt-8 border-t border-default-200 pt-4">
