@@ -2,7 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { IconPlus, IconEye, IconClockPlay } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconEye,
+  IconClockPlay,
+  IconRefresh,
+  IconLock,
+} from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
@@ -141,7 +147,13 @@ const MonthlyPayrollsPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-default-200 bg-white">
                 {payrolls.map((payroll) => (
-                  <tr key={payroll.id} className="hover:bg-default-50">
+                  <tr
+                    key={payroll.id}
+                    className="hover:bg-default-50 cursor-pointer"
+                    onClick={() => {
+                      navigate(`/payroll/monthly-payrolls/${payroll.id}`);
+                    }}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-default-900">
                         {getMonthName(payroll.month)} {payroll.year}
@@ -158,35 +170,40 @@ const MonthlyPayrollsPage: React.FC = () => {
                           payroll.status
                         )}`}
                       >
-                        {payroll.status}
+                        {payroll.status === "Processing" ? (
+                          <>{payroll.status}</>
+                        ) : (
+                          <span className="flex items-center">
+                            <IconLock size={12} className="mr-1" />
+                            {payroll.status}
+                          </span>
+                        )}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-end space-x-3">
                         <button
-                          onClick={() =>
-                            navigate(`/payroll/monthly-payrolls/${payroll.id}`)
-                          }
+                          onClick={() => {}}
                           className="text-sky-600 hover:text-sky-800"
                           title="View Details"
                         >
                           <IconEye size={18} />
                         </button>
-                        <button
-                          onClick={() =>
-                            navigate(
-                              `/payroll/monthly-payrolls/${payroll.id}/process`
-                            )
-                          }
-                          className="text-emerald-600 hover:text-emerald-800"
-                          title={
-                            payroll.status === "Processing"
-                              ? "Process Payroll"
-                              : "Reprocess Payroll"
-                          }
-                        >
-                          <IconClockPlay size={18} />
-                        </button>
+                        {payroll.status === "Processing" && (
+                          <button
+                            onClick={(e) => {
+                              // Prevent double triggering from container onClick
+                              e.stopPropagation();
+                              navigate(
+                                `/payroll/monthly-payrolls/${payroll.id}/process`
+                              );
+                            }}
+                            className="text-sky-600 hover:text-sky-800"
+                            title="Process Payroll"
+                          >
+                            <IconClockPlay size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

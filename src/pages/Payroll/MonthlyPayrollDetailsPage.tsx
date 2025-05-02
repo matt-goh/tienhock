@@ -449,7 +449,10 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                         {employees.map((employeePayroll) => (
                           <tr
                             key={employeePayroll.id}
-                            className="hover:bg-default-50"
+                            className="hover:bg-default-50 cursor-pointer"
+                            onClick={() =>
+                              handleViewEmployeePayroll(employeePayroll.id)
+                            }
                           >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-default-900">
@@ -489,11 +492,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="flex justify-end space-x-2">
                                 <button
-                                  onClick={() =>
-                                    handleViewEmployeePayroll(
-                                      employeePayroll.id
-                                    )
-                                  }
+                                  onClick={() => {}}
                                   className="text-sky-600 hover:text-sky-800"
                                   title="View Details"
                                 >
