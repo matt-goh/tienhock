@@ -248,14 +248,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           >
                             Amount
                           </th>
-                          {isEditable && (
-                            <th
-                              scope="col"
-                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                            >
-                              Actions
-                            </th>
-                          )}
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-default-200">
@@ -296,26 +288,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                 {formatCurrency(item.amount)}
                               </div>
                             </td>
-                            {isEditable && (
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
-                                {/* Base items typically can't be deleted, so we only show action buttons for manual items */}
-                                {item.is_manual && (
-                                  <button
-                                    onClick={() => {
-                                      setItemToDelete({
-                                        ...item,
-                                        id: item.id || 0,
-                                      });
-                                      setShowDeleteDialog(true);
-                                    }}
-                                    className="text-rose-600 hover:text-rose-800"
-                                    title="Delete Item"
-                                  >
-                                    <IconTrash size={18} />
-                                  </button>
-                                )}
-                              </td>
-                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -470,14 +442,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           >
                             Amount
                           </th>
-                          {isEditable && (
-                            <th
-                              scope="col"
-                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                            >
-                              Actions
-                            </th>
-                          )}
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-default-200">
@@ -518,26 +482,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                 {formatCurrency(item.amount)}
                               </div>
                             </td>
-                            {isEditable && (
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
-                                {/* Overtime items typically can't be deleted */}
-                                {item.is_manual && (
-                                  <button
-                                    onClick={() => {
-                                      setItemToDelete({
-                                        ...item,
-                                        id: item.id || 0,
-                                      });
-                                      setShowDeleteDialog(true);
-                                    }}
-                                    className="text-rose-600 hover:text-rose-800"
-                                    title="Delete Item"
-                                  >
-                                    <IconTrash size={18} />
-                                  </button>
-                                )}
-                              </td>
-                            )}
                           </tr>
                         ))}
                       </tbody>
