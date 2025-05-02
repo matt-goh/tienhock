@@ -1,6 +1,6 @@
 // src/pages/Payroll/MonthlyPayrollsPage.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { IconPlus, IconEye, IconClockPlay } from "@tabler/icons-react";
 import Button from "../../components/Button";
@@ -27,6 +27,7 @@ const MonthlyPayrollsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchPayrolls();
@@ -37,6 +38,23 @@ const MonthlyPayrollsPage: React.FC = () => {
     try {
       const response = await getMonthlyPayrolls();
       setPayrolls(response);
+
+      // Only redirect if we're on the main entry path
+      // And not on the explicit list view
+      if (location.pathname === "/payroll/monthly-payrolls") {
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+
+        const currentMonthPayroll = response.find(
+          (payroll: { month: number; year: number }) =>
+            payroll.month === currentMonth && payroll.year === currentYear
+        );
+
+        if (currentMonthPayroll) {
+          navigate(`/payroll/monthly-payrolls/${currentMonthPayroll.id}`);
+        }
+      }
     } catch (error) {
       console.error("Error fetching payrolls:", error);
       toast.error("Failed to load payrolls");
