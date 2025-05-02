@@ -71,20 +71,6 @@ export default function (pool) {
     }
 
     try {
-      // Check if a payroll already exists for this month/year
-      const checkQuery = `
-        SELECT id FROM monthly_payrolls
-        WHERE year = $1 AND month = $2
-      `;
-      const checkResult = await pool.query(checkQuery, [year, month]);
-
-      if (checkResult.rows.length > 0) {
-        return res.status(409).json({
-          message: "A payroll already exists for this month and year",
-          existing_id: checkResult.rows[0].id,
-        });
-      }
-
       // Create new monthly payroll
       const insertQuery = `
         INSERT INTO monthly_payrolls (year, month, status, created_by)
