@@ -95,6 +95,11 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: MonthlyPayrollsPage,
     subItems: [
       {
+        name: "Payroll List",
+        path: "/payroll/monthly-payrolls/list",
+        component: MonthlyPayrollsPage,
+      },
+      {
         name: "Payroll Details",
         path: "/payroll/monthly-payrolls/:id",
         component: MonthlyPayrollDetailsPage,

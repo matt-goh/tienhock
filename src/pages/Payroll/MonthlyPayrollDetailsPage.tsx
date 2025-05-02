@@ -161,7 +161,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate("/payroll/monthly-payrolls");
+    navigate("/payroll/monthly-payrolls/list");
   };
 
   const handleViewEmployeePayroll = (employeePayrollId: number) => {
