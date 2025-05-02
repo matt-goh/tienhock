@@ -297,7 +297,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                       <td className="px-3 py-4">
                                         <Checkbox
                                           checked={activity.isSelected}
-                                          onChange={() => {}} // Empty handler as the row handles the toggle
+                                          onChange={() =>
+                                            handleToggleActivity(index)
+                                          }
                                           size={20}
                                           checkedColor="text-sky-600"
                                           className="align-middle"

@@ -207,13 +207,19 @@ const AssociateWithJobsModal: React.FC<AssociateWithJobsModalProps> = ({
                               >
                                 <Checkbox
                                   checked={selectedJobIds.has(job.id)}
-                                  onChange={() => {}}
+                                  onChange={() => handleToggleJob(job.id)}
                                   label={
                                     <div>
-                                      <div className="font-medium text-default-800">
+                                      <div
+                                        className="font-medium text-default-800"
+                                        onClick={() => handleToggleJob(job.id)}
+                                      >
                                         {job.name}
                                       </div>
-                                      <div className="text-xs text-default-500">
+                                      <div
+                                        className="text-xs text-default-500"
+                                        onClick={() => handleToggleJob(job.id)}
+                                      >
                                         {job.id}
                                       </div>
                                     </div>

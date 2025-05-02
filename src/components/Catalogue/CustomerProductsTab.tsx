@@ -303,7 +303,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                         product.product_id
                       }`}
                       role="switch"
-                      buttonClassName="p-1 rounded"
+                      buttonClassName="p-1.5 rounded-full"
                     />
                   </td>
                   {/* Action */}

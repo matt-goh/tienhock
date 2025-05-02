@@ -134,10 +134,10 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
               <div className="flex items-center mt-1 text-sm text-sky-600 hover:text-sky-800 rounded">
                 <Checkbox
                   checked={allSelected}
-                  onChange={() => {}}
+                  onChange={handleSelectAllClick}
                   size={16}
                   className="mr-1.5"
-                  checkedColor="text-sky-600"
+                  checkedColor="text-sky-700"
                 />
                 {allSelected ? "Deselect All" : "Select All"}
               </div>
@@ -172,7 +172,12 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
                       </div>
                       <Checkbox
                         checked={!!selectedEmployees[employee.id]}
-                        onChange={() => {}}
+                        onChange={() =>
+                          onEmployeeSelectionChange(
+                            employee.id,
+                            !selectedEmployees[employee.id]
+                          )
+                        }
                         size={16}
                         className="mr-2.5"
                         checkedColor="text-sky-600"
