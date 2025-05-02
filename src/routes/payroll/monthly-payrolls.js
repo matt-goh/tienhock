@@ -239,19 +239,19 @@ export default function (pool) {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!status || !["Processing", "Completed", "Finalized"].includes(status)) {
+    if (!status || !["Processing", "Finalized"].includes(status)) {
       return res.status(400).json({
-        message: "Valid status is required (Processing, Completed, Finalized)",
+        message: "Valid status is required (Processing, Finalized)",
       });
     }
 
     try {
       const query = `
-        UPDATE monthly_payrolls
-        SET status = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-        RETURNING *
-      `;
+      UPDATE monthly_payrolls
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
 
       const result = await pool.query(query, [status, id]);
 

@@ -72,12 +72,12 @@ export const processMonthlyPayroll = async (id: number) => {
 /**
  * Updates a monthly payroll status
  * @param id Monthly payroll ID
- * @param status New status (Processing, Completed, Finalized)
+ * @param status New status (Processing, Finalized)
  * @returns Updated payroll data
  */
 export const updateMonthlyPayrollStatus = async (
   id: number,
-  status: "Processing" | "Completed" | "Finalized"
+  status: "Processing" | "Finalized"
 ) => {
   try {
     const response = await api.put(`/api/monthly-payrolls/${id}/status`, {

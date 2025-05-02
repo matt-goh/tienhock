@@ -11,7 +11,6 @@ import Button from "../Button";
 import {
   IconAlertTriangle,
   IconLock,
-  IconCircleCheck,
 } from "@tabler/icons-react";
 
 interface FinalizePayrollDialogProps {
@@ -94,19 +93,6 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
                   >
                     Finalize Payroll
                   </DialogTitle>
-                </div>
-
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                  <div className="text-sm text-amber-800">
-                    <p className="font-medium mb-1">
-                      Important: This action cannot be undone
-                    </p>
-                    <p>
-                      Finalizing this payroll will lock all employee records and
-                      prevent any further changes. Pay slips can be printed
-                      after finalization.
-                    </p>
-                  </div>
                 </div>
 
                 <div className="mb-6">

@@ -11,6 +11,8 @@ import {
   IconCircleCheck,
   IconUsers,
   IconLock,
+  IconClockPlay,
+  IconRefresh,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
@@ -35,9 +37,9 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedJobs, setExpandedJobs] = useState<Record<string, boolean>>({});
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState<
-    "Processing" | "Completed" | "Finalized"
-  >("Completed");
+  const [newStatus, setNewStatus] = useState<"Processing" | "Finalized">(
+    "Finalized"
+  );
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
@@ -140,7 +142,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     navigate("/payroll/monthly-payrolls/list");
   };
 
-  const handleViewEmployeePayroll = (employeePayrollId: number| undefined) => {
+  const handleViewEmployeePayroll = (employeePayrollId: number | undefined) => {
     navigate(`/payroll/employee-payroll/${employeePayrollId}`);
   };
 
@@ -159,8 +161,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     switch (status) {
       case "Processing":
         return "bg-sky-100 text-sky-700";
-      case "Completed":
-        return "bg-emerald-100 text-emerald-700";
       case "Finalized":
         return "bg-amber-100 text-amber-700";
       default:
@@ -216,26 +216,41 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
-            {payroll.status === "Completed" ? (
-              <Button
-                onClick={() => setShowFinalizeDialog(true)}
-                variant="filled"
-                color="amber"
-              >
-                Finalize Payroll
-              </Button>
+            {payroll.status === "Processing" ? (
+              <>
+                <Button
+                  onClick={() =>
+                    navigate(`/payroll/monthly-payrolls/${payroll.id}/process`)
+                  }
+                  variant="outline"
+                  color="sky"
+                  icon={IconClockPlay}
+                >
+                  Process
+                </Button>
+                <Button
+                  onClick={() => setShowFinalizeDialog(true)}
+                  variant="filled"
+                  color="amber"
+                  icon={IconLock}
+                >
+                  Finalize Payroll
+                </Button>
+              </>
             ) : (
-              <Button
-                onClick={() => {
-                  setNewStatus(
-                    payroll.status === "Processing" ? "Completed" : "Processing"
-                  );
-                  setIsStatusDialogOpen(true);
-                }}
-                variant="outline"
-              >
-                Change Status
-              </Button>
+              <>
+                <Button
+                  onClick={() => {
+                    setNewStatus("Processing");
+                    setIsStatusDialogOpen(true);
+                  }}
+                  variant="outline"
+                  color="amber"
+                  icon={IconRefresh}
+                >
+                  Revert to Processing
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -297,7 +312,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                   "p-2 rounded-full",
                   payroll.status === "Processing"
                     ? "bg-sky-100"
-                    : payroll.status === "Completed"
+                    : payroll.status === "Finalized"
                     ? "bg-emerald-100"
                     : "bg-amber-100"
                 )}
@@ -307,7 +322,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                     "h-6 w-6",
                     payroll.status === "Processing"
                       ? "text-sky-600"
-                      : payroll.status === "Completed"
+                      : payroll.status === "Finalized"
                       ? "text-emerald-600"
                       : "text-amber-600"
                   )}
@@ -516,15 +531,15 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
         onClose={() => setIsStatusDialogOpen(false)}
         onConfirm={handleStatusChange}
         title={`${
-          payroll.status === "Completed" ? "Finalize" : "Update"
+          payroll.status === "Finalized" ? "Revert" : "Update"
         } Payroll Status`}
         message={
-          payroll.status === "Completed"
-            ? "Are you sure you want to finalize this payroll? This action cannot be undone and will lock all employee payrolls."
+          payroll.status === "Finalized"
+            ? "Are you sure you want to revert this payroll back to Processing? This will allow making changes to the payroll."
             : `Are you sure you want to change the status from ${payroll.status} to ${newStatus}?`
         }
         confirmButtonText={isUpdatingStatus ? "Processing..." : "Confirm"}
-        variant={payroll.status === "Completed" ? "danger" : "default"}
+        variant={payroll.status === "Finalized" ? "danger" : "default"}
       />
       {/* Finalize Payroll Dialog */}
       <FinalizePayrollDialog
