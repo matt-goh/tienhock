@@ -91,8 +91,6 @@ const MonthlyPayrollsPage: React.FC = () => {
     switch (status) {
       case "Processing":
         return "bg-sky-100 text-sky-700";
-      case "Completed":
-        return "bg-emerald-100 text-emerald-700";
       case "Finalized":
         return "bg-amber-100 text-amber-700";
       default:
@@ -174,19 +172,21 @@ const MonthlyPayrollsPage: React.FC = () => {
                         >
                           <IconEye size={18} />
                         </button>
-                        {payroll.status === "Processing" && (
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/payroll/monthly-payrolls/${payroll.id}/process`
-                              )
-                            }
-                            className="text-emerald-600 hover:text-emerald-800"
-                            title="Process Payroll"
-                          >
-                            <IconClockPlay size={18} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/payroll/monthly-payrolls/${payroll.id}/process`
+                            )
+                          }
+                          className="text-emerald-600 hover:text-emerald-800"
+                          title={
+                            payroll.status === "Processing"
+                              ? "Process Payroll"
+                              : "Reprocess Payroll"
+                          }
+                        >
+                          <IconClockPlay size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>

@@ -644,7 +644,7 @@ export interface MonthlyPayroll {
   id: number;
   year: number;
   month: number;
-  status: "Processing" | "Completed" | "Finalized";
+  status: "Processing" | "Finalized";
   created_at: string;
   updated_at: string;
   created_by: string | null;
