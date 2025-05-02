@@ -51,7 +51,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filteredJobType, setFilteredJobType] = useState<string>("all");
-  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(true);
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     fetchPayrollDetails();
