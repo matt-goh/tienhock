@@ -8,6 +8,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   getMonthlyPayrolls,
   createMonthlyPayroll,
+  getMonthName,
 } from "../../utils/payroll/payrollUtils";
 import CreatePayrollModal from "../../components/Payroll/CreatePayrollModal";
 import toast from "react-hot-toast";
@@ -106,12 +107,6 @@ const MonthlyPayrollsPage: React.FC = () => {
       default:
         return "bg-default-100 text-default-700";
     }
-  };
-
-  const getMonthName = (month: number) => {
-    return new Date(2000, month - 1, 1).toLocaleString("default", {
-      month: "long",
-    });
   };
 
   return (

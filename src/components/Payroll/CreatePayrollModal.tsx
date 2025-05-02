@@ -10,6 +10,7 @@ import {
 import Button from "../Button";
 import { FormListbox } from "../FormComponents";
 import { useNavigate } from "react-router-dom";
+import { getMonthName } from "../../utils/payroll/payrollUtils";
 
 interface CreatePayrollModalProps {
   isOpen: boolean;
@@ -54,12 +55,6 @@ const CreatePayrollModal: React.FC<CreatePayrollModalProps> = ({
 
     if (existingPayroll) {
       // If exists, show error and offer to navigate
-      const getMonthName = (monthNumber: number): string => {
-        return new Date(2000, monthNumber - 1, 1).toLocaleString("default", {
-          month: "long",
-        });
-      };
-
       const confirmed = window.confirm(
         `A payroll already exists for ${getMonthName(
           month

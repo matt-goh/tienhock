@@ -1,6 +1,10 @@
 // src/components/Payroll/PaySlipPreview.tsx
 import React from "react";
 import { EmployeePayroll } from "../../types/types";
+import {
+  groupItemsByType,
+  getMonthName,
+} from "../../utils/payroll/payrollUtils";
 
 interface PayrollItem {
   id: number;
@@ -26,33 +30,6 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
   showPrintHeader = true,
   className = "",
 }) => {
-  // Group items by pay type
-  const groupItemsByType = (items: PayrollItem[]) => {
-    const grouped: Record<string, PayrollItem[]> = {
-      Base: [],
-      Tambahan: [],
-      Overtime: [],
-    };
-
-    items.forEach((item) => {
-      if (
-        item.description.toLowerCase().includes("overtime") ||
-        item.description.toLowerCase().includes("ot")
-      ) {
-        grouped["Overtime"].push(item);
-      } else if (
-        item.is_manual ||
-        item.description.toLowerCase().includes("tambahan")
-      ) {
-        grouped["Tambahan"].push(item);
-      } else {
-        grouped["Base"].push(item);
-      }
-    });
-
-    return grouped;
-  };
-
   const groupedItems = groupItemsByType(
     payroll.items.map((item) => ({
       ...item,
@@ -67,13 +44,6 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
-  };
-
-  const getMonthName = (month: number | undefined) => {
-    if (month === undefined) return "Unknown Month";
-    return new Date(2000, month - 1, 1).toLocaleString("default", {
-      month: "long",
-    });
   };
 
   return (

@@ -9,6 +9,8 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
   getEmployeePayrollDetails,
   deletePayrollItem,
+  groupItemsByType,
+  getMonthName,
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -92,49 +94,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       style: "currency",
       currency: "MYR",
     }).format(amount);
-  };
-
-  const getMonthName = (month: number | undefined) => {
-    if (month === undefined) return "Unknown Month";
-    return new Date(2000, month - 1, 1).toLocaleString("default", {
-      month: "long",
-    });
-  };
-
-  const groupItemsByType = (items: PayrollItem[]) => {
-    const grouped: Record<string, PayrollItem[]> = {
-      Base: [],
-      Tambahan: [],
-      Overtime: [],
-    };
-
-    items.forEach((item) => {
-      // Use the pay_type returned from the backend
-      if (item.pay_type === "Overtime") {
-        grouped["Overtime"].push(item);
-      } else if (item.pay_type === "Tambahan") {
-        grouped["Tambahan"].push(item);
-      } else if (item.pay_type === "Base") {
-        grouped["Base"].push(item);
-      } else {
-        // Fallback for items without pay_type (using previous logic)
-        if (
-          item.description.toLowerCase().includes("overtime") ||
-          item.description.toLowerCase().includes("ot")
-        ) {
-          grouped["Overtime"].push(item);
-        } else if (
-          item.is_manual ||
-          item.description.toLowerCase().includes("tambahan")
-        ) {
-          grouped["Tambahan"].push(item);
-        } else {
-          grouped["Base"].push(item);
-        }
-      }
-    });
-
-    return grouped;
   };
 
   if (isLoading) {
@@ -343,7 +302,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                 {item.is_manual && (
                                   <button
                                     onClick={() => {
-                                      setItemToDelete(item);
+                                      setItemToDelete({
+                                        ...item,
+                                        id: item.id || 0,
+                                      });
                                       setShowDeleteDialog(true);
                                     }}
                                     className="text-rose-600 hover:text-rose-800"
@@ -453,7 +415,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-center">
                                 <button
                                   onClick={() => {
-                                    setItemToDelete(item);
+                                    setItemToDelete({
+                                      ...item,
+                                      id: item.id || 0,
+                                    });
                                     setShowDeleteDialog(true);
                                   }}
                                   className="text-rose-600 hover:text-rose-800"
@@ -559,7 +524,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                 {item.is_manual && (
                                   <button
                                     onClick={() => {
-                                      setItemToDelete(item);
+                                      setItemToDelete({
+                                        ...item,
+                                        id: item.id || 0,
+                                      });
                                       setShowDeleteDialog(true);
                                     }}
                                     className="text-rose-600 hover:text-rose-800"

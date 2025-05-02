@@ -632,6 +632,7 @@ export interface PayrollItem {
   id?: number;
   pay_code_id: string;
   description: string;
+  pay_type?: string;
   rate: number;
   rate_unit: string;
   quantity: number;
