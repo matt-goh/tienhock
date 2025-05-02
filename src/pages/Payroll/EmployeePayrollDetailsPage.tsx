@@ -245,12 +245,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 {formatCurrency(payroll.net_pay)}
               </p>
             </div>
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-default-500 mb-1">End Month Payment</p>
-              <p className="text-xl font-semibold text-default-800">
-                {formatCurrency(payroll.end_month_payment)}
-              </p>
-            </div>
           </div>
         </div>
 

@@ -270,30 +270,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Summary Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="border rounded-lg p-4">
-            <p className="text-sm text-default-500 mb-1">Total Gross Pay</p>
-            <p className="text-xl font-semibold text-default-800">
-              {formatCurrency(totals.grossPay)}
-            </p>
-          </div>
-          <div className="border rounded-lg p-4">
-            <p className="text-sm text-default-500 mb-1">Total Net Pay</p>
-            <p className="text-xl font-semibold text-default-800">
-              {formatCurrency(totals.netPay)}
-            </p>
-          </div>
-          <div className="border rounded-lg p-4">
-            <p className="text-sm text-default-500 mb-1">
-              Total End Month Payment
-            </p>
-            <p className="text-xl font-semibold text-default-800">
-              {formatCurrency(totals.endMonthPayment)}
-            </p>
-          </div>
-        </div>
-
         {/* Payroll Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg border border-default-200 p-4">
