@@ -36,7 +36,7 @@ export interface WorkLog {
   shift: number;
   day_type: "Biasa" | "Ahad" | "Umum";
   section: string;
-  employeeEntries: WorkLogEntry[];
+  employee_entries: WorkLogEntry[];
 }
 
 export interface EmployeePayroll {
@@ -78,13 +78,13 @@ export class PayrollCalculationService {
     // Process each work log
     targetLogs.forEach((log) => {
       // Skip logs with missing employeeEntries
-      if (!log.employeeEntries || !Array.isArray(log.employeeEntries)) {
+      if (!log.employee_entries || !Array.isArray(log.employee_entries)) {
         return;
       }
 
       // Find entries for this employee and job type
       const employeeEntries =
-        log.employeeEntries?.filter(
+        log.employee_entries?.filter(
           (entry) =>
             entry.employee_id === employeeId && entry.job_id === jobType
         ) || [];
