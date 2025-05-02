@@ -63,7 +63,7 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true);
-    }, 200);
+    }, 0);
   };
 
   const handleMouseLeave = () => {
@@ -72,7 +72,7 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(false);
-    }, 300); // Longer delay before hiding
+    }, 100); // Longer delay before hiding
   };
 
   const handleSelectAllClick = () => {
