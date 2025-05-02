@@ -41,7 +41,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
     if (isVisible && iconRef.current) {
       const rect = iconRef.current.getBoundingClientRect();
       setPosition({
-        top: rect.top,
+        top: rect.top + rect.height / 2, // Center vertically
         left: rect.right + 5, // Simply use left position of the icon
       });
     }
@@ -98,6 +98,7 @@ const JobsUsingPayCodeTooltip: React.FC<JobsUsingPayCodeTooltipProps> = ({
               maxHeight: "280px",
               overflowY: "auto",
               opacity: isVisible ? 1 : 0,
+              transform: `translate(0%, -50%)`,
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
