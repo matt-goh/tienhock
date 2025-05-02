@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Checkbox from "../Checkbox";
 import { Employee } from "../../types/types";
+import { IconUsers, IconCheck, IconBriefcase } from "@tabler/icons-react";
 
 interface EmployeeSelectionTooltipProps {
   jobName: string;
@@ -42,7 +43,7 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
     if (isVisible && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setPosition({
-        top: rect.top + rect.height / 2,
+        top: rect.top + rect.height / 2, // Center vertically
         left: rect.left - 10, // Position to the left
       });
     }
@@ -85,88 +86,100 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
         ref={buttonRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`text-sky-600 hover:text-sky-900 disabled:text-default-300 disabled:cursor-not-allowed flex items-center ${className}`}
+        onClick={() => setIsVisible(true)}
+        className={`text-sky-600 hover:text-sky-900 hover:bg-sky-50 py-1 rounded-md transition-colors duration-150 disabled:text-default-300 disabled:cursor-not-allowed flex items-center ${className}`}
         type="button"
         disabled={disabled}
       >
-        <span className="mr-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-100 text-sky-600 text-xs">
-          {selectedCount}
+        <IconUsers size={18} className="mr-1.5" />
+        <span className="mr-1.5 font-medium">Select</span>
+        <span className="inline-flex items-center justify-center rounded-full bg-sky-100 text-sky-700 px-2 py-0.5 text-xs font-medium">
+          {selectedCount}/{employees.length}
         </span>
-        <span>Configure Employees</span>
       </button>
 
       {isVisible &&
         createPortal(
           <div
             ref={tooltipRef}
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-80 transform -translate-y-1/2 opacity-0 transition-opacity duration-200 flex flex-col"
+            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-0 w-80 opacity-0 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
               opacity: isVisible ? 1 : 0,
               transform: `translate(-100%, -50%)`,
+              maxHeight: "80vh",
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
             {/* Header */}
-            <div className="flex-shrink-0 border-b border-default-200 pb-2 mb-2">
+            <div
+              className="flex-shrink-0 border-b border-default-200 px-3 py-2 bg-default-50 rounded-t-lg cursor-pointer"
+              onClick={handleSelectAllClick}
+              title={allSelected ? "Deselect All" : "Select All"}
+            >
               <div className="flex justify-between items-center">
-                <div className="text-base font-medium text-default-800">
+                <div className="text-base font-medium text-default-800 flex items-center">
+                  <IconBriefcase
+                    size={16}
+                    className="mr-1.5 mt-0.5 text-default-500"
+                  />
                   {jobName}
                 </div>
-                <div className="text-xs text-default-500">
-                  {selectedCount} of {employees.length} selected
+                <div className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded-full text-xs font-medium">
+                  {selectedCount}/{employees.length}
                 </div>
               </div>
-              <div
-                className="flex items-center mt-1 text-sm text-sky-600 cursor-pointer"
-                onClick={handleSelectAllClick}
-              >
+              <div className="flex items-center mt-1 text-sm text-sky-600 hover:text-sky-800 rounded">
                 <Checkbox
                   checked={allSelected}
                   onChange={() => {}}
                   size={16}
-                  className="mr-1"
+                  className="mr-1.5"
+                  checkedColor="text-sky-600"
                 />
-                Select All Employees
+                {allSelected ? "Deselect All" : "Select All"}
               </div>
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-grow overflow-y-auto py-1 space-y-2 max-h-64 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+            <div className="flex-grow overflow-y-auto py-1 max-h-64">
               {employees.length === 0 ? (
-                <div className="text-center text-default-500 py-2">
+                <div className="text-center text-default-500 py-4">
                   No employees found for this job
                 </div>
               ) : (
-                employees.map((employee) => (
-                  <div
-                    key={employee.id}
-                    className="flex items-center px-1 py-1.5 hover:bg-default-50 rounded cursor-pointer"
-                    onClick={() =>
-                      onEmployeeSelectionChange(
-                        employee.id,
-                        !selectedEmployees[employee.id]
-                      )
-                    }
-                  >
-                    <Checkbox
-                      checked={!!selectedEmployees[employee.id]}
-                      onChange={() => {}}
-                      size={16}
-                      className="mr-2"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-default-800 truncate">
-                        {employee.name}
+                <div className="px-1 space-y-1">
+                  {employees.map((employee) => (
+                    <div
+                      key={employee.id}
+                      className="flex items-center px-2 py-2 hover:bg-default-50 rounded-lg cursor-pointer transition-colors duration-150"
+                      onClick={() =>
+                        onEmployeeSelectionChange(
+                          employee.id,
+                          !selectedEmployees[employee.id]
+                        )
+                      }
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-default-700 truncate">
+                          {employee.name}
+                        </div>
+                        <div className="text-xs text-default-500">
+                          ID: {employee.id}
+                        </div>
                       </div>
-                      <div className="text-xs text-default-500">
-                        {employee.id}
-                      </div>
+                      <Checkbox
+                        checked={!!selectedEmployees[employee.id]}
+                        onChange={() => {}}
+                        size={16}
+                        className="mr-2.5"
+                        checkedColor="text-sky-600"
+                      />
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           </div>,
