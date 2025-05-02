@@ -220,7 +220,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <h3 className="text-md font-medium text-default-700 mb-2">
                     Base Pay
                   </h3>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-x-auto">
                     <table className="min-w-full divide-y divide-default-200">
                       <thead className="bg-default-50">
                         <tr>
@@ -253,8 +253,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <tbody className="bg-white divide-y divide-default-200">
                         {groupedItems["Base"].map((item) => (
                           <tr key={item.id} className="hover:bg-default-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-default-900">
+                            <td className="px-6 py-4 max-w-xs">
+                              <div
+                                className="text-sm font-medium text-default-900 truncate"
+                                title={item.description}
+                              >
                                 {item.description}
                               </div>
                               <div className="text-xs text-default-500">
@@ -302,7 +305,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <h3 className="text-md font-medium text-default-700 mb-2">
                     Tambahan Pay
                   </h3>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-x-auto">
                     <table className="min-w-full divide-y divide-default-200">
                       <thead className="bg-default-50">
                         <tr>
@@ -343,11 +346,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <tbody className="bg-white divide-y divide-default-200">
                         {groupedItems["Tambahan"].map((item) => (
                           <tr key={item.id} className="hover:bg-default-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-default-900 flex items-center">
-                                {item.description}
+                            <td className="px-6 py-4 max-w-xs">
+                              <div
+                                className="text-sm font-medium text-default-900 truncate flex items-center"
+                                title={item.description}
+                              >
+                                <span className="truncate">
+                                  {item.description}
+                                </span>
                                 {item.is_manual && (
-                                  <span className="ml-2 px-1.5 py-0.5 text-xs rounded bg-default-100 text-default-600">
+                                  <span className="ml-2 px-1.5 py-0.5 text-xs rounded bg-default-100 text-default-600 flex-shrink-0">
                                     Manual
                                   </span>
                                 )}
@@ -414,7 +422,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <h3 className="text-md font-medium text-default-700 mb-2">
                     Overtime Pay
                   </h3>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-x-auto">
                     <table className="min-w-full divide-y divide-default-200">
                       <thead className="bg-default-50">
                         <tr>
@@ -447,8 +455,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <tbody className="bg-white divide-y divide-default-200">
                         {groupedItems["Overtime"].map((item) => (
                           <tr key={item.id} className="hover:bg-default-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-default-900">
+                            <td className="px-6 py-4 max-w-xs">
+                              <div
+                                className="text-sm font-medium text-default-900 truncate"
+                                title={item.description}
+                              >
                                 {item.description}
                               </div>
                               <div className="text-xs text-default-500">
