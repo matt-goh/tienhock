@@ -395,6 +395,67 @@ const PayrollProcessingPage: React.FC = () => {
           </div>
         ) : null}
 
+        {processedPayrolls.length > 0 && !isProcessing && (
+          <div className="mb-8 border-b border-default-200 pb-4">
+            <h2 className="text-lg font-medium text-default-700 mb-3">
+              Processing Summary
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-default-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <IconUsers className="text-default-600 mr-3" size={24} />
+                  <div>
+                    <div className="text-sm text-default-500">
+                      Employees Processed
+                    </div>
+                    <div className="text-xl font-semibold text-default-800">
+                      {processedPayrolls.length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-default-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <IconCheck className="text-emerald-600 mr-3" size={24} />
+                  <div>
+                    <div className="text-sm text-default-500">Successful</div>
+                    <div className="text-xl font-semibold text-emerald-600">
+                      {
+                        Object.values(processingStatus).filter(
+                          (s) => s === "success"
+                        ).length
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-default-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <IconAlertTriangle className="text-rose-600 mr-3" size={24} />
+                  <div>
+                    <div className="text-sm text-default-500">Errors</div>
+                    <div className="text-xl font-semibold text-rose-600">
+                      {
+                        Object.values(processingStatus).filter(
+                          (s) => s === "error"
+                        ).length
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center mb-6">
+              <Button onClick={handleViewDetails} color="sky" variant="filled">
+                View Payroll Details
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Job Types Section */}
         <div>
           {eligibleData.eligibleJobs.length === 0 ? (
@@ -534,67 +595,6 @@ const PayrollProcessingPage: React.FC = () => {
             </div>
           )}
         </div>
-
-        {processedPayrolls.length > 0 && !isProcessing && (
-          <div className="mt-8 border-t border-default-200 pt-4">
-            <h2 className="text-lg font-medium text-default-700 mb-3">
-              Processing Summary
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-default-50 rounded-lg p-4">
-                <div className="flex items-center">
-                  <IconUsers className="text-default-600 mr-3" size={24} />
-                  <div>
-                    <div className="text-sm text-default-500">
-                      Employees Processed
-                    </div>
-                    <div className="text-xl font-semibold text-default-800">
-                      {processedPayrolls.length}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-default-50 rounded-lg p-4">
-                <div className="flex items-center">
-                  <IconCheck className="text-emerald-600 mr-3" size={24} />
-                  <div>
-                    <div className="text-sm text-default-500">Successful</div>
-                    <div className="text-xl font-semibold text-emerald-600">
-                      {
-                        Object.values(processingStatus).filter(
-                          (s) => s === "success"
-                        ).length
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-default-50 rounded-lg p-4">
-                <div className="flex items-center">
-                  <IconAlertTriangle className="text-rose-600 mr-3" size={24} />
-                  <div>
-                    <div className="text-sm text-default-500">Errors</div>
-                    <div className="text-xl font-semibold text-rose-600">
-                      {
-                        Object.values(processingStatus).filter(
-                          (s) => s === "error"
-                        ).length
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-center mt-6">
-              <Button onClick={handleViewDetails} color="sky" variant="filled">
-                View Payroll Details
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
