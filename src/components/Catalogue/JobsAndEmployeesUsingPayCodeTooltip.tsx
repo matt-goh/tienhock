@@ -113,7 +113,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -124,19 +124,27 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <div className="text-sm font-medium text-default-700 mb-2 flex justify-between items-center">
-              <span className="truncate" title={`Pay Code Usage: ${payCodeId}`}>
-                Pay Code Usage: {payCodeId}
-              </span>
-              <span
-                className="text-xs text-default-500 truncate"
-                title={`Total: ${totalCount}`}
-              >
-                ({totalCount} total)
-              </span>
+            {/* Fixed Header */}
+            <div className="flex-shrink-0">
+              <div className="text-sm font-medium text-default-700 mb-2 flex justify-between items-center">
+                <span
+                  className="truncate"
+                  title={`Pay Code Usage: ${payCodeId}`}
+                >
+                  Pay Code Usage: {payCodeId}
+                </span>
+                <span
+                  className="text-xs text-default-500 truncate"
+                  title={`Total: ${totalCount}`}
+                >
+                  ({totalCount} total)
+                </span>
+              </div>
+              <div className="border-t border-default-200"></div>
             </div>
 
-            <div className="border-t border-default-200 pt-2 space-y-4">
+            {/* Scrollable Content */}
+            <div className="flex-grow overflow-y-auto pt-2 space-y-4 min-h-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
               {/* Jobs Section */}
               {jobDetails.length > 0 && (
                 <div>
