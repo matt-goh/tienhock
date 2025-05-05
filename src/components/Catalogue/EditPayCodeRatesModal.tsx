@@ -6,7 +6,7 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
-import { IconRotateClockwise } from "@tabler/icons-react";
+import { IconRotateClockwise, IconLinkOff } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 
 import Button from "../Button";
@@ -44,6 +44,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
 
   // Initialize form when modal opens or data changes
   useEffect(() => {
@@ -56,6 +57,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
       });
       setError(null); // Clear previous errors
       setIsSaving(false);
+      setShowUnlinkConfirm(false);
     }
   }, [isOpen, payCodeDetail]);
 
@@ -84,6 +86,21 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
       [rateType]: "", // Empty string signifies clearing the override
     }));
     setError(null);
+  };
+
+  const handleUnlink = async () => {
+    if (!payCodeDetail || !jobId) return;
+
+    try {
+      await api.delete(`/api/job-pay-codes/${jobId}/${payCodeDetail.id}`);
+      toast.success("Pay code unlinked successfully");
+      onRatesSaved();
+      onClose();
+    } catch (err: any) {
+      console.error("Error unlinking job pay code:", err);
+      setError(err?.response?.data?.message || "Failed to unlink pay code");
+      toast.error(err?.response?.data?.message || "Failed to unlink pay code");
+    }
   };
 
   const handleSave = async () => {
@@ -243,7 +260,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                     </>
                   )}
 
-                  <div className="mt-4 border-t pt-4 border-gray-100">
+                  <div className="mt-4 border-t pt-4 border-gray-100 space-y-1">
                     <Checkbox
                       checked={editRates.is_default}
                       onChange={handleDefaultChange}
@@ -261,6 +278,40 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                       uncheckedColor="text-gray-400"
                       disabled={isSaving}
                     />
+
+                    {/* Unlink button section */}
+                    <div className="h-8 flex items-center">
+                      {!showUnlinkConfirm ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center font-medium text-sm text-red-600 hover:text-red-800 hover:underline"
+                          onClick={() => setShowUnlinkConfirm(true)}
+                          disabled={isSaving}
+                        >
+                          <IconLinkOff size={16} className="mr-1" />
+                          Unlink Pay Code
+                        </button>
+                      ) : (
+                        <div className="inline-flex items-center space-x-2">
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-full"
+                            onClick={handleUnlink}
+                            disabled={isSaving}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs font-medium text-default-600 bg-default-100 hover:bg-default-200 rounded-full"
+                            onClick={() => setShowUnlinkConfirm(false)}
+                            disabled={isSaving}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {error && (
@@ -268,7 +319,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                   )}
                 </div>
 
-                <div className="mt-8 flex justify-end space-x-3">
+                <div className="flex justify-end space-x-3">
                   <Button
                     type="button"
                     variant="outline"
