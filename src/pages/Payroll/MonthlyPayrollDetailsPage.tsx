@@ -51,7 +51,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filteredJobType, setFilteredJobType] = useState<string>("all");
-  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(true);
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     fetchPayrollDetails();
@@ -517,7 +517,9 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                 return (
                   <div key={jobType} className="mb-4">
                     <div
-                      className="flex justify-between items-center p-4 bg-default-50 border border-default-200 rounded-t-lg cursor-pointer hover:bg-default-100 transition-colors duration-150"
+                      className={`flex justify-between items-center p-4 bg-default-50 border border-default-200 cursor-pointer hover:bg-default-100 transition-colors duration-150 ${
+                        expandedJobs[jobType] ? "rounded-t-lg" : "rounded-lg"
+                      }`}
                       onClick={() => handleToggleJobExpansion(jobType)}
                     >
                       <div className="flex items-center">
