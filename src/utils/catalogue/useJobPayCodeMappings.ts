@@ -50,6 +50,7 @@ export const useJobPayCodeMappings = () => {
           if (now - parsedData.timestamp < CACHE_DURATION) {
             setDetailedMappings(parsedData.detailedMappings);
             setPayCodes(parsedData.payCodes);
+            setEmployeeMappings(parsedData.employeeMappings || {});
             setLoading(false);
             return;
           }
