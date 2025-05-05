@@ -1,5 +1,5 @@
 // src/components/Catalogue/AssociatePayCodesWithEmployeeModal.tsx
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useMemo } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -13,6 +13,7 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../LoadingSpinner";
 import { PayCode, Employee } from "../../types/types";
+import { IconChevronDown } from "@tabler/icons-react";
 
 interface AssociatePayCodesWithEmployeeModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadedItemCount, setLoadedItemCount] = useState(20);
 
   // Initialize selections when modal opens
   useEffect(() => {
@@ -47,15 +49,42 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
   }, [isOpen, currentPayCodeIds]);
 
   // Filter pay codes based on search query
-  const filteredPayCodes = searchQuery
-    ? availablePayCodes.filter(
-        (payCode) =>
-          payCode.description
+  const visiblePayCodes = useMemo(() => {
+    const filtered = availablePayCodes.filter((payCode) =>
+      searchQuery
+        ? payCode.description
             .toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
           payCode.id.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : availablePayCodes;
+        : true
+    );
+
+    return filtered.slice(0, loadedItemCount);
+  }, [availablePayCodes, searchQuery, loadedItemCount]);
+
+  const hasMoreItems = useMemo(() => {
+    const totalFiltered = availablePayCodes.filter((payCode) =>
+      searchQuery
+        ? payCode.description
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          payCode.id.toLowerCase().includes(searchQuery.toLowerCase())
+        : true
+    ).length;
+
+    return totalFiltered > loadedItemCount;
+  }, [availablePayCodes, searchQuery, loadedItemCount]);
+
+  const handleLoadMore = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setLoadedItemCount((prev) => prev + 20);
+  };
+
+  // Reset loadedItemCount when search query changes
+  useEffect(() => {
+    setLoadedItemCount(20);
+  }, [searchQuery]);
 
   const handleTogglePayCode = (payCodeId: string) => {
     setSelectedPayCodeIds((prev) => {
@@ -175,13 +204,13 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                       <div className="flex justify-center items-center py-10">
                         <LoadingSpinner size="sm" hideText />
                       </div>
-                    ) : filteredPayCodes.length === 0 ? (
+                    ) : visiblePayCodes.length === 0 ? (
                       <div className="py-4 px-3 text-center text-sm text-default-500">
                         No pay codes found
                       </div>
                     ) : (
                       <ul className="divide-y divide-default-200">
-                        {filteredPayCodes.map((payCode) => (
+                        {visiblePayCodes.map((payCode) => (
                           <li
                             key={payCode.id}
                             className="px-3 py-2 hover:bg-default-50 cursor-pointer"
@@ -192,10 +221,20 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                               onChange={() => handleTogglePayCode(payCode.id)}
                               label={
                                 <div>
-                                  <div className="font-medium text-default-800">
+                                  <div
+                                    className="font-medium text-default-800"
+                                    onClick={() =>
+                                      handleTogglePayCode(payCode.id)
+                                    }
+                                  >
                                     {payCode.description}
                                   </div>
-                                  <div className="text-xs text-default-500">
+                                  <div
+                                    className="text-xs text-default-500"
+                                    onClick={() =>
+                                      handleTogglePayCode(payCode.id)
+                                    }
+                                  >
                                     {payCode.id} - {payCode.pay_type} -{" "}
                                     {payCode.rate_unit}
                                   </div>
@@ -208,6 +247,33 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                           </li>
                         ))}
                       </ul>
+                    )}
+                    {/* Load More Button */}
+                    {hasMoreItems && (
+                      <div className="border-t border-gray-200 p-2">
+                        <button
+                          type="button"
+                          onClick={handleLoadMore}
+                          className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
+                          disabled={isProcessing}
+                        >
+                          <IconChevronDown size={16} className="mr-1.5" />
+                          <span>
+                            Load More Pay Codes (
+                            {availablePayCodes.filter((payCode) =>
+                              searchQuery
+                                ? payCode.description
+                                    .toLowerCase()
+                                    .includes(searchQuery.toLowerCase()) ||
+                                  payCode.id
+                                    .toLowerCase()
+                                    .includes(searchQuery.toLowerCase())
+                                : true
+                            ).length - loadedItemCount}{" "}
+                            remaining)
+                          </span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
