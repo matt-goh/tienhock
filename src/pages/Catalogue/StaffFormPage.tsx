@@ -86,6 +86,7 @@ const StaffFormPage: React.FC = () => {
   const {
     employeeMappings,
     payCodes: availablePayCodes,
+    detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodes,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
@@ -117,6 +118,35 @@ const StaffFormPage: React.FC = () => {
     { id: "Cash", name: "Cash" },
     { id: "Cheque", name: "Cheque" },
   ];
+
+  const getAllPayCodesForEmployee = useCallback(() => {
+    if (!id) return { employeePayCodes: [], jobPayCodes: [] };
+
+    // Get employee-specific pay codes
+    const employeePayCodes = employeeMappings[id] || [];
+
+    // Get job-linked pay codes
+    const jobPayCodes: EmployeePayCodeDetails[] = [];
+    const employeeJobs = formData.job || [];
+
+    employeeJobs.forEach((jobId) => {
+      const jobDetails = jobPayCodeDetails[jobId] || [];
+      jobDetails.forEach((payCode) => {
+        // Check if this pay code already exists in employee-specific pay codes
+        const isDuplicate = employeePayCodes.some(
+          (epc) => epc.id === payCode.id
+        );
+        if (!isDuplicate) {
+          jobPayCodes.push({
+            ...payCode,
+            source: "job" as const,
+          });
+        }
+      });
+    });
+
+    return { employeePayCodes, jobPayCodes };
+  }, [id, employeeMappings, jobPayCodeDetails, formData.job]);
 
   // Utility function: Convert display name to option ID
   const mapDisplayNameToId = (
@@ -543,7 +573,7 @@ const StaffFormPage: React.FC = () => {
                         size="sm"
                         icon={IconLink}
                       >
-                        Manage Pay Codes
+                        Manage Employee Pay Codes
                       </Button>
                     )}
                   </div>
@@ -553,57 +583,113 @@ const StaffFormPage: React.FC = () => {
                       <LoadingSpinner size="sm" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                      {id &&
-                      employeeMappings[id] &&
-                      employeeMappings[id].length > 0 ? (
-                        employeeMappings[id].map((payCode) => (
-                          <div
-                            key={payCode.id}
-                            className={`flex items-center justify-between px-3 py-2 bg-default-50 border border-default-200 rounded-md ${
-                              isEditMode
-                                ? "cursor-pointer hover:bg-default-100"
-                                : ""
-                            }`}
-                            onClick={() => {
-                              if (isEditMode) {
-                                setSelectedPayCodeForEdit(payCode);
-                                setShowEditRateModal(true);
-                              }
-                            }}
-                            title={`Edit rates for ${payCode.description}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 max-w-full">
-                                  <span className="text-sm font-medium text-default-800 truncate">
-                                    {payCode.description}
-                                  </span>
-                                  <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
-                                    {payCode.id}
-                                  </span>
+                    <div className="space-y-6">
+                      {/* Employee-specific Pay Codes Section */}
+                      <div>
+                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                          Employee-Specific Pay Codes
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {id &&
+                          employeeMappings[id] &&
+                          employeeMappings[id].length > 0 ? (
+                            employeeMappings[id].map((payCode) => (
+                              <div
+                                key={payCode.id}
+                                className={`flex items-center justify-between px-3 py-2 bg-sky-50 border border-sky-200 rounded-md ${
+                                  isEditMode
+                                    ? "cursor-pointer hover:bg-sky-100"
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  if (isEditMode) {
+                                    setSelectedPayCodeForEdit(payCode);
+                                    setShowEditRateModal(true);
+                                  }
+                                }}
+                                title={`Edit rates for ${payCode.description}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 max-w-full">
+                                      <span className="text-sm font-medium text-default-800 truncate">
+                                        {payCode.description}
+                                      </span>
+                                      <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                        {payCode.id}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {(payCode.override_rate_biasa !== null ||
+                                    payCode.is_default_setting) && (
+                                    <div className="mt-1.5 flex flex-wrap gap-2">
+                                      {payCode.override_rate_biasa !== null && (
+                                        <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
+                                          Customized rate
+                                        </span>
+                                      )}
+                                      {payCode.is_default_setting && (
+                                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                          Default
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <div className="mt-1.5 flex flex-wrap gap-2">
-                                {payCode.override_rate_biasa !== null && (
-                                  <span className="text-xs px-2 py-0.5 bg-sky-100 text-sky-800 rounded-full font-medium">
-                                    Customized rate
-                                  </span>
-                                )}
-                                {payCode.is_default_setting && (
-                                  <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
-                                    Default
-                                  </span>
-                                )}
-                              </div>
+                            ))
+                          ) : (
+                            <div className="col-span-3 text-sm text-default-500 py-4">
+                              No employee-specific pay codes
                             </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="col-span-3 text-sm text-default-500 text-center py-4">
-                          No pay codes associated
+                          )}
                         </div>
-                      )}
+                      </div>
+
+                      {/* Job-linked Pay Codes Section */}
+                      <div>
+                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                          Job-Linked Pay Codes
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {(() => {
+                            const { jobPayCodes } = getAllPayCodesForEmployee();
+                            return jobPayCodes.length > 0 ? (
+                              jobPayCodes.map((payCode) => (
+                                <div
+                                  key={payCode.id}
+                                  className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-md"
+                                  title={`View job-linked pay code: ${payCode.description}`}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5 max-w-full">
+                                        <span className="text-sm font-medium text-default-800 truncate">
+                                          {payCode.description}
+                                        </span>
+                                        <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                          {payCode.id}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {payCode.is_default_setting && (
+                                      <div className="mt-1.5 flex flex-wrap gap-2">
+                                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                          Default
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="col-span-3 text-sm text-default-500 py-4">
+                                No job-linked pay codes
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
