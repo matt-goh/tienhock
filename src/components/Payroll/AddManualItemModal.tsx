@@ -1,4 +1,5 @@
-// src/components/Payroll/AddManualItemModal.tsx (Enhanced)
+// src/components/Payroll/AddManualItemModal.tsx - Updated version with pagination and combobox
+
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import {
   Dialog,
@@ -6,15 +7,25 @@ import {
   DialogTitle,
   Transition,
   TransitionChild,
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOptions,
+  ComboboxOption,
 } from "@headlessui/react";
 import Button from "../Button";
-import { FormInput, FormListbox } from "../FormComponents";
+import { FormInput } from "../FormComponents";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { addManualPayrollItem } from "../../utils/payroll/payrollUtils";
 import { PayrollCalculationService } from "../../utils/payroll/payrollCalculationService";
 import { RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
-import { IconInfoCircle, IconCurrencyDollar } from "@tabler/icons-react";
+import {
+  IconInfoCircle,
+  IconCurrencyDollar,
+  IconChevronDown,
+  IconCheck,
+} from "@tabler/icons-react";
 
 interface AddManualItemModalProps {
   isOpen: boolean;
@@ -52,6 +63,8 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
   const [calculatedAmount, setCalculatedAmount] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState(""); // New state for search query
+  const [loadedItemCount, setLoadedItemCount] = useState(20); // For pagination
 
   // Get all available pay codes that can be used for manual addition
   const availablePayCodes: PayCodeOption[] = useMemo(() => {
@@ -89,14 +102,55 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
     return tambahan;
   }, [payCodes, detailedMappings, employeeJobType]);
 
+  // Filter pay codes based on search query and limit by loadedItemCount
+  const filteredPayCodes = useMemo(() => {
+    const filtered =
+      query === ""
+        ? availablePayCodes
+        : availablePayCodes.filter((code) =>
+            `${code.id.toLowerCase()} ${code.description.toLowerCase()}`.includes(
+              query.toLowerCase()
+            )
+          );
+
+    // Only return the first loadedItemCount items
+    return filtered.slice(0, loadedItemCount);
+  }, [availablePayCodes, query, loadedItemCount]);
+
+  // Check if there are more items to load
+  const hasMoreItems = useMemo(() => {
+    const totalFiltered =
+      query === ""
+        ? availablePayCodes.length
+        : availablePayCodes.filter((code) =>
+            `${code.id.toLowerCase()} ${code.description.toLowerCase()}`.includes(
+              query.toLowerCase()
+            )
+          ).length;
+
+    return totalFiltered > loadedItemCount;
+  }, [availablePayCodes, query, loadedItemCount]);
+
+  // Handle load more button click
+  const handleLoadMore = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setLoadedItemCount((prev) => prev + 20);
+  };
+
+  // Reset loadedItemCount when query changes
+  useEffect(() => {
+    setLoadedItemCount(20);
+  }, [query]);
+
   // Sort pay codes alphabetically
   const sortedPayCodes = useMemo(() => {
-    return [...availablePayCodes].sort((a, b) => a.name.localeCompare(b.name));
-  }, [availablePayCodes]);
+    return [...filteredPayCodes].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredPayCodes]);
 
   // Get selected pay code details
-  const selectedPayCodeDetails = sortedPayCodes.find(
-    (code: { id: string }) => code.id === selectedPayCode
+  const selectedPayCodeDetails = availablePayCodes.find(
+    (code) => code.id === selectedPayCode
   );
 
   // Reset form when modal is opened
@@ -108,6 +162,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
       setRate("0");
       setCalculatedAmount(0);
       setError(null);
+      setQuery(""); // Reset search query
     }
   }, [isOpen]);
 
@@ -245,16 +300,116 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Pay Code Selection */}
-                  <FormListbox
-                    name="payCode"
-                    label="Pay Code"
-                    value={selectedPayCode}
-                    onChange={(value) => setSelectedPayCode(value)}
-                    options={sortedPayCodes}
-                    required
-                    placeholder="Select a pay code"
-                  />
+                  {/* Pay Code Selection - Now using Combobox instead of FormListbox */}
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-1">
+                      Pay Code
+                    </label>
+                    <div className="relative">
+                      <Combobox
+                        value={selectedPayCode}
+                        onChange={(value: string | null) =>
+                          setSelectedPayCode(value || "")
+                        }
+                        disabled={isSaving}
+                      >
+                        <div className="relative">
+                          <ComboboxInput
+                            className="w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                            displayValue={(code: string) => {
+                              const selected = availablePayCodes.find(
+                                (pc) => pc.id === code
+                              );
+                              return selected
+                                ? `${selected.id} - ${selected.description}`
+                                : "";
+                            }}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search pay code..."
+                          />
+                          <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                            <IconChevronDown
+                              size={20}
+                              className="text-gray-400"
+                              aria-hidden="true"
+                            />
+                          </ComboboxButton>
+                        </div>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                          afterLeave={() => setQuery("")}
+                        >
+                          <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                            {sortedPayCodes.length === 0 ? (
+                              <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                                Nothing found.
+                              </div>
+                            ) : (
+                              sortedPayCodes.map((code) => (
+                                <ComboboxOption
+                                  key={code.id}
+                                  value={code.id}
+                                  className={({ active }) =>
+                                    `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                      active
+                                        ? "bg-sky-100 text-sky-900"
+                                        : "text-gray-900"
+                                    }`
+                                  }
+                                >
+                                  {({ selected, active }) => (
+                                    <>
+                                      <span
+                                        className={`block truncate ${
+                                          selected
+                                            ? "font-medium"
+                                            : "font-normal"
+                                        }`}
+                                      >
+                                        {code.id} - {code.description}
+                                      </span>
+                                      {selected ? (
+                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                          <IconCheck
+                                            size={20}
+                                            aria-hidden="true"
+                                          />
+                                        </span>
+                                      ) : null}
+                                    </>
+                                  )}
+                                </ComboboxOption>
+                              ))
+                            )}
+                            {/* Load More Button */}
+                            {hasMoreItems && (
+                              <div className="border-t border-gray-200 p-2">
+                                <button
+                                  type="button"
+                                  onClick={handleLoadMore}
+                                  className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
+                                  disabled={isSaving}
+                                >
+                                  <IconChevronDown
+                                    size={16}
+                                    className="mr-1.5"
+                                  />
+                                  <span>
+                                    Load More Pay Codes (
+                                    {availablePayCodes.length - loadedItemCount}{" "}
+                                    remaining)
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </ComboboxOptions>
+                        </Transition>
+                      </Combobox>
+                    </div>
+                  </div>
 
                   {/* Custom Description */}
                   <FormInput
@@ -292,7 +447,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                     type="number"
                     value={rate}
                     onChange={(e) => setRate(e.target.value)}
-                    step="0.01"
+                    step="1"
                     min={0}
                     required
                   />
