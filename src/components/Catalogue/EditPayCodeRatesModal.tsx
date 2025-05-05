@@ -260,7 +260,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                     </>
                   )}
 
-                  <div className="mt-4 border-t pt-4 border-gray-100 space-y-1">
+                  <div className="mt-4 border-t pt-4 border-gray-100">
                     <Checkbox
                       checked={editRates.is_default}
                       onChange={handleDefaultChange}
@@ -319,7 +319,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                   )}
                 </div>
 
-                <div className="flex justify-end space-x-3">
+                <div className="flex justify-end space-x-3 mt-1">
                   <Button
                     type="button"
                     variant="outline"
