@@ -18,7 +18,6 @@ import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay"
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import { PayCode } from "../../types/types";
 import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
 import { IconLink } from "@tabler/icons-react";
 
@@ -80,13 +79,13 @@ const StaffFormPage: React.FC = () => {
   const { options } = useStaffFormOptions();
   const { jobs } = useJobsCache();
   const { refreshStaffs, staffs, loading: loadingStaffs } = useStaffsCache();
-const {
-  employeeMappings,
-  payCodes: availablePayCodes,
-  loading: loadingPayCodes,
-  refreshData: refreshPayCodeMappings,
-} = useJobPayCodeMappings();
-const [showPayCodeModal, setShowPayCodeModal] = useState(false);
+  const {
+    employeeMappings,
+    payCodes: availablePayCodes,
+    loading: loadingPayCodes,
+    refreshData: refreshPayCodeMappings,
+  } = useJobPayCodeMappings();
+  const [showPayCodeModal, setShowPayCodeModal] = useState(false);
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -524,6 +523,61 @@ const [showPayCodeModal, setShowPayCodeModal] = useState(false);
                   )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
+                <div className="border-t border-default-200 pt-6 mt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-base font-medium text-default-800">
+                      Associated Pay Codes
+                    </h3>
+                    {isEditMode && (
+                      <Button
+                        type="button"
+                        onClick={() => setShowPayCodeModal(true)}
+                        variant="outline"
+                        size="sm"
+                        icon={IconLink}
+                      >
+                        Manage Pay Codes
+                      </Button>
+                    )}
+                  </div>
+
+                  {loading || loadingPayCodes ? (
+                    <div className="flex justify-center py-4">
+                      <LoadingSpinner size="sm" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {id &&
+                      employeeMappings[id] &&
+                      employeeMappings[id].length > 0 ? (
+                        employeeMappings[id].map((payCode) => (
+                          <div
+                            key={payCode.id}
+                            className="flex items-center justify-between px-3 py-2 bg-default-50 border border-default-200 rounded-md"
+                          >
+                            <div>
+                              <span className="text-sm font-medium text-default-800">
+                                {payCode.description}
+                              </span>
+                              <span className="text-xs text-default-500 ml-2">
+                                ({payCode.id})
+                              </span>
+                            </div>
+                            {payCode.is_default_setting && (
+                              <span className="text-xs px-2 py-1 bg-sky-100 text-sky-700 rounded-full">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-sm text-default-500 text-center py-4">
+                          No pay codes associated
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -575,6 +629,22 @@ const [showPayCodeModal, setShowPayCodeModal] = useState(false);
           </div>
         </form>
       </div>
+      {isEditMode && formData.id && (
+        <AssociatePayCodesWithEmployeeModal
+          isOpen={showPayCodeModal}
+          onClose={() => setShowPayCodeModal(false)}
+          employee={formData}
+          availablePayCodes={availablePayCodes}
+          currentPayCodeIds={
+            employeeMappings[formData.id]?.map((pc) => pc.id) || []
+          }
+          onAssociationComplete={async () => {
+            await refreshPayCodeMappings();
+            // Optional: Add toast notification
+            toast.success("Pay code associations updated successfully");
+          }}
+        />
+      )}
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
