@@ -32,7 +32,7 @@ import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCode
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import AssociateWithJobsModal from "../../components/Catalogue/AssociateWithJobsModal";
-import AssociatePayCodesWithEmployeesModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
+import AssociatePayCodesWithEmployeesModal from "../../components/Catalogue/AssociatePayCodesWithEmployeesModal";
 
 const PayCodePage: React.FC = () => {
   const location = useLocation();
