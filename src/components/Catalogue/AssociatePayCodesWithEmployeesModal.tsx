@@ -206,10 +206,20 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
                                   }
                                   label={
                                     <div>
-                                      <div className="font-medium text-default-800">
+                                      <div
+                                        className="font-medium text-default-800"
+                                        onClick={() =>
+                                          handleToggleEmployee(employee.id)
+                                        }
+                                      >
                                         {employee.name}
                                       </div>
-                                      <div className="text-xs text-default-500">
+                                      <div
+                                        className="text-xs text-default-500"
+                                        onClick={() =>
+                                          handleToggleEmployee(employee.id)
+                                        }
+                                      >
                                         {employee.id} -{" "}
                                         {employee.job.join(", ")}
                                       </div>
