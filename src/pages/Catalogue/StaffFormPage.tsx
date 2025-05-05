@@ -17,9 +17,13 @@ import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import {
+  EmployeePayCodeDetails,
+  useJobPayCodeMappings,
+} from "../../utils/catalogue/useJobPayCodeMappings";
 import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
 import { IconLink } from "@tabler/icons-react";
+import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 
 interface SelectOption {
   id: string;
@@ -86,6 +90,9 @@ const StaffFormPage: React.FC = () => {
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const [showPayCodeModal, setShowPayCodeModal] = useState(false);
+  const [selectedPayCodeForEdit, setSelectedPayCodeForEdit] =
+    useState<EmployeePayCodeDetails | null>(null);
+  const [showEditRateModal, setShowEditRateModal] = useState(false);
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -553,21 +560,43 @@ const StaffFormPage: React.FC = () => {
                         employeeMappings[id].map((payCode) => (
                           <div
                             key={payCode.id}
-                            className="flex items-center justify-between px-3 py-2 bg-default-50 border border-default-200 rounded-md"
+                            className={`flex items-center justify-between px-3 py-2 bg-default-50 border border-default-200 rounded-md ${
+                              isEditMode
+                                ? "cursor-pointer hover:bg-default-100"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              if (isEditMode) {
+                                setSelectedPayCodeForEdit(payCode);
+                                setShowEditRateModal(true);
+                              }
+                            }}
+                            title={`Edit rates for ${payCode.description}`}
                           >
-                            <div>
-                              <span className="text-sm font-medium text-default-800">
-                                {payCode.description}
-                              </span>
-                              <span className="text-xs text-default-500 ml-2">
-                                ({payCode.id})
-                              </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 max-w-full">
+                                  <span className="text-sm font-medium text-default-800 truncate">
+                                    {payCode.description}
+                                  </span>
+                                  <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                    {payCode.id}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="mt-1.5 flex flex-wrap gap-2">
+                                {payCode.override_rate_biasa !== null && (
+                                  <span className="text-xs px-2 py-0.5 bg-sky-100 text-sky-800 rounded-full font-medium">
+                                    Customized rate
+                                  </span>
+                                )}
+                                {payCode.is_default_setting && (
+                                  <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {payCode.is_default_setting && (
-                              <span className="text-xs px-2 py-1 bg-sky-100 text-sky-700 rounded-full">
-                                Default
-                              </span>
-                            )}
                           </div>
                         ))
                       ) : (
@@ -639,6 +668,18 @@ const StaffFormPage: React.FC = () => {
             employeeMappings[formData.id]?.map((pc) => pc.id) || []
           }
           onAssociationComplete={async () => {
+            await refreshPayCodeMappings();
+          }}
+        />
+      )}
+      {/* Edit Employee Pay Code Rates Modal */}
+      {isEditMode && formData.id && (
+        <EditEmployeePayCodeRatesModal
+          isOpen={showEditRateModal}
+          onClose={() => setShowEditRateModal(false)}
+          employeeId={formData.id}
+          payCodeDetail={selectedPayCodeForEdit}
+          onRatesSaved={async () => {
             await refreshPayCodeMappings();
           }}
         />

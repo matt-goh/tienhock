@@ -28,11 +28,11 @@ import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PayCodeModal from "../../components/Catalogue/PayCodeModal"; // Imports the updated modal
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCodeTooltip";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import AssociateWithJobsModal from "../../components/Catalogue/AssociateWithJobsModal";
 import AssociatePayCodesWithEmployeesModal from "../../components/Catalogue/AssociatePayCodesWithEmployeesModal";
+import JobsAndEmployeesUsingPayCodeTooltip from "../../components/Catalogue/JobsAndEmployeesUsingPayCodeTooltip";
 
 const PayCodePage: React.FC = () => {
   const location = useLocation();
@@ -150,6 +150,25 @@ const PayCodePage: React.FC = () => {
 
     return reverseMap;
   }, [detailedMappings]);
+
+  const payCodeToEmployeesMap = useMemo(() => {
+    // Create reverse mapping: payCodeId -> employeeIds[]
+    const reverseMap: Record<string, string[]> = {};
+
+    // Go through each employee in the employee mappings
+    Object.entries(employeeMappings).forEach(([employeeId, payCodeDetails]) => {
+      // For each pay code used by this employee
+      payCodeDetails.forEach((detail) => {
+        const payCodeId = detail.id;
+        if (!reverseMap[payCodeId]) {
+          reverseMap[payCodeId] = [];
+        }
+        reverseMap[payCodeId].push(employeeId);
+      });
+    });
+
+    return reverseMap;
+  }, [employeeMappings]);
 
   const paginatedCodes = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -612,10 +631,15 @@ const PayCodePage: React.FC = () => {
                       >
                         <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-500 flex items-center">
                           {pc.id}
-                          <JobsUsingPayCodeTooltip
+                          <JobsAndEmployeesUsingPayCodeTooltip
                             payCodeId={pc.id}
                             jobsMap={payCodeToJobsMap}
                             jobsList={jobs}
+                            employeesMap={payCodeToEmployeesMap}
+                            employeesList={allEmployees.map((e) => ({
+                              id: e.id,
+                              name: e.name,
+                            }))}
                             className="ml-1"
                           />
                         </td>
