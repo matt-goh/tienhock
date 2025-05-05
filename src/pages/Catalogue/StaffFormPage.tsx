@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import Tab from "../../components/Tab";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -22,7 +22,7 @@ import {
   useJobPayCodeMappings,
 } from "../../utils/catalogue/useJobPayCodeMappings";
 import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
-import { IconLink, IconPencil } from "@tabler/icons-react";
+import { IconLink } from "@tabler/icons-react";
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import { JobPayCodeDetails } from "../../types/types";
@@ -556,7 +556,7 @@ const StaffFormPage: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
           <h1 className="text-xl font-semibold text-default-900">
-            {isEditMode ? "Edit Staff" : "Add New Staff"}
+            Edit {formData.name}'s Details
           </h1>
           <p className="mt-1 text-sm text-default-500">
             {isEditMode
@@ -653,9 +653,14 @@ const StaffFormPage: React.FC = () => {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5 max-w-full">
-                                      <span className="text-sm font-medium text-default-800 truncate">
+                                      <Link
+                                        to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                        className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title={`${payCode.description} (${payCode.id})`}
+                                      >
                                         {payCode.description}
-                                      </span>
+                                      </Link>
                                       <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
                                         {payCode.id}
                                       </span>
@@ -780,9 +785,14 @@ const StaffFormPage: React.FC = () => {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-1.5 max-w-full">
-                                        <span className="text-sm font-medium text-default-800 truncate">
+                                        <Link
+                                          to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                          className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
+                                          onClick={(e) => e.stopPropagation()}
+                                          title={`${payCode.description} (${payCode.id})`}
+                                        >
                                           {payCode.description}
-                                        </span>
+                                        </Link>
                                         <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
                                           {payCode.id}
                                         </span>
@@ -914,9 +924,14 @@ const StaffFormPage: React.FC = () => {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-1.5 max-w-full">
-                                        <span className="text-sm font-medium text-default-800 truncate">
+                                        <Link
+                                          to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                          className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
+                                          onClick={(e) => e.stopPropagation()}
+                                          title={`${payCode.description} (${payCode.id})`}
+                                        >
                                           {payCode.description}
-                                        </span>
+                                        </Link>
                                         <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
                                           {payCode.id}
                                         </span>
