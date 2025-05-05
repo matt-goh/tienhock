@@ -832,6 +832,7 @@ const JobPage: React.FC = () => {
         isOpen={showEditRatesModal}
         onClose={() => setShowEditRatesModal(false)}
         jobId={selectedJob?.id ?? ""} // Pass selected job ID
+        jobName={selectedJob?.name}
         payCodeDetail={payCodeDetailToEdit} // Pass the detail for editing
         onRatesSaved={handleRatesSaved} // Pass callback to refresh data
       />

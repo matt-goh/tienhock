@@ -24,6 +24,8 @@ import {
 import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
 import { IconLink } from "@tabler/icons-react";
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
+import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
+import { JobPayCodeDetails } from "../../types/types";
 
 interface SelectOption {
   id: string;
@@ -94,6 +96,9 @@ const StaffFormPage: React.FC = () => {
   const [selectedPayCodeForEdit, setSelectedPayCodeForEdit] =
     useState<EmployeePayCodeDetails | null>(null);
   const [showEditRateModal, setShowEditRateModal] = useState(false);
+  const [selectedJobPayCodeForEdit, setSelectedJobPayCodeForEdit] =
+    useState<JobPayCodeDetails | null>(null);
+  const [showJobPayCodeEditModal, setShowJobPayCodeEditModal] = useState(false);
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -120,32 +125,68 @@ const StaffFormPage: React.FC = () => {
   ];
 
   const getAllPayCodesForEmployee = useCallback(() => {
-    if (!id) return { employeePayCodes: [], jobPayCodes: [] };
+    if (!id)
+      return { employeePayCodes: [], jobPayCodes: [], duplicatePayCodes: [] };
 
     // Get employee-specific pay codes
     const employeePayCodes = employeeMappings[id] || [];
 
     // Get job-linked pay codes
-    const jobPayCodes: EmployeePayCodeDetails[] = [];
     const employeeJobs = formData.job || [];
+
+    // Use a Map to track unique pay codes by ID
+    const uniqueJobPayCodes = new Map<string, EmployeePayCodeDetails>();
+    // Track which pay codes appear in multiple jobs
+    const payCodeJobMap = new Map<string, string[]>();
 
     employeeJobs.forEach((jobId) => {
       const jobDetails = jobPayCodeDetails[jobId] || [];
       jobDetails.forEach((payCode) => {
-        // Check if this pay code already exists in employee-specific pay codes
+        // Skip if this pay code already exists in employee-specific pay codes
         const isDuplicate = employeePayCodes.some(
           (epc) => epc.id === payCode.id
         );
+
         if (!isDuplicate) {
-          jobPayCodes.push({
-            ...payCode,
-            source: "job" as const,
-          });
+          // Track which jobs this pay code belongs to
+          if (!payCodeJobMap.has(payCode.id)) {
+            payCodeJobMap.set(payCode.id, []);
+          }
+          payCodeJobMap.get(payCode.id)!.push(jobId);
+
+          if (!uniqueJobPayCodes.has(payCode.id)) {
+            uniqueJobPayCodes.set(payCode.id, {
+              ...payCode,
+              source: "job" as const,
+            });
+          }
         }
       });
     });
 
-    return { employeePayCodes, jobPayCodes };
+    // Identify duplicates (pay codes that appear in multiple jobs)
+    const duplicatePayCodes: (EmployeePayCodeDetails & {
+      job_ids: string[];
+    })[] = [];
+
+    payCodeJobMap.forEach((jobIds, payCodeId) => {
+      if (jobIds.length > 1) {
+        const payCode = uniqueJobPayCodes.get(payCodeId);
+        if (payCode) {
+          duplicatePayCodes.push({
+            ...payCode,
+            job_ids: jobIds,
+          });
+          uniqueJobPayCodes.delete(payCodeId);
+        }
+      }
+    });
+
+    return {
+      employeePayCodes,
+      jobPayCodes: Array.from(uniqueJobPayCodes.values()),
+      duplicatePayCodes,
+    };
   }, [id, employeeMappings, jobPayCodeDetails, formData.job]);
 
   // Utility function: Convert display name to option ID
@@ -658,8 +699,18 @@ const StaffFormPage: React.FC = () => {
                               jobPayCodes.map((payCode) => (
                                 <div
                                   key={payCode.id}
-                                  className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-md"
-                                  title={`View job-linked pay code: ${payCode.description}`}
+                                  className={`flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-md ${
+                                    isEditMode
+                                      ? "cursor-pointer hover:bg-amber-100"
+                                      : ""
+                                  }`}
+                                  onClick={() => {
+                                    if (isEditMode) {
+                                      setSelectedJobPayCodeForEdit(payCode);
+                                      setShowJobPayCodeEditModal(true);
+                                    }
+                                  }}
+                                  title={`Edit rates for ${payCode.description}`}
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
@@ -685,6 +736,76 @@ const StaffFormPage: React.FC = () => {
                             ) : (
                               <div className="col-span-3 text-sm text-default-500 py-4">
                                 No job-linked pay codes
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Shared Pay Codes Section (duplicates) */}
+                      <div>
+                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                          Shared Pay Codes (Across Multiple Jobs)
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {(() => {
+                            const { duplicatePayCodes } =
+                              getAllPayCodesForEmployee();
+                            return duplicatePayCodes.length > 0 ? (
+                              duplicatePayCodes.map((payCode) => (
+                                <div
+                                  key={`shared-${payCode.id}`}
+                                  className={`flex items-center justify-between px-3 py-2 bg-sky-50 border border-sky-200 rounded-md ${
+                                    isEditMode
+                                      ? "cursor-pointer hover:bg-sky-100"
+                                      : ""
+                                  }`}
+                                  onClick={() => {
+                                    if (isEditMode) {
+                                      setSelectedJobPayCodeForEdit(payCode);
+                                      setShowJobPayCodeEditModal(true);
+                                    }
+                                  }}
+                                  title={`Edit rates for ${payCode.description} (shared across multiple jobs)`}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5 max-w-full">
+                                        <span className="text-sm font-medium text-default-800 truncate">
+                                          {payCode.description}
+                                        </span>
+                                        <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                          {payCode.id}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {/* Show which jobs this pay code is shared between */}
+                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                      {payCode.job_ids.map((jobId) => {
+                                        const job = jobs.find(
+                                          (j) => j.id === jobId
+                                        );
+                                        return job ? (
+                                          <span
+                                            key={jobId}
+                                            className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full font-medium"
+                                          >
+                                            {job.name}
+                                          </span>
+                                        ) : null;
+                                      })}
+                                      {payCode.is_default_setting && (
+                                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                          Default
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="col-span-3 text-sm text-default-500 py-4">
+                                No shared pay codes across multiple jobs
                               </div>
                             );
                           })()}
@@ -765,6 +886,21 @@ const StaffFormPage: React.FC = () => {
           onClose={() => setShowEditRateModal(false)}
           employeeId={formData.id}
           payCodeDetail={selectedPayCodeForEdit}
+          onRatesSaved={async () => {
+            await refreshPayCodeMappings();
+          }}
+        />
+      )}
+      {/* Edit Job Pay Code Rates Modal */}
+      {isEditMode && formData.id && selectedJobPayCodeForEdit && (
+        <EditPayCodeRatesModal
+          isOpen={showJobPayCodeEditModal}
+          onClose={() => setShowJobPayCodeEditModal(false)}
+          jobId={selectedJobPayCodeForEdit.job_id}
+          jobName={
+            jobs.find((j) => j.id === selectedJobPayCodeForEdit.job_id)?.name
+          }
+          payCodeDetail={selectedJobPayCodeForEdit}
           onRatesSaved={async () => {
             await refreshPayCodeMappings();
           }}
