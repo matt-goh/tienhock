@@ -3,9 +3,15 @@ import React, { useState } from "react";
 interface TabProps {
   children: React.ReactElement[];
   labels: string[];
+  tabWidth?: string; // Add optional width prop
 }
 
-const Tab: React.FC<TabProps> = ({ children, labels }) => {
+const Tab: React.FC<TabProps> = ({
+  children,
+  labels,
+  tabWidth = "w-[8rem]",
+}) => {
+  // Default to w-[8rem]
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -17,7 +23,7 @@ const Tab: React.FC<TabProps> = ({ children, labels }) => {
           <button
             key={index}
             type="button"
-            className={`px-4 py-2 my-1 text-sm font-medium transition-all duration-200 w-[8rem] ${
+            className={`px-4 py-2 my-1 text-center text-sm font-medium transition-all duration-200 ${tabWidth} ${
               index === activeTab
                 ? "bg-white rounded-lg"
                 : "text-default-700 hover:text-default-800"

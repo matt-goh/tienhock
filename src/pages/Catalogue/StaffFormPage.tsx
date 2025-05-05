@@ -566,7 +566,10 @@ const StaffFormPage: React.FC = () => {
         </div>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
-            <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
+            <Tab
+              labels={["Personal", "Work", "Documents", "Additional"]}
+              tabWidth="w-[104px]"
+            >
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderInput("id", "ID")}
