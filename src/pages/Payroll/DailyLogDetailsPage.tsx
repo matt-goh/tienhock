@@ -396,6 +396,16 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       <span className="text-default-500 ml-2">
                                         ({activity.pay_type})
                                       </span>
+                                      {activity.source === "employee" && (
+                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                                          Staff
+                                        </span>
+                                      )}
+                                      {activity.source === "job" && (
+                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                          Job
+                                        </span>
+                                      )}
                                       {/* Display rate used for all activity types */}
                                       <span className="text-default-500 ml-2">
                                         •{" "}

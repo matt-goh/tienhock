@@ -15,6 +15,7 @@ export interface WorkLogActivity {
   hours_applied: number | null;
   units_produced: number | null;
   calculated_amount: number;
+  source?: "job" | "employee";
 }
 
 export interface WorkLogEntry {

@@ -13,7 +13,7 @@ import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
 import { ContextField } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
-import { IconLink } from "@tabler/icons-react";
+import { IconBriefcase, IconLink, IconUser } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
 
@@ -28,6 +28,7 @@ export interface ActivityItem {
   unitsProduced?: number;
   calculatedAmount: number;
   isContextLinked?: boolean;
+  source?: "job" | "employee";
 }
 
 interface ManageActivitiesModalProps {
@@ -318,10 +319,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 e.stopPropagation()
                                               }
                                             >
-                                              {activity.description.length > 85
+                                              {activity.description.length > 80
                                                 ? `${activity.description.substring(
                                                     0,
-                                                    85
+                                                    80
                                                   )}...`
                                                 : activity.description}
                                             </Link>
@@ -355,6 +356,25 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   ]
                                                 }
                                               />
+                                            )}
+                                            {/* Add the source badges HERE */}
+                                            {activity.source === "employee" && (
+                                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
+                                                <IconUser
+                                                  size={10}
+                                                  className="mr-0.5"
+                                                />
+                                                Staff
+                                              </span>
+                                            )}
+                                            {activity.source === "job" && (
+                                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                                <IconBriefcase
+                                                  size={10}
+                                                  className="mr-0.5"
+                                                />
+                                                Job
+                                              </span>
                                             )}
                                           </span>
                                           <div className="text-xs text-gray-500">
