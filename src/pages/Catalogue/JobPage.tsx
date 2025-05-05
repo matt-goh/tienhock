@@ -15,7 +15,8 @@ import {
   IconPlus,
   IconChevronLeft,
   IconChevronRight,
-  IconPencil, // For Edit Rates button
+  IconPencil,
+  IconSearch, // For Edit Rates button
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { Link, useLocation } from "react-router-dom";
@@ -81,6 +82,7 @@ const JobPage: React.FC = () => {
   const [jobPayCodesDetails, setJobPayCodesDetails] = useState<
     JobPayCodeDetails[]
   >([]);
+  const [payCodeSearch, setPayCodeSearch] = useState("");
 
   // --- Modal States ---
   const [showAddJobModal, setShowAddJobModal] = useState(false);
@@ -102,8 +104,10 @@ const JobPage: React.FC = () => {
     if (selectedJob && !loadingPayCodeMappings) {
       const jobPayCodes = detailedMappings[selectedJob.id] || [];
       setJobPayCodesDetails(jobPayCodes);
+      setPayCodeSearch(""); // Add this line
     } else {
       setJobPayCodesDetails([]);
+      setPayCodeSearch(""); // Add this line
     }
   }, [selectedJob, detailedMappings, loadingPayCodeMappings]);
 
@@ -271,18 +275,40 @@ const JobPage: React.FC = () => {
           ),
     [jobs, query]
   );
-  const totalPayCodePages = useMemo(
-    () => Math.ceil(jobPayCodesDetails.length / itemsPerPage),
-    [jobPayCodesDetails, itemsPerPage]
-  );
-  const paginatedPayCodes = useMemo(
-    () =>
-      jobPayCodesDetails.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-      ),
-    [jobPayCodesDetails, currentPage, itemsPerPage]
-  );
+  const totalPayCodePages = useMemo(() => {
+    // Filter by search term first
+    let filtered = jobPayCodesDetails;
+
+    if (payCodeSearch) {
+      const searchTerm = payCodeSearch.toLowerCase();
+      filtered = filtered.filter(
+        (detail) =>
+          detail.id.toLowerCase().includes(searchTerm) ||
+          detail.description.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    return Math.ceil(filtered.length / itemsPerPage);
+  }, [jobPayCodesDetails, itemsPerPage, payCodeSearch]);
+
+  const paginatedPayCodes = useMemo(() => {
+    // First filter by search term
+    let filtered = jobPayCodesDetails;
+
+    if (payCodeSearch) {
+      const searchTerm = payCodeSearch.toLowerCase();
+      filtered = filtered.filter(
+        (detail) =>
+          detail.id.toLowerCase().includes(searchTerm) ||
+          detail.description.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Then apply pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [jobPayCodesDetails, currentPage, itemsPerPage, payCodeSearch]);
+
   const availablePayCodesToAdd = useMemo(() => {
     if (!selectedJob) return [];
     const assignedIds = new Set(jobPayCodesDetails.map((d) => d.id));
@@ -599,21 +625,42 @@ const JobPage: React.FC = () => {
 
           {/* --- Pay Codes Section (Only shows after selection) --- */}
           <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-            {/* Header + Add Button */}
+            {/* Header + Add Button + Search */}
             <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
               <h2 className="text-lg font-semibold text-default-800">
                 Pay Codes for "{selectedJob.name}"
               </h2>
-              <Button
-                onClick={() => setShowAddPayCodeModal(true)}
-                color="sky"
-                variant="filled"
-                icon={IconPlus}
-                size="md"
-                disabled={!selectedJob} // Should always be enabled here, but good practice
-              >
-                Add Pay Code
-              </Button>
+              <div className="flex items-center gap-3">
+                {/* Search Input */}
+                <div className="relative">
+                  <IconSearch
+                    className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
+                    stroke={1.5}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search pay codes..."
+                    className="w-64 rounded-full border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    value={payCodeSearch}
+                    onChange={(e) => {
+                      setPayCodeSearch(e.target.value);
+                      setCurrentPage(1); // Reset to first page when searching
+                    }}
+                  />
+                </div>
+
+                {/* Add Pay Code Button */}
+                <Button
+                  onClick={() => setShowAddPayCodeModal(true)}
+                  color="sky"
+                  variant="filled"
+                  icon={IconPlus}
+                  size="md"
+                  disabled={!selectedJob}
+                >
+                  Add Pay Code
+                </Button>
+              </div>
             </div>
 
             {/* Table */}
