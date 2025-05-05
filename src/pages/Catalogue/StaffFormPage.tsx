@@ -640,8 +640,6 @@ const StaffFormPage: React.FC = () => {
           }
           onAssociationComplete={async () => {
             await refreshPayCodeMappings();
-            // Optional: Add toast notification
-            toast.success("Pay code associations updated successfully");
           }}
         />
       )}
