@@ -17,6 +17,10 @@ import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { PayCode } from "../../types/types";
+import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
+import { IconLink } from "@tabler/icons-react";
 
 interface SelectOption {
   id: string;
@@ -76,6 +80,13 @@ const StaffFormPage: React.FC = () => {
   const { options } = useStaffFormOptions();
   const { jobs } = useJobsCache();
   const { refreshStaffs, staffs, loading: loadingStaffs } = useStaffsCache();
+const {
+  employeeMappings,
+  payCodes: availablePayCodes,
+  loading: loadingPayCodes,
+  refreshData: refreshPayCodeMappings,
+} = useJobPayCodeMappings();
+const [showPayCodeModal, setShowPayCodeModal] = useState(false);
 
   const genderOptions = [
     { id: "Male", name: "Male" },

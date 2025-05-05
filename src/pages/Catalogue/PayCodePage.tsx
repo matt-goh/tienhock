@@ -10,6 +10,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconLink,
+  IconUser,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -21,7 +22,7 @@ import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
 
 import { api } from "../../routes/utils/api";
-import { PayCode } from "../../types/types"; // Type updated to exclude 'code'
+import { PayCode, Employee } from "../../types/types"; // Type updated to exclude 'code'
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -29,7 +30,9 @@ import PayCodeModal from "../../components/Catalogue/PayCodeModal"; // Imports t
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import JobsUsingPayCodeTooltip from "../../components/Catalogue/JobsUsingPayCodeTooltip";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import AssociateWithJobsModal from "../../components/Catalogue/AssociateWithJobsModal";
+import AssociatePayCodesWithEmployeesModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
 
 const PayCodePage: React.FC = () => {
   const location = useLocation();
@@ -42,12 +45,16 @@ const PayCodePage: React.FC = () => {
   // Hooks for data and caching
   const {
     detailedMappings,
+    employeeMappings,
     payCodes,
     loading: loadingPayCodesData,
     refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const { jobs, loading: loadingJobs } = useJobsCache();
+  const { staffs: allEmployees, loading: loadingEmployees } = useStaffsCache();
   const [codeToAssociate, setCodeToAssociate] = useState<PayCode | null>(null);
+  const [payCodeToAssociateWithEmployees, setPayCodeToAssociateWithEmployees] =
+    useState<PayCode | null>(null);
 
   const loading = loadingPayCodesData || loadingJobs;
 
@@ -57,6 +64,8 @@ const PayCodePage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [codeToDelete, setCodeToDelete] = useState<PayCode | null>(null); // Holds PayCode object (without 'code')
   const [showAssociateModal, setShowAssociateModal] = useState(false);
+  const [showAssociateEmployeesModal, setShowAssociateEmployeesModal] =
+    useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -142,14 +151,6 @@ const PayCodePage: React.FC = () => {
     return reverseMap;
   }, [detailedMappings]);
 
-  const getAssociatedJobIds = (payCodeId: string): string[] => {
-    return Object.entries(detailedMappings)
-      .filter(([_jobId, details]) =>
-        details.some((detail) => detail.id === payCodeId)
-      )
-      .map(([jobId]) => jobId);
-  };
-
   const paginatedCodes = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredCodes.slice(startIndex, startIndex + itemsPerPage);
@@ -158,6 +159,25 @@ const PayCodePage: React.FC = () => {
     () => Math.ceil(filteredCodes.length / itemsPerPage),
     [filteredCodes.length, itemsPerPage]
   );
+
+  // --- Helper Functions ---
+  const getAssociatedJobIds = (payCodeId: string): string[] => {
+    return Object.entries(detailedMappings)
+      .filter(([_jobId, details]) =>
+        details.some((detail) => detail.id === payCodeId)
+      )
+      .map(([jobId]) => jobId);
+  };
+
+  const getAssociatedEmployeeIds = (payCodeId: string): string[] => {
+    const associatedEmployees: string[] = [];
+    Object.entries(employeeMappings).forEach(([employeeId, payCodeDetails]) => {
+      if (payCodeDetails.some((detail) => detail.id === payCodeId)) {
+        associatedEmployees.push(employeeId);
+      }
+    });
+    return associatedEmployees;
+  };
 
   // --- Handlers ---
   const handleAddClick = () => {
@@ -173,6 +193,11 @@ const PayCodePage: React.FC = () => {
   const handleAssociateWithJobs = (pc: PayCode) => {
     setCodeToAssociate(pc);
     setShowAssociateModal(true);
+  };
+
+  const handleAssociateWithEmployees = (payCode: PayCode) => {
+    setPayCodeToAssociateWithEmployees(payCode);
+    setShowAssociateEmployeesModal(true);
   };
 
   const handleSavePayCode = async (payCodeData: PayCode) => {
@@ -650,6 +675,16 @@ const PayCodePage: React.FC = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                handleAssociateWithEmployees(pc);
+                              }}
+                              className="text-emerald-600 hover:text-emerald-800"
+                              title="Link to Employees"
+                            >
+                              <IconUser size={18} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 handleDeleteClick(pc);
                               }}
                               className="text-rose-600 hover:text-rose-800"
@@ -702,6 +737,19 @@ const PayCodePage: React.FC = () => {
         availableJobs={jobs}
         currentJobIds={
           codeToAssociate ? getAssociatedJobIds(codeToAssociate.id) : []
+        }
+        onAssociationComplete={refreshPayCodeMappings}
+      />
+      {/* Associate with Employees Modal */}
+      <AssociatePayCodesWithEmployeesModal
+        isOpen={showAssociateEmployeesModal}
+        onClose={() => setShowAssociateEmployeesModal(false)}
+        payCode={payCodeToAssociateWithEmployees}
+        availableEmployees={allEmployees}
+        currentEmployeeIds={
+          payCodeToAssociateWithEmployees
+            ? getAssociatedEmployeeIds(payCodeToAssociateWithEmployees.id)
+            : []
         }
         onAssociationComplete={refreshPayCodeMappings}
       />
