@@ -22,7 +22,7 @@ import {
   useJobPayCodeMappings,
 } from "../../utils/catalogue/useJobPayCodeMappings";
 import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
-import { IconLink } from "@tabler/icons-react";
+import { IconLink, IconPencil } from "@tabler/icons-react";
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import { JobPayCodeDetails } from "../../types/types";
@@ -661,21 +661,86 @@ const StaffFormPage: React.FC = () => {
                                       </span>
                                     </div>
                                   </div>
-                                  {(payCode.override_rate_biasa !== null ||
-                                    payCode.is_default_setting) && (
-                                    <div className="mt-1.5 flex flex-wrap gap-2">
+
+                                  {/* Add rates display */}
+                                  <div className="mt-1 text-xs text-default-600">
+                                    <div className="flex gap-3 flex-wrap">
+                                      <span>
+                                        Biasa: RM
+                                        {payCode.override_rate_biasa !== null
+                                          ? payCode.override_rate_biasa.toFixed(
+                                              2
+                                            )
+                                          : (payCode.rate_biasa ?? 0).toFixed(
+                                              2
+                                            )}
+                                        {payCode.override_rate_biasa !==
+                                          null && (
+                                          <span
+                                            className="text-sky-600"
+                                            title="Override rate"
+                                          >
+                                            {" "}
+                                            *
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span>
+                                        Ahad: RM
+                                        {payCode.override_rate_ahad !== null
+                                          ? payCode.override_rate_ahad.toFixed(
+                                              2
+                                            )
+                                          : (payCode.rate_ahad ?? 0).toFixed(2)}
+                                        {payCode.override_rate_ahad !==
+                                          null && (
+                                          <span
+                                            className="text-sky-600"
+                                            title="Override rate"
+                                          >
+                                            {" "}
+                                            *
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span>
+                                        Umum: RM
+                                        {payCode.override_rate_umum !== null
+                                          ? payCode.override_rate_umum.toFixed(
+                                              2
+                                            )
+                                          : (payCode.rate_umum ?? 0).toFixed(2)}
+                                        {payCode.override_rate_umum !==
+                                          null && (
+                                          <span
+                                            className="text-sky-600"
+                                            title="Override rate"
+                                          >
+                                            {" "}
+                                            *
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 flex gap-1 flex-wrap text-xs">
+                                      <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+                                        {payCode.pay_type}
+                                      </span>
+                                      <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+                                        {payCode.rate_unit}
+                                      </span>
                                       {payCode.override_rate_biasa !== null && (
-                                        <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
+                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
                                           Customized rate
                                         </span>
                                       )}
                                       {payCode.is_default_setting && (
-                                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
                                           Default
                                         </span>
                                       )}
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
                               </div>
                             ))
@@ -723,13 +788,91 @@ const StaffFormPage: React.FC = () => {
                                         </span>
                                       </div>
                                     </div>
-                                    {payCode.is_default_setting && (
-                                      <div className="mt-1.5 flex flex-wrap gap-2">
-                                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
-                                          Default
+
+                                    {/* Add rates display */}
+                                    <div className="mt-1 text-xs text-default-600">
+                                      <div className="flex gap-3 flex-wrap">
+                                        <span>
+                                          Biasa: RM
+                                          {payCode.override_rate_biasa !== null
+                                            ? payCode.override_rate_biasa.toFixed(
+                                                2
+                                              )
+                                            : (payCode.rate_biasa ?? 0).toFixed(
+                                                2
+                                              )}
+                                          {payCode.override_rate_biasa !==
+                                            null && (
+                                            <span
+                                              className="text-amber-600"
+                                              title="Override rate"
+                                            >
+                                              {" "}
+                                              *
+                                            </span>
+                                          )}
+                                        </span>
+                                        <span>
+                                          Ahad: RM
+                                          {payCode.override_rate_ahad !== null
+                                            ? payCode.override_rate_ahad.toFixed(
+                                                2
+                                              )
+                                            : (payCode.rate_ahad ?? 0).toFixed(
+                                                2
+                                              )}
+                                          {payCode.override_rate_ahad !==
+                                            null && (
+                                            <span
+                                              className="text-amber-600"
+                                              title="Override rate"
+                                            >
+                                              {" "}
+                                              *
+                                            </span>
+                                          )}
+                                        </span>
+                                        <span>
+                                          Umum: RM
+                                          {payCode.override_rate_umum !== null
+                                            ? payCode.override_rate_umum.toFixed(
+                                                2
+                                              )
+                                            : (payCode.rate_umum ?? 0).toFixed(
+                                                2
+                                              )}
+                                          {payCode.override_rate_umum !==
+                                            null && (
+                                            <span
+                                              className="text-amber-600"
+                                              title="Override rate"
+                                            >
+                                              {" "}
+                                              *
+                                            </span>
+                                          )}
                                         </span>
                                       </div>
-                                    )}
+                                      <div className="mt-2 flex gap-1 text-xs flex-wrap">
+                                        <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+                                          {payCode.pay_type}
+                                        </span>
+                                        <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+                                          {payCode.rate_unit}
+                                        </span>
+                                        {payCode.override_rate_biasa !==
+                                          null && (
+                                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
+                                            Customized rate
+                                          </span>
+                                        )}
+                                        {payCode.is_default_setting && (
+                                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                            Default
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               ))
@@ -794,11 +937,6 @@ const StaffFormPage: React.FC = () => {
                                           </span>
                                         ) : null;
                                       })}
-                                      {payCode.is_default_setting && (
-                                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
-                                          Default
-                                        </span>
-                                      )}
                                     </div>
                                   </div>
                                 </div>
