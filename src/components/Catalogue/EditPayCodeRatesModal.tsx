@@ -25,6 +25,7 @@ interface EditPayCodeRatesModalProps {
   isOpen: boolean;
   onClose: () => void;
   jobId: string;
+  jobName?: string;
   payCodeDetail: JobPayCodeDetails | null;
   onRatesSaved: () => void; // Callback after successful save to refresh parent
 }
@@ -33,6 +34,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
   isOpen,
   onClose,
   jobId,
+  jobName,
   payCodeDetail,
   onRatesSaved,
 }) => {
@@ -237,6 +239,12 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                 <p className="mt-1 text-sm text-gray-600">
                   {payCodeDetail?.description}
                 </p>
+
+                {jobName && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Job: {jobName} ({jobId})
+                  </p>
+                )}
 
                 <div className="mt-6 space-y-4">
                   {/* Display Default Rates for reference maybe? Or just in placeholder */}

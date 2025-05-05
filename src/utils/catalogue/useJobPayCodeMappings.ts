@@ -7,6 +7,7 @@ type DetailedJobPayCodeMap = Record<string, JobPayCodeDetails[]>;
 
 export interface EmployeePayCodeDetails
   extends Omit<PayCode, "rate_biasa" | "rate_ahad" | "rate_umum"> {
+  job_id: string;
   employee_id?: string;
   pay_code_id: string;
   is_default_setting: boolean;
