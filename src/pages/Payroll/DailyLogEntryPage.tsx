@@ -459,17 +459,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
-    setEmployeeSelectionState(() => {
+    setEmployeeSelectionState((prev) => {
       if (selectAll) {
-        // Deselect all - clear all selections
+        // Deselect all - clear only the selections, not the hours
         return {
-          selectedJobs: {},
-          jobHours: {},
+          selectedJobs: {}, // Clear selections
+          jobHours: { ...prev.jobHours }, // Preserve hours
         };
       } else {
         // Select all employees with default hours
         const newSelectedJobs: Record<string, string[]> = {};
-        const newJobHours: Record<string, Record<string, number>> = {};
+        const newJobHours: Record<string, Record<string, number>> = {
+          ...prev.jobHours,
+        };
 
         expandedEmployees.forEach((employee) => {
           const employeeId = employee.id;
@@ -483,7 +485,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           }
 
           newSelectedJobs[employeeId].push(jobType);
-          newJobHours[employeeId][jobType] = 7; // Default hours
+
+          // Only set hours if they're not already set
+          if (!newJobHours[employeeId][jobType]) {
+            newJobHours[employeeId][jobType] = 7; // Default hours
+          }
         });
 
         return {
