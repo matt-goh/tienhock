@@ -129,7 +129,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                   <div className="flex-1 min-w-0 pr-4">
                     <div
                       className="font-medium text-default-800 truncate"
-                      title={activity.payCodeId}
+                      title={`${activity.description} (${activity.payCodeId})`}
                     >
                       <Link
                         to={`/catalogue/pay-codes?desc=${activity.description}`}
