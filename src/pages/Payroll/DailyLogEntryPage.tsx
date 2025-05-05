@@ -133,6 +133,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     };
   });
   const {
+    employeeMappings,
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
   } = useJobPayCodeMappings();
@@ -663,8 +664,30 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const hours =
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
 
-          // Get pay codes from cache
+          // Get job pay codes from cache
           const jobPayCodes = jobPayCodeDetails[jobType] || [];
+
+          // Get employee-specific pay codes from cache
+          const employeePayCodes = employeeMappings[employeeId] || [];
+
+          // Create a map of job pay codes by ID for easy lookup
+          const jobPayCodeMap = new Map(jobPayCodes.map((pc) => [pc.id, pc]));
+
+          // Merge pay codes, prioritizing employee-specific ones
+          const allPayCodes = new Map();
+
+          // First add job pay codes
+          jobPayCodes.forEach((pc) => {
+            allPayCodes.set(pc.id, { ...pc, source: "job" });
+          });
+
+          // Then add/override with employee-specific pay codes
+          employeePayCodes.forEach((pc) => {
+            allPayCodes.set(pc.id, { ...pc, source: "employee" });
+          });
+
+          // Convert map back to array
+          const mergedPayCodes = Array.from(allPayCodes.values());
 
           // Check if we already have activities for this employee/job
           const existingActivities = employeeActivities[rowKey] || [];
@@ -672,8 +695,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Filter pay codes based on hours
           const filteredPayCodes =
             hours > 8
-              ? jobPayCodes // If overtime, include all pay codes
-              : jobPayCodes.filter(
+              ? mergedPayCodes // If overtime, include all pay codes
+              : mergedPayCodes.filter(
                   (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
                 ); // Otherwise, only Base and Tambahan
 
@@ -741,6 +764,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               isSelected: isSelected,
               unitsProduced: unitsProduced,
               isContextLinked: isContextLinked, // Flag for special handling
+              source: payCode.source, // Track source (job or employee)
               calculatedAmount: calculateActivityAmount(
                 {
                   isSelected,
