@@ -100,6 +100,7 @@ const StaffFormPage: React.FC = () => {
     useState<JobPayCodeDetails | null>(null);
   const [showJobPayCodeEditModal, setShowJobPayCodeEditModal] = useState(false);
   const [payCodeSearchQuery, setPayCodeSearchQuery] = useState<string>("");
+  const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -258,7 +259,8 @@ const StaffFormPage: React.FC = () => {
 
     // Helper function to normalize data (from cache or API)
     const normalizeData = (data: Employee): Employee => {
-      return {
+      // Create a base normalized data object
+      const normalizedData = {
         ...data,
         nationality: mapDisplayNameToId(
           data.nationality,
@@ -274,6 +276,17 @@ const StaffFormPage: React.FC = () => {
         dateJoined: data.dateJoined || "",
         dateResigned: data.dateResigned || "",
       };
+
+      // Preserve modified fields from current formData
+      if (formData) {
+        // For each modified field, keep the user's changes
+        Array.from(modifiedFields).forEach((field) => {
+          // @ts-ignore - field is a valid key of formData
+          normalizedData[field] = formData[field];
+        });
+      }
+
+      return normalizedData;
     };
 
     if (staffData) {
@@ -308,7 +321,9 @@ const StaffFormPage: React.FC = () => {
     options.nationalities,
     options.races,
     options.agama,
-  ]); // Updated dependencies
+    formData, // Add this dependency
+    modifiedFields, // Add this dependency
+  ]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -377,6 +392,8 @@ const StaffFormPage: React.FC = () => {
         ...prevData,
         [name]: value,
       }));
+      // Add this line to track that this field was modified
+      setModifiedFields((prev) => new Set(prev).add(name));
     },
     []
   );
@@ -446,6 +463,9 @@ const StaffFormPage: React.FC = () => {
 
       // Refresh the cache after successful save
       await refreshStaffs();
+      
+      // Reset modified fields after successful save
+      setModifiedFields(new Set());
 
       toast.success(
         `Staff member ${isEditMode ? "updated" : "created"} successfully!`
