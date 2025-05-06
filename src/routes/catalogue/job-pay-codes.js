@@ -93,79 +93,6 @@ export default function (pool) {
     }
   });
 
-  router.post("/by-jobs", async (req, res) => {
-    const { jobIds } = req.body;
-
-    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
-      return res.status(400).json({ message: "jobIds array is required" });
-    }
-
-    try {
-      const query = `
-        SELECT
-          pc.id,
-          pc.description,
-          pc.pay_type,
-          pc.rate_unit,
-          CAST(pc.rate_biasa AS NUMERIC(10, 2)) AS rate_biasa,
-          CAST(pc.rate_ahad AS NUMERIC(10, 2)) AS rate_ahad,
-          CAST(pc.rate_umum AS NUMERIC(10, 2)) AS rate_umum,
-          pc.is_active,
-          pc.requires_units_input,
-          jpc.job_id,
-          jpc.pay_code_id,
-          jpc.is_default AS is_default_setting,
-          CAST(jpc.override_rate_biasa AS NUMERIC(10, 2)) AS override_rate_biasa,
-          CAST(jpc.override_rate_ahad AS NUMERIC(10, 2)) AS override_rate_ahad,
-          CAST(jpc.override_rate_umum AS NUMERIC(10, 2)) AS override_rate_umum
-        FROM job_pay_codes jpc
-        JOIN pay_codes pc ON jpc.pay_code_id = pc.id
-        WHERE jpc.job_id = ANY($1::varchar[])
-        ORDER BY jpc.job_id, pc.id
-      `;
-
-      const result = await pool.query(query, [jobIds]);
-
-      // Group results by job ID for easier consumption
-      const payCodesByJob = result.rows.reduce((acc, row) => {
-        if (!acc[row.job_id]) {
-          acc[row.job_id] = [];
-        }
-
-        // Parse numeric values
-        acc[row.job_id].push({
-          ...row,
-          rate_biasa:
-            row.rate_biasa === null ? null : parseFloat(row.rate_biasa),
-          rate_ahad: row.rate_ahad === null ? null : parseFloat(row.rate_ahad),
-          rate_umum: row.rate_umum === null ? null : parseFloat(row.rate_umum),
-          override_rate_biasa:
-            row.override_rate_biasa === null
-              ? null
-              : parseFloat(row.override_rate_biasa),
-          override_rate_ahad:
-            row.override_rate_ahad === null
-              ? null
-              : parseFloat(row.override_rate_ahad),
-          override_rate_umum:
-            row.override_rate_umum === null
-              ? null
-              : parseFloat(row.override_rate_umum),
-        });
-
-        return acc;
-      }, {});
-
-      res.json(payCodesByJob);
-    } catch (error) {
-      console.error("Error fetching pay codes for multiple jobs:", error);
-      res.status(500).json({
-        message: "Error fetching pay codes for multiple jobs",
-        error: error.message,
-      });
-    }
-  });
-
   // Get detailed pay codes (excluding 'code', including overrides) for a specific job
   router.get("/job/:jobId", async (req, res) => {
     const { jobId } = req.params;
@@ -228,7 +155,7 @@ export default function (pool) {
     }
   });
 
-  // Add a pay code association to a job (without setting overrides initially)
+  // Add a pay code association to a job
   router.post("/", async (req, res) => {
     const { job_id, pay_code_id, is_default = false } = req.body;
 
@@ -239,36 +166,51 @@ export default function (pool) {
     }
 
     try {
+      // Begin transaction
+      await pool.query("BEGIN");
+
       // Check if the association already exists
       const checkQuery =
         "SELECT 1 FROM job_pay_codes WHERE job_id = $1 AND pay_code_id = $2";
       const checkResult = await pool.query(checkQuery, [job_id, pay_code_id]);
       if (checkResult.rows.length > 0) {
-        return res
-          .status(409)
-          .json({ message: "This pay code is already assigned to the job" }); // 409 Conflict
+        await pool.query("ROLLBACK");
+        return res.status(409).json({
+          message: "This pay code is already assigned to the job",
+        });
       }
 
       // Insert with default NULL overrides
       const insertQuery = `
-        INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
-        VALUES ($1, $2, $3, NULL, NULL, NULL)
-        RETURNING *
-      `;
+      INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
+      VALUES ($1, $2, $3, NULL, NULL, NULL)
+      RETURNING *
+    `;
       const result = await pool.query(insertQuery, [
         job_id,
         pay_code_id,
         is_default,
       ]);
+
+      // Update the updated_at timestamp for all staff with this job
+      const updateStaffQuery = `
+      UPDATE staffs 
+      SET updated_at = CURRENT_TIMESTAMP 
+      WHERE job::jsonb ? $1
+    `;
+      await pool.query(updateStaffQuery, [job_id]);
+
+      // Commit transaction
+      await pool.query("COMMIT");
+
       res.status(201).json({
         message: "Pay code assigned to job successfully",
         jobPayCode: result.rows[0],
       });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error assigning pay code to job:", error);
-      // Check for specific DB errors like foreign key violations
       if (error.code === "23503") {
-        // PostgreSQL foreign key violation code
         return res
           .status(404)
           .json({ message: "Invalid job_id or pay_code_id provided" });
@@ -309,6 +251,7 @@ export default function (pool) {
       const results = [];
       const errors = [];
       let successCount = 0;
+      const affectedJobs = new Set(); // Track affected jobs for timestamp updates
 
       // Use a transaction for atomicity
       await pool.query("BEGIN");
@@ -347,6 +290,9 @@ export default function (pool) {
           ]);
           results.push(result.rows[0]);
           successCount++;
+
+          // Add to list of affected jobs
+          affectedJobs.add(job_id);
         } catch (error) {
           // Handle individual entry errors
           errors.push({
@@ -361,6 +307,17 @@ export default function (pool) {
       }
 
       if (successCount > 0) {
+        // Update timestamps for all affected jobs' staff
+        for (const jobId of affectedJobs) {
+          // Update the updated_at timestamp for all staff with this job
+          const updateStaffQuery = `
+          UPDATE staffs 
+          SET updated_at = CURRENT_TIMESTAMP 
+          WHERE job::jsonb ? $1
+        `;
+          await pool.query(updateStaffQuery, [jobId]);
+        }
+
         await pool.query("COMMIT");
         return res.status(201).json({
           message: `Successfully added ${successCount} of ${associations.length} associations`,
@@ -387,7 +344,6 @@ export default function (pool) {
   // Update override rates for a specific job-pay code association
   router.put("/:jobId/:payCodeId", async (req, res) => {
     const { jobId, payCodeId } = req.params;
-    // Extract potential override fields from the request body
     const {
       override_rate_biasa,
       override_rate_ahad,
@@ -396,16 +352,16 @@ export default function (pool) {
     } = req.body;
 
     if (!jobId || !payCodeId) {
-      return res
-        .status(400)
-        .json({ message: "Job ID and Pay Code ID are required in URL" });
+      return res.status(400).json({
+        message: "Job ID and Pay Code ID are required in URL",
+      });
     }
 
     const fieldsToUpdate = [];
     const values = [];
-    let valueIndex = 1; // Parameter index for the SQL query
+    let valueIndex = 1;
 
-    // Helper to validate and add fields
+    // Helper functions - existing code remains unchanged
     const addUpdateField = (fieldName, value) => {
       if (value !== undefined) {
         // Check if the key exists in the body
@@ -430,27 +386,25 @@ export default function (pool) {
     };
 
     try {
-      // Validate and add each field present in the request body
+      // Begin transaction
+      await pool.query("BEGIN");
+
+      // Validation logic (unchanged)
       addUpdateField("override_rate_biasa", override_rate_biasa);
       addUpdateField("override_rate_ahad", override_rate_ahad);
       addUpdateField("override_rate_umum", override_rate_umum);
       addBooleanField("is_default", is_default);
-    } catch (validationError) {
-      // Catch validation errors from addUpdateField
-      return res.status(400).json({ message: validationError.message });
-    }
 
-    if (fieldsToUpdate.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No update fields provided in the request body" });
-    }
+      if (fieldsToUpdate.length === 0) {
+        await pool.query("ROLLBACK");
+        return res
+          .status(400)
+          .json({ message: "No update fields provided in the request body" });
+      }
 
-    // Add the WHERE clause parameters
-    values.push(jobId);
-    values.push(payCodeId);
+      values.push(jobId);
+      values.push(payCodeId);
 
-    try {
       const query = `
       UPDATE job_pay_codes
       SET ${fieldsToUpdate.join(", ")}
@@ -461,12 +415,24 @@ export default function (pool) {
       const result = await pool.query(query, values);
 
       if (result.rows.length === 0) {
+        await pool.query("ROLLBACK");
         return res
           .status(404)
           .json({ message: "Job-PayCode association not found" });
       }
 
-      // Return the updated record (ensure numbers are numbers)
+      // Update the updated_at timestamp for all staff with this job
+      const updateStaffQuery = `
+      UPDATE staffs 
+      SET updated_at = CURRENT_TIMESTAMP 
+      WHERE job::jsonb ? $1
+    `;
+      await pool.query(updateStaffQuery, [jobId]);
+
+      // Commit transaction
+      await pool.query("COMMIT");
+
+      // Format response data
       const updatedRecord = {
         ...result.rows[0],
         override_rate_biasa:
@@ -481,7 +447,7 @@ export default function (pool) {
           result.rows[0].override_rate_umum === null
             ? null
             : parseFloat(result.rows[0].override_rate_umum),
-        is_default: !!result.rows[0].is_default, // Ensure boolean
+        is_default: !!result.rows[0].is_default,
       };
 
       res.json({
@@ -489,6 +455,7 @@ export default function (pool) {
         updated: updatedRecord,
       });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error updating job-pay code settings:", error);
       res.status(500).json({
         message: "Error updating job-pay code settings",
@@ -508,25 +475,41 @@ export default function (pool) {
     }
 
     try {
+      // Begin transaction
+      await pool.query("BEGIN");
+
       const query = `
-        DELETE FROM job_pay_codes
-        WHERE job_id = $1 AND pay_code_id = $2
-        RETURNING job_id, pay_code_id -- Return identifiers
-      `;
+      DELETE FROM job_pay_codes
+      WHERE job_id = $1 AND pay_code_id = $2
+      RETURNING job_id, pay_code_id
+    `;
 
       const result = await pool.query(query, [jobId, payCodeId]);
 
       if (result.rows.length === 0) {
+        await pool.query("ROLLBACK");
         return res
           .status(404)
           .json({ message: "Job-PayCode association not found" });
       }
 
+      // Update the updated_at timestamp for all staff with this job
+      const updateStaffQuery = `
+      UPDATE staffs 
+      SET updated_at = CURRENT_TIMESTAMP 
+      WHERE job::jsonb ? $1
+    `;
+      await pool.query(updateStaffQuery, [jobId]);
+
+      // Commit transaction
+      await pool.query("COMMIT");
+
       res.status(200).json({
         message: "Pay code removed from job successfully",
-        removed: result.rows[0], // Return the IDs of the removed association
+        removed: result.rows[0],
       });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error removing pay code from job:", error);
       res.status(500).json({
         message: "Error removing pay code from job",
@@ -562,6 +545,7 @@ export default function (pool) {
       const results = [];
       const errors = [];
       let successCount = 0;
+      const affectedJobs = new Set(); // Track affected jobs for timestamp updates
 
       for (const item of items) {
         const { job_id, pay_code_id } = item;
@@ -577,6 +561,7 @@ export default function (pool) {
           if (result.rows.length > 0) {
             results.push(result.rows[0]);
             successCount++;
+            affectedJobs.add(job_id);
           } else {
             errors.push({
               job_id,
@@ -594,6 +579,17 @@ export default function (pool) {
       }
 
       if (successCount > 0) {
+        // Update timestamps for all affected jobs' staff
+        for (const jobId of affectedJobs) {
+          // Update the updated_at timestamp for all staff with this job
+          const updateStaffQuery = `
+          UPDATE staffs 
+          SET updated_at = CURRENT_TIMESTAMP 
+          WHERE job::jsonb ? $1
+        `;
+          await pool.query(updateStaffQuery, [jobId]);
+        }
+
         await pool.query("COMMIT");
         return res.status(200).json({
           message: `Successfully removed ${successCount} of ${items.length} associations`,

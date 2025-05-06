@@ -1104,6 +1104,7 @@ const StaffFormPage: React.FC = () => {
           }
           onAssociationComplete={async () => {
             await refreshPayCodeMappings();
+            await refreshStaffs();
           }}
         />
       )}
@@ -1116,6 +1117,7 @@ const StaffFormPage: React.FC = () => {
           payCodeDetail={selectedPayCodeForEdit}
           onRatesSaved={async () => {
             await refreshPayCodeMappings();
+            await refreshStaffs();
           }}
         />
       )}
@@ -1131,6 +1133,7 @@ const StaffFormPage: React.FC = () => {
           payCodeDetail={selectedJobPayCodeForEdit}
           onRatesSaved={async () => {
             await refreshPayCodeMappings();
+            await refreshStaffs();
           }}
         />
       )}

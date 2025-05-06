@@ -164,6 +164,9 @@ export default function (pool) {
     }
 
     try {
+      // Begin transaction
+      await pool.query("BEGIN");
+
       // Check if the association already exists
       const checkQuery =
         "SELECT 1 FROM employee_pay_codes WHERE employee_id = $1 AND pay_code_id = $2";
@@ -172,6 +175,7 @@ export default function (pool) {
         pay_code_id,
       ]);
       if (checkResult.rows.length > 0) {
+        await pool.query("ROLLBACK");
         return res.status(409).json({
           message: "This pay code is already assigned to the employee",
         });
@@ -188,6 +192,18 @@ export default function (pool) {
         pay_code_id,
         is_default,
       ]);
+
+      // Update the staff's updated_at timestamp
+      const updateStaffQuery = `
+        UPDATE staffs 
+        SET updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1
+      `;
+      await pool.query(updateStaffQuery, [employee_id]);
+
+      // Commit transaction
+      await pool.query("COMMIT");
+
       res.status(201).json({
         message: "Pay code assigned to employee successfully",
         employeePayCode: result.rows[0],
@@ -281,26 +297,19 @@ export default function (pool) {
           .json({ message: "Employee-PayCode association not found" });
       }
 
-      const updatedRecord = {
-        ...result.rows[0],
-        override_rate_biasa:
-          result.rows[0].override_rate_biasa === null
-            ? null
-            : parseFloat(result.rows[0].override_rate_biasa),
-        override_rate_ahad:
-          result.rows[0].override_rate_ahad === null
-            ? null
-            : parseFloat(result.rows[0].override_rate_ahad),
-        override_rate_umum:
-          result.rows[0].override_rate_umum === null
-            ? null
-            : parseFloat(result.rows[0].override_rate_umum),
-        is_default: !!result.rows[0].is_default,
-      };
+      // Update the staff's updated_at timestamp
+      const updateStaffQuery = `
+    UPDATE staffs 
+    SET updated_at = CURRENT_TIMESTAMP 
+    WHERE id = $1
+  `;
+      await pool.query(updateStaffQuery, [employeeId]);
+
+      // Commit transaction
+      await pool.query("COMMIT");
 
       res.json({
         message: "Settings updated successfully",
-        updated: updatedRecord,
       });
     } catch (error) {
       console.error("Error updating employee-pay code settings:", error);
@@ -322,25 +331,41 @@ export default function (pool) {
     }
 
     try {
+      // Begin transaction
+      await pool.query("BEGIN");
+
       const query = `
-        DELETE FROM employee_pay_codes
-        WHERE employee_id = $1 AND pay_code_id = $2
-        RETURNING employee_id, pay_code_id
-      `;
+      DELETE FROM employee_pay_codes
+      WHERE employee_id = $1 AND pay_code_id = $2
+      RETURNING employee_id, pay_code_id
+    `;
 
       const result = await pool.query(query, [employeeId, payCodeId]);
 
       if (result.rows.length === 0) {
+        await pool.query("ROLLBACK");
         return res
           .status(404)
           .json({ message: "Employee-PayCode association not found" });
       }
+
+      // Update the staff's updated_at timestamp
+      const updateStaffQuery = `
+      UPDATE staffs 
+      SET updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $1
+    `;
+      await pool.query(updateStaffQuery, [employeeId]);
+
+      // Commit transaction
+      await pool.query("COMMIT");
 
       res.status(200).json({
         message: "Pay code removed from employee successfully",
         removed: result.rows[0],
       });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error removing pay code from employee:", error);
       res.status(500).json({
         message: "Error removing pay code from employee",
