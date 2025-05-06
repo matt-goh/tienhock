@@ -431,6 +431,7 @@ export interface Employee {
   agama: string;
   dateResigned: string;
   newId: string;
+  updatedAt?: string;
 }
 
 export type FilterOptions = {
