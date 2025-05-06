@@ -619,7 +619,7 @@ const StaffFormPage: React.FC = () => {
                           onChange={(e) =>
                             setPayCodeSearchQuery(e.target.value)
                           }
-                          className="px-3 py-1.5 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
+                          className="px-3 py-1 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
                         />
                         {payCodeSearchQuery && (
                           <button
