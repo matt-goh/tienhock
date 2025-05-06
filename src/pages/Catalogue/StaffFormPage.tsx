@@ -99,6 +99,7 @@ const StaffFormPage: React.FC = () => {
   const [selectedJobPayCodeForEdit, setSelectedJobPayCodeForEdit] =
     useState<JobPayCodeDetails | null>(null);
   const [showJobPayCodeEditModal, setShowJobPayCodeEditModal] = useState(false);
+  const [payCodeSearchQuery, setPayCodeSearchQuery] = useState<string>("");
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -609,17 +610,39 @@ const StaffFormPage: React.FC = () => {
                     <h3 className="text-base font-medium text-default-800">
                       Associated Pay Codes
                     </h3>
-                    {isEditMode && (
-                      <Button
-                        type="button"
-                        onClick={() => setShowPayCodeModal(true)}
-                        variant="outline"
-                        size="sm"
-                        icon={IconLink}
-                      >
-                        Manage Employee Pay Codes
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search pay codes..."
+                          value={payCodeSearchQuery}
+                          onChange={(e) =>
+                            setPayCodeSearchQuery(e.target.value)
+                          }
+                          className="px-3 py-1.5 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
+                        />
+                        {payCodeSearchQuery && (
+                          <button
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                            onClick={() => setPayCodeSearchQuery("")}
+                            title="Clear search"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      {isEditMode && (
+                        <Button
+                          type="button"
+                          onClick={() => setShowPayCodeModal(true)}
+                          variant="outline"
+                          size="sm"
+                          icon={IconLink}
+                        >
+                          Manage Employee Pay Codes
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {loading || loadingPayCodes ? (
@@ -637,150 +660,31 @@ const StaffFormPage: React.FC = () => {
                           {id &&
                           employeeMappings[id] &&
                           employeeMappings[id].length > 0 ? (
-                            employeeMappings[id].map((payCode) => (
-                              <div
-                                key={payCode.id}
-                                className={`flex items-center justify-between px-3 py-2 bg-sky-50 border border-sky-200 rounded-md ${
-                                  isEditMode
-                                    ? "cursor-pointer hover:bg-sky-100"
-                                    : ""
-                                }`}
-                                onClick={() => {
-                                  if (isEditMode) {
-                                    setSelectedPayCodeForEdit(payCode);
-                                    setShowEditRateModal(true);
-                                  }
-                                }}
-                                title={`Edit rates for ${payCode.description}`}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 max-w-full">
-                                      <Link
-                                        to={`/catalogue/pay-codes?desc=${payCode.description}`}
-                                        className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
-                                        onClick={(e) => e.stopPropagation()}
-                                        title={`${payCode.description} (${payCode.id})`}
-                                      >
-                                        {payCode.description}
-                                      </Link>
-                                      <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
-                                        {payCode.id}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Add rates display */}
-                                  <div className="mt-1 text-xs text-default-600">
-                                    <div className="flex gap-3 flex-wrap">
-                                      <span>
-                                        Biasa: RM
-                                        {payCode.override_rate_biasa !== null
-                                          ? payCode.override_rate_biasa.toFixed(
-                                              2
-                                            )
-                                          : (payCode.rate_biasa ?? 0).toFixed(
-                                              2
-                                            )}
-                                        {payCode.override_rate_biasa !==
-                                          null && (
-                                          <span
-                                            className="text-sky-600"
-                                            title="Override rate"
-                                          >
-                                            {" "}
-                                            *
-                                          </span>
-                                        )}
-                                      </span>
-                                      <span>
-                                        Ahad: RM
-                                        {payCode.override_rate_ahad !== null
-                                          ? payCode.override_rate_ahad.toFixed(
-                                              2
-                                            )
-                                          : (payCode.rate_ahad ?? 0).toFixed(2)}
-                                        {payCode.override_rate_ahad !==
-                                          null && (
-                                          <span
-                                            className="text-sky-600"
-                                            title="Override rate"
-                                          >
-                                            {" "}
-                                            *
-                                          </span>
-                                        )}
-                                      </span>
-                                      <span>
-                                        Umum: RM
-                                        {payCode.override_rate_umum !== null
-                                          ? payCode.override_rate_umum.toFixed(
-                                              2
-                                            )
-                                          : (payCode.rate_umum ?? 0).toFixed(2)}
-                                        {payCode.override_rate_umum !==
-                                          null && (
-                                          <span
-                                            className="text-sky-600"
-                                            title="Override rate"
-                                          >
-                                            {" "}
-                                            *
-                                          </span>
-                                        )}
-                                      </span>
-                                    </div>
-                                    <div className="mt-2 flex gap-1 flex-wrap text-xs">
-                                      <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
-                                        {payCode.pay_type}
-                                      </span>
-                                      <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
-                                        {payCode.rate_unit}
-                                      </span>
-                                      {payCode.override_rate_biasa !== null && (
-                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
-                                          Customized rate
-                                        </span>
-                                      )}
-                                      {payCode.is_default_setting && (
-                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
-                                          Default
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="col-span-3 text-sm text-default-500 py-4">
-                              No employee-specific pay codes
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Job-linked Pay Codes Section */}
-                      <div>
-                        <h4 className="text-sm font-medium text-default-700 mb-2">
-                          Job-Linked Pay Codes
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {(() => {
-                            const { jobPayCodes } = getAllPayCodesForEmployee();
-                            return jobPayCodes.length > 0 ? (
-                              jobPayCodes.map((payCode) => (
+                            employeeMappings[id]
+                              .filter(
+                                (payCode) =>
+                                  !payCodeSearchQuery ||
+                                  payCode.id
+                                    .toLowerCase()
+                                    .includes(
+                                      payCodeSearchQuery.toLowerCase()
+                                    ) ||
+                                  payCode.description
+                                    .toLowerCase()
+                                    .includes(payCodeSearchQuery.toLowerCase())
+                              )
+                              .map((payCode) => (
                                 <div
                                   key={payCode.id}
-                                  className={`flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-md ${
+                                  className={`flex items-center justify-between px-3 py-2 bg-sky-50 border border-sky-200 rounded-md ${
                                     isEditMode
-                                      ? "cursor-pointer hover:bg-amber-100"
+                                      ? "cursor-pointer hover:bg-sky-100"
                                       : ""
                                   }`}
                                   onClick={() => {
                                     if (isEditMode) {
-                                      setSelectedJobPayCodeForEdit(payCode);
-                                      setShowJobPayCodeEditModal(true);
+                                      setSelectedPayCodeForEdit(payCode);
+                                      setShowEditRateModal(true);
                                     }
                                   }}
                                   title={`Edit rates for ${payCode.description}`}
@@ -817,7 +721,7 @@ const StaffFormPage: React.FC = () => {
                                           {payCode.override_rate_biasa !==
                                             null && (
                                             <span
-                                              className="text-amber-600"
+                                              className="text-sky-600"
                                               title="Override rate"
                                             >
                                               {" "}
@@ -837,7 +741,7 @@ const StaffFormPage: React.FC = () => {
                                           {payCode.override_rate_ahad !==
                                             null && (
                                             <span
-                                              className="text-amber-600"
+                                              className="text-sky-600"
                                               title="Override rate"
                                             >
                                               {" "}
@@ -857,7 +761,7 @@ const StaffFormPage: React.FC = () => {
                                           {payCode.override_rate_umum !==
                                             null && (
                                             <span
-                                              className="text-amber-600"
+                                              className="text-sky-600"
                                               title="Override rate"
                                             >
                                               {" "}
@@ -866,7 +770,7 @@ const StaffFormPage: React.FC = () => {
                                           )}
                                         </span>
                                       </div>
-                                      <div className="mt-2 flex gap-1 text-xs flex-wrap">
+                                      <div className="mt-2 flex gap-1 flex-wrap text-xs">
                                         <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
                                           {payCode.pay_type}
                                         </span>
@@ -889,6 +793,159 @@ const StaffFormPage: React.FC = () => {
                                   </div>
                                 </div>
                               ))
+                          ) : (
+                            <div className="col-span-3 text-sm text-default-500 py-4">
+                              No employee-specific pay codes
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Job-linked Pay Codes Section */}
+                      <div>
+                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                          Job-Linked Pay Codes
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {(() => {
+                            const { jobPayCodes } = getAllPayCodesForEmployee();
+                            return jobPayCodes.length > 0 ? (
+                              jobPayCodes
+                                .filter(
+                                  (payCode) =>
+                                    !payCodeSearchQuery ||
+                                    payCode.id
+                                      .toLowerCase()
+                                      .includes(
+                                        payCodeSearchQuery.toLowerCase()
+                                      ) ||
+                                    payCode.description
+                                      .toLowerCase()
+                                      .includes(
+                                        payCodeSearchQuery.toLowerCase()
+                                      )
+                                )
+                                .map((payCode) => (
+                                  <div
+                                    key={payCode.id}
+                                    className={`flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-md ${
+                                      isEditMode
+                                        ? "cursor-pointer hover:bg-amber-100"
+                                        : ""
+                                    }`}
+                                    onClick={() => {
+                                      if (isEditMode) {
+                                        setSelectedJobPayCodeForEdit(payCode);
+                                        setShowJobPayCodeEditModal(true);
+                                      }
+                                    }}
+                                    title={`Edit rates for ${payCode.description}`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 max-w-full">
+                                          <Link
+                                            to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                            className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
+                                            onClick={(e) => e.stopPropagation()}
+                                            title={`${payCode.description} (${payCode.id})`}
+                                          >
+                                            {payCode.description}
+                                          </Link>
+                                          <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                            {payCode.id}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Add rates display */}
+                                      <div className="mt-1 text-xs text-default-600">
+                                        <div className="flex gap-3 flex-wrap">
+                                          <span>
+                                            Biasa: RM
+                                            {payCode.override_rate_biasa !==
+                                            null
+                                              ? payCode.override_rate_biasa.toFixed(
+                                                  2
+                                                )
+                                              : (
+                                                  payCode.rate_biasa ?? 0
+                                                ).toFixed(2)}
+                                            {payCode.override_rate_biasa !==
+                                              null && (
+                                              <span
+                                                className="text-amber-600"
+                                                title="Override rate"
+                                              >
+                                                {" "}
+                                                *
+                                              </span>
+                                            )}
+                                          </span>
+                                          <span>
+                                            Ahad: RM
+                                            {payCode.override_rate_ahad !== null
+                                              ? payCode.override_rate_ahad.toFixed(
+                                                  2
+                                                )
+                                              : (
+                                                  payCode.rate_ahad ?? 0
+                                                ).toFixed(2)}
+                                            {payCode.override_rate_ahad !==
+                                              null && (
+                                              <span
+                                                className="text-amber-600"
+                                                title="Override rate"
+                                              >
+                                                {" "}
+                                                *
+                                              </span>
+                                            )}
+                                          </span>
+                                          <span>
+                                            Umum: RM
+                                            {payCode.override_rate_umum !== null
+                                              ? payCode.override_rate_umum.toFixed(
+                                                  2
+                                                )
+                                              : (
+                                                  payCode.rate_umum ?? 0
+                                                ).toFixed(2)}
+                                            {payCode.override_rate_umum !==
+                                              null && (
+                                              <span
+                                                className="text-amber-600"
+                                                title="Override rate"
+                                              >
+                                                {" "}
+                                                *
+                                              </span>
+                                            )}
+                                          </span>
+                                        </div>
+                                        <div className="mt-2 flex gap-1 text-xs flex-wrap">
+                                          <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+                                            {payCode.pay_type}
+                                          </span>
+                                          <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+                                            {payCode.rate_unit}
+                                          </span>
+                                          {payCode.override_rate_biasa !==
+                                            null && (
+                                            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
+                                              Customized rate
+                                            </span>
+                                          )}
+                                          {payCode.is_default_setting && (
+                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                                              Default
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
                             ) : (
                               <div className="col-span-3 text-sm text-default-500 py-4">
                                 No job-linked pay codes
@@ -908,57 +965,72 @@ const StaffFormPage: React.FC = () => {
                             const { duplicatePayCodes } =
                               getAllPayCodesForEmployee();
                             return duplicatePayCodes.length > 0 ? (
-                              duplicatePayCodes.map((payCode) => (
-                                <div
-                                  key={`shared-${payCode.id}`}
-                                  className={`flex items-center justify-between px-3 py-2 bg-sky-50 border border-sky-200 rounded-md ${
-                                    isEditMode
-                                      ? "cursor-pointer hover:bg-sky-100"
-                                      : ""
-                                  }`}
-                                  onClick={() => {
-                                    if (isEditMode) {
-                                      setSelectedJobPayCodeForEdit(payCode);
-                                      setShowJobPayCodeEditModal(true);
-                                    }
-                                  }}
-                                  title={`Edit rates for ${payCode.description} (shared across multiple jobs)`}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-1.5 max-w-full">
-                                        <Link
-                                          to={`/catalogue/pay-codes?desc=${payCode.description}`}
-                                          className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
-                                          onClick={(e) => e.stopPropagation()}
-                                          title={`${payCode.description} (${payCode.id})`}
-                                        >
-                                          {payCode.description}
-                                        </Link>
-                                        <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
-                                          {payCode.id}
-                                        </span>
+                              duplicatePayCodes
+                                .filter(
+                                  (payCode) =>
+                                    !payCodeSearchQuery ||
+                                    payCode.id
+                                      .toLowerCase()
+                                      .includes(
+                                        payCodeSearchQuery.toLowerCase()
+                                      ) ||
+                                    payCode.description
+                                      .toLowerCase()
+                                      .includes(
+                                        payCodeSearchQuery.toLowerCase()
+                                      )
+                                )
+                                .map((payCode) => (
+                                  <div
+                                    key={`shared-${payCode.id}`}
+                                    className={`flex items-center justify-between px-3 py-2 bg-sky-50 border border-sky-200 rounded-md ${
+                                      isEditMode
+                                        ? "cursor-pointer hover:bg-sky-100"
+                                        : ""
+                                    }`}
+                                    onClick={() => {
+                                      if (isEditMode) {
+                                        setSelectedJobPayCodeForEdit(payCode);
+                                        setShowJobPayCodeEditModal(true);
+                                      }
+                                    }}
+                                    title={`Edit rates for ${payCode.description} (shared across multiple jobs)`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 max-w-full">
+                                          <Link
+                                            to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                            className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
+                                            onClick={(e) => e.stopPropagation()}
+                                            title={`${payCode.description} (${payCode.id})`}
+                                          >
+                                            {payCode.description}
+                                          </Link>
+                                          <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                            {payCode.id}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {/* Show which jobs this pay code is shared between */}
+                                      <div className="mt-1.5 flex flex-wrap gap-1">
+                                        {payCode.job_ids.map((jobId) => {
+                                          const job = jobs.find(
+                                            (j) => j.id === jobId
+                                          );
+                                          return job ? (
+                                            <span
+                                              key={jobId}
+                                              className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full font-medium"
+                                            >
+                                              {job.name}
+                                            </span>
+                                          ) : null;
+                                        })}
                                       </div>
                                     </div>
-                                    {/* Show which jobs this pay code is shared between */}
-                                    <div className="mt-1.5 flex flex-wrap gap-1">
-                                      {payCode.job_ids.map((jobId) => {
-                                        const job = jobs.find(
-                                          (j) => j.id === jobId
-                                        );
-                                        return job ? (
-                                          <span
-                                            key={jobId}
-                                            className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full font-medium"
-                                          >
-                                            {job.name}
-                                          </span>
-                                        ) : null;
-                                      })}
-                                    </div>
                                   </div>
-                                </div>
-                              ))
+                                ))
                             ) : (
                               <div className="col-span-3 text-sm text-default-500 py-4">
                                 No shared pay codes across multiple jobs
