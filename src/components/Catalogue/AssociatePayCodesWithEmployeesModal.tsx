@@ -90,7 +90,7 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
           api.post("/api/employee-pay-codes", {
             employee_id: employeeId,
             pay_code_id: payCode.id,
-            is_default: false,
+            is_default: true,
           })
         );
       }
