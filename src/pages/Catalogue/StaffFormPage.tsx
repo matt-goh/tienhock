@@ -240,10 +240,18 @@ const StaffFormPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const hasChanged =
-      JSON.stringify(formData) !== JSON.stringify(initialFormData);
-    setIsFormChanged(hasChanged);
-  }, [formData, initialFormData]);
+    const hasModifications = modifiedFields.size > 0;
+
+    // If there are tracked modifications, we need to consider the form changed
+    if (hasModifications) {
+      setIsFormChanged(true);
+    } else {
+      // Fall back to regular comparison if no tracked modifications
+      const hasChanged =
+        JSON.stringify(formData) !== JSON.stringify(initialFormData);
+      setIsFormChanged(hasChanged);
+    }
+  }, [formData, initialFormData, modifiedFields]);
 
   const fetchStaffDetails = useCallback(() => {
     if (!id) return;
@@ -321,8 +329,6 @@ const StaffFormPage: React.FC = () => {
     options.nationalities,
     options.races,
     options.agama,
-    formData, // Add this dependency
-    modifiedFields, // Add this dependency
   ]);
 
   useEffect(() => {
@@ -385,15 +391,19 @@ const StaffFormPage: React.FC = () => {
 
   const handleComboboxChange = useCallback(
     (name: "job" | "location", value: string[] | null) => {
-      if (value === null) {
-        return;
-      }
+      if (value === null) return;
+
       setFormData((prevData) => ({
         ...prevData,
         [name]: value,
       }));
-      // Add this line to track that this field was modified
-      setModifiedFields((prev) => new Set(prev).add(name));
+
+      // Track the modification in the state
+      setModifiedFields((prev) => {
+        const updated = new Set(prev);
+        updated.add(name);
+        return updated;
+      });
     },
     []
   );
@@ -463,7 +473,7 @@ const StaffFormPage: React.FC = () => {
 
       // Refresh the cache after successful save
       await refreshStaffs();
-      
+
       // Reset modified fields after successful save
       setModifiedFields(new Set());
 
