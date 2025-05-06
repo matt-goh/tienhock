@@ -203,8 +203,7 @@ const StaffPage = () => {
   };
 
   const filteredEmployees = useMemo(() => {
-    // First filter the employees based on search and other criteria
-    const filtered = employees.filter((employee) => {
+    return employees.filter((employee) => {
       const matchesSearch =
         employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         employee.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -244,9 +243,6 @@ const StaffPage = () => {
         matchesLocationFilter
       );
     });
-
-    // Simply reverse the array to show most recently edited employees first
-    return [...filtered].reverse();
   }, [employees, searchTerm, filters]);
 
   const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);

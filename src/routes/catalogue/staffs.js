@@ -41,7 +41,8 @@ export default function (pool) {
            s.agama,
            s.date_resigned as "dateResigned",
            s.job,
-           s.location`;
+           s.location,
+           s.updated_at as "updatedAt"`;
 
       let query = `
       SELECT ${columns}
@@ -53,6 +54,8 @@ export default function (pool) {
         query += ` WHERE (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)`;
         query += ` AND s.job::jsonb ? 'SALESMAN'`;
       }
+
+      query += ` ORDER BY s.updated_at DESC NULLS LAST`;
 
       const result = await pool.query(query);
 
