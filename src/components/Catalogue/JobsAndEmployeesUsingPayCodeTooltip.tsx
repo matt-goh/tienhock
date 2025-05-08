@@ -166,7 +166,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                         title={`View job details: ${job.name}`}
                         onClick={() => {
                           if (!disableNavigation) {
-                            navigate(`/catalogue/job?id=${job.id}`);
+                            navigate(`/catalogue/job?id=${job.id}&paycode=${payCodeId}`);
                           }
                         }}
                       >
