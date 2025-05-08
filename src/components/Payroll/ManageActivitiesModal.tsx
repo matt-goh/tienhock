@@ -205,7 +205,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-5xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
@@ -326,6 +326,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   )}...`
                                                 : activity.description}
                                             </Link>
+                                            <span className="ml-1.5 text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                              {activity.payCodeId}
+                                            </span>
                                             {activity.payType ===
                                               "Overtime" && (
                                               <span className="ml-2 text-xs text-amber-600">
