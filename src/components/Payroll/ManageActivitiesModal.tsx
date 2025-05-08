@@ -377,7 +377,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   title={`${activity.description} (${activity.payCodeId})`}
                                                 >
                                                   <Link
-                                                    to={`/catalogue/pay-codes?desc=${activity.description}`}
+                                                    to={`/catalogue/pay-codes?desc=${activity.payCodeId}`}
                                                     className="hover:text-sky-600 hover:underline"
                                                     onClick={(e) =>
                                                       e.stopPropagation()

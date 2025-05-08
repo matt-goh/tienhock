@@ -720,7 +720,7 @@ const StaffFormPage: React.FC = () => {
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-1.5 max-w-full">
                                         <Link
-                                          to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                          to={`/catalogue/pay-codes?desc=${payCode.id}`}
                                           className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
                                           onClick={(e) => e.stopPropagation()}
                                           title={`${payCode.description} (${payCode.id})`}
@@ -872,7 +872,7 @@ const StaffFormPage: React.FC = () => {
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 max-w-full">
                                           <Link
-                                            to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                            to={`/catalogue/pay-codes?desc=${payCode.id}`}
                                             className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
                                             onClick={(e) => e.stopPropagation()}
                                             title={`${payCode.description} (${payCode.id})`}
@@ -1037,7 +1037,7 @@ const StaffFormPage: React.FC = () => {
                                         <div className="flex items-center justify-between">
                                           <div className="flex items-center gap-1.5 max-w-full">
                                             <Link
-                                              to={`/catalogue/pay-codes?desc=${payCode.description}`}
+                                              to={`/catalogue/pay-codes?desc=${payCode.id}`}
                                               className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
                                               onClick={(e) =>
                                                 e.stopPropagation()
