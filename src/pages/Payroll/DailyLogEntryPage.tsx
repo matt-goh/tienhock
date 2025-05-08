@@ -238,9 +238,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     // Sort by employee name first, then job name
     return expanded.sort((a, b) => {
-      const nameCompare = a.name.localeCompare(b.name);
-      if (nameCompare !== 0) return nameCompare;
-      return (a.jobName || "").localeCompare(b.jobName || "");
+      const jobCompare = (a.jobName || "").localeCompare(b.jobName || "");
+      if (jobCompare !== 0) return jobCompare;
+      return a.name.localeCompare(b.name);
     });
   }, [availableEmployees, jobs, JOB_IDS]);
 
@@ -902,7 +902,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           ) : (
             <div className="overflow-x-auto mt-4">
               <div className="relative border border-default-200 rounded-lg overflow-hidden">
-                <div className="max-h-[600px] overflow-y-auto">
+                <div className="max-h-[1200px] overflow-y-auto">
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-100 sticky top-0 z-10">
                       <tr>
