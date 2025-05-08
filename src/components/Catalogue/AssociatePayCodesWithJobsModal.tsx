@@ -190,7 +190,7 @@ const AssociatePayCodesWithJobsModal: React.FC<
                         />
                       </div>
 
-                      <div className="max-h-60 overflow-y-auto border border-default-200 rounded-lg">
+                      <div className="max-h-96 overflow-y-auto border border-default-200 rounded-lg">
                         {isProcessing ? (
                           <div className="flex justify-center items-center py-10">
                             <LoadingSpinner size="sm" hideText />
