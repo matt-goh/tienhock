@@ -253,67 +253,68 @@ const EditEmployeePayCodeRatesModal: React.FC<
                       )}
                     </>
                   )}
-
-                  <div className="mt-4 border-t pt-4 border-gray-100">
-                    <Checkbox
-                      checked={editRates.is_default}
-                      onChange={handleDefaultChange}
-                      label={
-                        <span>
-                          <span className="font-medium">Default</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            (Auto-select this pay code when creating new
-                            entries)
+                  {/* Default checkbox and unlink button only for non-Tambahan pay codes */}
+                  {payCodeDetail && payCodeDetail.pay_type !== "Tambahan" && (
+                    <div className="mt-4 border-t pt-4 border-gray-100">
+                      <Checkbox
+                        checked={editRates.is_default}
+                        onChange={handleDefaultChange}
+                        label={
+                          <span>
+                            <span className="font-medium">Default</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              (Auto-select this pay code when creating new
+                              entries)
+                            </span>
                           </span>
-                        </span>
-                      }
-                      size={18}
-                      checkedColor="text-sky-600"
-                      uncheckedColor="text-gray-400"
-                      disabled={isSaving}
-                    />
+                        }
+                        size={18}
+                        checkedColor="text-sky-600"
+                        uncheckedColor="text-gray-400"
+                        disabled={isSaving}
+                      />
 
-                    {/* Unlink button section */}
-                    <div className="h-8 flex items-center">
-                      {!showUnlinkConfirm ? (
-                        <button
-                          type="button"
-                          className="inline-flex items-center font-medium text-sm text-red-600 hover:text-red-800 hover:underline"
-                          onClick={() => setShowUnlinkConfirm(true)}
-                          disabled={isSaving}
-                        >
-                          <IconLinkOff size={16} className="mr-1" />
-                          Unlink Pay Code
-                        </button>
-                      ) : (
-                        <div className="inline-flex items-center space-x-2">
+                      {/* Unlink button section */}
+                      <div className="h-8 flex items-center">
+                        {!showUnlinkConfirm ? (
                           <button
                             type="button"
-                            className="px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-full"
-                            onClick={handleUnlink}
+                            className="inline-flex items-center font-medium text-sm text-red-600 hover:text-red-800 hover:underline"
+                            onClick={() => setShowUnlinkConfirm(true)}
                             disabled={isSaving}
                           >
-                            Confirm
+                            <IconLinkOff size={16} className="mr-1" />
+                            Unlink Pay Code
                           </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs font-medium text-default-600 bg-default-100 hover:bg-default-200 rounded-full"
-                            onClick={() => setShowUnlinkConfirm(false)}
-                            disabled={isSaving}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="inline-flex items-center space-x-2">
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-full"
+                              onClick={handleUnlink}
+                              disabled={isSaving}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-xs font-medium text-default-600 bg-default-100 hover:bg-default-200 rounded-full"
+                              onClick={() => setShowUnlinkConfirm(false)}
+                              disabled={isSaving}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-
+                  )}
                   {error && (
                     <p className="text-sm text-red-600 text-center">{error}</p>
                   )}
                 </div>
 
-                <div className="flex justify-end space-x-3 mt-1">
+                <div className={`flex justify-end space-x-3 mt-${payCodeDetail && payCodeDetail.pay_type == "Tambahan" ? '6' : '1'}`}>
                   <Button
                     type="button"
                     variant="outline"
