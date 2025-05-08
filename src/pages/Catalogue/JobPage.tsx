@@ -736,7 +736,7 @@ const JobPage: React.FC = () => {
                               title={detail.description}
                             >
                               <Link
-                                to={`/catalogue/pay-codes?desc=${detail.description}`}
+                                to={`/catalogue/pay-codes?desc=${detail.pay_code_id}`}
                                 className="hover:text-sky-600 hover:underline"
                                 onClick={(e) => e.stopPropagation()}
                               >
