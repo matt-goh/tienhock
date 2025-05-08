@@ -654,6 +654,15 @@ const JobPage: React.FC = () => {
                       setCurrentPage(1); // Reset to first page when searching
                     }}
                   />
+                  {payCodeSearch && (
+                    <button
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                      onClick={() => setPayCodeSearch("")}
+                      title="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
 
                 {/* Add Pay Code Button */}
