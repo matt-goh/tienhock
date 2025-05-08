@@ -597,6 +597,7 @@ const StaffFormPage: React.FC = () => {
             <Tab
               labels={["Personal", "Work", "Documents", "Additional"]}
               tabWidth="w-[104px]"
+              defaultActiveTab={1}
             >
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

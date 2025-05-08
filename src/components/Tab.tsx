@@ -1,18 +1,20 @@
+// src/components/Tab.tsx
 import React, { useState } from "react";
 
 interface TabProps {
   children: React.ReactElement[];
   labels: string[];
-  tabWidth?: string; // Add optional width prop
+  tabWidth?: string;
+  defaultActiveTab?: number;
 }
 
 const Tab: React.FC<TabProps> = ({
   children,
   labels,
   tabWidth = "w-[8rem]",
+  defaultActiveTab = 0, // Default to first tab if not specified
 }) => {
-  // Default to w-[8rem]
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(defaultActiveTab);
 
   return (
     <div className="w-full">
