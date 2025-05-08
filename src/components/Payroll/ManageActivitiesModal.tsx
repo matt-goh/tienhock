@@ -580,9 +580,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                           </div>
                           <div className="bg-gray-50 border-t border-gray-200">
                             <div className="px-3 py-3 flex justify-between">
-                              <span className="text-sm font-medium text-gray-900">
-                                Total
-                              </span>
+                              <div className="text-sm font-medium text-gray-900 flex items-center">
+                                <span>Total</span>
+                                <span className="ml-2 px-2 py-0.5 bg-sky-100 text-sky-700 rounded-full text-xs">
+                                  {
+                                    activities.filter((a) => a.isSelected)
+                                      .length
+                                  }{" "}
+                                  activities
+                                </span>
+                              </div>
                               <span className="text-sm font-medium text-gray-900">
                                 RM{totalAmount.toFixed(2)}
                               </span>
