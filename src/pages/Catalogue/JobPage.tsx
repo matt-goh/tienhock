@@ -115,11 +115,18 @@ const JobPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const jobId = params.get("id");
+    const payCodeId = params.get("paycode");
+
     if (jobId && !selectedJob && !loadingJobs && jobs.length > 0) {
       const jobToSelect = jobs.find((job) => job.id === jobId);
       if (jobToSelect) {
         setSelectedJob(jobToSelect);
       }
+    }
+
+    // Set pay code search if parameter exists
+    if (payCodeId) {
+      setPayCodeSearch(payCodeId);
     }
     // Dependency on jobs.length ensures this runs after jobs are loaded
   }, [location.search, jobs, selectedJob, loadingJobs]);
