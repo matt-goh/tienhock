@@ -30,7 +30,7 @@ import PayCodeModal from "../../components/Catalogue/PayCodeModal"; // Imports t
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import AssociateWithJobsModal from "../../components/Catalogue/AssociateWithJobsModal";
+import AssociatePayCodesWithJobsModal from "../../components/Catalogue/AssociatePayCodesWithJobsModal";
 import AssociatePayCodesWithEmployeesModal from "../../components/Catalogue/AssociatePayCodesWithEmployeesModal";
 import JobsAndEmployeesUsingPayCodeTooltip from "../../components/Catalogue/JobsAndEmployeesUsingPayCodeTooltip";
 
@@ -763,7 +763,7 @@ const PayCodePage: React.FC = () => {
         existingPayCodes={payCodes} // Pass full list for ID check
       />
       {/* Associate with Jobs Modal */}
-      <AssociateWithJobsModal
+      <AssociatePayCodesWithJobsModal
         isOpen={showAssociateModal}
         onClose={() => setShowAssociateModal(false)}
         payCode={codeToAssociate}
