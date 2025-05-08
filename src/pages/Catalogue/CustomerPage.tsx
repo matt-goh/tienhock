@@ -43,8 +43,7 @@ const CustomerPage: React.FC = () => {
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
-  const { salesmen: salesmenData, isLoading: salesmenLoading } =
-    useSalesmanCache();
+  const { salesmen: salesmenData } = useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
 
   useEffect(() => {
@@ -289,6 +288,15 @@ const CustomerPage: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                onClick={() => setSearchTerm("")}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
           {renderSalesmanListbox()}
           <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
