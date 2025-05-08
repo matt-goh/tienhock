@@ -379,7 +379,7 @@ const StaffPage = () => {
           </span>
         </h1>
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-grow sm:max-w-xs">
+          <div className="relative flex items-center sm:max-w-xs">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
               size={18}
@@ -387,10 +387,19 @@ const StaffPage = () => {
             <input
               type="text"
               placeholder="Search name, ID or phone..."
-              className="w-full pl-10 pr-4 py-2 border border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm"
+              className="w-full pl-10 pr-10 py-2 border border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm"
               value={searchTerm}
               onChange={handleSearchChange}
             />
+            {searchTerm && (
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                onClick={() => setSearchTerm("")}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
           <div className="flex gap-3">
             <StaffFilterMenu
