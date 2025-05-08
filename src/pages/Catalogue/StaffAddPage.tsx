@@ -56,7 +56,7 @@ const StaffAddPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
-  const { staffs, refreshStaffs } = useStaffsCache();
+  const { allStaffs, refreshStaffs } = useStaffsCache();
   const { options } = useStaffFormOptions();
   const { jobs } = useJobsCache();
 
@@ -149,9 +149,7 @@ const StaffAddPage: React.FC = () => {
 
   const checkDuplicateId = async (id: string): Promise<boolean> => {
     try {
-      // You can create a lightweight API endpoint for this check
-      // or check against the cached staff list
-      const existingStaff = staffs.find((staff) => staff.id === id);
+      const existingStaff = allStaffs.find((staff) => staff.id === id);
       return !!existingStaff;
     } catch (error) {
       console.error("Error checking ID:", error);
