@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   employeeInfoLabel: {
-    width: 100,
+    width: 50,
     fontSize: 9,
     fontWeight: "bold",
   },
@@ -223,7 +223,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   staffDetails,
 }) => {
-  const groupedItems = groupItemsByType(payroll.items);
+  const groupedItems = groupItemsByType(payroll.items || []);
   const year = payroll.year ?? new Date().getFullYear();
   const month = payroll.month ?? new Date().getMonth() + 1;
   const monthName = getMonthName(month);
@@ -253,14 +253,14 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           {/* Employee Information */}
           <View style={styles.employeeInfoTable}>
             <View style={styles.employeeInfoRow}>
-              <Text style={styles.employeeInfoLabel}>Employee name</Text>
+              <Text style={styles.employeeInfoLabel}>Employee</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
                 {staffDetails?.name || payroll.employee_name}
               </Text>
             </View>
             <View style={styles.employeeInfoRow}>
-              <Text style={styles.employeeInfoLabel}>Ic no</Text>
+              <Text style={styles.employeeInfoLabel}>IC no</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
                 {staffDetails?.icNo || "N/A"}
