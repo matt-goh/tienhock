@@ -1,6 +1,6 @@
 // src/utils/payroll/PrintPaySlipOverlay.tsx
 import { useEffect, useState, useRef } from "react";
-import { pdf } from "@react-pdf/renderer";
+import { pdf, Document } from "@react-pdf/renderer";
 import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
@@ -71,7 +71,9 @@ const PrintPaySlipOverlay = ({
         resourcesRef.current.container = container;
 
         const pdfComponent = (
-          <PaySlipPDF payroll={payroll} companyName={companyName} />
+          <Document>
+            <PaySlipPDF payroll={payroll} companyName={companyName} />
+          </Document>
         );
 
         const pdfBlob = await pdf(pdfComponent).toBlob();

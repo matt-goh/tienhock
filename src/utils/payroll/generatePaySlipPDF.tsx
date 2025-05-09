@@ -1,5 +1,5 @@
 // src/utils/payroll/generatePaySlipPDF.tsx
-import { pdf } from "@react-pdf/renderer";
+import { pdf, Document } from "@react-pdf/renderer";
 import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 
@@ -14,7 +14,9 @@ export const generateSinglePaySlipPDF = async (
   companyName = "Tien Hock"
 ): Promise<Blob> => {
   return await pdf(
-    <PaySlipPDF payroll={payroll} companyName={companyName} />
+    <Document>
+      <PaySlipPDF payroll={payroll} companyName={companyName} />
+    </Document>
   ).toBlob();
 };
 
@@ -30,11 +32,11 @@ export const generateBatchPaySlipsPDF = async (
 ): Promise<Blob> => {
   // Create a single document with multiple pages
   const pdfDoc = pdf(
-    <>
+    <Document>
       {payrolls.map((payroll, index) => (
         <PaySlipPDF key={index} payroll={payroll} companyName={companyName} />
       ))}
-    </>
+    </Document>
   );
 
   return await pdfDoc.toBlob();

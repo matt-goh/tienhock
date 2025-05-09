@@ -1,6 +1,6 @@
 // src/utils/payroll/BatchPrintPaySlipOverlay.tsx
 import React, { useEffect, useState, useRef } from "react";
-import { pdf } from "@react-pdf/renderer";
+import { pdf, Document } from "@react-pdf/renderer";
 import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
@@ -69,11 +69,11 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
         cleanup(true);
         return;
       }
-      
+
       try {
         // Create Document with all pages
         const pdfDoc = pdf(
-          <>
+          <Document>
             {payrolls.map((payroll, index) => (
               <PaySlipPDF
                 key={index}
@@ -81,7 +81,7 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
                 companyName={companyName}
               />
             ))}
-          </>
+          </Document>
         );
 
         const pdfBlob = await pdfDoc.toBlob();
