@@ -256,6 +256,11 @@ export const groupItemsByType = (items: PayrollItem[]) => {
     Overtime: [],
   };
 
+  // Check to handle undefined items
+  if (!items || !Array.isArray(items)) {
+    return grouped;
+  }
+
   items.forEach((item) => {
     // Use the pay_type returned from the backend
     if (item.pay_type === "Overtime") {

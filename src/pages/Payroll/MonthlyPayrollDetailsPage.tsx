@@ -19,7 +19,7 @@ import {
   IconX,
   IconFilter,
   IconPrinter,
-  IconDownload,
+  IconSelectAll,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
@@ -174,6 +174,45 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
       [`${employeeId}`]: isSelected,
     }));
   };
+
+  // Handle select all employees
+  const handleSelectAll = useCallback(() => {
+    if (!payroll?.employeePayrolls) return;
+
+    // If all are selected, deselect all. Otherwise, select all.
+    const allSelected = payroll.employeePayrolls.every(
+      (emp) => selectedEmployeePayrolls[`${emp.id}`]
+    );
+
+    const newSelectedEmployees: Record<string, boolean> = {};
+
+    if (allSelected) {
+      // Deselect all
+      payroll.employeePayrolls.forEach((emp) => {
+        newSelectedEmployees[`${emp.id}`] = false;
+      });
+    } else {
+      // Select all
+      payroll.employeePayrolls.forEach((emp) => {
+        newSelectedEmployees[`${emp.id}`] = true;
+      });
+    }
+
+    setSelectedEmployeePayrolls(newSelectedEmployees);
+  }, [payroll?.employeePayrolls, selectedEmployeePayrolls]);
+
+  useEffect(() => {
+    if (!payroll?.employeePayrolls) {
+      setIsAllSelected(false);
+      return;
+    }
+
+    const allSelected = payroll.employeePayrolls.every(
+      (emp) => selectedEmployeePayrolls[`${emp.id}`]
+    );
+
+    setIsAllSelected(allSelected);
+  }, [payroll?.employeePayrolls, selectedEmployeePayrolls]);
 
   // Handle job group selection (select all in group)
   const handleSelectJobGroup = (jobType: string, isSelected: boolean) => {
@@ -494,6 +533,15 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
+                color="sky"
+                icon={IconSelectAll}
+                onClick={handleSelectAll}
+              >
+                {isAllSelected ? "Deselect All" : "Select All"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 icon={IconFilter}
                 onClick={() => setIsFilterExpanded(!isFilterExpanded)}
               >
@@ -670,8 +718,27 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                               <th
                                 scope="col"
                                 className="px-3 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectJobGroup(
+                                    jobType,
+                                    !isJobGroupSelected(jobType)
+                                  );
+                                }}
+                                style={{ cursor: "pointer" }}
                               >
-                                <span className="sr-only">Select</span>
+                                <Checkbox
+                                  checked={isJobGroupSelected(jobType)}
+                                  onChange={() =>
+                                    handleSelectJobGroup(
+                                      jobType,
+                                      !isJobGroupSelected(jobType)
+                                    )
+                                  }
+                                  size={20}
+                                  className="mx-auto"
+                                  aria-label={`Select all ${jobType} employees`}
+                                />
                               </th>
                               <th
                                 scope="col"
@@ -716,9 +783,17 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                               >
                                 <td
                                   className="pl-4 py-4 whitespace-nowrap align-middle"
-                                  onClick={(
-                                    e: React.MouseEvent<HTMLTableCellElement>
-                                  ) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectEmployee(
+                                      employeePayroll.id as number,
+                                      !selectedEmployeePayrolls[
+                                        `${employeePayroll.id}`
+                                      ],
+                                      e
+                                    );
+                                  }}
+                                  style={{ cursor: "pointer" }}
                                 >
                                   <Checkbox
                                     checked={
@@ -726,7 +801,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                         `${employeePayroll.id}`
                                       ]
                                     }
-                                    onChange={(checked: boolean) =>
+                                    onChange={(checked) =>
                                       handleSelectEmployee(
                                         employeePayroll.id as number,
                                         checked,
