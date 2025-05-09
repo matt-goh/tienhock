@@ -226,7 +226,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const groupedItems = groupItemsByType(payroll.items);
   const year = payroll.year ?? new Date().getFullYear();
   const month = payroll.month ?? new Date().getMonth() + 1;
-  const monthName = getMonthName(month).toUpperCase();
+  const monthName = getMonthName(month);
 
   // Calculate total deductions (for demo purposes - you'll need to add real deductions)
   const epfAmount = (payroll.gross_pay * 0.11).toFixed(2);
@@ -286,7 +286,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
       {/* Pay Slip Title - Now separate from header */}
       <Text style={styles.payslipTitle}>
-        SLIP GAJI PAJAK (JAM/BAG/COMM) UNTUK BULAN {monthName}, {year}
+        Slip Gaji Pajak (Jam/Bag/Commission) Untuk Bulan {monthName}, {year}
       </Text>
 
       {/* Main Table */}
