@@ -6,17 +6,6 @@ import {
   getMonthName,
 } from "../../utils/payroll/payrollUtils";
 
-interface PayrollItem {
-  id: number;
-  pay_code_id: string;
-  description: string;
-  rate: number;
-  rate_unit: string;
-  quantity: number;
-  amount: number;
-  is_manual: boolean;
-}
-
 interface PaySlipPreviewProps {
   payroll: EmployeePayroll;
   companyName?: string;
