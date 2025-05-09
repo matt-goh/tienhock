@@ -513,6 +513,15 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
               {/* Batch action buttons - show only when employees are selected */}
               {selectedCount > 0 && (
                 <>
+                  <BatchPaySlipPDFButton
+                    payrolls={getSelectedPayrolls()}
+                    size="sm"
+                    icon={true}
+                    variant="outline"
+                    color="sky"
+                    buttonText={`Download ${selectedCount} PDFs`}
+                    title={"Download Payslips"}
+                  />
                   <Button
                     size="sm"
                     variant="outline"
@@ -523,15 +532,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                   >
                     Print {selectedCount} Payslips
                   </Button>
-                  <BatchPaySlipPDFButton
-                    payrolls={getSelectedPayrolls()}
-                    size="sm"
-                    icon={true}
-                    variant="outline"
-                    color="sky"
-                    buttonText={`Download ${selectedCount} PDFs`}
-                    title={"Download Payslips"}
-                  />
                 </>
               )}
               <Button
