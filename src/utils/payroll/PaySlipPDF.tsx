@@ -433,11 +433,16 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text>
                 {(
                   payroll.gross_pay /
-                  (payroll.items.reduce(
-                    (sum, item) =>
-                      sum + (item.rate_unit === "Hour" ? item.quantity : 0),
-                    0
-                  ) || 1)
+                  (payroll.items && Array.isArray(payroll.items)
+                    ? payroll.items.reduce(
+                        (sum, item) =>
+                          sum +
+                          (item?.rate_unit === "Hour"
+                            ? item?.quantity || 0
+                            : 0),
+                        0
+                      )
+                    : 1 || 1)
                 ).toFixed(2)}
               </Text>
             </View>
