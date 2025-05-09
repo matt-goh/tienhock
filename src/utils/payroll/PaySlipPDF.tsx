@@ -1,13 +1,6 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Font,
-} from "@react-pdf/renderer";
+import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { EmployeePayroll } from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
@@ -20,24 +13,30 @@ const styles = StyleSheet.create({
     lineHeight: 1.3,
   },
   header: {
-    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  companySection: {
+    flex: 1,
+    marginRight: 15,
   },
   companyName: {
     fontSize: 14,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 2,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 6,
   },
   employeeInfoTable: {
     marginTop: 10,
-    marginBottom: 5,
   },
   employeeInfoRow: {
     flexDirection: "row",
+    marginBottom: 3,
   },
   employeeInfoLabel: {
     width: 100,
     fontSize: 9,
+    fontWeight: "bold",
   },
   employeeInfoColon: {
     width: 10,
@@ -49,10 +48,13 @@ const styles = StyleSheet.create({
     fontWeight: "medium",
   },
   payslipTitle: {
-    marginTop: 8,
-    marginBottom: 5,
-    fontSize: 10,
-    textAlign: "left",
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 20,
+    textAlign: "center",
+    backgroundColor: "#f0f0f0",
+    padding: 8,
+    borderRadius: 4,
   },
   table: {
     display: "flex",
@@ -208,11 +210,18 @@ const formatCurrency = (amount: number) => {
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
+  staffDetails?: {
+    name: string;
+    icNo: string;
+    jobName: string;
+    section: string;
+  };
 }
 
 const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   payroll,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  staffDetails,
 }) => {
   const groupedItems = groupItemsByType(payroll.items);
   const year = payroll.year ?? new Date().getFullYear();
@@ -239,38 +248,46 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     <Page size="A4" style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.companyName}>{companyName}</Text>
-
-        {/* Employee Information */}
-        <View style={styles.employeeInfoTable}>
-          <View style={styles.employeeInfoRow}>
-            <Text style={styles.employeeInfoLabel}>EMPLOYEE NAME</Text>
-            <Text style={styles.employeeInfoColon}>:</Text>
-            <Text style={styles.employeeInfoValue}>
-              {payroll.employee_name}
-            </Text>
-          </View>
-          <View style={styles.employeeInfoRow}>
-            <Text style={styles.employeeInfoLabel}>STAFF NO</Text>
-            <Text style={styles.employeeInfoColon}>:</Text>
-            <Text style={styles.employeeInfoValue}>{payroll.employee_id}</Text>
-          </View>
-          <View style={styles.employeeInfoRow}>
-            <Text style={styles.employeeInfoLabel}>KERJA</Text>
-            <Text style={styles.employeeInfoColon}>:</Text>
-            <Text style={styles.employeeInfoValue}>{payroll.job_type}</Text>
-          </View>
-          <View style={styles.employeeInfoRow}>
-            <Text style={styles.employeeInfoLabel}>BAHAGIAN</Text>
-            <Text style={styles.employeeInfoColon}>:</Text>
-            <Text style={styles.employeeInfoValue}>{payroll.section}</Text>
+        <View style={styles.companySection}>
+          <Text style={styles.companyName}>{companyName}</Text>
+          {/* Employee Information */}
+          <View style={styles.employeeInfoTable}>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Employee name</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.name || payroll.employee_name}
+              </Text>
+            </View>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Ic no</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.icNo || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Kerja</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.jobName || payroll.job_type}
+              </Text>
+            </View>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Bahagian</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.section || payroll.section}
+              </Text>
+            </View>
           </View>
         </View>
-
-        <Text style={styles.payslipTitle}>
-          SLIP GAJI PAJAK (JAM/BAG/COMM) UNTUK BULAN {monthName}, {year}
-        </Text>
       </View>
+
+      {/* Pay Slip Title - Now separate from header */}
+      <Text style={styles.payslipTitle}>
+        SLIP GAJI PAJAK (JAM/BAG/COMM) UNTUK BULAN {monthName}, {year}
+      </Text>
 
       {/* Main Table */}
       <View style={styles.table}>
