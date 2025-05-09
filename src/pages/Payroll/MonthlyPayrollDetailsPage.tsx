@@ -31,7 +31,6 @@ import {
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
-import BatchPrintModal from "../../components/Payroll/BatchPrintModal";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { FormListbox } from "../../components/FormComponents";
 
@@ -48,7 +47,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   );
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filteredJobType, setFilteredJobType] = useState<string>("all");
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
@@ -666,19 +664,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
           )}
         </div>
       </div>
-      {/* Batch Print Modal */}
-      <BatchPrintModal
-        isOpen={showBatchPrintModal}
-        onClose={() => setShowBatchPrintModal(false)}
-        payrolls={payroll.employeePayrolls.map((ep) => ({
-          ...ep,
-          year: payroll.year,
-          month: payroll.month,
-          items: [],
-        }))}
-        payrollMonth={getMonthName(payroll.month)}
-        payrollYear={payroll.year}
-      />
       {/* Status Change Dialog */}
       <ConfirmationDialog
         isOpen={isStatusDialogOpen}
