@@ -18,6 +18,8 @@ import {
   IconSearch,
   IconX,
   IconFilter,
+  IconPrinter,
+  IconDownload,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
@@ -33,6 +35,10 @@ import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { FormListbox } from "../../components/FormComponents";
+import { BatchPaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
+import ReactDOM from "react-dom";
+import BatchPrintPaySlipOverlay from "../../utils/payroll/BatchPrintPaySlipOverlay";
+import Checkbox from "../../components/Checkbox";
 
 const MonthlyPayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,6 +56,11 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filteredJobType, setFilteredJobType] = useState<string>("all");
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
+  const [selectedEmployeePayrolls, setSelectedEmployeePayrolls] = useState<
+    Record<string, boolean>
+  >({});
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [showPrintBatchOverlay, setShowPrintBatchOverlay] = useState(false);
 
   useEffect(() => {
     fetchPayrollDetails();
@@ -119,6 +130,81 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     }));
   };
 
+  const groupEmployeesByJobType = (employeePayrolls: EmployeePayroll[]) => {
+    const grouped: Record<string, EmployeePayroll[]> = {};
+
+    employeePayrolls.forEach((employeePayroll) => {
+      const { job_type } = employeePayroll;
+      if (!grouped[job_type]) {
+        grouped[job_type] = [];
+      }
+      grouped[job_type].push(employeePayroll);
+    });
+
+    return grouped;
+  };
+
+  const handleBack = () => {
+    navigate("/payroll/monthly-payrolls/list");
+  };
+
+  // Get selected payrolls as array
+  const getSelectedPayrolls = useCallback(() => {
+    if (!payroll?.employeePayrolls) return [];
+    return payroll.employeePayrolls.filter(
+      (emp) => selectedEmployeePayrolls[`${emp.id}`]
+    );
+  }, [payroll?.employeePayrolls, selectedEmployeePayrolls]);
+
+  // Calculate selected count
+  const selectedCount = useMemo(
+    () => Object.values(selectedEmployeePayrolls).filter(Boolean).length,
+    [selectedEmployeePayrolls]
+  );
+
+  // Handle employee selection
+  const handleSelectEmployee = (
+    employeeId: number,
+    isSelected: boolean,
+    event: React.MouseEvent<Element, MouseEvent>
+  ) => {
+    event.stopPropagation();
+    setSelectedEmployeePayrolls((prev) => ({
+      ...prev,
+      [`${employeeId}`]: isSelected,
+    }));
+  };
+
+  // Handle job group selection (select all in group)
+  const handleSelectJobGroup = (jobType: string, isSelected: boolean) => {
+    const newSelectedEmployees = { ...selectedEmployeePayrolls };
+
+    const employees = groupedEmployees[jobType] || [];
+    const filteredEmployees = getFilteredEmployees(jobType, employees);
+
+    filteredEmployees.forEach((emp) => {
+      newSelectedEmployees[`${emp.id}`] = isSelected;
+    });
+
+    setSelectedEmployeePayrolls(newSelectedEmployees);
+  };
+
+  // Handle batch print
+  const handleBatchPrint = () => {
+    const selectedPayrolls = getSelectedPayrolls();
+    if (selectedPayrolls.length === 0) {
+      toast.error("No payrolls selected for printing");
+      return;
+    }
+
+    setShowPrintBatchOverlay(true);
+  };
+
+  // Reset selections when filters change
+  useEffect(() => {
+    setSelectedEmployeePayrolls({});
+  }, [searchTerm, filteredJobType]);
+
   const handleToggleAllJobs = (expanded: boolean) => {
     if (!payroll?.employeePayrolls) return;
 
@@ -147,20 +233,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     }
   };
 
-  const groupEmployeesByJobType = (employeePayrolls: EmployeePayroll[]) => {
-    const grouped: Record<string, EmployeePayroll[]> = {};
-
-    employeePayrolls.forEach((employeePayroll) => {
-      const { job_type } = employeePayroll;
-      if (!grouped[job_type]) {
-        grouped[job_type] = [];
-      }
-      grouped[job_type].push(employeePayroll);
-    });
-
-    return grouped;
-  };
-
   const calculateTotals = (employeePayrolls: EmployeePayroll[]) => {
     return employeePayrolls.reduce(
       (acc, curr) => {
@@ -171,10 +243,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
       },
       { grossPay: 0, netPay: 0 }
     );
-  };
-
-  const handleBack = () => {
-    navigate("/payroll/monthly-payrolls/list");
   };
 
   const handleViewEmployeePayroll = (employeePayrollId: number | undefined) => {
@@ -203,6 +271,24 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     }
   };
 
+  // Check if all employees in a job group are selected
+  const isJobGroupSelected = useCallback(
+    (jobType: string) => {
+      if (!payroll) return false;
+
+      const grouped = groupEmployeesByJobType(payroll.employeePayrolls || []);
+      const employees = grouped[jobType] || [];
+      const filteredEmployees = getFilteredEmployees(jobType, employees);
+
+      if (filteredEmployees.length === 0) return false;
+
+      return filteredEmployees.every(
+        (emp) => selectedEmployeePayrolls[`${emp.id}`]
+      );
+    },
+    [payroll, getFilteredEmployees, selectedEmployeePayrolls]
+  );
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -221,7 +307,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
       </div>
     );
   }
-
   const groupedEmployees = groupEmployeesByJobType(
     payroll.employeePayrolls || []
   );
@@ -382,6 +467,30 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
               Employee Payrolls
             </h2>
             <div className="flex space-x-2 mt-2 md:mt-0">
+              {/* Batch action buttons - show only when employees are selected */}
+              {selectedCount > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="sky"
+                    icon={IconPrinter}
+                    onClick={handleBatchPrint}
+                    title={"Print Payslips"}
+                  >
+                    Print {selectedCount} Payslips
+                  </Button>
+                  <BatchPaySlipPDFButton
+                    payrolls={getSelectedPayrolls()}
+                    size="sm"
+                    icon={true}
+                    variant="outline"
+                    color="sky"
+                    buttonText={`Download ${selectedCount} PDFs`}
+                    title={"Download Payslips"}
+                  />
+                </>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -560,6 +669,12 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                             <tr>
                               <th
                                 scope="col"
+                                className="px-3 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              >
+                                <span className="sr-only">Select</span>
+                              </th>
+                              <th
+                                scope="col"
                                 className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                               >
                                 Employee
@@ -599,6 +714,37 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                   handleViewEmployeePayroll(employeePayroll.id)
                                 }
                               >
+                                <td
+                                  className="pl-4 py-4 whitespace-nowrap align-middle"
+                                  onClick={(
+                                    e: React.MouseEvent<HTMLTableCellElement>
+                                  ) => e.stopPropagation()}
+                                >
+                                  <Checkbox
+                                    checked={
+                                      !!selectedEmployeePayrolls[
+                                        `${employeePayroll.id}`
+                                      ]
+                                    }
+                                    onChange={(checked: boolean) =>
+                                      handleSelectEmployee(
+                                        employeePayroll.id as number,
+                                        checked,
+                                        new MouseEvent(
+                                          "click"
+                                        ) as unknown as React.MouseEvent<
+                                          Element,
+                                          MouseEvent
+                                        >
+                                      )
+                                    }
+                                    size={20}
+                                    aria-label={`Select ${
+                                      employeePayroll.employee_name ||
+                                      "employee"
+                                    }`}
+                                  />
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-default-900">
                                     {employeePayroll.employee_name || "Unknown"}
@@ -680,6 +826,15 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
         confirmButtonText={isUpdatingStatus ? "Processing..." : "Confirm"}
         variant={payroll.status === "Finalized" ? "danger" : "default"}
       />
+      {/* Batch Print Overlay */}
+      {showPrintBatchOverlay && (
+        <BatchPrintPaySlipOverlay
+          payrolls={getSelectedPayrolls()}
+          onComplete={() => {
+            setShowPrintBatchOverlay(false);
+          }}
+        />
+      )}
       {/* Finalize Payroll Dialog */}
       <FinalizePayrollDialog
         isOpen={showFinalizeDialog}

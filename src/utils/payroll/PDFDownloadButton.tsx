@@ -7,6 +7,7 @@ import {
   downloadBatchPaySlips,
 } from "./generatePaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
+import toast from "react-hot-toast";
 
 // Define interfaces
 interface SinglePDFButtonProps {
@@ -33,6 +34,8 @@ interface BatchPDFButtonProps {
   variant?: "default" | "outline" | "boldOutline" | "filled";
   color?: string;
   size?: "sm" | "md" | "lg";
+  onComplete?: () => void;
+  title?: string;
 }
 
 /**
@@ -62,6 +65,10 @@ export const SinglePaySlipPDFButton: React.FC<SinglePDFButtonProps> = ({
       await downloadSinglePaySlip(payroll, companyName);
     } catch (error) {
       console.error("Error downloading PDF:", error);
+      toast.error(
+        "Failed to download PDF: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -89,13 +96,15 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
   payrolls,
   companyName = "Tien Hock",
   fileName,
-  buttonText = "Download Batch PDF",
+  buttonText,
   disabled = false,
   icon = true,
   className = "",
   variant = "outline",
   color = "sky",
   size = "md",
+  title = "Download Payslips",
+  onComplete,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -105,14 +114,33 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
   const defaultFileName = `PaySlips-Batch-${year}-${month}.pdf`;
   const finalFileName = fileName || defaultFileName;
 
+  // Set default button text based on number of payrolls
+  const defaultButtonText =
+    payrolls.length === 1 ? "Download PDF" : `Download ${payrolls.length} PDFs`;
+
+  const finalButtonText = buttonText || defaultButtonText;
+
   const handleDownload = async () => {
-    if (payrolls.length === 0) return;
+    if (payrolls.length === 0) {
+      toast.error("No payslips selected for download");
+      return;
+    }
 
     setIsDownloading(true);
     try {
       await downloadBatchPaySlips(payrolls, companyName);
+      toast.success(
+        `${payrolls.length} payslip${
+          payrolls.length > 1 ? "s" : ""
+        } downloaded successfully`
+      );
+      if (onComplete) onComplete();
     } catch (error) {
       console.error("Error downloading batch PDF:", error);
+      toast.error(
+        "Failed to download PDFs: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -127,8 +155,9 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
       variant={variant}
       color={color}
       size={size}
+      title={title}
     >
-      {isDownloading ? "Preparing..." : buttonText}
+      {isDownloading ? "Preparing..." : finalButtonText}
     </Button>
   );
 };
