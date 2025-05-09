@@ -126,12 +126,23 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
       return;
     }
 
+    // Add validation for each payroll
+    const validPayrolls = payrolls.filter(
+      (payroll) =>
+        payroll && payroll.employee_id && Array.isArray(payroll.items) // Ensure items is an array
+    );
+
+    if (validPayrolls.length === 0) {
+      toast.error("No valid payslips to download");
+      return;
+    }
+
     setIsDownloading(true);
     try {
-      await downloadBatchPaySlips(payrolls, companyName);
+      await downloadBatchPaySlips(validPayrolls, companyName);
       toast.success(
-        `${payrolls.length} payslip${
-          payrolls.length > 1 ? "s" : ""
+        `${validPayrolls.length} payslip${
+          validPayrolls.length > 1 ? "s" : ""
         } downloaded successfully`
       );
       if (onComplete) onComplete();

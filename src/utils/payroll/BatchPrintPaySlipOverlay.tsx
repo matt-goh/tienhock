@@ -54,8 +54,22 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
 
   useEffect(() => {
     const generateAndPrint = async () => {
+      // For batch printing
       if (hasPrintedRef.current || payrolls.length === 0) return;
 
+      // Validate payrolls
+      const validPayrolls = payrolls.filter(
+        (payroll) =>
+          payroll && payroll.employee_id && Array.isArray(payroll.items) // Ensure items is an array
+      );
+
+      if (validPayrolls.length === 0) {
+        setError("No valid payslips to print");
+        toast.error("No valid payslips to print");
+        cleanup(true);
+        return;
+      }
+      
       try {
         // Create Document with all pages
         const pdfDoc = pdf(

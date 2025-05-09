@@ -151,9 +151,14 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   // Get selected payrolls as array
   const getSelectedPayrolls = useCallback(() => {
     if (!payroll?.employeePayrolls) return [];
-    return payroll.employeePayrolls.filter(
-      (emp) => selectedEmployeePayrolls[`${emp.id}`]
-    );
+
+    // Filter out any potentially invalid payrolls
+    return payroll.employeePayrolls
+      .filter((emp) => selectedEmployeePayrolls[`${emp.id}`])
+      .map((emp) => ({
+        ...emp,
+        items: emp.items || [], // Ensure items is always at least an empty array
+      }));
   }, [payroll?.employeePayrolls, selectedEmployeePayrolls]);
 
   // Calculate selected count
@@ -717,7 +722,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                             <tr>
                               <th
                                 scope="col"
-                                className="px-3 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                                className="px-1 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleSelectJobGroup(
@@ -727,18 +732,19 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                 }}
                                 style={{ cursor: "pointer" }}
                               >
-                                <Checkbox
-                                  checked={isJobGroupSelected(jobType)}
-                                  onChange={() =>
-                                    handleSelectJobGroup(
-                                      jobType,
-                                      !isJobGroupSelected(jobType)
-                                    )
-                                  }
-                                  size={20}
-                                  className="mx-auto"
-                                  aria-label={`Select all ${jobType} employees`}
-                                />
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={isJobGroupSelected(jobType)}
+                                    onChange={() =>
+                                      handleSelectJobGroup(
+                                        jobType,
+                                        !isJobGroupSelected(jobType)
+                                      )
+                                    }
+                                    size={20}
+                                    aria-label={`Select all ${jobType} employees`}
+                                  />
+                                </div>
                               </th>
                               <th
                                 scope="col"
@@ -782,7 +788,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                 }
                               >
                                 <td
-                                  className="pl-4 py-4 whitespace-nowrap align-middle"
+                                  className="px-1 py-4 whitespace-nowrap align-middle"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleSelectEmployee(
@@ -795,30 +801,32 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                   }}
                                   style={{ cursor: "pointer" }}
                                 >
-                                  <Checkbox
-                                    checked={
-                                      !!selectedEmployeePayrolls[
-                                        `${employeePayroll.id}`
-                                      ]
-                                    }
-                                    onChange={(checked) =>
-                                      handleSelectEmployee(
-                                        employeePayroll.id as number,
-                                        checked,
-                                        new MouseEvent(
-                                          "click"
-                                        ) as unknown as React.MouseEvent<
-                                          Element,
-                                          MouseEvent
-                                        >
-                                      )
-                                    }
-                                    size={20}
-                                    aria-label={`Select ${
-                                      employeePayroll.employee_name ||
-                                      "employee"
-                                    }`}
-                                  />
+                                  <div className="flex justify-center">
+                                    <Checkbox
+                                      checked={
+                                        !!selectedEmployeePayrolls[
+                                          `${employeePayroll.id}`
+                                        ]
+                                      }
+                                      onChange={(checked) =>
+                                        handleSelectEmployee(
+                                          employeePayroll.id as number,
+                                          checked,
+                                          new MouseEvent(
+                                            "click"
+                                          ) as unknown as React.MouseEvent<
+                                            Element,
+                                            MouseEvent
+                                          >
+                                        )
+                                      }
+                                      size={20}
+                                      aria-label={`Select ${
+                                        employeePayroll.employee_name ||
+                                        "employee"
+                                      }`}
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-default-900">
