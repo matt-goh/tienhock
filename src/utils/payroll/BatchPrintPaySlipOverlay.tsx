@@ -16,7 +16,7 @@ interface BatchPrintPaySlipOverlayProps {
 const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
   payrolls,
   onComplete,
-  companyName = "Tien Hock",
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
 }) => {
   const [isPrinting, setIsPrinting] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);

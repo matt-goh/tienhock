@@ -212,7 +212,7 @@ interface PaySlipPDFProps {
 
 const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   payroll,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B (953309-T)",
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
 }) => {
   const groupedItems = groupItemsByType(payroll.items);
   const year = payroll.year ?? new Date().getFullYear();
