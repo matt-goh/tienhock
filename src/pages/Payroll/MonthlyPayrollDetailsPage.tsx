@@ -36,7 +36,6 @@ import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialo
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { FormListbox } from "../../components/FormComponents";
 import { BatchPaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
-import ReactDOM from "react-dom";
 import BatchPrintPaySlipOverlay from "../../utils/payroll/BatchPrintPaySlipOverlay";
 import Checkbox from "../../components/Checkbox";
 
