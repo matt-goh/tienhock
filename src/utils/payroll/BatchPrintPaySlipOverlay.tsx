@@ -111,7 +111,7 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
         // Create Document with all pages using complete data
         const pdfDoc = pdf(
           <Document>
-            {payrolls.map((payroll, index) => {
+            {completePayrolls.map((payroll, index) => {
               // Find staff details
               const employeeStaff = staffs.find(
                 (staff) => staff.id === payroll.employee_id
