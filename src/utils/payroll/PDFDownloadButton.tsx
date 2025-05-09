@@ -44,7 +44,7 @@ interface BatchPDFButtonProps {
  */
 export const SinglePaySlipPDFButton: React.FC<SinglePDFButtonProps> = ({
   payroll,
-  companyName = "Tien Hock",
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   fileName,
   buttonText = "Download PDF",
   disabled = false,
@@ -95,7 +95,7 @@ export const SinglePaySlipPDFButton: React.FC<SinglePDFButtonProps> = ({
  */
 export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
   payrolls,
-  companyName = "Tien Hock",
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   fileName,
   buttonText,
   disabled = false,

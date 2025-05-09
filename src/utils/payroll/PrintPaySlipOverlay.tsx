@@ -9,7 +9,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 const PrintPaySlipOverlay = ({
   payroll,
   onComplete,
-  companyName = "Tien Hock",
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
 }: {
   payroll: EmployeePayroll;
   onComplete: () => void;

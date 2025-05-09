@@ -28,7 +28,7 @@ export const generateSinglePaySlipPDF = async (
  */
 export const generateBatchPaySlipsPDF = async (
   payrolls: EmployeePayroll[],
-  companyName = "Tien Hock"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
 ): Promise<Blob> => {
   // Create a single document with multiple pages
   const pdfDoc = pdf(
@@ -49,7 +49,7 @@ export const generateBatchPaySlipsPDF = async (
  */
 export const downloadSinglePaySlip = async (
   payroll: EmployeePayroll,
-  companyName = "Tien Hock"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
 ): Promise<void> => {
   const blob = await generateSinglePaySlipPDF(payroll, companyName);
   const fileName = `PaySlip-${payroll.employee_id}-${payroll.year}-${payroll.month}.pdf`;
@@ -70,7 +70,7 @@ export const downloadSinglePaySlip = async (
  */
 export const downloadBatchPaySlips = async (
   payrolls: EmployeePayroll[],
-  companyName = "Tien Hock"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
 ): Promise<void> => {
   const blob = await generateBatchPaySlipsPDF(payrolls, companyName);
 

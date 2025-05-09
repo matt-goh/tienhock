@@ -15,7 +15,7 @@ interface PaySlipPreviewProps {
 
 const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
   payroll,
-  companyName = "Tien Hock",
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   showPrintHeader = true,
   className = "",
 }) => {
