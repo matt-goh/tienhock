@@ -11,11 +11,21 @@ import { EmployeePayroll } from "../../types/types";
  */
 export const generateSinglePaySlipPDF = async (
   payroll: EmployeePayroll,
-  companyName = "Tien Hock"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  staffDetails?: {
+    name: string;
+    icNo: string;
+    jobName: string;
+    section: string;
+  }
 ): Promise<Blob> => {
   return await pdf(
     <Document>
-      <PaySlipPDF payroll={payroll} companyName={companyName} />
+      <PaySlipPDF
+        payroll={payroll}
+        companyName={companyName}
+        staffDetails={staffDetails}
+      />
     </Document>
   ).toBlob();
 };
@@ -28,13 +38,27 @@ export const generateSinglePaySlipPDF = async (
  */
 export const generateBatchPaySlipsPDF = async (
   payrolls: EmployeePayroll[],
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  staffDetailsMap?: Record<
+    string,
+    {
+      name: string;
+      icNo: string;
+      jobName: string;
+      section: string;
+    }
+  >
 ): Promise<Blob> => {
   // Create a single document with multiple pages
   const pdfDoc = pdf(
     <Document>
       {payrolls.map((payroll, index) => (
-        <PaySlipPDF key={index} payroll={payroll} companyName={companyName} />
+        <PaySlipPDF
+          key={index}
+          payroll={payroll}
+          companyName={companyName}
+          staffDetails={staffDetailsMap?.[payroll.employee_id]}
+        />
       ))}
     </Document>
   );
@@ -49,9 +73,19 @@ export const generateBatchPaySlipsPDF = async (
  */
 export const downloadSinglePaySlip = async (
   payroll: EmployeePayroll,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
+  companyName = "Tien Hock",
+  staffDetails?: {
+    name: string;
+    icNo: string;
+    jobName: string;
+    section: string;
+  }
 ): Promise<void> => {
-  const blob = await generateSinglePaySlipPDF(payroll, companyName);
+  const blob = await generateSinglePaySlipPDF(
+    payroll,
+    companyName,
+    staffDetails
+  );
   const fileName = `PaySlip-${payroll.employee_id}-${payroll.year}-${payroll.month}.pdf`;
 
   // Create download link
@@ -70,9 +104,22 @@ export const downloadSinglePaySlip = async (
  */
 export const downloadBatchPaySlips = async (
   payrolls: EmployeePayroll[],
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
+  companyName = "Tien Hock",
+  staffDetailsMap?: Record<
+    string,
+    {
+      name: string;
+      icNo: string;
+      jobName: string;
+      section: string;
+    }
+  >
 ): Promise<void> => {
-  const blob = await generateBatchPaySlipsPDF(payrolls, companyName);
+  const blob = await generateBatchPaySlipsPDF(
+    payrolls,
+    companyName,
+    staffDetailsMap
+  );
 
   // Get month/year info from the first payroll
   const month = payrolls[0]?.month || new Date().getMonth() + 1;

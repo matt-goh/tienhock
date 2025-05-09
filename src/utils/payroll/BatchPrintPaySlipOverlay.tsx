@@ -6,6 +6,8 @@ import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { getEmployeePayrollDetailsBatch } from "./payrollUtils";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 interface BatchPrintPaySlipOverlayProps {
   payrolls: EmployeePayroll[];
@@ -30,6 +32,8 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
     printFrame: null,
     pdfUrl: null,
   });
+  const { staffs } = useStaffsCache();
+  const { jobs } = useJobsCache();
 
   const cleanup = (fullCleanup = false) => {
     if (fullCleanup) {
@@ -107,13 +111,29 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
         // Create Document with all pages using complete data
         const pdfDoc = pdf(
           <Document>
-            {completePayrolls.map((payroll, index) => (
-              <PaySlipPDF
-                key={index}
-                payroll={payroll}
-                companyName={companyName}
-              />
-            ))}
+            {payrolls.map((payroll, index) => {
+              // Find staff details
+              const employeeStaff = staffs.find(
+                (staff) => staff.id === payroll.employee_id
+              );
+              const jobInfo = jobs.find((job) => job.id === payroll.job_type);
+
+              const staffDetails = {
+                name: employeeStaff?.name || payroll.employee_name || "",
+                icNo: employeeStaff?.icNo || "",
+                jobName: jobInfo?.name || payroll.job_type,
+                section: payroll.section,
+              };
+
+              return (
+                <PaySlipPDF
+                  key={index}
+                  payroll={payroll}
+                  companyName={companyName}
+                  staffDetails={staffDetails}
+                />
+              );
+            })}
           </Document>
         );
 

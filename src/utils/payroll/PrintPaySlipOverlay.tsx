@@ -5,6 +5,8 @@ import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 const PrintPaySlipOverlay = ({
   payroll,
@@ -29,6 +31,8 @@ const PrintPaySlipOverlay = ({
     container: null,
     pdfUrl: null,
   });
+  const { staffs } = useStaffsCache();
+  const { jobs } = useJobsCache();
 
   const cleanup = (fullCleanup = false) => {
     if (fullCleanup) {
@@ -70,9 +74,26 @@ const PrintPaySlipOverlay = ({
         document.body.appendChild(container);
         resourcesRef.current.container = container;
 
+        // Find staff details
+        const employeeStaff = staffs.find(
+          (staff) => staff.id === payroll.employee_id
+        );
+        const jobInfo = jobs.find((job) => job.id === payroll.job_type);
+
+        const staffDetails = {
+          name: employeeStaff?.name || payroll.employee_name || "",
+          icNo: employeeStaff?.icNo || "",
+          jobName: jobInfo?.name || payroll.job_type,
+          section: payroll.section,
+        };
+
         const pdfComponent = (
           <Document>
-            <PaySlipPDF payroll={payroll} companyName={companyName} />
+            <PaySlipPDF
+              payroll={payroll}
+              companyName={companyName}
+              staffDetails={staffDetails}
+            />
           </Document>
         );
 
