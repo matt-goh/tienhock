@@ -286,7 +286,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
       {/* Pay Slip Title - Now separate from header */}
       <Text style={styles.payslipTitle}>
-        Slip Gaji Pajak (Jam/Bag/Commission) Untuk Bulan {monthName}, {year}
+        Slip Gaji Pajak (Jam/Bag/Commission) Untuk Bulan {monthName} {year}
       </Text>
 
       {/* Main Table */}

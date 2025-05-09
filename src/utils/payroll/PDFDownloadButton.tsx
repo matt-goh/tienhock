@@ -9,6 +9,8 @@ import {
 import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
 import { getEmployeePayrollDetailsBatch } from "./payrollUtils";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 // Define interfaces
 interface SinglePDFButtonProps {
@@ -55,6 +57,8 @@ export const SinglePaySlipPDFButton: React.FC<SinglePDFButtonProps> = ({
   size = "md",
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const { staffs } = useStaffsCache();
+  const { jobs } = useJobsCache();
 
   // Generate default filename if none provided
   const defaultFileName = `PaySlip-${payroll.employee_id}-${payroll.year}-${payroll.month}.pdf`;
@@ -63,7 +67,20 @@ export const SinglePaySlipPDFButton: React.FC<SinglePDFButtonProps> = ({
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      await downloadSinglePaySlip(payroll, companyName);
+      // Find staff details
+      const employeeStaff = staffs.find(
+        (staff) => staff.id === payroll.employee_id
+      );
+      const jobInfo = jobs.find((job) => job.id === payroll.job_type);
+
+      const staffDetails = {
+        name: employeeStaff?.name || payroll.employee_name || "",
+        icNo: employeeStaff?.icNo || "",
+        jobName: jobInfo?.name || payroll.job_type,
+        section: payroll.section,
+      };
+
+      await downloadSinglePaySlip(payroll, companyName, staffDetails);
     } catch (error) {
       console.error("Error downloading PDF:", error);
       toast.error(
@@ -108,6 +125,8 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
   onComplete,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const { staffs } = useStaffsCache();
+  const { jobs } = useJobsCache();
 
   // Generate default batch filename if none provided
   const month = payrolls[0]?.month || new Date().getMonth() + 1;
@@ -127,43 +146,64 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
       return;
     }
 
+    // Get payroll IDs for valid payrolls
+    const payrollIds = payrolls
+      .filter((payroll) => payroll && payroll.id)
+      .map((payroll) => payroll.id as number);
+
+    if (payrollIds.length === 0) {
+      toast.error("No valid payslips to download");
+      return;
+    }
+
     setIsDownloading(true);
     try {
-      // Get all payroll IDs that need complete data (those without items)
-      const payrollIdsToFetch = payrolls
-        .filter((p) => !p.items || p.items.length === 0)
-        .map((p) => p.id)
-        .filter((id) => id !== undefined) as number[];
+      // Fetch detailed payroll data for all selected payrolls
+      const detailedPayrolls = await getEmployeePayrollDetailsBatch(payrollIds);
 
-      let completePayrolls = [...payrolls];
-
-      // Only fetch if there are payrolls needing complete data
-      if (payrollIdsToFetch.length > 0) {
-        // Use the new batch function to get complete data in one API call
-        const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
-          payrollIdsToFetch
-        );
-
-        // Replace incomplete payrolls with complete ones
-        completePayrolls = payrolls.map((payroll) => {
-          if (!payroll.items || payroll.items.length === 0) {
-            const completePayroll = fetchedPayrolls.find(
-              (p) => p.id === payroll.id
-            );
-            return completePayroll || payroll;
-          }
-          return payroll;
-        });
+      if (detailedPayrolls.length === 0) {
+        toast.error("Failed to fetch payroll details");
+        return;
       }
 
-      // Now generate the PDFs with complete data
-      await downloadBatchPaySlips(completePayrolls, companyName);
+      // Create a map of employee details
+      const staffDetailsMap: Record<
+        string,
+        {
+          name: string;
+          icNo: string;
+          jobName: string;
+          section: string;
+        }
+      > = {};
+
+      detailedPayrolls.forEach((payroll) => {
+        const employeeStaff = staffs.find(
+          (staff) => staff.id === payroll.employee_id
+        );
+        const jobInfo = jobs.find((job) => job.id === payroll.job_type);
+
+        staffDetailsMap[payroll.employee_id] = {
+          name: employeeStaff?.name || payroll.employee_name || "",
+          icNo: employeeStaff?.icNo || "",
+          jobName: jobInfo?.name || payroll.job_type,
+          section: payroll.section,
+        };
+      });
+
+      // Download the batch of payslips with detailed data
+      await downloadBatchPaySlips(
+        detailedPayrolls,
+        companyName,
+        staffDetailsMap
+      );
 
       toast.success(
-        `${completePayrolls.length} payslip${
-          completePayrolls.length > 1 ? "s" : ""
+        `${detailedPayrolls.length} payslip${
+          detailedPayrolls.length > 1 ? "s" : ""
         } downloaded successfully`
       );
+
       if (onComplete) onComplete();
     } catch (error) {
       console.error("Error downloading batch PDF:", error);
