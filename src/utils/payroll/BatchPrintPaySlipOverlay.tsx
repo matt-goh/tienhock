@@ -24,6 +24,7 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
   const [isGenerating, setIsGenerating] = useState(true);
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [waitingForCache, setWaitingForCache] = useState(false);
   const hasPrintedRef = useRef(false);
   const resourcesRef = useRef<{
     printFrame: HTMLIFrameElement | null;
@@ -32,8 +33,10 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
     printFrame: null,
     pdfUrl: null,
   });
-  const { staffs } = useStaffsCache();
-  const { jobs } = useJobsCache();
+
+  // Access the caches with their loading states
+  const { staffs, loading: staffsLoading, refreshStaffs } = useStaffsCache();
+  const { jobs, loading: jobsLoading, refreshJobs } = useJobsCache();
 
   const cleanup = (fullCleanup = false) => {
     if (fullCleanup) {
@@ -76,9 +79,55 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
       }
 
       try {
-        // Check which payrolls need to fetch complete data
+        // Check if caches are loading
+        if (staffsLoading || jobsLoading) {
+          console.log("Caches are still loading, waiting...");
+          setWaitingForCache(true);
+
+          // Wait for caches to finish loading
+          for (
+            let i = 0;
+            i < 30 &&
+            (staffsLoading ||
+              jobsLoading ||
+              staffs.length === 0 ||
+              jobs.length === 0);
+            i++
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          }
+
+          setWaitingForCache(false);
+        }
+
+        console.log("Staff cache has", staffs.length, "entries");
+        console.log("Jobs cache has", jobs.length, "entries");
+
+        // Force refresh caches if they're still empty
+        if (staffs.length === 0) {
+          console.log("Staff cache is empty, forcing refresh...");
+          try {
+            await refreshStaffs();
+            // Wait a moment for refresh to complete
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          } catch (err) {
+            console.error("Failed to refresh staff cache:", err);
+          }
+        }
+
+        if (jobs.length === 0) {
+          console.log("Jobs cache is empty, forcing refresh...");
+          try {
+            await refreshJobs();
+            // Wait a moment for refresh to complete
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          } catch (err) {
+            console.error("Failed to refresh jobs cache:", err);
+          }
+        }
+
+        // Always fetch complete payroll data
         const payrollIdsToFetch = validPayrolls
-          .filter((p) => !p.items || p.items.length === 0)
           .map((p) => p.id)
           .filter((id) => id !== undefined) as number[];
 
@@ -91,39 +140,63 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
             const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
               payrollIdsToFetch
             );
+            console.log("Fetched payrolls:", fetchedPayrolls);
 
-            // Replace incomplete payrolls with complete ones
-            completePayrolls = validPayrolls.map((payroll) => {
-              if (!payroll.items || payroll.items.length === 0) {
+            // Check if we received a valid response
+            if (
+              fetchedPayrolls &&
+              Array.isArray(fetchedPayrolls) &&
+              fetchedPayrolls.length > 0
+            ) {
+              // Replace all payrolls with complete ones
+              completePayrolls = validPayrolls.map((payroll) => {
                 const completePayroll = fetchedPayrolls.find(
                   (p) => p.id === payroll.id
                 );
                 return completePayroll || payroll;
-              }
-              return payroll;
-            });
+              });
+            } else {
+              console.error(
+                "No valid payroll data returned from API:",
+                fetchedPayrolls
+              );
+              // Keep using what we have
+            }
           } catch (error) {
             console.error("Error fetching complete payroll data:", error);
             // Continue with what we have
           }
         }
 
-        // Create Document with all pages using complete data
+        // Create Document with all pages
         const pdfDoc = pdf(
           <Document>
             {completePayrolls.map((payroll, index) => {
-              // Find staff details
+              // Get staff and job data from caches
               const employeeStaff = staffs.find(
                 (staff) => staff.id === payroll.employee_id
               );
               const jobInfo = jobs.find((job) => job.id === payroll.job_type);
 
+              console.log(
+                `Payroll ${index + 1}:`,
+                payroll.employee_id,
+                payroll.job_type
+              );
+              console.log(`Staff info:`, employeeStaff || "Not found");
+              console.log(`Job info:`, jobInfo || "Not found");
+
               const staffDetails = {
                 name: employeeStaff?.name || payroll.employee_name || "",
                 icNo: employeeStaff?.icNo || "",
-                jobName: jobInfo?.name || payroll.job_type,
-                section: payroll.section,
+                jobName: jobInfo?.name || payroll.job_type || "",
+                section: payroll.section || "",
               };
+
+              console.log(
+                `Staff details for ${payroll.employee_id}:`,
+                staffDetails
+              );
 
               return (
                 <PaySlipPDF
@@ -187,7 +260,18 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
         cleanup(true);
       }
     };
-  }, [payrolls, isPrinting, onComplete, companyName]);
+  }, [
+    payrolls,
+    isPrinting,
+    onComplete,
+    companyName,
+    staffs,
+    jobs,
+    staffsLoading,
+    jobsLoading,
+    refreshStaffs,
+    refreshJobs,
+  ]);
 
   return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-50">
@@ -197,9 +281,11 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
           <LoadingSpinner size="sm" hideText />
           <p className="text-base font-medium text-default-900">
             {isGenerating
-              ? `Preparing ${payrolls.length} pay slip${
-                  payrolls.length > 1 ? "s" : ""
-                } for printing...`
+              ? waitingForCache
+                ? "Loading employee data..."
+                : `Preparing ${payrolls.length} pay slip${
+                    payrolls.length > 1 ? "s" : ""
+                  } for printing...`
               : "Opening print dialog..."}
           </p>
           <p className="text-sm text-default-500">Please wait a moment</p>
