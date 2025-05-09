@@ -5,6 +5,7 @@ import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { getEmployeePayrollDetailsBatch } from "./payrollUtils";
 
 interface BatchPrintPaySlipOverlayProps {
   payrolls: EmployeePayroll[];
@@ -71,10 +72,42 @@ const BatchPrintPaySlipOverlay: React.FC<BatchPrintPaySlipOverlayProps> = ({
       }
 
       try {
-        // Create Document with all pages
+        // Check which payrolls need to fetch complete data
+        const payrollIdsToFetch = validPayrolls
+          .filter((p) => !p.items || p.items.length === 0)
+          .map((p) => p.id)
+          .filter((id) => id !== undefined) as number[];
+
+        let completePayrolls = [...validPayrolls];
+
+        // Only fetch if there are payrolls needing complete data
+        if (payrollIdsToFetch.length > 0) {
+          try {
+            // Use the batch function to get complete data in one API call
+            const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
+              payrollIdsToFetch
+            );
+
+            // Replace incomplete payrolls with complete ones
+            completePayrolls = validPayrolls.map((payroll) => {
+              if (!payroll.items || payroll.items.length === 0) {
+                const completePayroll = fetchedPayrolls.find(
+                  (p) => p.id === payroll.id
+                );
+                return completePayroll || payroll;
+              }
+              return payroll;
+            });
+          } catch (error) {
+            console.error("Error fetching complete payroll data:", error);
+            // Continue with what we have
+          }
+        }
+
+        // Create Document with all pages using complete data
         const pdfDoc = pdf(
           <Document>
-            {payrolls.map((payroll, index) => (
+            {completePayrolls.map((payroll, index) => (
               <PaySlipPDF
                 key={index}
                 payroll={payroll}

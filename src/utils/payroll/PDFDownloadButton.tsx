@@ -8,6 +8,7 @@ import {
 } from "./generatePaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 import toast from "react-hot-toast";
+import { getEmployeePayrollDetailsBatch } from "./payrollUtils";
 
 // Define interfaces
 interface SinglePDFButtonProps {
@@ -126,23 +127,41 @@ export const BatchPaySlipPDFButton: React.FC<BatchPDFButtonProps> = ({
       return;
     }
 
-    // Add validation for each payroll
-    const validPayrolls = payrolls.filter(
-      (payroll) =>
-        payroll && payroll.employee_id && Array.isArray(payroll.items) // Ensure items is an array
-    );
-
-    if (validPayrolls.length === 0) {
-      toast.error("No valid payslips to download");
-      return;
-    }
-
     setIsDownloading(true);
     try {
-      await downloadBatchPaySlips(validPayrolls, companyName);
+      // Get all payroll IDs that need complete data (those without items)
+      const payrollIdsToFetch = payrolls
+        .filter((p) => !p.items || p.items.length === 0)
+        .map((p) => p.id)
+        .filter((id) => id !== undefined) as number[];
+
+      let completePayrolls = [...payrolls];
+
+      // Only fetch if there are payrolls needing complete data
+      if (payrollIdsToFetch.length > 0) {
+        // Use the new batch function to get complete data in one API call
+        const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
+          payrollIdsToFetch
+        );
+
+        // Replace incomplete payrolls with complete ones
+        completePayrolls = payrolls.map((payroll) => {
+          if (!payroll.items || payroll.items.length === 0) {
+            const completePayroll = fetchedPayrolls.find(
+              (p) => p.id === payroll.id
+            );
+            return completePayroll || payroll;
+          }
+          return payroll;
+        });
+      }
+
+      // Now generate the PDFs with complete data
+      await downloadBatchPaySlips(completePayrolls, companyName);
+
       toast.success(
-        `${validPayrolls.length} payslip${
-          validPayrolls.length > 1 ? "s" : ""
+        `${completePayrolls.length} payslip${
+          completePayrolls.length > 1 ? "s" : ""
         } downloaded successfully`
       );
       if (onComplete) onComplete();

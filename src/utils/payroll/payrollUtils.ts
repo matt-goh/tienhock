@@ -175,6 +175,30 @@ export const saveEmployeePayroll = async (
 };
 
 /**
+ * Fetches detailed employee payroll data for multiple payrolls in a single batch
+ * @param payrollIds Array of employee payroll IDs to fetch
+ * @returns Promise with array of complete employee payroll data
+ */
+export const getEmployeePayrollDetailsBatch = async (
+  payrollIds: number[]
+): Promise<EmployeePayroll[]> => {
+  if (!payrollIds.length) return [];
+
+  try {
+    // Create a comma-separated list of IDs
+    const idList = payrollIds.join(",");
+    // Make a single API call with all IDs as query parameter
+    const response = await api.get(
+      `/api/employee-payrolls/batch?ids=${idList}`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching batch employee payrolls:", error);
+    throw error;
+  }
+};
+
+/**
  * Fetches detailed employee payroll with items
  * @param id Employee payroll ID
  * @returns Employee payroll with items

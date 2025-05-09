@@ -4,6 +4,78 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  // Get multiple employee payroll details with items
+  router.get("/batch", async (req, res) => {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res
+        .status(400)
+        .json({ message: "Employee payroll IDs are required" });
+    }
+
+    try {
+      // Convert comma-separated string to array of numbers
+      const payrollIds = ids.split(",").map((id) => parseInt(id));
+
+      // Query all payrolls in a single database call
+      const query = `
+      SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      LEFT JOIN staffs s ON ep.employee_id = s.id
+      WHERE ep.id = ANY($1)
+    `;
+
+      const payrollsResult = await pool.query(query, [payrollIds]);
+
+      // Get all items for these payrolls in a single query (more efficient)
+      const itemsQuery = `
+      SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
+            pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+      FROM payroll_items pi
+      LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+      WHERE pi.employee_payroll_id = ANY($1)
+      ORDER BY pi.id
+    `;
+
+      const itemsResult = await pool.query(itemsQuery, [payrollIds]);
+
+      // Group items by employee_payroll_id
+      const itemsByPayrollId = itemsResult.rows.reduce((acc, item) => {
+        if (!acc[item.employee_payroll_id]) {
+          acc[item.employee_payroll_id] = [];
+        }
+        acc[item.employee_payroll_id].push({
+          ...item,
+          id: parseInt(item.id),
+          rate: parseFloat(item.rate),
+          quantity: parseFloat(item.quantity),
+          amount: parseFloat(item.amount),
+          is_manual: !!item.is_manual,
+        });
+        delete item.employee_payroll_id;
+        return acc;
+      }, {});
+
+      // Merge payrolls with their items
+      const response = payrollsResult.rows.map((payroll) => ({
+        ...payroll,
+        items: itemsByPayrollId[payroll.id] || [],
+        gross_pay: parseFloat(payroll.gross_pay),
+        net_pay: parseFloat(payroll.net_pay),
+      }));
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error fetching batch employee payroll details:", error);
+      res.status(500).json({
+        message: "Error fetching batch employee payroll details",
+        error: error.message,
+      });
+    }
+  });
+
   // Get employee payroll details with items
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
