@@ -42,11 +42,11 @@ const generatePayslipPDF = async (
   const paySlipElement = React.createElement(PaySlipPDF, {
     payroll,
     companyName,
-    staffDetails
+    staffDetails,
   });
-  
+
   const documentElement = React.createElement(Document, {}, paySlipElement);
-  
+
   return await pdf(documentElement).toBlob();
 };
 
@@ -56,17 +56,17 @@ const generateBatchPayslipPDF = async (
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
 ): Promise<Blob> => {
   // Map payrolls to React elements
-  const paySlipElements = payrolls.map((payroll, index) => 
+  const paySlipElements = payrolls.map((payroll, index) =>
     React.createElement(PaySlipPDF, {
       key: index,
       payroll,
       companyName,
-      staffDetails: staffDetailsMap?.[payroll.employee_id]
+      staffDetails: staffDetailsMap?.[payroll.employee_id],
     })
   );
-  
+
   const documentElement = React.createElement(Document, {}, ...paySlipElements);
-  
+
   return await pdf(documentElement).toBlob();
 };
 
@@ -136,8 +136,39 @@ export const downloadBatchPayslips = async (
   try {
     if (onBeforeDownload) onBeforeDownload();
 
+    // Fetch complete payroll data for the batch
+    const payrollIdsToFetch = payrolls
+      .map((p) => p.id)
+      .filter((id) => id !== undefined) as number[];
+
+    let completePayrolls = [...payrolls];
+
+    if (payrollIdsToFetch.length > 0) {
+      try {
+        const fetchedPayrolls = await getEmployeePayrollDetailsBatch(
+          payrollIdsToFetch
+        );
+
+        if (
+          fetchedPayrolls &&
+          Array.isArray(fetchedPayrolls) &&
+          fetchedPayrolls.length > 0
+        ) {
+          completePayrolls = payrolls.map((payroll) => {
+            const completePayroll = fetchedPayrolls.find(
+              (p) => p.id === payroll.id
+            );
+            return completePayroll || payroll;
+          });
+        }
+      } catch (error) {
+        console.warn("Error fetching batch payroll data:", error);
+        // Continue with what we have
+      }
+    }
+
     const blob = await generateBatchPayslipPDF(
-      payrolls,
+      completePayrolls,
       staffDetailsMap,
       companyName
     );
