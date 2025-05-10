@@ -18,8 +18,7 @@ import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import PaySlipPreview from "../../components/Payroll/PaySlipPreview";
 import Tab from "../../components/Tab";
 import { EmployeePayroll } from "../../types/types";
-import { SinglePaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
-import PrintPaySlipOverlay from "../../utils/payroll/PrintPaySlipOverlay";
+import { DownloadPayslipButton, PrintPayslipButton } from "../../utils/payroll/PayslipButtons";
 
 interface PayrollItem {
   id: number;
@@ -39,7 +38,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   const [payroll, setPayroll] = useState<EmployeePayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -80,15 +78,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       setShowDeleteDialog(false);
       setItemToDelete(null);
     }
-  };
-
-  const handlePrintPaySlip = () => {
-    if (!payroll) {
-      toast.error("No payroll data available for printing");
-      return;
-    }
-
-    setShowPrintOverlay(true);
   };
 
   const handleBack = () => {
@@ -148,18 +137,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </p>
           </div>
           <div className="flex space-x-3 mt-4 md:mt-0">
-            <SinglePaySlipPDFButton
+            <DownloadPayslipButton
               payroll={payroll}
               buttonText="Download PDF"
               variant="outline"
             />
-            <Button
-              onClick={handlePrintPaySlip}
-              icon={IconPrinter}
+            <PrintPayslipButton
+              payroll={payroll}
+              buttonText="Print Pay Slip"
               variant="outline"
-            >
-              Print Pay Slip
-            </Button>
+            />
             {isEditable && (
               <Button
                 onClick={() => setShowAddItemModal(true)}
@@ -551,16 +538,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         employeePayrollId={Number(id)}
         onItemAdded={fetchEmployeePayroll}
       />
-
-      {/* Print Overlay */}
-      {showPrintOverlay && payroll && (
-        <PrintPaySlipOverlay
-          payroll={payroll}
-          onComplete={() => {
-            setShowPrintOverlay(false);
-          }}
-        />
-      )}
 
       {/* Delete Item Confirmation Dialog */}
       <ConfirmationDialog

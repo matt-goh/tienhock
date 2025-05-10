@@ -18,7 +18,6 @@ import {
   IconSearch,
   IconX,
   IconFilter,
-  IconPrinter,
   IconSelectAll,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
@@ -35,9 +34,8 @@ import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { FormListbox } from "../../components/FormComponents";
-import { BatchPaySlipPDFButton } from "../../utils/payroll/PDFDownloadButton";
-import BatchPrintPaySlipOverlay from "../../utils/payroll/BatchPrintPaySlipOverlay";
 import Checkbox from "../../components/Checkbox";
+import { DownloadBatchPayslipsButton, PrintBatchPayslipsButton } from "../../utils/payroll/PayslipButtons";
 
 const MonthlyPayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -59,7 +57,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     Record<string, boolean>
   >({});
   const [isAllSelected, setIsAllSelected] = useState(false);
-  const [showPrintBatchOverlay, setShowPrintBatchOverlay] = useState(false);
 
   useEffect(() => {
     fetchPayrollDetails();
@@ -230,17 +227,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     });
 
     setSelectedEmployeePayrolls(newSelectedEmployees);
-  };
-
-  // Handle batch print
-  const handleBatchPrint = () => {
-    const selectedPayrolls = getSelectedPayrolls();
-    if (selectedPayrolls.length === 0) {
-      toast.error("No payrolls selected for printing");
-      return;
-    }
-
-    setShowPrintBatchOverlay(true);
   };
 
   // Reset selections when filters change
@@ -513,27 +499,23 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
               {/* Batch action buttons - show only when employees are selected */}
               {selectedCount > 0 && (
                 <>
-                  <BatchPaySlipPDFButton
+                  <DownloadBatchPayslipsButton
                     payrolls={getSelectedPayrolls()}
                     size="sm"
-                    icon={true}
                     variant="outline"
                     color="sky"
                     buttonText={`Download ${selectedCount} PDFs`}
-                    title={"Download Payslips"}
                   />
-                  <Button
+                  <PrintBatchPayslipsButton
+                    payrolls={getSelectedPayrolls()}
                     size="sm"
                     variant="outline"
                     color="sky"
-                    icon={IconPrinter}
-                    onClick={handleBatchPrint}
-                    title={"Print Payslips"}
-                  >
-                    Print {selectedCount} Payslips
-                  </Button>
+                    buttonText={`Print ${selectedCount} Payslips`}
+                  />
                 </>
               )}
+
               <Button
                 size="sm"
                 variant="outline"
@@ -908,15 +890,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
         confirmButtonText={isUpdatingStatus ? "Processing..." : "Confirm"}
         variant={payroll.status === "Finalized" ? "danger" : "default"}
       />
-      {/* Batch Print Overlay */}
-      {showPrintBatchOverlay && (
-        <BatchPrintPaySlipOverlay
-          payrolls={getSelectedPayrolls()}
-          onComplete={() => {
-            setShowPrintBatchOverlay(false);
-          }}
-        />
-      )}
       {/* Finalize Payroll Dialog */}
       <FinalizePayrollDialog
         isOpen={showFinalizeDialog}
