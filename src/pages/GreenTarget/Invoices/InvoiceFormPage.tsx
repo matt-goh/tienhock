@@ -22,7 +22,9 @@ import {
   IconSquare,
 } from "@tabler/icons-react";
 import clsx from "clsx";
-import { FormCombobox, SelectOption } from "../../../components/FormComponents"; // Use FormCombobox and SelectOption
+import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
+import { EInvoiceSubmissionResult } from "../../../types/types";
 
 // Interfaces
 interface Customer {
@@ -52,15 +54,13 @@ interface Rental {
 interface Invoice {
   invoice_id?: number;
   invoice_number?: string;
-  type: "regular" | "statement";
+  type: "regular";
   customer_id: number; // Store as number
   rental_id?: number | null; // Store as number or null
   amount_before_tax: number;
   tax_amount: number;
   total_amount?: number; // Calculated
   date_issued: string; // YYYY-MM-DD
-  statement_period_start?: string | null; // YYYY-MM-DD or null
-  statement_period_end?: string | null; // YYYY-MM-DD or null
 }
 
 // Payment method options
@@ -107,8 +107,11 @@ const InvoiceFormPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [submitAsEinvoice, setSubmitAsEinvoice] = useState(false);
-  const [showEinvoiceError, setShowEinvoiceError] = useState(false);
-  const [einvoiceErrorMessage, setEinvoiceErrorMessage] = useState("");
+  const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
+    useState(false);
+  const [submissionResults, setSubmissionResults] =
+    useState<EInvoiceSubmissionResult | null>(null);
+  const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
 
   // State to remember rental selection when switching types
   const [previousRental, setPreviousRental] = useState<{
@@ -289,12 +292,6 @@ const InvoiceFormPage: React.FC = () => {
         date_issued: inv.date_issued
           ? new Date(inv.date_issued).toISOString().split("T")[0]
           : "",
-        statement_period_start: inv.statement_period_start
-          ? new Date(inv.statement_period_start).toISOString().split("T")[0]
-          : null,
-        statement_period_end: inv.statement_period_end
-          ? new Date(inv.statement_period_end).toISOString().split("T")[0]
-          : null,
       };
       setFormData(parsed);
       setInitialFormData(parsed);
@@ -332,6 +329,26 @@ const InvoiceFormPage: React.FC = () => {
     return selected ? selected.name : "";
   };
 
+  const isInvoiceDateEligibleForEinvoice = (
+    dateIssuedString: string | undefined | null
+  ): boolean => {
+    if (!dateIssuedString) return false;
+
+    try {
+      // Parse the ISO date string to a Date object
+      const dateIssued = new Date(dateIssuedString);
+      if (isNaN(dateIssued.getTime())) return false; // Invalid date
+
+      const now = new Date();
+      const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+      const cutoffDate = new Date(now.getTime() - threeDaysInMillis);
+
+      return dateIssued >= cutoffDate;
+    } catch {
+      return false;
+    }
+  };
+
   // --- EVENT HANDLERS ---
 
   const handleInputChange = (
@@ -345,33 +362,6 @@ const InvoiceFormPage: React.FC = () => {
       [name]:
         type === "number" ? (value === "" ? 0 : parseFloat(value) || 0) : value,
     }));
-  };
-  const handleTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    if (value === "regular") {
-      setFormData((p) => ({
-        ...p,
-        type: "regular",
-        statement_period_start: null,
-        statement_period_end: null,
-        rental_id:
-          previousRental.rental?.customer_id === p.customer_id
-            ? previousRental.rental_id
-            : null,
-      }));
-      setSelectedRental(
-        previousRental.rental?.customer_id === formData.customer_id
-          ? previousRental.rental
-          : null
-      );
-    } else if (value === "statement") {
-      setPreviousRental({
-        rental_id: formData.rental_id ?? null,
-        rental: selectedRental,
-      });
-      setFormData((p) => ({ ...p, type: "statement", rental_id: null }));
-      setSelectedRental(null);
-    }
   };
   const handleCustomerChange = (selectedId: string | string[] | null) => {
     const newCustId =
@@ -428,23 +418,6 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Select rental");
       return false;
     }
-    if (
-      formData.type === "statement" &&
-      (!formData.statement_period_start || !formData.statement_period_end)
-    ) {
-      toast.error("Specify statement period");
-      return false;
-    }
-    if (
-      formData.type === "statement" &&
-      formData.statement_period_start &&
-      formData.statement_period_end &&
-      new Date(formData.statement_period_start) >
-        new Date(formData.statement_period_end)
-    ) {
-      toast.error("Start date after end");
-      return false;
-    }
     if (!formData.date_issued) {
       toast.error("Specify issue date");
       return false;
@@ -456,11 +429,6 @@ const InvoiceFormPage: React.FC = () => {
     if (!isEditMode && submitAsEinvoice) {
       if (!selCust) {
         toast.error("eInvoice: Customer missing.");
-        return false;
-      }
-      if (!selCust.tin_number || !selCust.id_number) {
-        setEinvoiceErrorMessage("eInvoice requires Customer TIN & ID.");
-        setShowEinvoiceError(true);
         return false;
       }
     }
@@ -497,8 +465,6 @@ const InvoiceFormPage: React.FC = () => {
         tax_amount: Number(formData.tax_amount),
         total_amount: Number(totalAmount),
         date_issued: formData.date_issued,
-        statement_period_start: formData.statement_period_start || null,
-        statement_period_end: formData.statement_period_end || null,
       };
       if (isEditMode && formData.invoice_id)
         invData.invoice_id = formData.invoice_id;
@@ -519,31 +485,100 @@ const InvoiceFormPage: React.FC = () => {
           const selCust = customers.find(
             (c) => c.customer_id === formData.customer_id
           );
+
           if (
             submitAsEinvoice &&
             selCust?.tin_number &&
             selCust?.id_number &&
             navId
           ) {
+            // Set state to show loading in modal immediately
+            setIsSubmittingEInvoice(true);
+            setSubmissionResults(null); // Clear previous results
+            setShowSubmissionResultsModal(true); // Show modal immediately with loading state
+
             const eTid = toast.loading("Submitting e-Invoice...");
             try {
               const eRes = await greenTargetApi.submitEInvoice(navId);
-              if (!eRes.success) {
-                toast.error(eRes.message || "eInvoice failed", { id: eTid });
-                setEinvoiceErrorMessage(eRes.message || "eInvoice failed");
-                setShowEinvoiceError(true);
-                setIsSaving(false);
-                return;
+
+              // Dismiss loading toast
+              toast.dismiss(eTid);
+
+              // Transform the response to match the expected format
+              const transformedResponse = {
+                success: eRes.success,
+                message: eRes.message || "e-Invoice submitted successfully",
+                overallStatus:
+                  eRes.einvoice?.einvoice_status === "valid"
+                    ? "Valid"
+                    : eRes.einvoice?.einvoice_status === "pending"
+                    ? "Pending"
+                    : "Unknown",
+                acceptedDocuments: eRes.einvoice
+                  ? [
+                      {
+                        internalId: eRes.einvoice.invoice_number,
+                        uuid: eRes.einvoice.uuid,
+                        longId: eRes.einvoice.long_id,
+                        status:
+                          eRes.einvoice.einvoice_status === "valid"
+                            ? "ACCEPTED"
+                            : "Submitted",
+                        dateTimeValidated: eRes.einvoice.datetime_validated,
+                      },
+                    ]
+                  : [],
+                rejectedDocuments:
+                  !eRes.success && eRes.error
+                    ? [
+                        {
+                          internalId: navId.toString(),
+                          error: {
+                            code: "ERROR",
+                            message: eRes.error.message || "Unknown error",
+                            details: eRes.error.details,
+                          },
+                        },
+                      ]
+                    : [],
+              };
+
+              // Store the transformed response for the modal
+              setSubmissionResults(transformedResponse);
+
+              // Only show minor toast if needed
+              if (eRes.success && !showSubmissionResultsModal) {
+                const status = eRes.einvoice?.einvoice_status || "pending";
+                if (status === "valid") {
+                  toast.success("e-Invoice submitted and validated");
+                } else {
+                  toast.success("e-Invoice submitted and pending validation");
+                }
               }
-              toast.success("eInvoice submitted", { id: eTid });
-            } catch (eErr: any) {
-              console.error("eInvoice err:", eErr);
-              const m = eErr instanceof Error ? eErr.message : "Unknown";
-              toast.error(`eInvoice failed: ${m}`, { id: eTid });
-              setEinvoiceErrorMessage(`eInvoice failed: ${m}`);
-              setShowEinvoiceError(true);
-              setIsSaving(false);
-              return;
+            } catch (eErr) {
+              console.error("e-Invoice submission error:", eErr);
+              toast.error("e-Invoice submission failed", { id: eTid });
+
+              // Format error for modal with the expected structure
+              const errorMessage =
+                eErr instanceof Error ? eErr.message : "Unknown error";
+              setSubmissionResults({
+                success: false,
+                message: `e-Invoice submission failed: ${errorMessage}`,
+                overallStatus: "Error",
+                rejectedDocuments: [
+                  {
+                    internalId: navId.toString(),
+                    error: {
+                      code: "EINVOICE_ERROR",
+                      message: errorMessage,
+                    },
+                  },
+                ],
+              });
+            } finally {
+              // Make sure to set the submitting state to false when done
+              setIsSubmittingEInvoice(false);
             }
           }
           if (isPaid && navId) {
@@ -606,7 +641,7 @@ const InvoiceFormPage: React.FC = () => {
   if (loading) return <LoadingSpinner />;
   if (error) {
     return (
-      <div className="container mx-auto -mt-12 px-4">
+      <div className="container mx-auto px-4">
         <BackButton onClick={handleBackClick} className="ml-5" />
         <div className="bg-white rounded-lg p-6 border border-rose-200 shadow-sm">
           <h2 className="text-xl font-semibold text-rose-700 mb-4">
@@ -644,7 +679,7 @@ const InvoiceFormPage: React.FC = () => {
   );
 
   return (
-    <div className="container mx-auto -mt-12 px-4 pb-10">
+    <div className="container mx-auto px-4 pb-10">
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
@@ -662,83 +697,6 @@ const InvoiceFormPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6">
-          {/* Invoice Type Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-default-700 mb-2">
-              Invoice Type
-            </label>
-            <div className="flex space-x-4">
-              <label className="inline-flex items-center cursor-pointer">
-                <div className="relative flex items-center">
-                  <input
-                    type="radio"
-                    name="type"
-                    value="regular"
-                    checked={formData.type === "regular"}
-                    onChange={handleTypeChange}
-                    className="sr-only"
-                    disabled={isEditMode}
-                  />
-                  <div
-                    className={clsx(
-                      "w-4 h-4 rounded-full border flex items-center justify-center mr-2",
-                      formData.type === "regular"
-                        ? "border-sky-500 bg-white"
-                        : "border-default-300 bg-white",
-                      isEditMode ? "cursor-not-allowed opacity-50" : ""
-                    )}
-                  >
-                    {formData.type === "regular" && (
-                      <div className="w-2 h-2 rounded-full bg-sky-500"></div>
-                    )}
-                  </div>
-                  <span
-                    className={clsx(
-                      "text-sm",
-                      isEditMode ? "text-default-500" : "text-default-700"
-                    )}
-                  >
-                    Regular Invoice
-                  </span>
-                </div>
-              </label>
-              <label className="inline-flex items-center cursor-pointer">
-                <div className="relative flex items-center">
-                  <input
-                    type="radio"
-                    name="type"
-                    value="statement"
-                    checked={formData.type === "statement"}
-                    onChange={handleTypeChange}
-                    className="sr-only"
-                    disabled={isEditMode}
-                  />
-                  <div
-                    className={clsx(
-                      "w-4 h-4 rounded-full border flex items-center justify-center mr-2",
-                      formData.type === "statement"
-                        ? "border-sky-500 bg-white"
-                        : "border-default-300 bg-white",
-                      isEditMode ? "cursor-not-allowed opacity-50" : ""
-                    )}
-                  >
-                    {formData.type === "statement" && (
-                      <div className="w-2 h-2 rounded-full bg-sky-500"></div>
-                    )}
-                  </div>
-                  <span
-                    className={clsx(
-                      "text-sm",
-                      isEditMode ? "text-default-500" : "text-default-700"
-                    )}
-                  >
-                    Statement
-                  </span>
-                </div>
-              </label>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* Customer Combobox */}
             <div className="space-y-2">
@@ -951,53 +909,6 @@ const InvoiceFormPage: React.FC = () => {
             </div>
           )}
 
-          {/* Conditional Fields (Statement Invoice) */}
-          {formData.type ===
-            "statement" /* ... Statement date fields ... */ && (
-            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label
-                  htmlFor="statement_period_start"
-                  className="block text-sm font-medium text-default-700"
-                >
-                  Start Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="statement_period_start"
-                  name="statement_period_start"
-                  value={formData.statement_period_start || ""}
-                  onChange={handleInputChange}
-                  required
-                  className={clsx(
-                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                  )}
-                />
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="statement_period_end"
-                  className="block text-sm font-medium text-default-700"
-                >
-                  End Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="statement_period_end"
-                  name="statement_period_end"
-                  value={formData.statement_period_end || ""}
-                  onChange={handleInputChange}
-                  required
-                  className={clsx(
-                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                  )}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Amount and Tax Section */}
           <div className="mt-6 border-t pt-6">
             <h2 className="text-lg font-medium mb-4">Invoice Amount</h2>
@@ -1020,7 +931,7 @@ const InvoiceFormPage: React.FC = () => {
                     value={formData.amount_before_tax}
                     onChange={handleInputChange}
                     min="0"
-                    step="0.01"
+                    step="1"
                     required
                     className={clsx(
                       "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
@@ -1047,7 +958,7 @@ const InvoiceFormPage: React.FC = () => {
                     value={formData.tax_amount}
                     onChange={handleInputChange}
                     min="0"
-                    step="0.01"
+                    step="1"
                     className={clsx(
                       "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm bg-default-50"
@@ -1102,127 +1013,124 @@ const InvoiceFormPage: React.FC = () => {
           </div>
 
           {/* Payment Method Section */}
-          {!isEditMode &&
-            isPaid && (
-              <div className="mt-6 border-t pt-6">
-                <h2 className="text-lg font-medium mb-4">
-                  Payment Info (Optional)
-                </h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="pm-paid"
-                      className="block text-sm font-medium text-default-700"
-                    >
-                      Method <span className="text-red-500">*</span>
-                    </label>
-                    <Listbox
-                      value={paymentMethod}
-                      onChange={handlePaymentMethodChange}
-                      name="payment_method_paid"
-                    >
-                      <div className="relative">
-                        <HeadlessListboxButton
-                          id="pm-paid"
-                          className={clsx(
-                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
-                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                          )}
-                        >
-                          <span className="block truncate">
-                            {getOptionName(
-                              paymentMethodOptions,
-                              paymentMethod
-                            ) || "Select"}
-                          </span>
-                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                            <IconChevronDown
-                              size={20}
-                              className="text-gray-400"
-                            />
-                          </span>
-                        </HeadlessListboxButton>
-                        <Transition
-                          as={Fragment}
-                          leave="transition ease-in duration-100"
-                          leaveFrom="opacity-100"
-                          leaveTo="opacity-0"
-                        >
-                          <ListboxOptions
-                            className={clsx(
-                              "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
-                              "bottom-full mb-1"
-                            )}
-                          >
-                            {paymentMethodOptions.map((o) => (
-                              <ListboxOption
-                                key={o.id}
-                                className={({ active }) =>
-                                  clsx(
-                                    "relative cursor-default select-none py-2 pl-3 pr-10",
-                                    active
-                                      ? "bg-sky-100 text-sky-900"
-                                      : "text-gray-900"
-                                  )
-                                }
-                                value={o.id.toString()}
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span
-                                      className={clsx(
-                                        "block truncate",
-                                        selected ? "font-medium" : "font-normal"
-                                      )}
-                                    >
-                                      {o.name}
-                                    </span>
-                                    {selected && (
-                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                        <IconCheck size={20} />
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </ListboxOption>
-                            ))}
-                          </ListboxOptions>
-                        </Transition>
-                      </div>
-                    </Listbox>
-                  </div>
-                  {(paymentMethod === "cheque" ||
-                    paymentMethod === "bank_transfer") && (
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="payment_reference"
-                        className="block text-sm font-medium text-default-700"
-                      >
-                        {paymentMethod === "cheque" ? "Cheque No" : "Reference"}{" "}
-                      </label>
-                      <input
-                        type="text"
-                        id="payment_reference"
-                        name="payment_reference"
-                        value={paymentReference}
-                        onChange={(e) => setPaymentReference(e.target.value)}
+          {!isEditMode && isPaid && (
+            <div className="mt-6 border-t pt-6">
+              <h2 className="text-lg font-medium mb-4">
+                Payment Info (Optional)
+              </h2>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="pm-paid"
+                    className="block text-sm font-medium text-default-700"
+                  >
+                    Method <span className="text-red-500">*</span>
+                  </label>
+                  <Listbox
+                    value={paymentMethod}
+                    onChange={handlePaymentMethodChange}
+                    name="payment_method_paid"
+                  >
+                    <div className="relative">
+                      <HeadlessListboxButton
+                        id="pm-paid"
                         className={clsx(
-                          "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                          "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
                           "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                         )}
-                      />
+                      >
+                        <span className="block truncate">
+                          {getOptionName(paymentMethodOptions, paymentMethod) ||
+                            "Select"}
+                        </span>
+                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                          <IconChevronDown
+                            size={20}
+                            className="text-gray-400"
+                          />
+                        </span>
+                      </HeadlessListboxButton>
+                      <Transition
+                        as={Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <ListboxOptions
+                          className={clsx(
+                            "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                            "bottom-full mb-1"
+                          )}
+                        >
+                          {paymentMethodOptions.map((o) => (
+                            <ListboxOption
+                              key={o.id}
+                              className={({ active }) =>
+                                clsx(
+                                  "relative cursor-default select-none py-2 pl-3 pr-10",
+                                  active
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "text-gray-900"
+                                )
+                              }
+                              value={o.id.toString()}
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span
+                                    className={clsx(
+                                      "block truncate",
+                                      selected ? "font-medium" : "font-normal"
+                                    )}
+                                  >
+                                    {o.name}
+                                  </span>
+                                  {selected && (
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                      <IconCheck size={20} />
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </ListboxOption>
+                          ))}
+                        </ListboxOptions>
+                      </Transition>
                     </div>
-                  )}
+                  </Listbox>
                 </div>
+                {(paymentMethod === "cheque" ||
+                  paymentMethod === "bank_transfer") && (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="payment_reference"
+                      className="block text-sm font-medium text-default-700"
+                    >
+                      {paymentMethod === "cheque" ? "Cheque No" : "Reference"}{" "}
+                    </label>
+                    <input
+                      type="text"
+                      id="payment_reference"
+                      name="payment_reference"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className={clsx(
+                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      )}
+                    />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
           {/* e-Invoice Section */}
-          {!isEditMode &&
-            formData.customer_id > 0 /* ... e-invoice checkbox ... */ && (
-              <div className="mt-6 border-t pt-6">
-                <h2 className="text-lg font-medium mb-2">e-Invoice Option</h2>
-                {canSubmitEinvoice ? (
+          {!isEditMode && formData.customer_id > 0 && (
+            <div className="mt-6 border-t pt-6">
+              <h2 className="text-lg font-medium mb-2">e-Invoice Option</h2>
+              {canSubmitEinvoice ? (
+                isInvoiceDateEligibleForEinvoice(formData.date_issued) ? (
                   <div className="flex items-center space-x-2">
                     <button
                       type="button"
@@ -1246,23 +1154,26 @@ const InvoiceFormPage: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          `/greentarget/customers/${formData.customer_id}`
-                        )
-                      }
-                      className="text-sm text-default-500 hover:text-sky-800 hover:underline focus:outline-none"
-                      title="Add TIN & ID for customer"
-                    >
-                      Cannot submit e-Invoice. Customer missing TIN or ID.
-                    </button>
+                  <div className="text-sm text-amber-600">
+                    Cannot submit e-Invoice for dates older than 3 days.
                   </div>
-                )}
-              </div>
-            )}
+                )
+              ) : (
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/greentarget/customers/${formData.customer_id}`)
+                    }
+                    className="text-sm text-default-500 hover:text-sky-800 hover:underline focus:outline-none"
+                    title="Add TIN & ID for customer"
+                  >
+                    Cannot submit e-Invoice. Customer missing TIN or ID.
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="mt-8 pt-5 border-t border-default-200 flex justify-end">
@@ -1290,6 +1201,20 @@ const InvoiceFormPage: React.FC = () => {
           </div>
         </form>
       </div>
+      <SubmissionResultsModal
+        isOpen={showSubmissionResultsModal}
+        onClose={() => setShowSubmissionResultsModal(false)}
+        results={
+          submissionResults
+            ? {
+                ...submissionResults,
+                message: submissionResults.message || "", // Ensure message is always a string
+                overallStatus: submissionResults.overallStatus || "Unknown", // Ensure overallStatus is always a string
+              }
+            : null
+        }
+        isLoading={isSubmittingEInvoice}
+      />
       {/* Dialogs */}
       <ConfirmationDialog
         isOpen={showBackConfirmation}
@@ -1299,16 +1224,6 @@ const InvoiceFormPage: React.FC = () => {
         message="Leave without saving?"
         confirmButtonText="Discard"
         variant="danger"
-      />
-      <ConfirmationDialog
-        isOpen={showEinvoiceError}
-        onClose={() => setShowEinvoiceError(false)}
-        onConfirm={() => setShowEinvoiceError(false)}
-        title="e-Invoice Issue"
-        message={einvoiceErrorMessage || "Error."}
-        confirmButtonText="OK"
-        variant="danger"
-        hideCancelButton={true}
       />
     </div>
   );

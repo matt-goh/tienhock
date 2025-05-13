@@ -3,8 +3,11 @@ import {
   IconBookmark,
   IconFileInvoice,
   IconListDetails,
+  IconUserDollar,
+  IconCalendarEvent,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
+import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -14,6 +17,17 @@ import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 // Sales related imports
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
+
+// Payroll related imports
+import DailyLogListPage from "./Payroll/DailyLogListPage";
+import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
+import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
+import DailyLogEditPage from "./Payroll/DailyLogEditPage";
+import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
+import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
+import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
+import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
+import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 
 // Catalogue related imports
 // Staff
@@ -27,11 +41,92 @@ import CustomerAddPage from "./Catalogue/CustomerAddPage";
 import CustomerFormPage from "./Catalogue/CustomerFormPage";
 
 // Other catalogues
+import PayCodePage from "./Catalogue/PayCodePage";
 import ProductPage from "./Catalogue/ProductPage";
 import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
+
+// Function to generate payroll subitems for each job type
+const generatePayrollSubItems = (): SidebarItem[] => {
+  const payrollSubItems: SidebarItem[] = [];
+
+  // Add each production type dynamically
+  Object.values(JOB_CONFIGS).forEach((jobConfig) => {
+    const jobTypeLower = jobConfig.id.toLowerCase();
+
+    payrollSubItems.push({
+      name: jobConfig.name,
+      path: `/payroll/${jobTypeLower}-production`,
+      component: (props: any) => (
+        <DailyLogListPage jobType={jobConfig.id} {...props} />
+      ),
+      subItems: [
+        {
+          name: `New ${jobConfig.name} Entry`,
+          path: `/payroll/${jobTypeLower}-entry`,
+          component: (props: any) => (
+            <DailyLogEntryPage jobType={jobConfig.id} {...props} />
+          ),
+        },
+        {
+          name: "View Log",
+          path: `/payroll/${jobTypeLower}-production/:id`,
+          component: (props: any) => (
+            <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
+          ),
+        },
+        {
+          name: "Edit Log",
+          path: `/payroll/${jobTypeLower}-production/:id/edit`,
+          component: (props: any) => (
+            <DailyLogEditPage jobType={jobConfig.id} {...props} />
+          ),
+        },
+      ],
+    });
+  });
+
+  // Add Monthly Payrolls
+  payrollSubItems.push({
+    name: "Monthly Payrolls",
+    path: "/payroll/monthly-payrolls",
+    component: MonthlyPayrollsPage,
+    subItems: [
+      {
+        name: "Payroll List",
+        path: "/payroll/monthly-payrolls/list",
+        component: MonthlyPayrollsPage,
+      },
+      {
+        name: "Payroll Details",
+        path: "/payroll/monthly-payrolls/:id",
+        component: MonthlyPayrollDetailsPage,
+      },
+      {
+        name: "Process Payroll",
+        path: "/payroll/monthly-payrolls/:id/process",
+        component: PayrollProcessingPage,
+      },
+      {
+        name: "Employee Payroll Details",
+        path: "/payroll/employee-payroll/:id",
+        component: EmployeePayrollDetailsPage,
+      },
+    ],
+  });
+
+  // Add Holiday Calendar at the end
+  payrollSubItems.push({
+    name: "Holiday Calendar",
+    path: "/payroll/holiday-calendar",
+    component: HolidayCalendarPage,
+    icon: IconCalendarEvent,
+  });
+
+  return payrollSubItems;
+};
 
 export const TienHockSidebarData: SidebarItem[] = [
   {
@@ -39,6 +134,11 @@ export const TienHockSidebarData: SidebarItem[] = [
     icon: IconBookmark,
     subItems: [],
     defaultOpen: true,
+  },
+  {
+    name: "Payroll",
+    icon: IconUserDollar,
+    subItems: generatePayrollSubItems(),
   },
   {
     name: "Sales",
@@ -122,6 +222,11 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Job",
         path: "/catalogue/job",
         component: JobPage,
+      },
+      {
+        name: "Pay Codes",
+        path: "/catalogue/pay-codes",
+        component: PayCodePage,
       },
       {
         name: "Job Category",

@@ -15,16 +15,15 @@ import {
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { validateCustomerIdentity } from "../../routes/catalogue/customerValidation";
-import { refreshCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import {
+  EnhancedCustomerList,
+  refreshCustomersCache,
+  useCustomersCache,
+} from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import CustomerProductsTab from "../../components/Catalogue/CustomerProductsTab";
 import Tab from "../../components/Tab";
-
-// Keep SelectOption interface if not imported
-// interface SelectOption {
-//   id: string;
-//   name: string;
-// }
+import { IconBuildingSkyscraper, IconBuildingStore } from "@tabler/icons-react";
 
 const CustomerFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -44,7 +43,7 @@ const CustomerFormPage: React.FC = () => {
   };
 
   // --- State ---
-  const [formData, setFormData] = useState<Customer>({
+  const [formData, setFormData] = useState<EnhancedCustomerList>({
     // Initial empty/default state
     id: "",
     name: "",
@@ -77,8 +76,15 @@ const CustomerFormPage: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [loading, setLoading] = useState(isEditMode); // Only true initially if editing
   const [error, setError] = useState<string | null>(null);
-  const { salesmen: salesmenData, isLoading: salesmenLoading } =
-    useSalesmanCache();
+  const { salesmen: salesmenData } = useSalesmanCache();
+  const [branchInfo, setBranchInfo] = useState<{
+    isInBranchGroup: boolean;
+    isMainBranch: boolean;
+    groupName: string;
+    groupId: number;
+    branches: { id: string; name: string; isMain: boolean }[];
+  } | null>(null);
+  const { customers, isLoading } = useCustomersCache();
 
   // Options
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
@@ -134,74 +140,105 @@ const CustomerFormPage: React.FC = () => {
   }, [formData, customProducts]);
 
   // --- Initial Data Fetching ---
-  const fetchCustomerDetailsAndProducts = useCallback(async () => {
-    if (!id) return; // Should not happen in edit mode, but safeguard
+  const fetchFromCache = useCallback(() => {
+    if (!id) return;
 
     setLoading(true);
     setError(null);
+
     try {
-      // SINGLE API CALL to the new endpoint
-      const response = await api.get(`/api/customers/${id}/details`);
-      const { customer, customProducts: fetchedProducts } = response;
+      // Find customer in the enhanced cache
+      const cachedCustomer = customers.find((customer) => customer.id === id);
 
-      // Ensure all necessary fields have defaults if null/undefined from API
-      const formattedCustomer = {
-        ...customer,
-        closeness: customer.closeness || "Local",
-        salesman: customer.salesman || "",
-        tin_number: customer.tin_number || "",
-        phone_number: customer.phone_number || "",
-        email: customer.email || "",
-        address: customer.address || "",
-        city: customer.city || "KOTA KINABALU",
-        state: customer.state || "12",
-        id_number: customer.id_number || "",
-        id_type: customer.id_type || "",
-        credit_limit: customer.credit_limit ?? 3000,
-        credit_used: customer.credit_used ?? 0,
-      };
+      if (!cachedCustomer) {
+        throw new Error(`Customer with ID ${id} not found in cache`);
+      }
 
-      setFormData(formattedCustomer);
-      initialFormDataRef.current = { ...formattedCustomer }; // Store deep copy
+      // Set customer form data
+      setFormData({
+        ...cachedCustomer,
+        // Ensure values have proper defaults
+        closeness: cachedCustomer.closeness || "Local",
+        salesman: cachedCustomer.salesman || "",
+        tin_number: cachedCustomer.tin_number || "",
+        phone_number: cachedCustomer.phone_number || "",
+        email: cachedCustomer.email || "",
+        address: cachedCustomer.address || "",
+        city: cachedCustomer.city || "KOTA KINABALU",
+        state: cachedCustomer.state || "12",
+        id_number: cachedCustomer.id_number || "",
+        id_type: cachedCustomer.id_type || "",
+        credit_limit: cachedCustomer.credit_limit ?? 3000,
+        credit_used: cachedCustomer.credit_used ?? 0,
+      });
 
-      // Add UID to fetched products for stable keys in the list
-      const productsWithUid = fetchedProducts.map((p: CustomProduct) => ({
-        ...p,
-        uid: crypto.randomUUID(),
-      }));
+      initialFormDataRef.current = { ...formData };
 
-      setCustomProducts(productsWithUid);
-      initialCustomProductsRef.current = JSON.parse(
-        JSON.stringify(productsWithUid)
-      ); // Store deep copy
-      setOriginalProductIds(
-        new Set(productsWithUid.map((p: { product_id: any }) => p.product_id))
-      );
+      // Set custom products
+      if (
+        cachedCustomer.customProducts &&
+        cachedCustomer.customProducts.length > 0
+      ) {
+        setCustomProducts(cachedCustomer.customProducts);
+        initialCustomProductsRef.current = JSON.parse(
+          JSON.stringify(cachedCustomer.customProducts)
+        );
+        setOriginalProductIds(
+          new Set(cachedCustomer.customProducts.map((p) => p.product_id))
+        );
+      } else {
+        setCustomProducts([]);
+        initialCustomProductsRef.current = [];
+        setOriginalProductIds(new Set());
+      }
+
+      // Set branch info
+      if (
+        cachedCustomer.branchInfo &&
+        cachedCustomer.branchInfo.isInBranchGroup !== undefined &&
+        cachedCustomer.branchInfo.isMainBranch !== undefined &&
+        cachedCustomer.branchInfo.groupName !== undefined &&
+        cachedCustomer.branchInfo.groupId !== undefined &&
+        cachedCustomer.branchInfo.branches !== undefined
+      ) {
+        setBranchInfo({
+          isInBranchGroup: cachedCustomer.branchInfo.isInBranchGroup,
+          isMainBranch: cachedCustomer.branchInfo.isMainBranch,
+          groupName: cachedCustomer.branchInfo.groupName,
+          groupId: cachedCustomer.branchInfo.groupId,
+          branches: cachedCustomer.branchInfo.branches,
+        });
+      } else {
+        setBranchInfo(null);
+      }
     } catch (err: any) {
       setError(
-        `Failed to fetch customer details: ${
-          err?.response?.data?.message || err.message
+        `Failed to find customer details: ${
+          err?.message || "Unknown error"
         }. Please try again later.`
       );
-      console.error("Error fetching customer details:", err);
-      // Reset refs on error? Depends on desired behavior.
+      console.error("Error finding customer details:", err);
       initialFormDataRef.current = null;
       initialCustomProductsRef.current = null;
     } finally {
       setLoading(false);
     }
-  }, [id]); // Dependency is only id
+  }, [id, customers]);
 
   useEffect(() => {
     if (isEditMode) {
-      fetchCustomerDetailsAndProducts();
+      // Only proceed with fetchFromCache when the cache is loaded
+      if (!isLoading) {
+        fetchFromCache();
+      }
+      // Don't set loading to false here, as we're now waiting for fetchFromCache
     } else {
       // For new customer, ensure initial refs are set for change detection
       initialFormDataRef.current = { ...formData };
       initialCustomProductsRef.current = [...customProducts];
       setLoading(false); // Not loading if creating new
     }
-  }, [isEditMode, fetchCustomerDetailsAndProducts]); // Run only when mode changes or fetch function updates
+  }, [isEditMode, fetchFromCache, isLoading]); // Add isLoading to dependencies
 
   // --- Populate Salesmen Options ---
   useEffect(() => {
@@ -285,10 +322,6 @@ const CustomerFormPage: React.FC = () => {
   const validateForm = (): boolean => {
     if (!formData.id || !formData.name) {
       toast.error("Customer ID and Name are required fields.");
-      return false;
-    }
-    if (formData.id.includes(" ")) {
-      toast.error("Customer ID cannot contain spaces.");
       return false;
     }
 
@@ -534,7 +567,7 @@ const CustomerFormPage: React.FC = () => {
         type={type}
         placeholder={placeholder}
         required={required}
-        disabled={isSaving} // Disable when saving
+        disabled={name === "id" ? true : isSaving} // Disable when saving
       />
     );
   };
@@ -590,9 +623,7 @@ const CustomerFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-10">
-      {" "}
-      {/* Added pb-10 */}
+    <div className="container mx-auto px-4 pb-4 -mt-12">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
@@ -665,6 +696,7 @@ const CustomerFormPage: React.FC = () => {
                         }}
                         options={idTypeOptions}
                         disabled={isSaving}
+                        optionsPosition="top"
                       />
                     </div>
                     {renderInput(
@@ -680,24 +712,74 @@ const CustomerFormPage: React.FC = () => {
                       "Company TIN"
                     )}
                   </div>
+
+                  {isEditMode && branchInfo && (
+                    <div className="mt-6 p-4 border border-indigo-100 rounded-lg bg-indigo-50/30">
+                      <div className="flex items-center mb-3">
+                        {branchInfo.isMainBranch ? (
+                          <IconBuildingSkyscraper
+                            size={20}
+                            className="text-indigo-600 mr-2"
+                          />
+                        ) : (
+                          <IconBuildingStore
+                            size={20}
+                            className="text-indigo-500 mr-2"
+                          />
+                        )}
+                        <h3 className="text-base font-medium text-indigo-700">
+                          {branchInfo.isMainBranch
+                            ? "Main Branch"
+                            : "Branch Location"}{" "}
+                          - {branchInfo.groupName}
+                        </h3>
+                      </div>
+
+                      <p className="text-sm text-indigo-600 mb-2">
+                        {branchInfo.isMainBranch
+                          ? "This is the main branch. Changes to pricing or e-Invoice information will affect all branches."
+                          : "This is a branch location. Pricing and e-Invoice information are synchronized with the main branch."}
+                      </p>
+
+                      {branchInfo.branches.length > 1 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-indigo-500 mb-1">
+                            Connected branches:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {branchInfo.branches
+                              .filter((b) => b.id !== id) // Don't show current branch
+                              .map((branch) => (
+                                <span
+                                  key={branch.id}
+                                  className="inline-flex items-center text-xs bg-white border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full"
+                                >
+                                  {branch.isMain && (
+                                    <IconBuildingSkyscraper
+                                      size={12}
+                                      className="mr-1"
+                                    />
+                                  )}
+                                  {branch.name}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* === Second tab - Credit & Pricing === */}
                 <div className="space-y-8 mt-5">
-                  {" "}
-                  {/* Increased spacing */}
                   {/* --- Credit Management Section --- */}
                   <div className="p-4 border border-default-200 rounded-lg bg-gray-50/50">
-                    {" "}
                     {/* Subtle background */}
                     <h3 className="text-lg font-medium text-default-900 mb-4">
-                      {" "}
                       {/* Increased bottom margin */}
                       Credit Management
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                      {" "}
-                      {/* Align items end */}
                       {/* Credit Limit Input */}
                       <div>
                         <label
@@ -751,7 +833,6 @@ const CustomerFormPage: React.FC = () => {
                           Credit Used
                         </label>
                         <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          {" "}
                           {/* Match height */}
                           <span className="font-medium text-default-700">
                             RM {Number(formData.credit_used ?? 0).toFixed(2)}
@@ -764,7 +845,6 @@ const CustomerFormPage: React.FC = () => {
                           Available Credit
                         </label>
                         <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          {" "}
                           {/* Match height */}
                           <span className="font-medium text-default-700">
                             {formData.credit_limit === 0

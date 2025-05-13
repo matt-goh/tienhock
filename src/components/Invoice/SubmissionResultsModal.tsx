@@ -192,7 +192,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-default-200">
           <h2 className="text-lg font-semibold text-default-900">
-            e-Invoice Submission Results
+            e-Invoice Submission
           </h2>
           {!isLoading && (
             <button

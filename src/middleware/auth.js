@@ -1,12 +1,23 @@
 const ALLOWED_API_KEY = "foodmaker";
 
+// Store last update times for session activity (more memory efficient than a regular object)
+const sessionLastUpdated = new WeakMap();
+// Minimum time between session updates (10 minutes in milliseconds)
+const MIN_SESSION_UPDATE_INTERVAL = 10 * 60 * 1000;
+
 export const authMiddleware = (pool) => async (req, res, next) => {
-  // Skip auth check for backup routes and OPTIONS requests
-  if (req.path.startsWith("/api/backup") || req.method === "OPTIONS") {
+  // STEP 1: Routes that always bypass auth check
+  if (
+    req.path.startsWith("/api/backup") ||
+    req.method === "OPTIONS" ||
+    req.path === "/api/sessions/initialize" ||
+    req.path === "/api/auth/login" ||
+    req.path === "/api/auth/check-ic"
+  ) {
     return next();
   }
 
-  // Check if system is in maintenance mode
+  // STEP 2: Check for maintenance mode
   if (pool.pool.maintenanceMode) {
     return res.status(200).json({
       status: "maintenance",
@@ -16,6 +27,7 @@ export const authMiddleware = (pool) => async (req, res, next) => {
     });
   }
 
+  // STEP 3: Get auth credentials (session ID or API key)
   const sessionId = req.headers["x-session-id"];
   const apiKey = req.headers["api-key"];
 
@@ -25,121 +37,157 @@ export const authMiddleware = (pool) => async (req, res, next) => {
       .json({ message: "No session ID or API key provided" });
   }
 
+  // STEP 4: Handle API Key auth
+  if (apiKey) {
+    if (apiKey !== ALLOWED_API_KEY) {
+      return res.status(401).json({ message: "Invalid API key" });
+    }
+    req.apiKey = apiKey;
+    return next();
+  }
+
+  // STEP 5: Additional routes that are allowed with any session ID (even if new)
+  if (
+    req.path === "/api/sessions/state" ||
+    req.path.startsWith("/api/sessions/state/")
+  ) {
+    // Let the session state endpoint handle validation itself
+    return next();
+  }
+
+  // STEP 6: Session validation (for all other routes)
   try {
-    // API Key validation - keep as is
-    if (apiKey) {
-      if (apiKey !== ALLOWED_API_KEY) {
-        return res.status(401).json({ message: "Invalid API key" });
-      }
-      req.apiKey = apiKey;
-      return next();
+    // Check if database is accessible
+    try {
+      await pool.query("SELECT 1");
+    } catch (error) {
+      return res.status(503).json({
+        error: "Service temporarily unavailable",
+        message:
+          "System maintenance in progress. Please try again in a few moments.",
+        maintenance: true,
+        preserveSession: true,
+        requireReconnect: true,
+      });
     }
 
-    // Session validation
-    try {
-      // First, check if the database is accessible
-      try {
-        await pool.query("SELECT 1");
-      } catch (error) {
-        console.log("Database connectivity check failed:", error);
+    // Query session info
+    const sessionQuery = `
+      SELECT 
+        s.*,
+        st.name as staff_name,
+        st.job as staff_job 
+      FROM active_sessions s
+      LEFT JOIN staffs st ON s.staff_id = s.staff_id
+      WHERE s.session_id = $1 
+        AND s.status = 'active'
+        AND s.last_active > NOW() - INTERVAL '7 days'
+    `;
+
+    const sessionResult = await pool.query(sessionQuery, [sessionId]);
+
+    if (sessionResult.rows.length === 0) {
+      // No valid session - check for maintenance mode
+      if (pool.pool.maintenanceMode) {
         return res.status(503).json({
           error: "Service temporarily unavailable",
           message:
             "System maintenance in progress. Please try again in a few moments.",
           maintenance: true,
           preserveSession: true,
-          requireReconnect: true, // Add this flag for the client
+          phase: "AUTH_CHECK",
         });
       }
 
-      const sessionQuery = `
-        SELECT 
-          s.*,
-          st.name as staff_name,
-          st.job as staff_job 
-        FROM active_sessions s
-        LEFT JOIN staffs st ON s.staff_id = st.id
-        WHERE s.session_id = $1 
-          AND s.status = 'active'
-          AND s.last_active > NOW() - INTERVAL '7 days'
-      `;
+      // Not in maintenance - return login required but with a friendlier message for login page
+      return res.status(401).json({
+        message: "Authentication required",
+        requireLogin: true,
+      });
+    }
 
-      const sessionResult = await pool.query(sessionQuery, [sessionId]);
+    // Get session data
+    const session = sessionResult.rows[0];
 
-      if (sessionResult.rows.length === 0) {
-        // Check if we're in maintenance mode
-        if (pool.pool.maintenanceMode) {
-          console.log("Auth middleware: System in maintenance mode");
-          return res.status(503).json({
-            error: "Service temporarily unavailable",
-            message:
-              "System maintenance in progress. Please try again in a few moments.",
-            maintenance: true,
-            preserveSession: true,
-            phase: "AUTH_CHECK",
-          });
-        }
+    // Set session in request
+    req.session = {
+      ...session,
+      staff: session.staff_id
+        ? {
+            id: session.staff_id,
+            name: session.staff_name,
+            job:
+              typeof session.staff_job === "string"
+                ? JSON.parse(session.staff_job)
+                : session.staff_job,
+          }
+        : null,
+    };
 
-        // Not in maintenance mode, session is actually invalid
-        return res.status(401).json({
-          message: "Session expired or invalid",
-          maintenance: false,
-          requireLogin: true,
-        });
-      }
+    // Check if we need to update the timestamp (throttled)
+    const shouldUpdateTimestamp = isUpdateNeeded(sessionId);
 
-      // Update last_active timestamp
+    if (shouldUpdateTimestamp) {
       await pool.query(
         "UPDATE active_sessions SET last_active = CURRENT_TIMESTAMP WHERE session_id = $1",
         [sessionId]
       );
 
-      const session = sessionResult.rows[0];
-      req.session = {
-        ...session,
-        staff: session.staff_id
-          ? {
-              id: session.staff_id,
-              name: session.staff_name,
-              job:
-                typeof session.staff_job === "string"
-                  ? JSON.parse(session.staff_job)
-                  : session.staff_job,
-            }
-          : null,
-      };
-
-      next();
-    } catch (error) {
-      // Handle database errors gracefully
-      if (
-        error.code === "42P01" || // relation does not exist
-        error.code === "08006" || // connection lost
-        error.code === "57P01" || // database unavailable
-        error.code === "ECONNREFUSED"
-      ) {
-        console.log(
-          "Database unavailable - likely during restore process:",
-          error
-        );
-        return res.status(503).json({
-          error: "Service temporarily unavailable",
-          message:
-            "System maintenance in progress. Please try again in a few moments.",
-          maintenance: true,
-          preserveSession: true,
-          requireReconnect: true, // Add this flag for the client
-        });
-      }
-      throw error;
+      recordUpdateTime(sessionId);
     }
+
+    next();
   } catch (error) {
+    // Handle database errors
+    if (
+      error.code === "42P01" || // relation does not exist
+      error.code === "08006" || // connection lost
+      error.code === "57P01" || // database unavailable
+      error.code === "ECONNREFUSED"
+    ) {
+      return res.status(503).json({
+        error: "Service temporarily unavailable",
+        message:
+          "System maintenance in progress. Please try again in a few moments.",
+        maintenance: true,
+        preserveSession: true,
+        requireReconnect: true,
+      });
+    }
+
     console.error("Auth middleware error:", error);
     res.status(500).json({
       message: "Authentication failed",
       maintenance: false,
       preserveSession: false,
-      requireReconnect: true, // Add this flag for severe issues
+      requireReconnect: true,
     });
   }
 };
+
+// Helper function to store session ID objects as keys for WeakMap
+const sessionIdCache = new Map();
+
+// Check if an update is needed based on time elapsed
+function isUpdateNeeded(sessionId) {
+  // Get the cached key object for this sessionId
+  let keyObj = sessionIdCache.get(sessionId);
+  if (!keyObj) {
+    keyObj = { id: sessionId };
+    sessionIdCache.set(sessionId, keyObj);
+  }
+
+  const lastUpdate = sessionLastUpdated.get(keyObj) || 0;
+  const now = Date.now();
+
+  // If enough time has passed since the last update, an update is needed
+  return now - lastUpdate > MIN_SESSION_UPDATE_INTERVAL;
+}
+
+// Record the time of the update
+function recordUpdateTime(sessionId) {
+  const keyObj = sessionIdCache.get(sessionId);
+  if (keyObj) {
+    sessionLastUpdated.set(keyObj, Date.now());
+  }
+}

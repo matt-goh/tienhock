@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   IconSearch,
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
   IconTrash,
+  IconBriefcase,
+  IconPhone,
+  IconId,
 } from "@tabler/icons-react";
 import { Employee, FilterOptions } from "../../types/types";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +17,7 @@ import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 
 const EmployeeCard = ({
   employee,
@@ -22,86 +26,9 @@ const EmployeeCard = ({
   employee: Employee;
   onDeleteClick: (employee: Employee) => void;
 }) => {
-  const [displayJobs, setDisplayJobs] = useState<string[]>([]);
-  const [remainingJobCount, setRemainingJobCount] = useState(0);
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const [isTrashHovered, setIsTrashHovered] = useState(false);
-  const jobContainerRef = useRef<HTMLDivElement>(null);
+  const [expandedJobs, setExpandedJobs] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const calculateDisplay = (
-      items: string[],
-      containerRef: React.RefObject<HTMLDivElement>,
-      setDisplayItems: React.Dispatch<React.SetStateAction<string[]>>,
-      setRemainingCount: React.Dispatch<React.SetStateAction<number>>
-    ) => {
-      if (containerRef.current) {
-        const container = containerRef.current;
-        const containerWidth = container.offsetWidth;
-        let currentWidth = 0;
-        const displayItems = [];
-        let remaining = 0;
-
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          const tempSpan = document.createElement("span");
-          tempSpan.style.visibility = "hidden";
-          tempSpan.style.position = "absolute";
-          tempSpan.className = "text-xs font-medium";
-          tempSpan.textContent = item + (i < items.length - 1 ? ", " : "");
-          document.body.appendChild(tempSpan);
-          const spanWidth = tempSpan.offsetWidth;
-          document.body.removeChild(tempSpan);
-
-          if (currentWidth + spanWidth > containerWidth) {
-            remaining = items.length - i;
-            break;
-          }
-
-          displayItems.push(item);
-          currentWidth += spanWidth;
-        }
-
-        // Check if we need to compress the last visible item
-        if (remaining > 0) {
-          const lastItem = displayItems.pop();
-          if (lastItem) {
-            remaining++;
-          }
-        }
-
-        setDisplayItems(displayItems);
-        setRemainingCount(remaining);
-      }
-    };
-    calculateDisplay(
-      employee.job,
-      jobContainerRef,
-      setDisplayJobs,
-      setRemainingJobCount
-    );
-
-    window.addEventListener("resize", () => {
-      calculateDisplay(
-        employee.job,
-        jobContainerRef,
-        setDisplayJobs,
-        setRemainingJobCount
-      );
-    });
-
-    return () => {
-      window.removeEventListener("resize", () => {
-        calculateDisplay(
-          employee.job,
-          jobContainerRef,
-          setDisplayJobs,
-          setRemainingJobCount
-        );
-      });
-    };
-  }, [employee.location, employee.job]);
 
   const handleClick = () => {
     navigate(`/catalogue/staff/${employee.id}`);
@@ -113,67 +40,130 @@ const EmployeeCard = ({
     onDeleteClick(employee);
   };
 
+  const handleMoreJobsClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card navigation
+    setExpandedJobs(!expandedJobs);
+  };
+
   return (
     <div
-      className={`relative border text-left rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-        isCardHovered && !isTrashHovered
-          ? "bg-default-100 active:bg-default-200"
-          : ""
-      }`}
+      className={`relative overflow-hidden rounded-lg border ${
+        isCardHovered ? "border-sky-200 shadow-md" : "border-default-200"
+      } transition-all duration-200 cursor-pointer bg-white`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
     >
-      <div className="mb-2">
-        <h3 className="font-semibold">{employee.name}</h3>
-        <div className="text-sm text-default-500">{employee.id}</div>
-      </div>
-      <div className="flex flex-wrap gap-2 mb-2" ref={jobContainerRef}>
-        {displayJobs.map((location, index) => (
-          <span
-            key={index}
-            className="text-xs font-medium px-2.5 py-0.5 rounded bg-sky-100 text-sky-800"
+      {/* Card Header */}
+      <div
+        className={`px-4 py-3 border-b ${
+          isCardHovered
+            ? "bg-sky-50 border-sky-100"
+            : "bg-default-50 border-default-100"
+        } transition-colors duration-200`}
+      >
+        <div className="flex justify-between items-center">
+          <h3
+            className="font-semibold text-default-800 truncate pr-6"
+            title={employee.name}
           >
-            {location}
-          </span>
-        ))}
-        {remainingJobCount > 0 && (
-          <span className="text-xs font-medium px-2.5 py-0.5 rounded bg-default-100 text-default-800">
-            +{remainingJobCount}
-          </span>
-        )}
-      </div>
-      <p className="text-sm">IC: {employee.icNo}</p>
-      <p className="text-sm">
-        Phone no: {employee.telephoneNo ? employee.telephoneNo : "-"}
-      </p>
-      <div className="absolute inset-y-0 top-2 right-2">
-        <div className="relative w-8 h-8">
-          {isCardHovered && (
-            <button
-              onClick={handleDeleteClick}
-              onMouseEnter={() => setIsTrashHovered(true)}
-              onMouseLeave={() => setIsTrashHovered(false)}
-              className="delete-button flex items-center justify-center absolute inset-0 rounded-lg transition-colors duration-200 bg-default-100 active:bg-default-200 focus:outline-none"
-            >
-              <IconTrash
-                className="text-default-700 active:text-default-800"
-                stroke={1.5}
-                size={18}
-              />
-            </button>
-          )}
+            {employee.name}
+          </h3>
+          <div className="absolute top-3 right-3">
+            {isCardHovered && (
+              <button
+                onClick={handleDeleteClick}
+                className="p-1.5 rounded-full bg-white hover:bg-rose-50 text-default-500 hover:text-rose-600 transition-colors duration-150 shadow-sm"
+                title="Delete employee"
+              >
+                <IconTrash size={16} stroke={1.5} />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="text-sm text-default-500 mt-0.5 flex items-center">
+          <span className="truncate">{employee.id}</span>
         </div>
       </div>
+
+      {/* Card Body */}
+      <div className="p-4 space-y-3">
+        {/* Jobs Section */}
+        <div className="flex items-start">
+          <IconBriefcase
+            size={16}
+            className="text-default-400 mt-0.5 flex-shrink-0 mr-2"
+          />
+          <div className="text-sm text-default-700 flex-1">
+            <div className="flex flex-wrap gap-1.5">
+              {(expandedJobs ? employee.job : employee.job.slice(0, 2)).map(
+                (job, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800"
+                  >
+                    {job}
+                  </span>
+                )
+              )}
+              {!expandedJobs && employee.job.length > 2 && (
+                <button
+                  onClick={handleMoreJobsClick}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-700 hover:bg-default-200 transition-colors"
+                >
+                  +{employee.job.length - 2} more
+                </button>
+              )}
+              {expandedJobs && (
+                <button
+                  onClick={handleMoreJobsClick}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-700 hover:bg-default-200 transition-colors"
+                >
+                  Show less
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* IC Number */}
+        <div className="flex items-center">
+          <IconId size={16} className="text-default-400 flex-shrink-0 mr-2" />
+          <div className="text-sm text-default-700 flex-1 truncate">
+            {employee.icNo || "-"}
+          </div>
+        </div>
+
+        {/* Phone Number */}
+        <div className="flex items-center">
+          <IconPhone
+            size={16}
+            className="text-default-400 flex-shrink-0 mr-2"
+          />
+          <div className="text-sm text-default-700 flex-1 truncate">
+            {employee.telephoneNo || "-"}
+          </div>
+        </div>
+      </div>
+
+      {/* Card Footer - Status indication like resignation */}
+      {employee.dateResigned && (
+        <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-amber-800 text-xs font-medium">
+          Resigned: {new Date(employee.dateResigned).toLocaleDateString()}
+        </div>
+      )}
     </div>
   );
 };
 
 const StaffPage = () => {
+  const {
+    allStaffs: employees,
+    loading,
+    error,
+    refreshStaffs,
+  } = useStaffsCache();
   const [searchTerm, setSearchTerm] = useState("");
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
@@ -190,33 +180,16 @@ const StaffPage = () => {
 
   const ITEMS_PER_PAGE = 12;
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get("/api/staffs");
-      setEmployees(data);
-      setError(null);
-    } catch (err) {
-      setError("Failed to fetch employees. Please try again later.");
-      console.error("Error fetching employees:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleConfirmDelete = async () => {
     if (employeeToDelete) {
       try {
         await api.delete(`/api/staffs/${employeeToDelete.id}`);
-
-        setEmployees(employees.filter((emp) => emp.id !== employeeToDelete.id));
         setIsDeleteDialogOpen(false);
         setEmployeeToDelete(null);
         toast.success("Employee deleted successfully");
+
+        // Refresh the cache instead of updating local state
+        await refreshStaffs();
       } catch (err) {
         console.error("Error deleting employee:", err);
         toast.error("Failed to delete employee. Please try again.");
@@ -233,24 +206,32 @@ const StaffPage = () => {
     return employees.filter((employee) => {
       const matchesSearch =
         employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.id.toLowerCase().includes(searchTerm.toLowerCase());
+        employee.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (employee.icNo &&
+          employee.icNo.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (employee.telephoneNo &&
+          employee.telephoneNo
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()));
 
       const matchesResignedFilter = filters.showResigned
-        ? true
-        : employee.dateResigned === null;
+        ? true // If showResigned is true, include all employees regardless of resignation date
+        : employee.dateResigned === null ||
+          employee.dateResigned === "" ||
+          !employee.dateResigned;
 
       const matchesJobFilter =
         !filters.applyJobFilter ||
         !filters.jobFilter ||
         filters.jobFilter.length === 0 ||
-        employee.job.some((job) => filters.jobFilter?.includes(job));
+        employee.job.some((job: string) => filters.jobFilter?.includes(job));
 
       const matchesLocationFilter =
         !filters.applyLocationFilter ||
         !filters.locationFilter ||
         filters.locationFilter.length === 0 ||
         (Array.isArray(employee.location)
-          ? employee.location.some((loc) =>
+          ? employee.location.some((loc: string) =>
               filters.locationFilter?.includes(loc)
             )
           : filters.locationFilter?.includes(employee.location));
@@ -273,7 +254,7 @@ const StaffPage = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filters]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -281,6 +262,7 @@ const StaffPage = () => {
 
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
+    setCurrentPage(1);
   };
 
   const handlePageChange = (page: number) => {
@@ -384,87 +366,144 @@ const StaffPage = () => {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Error: {error.message}</div>;
   }
 
   return (
-    <div className="relative w-full mx-20">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="relative text-2xl text-default-700 font-bold">
-          Staffs ({filteredEmployees.length})
+    <div className="w-full max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl text-default-800 font-bold flex items-center">
+          Staff Directory
+          <span className="ml-2 text-sm bg-default-100 text-default-700 px-3 py-1.5 rounded-full">
+            {filteredEmployees.length}
+          </span>
         </h1>
-        <div className="flex">
-          <div className="relative mx-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex items-center sm:max-w-xs">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-              size={22}
+              size={18}
             />
             <input
               type="text"
-              placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+              placeholder="Search name, ID or phone..."
+              className="w-full pl-10 pr-10 py-2 border border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm"
               value={searchTerm}
               onChange={handleSearchChange}
             />
+            {searchTerm && (
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                onClick={() => setSearchTerm("")}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
-          <StaffFilterMenu
-            onFilterChange={handleFilterChange}
-            currentFilters={filters}
-            jobOptions={employees.map((emp) => emp.job).flat()}
-            locationOptions={employees.map((emp) => emp.location).flat()}
-          />
-          <Button
-            onClick={() => navigate("/catalogue/staff/new")}
-            icon={IconPlus}
-            variant="outline"
-          >
-            Add Staff
-          </Button>
+          <div className="flex gap-3">
+            <StaffFilterMenu
+              onFilterChange={handleFilterChange}
+              currentFilters={filters}
+              jobOptions={employees.map((emp) => emp.job).flat()}
+              locationOptions={employees.map((emp) => emp.location).flat()}
+            />
+            <Button
+              onClick={() => navigate("/catalogue/staff/new")}
+              icon={IconPlus}
+              color="sky"
+            >
+              Add Staff
+            </Button>
+          </div>
         </div>
       </div>
 
       {filteredEmployees.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-default-500">No employees found.</p>
+        <div className="text-center py-16 bg-white rounded-lg border border-default-200">
+          <IconBriefcase size={48} className="mx-auto text-default-300 mb-4" />
+          <h3 className="text-lg font-medium text-default-800 mb-1">
+            No staff members found
+          </h3>
+          <p className="text-default-500 max-w-md mx-auto">
+            {searchTerm ||
+            filters.showResigned ||
+            (filters.applyJobFilter &&
+              filters.jobFilter &&
+              filters.jobFilter.length > 0) ||
+            (filters.applyLocationFilter &&
+              filters.locationFilter &&
+              filters.locationFilter.length > 0)
+              ? "Try adjusting your search or filter criteria"
+              : "Get started by adding your first staff member"}
+          </p>
+          {!searchTerm &&
+            !(
+              filters.showResigned ||
+              (filters.applyJobFilter &&
+                filters.jobFilter &&
+                filters.jobFilter.length > 0) ||
+              (filters.applyLocationFilter &&
+                filters.locationFilter &&
+                filters.locationFilter.length > 0)
+            ) && (
+              <Button
+                onClick={() => navigate("/catalogue/staff/new")}
+                icon={IconPlus}
+                variant="outline"
+                className="mt-4"
+              >
+                Add Staff Member
+              </Button>
+            )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {paginatedEmployees.map((employee) => (
-            <EmployeeCard
-              key={employee.id}
-              employee={employee}
-              onDeleteClick={handleDeleteClick}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+            {paginatedEmployees.map((employee) => (
+              <EmployeeCard
+                key={employee.id}
+                employee={employee}
+                onDeleteClick={handleDeleteClick}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center">
+              <button
+                className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-white border border-default-200 hover:bg-default-50 active:bg-default-100"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <IconChevronLeft className="w-4 h-4 mr-1" /> Previous
+              </button>
+              <div className="hidden md:flex space-x-1">
+                {renderPaginationButtons()}
+              </div>
+              <div className="md:hidden text-sm text-default-600">
+                Page {currentPage} of {totalPages}
+              </div>
+              <button
+                className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-white border border-default-200 hover:bg-default-50 active:bg-default-100"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next <IconChevronRight className="w-4 h-4 ml-1" />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {filteredEmployees.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
-          <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200 hover:bg-accent hover:text-accent-foreground"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
-          </button>
-          <div className="flex space-x-2">{renderPaginationButtons()}</div>
-          <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200 hover:bg-accent hover:text-accent-foreground"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Next <IconChevronRight className="w-5 h-5 ml-2" />
-          </button>
-        </div>
-      )}
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Staff"
-        message={`Are you sure you want to remove ${employeeToDelete?.name} from the staff list? This action cannot be undone.`}
+        title="Delete Staff Member"
+        message={`Are you sure you want to remove ${employeeToDelete?.name} from the staff directory? This action cannot be undone.`}
         confirmButtonText="Delete"
+        variant="danger"
       />
     </div>
   );

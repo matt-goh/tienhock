@@ -164,9 +164,6 @@ class EInvoiceSubmissionHandler {
           // If all documents are in "Submitted" state for two consecutive polls,
           // consider it success (the API may take longer to fully validate)
           if (allDocumentsSubmitted && attempts > 8) {
-            console.log(
-              "All documents are in Submitted state, considering successful"
-            );
             // Create a copy with a different status for our internal handling
             return {
               ...response,
@@ -191,9 +188,6 @@ class EInvoiceSubmissionHandler {
       lastResponse.documentSummary &&
       lastResponse.documentSummary.length > 0
     ) {
-      console.log(
-        "Polling timed out, but documents were processed. Returning last status."
-      );
       return {
         ...lastResponse,
         overallStatus: "Valid",
@@ -202,7 +196,7 @@ class EInvoiceSubmissionHandler {
     }
 
     throw new Error(
-      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`
+      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts, Please check the submission status manually or try again later.`
     );
   }
 

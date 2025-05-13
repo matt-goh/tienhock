@@ -26,7 +26,7 @@ export interface SelectOption {
 // --- FormInput ---
 interface InputProps {
   name: string;
-  label: string;
+  label: string | React.ReactNode;
   value: string | number | undefined;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
@@ -34,7 +34,7 @@ interface InputProps {
   placeholder?: string;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   step?: string;
-  min?: string;
+  min?: number;
   max?: number;
   required?: boolean;
 }
@@ -54,11 +54,11 @@ export const FormInput: React.FC<InputProps> = ({
   required = false,
 }) => (
   <div className={`${label ? "space-y-2" : ""}`}>
-    {" "}
     {label && (
       <label
         htmlFor={name}
-        className="block text-sm font-medium text-default-700"
+        className="block text-sm font-medium text-default-700 truncate"
+        title={typeof label === "string" ? label : undefined}
       >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
@@ -104,12 +104,12 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
   required = false,
 }) => (
   <div className={`${label ? "space-y-2" : ""}`}>
-    {" "}
     <div className="flex items-center justify-between">
       {label && (
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 truncate"
+          title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -139,7 +139,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
 // --- FormListbox ---
 interface ListboxProps {
   name: string;
-  label: string;
+  label: string | React.ReactNode;
   value: string | number | undefined;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -179,7 +179,8 @@ export const FormListbox: React.FC<ListboxProps> = ({
       {label && (
         <label
           htmlFor={`${name}-button`}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 truncate"
+          title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -194,7 +195,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
           <HeadlessListboxButton
             id={`${name}-button`}
             className={clsx(
-              "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+              "relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
               "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
               disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
             )}
@@ -226,7 +227,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
                   key={option.id}
                   className={({ active }) =>
                     clsx(
-                      "relative cursor-default select-none py-2 pl-3 pr-10",
+                      "relative cursor-pointer select-none py-2 pl-3 pr-10",
                       active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                     )
                   }
@@ -365,7 +366,8 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
       {label && (
         <label
           htmlFor={`${name}-input`}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 truncate"
+          title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -377,7 +379,6 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
         disabled={disabled}
         name={name}
         multiple={isMultiple} // Set based on mode
-        nullable={!isMultiple} // Allow null selection in single mode
       >
         <div className="relative">
           {/* Input area */}
@@ -401,7 +402,10 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
               disabled={disabled}
               id={`${name}-input`}
             />
-            <HeadlessComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+            <HeadlessComboboxButton
+              className="absolute inset-y-0 right-0 flex items-center pr-2"
+              onClick={() => setQuery("")}
+            >
               <IconChevronDown
                 size={20}
                 className="text-gray-400"

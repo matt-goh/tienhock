@@ -12,28 +12,43 @@ interface PDFDownloadHandlerProps {
   invoices: InvoiceData[];
   disabled?: boolean;
   customerNames: Record<string, string>;
+  onComplete?: () => void;
 }
 
 const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
   invoices,
   disabled,
   customerNames = {},
+  onComplete,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownload = async () => {
-    if (isGenerating) return;
+    if (isGenerating || disabled) return;
 
     setIsGenerating(true);
-    const toastId = toast.loading("Generating PDF...");
+    const isBatchDownload = invoices.length > 1;
+    const toastId = toast.loading(
+      isBatchDownload
+        ? `Generating PDFs for ${invoices.length} invoices...`
+        : "Generating PDF..."
+    );
 
     try {
       // First render the PDF component
+      const isJellyPolly = window.location.pathname.includes("/jellypolly");
+
       const pdfComponent = (
-        <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
+        <Document
+          title={generatePDFFilename(
+            invoices,
+            isJellyPolly ? "jellypolly" : "tienhock"
+          ).replace(".pdf", "")}
+        >
           <InvoicePDF
             invoices={invoices}
-            customerNames={customerNames} // Use the passed-in customerNames directly
+            customerNames={customerNames}
+            companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
           />
         </Document>
       );
@@ -45,7 +60,10 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Create and trigger download
       const link = document.createElement("a");
       link.href = pdfUrl;
-      link.download = generatePDFFilename(invoices);
+      link.download = generatePDFFilename(
+        invoices,
+        isJellyPolly ? "jellypolly" : "tienhock"
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -53,6 +71,7 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       // Cleanup
       URL.revokeObjectURL(pdfUrl);
       toast.success("PDF downloaded successfully", { id: toastId });
+      if (onComplete) onComplete();
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error(
@@ -66,6 +85,13 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
     }
   };
 
+  // Determine button label based on invoice count
+  const buttonLabel = isGenerating
+    ? "Generating..."
+    : invoices.length > 1
+    ? `Download ${invoices.length} PDFs`
+    : "Download";
+
   if (!invoices || invoices.length === 0) {
     return null;
   }
@@ -78,8 +104,9 @@ const PDFDownloadHandler: React.FC<PDFDownloadHandlerProps> = ({
       iconSize={16}
       iconStroke={2}
       variant="outline"
+      data-pdf-download="true"
     >
-      {isGenerating ? "Generating..." : "Download"}
+      {buttonLabel}
     </Button>
   );
 };

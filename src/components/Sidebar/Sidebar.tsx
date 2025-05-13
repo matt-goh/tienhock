@@ -22,6 +22,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../routes/utils/api";
 import CompanySwitcher from "../CompanySwitcher";
 import { useCompany } from "../../contexts/CompanyContext";
+import {
+  getBookmarksFromCache,
+  saveBookmarksToCache,
+} from "../../utils/bookmarkCache";
 
 interface SidebarProps {
   isPinned: boolean;
@@ -200,11 +204,27 @@ const Sidebar: React.FC<SidebarProps> = ({
     const fetchBookmarks = async () => {
       if (user?.id) {
         try {
+          // Try to get bookmarks from cache first
+          const cachedBookmarks = getBookmarksFromCache(user.id);
+
+          if (cachedBookmarks) {
+            // Use cached data
+            setBookmarks(cachedBookmarks);
+            setBookmarkedItems(
+              new Set(cachedBookmarks.map((bookmark) => bookmark.name))
+            );
+            return;
+          }
+
+          // If no cache or expired, fetch from server
           const data = await api.get(`/api/bookmarks/${user.id}`);
           setBookmarks(data);
           setBookmarkedItems(
             new Set(data.map((bookmark: any) => bookmark.name))
           );
+
+          // Save to cache
+          saveBookmarksToCache(user.id, data);
         } catch (error) {
           console.error("Error fetching bookmarks:", error);
           setBookmarks([]);
@@ -235,22 +255,47 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleBookmarkUpdate = async (name: string, isBookmarked: boolean) => {
     if (isBookmarked) {
+      // Add to local state
       setBookmarkedItems((prev) => {
         const newSet = new Set(prev);
         newSet.add(name);
         return newSet;
       });
+
       const itemData = findSidebarItem(SidebarData, name);
       if (itemData) {
-        setBookmarks((prev) => [...prev, { id: Date.now(), name }]);
+        // Add to bookmarks array
+        const newBookmark = { id: Date.now(), name };
+        setBookmarks((prev) => [...prev, newBookmark]);
+
+        // If we have a logged in user, also update the cache
+        if (user?.id) {
+          // Get current cached bookmarks or use current state if no cache
+          const cachedBookmarks = getBookmarksFromCache(user.id) || [
+            ...bookmarks,
+          ];
+          // Add new bookmark to cache
+          saveBookmarksToCache(user.id, [...cachedBookmarks, newBookmark]);
+        }
       }
     } else {
+      // Remove from local state
       setBookmarkedItems((prev) => {
         const newSet = new Set(prev);
         newSet.delete(name);
         return newSet;
       });
-      setBookmarks((prev) => prev.filter((bookmark) => bookmark.name !== name));
+
+      // Filter out from bookmarks array
+      const updatedBookmarks = bookmarks.filter(
+        (bookmark) => bookmark.name !== name
+      );
+      setBookmarks(updatedBookmarks);
+
+      // If we have a logged in user, also update the cache
+      if (user?.id) {
+        saveBookmarksToCache(user.id, updatedBookmarks);
+      }
     }
   };
 

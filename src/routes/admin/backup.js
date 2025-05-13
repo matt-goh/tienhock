@@ -21,7 +21,6 @@ export default function backupRouter(pool) {
   };
 
   async function restoreDatabase(backupPath) {
-    console.log('Starting database restore process...');
     let cachedSessions = [];
     
     try {
@@ -36,7 +35,6 @@ export default function backupRouter(pool) {
   
       // Phase 1: Cache active sessions
       try {
-        console.log('Caching active sessions...');
         const { rows } = await pool.query(`
           SELECT 
             created_at,
@@ -49,7 +47,6 @@ export default function backupRouter(pool) {
           AND last_active > NOW() - INTERVAL '7 days'
         `);
         cachedSessions = rows;
-        console.log(`Cached ${cachedSessions.length} active sessions`);
       } catch (error) {
         console.warn('Failed to cache sessions:', error);
         // Continue with restore even if session caching fails
@@ -57,7 +54,6 @@ export default function backupRouter(pool) {
   
       // Phase 2: Database restore
       restoreState.phase = 'DATABASE_RESTORE';
-      console.log('Starting database restore...');
       
       const restoreCommand = `PGPASSWORD=${DB_PASSWORD} pg_restore \
         -h ${DB_HOST} \
@@ -70,15 +66,11 @@ export default function backupRouter(pool) {
         -v \
         "${backupPath}"`;
   
-      const { stdout, stderr } = await execAsync(restoreCommand);
-      console.log('Restore stdout:', stdout);
-      if (stderr) console.log('Restore stderr:', stderr);
+      await execAsync(restoreCommand);
   
       // Phase 3: Session restoration
       if (cachedSessions.length > 0) {
-        restoreState.phase = 'SESSION_RESTORE';
-        console.log('Restoring cached sessions...');
-  
+        restoreState.phase = 'SESSION_RESTORE';  
         try {
           // Ensure active_sessions table exists
           await pool.query(`
@@ -118,7 +110,6 @@ export default function backupRouter(pool) {
                 status = EXCLUDED.status
             `);
           }
-          console.log(`Successfully restored ${cachedSessions.length} sessions`);
         } catch (error) {
           console.error('Failed to restore sessions:', error);
           // Continue even if session restore fails
@@ -170,7 +161,6 @@ export default function backupRouter(pool) {
       const command = `DB_USER=${DB_USER} DB_HOST=${DB_HOST} DB_NAME=${DB_NAME} DB_PASSWORD=${DB_PASSWORD} DB_PORT=${DB_PORT} NODE_ENV=${env} MANUAL_BACKUP=true ${customNameEnv} bash /backup.sh`;
       
       const { stdout, stderr } = await execAsync(command);
-      console.log('Backup stdout:', stdout);
       if (stderr) console.error('Backup stderr:', stderr);
       res.json({ message: 'Backup initiated successfully' });
     } catch (error) {
@@ -212,7 +202,6 @@ export default function backupRouter(pool) {
       
       // Log deletion
       const logMessage = `[${env}] Backup deleted: ${filename} at ${new Date().toISOString()}\n`;
-      console.log(logMessage);
       await fs.appendFile(path.join(envBackupDir, 'backup.log'), logMessage);
   
       res.json({ message: 'Backup deleted successfully' });
@@ -225,11 +214,9 @@ export default function backupRouter(pool) {
   router.get('/list', async (req, res) => {
     try {
       const envBackupDir = path.join(backupDir, env);
-      console.log('Looking for backups in:', envBackupDir);
 
       await fs.mkdir(envBackupDir, { recursive: true });
       const files = await fs.readdir(envBackupDir);
-      console.log('Found files:', files);
       
       const backups = await Promise.all(
         files

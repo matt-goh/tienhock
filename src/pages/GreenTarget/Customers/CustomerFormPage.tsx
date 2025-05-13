@@ -35,6 +35,7 @@ interface Customer {
   id_type?: string;
   id_number?: string;
   state?: string;
+  additional_info?: string;
 }
 
 interface SelectOption {
@@ -55,6 +56,7 @@ const CustomerFormPage: React.FC = () => {
     id_number: "",
     email: "",
     state: "12",
+    additional_info: "",
   });
 
   const [initialFormData, setInitialFormData] = useState<Customer>({
@@ -65,6 +67,7 @@ const CustomerFormPage: React.FC = () => {
     id_number: "",
     email: "",
     state: "12",
+    additional_info: "",
   });
 
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
@@ -147,6 +150,7 @@ const CustomerFormPage: React.FC = () => {
         id_type: data.id_type || "Select",
         id_number: data.id_number || "",
         state: data.state || "12",
+        additional_info: data.additional_info || "",
       };
 
       setFormData(formattedData);
@@ -162,7 +166,9 @@ const CustomerFormPage: React.FC = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prevData) => ({
       ...prevData,
@@ -285,24 +291,26 @@ const CustomerFormPage: React.FC = () => {
           formData.customer_id,
           {
             name: formData.name,
-            phone_number: formData.phone_number,
+            phone_number: formData.phone_number || null,
             tin_number: formData.tin_number,
             id_type: formData.id_type,
             id_number: formData.id_number,
             email: formData.email,
             state: formData.state,
+            additional_info: formData.additional_info,
           }
         );
       } else {
         // Create new customer
         customerResponse = await greenTargetApi.createCustomer({
           name: formData.name,
-          phone_number: formData.phone_number,
+          phone_number: formData.phone_number || null,
           tin_number: formData.tin_number,
           id_type: formData.id_type,
           id_number: formData.id_number,
           email: formData.email,
           state: formData.state,
+          additional_info: formData.additional_info,
         });
       }
 
@@ -464,29 +472,6 @@ const CustomerFormPage: React.FC = () => {
   ) => {
     const value = formData[name]?.toString() || "";
 
-    // For state field, we want to show the name but save the code
-    if (name === "state") {
-      const selectedState = stateOptions.find((opt) => opt.id === value);
-      return (
-        <FormListbox
-          name={name}
-          label={label}
-          value={selectedState ? selectedState.name : value}
-          onChange={(selectedName) => {
-            const selectedOption = stateOptions.find(
-              (opt) => opt.name === selectedName
-            );
-            handleListboxChange(
-              name,
-              selectedOption ? selectedOption.id : selectedName
-            );
-          }}
-          options={options}
-        />
-      );
-    }
-
-    // For other fields, normal behavior
     return (
       <FormListbox
         name={name}
@@ -495,6 +480,35 @@ const CustomerFormPage: React.FC = () => {
         onChange={(value) => handleListboxChange(name, value)}
         options={options}
       />
+    );
+  };
+
+  const renderTextArea = (
+    name: keyof Customer,
+    label: string,
+    placeholder: string = ""
+  ) => {
+    const value = formData[name]?.toString() || "";
+
+    return (
+      <div className="space-y-2">
+        <label
+          htmlFor={name}
+          className="block text-sm font-medium text-default-700"
+        >
+          {label}
+        </label>
+        <textarea
+          id={name}
+          name={name}
+          value={value}
+          onChange={handleInputChange}
+          placeholder={placeholder}
+          rows={4}
+          className="block w-full h-[10rem] px-3 py-2 border border-default-300 rounded-lg shadow-sm
+                     focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+        />
+      </div>
     );
   };
 
@@ -568,6 +582,11 @@ const CustomerFormPage: React.FC = () => {
               {renderInput("name", "Customer Name")}
               {renderInput("phone_number", "Phone Number", "tel")}
             </div>
+            {renderTextArea(
+              "additional_info",
+              "Additional Notes (optional)",
+              "Enter additional customer information here. This will appear in the customer's statement header."
+            )}
 
             {/* Locations Section */}
             <div className="border-t pt-6 mt-6">

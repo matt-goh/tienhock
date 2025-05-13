@@ -5,7 +5,10 @@ import { ColumnConfig } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { refreshProductsCache } from "../../utils/invoice/useProductsCache";
+import {
+  refreshProductsCache,
+  useProductsCache,
+} from "../../utils/invoice/useProductsCache";
 
 interface Product {
   originalId: string;
@@ -18,11 +21,38 @@ interface Product {
 }
 
 const ProductPage: React.FC = () => {
+  const {
+    products: cachedProductsData,
+    isLoading: cacheLoading,
+    error: cacheError,
+  } = useProductsCache("all"); // Use the cache hook
+
   const [products, setProducts] = useState<Product[]>([]);
   const [editedProducts, setEditedProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Removed local loading state, using cacheLoading now
   const [isEditing, setIsEditing] = useState(false);
+
+  // Effect to update local products state when cache data changes
+  useEffect(() => {
+    if (cachedProductsData) {
+      // Map cached data to include originalId for editing purposes
+      setProducts(
+        cachedProductsData.map((product: any) => ({
+          ...product,
+          originalId: product.id,
+        }))
+      );
+    }
+  }, [cachedProductsData]);
+
+  // Effect to handle cache errors
+  useEffect(() => {
+    if (cacheError) {
+      console.error("Error fetching products from cache:", cacheError);
+      toast.error("Failed to load products. Please try refreshing.");
+    }
+  }, [cacheError]);
 
   const columns: ColumnConfig[] = [
     { id: "id", header: "ID", type: "readonly", width: 150 },
@@ -44,71 +74,62 @@ const ProductPage: React.FC = () => {
     if (col.id === "tax") {
       return { ...col, type: "listbox", options: ["None", "SR", "ZRL"] };
     }
-    return { ...col, type: "string" };
+    // Allow editing ID, description, type as string
+    if (["id", "description", "type"].includes(col.id)) {
+      return { ...col, type: "string" };
+    }
+    // Keep tax as listbox, price as rate
+    return col; // Keep others readonly implicitly if not matched
   });
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await api.get("/api/products?all");
-      setProducts(
-        data.map((product: Product) => ({ ...product, originalId: product.id }))
-      );
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      toast.error("Failed to fetch products. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Removed fetchProducts and its useEffect, cache handles fetching
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
+  // Effect to sync edited/original state when editing starts or products change
   useEffect(() => {
     if (isEditing) {
+      // Use the current local products state derived from the cache
       setEditedProducts([...products]);
       setOriginalProducts([...products]);
     }
-  }, [isEditing, products]);
+  }, [isEditing, products]); // Depend on local products state
 
   const handleDataChange = useCallback((updatedData: Product[]) => {
+    // Use setTimeout to defer state update slightly, can help with performance
     setTimeout(() => setEditedProducts(updatedData), 0);
   }, []);
 
   const handleDeleteProducts = useCallback(
     async (selectedIndices: number[]) => {
+      // Use the current local products state to identify items to delete
       const productsToDelete = selectedIndices.map((index) => products[index]);
       const productIdsToDelete = productsToDelete.map((product) => product.id);
+
+      if (productIdsToDelete.length === 0) {
+        toast("No products selected for deletion.");
+        return;
+      }
 
       try {
         await api.delete("/api/products", productIdsToDelete);
 
-        setProducts((prevProducts) =>
-          prevProducts.filter(
-            (product) => !productIdsToDelete.includes(product.id)
-          )
-        );
-
-        // Refresh products cache after deletion
-        await refreshProductsCache();
+        // Refresh products cache after deletion instead of setting local state directly
+        await refreshProductsCache(); // This will trigger the cache hook to refetch
 
         toast.success("Selected products deleted successfully");
-        setIsEditing(false);
+        setIsEditing(false); // Exit editing mode after successful deletion
       } catch (error) {
         console.error("Error deleting selected products:", error);
         toast.error("Failed to delete products. Please try again.");
       }
     },
-    [products]
+    [products] // Depend on local products state
   );
 
   const handleSave = useCallback(async () => {
     try {
       // Validate product IDs
       const emptyProductId = editedProducts.find(
-        (product) => !product.id.trim()
+        (product) => !product.id?.trim() // Add optional chaining for safety
       );
       if (emptyProductId) {
         toast.error("Product ID cannot be empty");
@@ -141,44 +162,52 @@ const ProductPage: React.FC = () => {
         return;
       }
 
+      // Prepare data for batch update, mapping originalId back to id for the API
       const productsToUpdate = editedProducts.map((product) => ({
-        ...product,
-        newId: product.id !== product.originalId ? product.id : undefined,
-        id: product.originalId,
+        ..._.omit(product, ["originalId"]), // Send clean product data
+        newId: product.id !== product.originalId ? product.id : undefined, // Send newId only if ID changed
+        id: product.originalId, // Use originalId as the key for update/creation
       }));
 
-      const result = await api.post("/api/products/batch", {
+      await api.post("/api/products/batch", {
         products: productsToUpdate,
       });
 
-      const updatedProducts = result.products.map((product: Product) => ({
-        ...product,
-        originalId: product.id,
-      }));
-
-      setProducts(updatedProducts);
-
-      // After successfully saving, refresh the products cache
-      await refreshProductsCache();
+      // After successfully saving, refresh the products cache instead of setting local state
+      await refreshProductsCache(); // This triggers the cache hook to refetch
 
       setIsEditing(false);
       toast.success("Changes saved successfully");
     } catch (error) {
       console.error("Error updating products:", error);
-      toast.error((error as Error).message);
+      // Attempt to provide a more specific error message if available
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error as Error).message ||
+        "An unknown error occurred";
+      toast.error(`Failed to save changes: ${message}`);
     }
-  }, [editedProducts, originalProducts]);
+  }, [editedProducts, originalProducts]); // Depend on edit states
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
-    setEditedProducts([]);
+    setEditedProducts([]); // Clear edits
+    setOriginalProducts([]); // Clear original snapshot
   }, []);
 
   const handleToggleEditing = useCallback(() => {
     setIsEditing((prev) => !prev);
-  }, []);
+    if (isEditing) {
+      // If toggling off editing, clear the edit states
+      setEditedProducts([]);
+      setOriginalProducts([]);
+    }
+    // When toggling on, the useEffect [isEditing, products] will populate the states
+  }, [isEditing]); // Depend on isEditing state
 
-  if (loading) {
+  // Use cacheLoading state for the loading spinner
+  if (cacheLoading && products.length === 0) {
+    // Show spinner only on initial load
     return (
       <div className="mt-40 w-full flex items-center justify-center">
         <LoadingSpinner />
@@ -194,9 +223,11 @@ const ProductPage: React.FC = () => {
         </div>
         <div className="relative justify-center">
           <Table
+            // Use local products state (derived from cache) when not editing
+            // Use editedProducts state when editing
             initialData={isEditing ? editedProducts : products}
             columns={isEditing ? editableColumns : columns}
-            onShowDeleteButton={() => {}}
+            onShowDeleteButton={() => {}} // Placeholder or implement if needed
             onDelete={handleDeleteProducts}
             onChange={handleDataChange}
             isEditing={isEditing}

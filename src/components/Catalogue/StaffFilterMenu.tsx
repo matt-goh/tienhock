@@ -126,7 +126,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
   }, []);
 
   return (
-    <div className="relative inline-block text-left mr-2" ref={menuRef}>
+    <div className="relative inline-block text-left" ref={menuRef}>
       <Button
         onClick={() => setIsOpen(!isOpen)}
         icon={IconFilter}
@@ -154,7 +154,6 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                 <IconSquare
                   width={18}
                   height={18}
-                  stroke={2}
                   className="text-default-400"
                 />
               )}

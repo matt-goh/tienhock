@@ -1,6 +1,6 @@
 // src/pages/Invoice/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ExtendedInvoiceData, Payment, ProductItem } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
@@ -14,6 +14,7 @@ import {
   cancelInvoice,
   createPayment,
   cancelPayment,
+  syncCancellationStatus,
 } from "../../utils/invoice/InvoiceUtils";
 import {
   parseDatabaseTimestamp,
@@ -22,7 +23,6 @@ import {
 import toast from "react-hot-toast";
 import {
   IconFileInvoice,
-  IconPrinter,
   IconBan,
   IconCash,
   IconTrash,
@@ -30,8 +30,11 @@ import {
   IconClockHour4,
   IconAlertTriangle,
   IconSend,
+  IconRefresh,
+  IconFiles,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
+import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
 
 // --- Helper: Read-only Line Items Table ---
@@ -135,6 +138,7 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const invoiceId = id || "";
 
@@ -149,7 +153,9 @@ const InvoiceDetailsPage: React.FC = () => {
   // Action States
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(
+    location.state?.showPaymentForm || false
+  );
   const [paymentFormData, setPaymentFormData] = useState<
     Omit<Payment, "payment_id" | "invoice_id" | "created_at">
   >({
@@ -162,9 +168,9 @@ const InvoiceDetailsPage: React.FC = () => {
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showCancelPaymentConfirm, setShowCancelPaymentConfirm] =
-    useState(false); // Rename from showDeletePaymentConfirm
-  const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null); // Rename from paymentToDelete
-  const [isCancellingPayment, setIsCancellingPayment] = useState(false); // Rename from isDeletingPayment
+    useState(false);
+  const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
+  const [isCancellingPayment, setIsCancellingPayment] = useState(false);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
@@ -172,6 +178,7 @@ const InvoiceDetailsPage: React.FC = () => {
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
+  const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -329,11 +336,33 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handlePrint = () => {
-    toast("Print function placeholder. Use browser print or PDF generation.", {
-      icon: "🖨️",
-    });
-    // Example: window.print();
+  const handleSyncCancellationStatus = async () => {
+    if (!invoiceData) return;
+
+    setIsSyncingCancellation(true);
+    const toastId = toast.loading("Syncing cancellation status...");
+
+    try {
+      const response = await syncCancellationStatus(invoiceData.id);
+
+      if (response.success) {
+        toast.success(
+          response.message || "Cancellation status synced successfully",
+          { id: toastId }
+        );
+        // Refresh invoice details
+        fetchDetails();
+      } else {
+        toast.error(response.message || "Failed to sync cancellation status", {
+          id: toastId,
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing cancellation status:", error);
+      toast.error("Failed to sync cancellation status", { id: toastId });
+    } finally {
+      setIsSyncingCancellation(false);
+    }
   };
 
   // --- Payment Form Handling ---
@@ -382,14 +411,6 @@ const InvoiceDetailsPage: React.FC = () => {
     }
     if (!paymentFormData.payment_method) {
       toast.error("Payment method is required");
-      return false;
-    }
-    if (
-      (paymentFormData.payment_method === "cheque" ||
-        paymentFormData.payment_method === "bank_transfer") &&
-      !paymentFormData.payment_reference?.trim() // Check trimmed value
-    ) {
-      toast.error("Payment Reference is required for Cheque/Bank Transfer.");
       return false;
     }
     return true;
@@ -543,6 +564,21 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const getConsolidatedStatusInfo = (consolidatedInfo: any) => {
+    if (!consolidatedInfo) return null;
+
+    // Only show for valid consolidated invoices - adjust based on your requirements
+    if (consolidatedInfo.einvoice_status !== "valid") return null;
+
+    return {
+      text: "Consolidated",
+      color: "text-indigo-600",
+      border: "border-indigo-200",
+      icon: IconFiles,
+      info: consolidatedInfo,
+    };
+  };
+
   // --- Render Logic ---
   if (isLoading && !invoiceData) {
     // Show full page spinner only on initial load
@@ -580,6 +616,10 @@ const InvoiceDetailsPage: React.FC = () => {
   const invoiceStatusStyle = getStatusBadgeClass(invoiceData.invoice_status);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoiceData.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
+  const consolidatedStatusInfo = getConsolidatedStatusInfo(
+    invoiceData.consolidated_part_of
+  );
+  const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const isCancelled = invoiceData.invoice_status === "cancelled";
   const isPaid = !isCancelled && invoiceData.balance_due <= 0; // Check balance only if not cancelled
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
@@ -628,9 +668,32 @@ const InvoiceDetailsPage: React.FC = () => {
               e-Invoice: {eInvoiceStatusInfo.text}
             </span>
           )}
+          {/* Add Consolidated Status Badge */}
+          {consolidatedStatusInfo && ConsolidatedIcon && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color}`}
+              title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
+            >
+              <ConsolidatedIcon size={14} />
+              Consolidated Invoice
+            </span>
+          )}
         </h1>
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
+          {invoiceData.invoice_status === "cancelled" &&
+            invoiceData.uuid &&
+            invoiceData.einvoice_status !== "cancelled" && (
+              <Button
+                onClick={handleSyncCancellationStatus}
+                icon={IconRefresh}
+                variant="outline"
+                color="rose"
+                disabled={isSyncingCancellation}
+              >
+                {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+              </Button>
+            )}
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
@@ -654,18 +717,22 @@ const InvoiceDetailsPage: React.FC = () => {
                     : "Submit for e-Invoicing"
                 }
               >
-                {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
+                {isSubmittingEInvoice
+                  ? "Submitting..."
+                  : invoiceData.einvoice_status === "pending"
+                  ? "Update e-Invoice"
+                  : "Submit e-Invoice"}
               </Button>
             )}
-          <Button
-            onClick={handlePrint}
-            icon={IconPrinter}
-            variant="outline"
-            size="md"
-            disabled={isLoading}
-          >
-            Print
-          </Button>
+          {invoiceData.einvoice_status === "valid" && (
+            <div className="inline-block">
+              <EInvoicePDFHandler
+                invoices={invoiceData ? [invoiceData] : []}
+                disabled={isLoading}
+                size="md"
+              />
+            </div>
+          )}
           {!isCancelled && !isPaid && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -687,7 +754,7 @@ const InvoiceDetailsPage: React.FC = () => {
               disabled={isCancelling || isLoading}
               icon={IconBan}
             >
-              {isCancelling ? "Cancelling..." : "Cancel Invoice"}
+              {isCancelling ? "Cancelling..." : "Cancel"}
             </Button>
           )}
         </div>
@@ -715,7 +782,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 value={paymentFormData.amount_paid}
                 onChange={handlePaymentFormChange}
                 step="0.01"
-                min="0.01"
+                min={0.01}
                 max={invoiceData.balance_due}
                 disabled={isProcessingPayment}
               />
@@ -872,17 +939,43 @@ const InvoiceDetailsPage: React.FC = () => {
         </section>
 
         {/* E-Invoice Details */}
-        {(invoiceData.uuid || invoiceData.einvoice_status) && (
+        {(invoiceData.uuid ||
+          invoiceData.einvoice_status ||
+          invoiceData.consolidated_part_of) && (
           <section className="p-4 border rounded-lg bg-white shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800">
-              E-Invoice Details
+              {(invoiceData.einvoice_status === "valid" ||
+                invoiceData.einvoice_status === "cancelled") &&
+              invoiceData.long_id ? (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-sky-600 hover:underline"
+                  title="View in MyInvois Portal"
+                >
+                  E-Invoice Details
+                </a>
+              ) : consolidatedStatusInfo?.info?.long_id ? (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-sky-600 hover:underline"
+                  title="View Consolidated Invoice in MyInvois Portal"
+                >
+                  E-Invoice Details
+                </a>
+              ) : (
+                "E-Invoice Details"
+              )}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {invoiceData.uuid && (
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     UUID:
-                  </strong>{" "}
+                  </strong>
                   <span className="font-mono text-sm break-all">
                     {invoiceData.uuid}
                   </span>
@@ -892,7 +985,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Long ID:
-                  </strong>{" "}
+                  </strong>
                   <span className="font-mono text-sm break-all">
                     {invoiceData.long_id}
                   </span>
@@ -902,7 +995,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Submission:
-                  </strong>{" "}
+                  </strong>
                   <span className="font-mono text-sm break-all">
                     {invoiceData.submission_uid}
                   </span>
@@ -912,7 +1005,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <p>
                   <strong className="text-gray-500 font-medium w-24 inline-block">
                     Validated:
-                  </strong>{" "}
+                  </strong>
                   {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
                   {new Date(invoiceData.datetime_validated).toLocaleTimeString(
                     "en-US",
@@ -925,18 +1018,42 @@ const InvoiceDetailsPage: React.FC = () => {
                   )}
                 </p>
               )}
-              <p>
-                <strong className="text-gray-500 font-medium w-24 inline-block">
-                  Status:
-                </strong>{" "}
-                {eInvoiceStatusInfo ? (
-                  <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
-                    {eInvoiceStatusInfo.text}
-                  </span>
-                ) : (
-                  <span className="text-gray-500">Not Submitted</span>
-                )}
-              </p>
+              {!consolidatedStatusInfo && (
+                <p>
+                  <strong className="text-gray-500 font-medium w-24 inline-block">
+                    Status:
+                  </strong>
+                  {eInvoiceStatusInfo ? (
+                    <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
+                      {eInvoiceStatusInfo.text}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">Not Submitted</span>
+                  )}
+                </p>
+              )}
+              {consolidatedStatusInfo && (
+                <>
+                  <p>
+                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                      Invoice ID:
+                    </strong>
+                    <span className="font-medium">
+                      {consolidatedStatusInfo.info.id}
+                    </span>
+                  </p>
+                  {consolidatedStatusInfo.info.uuid && (
+                    <p>
+                      <strong className="text-gray-500 font-medium w-24 inline-block">
+                        UUID:
+                      </strong>
+                      <span className="font-mono text-sm break-all">
+                        {consolidatedStatusInfo.info.uuid}
+                      </span>
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </section>
         )}
@@ -1014,40 +1131,30 @@ const InvoiceDetailsPage: React.FC = () => {
                         {formatCurrency(p.amount_paid)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          color="rose"
-                          onClick={() => handleCancelPaymentClick(p)}
-                          disabled={
-                            isCancellingPayment ||
-                            isCancelled ||
-                            p.status === "cancelled"
-                          }
-                          title={
-                            isCancelled
-                              ? "Cannot cancel payment for cancelled invoice"
-                              : p.status === "cancelled"
-                              ? p.cancellation_date
-                                ? `Cancelled on ${formatDisplayDate(
-                                    new Date(p.cancellation_date)
-                                  )}`
-                                : "Payment cancelled"
-                              : "Cancel Payment"
-                          }
-                          className="ml-auto"
-                        >
-                          {p.status === "cancelled" ? (
-                            // Show a disabled 'Cancelled' indicator if the payment is already cancelled
-                            <button className="italic cursor-not-allowed">
-                              Cancelled
-                            </button>
-                          ) : (
-                            <button className="flex items-center gap-1">
+                        {p.status === "cancelled" ? (
+                          // Show a disabled 'Cancelled' indicator if the payment is already cancelled
+                          <span className="italic text-gray-500 ml-auto">
+                            Cancelled
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            color="rose"
+                            onClick={() => handleCancelPaymentClick(p)}
+                            disabled={isCancellingPayment || isCancelled}
+                            title={
+                              isCancelled
+                                ? "Cannot cancel payment for cancelled invoice"
+                                : "Cancel Payment"
+                            }
+                            className="ml-auto"
+                          >
+                            <span className="flex items-center gap-1">
                               <IconTrash size={16} /> Delete
-                            </button>
-                          )}
-                        </Button>
+                            </span>
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1070,8 +1177,18 @@ const InvoiceDetailsPage: React.FC = () => {
         onClose={() => setShowSubmitEInvoiceConfirm(false)}
         onConfirm={handleConfirmSubmitEInvoice}
         title="Submit Invoice for e-Invoicing"
-        message={`You are about to submit this invoice to the MyInvois e-invoicing system. Continue?`}
-        confirmButtonText="Submit e-Invoice"
+        message={
+          invoiceData.einvoice_status === "pending"
+            ? "You are about to update this invoice in the MyInvois e-invoicing system. Continue?"
+            : "You are about to submit this invoice to the MyInvois e-invoicing system. Continue?"
+        }
+        confirmButtonText={
+          isSubmittingEInvoice
+            ? "Submitting..."
+            : invoiceData.einvoice_status === "pending"
+            ? "Update e-Invoice"
+            : "Submit e-Invoice"
+        }
         variant="default"
       />
       <ConfirmationDialog

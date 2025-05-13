@@ -1,7 +1,14 @@
-// src/utils/invoice/useProductsCache.tsx
+// src/utils/invoice/useProductsCache.tsx - UPDATED
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+
+// Define cache keys for different product types
+const CACHE_KEYS = {
+  ALL: "products_cache_all",
+  JP: "products_cache_jp",
+  DEFAULT: "products_cache_default", // BH and MEE
+};
 
 interface CachedProducts {
   data: Array<{
@@ -13,32 +20,70 @@ interface CachedProducts {
   timestamp: number;
 }
 
-const CACHE_KEY = "products_cache";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const PRODUCTS_UPDATED_EVENT = "products-updated";
 
-// Create a global function to trigger cache refresh
-export const refreshProductsCache = async () => {
+// Create global functions to refresh specific product caches
+export const refreshProductsCache = async (type?: "all" | "jp" | "default") => {
   try {
-    // Remove the current cache
-    localStorage.removeItem(CACHE_KEY);
+    const cacheKeys = type
+      ? [getCacheKeyForType(type)]
+      : Object.values(CACHE_KEYS);
 
-    // Fetch new data
-    const data = await api.get("/api/products");
+    // For each cache type we need to refresh
+    for (const cacheKey of cacheKeys) {
+      // Remove the current cache
+      localStorage.removeItem(cacheKey);
 
-    // Store in cache
-    const cacheData = {
-      data,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      // Fetch new data based on the cache type
+      let queryParam = "";
+      if (cacheKey === CACHE_KEYS.ALL) queryParam = "?all";
+      else if (cacheKey === CACHE_KEYS.JP) queryParam = "?JP";
 
-    // Dispatch event to notify subscribers
-    window.dispatchEvent(
-      new CustomEvent(PRODUCTS_UPDATED_EVENT, { detail: data })
-    );
+      const data = await api.get(`/api/products${queryParam}`);
+
+      // Store in cache
+      const cacheData = {
+        data,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+
+      // Dispatch event to notify subscribers with cache type info
+      window.dispatchEvent(
+        new CustomEvent(PRODUCTS_UPDATED_EVENT, {
+          detail: { data, type: getCacheTypeFromKey(cacheKey) },
+        })
+      );
+    }
   } catch (error) {
     console.error("Error refreshing products cache:", error);
+  }
+};
+
+// Helper to get cache key from type
+const getCacheKeyForType = (type: "all" | "jp" | "default"): string => {
+  switch (type) {
+    case "all":
+      return CACHE_KEYS.ALL;
+    case "jp":
+      return CACHE_KEYS.JP;
+    case "default":
+    default:
+      return CACHE_KEYS.DEFAULT;
+  }
+};
+
+// Helper to get type from cache key
+const getCacheTypeFromKey = (cacheKey: string): "all" | "jp" | "default" => {
+  switch (cacheKey) {
+    case CACHE_KEYS.ALL:
+      return "all";
+    case CACHE_KEYS.JP:
+      return "jp";
+    case CACHE_KEYS.DEFAULT:
+    default:
+      return "default";
   }
 };
 
@@ -48,7 +93,9 @@ if (typeof window !== "undefined") {
   window.refreshProductsCache = refreshProductsCache;
 }
 
-export const useProductsCache = () => {
+export const useProductsCache = (
+  type: "all" | "jp" | "default" = "default"
+) => {
   const [products, setProducts] = useState<
     Array<{
       id: string;
@@ -59,6 +106,7 @@ export const useProductsCache = () => {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const cacheKey = getCacheKeyForType(type);
 
   const fetchProducts = async (forceRefresh = false) => {
     setIsLoading(true);
@@ -66,7 +114,7 @@ export const useProductsCache = () => {
       // Skip cache if force refresh is requested
       if (!forceRefresh) {
         // Check cache first
-        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
           const { data, timestamp }: CachedProducts = JSON.parse(cachedData);
           const isExpired = Date.now() - timestamp > CACHE_DURATION;
@@ -81,24 +129,30 @@ export const useProductsCache = () => {
       }
 
       // If cache is missing, expired, or force refresh is requested, fetch fresh data
-      const data = await api.get("/api/products");
+      let queryParam = "";
+      if (type === "all") queryParam = "?all";
+      else if (type === "jp") queryParam = "?JP";
+
+      const data = await api.get(`/api/products${queryParam}`);
 
       // Update cache
       const cacheData: CachedProducts = {
         data,
         timestamp: Date.now(),
       };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
 
       setProducts(data);
       setError(null);
       return data;
     } catch (error) {
-      console.error("Error fetching products:", error);
+      console.error(`Error fetching ${type} products:`, error);
       const err =
-        error instanceof Error ? error : new Error("Failed to fetch products");
+        error instanceof Error
+          ? error
+          : new Error(`Failed to fetch ${type} products`);
       setError(err);
-      toast.error("Error fetching products");
+      toast.error(`Error fetching ${type} products`);
       throw err;
     } finally {
       setIsLoading(false);
@@ -108,17 +162,19 @@ export const useProductsCache = () => {
   // Initial load
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [type]); // Re-fetch when type changes
 
   // Listen for product updates
   useEffect(() => {
     const handleProductsUpdated = (event: CustomEvent) => {
-      // If event contains data, use it directly
-      if (event.detail) {
-        setProducts(event.detail);
-      } else {
-        // Otherwise refresh from cache or API
-        fetchProducts(true);
+      // Check if the event is for our product type
+      if (event.detail && (!event.detail.type || event.detail.type === type)) {
+        if (event.detail.data) {
+          setProducts(event.detail.data);
+        } else {
+          // Otherwise refresh from cache or API
+          fetchProducts(true);
+        }
       }
     };
 
@@ -133,10 +189,10 @@ export const useProductsCache = () => {
         handleProductsUpdated as EventListener
       );
     };
-  }, []);
+  }, [type]);
 
   const invalidateCache = () => {
-    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(cacheKey);
   };
 
   const refreshProducts = async () => {

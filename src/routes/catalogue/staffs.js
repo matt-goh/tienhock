@@ -11,7 +11,7 @@ export default function (pool) {
     return result.rows.length > 0;
   }
 
-  // Get active salesmen
+  // Get staff members
   router.get("/", async (req, res) => {
     try {
       const { salesmenOnly } = req.query;
@@ -21,22 +21,41 @@ export default function (pool) {
         salesmenOnly === "true"
           ? "s.id" // Only select ID for salesmen
           : `s.id, 
-             s.name, 
-             s.ic_no as "icNo", 
-             s.telephone_no as "telephoneNo",
-             s.job,
-             s.location,
-             s.date_resigned as "dateResigned"`;
+           s.name, 
+           s.ic_no as "icNo", 
+           s.telephone_no as "telephoneNo",
+           s.email,
+           s.gender,
+           s.nationality,
+           s.birthdate,
+           s.address,
+           s.date_joined as "dateJoined",
+           s.bank_account_number as "bankAccountNumber",
+           s.epf_no as "epfNo",
+           s.income_tax_no as "incomeTaxNo",
+           s.socso_no as "socsoNo",
+           s.document,
+           s.payment_type as "paymentType",
+           s.payment_preference as "paymentPreference",
+           s.race,
+           s.agama,
+           s.date_resigned as "dateResigned",
+           s.job,
+           s.location,
+           s.updated_at as "updatedAt"`;
 
       let query = `
-        SELECT ${columns}
-        FROM staffs s
-        WHERE (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
-      `;
+      SELECT ${columns}
+      FROM staffs s
+    `;
 
+      // Only filter by active status for salesmenOnly query
       if (salesmenOnly === "true") {
+        query += ` WHERE (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)`;
         query += ` AND s.job::jsonb ? 'SALESMAN'`;
       }
+
+      query += ` ORDER BY s.updated_at DESC NULLS LAST`;
 
       const result = await pool.query(query);
 
@@ -48,9 +67,16 @@ export default function (pool) {
               ...staff,
               job: Array.isArray(staff.job) ? staff.job : [],
               location: Array.isArray(staff.location) ? staff.location : [],
+              // Format dates
+              birthdate: staff.birthdate
+                ? staff.birthdate.toISOString().split("T")[0]
+                : "",
+              dateJoined: staff.dateJoined
+                ? staff.dateJoined.toISOString().split("T")[0]
+                : "",
               dateResigned: staff.dateResigned
                 ? staff.dateResigned.toISOString().split("T")[0]
-                : null,
+                : "",
             }));
 
       res.json(staffs);

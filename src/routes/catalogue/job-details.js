@@ -81,7 +81,6 @@ export default function (pool) {
         await client.query("BEGIN");
 
         // First, delete existing associations
-        console.log("Deleting existing associations for job:", jobId);
         await client.query("DELETE FROM jobs_job_details WHERE job_id = $1", [
           jobId,
         ]);
@@ -91,8 +90,6 @@ export default function (pool) {
         // Process each job detail
         for (const jobDetail of jobDetails) {
           const { id, description, amount, remark, type } = jobDetail;
-
-          console.log("Processing job detail:", jobDetail);
 
           // Try to update first
           const updateQuery = `
@@ -112,10 +109,6 @@ export default function (pool) {
 
           // If no rows were updated, this is a new record
           if (result.rowCount === 0) {
-            console.log(
-              "No existing record found, inserting new one for id:",
-              id
-            );
             // Insert new record
             const insertQuery = `
             INSERT INTO job_details (id, description, amount, remark, type)
@@ -140,12 +133,6 @@ export default function (pool) {
           processedDetails.push(result.rows[0]);
 
           // Create the job-detail association
-          console.log(
-            "Creating association for job_id:",
-            jobId,
-            "detail_id:",
-            id
-          );
           await client.query(
             "INSERT INTO jobs_job_details (job_id, job_detail_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
             [jobId, id]
@@ -160,7 +147,6 @@ export default function (pool) {
 
         await client.query("COMMIT");
 
-        console.log("Successfully processed job details:", processedDetails);
         res.json({
           message: "Job details processed successfully",
           jobDetails: processedDetails,

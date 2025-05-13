@@ -86,7 +86,7 @@ const Layout: React.FC = () => {
           className={`fixed z-50 top-0 left-0 h-screen sidebar-hidden ${
             isMobile ? "w-0 overflow-hidden" : ""
           }`}
-          style={{ width: isMobile ? 0 : isVisible ? "254px" : "6rem" }}
+          style={{ width: isMobile ? 0 : isVisible ? "254px" : "3rem" }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -101,7 +101,7 @@ const Layout: React.FC = () => {
       <main
         className={`
     flex justify-center w-full transition-all duration-300 ease-in-out
-    ${!isPDFRoute && location.pathname !== "/login" ? "mt-[84px]" : ""} 
+    ${!isPDFRoute && location.pathname !== "/login" ? "mt-[60px]" : ""} 
     ${
       isAuthenticated && isVisible && !isPDFRoute && !isMobile
         ? "ml-[254px]"

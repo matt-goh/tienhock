@@ -1,19 +1,7 @@
 // src/routes/sales/invoices/invoices.js
 import { Router } from "express";
 import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
-import {
-  MYINVOIS_API_BASE_URL,
-  MYINVOIS_CLIENT_ID,
-  MYINVOIS_CLIENT_SECRET,
-} from "../../../configs/config.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
-
-// Define the MyInvois configuration object
-const myInvoisConfig = {
-  MYINVOIS_API_BASE_URL,
-  MYINVOIS_CLIENT_ID,
-  MYINVOIS_CLIENT_SECRET,
-};
 
 const fetchCustomerData = async (pool, customerId) => {
   try {
@@ -71,7 +59,7 @@ const updateCustomerCredit = async (client, customerId, amount) => {
 export default function (pool, config) {
   const router = Router();
 
-  const apiClient = EInvoiceApiClientFactory.getInstance(myInvoisConfig);
+  const apiClient = EInvoiceApiClientFactory.getInstance(config);
 
   // Customer data cache
   const customerCache = new Map();
@@ -132,14 +120,33 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType
+          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType,
+          (
+            SELECT jsonb_build_object(
+              'id', con.id,
+              'uuid', con.uuid,
+              'long_id', con.long_id,
+              'einvoice_status', con.einvoice_status
+            )
+            FROM invoices con
+            WHERE con.is_consolidated = true
+              AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+              AND con.invoice_status != 'cancelled'
+            LIMIT 1
+          ) as consolidated_part_of
       `;
       let fromClause = `
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
       `;
-      let whereClause = ` WHERE 1=1 `;
-      let groupByClause = `GROUP BY i.id, c.name, c.tin_number, c.id_number, c.id_type`; // Grouping by primary key is sufficient if using aggregates or joins correctly
+      let whereClause = ` WHERE 1=1 `; // Start with basic condition
+      let groupByClause = `GROUP BY 
+      i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+      i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.invoice_status, i.einvoice_status, i.balance_due,
+      i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
+      i.is_consolidated, i.consolidated_invoices,
+      c.name, c.tin_number, c.id_number, c.id_type`;
 
       const filterParams = []; // Parameters ONLY for filtering (WHERE clause)
       let filterParamCounter = 1;
@@ -166,6 +173,9 @@ export default function (pool, config) {
         const statusParam = `$${filterParamCounter++}`;
         filterParams.push(invoiceStatus.split(","));
         whereClause += ` AND i.invoice_status = ANY(${statusParam})`;
+      } else {
+        // Default filter to exclude cancelled invoices
+        whereClause += ` AND i.invoice_status != 'cancelled'`;
       }
       if (eInvoiceStatus) {
         const eStatusParam = `$${filterParamCounter++}`;
@@ -192,15 +202,38 @@ export default function (pool, config) {
           COALESCE(i.einvoice_status, '') ILIKE ${searchParam} OR
           CAST(i.totalamountpayable AS TEXT) ILIKE ${searchParam} OR
           EXISTS (
-            SELECT 1 FROM order_details od
-            WHERE od.invoiceid = i.id AND (
-              od.code ILIKE ${searchParam} OR
-              od.description ILIKE ${searchParam}
-            )
+        SELECT 1 FROM order_details od
+        WHERE od.invoiceid = i.id AND (
+          od.code ILIKE ${searchParam} OR
+          od.description ILIKE ${searchParam}
+        )
           )
         )`;
       }
+      const consolidatedOnly = req.query.consolidated_only === "true";
+      const excludeConsolidated = req.query.exclude_consolidated === "true";
 
+      // Fix the consolidated invoices logic:
+      if (consolidatedOnly) {
+        // Show ONLY invoices that are part of any consolidated invoice
+        whereClause += ` AND EXISTS (
+          SELECT 1 FROM invoices con 
+          WHERE con.is_consolidated = true 
+          AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+          AND con.invoice_status != 'cancelled'
+        )`;
+      } else if (excludeConsolidated) {
+        // Exclude invoices that are part of any consolidated invoice
+        whereClause += ` AND NOT EXISTS (
+          SELECT 1 FROM invoices con 
+          WHERE con.is_consolidated = true 
+          AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+          AND con.invoice_status != 'cancelled'
+        )`;
+      }
+
+      // Always exclude the consolidated invoices themselves from this listing
+      whereClause += ` AND (i.is_consolidated = false OR i.is_consolidated IS NULL)`;
       // Construct Count Query
       const countQuery = `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
 
@@ -249,6 +282,7 @@ export default function (pool, config) {
         datetime_validated: row.datetime_validated,
         is_consolidated: row.is_consolidated || false,
         consolidated_invoices: row.consolidated_invoices,
+        consolidated_part_of: row.consolidated_part_of,
         customerName: row.customername || row.customerid,
         customerTin: row.customertin,
         customerIdNumber: row.customeridnumber,
@@ -294,6 +328,259 @@ export default function (pool, config) {
     }
   });
 
+  // Get all invoice IDs and summary matching current filters
+  router.get("/selection/ids", async (req, res) => {
+    try {
+      const {
+        startDate,
+        endDate,
+        salesman,
+        paymentType,
+        invoiceStatus,
+        eInvoiceStatus,
+        search,
+        consolidated_only,
+        exclude_consolidated,
+      } = req.query;
+
+      // Start building query
+      let whereClause = " WHERE 1=1 "; // Start with basic condition
+      const filterParams = []; // Parameters for filtering
+      let filterParamCounter = 1;
+
+      // Apply date filters
+      if (startDate && endDate) {
+        whereClause += ` AND CAST(createddate AS bigint) BETWEEN $${filterParamCounter++} AND $${filterParamCounter++}`;
+        filterParams.push(startDate, endDate);
+      } else {
+        // Default to last year if no date range specified
+        const currentDate = Date.now();
+        const oneYearAgo = currentDate - 365 * 24 * 60 * 60 * 1000;
+        whereClause += ` AND CAST(createddate AS bigint) BETWEEN $${filterParamCounter++} AND $${filterParamCounter++}`;
+        filterParams.push(oneYearAgo.toString(), currentDate.toString());
+      }
+
+      // Apply salesman filter
+      if (salesman) {
+        whereClause += ` AND salespersonid = ANY($${filterParamCounter++})`;
+        filterParams.push(salesman.split(","));
+      }
+
+      // Apply payment type filter
+      if (paymentType) {
+        whereClause += ` AND paymenttype = $${filterParamCounter++}`;
+        filterParams.push(paymentType.toUpperCase());
+      }
+
+      // Apply invoice status filter
+      if (invoiceStatus) {
+        whereClause += ` AND invoice_status = ANY($${filterParamCounter++})`;
+        filterParams.push(invoiceStatus.split(","));
+      } else {
+        // Default filter to exclude cancelled invoices
+        whereClause += ` AND invoice_status != 'cancelled'`;
+      }
+
+      // Apply e-invoice status filter
+      if (eInvoiceStatus) {
+        const statuses = eInvoiceStatus.split(",");
+        if (statuses.includes("null")) {
+          // Handle 'null' specifically
+          filterParams.push(statuses.filter((s) => s !== "null"));
+          whereClause += ` AND (einvoice_status = ANY($${filterParamCounter++}) OR einvoice_status IS NULL)`;
+        } else {
+          filterParams.push(statuses);
+          whereClause += ` AND einvoice_status = ANY($${filterParamCounter++})`;
+        }
+      }
+
+      // Apply search filter
+      if (search) {
+        whereClause += ` AND (
+        id ILIKE $${filterParamCounter++} OR
+        EXISTS (
+          SELECT 1 FROM customers c 
+          WHERE c.id = customerid AND c.name ILIKE $${filterParamCounter++}
+        ) OR
+        CAST(customerid AS TEXT) ILIKE $${filterParamCounter++} OR
+        CAST(salespersonid AS TEXT) ILIKE $${filterParamCounter++} OR
+        paymenttype ILIKE $${filterParamCounter++} OR
+        invoice_status ILIKE $${filterParamCounter++} OR
+        COALESCE(einvoice_status, '') ILIKE $${filterParamCounter++} OR
+        CAST(totalamountpayable AS TEXT) ILIKE $${filterParamCounter++}
+      )`;
+
+        const searchPattern = `%${search}%`;
+        // Add search param 8 times for each ILIKE condition
+        for (let i = 0; i < 8; i++) {
+          filterParams.push(searchPattern);
+        }
+      }
+
+      // Apply consolidation filters
+      if (consolidated_only === "true") {
+        // Show ONLY invoices that are part of any consolidated invoice
+        whereClause += ` AND EXISTS (
+        SELECT 1 FROM invoices con 
+        WHERE con.is_consolidated = true 
+        AND con.consolidated_invoices::jsonb ? CAST(invoices.id AS TEXT)
+        AND con.invoice_status != 'cancelled'
+      )`;
+      } else if (exclude_consolidated === "true") {
+        // Exclude invoices that are part of any consolidated invoice
+        whereClause += ` AND NOT EXISTS (
+        SELECT 1 FROM invoices con 
+        WHERE con.is_consolidated = true 
+        AND con.consolidated_invoices::jsonb ? CAST(invoices.id AS TEXT)
+        AND con.invoice_status != 'cancelled'
+      )`;
+      }
+
+      // Always exclude the consolidated invoices themselves
+      whereClause += ` AND (is_consolidated = false OR is_consolidated IS NULL)`;
+
+      // Modified query to get both IDs and total amount
+      const query = `
+      SELECT 
+        id,
+        totalamountpayable
+      FROM invoices 
+      ${whereClause} 
+      ORDER BY CAST(createddate AS bigint) DESC
+    `;
+
+      const result = await pool.query(query, filterParams);
+
+      // Calculate total amount
+      const totalAmount = result.rows.reduce(
+        (sum, row) => sum + parseFloat(row.totalamountpayable || 0),
+        0
+      );
+
+      // Extract just the IDs for the response
+      const invoiceIds = result.rows.map((row) => row.id);
+
+      // Return both IDs and total
+      res.json({
+        ids: invoiceIds,
+        total: totalAmount,
+        count: invoiceIds.length,
+      });
+    } catch (error) {
+      console.error("Error fetching invoice IDs and summary:", error);
+      res.status(500).json({
+        message: "Error fetching invoice data",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/invoices/batch - Get Multiple Invoices By IDs
+  router.get("/batch", async (req, res) => {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res
+        .status(400)
+        .json({ message: "Missing required ids parameter" });
+    }
+
+    try {
+      // Split comma-separated string into array
+      const invoiceIds = ids.split(",");
+
+      // Limit batch size for performance
+      if (invoiceIds.length > 100) {
+        return res.status(400).json({
+          message: "Too many invoices requested. Maximum batch size is 100.",
+        });
+      }
+
+      // Generate a query to fetch multiple invoices at once
+      const placeholders = invoiceIds.map((_, i) => `$${i + 1}`).join(",");
+
+      const query = `
+      SELECT
+        i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+        i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+        i.invoice_status, i.einvoice_status, i.balance_due,
+        i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
+        i.is_consolidated, i.consolidated_invoices,
+        c.name as customerName, c.tin_number, c.id_number,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', od.id,
+              'code', od.code,
+              'quantity', od.quantity,
+              'price', od.price,
+              'freeProduct', od.freeproduct,
+              'returnProduct', od.returnproduct,
+              'description', od.description,
+              'tax', od.tax,
+              'total', od.total,
+              'issubtotal', od.issubtotal
+            )
+            ORDER BY od.id
+          ) FILTER (WHERE od.id IS NOT NULL),
+          '[]'::json
+        ) as products
+      FROM invoices i
+      LEFT JOIN customers c ON i.customerid = c.id
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE i.id IN (${placeholders})
+      GROUP BY i.id, c.name, c.tin_number, c.id_number
+    `;
+
+      const result = await pool.query(query, invoiceIds);
+
+      // Format each invoice the same way as the single invoice endpoint
+      const formattedInvoices = result.rows.map((invoice) => ({
+        id: invoice.id,
+        salespersonid: invoice.salespersonid,
+        customerid: invoice.customerid,
+        createddate: invoice.createddate,
+        paymenttype: invoice.paymenttype,
+        total_excluding_tax: parseFloat(invoice.total_excluding_tax || 0),
+        tax_amount: parseFloat(invoice.tax_amount || 0),
+        rounding: parseFloat(invoice.rounding || 0),
+        totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
+        balance_due: parseFloat(invoice.balance_due || 0),
+        invoice_status: invoice.invoice_status,
+        einvoice_status: invoice.einvoice_status,
+        uuid: invoice.uuid,
+        submission_uid: invoice.submission_uid,
+        long_id: invoice.long_id,
+        datetime_validated: invoice.datetime_validated,
+        is_consolidated: invoice.is_consolidated || false,
+        consolidated_invoices: invoice.consolidated_invoices,
+        customerName: invoice.customername || invoice.customerid,
+        customerTin: invoice.tin_number,
+        customerIdNumber: invoice.id_number,
+        products: (invoice.products || []).map((product) => ({
+          id: product.id,
+          code: product.code,
+          price: parseFloat(product.price || 0),
+          quantity: parseInt(product.quantity || 0),
+          freeProduct: parseInt(product.freeProduct || 0),
+          returnProduct: parseInt(product.returnProduct || 0),
+          tax: parseFloat(product.tax || 0),
+          description: product.description,
+          total: String(product.total || "0.00"),
+          issubtotal: product.issubtotal || false,
+        })),
+      }));
+
+      res.json(formattedInvoices);
+    } catch (error) {
+      console.error("Error fetching batch invoices:", error);
+      res.status(500).json({
+        message: "Error fetching invoices",
+        error: error.message,
+      });
+    }
+  });
+
   // Get order details for a specific invoice
   router.get("/details/:id/items", async (req, res) => {
     const { id } = req.params;
@@ -325,6 +612,300 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/sales/products - Get product sales data
+  router.get("/sales/products", async (req, res) => {
+    try {
+      const { startDate, endDate, salesman } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      // Base query to get invoices and their products within date range
+      let query = `
+      SELECT 
+        i.id, i.salespersonid, i.invoice_status, i.paymenttype,
+        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, 
+        p.type
+      FROM invoices i
+      JOIN order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE 
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+    `;
+
+      const queryParams = [startDate, endDate];
+      let paramCount = 3;
+
+      // Add optional salesman filter
+      if (salesman && salesman !== "All Salesmen") {
+        query += ` AND i.salespersonid = $${paramCount++}`;
+        queryParams.push(salesman);
+      }
+
+      const result = await pool.query(query, queryParams);
+
+      // Process data - group by product
+      const productMap = new Map();
+
+      result.rows.forEach((product) => {
+        const productId = product.code;
+        if (!productId) return;
+
+        // Parse values from string to number
+        const quantity = parseInt(product.quantity) || 0;
+        const price = parseFloat(product.price) || 0;
+        const total = quantity * price;
+        const foc = parseInt(product.freeproduct) || 0;
+        const returns = parseInt(product.returnproduct) || 0;
+
+        if (productMap.has(productId)) {
+          const existingProduct = productMap.get(productId);
+          existingProduct.quantity += quantity;
+          existingProduct.totalSales += total;
+          existingProduct.foc += foc;
+          existingProduct.returns += returns;
+        } else {
+          productMap.set(productId, {
+            id: productId,
+            description: product.description || productId,
+            type: product.type || "OTHER",
+            quantity,
+            totalSales: total,
+            foc,
+            returns,
+          });
+        }
+      });
+
+      // Convert Map to Array for response
+      const productData = Array.from(productMap.values());
+
+      res.json(productData);
+    } catch (error) {
+      console.error("Error fetching product sales data:", error);
+      res.status(500).json({
+        message: "Error fetching product sales data",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/invoices/sales/salesmen - Get salesmen sales data
+  router.get("/sales/salesmen", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      // Query to get sales statistics grouped by salesperson
+      const query = `
+      WITH invoice_totals AS (
+        SELECT 
+          i.id, i.salespersonid, i.paymenttype,
+          SUM(od.quantity * od.price) as total_amount,
+          SUM(od.quantity) as total_quantity
+        FROM invoices i
+        JOIN order_details od ON i.id = od.invoiceid
+        WHERE 
+          CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+          AND i.invoice_status != 'cancelled'
+          AND od.issubtotal IS NOT TRUE
+        GROUP BY i.id, i.salespersonid, i.paymenttype
+      )
+      SELECT 
+        it.salespersonid as id,
+        SUM(it.total_amount) as total_sales,
+        SUM(it.total_quantity) as total_quantity,
+        COUNT(it.id) as sales_count,
+        COUNT(CASE WHEN it.paymenttype = 'INVOICE' THEN 1 END) as invoice_count,
+        COUNT(CASE WHEN it.paymenttype = 'CASH' THEN 1 END) as cash_count
+      FROM invoice_totals it
+      GROUP BY it.salespersonid
+      ORDER BY total_sales DESC
+    `;
+
+      const result = await pool.query(query, [startDate, endDate]);
+
+      res.json(
+        result.rows.map((row) => ({
+          id: row.id,
+          totalSales: parseFloat(row.total_sales) || 0,
+          totalQuantity: parseInt(row.total_quantity) || 0,
+          salesCount: parseInt(row.sales_count) || 0,
+          invoiceCount: parseInt(row.invoice_count) || 0,
+          cashCount: parseInt(row.cash_count) || 0,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching salesman sales data:", error);
+      res.status(500).json({
+        message: "Error fetching salesman sales data",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/invoices/sales/trends - Get monthly sales trends for products or salesmen
+  router.get("/sales/trends", async (req, res) => {
+    try {
+      const { startDate, endDate, type, ids } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      if (!type || (type !== "products" && type !== "salesmen")) {
+        return res
+          .status(400)
+          .json({
+            message: "Valid type parameter (products or salesmen) is required",
+          });
+      }
+
+      // Parse IDs from comma-separated string if provided
+      const idArray = ids ? ids.split(",") : [];
+
+      // Different SQL logic based on type
+      let query;
+      const queryParams = [startDate, endDate];
+
+      if (type === "products") {
+        // Product trends - include category level (BH, MEE) and individual products
+        query = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            od.code as product_id,
+            p.type as product_type,
+            SUM(od.quantity * od.price) as total_sales
+          FROM invoices i
+          JOIN order_details od ON i.id = od.invoiceid
+          LEFT JOIN products p ON od.code = p.id
+          WHERE 
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+          GROUP BY month, product_id, product_type
+        )
+        SELECT 
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          product_id,
+          product_type,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, product_id
+      `;
+      } else {
+        // Salesman trends
+        query = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            i.salespersonid,
+            SUM(od.quantity * od.price) as total_sales
+          FROM invoices i
+          JOIN order_details od ON i.id = od.invoiceid
+          WHERE 
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+            ${idArray.length > 0 ? "AND i.salespersonid = ANY($3)" : ""}
+          GROUP BY month, i.salespersonid
+        )
+        SELECT 
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          salespersonid,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, salespersonid
+      `;
+
+        if (idArray.length > 0) {
+          queryParams.push(idArray);
+        }
+      }
+
+      const result = await pool.query(query, queryParams);
+
+      // Transform data for frontend consumption
+      const monthlyData = new Map();
+
+      // For products, we also track by product type (BH, MEE)
+      const trackedItems = new Set();
+      if (type === "products" && idArray.length > 0) {
+        idArray.forEach((id) => trackedItems.add(id));
+      }
+
+      result.rows.forEach((row) => {
+        const monthYear = row.month_year;
+
+        if (!monthlyData.has(monthYear)) {
+          monthlyData.set(monthYear, {
+            month: monthYear,
+          });
+        }
+
+        const monthData = monthlyData.get(monthYear);
+
+        if (type === "products") {
+          const productId = row.product_id;
+          const productType = row.product_type;
+          const sales = parseFloat(row.total_sales) || 0;
+
+          // Track product ID and product type both when needed
+          if (trackedItems.has(productId)) {
+            monthData[productId] = sales;
+          }
+
+          if (trackedItems.has(productType)) {
+            // Aggregate sales for product type
+            monthData[productType] = (monthData[productType] || 0) + sales;
+          }
+        } else {
+          // Salesman data - more straightforward
+          const salesmanId = row.salespersonid;
+          monthData[salesmanId] = parseFloat(row.total_sales) || 0;
+        }
+      });
+
+      // Return as array
+      const chartData = Array.from(monthlyData.values());
+
+      // Add nice month names for display
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      chartData.forEach((dataPoint) => {
+        const [year, month] = dataPoint.month.split("-");
+        dataPoint.month = `${monthNames[parseInt(month) - 1]} ${year}`;
+      });
+
+      res.json(chartData);
+    } catch (error) {
+      console.error(`Error fetching sales trends:`, error);
+      res.status(500).json({
+        message: "Error fetching sales trend data",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/invoices/:id - Get Single Invoice (Updated Schema)
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
@@ -337,23 +918,36 @@ export default function (pool, config) {
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName, c.tin_number, c.id_number,
+          (
+            SELECT jsonb_build_object(
+              'id', con.id,
+              'uuid', con.uuid,
+              'long_id', con.long_id,
+              'einvoice_status', con.einvoice_status
+            )
+            FROM invoices con
+            WHERE con.is_consolidated = true
+              AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+              AND con.invoice_status != 'cancelled'
+            LIMIT 1
+          ) as consolidated_part_of,
           COALESCE(
-        json_agg(
-          json_build_object(
-             'id', od.id,
-             'code', od.code,
-             'quantity', od.quantity,
-             'price', od.price,
-             'freeProduct', od.freeproduct,
-             'returnProduct', od.returnproduct,
-             'description', od.description,
-             'tax', od.tax,
-             'total', od.total,
-             'issubtotal', od.issubtotal
-          )
-          ORDER BY od.id
-        ) FILTER (WHERE od.id IS NOT NULL),
-        '[]'::json
+            json_agg(
+              json_build_object(
+                'id', od.id,
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+              ORDER BY od.id
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
           ) as products
         FROM invoices i
         LEFT JOIN customers c ON i.customerid = c.id
@@ -390,11 +984,12 @@ export default function (pool, config) {
         datetime_validated: invoice.datetime_validated,
         is_consolidated: invoice.is_consolidated || false,
         consolidated_invoices: invoice.consolidated_invoices,
+        consolidated_part_of: invoice.consolidated_part_of,
         customerName: invoice.customername || invoice.customerid,
         customerTin: invoice.tin_number,
         customerIdNumber: invoice.id_number,
         products: (invoice.products || []).map((product) => ({
-          id: product.id, // order_details.id
+          id: product.id,
           code: product.code,
           price: parseFloat(product.price || 0),
           quantity: parseInt(product.quantity || 0),
@@ -502,6 +1097,12 @@ export default function (pool, config) {
 
       // If it's a CASH invoice, create automatic payment record
       if (isCash && totalPayable > 0) {
+        // Check if payment details were provided in the request
+        const paymentMethod = invoice.payment_method || "cash";
+        const paymentReference = invoice.payment_reference || null;
+        const paymentNotes =
+          invoice.payment_notes || "Automatic payment for CASH invoice";
+
         const paymentQuery = `
           INSERT INTO payments (
             invoice_id, payment_date, amount_paid, payment_method,
@@ -512,9 +1113,9 @@ export default function (pool, config) {
           createdInvoice.id,
           new Date().toISOString(),
           totalPayable,
-          "cash", // Default payment method for CASH invoices
-          null,
-          "Automatic payment for CASH invoice",
+          paymentMethod, // Use provided payment method
+          paymentReference, // Use provided reference
+          paymentNotes, // Use provided notes or default
         ]);
       }
 
@@ -840,15 +1441,11 @@ export default function (pool, config) {
 
     if (savedInvoiceDataForEInvoice.length > 0) {
       try {
-        console.log(
-          `Attempting to submit ${savedInvoiceDataForEInvoice.length} invoices to MyInvois...`
-        );
         einvoiceResults = await submitInvoicesToMyInvois(
           config, // Pass the main config object
           savedInvoiceDataForEInvoice,
           fetchCustomerDataWithCache
         );
-        console.log("MyInvois submission response received.");
 
         // --- Step 3: Update Database with E-Invoice Results ---
         if (
@@ -938,10 +1535,6 @@ export default function (pool, config) {
           einvoiceResults.error = einvoiceError.message || "Unknown API error";
         }
       }
-    } else {
-      console.log(
-        "No invoices were successfully saved to DB, skipping MyInvois submission."
-      );
     }
 
     // --- Step 4: Construct Final Response (Prioritizing Consistency) ---
@@ -1161,7 +1754,7 @@ export default function (pool, config) {
     }
   }); // End POST /submit-invoices
 
-  // DELETE /api/invoices/:id - Cancel Invoice (Update Status)
+  // DELETE /api/invoices/:id - Cancel Invoice (Update Status and Cancel Payments)
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
@@ -1170,15 +1763,17 @@ export default function (pool, config) {
 
       // 1. Get Invoice details for credit adjustment and e-invoice check
       const invoiceQuery = `
-        SELECT id, customerid, paymenttype, totalamountpayable, uuid, einvoice_status
+        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, uuid, einvoice_status, invoice_status
         FROM invoices
         WHERE id = $1 FOR UPDATE`; // Lock row
       const invoiceResult = await client.query(invoiceQuery, [id]);
 
       if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK"); // Release lock early
         return res.status(404).json({ message: "Invoice not found" });
       }
       const invoice = invoiceResult.rows[0];
+      const invoiceTotal = parseFloat(invoice.totalamountpayable || 0);
 
       // If already cancelled, do nothing
       if (invoice.invoice_status === "cancelled") {
@@ -1188,19 +1783,62 @@ export default function (pool, config) {
           .json({ message: "Invoice is already cancelled" });
       }
 
-      // 2. Adjust Customer Credit if it was an INVOICE
-      if (
-        invoice.paymenttype === "INVOICE" &&
-        parseFloat(invoice.totalamountpayable || 0) !== 0
-      ) {
+      // 2. Find and cancel ACTIVE payments associated with this invoice
+      const activePaymentsQuery = `
+        SELECT payment_id, amount_paid
+        FROM payments 
+        WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')
+        FOR UPDATE -- Lock payment rows as well
+      `;
+      const activePaymentsResult = await client.query(activePaymentsQuery, [
+        id,
+      ]);
+      const activePayments = activePaymentsResult.rows;
+
+      if (activePayments.length > 0) {
+        const cancelPaymentQuery = `
+          UPDATE payments 
+          SET status = 'cancelled', 
+              cancellation_date = NOW(),
+              cancellation_reason = $1 
+          WHERE payment_id = $2
+        `;
+        const cancellationReason = `Invoice ${id} cancelled`;
+
+        for (const payment of activePayments) {
+          const paidAmount = parseFloat(payment.amount_paid || 0);
+
+          // Cancel the payment record
+          await client.query(cancelPaymentQuery, [
+            cancellationReason,
+            payment.payment_id,
+          ]);
+
+          // Reverse customer credit adjustment ONLY if the original invoice was an INVOICE type
+          if (invoice.paymenttype === "INVOICE" && paidAmount !== 0) {
+            // Add the paid amount BACK to credit_used (reversing the payment's effect)
+            await updateCustomerCredit(
+              client,
+              invoice.customerid,
+              paidAmount // Positive amount increases credit_used
+            );
+          }
+        }
+      }
+
+      // --- END: Added Logic for Cancelling Payments ---
+
+      // 3. Adjust Customer Credit for the INVOICE TOTAL (This reverses the initial credit impact of creating the invoice)
+      // This logic remains the same as before.
+      if (invoice.paymenttype === "INVOICE" && invoiceTotal !== 0) {
         await updateCustomerCredit(
           client,
           invoice.customerid,
-          -parseFloat(invoice.totalamountpayable || 0)
+          -invoiceTotal // Negative amount decreases credit_used
         );
       }
 
-      // 3. Attempt to Cancel E-Invoice via API if it exists and isn't already cancelled
+      // 4. Attempt to Cancel E-Invoice via API (Existing logic)
       let einvoiceCancelledApi = false;
       if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
         try {
@@ -1210,68 +1848,67 @@ export default function (pool, config) {
             { status: "cancelled", reason: "Invoice cancelled" }
           );
           einvoiceCancelledApi = true;
-          console.log(
-            `Successfully cancelled e-invoice ${invoice.uuid} via API.`
-          );
         } catch (cancelError) {
           console.error(
             `Error cancelling e-invoice ${invoice.uuid} via API:`,
             cancelError
           );
           // Log error but continue - local status should still be updated
-          // Potentially check error code (e.g., if already cancelled or time limit expired)
           if (cancelError.status === 400) {
-            // Example: Bad request might mean it's already cancelled or invalid state
             console.warn(
               `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
             );
-            // Optionally force local status update if API confirms cancellation happened previously
             einvoiceCancelledApi = true; // Assume cancelled if API fails in a way suggesting it's done
           }
         }
       }
 
-      // 4. Update Invoice Status in DB
+      // 5. Update Invoice Status in DB
       const newEInvoiceStatus = einvoiceCancelledApi
         ? "cancelled"
-        : invoice.einvoice_status; // Update if API call succeeded or implied success
-      const updateQuery = `
-        UPDATE invoices
-        SET invoice_status = 'cancelled',
-            einvoice_status = $1
+        : invoice.einvoice_status;
+      const updateInvoiceQuery = `
+        UPDATE invoices 
+        SET invoice_status = 'cancelled', 
+            einvoice_status = $1,
+            balance_due = 0 -- Set balance to 0 when cancelling
             -- Optionally add a cancellation_timestamp column
         WHERE id = $2
-        RETURNING *`;
+        RETURNING *`; // Fetch the updated row
 
-      const updateResult = await client.query(updateQuery, [
+      const updateResult = await client.query(updateInvoiceQuery, [
         newEInvoiceStatus,
         id,
       ]);
 
       await client.query("COMMIT");
 
+      // Format and return the final cancelled invoice data
+      const finalCancelledInvoice = updateResult.rows[0];
       res.status(200).json({
-        message: "Invoice cancelled successfully",
-        invoice: {
-          // Return the updated invoice record
-          ...updateResult.rows[0],
+        message:
+          "Invoice and associated active payments cancelled successfully",
+        deletedInvoice: {
+          // using deletedInvoice to match the old format for mobile app to work
+          ...finalCancelledInvoice,
           total_excluding_tax: parseFloat(
-            updateResult.rows[0].total_excluding_tax || 0
+            finalCancelledInvoice.total_excluding_tax || 0
           ),
-          tax_amount: parseFloat(updateResult.rows[0].tax_amount || 0),
-          rounding: parseFloat(updateResult.rows[0].rounding || 0),
+          tax_amount: parseFloat(finalCancelledInvoice.tax_amount || 0),
+          rounding: parseFloat(finalCancelledInvoice.rounding || 0),
           totalamountpayable: parseFloat(
-            updateResult.rows[0].totalamountpayable || 0
+            finalCancelledInvoice.totalamountpayable || 0
           ),
-          balance_due: parseFloat(updateResult.rows[0].balance_due || 0),
+          balance_due: parseFloat(finalCancelledInvoice.balance_due || 0), // Should be 0 now
         },
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error cancelling invoice:", error);
-      res
-        .status(500)
-        .json({ message: "Error cancelling invoice", error: error.message });
+      console.error("Error cancelling invoice and payments:", error); // Updated log message
+      res.status(500).json({
+        message: "Error cancelling invoice and payments",
+        error: error.message,
+      }); // Updated error message
     } finally {
       client.release();
     }

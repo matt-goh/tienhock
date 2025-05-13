@@ -6,14 +6,13 @@ import cron from "node-cron";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
-import {
-  NODE_ENV,
-  SERVER_HOST,
-  MYINVOIS_API_BASE_URL,
-} from "./src/configs/config.js";
 import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";
+import {
+  checkAndProcessDueConsolidations,
+  scheduleNextMonthConsolidation,
+} from "./src/utils/invoice/autoConsolidation.js";
 
 dotenv.config();
 
@@ -80,14 +79,9 @@ app.use(express.static(path.join(__dirname, "build")));
 setupRoutes(app, pool); // Pass the pool instance here
 
 // --- Scheduled Job for Invoice Status Updates ---
-// Runs every day at 8:00 AM Kuala Lumpur time (adjust as needed)
-console.log("Setting up daily invoice status update job...");
 cron.schedule(
-  "0 8 * * *",
+  "0 8 * * *", // Run daily at 8 AM
   async () => {
-    console.log(
-      `[${new Date().toISOString()}] Running daily invoice status update job...`
-    );
     try {
       // The updater function now imports and uses the pool directly
       await updateInvoiceStatuses();
@@ -104,7 +98,36 @@ cron.schedule(
     timezone: "Asia/Kuala_Lumpur", // Set your desired timezone
   }
 );
-console.log("Daily invoice status update job scheduled for 8:00 AM KLT.");
+
+// --- Auto-consolidation scheduler ---
+cron.schedule(
+  "0 8 * * *", // Run at 8 AM every day
+  async () => {
+    try {
+      // Check if any consolidations are due today
+      await checkAndProcessDueConsolidations(pool);
+
+      // Schedule next month's consolidation if we're at month-end
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // If today is the last day of the month, schedule next month's consolidation
+      if (now.getMonth() !== tomorrow.getMonth()) {
+        await scheduleNextMonthConsolidation(pool);
+      }
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error in auto-consolidation job:`,
+        error
+      );
+    }
+  },
+  {
+    scheduled: true,
+    timezone: "Asia/Kuala_Lumpur",
+  }
+);
 
 // Handle react routing (Catch-all for client-side routing)
 // This should generally be AFTER your API routes
@@ -112,7 +135,8 @@ app.get("*", (req, res) => {
   // Avoid sending index.html for API-like paths that weren't matched
   if (
     req.path.startsWith("/api/") ||
-    req.path.startsWith("/greentarget/api/")
+    req.path.startsWith("/greentarget/api/") ||
+    req.path.startsWith("/jellypolly/api/")
   ) {
     return res.status(404).json({ message: "API endpoint not found" });
   }
@@ -120,35 +144,15 @@ app.get("*", (req, res) => {
 });
 
 // Start server
-const server = app.listen(port, "0.0.0.0", () => {
-  // Use SERVER_HOST from config if available, otherwise '0.0.0.0'
-  const displayHost =
-    NODE_ENV === "development"
-      ? `localhost:${port}`
-      : `${SERVER_HOST || "0.0.0.0"}:${port}`;
-
-  console.log(`🚀Server running on http://${displayHost}`);
-  console.log(`Environment: ${NODE_ENV}`);
-  if (MYINVOIS_API_BASE_URL) {
-    console.log(`MyInvois API: ${MYINVOIS_API_BASE_URL}`);
-  } else {
-    console.warn("MyInvois API URL not configured.");
-  }
-});
+const server = app.listen(port, "0.0.0.0");
 
 // Enhanced graceful shutdown
 const shutdownGracefully = async (signal) => {
-  console.log(`\n${signal} signal received.`);
-  console.log("Closing HTTP server...");
-
   server.close(async () => {
-    console.log("HTTP server closed.");
-    console.log("Closing database pool...");
     try {
       // Give active queries a chance to complete gracefully
       // The pool.end() method waits for acquired clients to be returned.
       await pool.end();
-      console.log("Database pool closed successfully.");
       process.exit(0); // Exit cleanly
     } catch (error) {
       console.error("Error closing database pool:", error);

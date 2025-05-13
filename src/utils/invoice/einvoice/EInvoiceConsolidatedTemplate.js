@@ -179,7 +179,7 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>Consolidated Buyers</cbc:RegistrationName>
+        <cbc:RegistrationName>Consolidated Customers</cbc:RegistrationName>
       </cac:PartyLegalEntity>
       <cac:Contact>
         <cbc:Telephone>NA</cbc:Telephone>

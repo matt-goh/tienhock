@@ -12,6 +12,7 @@ import {
   IconBan,
   IconAlertTriangle,
   IconCircleCheck,
+  IconFiles,
 } from "@tabler/icons-react";
 import {
   formatDisplayDate,
@@ -53,14 +54,12 @@ const getInvoiceStatusStyles = (status: InvoiceStatus | undefined) => {
         border: "border-red-200",
         label: "Overdue",
       };
-    case "active":
-    case "unpaid": // Treat 'active' and 'unpaid' the same visually
     default: // Default to Unpaid style
       return {
         bg: "bg-amber-100",
         text: "text-amber-800",
         border: "border-amber-200",
-        label: status === "active" ? "Active" : "Unpaid", // Keep original label if needed
+        label: "Unpaid", // Keep original label if needed
       };
   }
 };
@@ -89,6 +88,21 @@ const getEInvoiceStatusInfo = (status: EInvoiceStatus) => {
   }
 };
 
+const getConsolidatedStatusInfo = (consolidatedInfo: any) => {
+  if (!consolidatedInfo) return null;
+
+  // Only show for valid consolidated invoices - adjust based on your requirements
+  if (consolidatedInfo.einvoice_status !== "valid") return null;
+
+  return {
+    text: "Consolidated",
+    color: "text-indigo-600",
+    border: "border-indigo-200",
+    icon: IconFiles,
+    info: consolidatedInfo,
+  };
+};
+
 const InvoiceCard: React.FC<InvoiceCardProps> = ({
   invoice,
   isSelected,
@@ -99,6 +113,10 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const invoiceStatusStyle = getInvoiceStatusStyles(invoice.invoice_status);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoice.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
+  const consolidatedStatusInfo = getConsolidatedStatusInfo(
+    invoice.consolidated_part_of
+  );
+  const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const navigate = useNavigate();
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -142,7 +160,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     >
       {/* Header - Now includes checkbox and is clickable for selection */}
       <div
-        className={`invoice-card-header flex justify-between items-center gap-3 border-b ${invoiceStatusStyle.border} ${invoiceStatusStyle.bg} -mx-4 -mt-4 px-4 py-2 rounded-t-lg cursor-pointer`} // Negative margins, re-add padding, ADD cursor-pointer
+        className={`invoice-card-header flex justify-between items-center gap-3 border-b ${invoiceStatusStyle.border} ${invoiceStatusStyle.bg} -mx-4 -mt-4 px-4 py-1.5 rounded-t-lg cursor-pointer`} // Negative margins, re-add padding, ADD cursor-pointer
         onClick={handleHeaderClick} // <-- Add header click handler
       >
         {/* Invoice ID - Takes available space */}
@@ -197,7 +215,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             {invoice.customerName || invoice.customerid}
           </span>
           <span
-            className="text-xs text-default-500 truncate hover:underline cursor-pointer"
+            className="w-fit text-xs text-default-500 truncate hover:underline cursor-pointer"
             title={invoice.salespersonid}
             onClick={(e) => {
               e.stopPropagation();
@@ -214,21 +232,68 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
       {/* Footer - Uses parent's horizontal padding */}
       <div className="flex flex-wrap gap-x-2 gap-y-1 items-center">
-        {/* Invoice Status */}
+        {/* Invoice Status - Make Unpaid and Overdue clickable */}
         <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${invoiceStatusStyle.bg} ${invoiceStatusStyle.text}`}
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            invoiceStatusStyle.bg
+          } ${invoiceStatusStyle.text} ${
+            invoiceStatusStyle.label === "Unpaid" ||
+            invoiceStatusStyle.label === "Overdue"
+              ? "cursor-pointer hover:brightness-95"
+              : ""
+          }`}
+          onClick={(e) => {
+            if (
+              invoiceStatusStyle.label === "Unpaid" ||
+              invoiceStatusStyle.label === "Overdue"
+            ) {
+              e.stopPropagation();
+              // Navigate directly to details page with payment form open
+              navigate(`/sales/invoice/${invoice.id}`, {
+                state: { showPaymentForm: true },
+              });
+            }
+          }}
         >
           {invoiceStatusStyle.label}
         </span>
         {/* E-Invoice Status */}
-        {eInvoiceStatusInfo && EInvoiceIcon && (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
-            title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+        {eInvoiceStatusInfo &&
+          EInvoiceIcon &&
+          (invoice.long_id ? (
+            <a
+              href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
+              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+            >
+              <EInvoiceIcon size={14} className="mr-1" />
+              e-Invoice
+            </a>
+          ) : (
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
+              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+            >
+              <EInvoiceIcon size={14} className="mr-1" />
+              e-Invoice
+            </span>
+          ))}
+        {/* Consolidated Status - add this */}
+        {consolidatedStatusInfo && ConsolidatedIcon && (
+          <a
+            href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${consolidatedStatusInfo.color} hover:underline`}
+            title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
           >
-            <EInvoiceIcon size={14} className="mr-1" />
-            e-Invoice
-          </span>
+            <ConsolidatedIcon size={14} className="mr-1" />
+            Consolidated
+          </a>
         )}
       </div>
     </div>

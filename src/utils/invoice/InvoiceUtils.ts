@@ -119,83 +119,66 @@ export const createInvoice = async (
 // GET Invoices (List)
 export const getInvoices = async (
   filters: InvoiceFilters,
-  page: number,
-  limit: number,
-  searchTerm: string
-): Promise<{
-  data: ExtendedInvoiceData[];
-  total: number;
-  totalPages: number;
-}> => {
+  page: number = 1,
+  limit: number = 15,
+  searchTerm: string = ""
+) => {
   try {
+    // Build query parameters
     const params = new URLSearchParams();
 
-    // Date Range
-    if (filters.dateRange.start) {
-      const startDate = new Date(filters.dateRange.start);
-      startDate.setHours(0, 0, 0, 0); // Start of the day
-      params.append("startDate", startDate.getTime().toString());
-    }
-    if (filters.dateRange.end) {
-      const endDate = new Date(filters.dateRange.end);
-      endDate.setHours(23, 59, 59, 999); // End of the day
-      params.append("endDate", endDate.getTime().toString());
-    }
-
-    // Other Filters (check backend expects comma-separated strings)
-    if (filters.applySalespersonFilter && filters.salespersonId?.length)
-      params.append("salesman", filters.salespersonId.join(","));
-    if (filters.applyPaymentTypeFilter && filters.paymentType)
-      params.append("paymentType", filters.paymentType); // CASH or INVOICE
-    if (filters.applyInvoiceStatusFilter && filters.invoiceStatus?.length)
-      params.append("invoiceStatus", filters.invoiceStatus.join(","));
-    if (filters.applyEInvoiceStatusFilter && filters.eInvoiceStatus?.length)
-      params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
-
-    // Search Term
-    if (searchTerm) params.append("search", searchTerm);
-
-    // Pagination
+    // Add pagination
     params.append("page", page.toString());
     params.append("limit", limit.toString());
 
-    const response = await api.get(`/api/invoices?${params.toString()}`);
-
-    if (!response || !response.data || !response.pagination) {
-      console.error("Invalid response format fetching invoices:", response);
-      throw new Error("Invalid response format from server");
+    // Add date range
+    if (filters.dateRange.start) {
+      params.append("startDate", filters.dateRange.start.getTime().toString());
+    }
+    if (filters.dateRange.end) {
+      params.append("endDate", filters.dateRange.end.getTime().toString());
     }
 
-    // Map backend data to frontend ExtendedInvoiceData shape
-    const mappedData = response.data.map(
-      (inv: any): ExtendedInvoiceData => ({
-        ...inv,
-        // Ensure numeric types (backend should return numbers, but safeguard here)
-        total_excluding_tax: parseFloat(inv.total_excluding_tax || 0),
-        tax_amount: parseFloat(inv.tax_amount || 0),
-        rounding: parseFloat(inv.rounding || 0),
-        totalamountpayable: parseFloat(inv.totalamountpayable || 0),
-        // Use customerName from backend if available, otherwise fallback
-        customerName: inv.customerName || inv.customerid,
-        // Ensure boolean type for is_consolidated
-        is_consolidated: Boolean(inv.is_consolidated || false),
-        // Parse consolidated_invoices if it's JSON string (backend returns JSON object)
-        consolidated_invoices: inv.consolidated_invoices, // Assuming backend sends parsed JSON array or null
-        products: [], // Assuming products are not returned in the list endpoint
-      })
-    );
+    // Add salesperson filter
+    if (filters.salespersonId && filters.salespersonId.length > 0) {
+      params.append("salesman", filters.salespersonId.join(","));
+    }
 
-    return {
-      data: mappedData,
-      total: response.pagination.total,
-      totalPages: response.pagination.totalPages,
-    };
+    // Add payment type filter
+    if (filters.paymentType) {
+      params.append("paymentType", filters.paymentType);
+    }
+
+    // Add invoice status filter
+    if (filters.invoiceStatus && filters.invoiceStatus.length > 0) {
+      params.append("invoiceStatus", filters.invoiceStatus.join(","));
+    }
+
+    // Add e-invoice status filter
+    if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+      params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
+    }
+
+    // Handle consolidation filter
+    if (filters.consolidation === "consolidated") {
+      params.append("consolidated_only", "true");
+    } else if (filters.consolidation === "individual") {
+      params.append("exclude_consolidated", "true");
+    }
+
+    // Add search term
+    if (searchTerm) {
+      params.append("search", searchTerm);
+    }
+
+    // Make the API call with all parameters
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+    const response = await api.get(`/api/invoices${queryString}`);
+
+    return response;
   } catch (error) {
     console.error("Error fetching invoices:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to fetch invoices";
-    toast.error(errorMessage);
-    throw new Error(errorMessage); // Re-throw
+    throw error;
   }
 };
 
@@ -207,17 +190,18 @@ export const cancelInvoice = async (
     // Backend DELETE /:id now handles the cancellation logic (updating status)
     const response = await api.delete(`/api/invoices/${id}`);
 
-    if (!response || !response.invoice) {
+    // Update this check to look for deletedInvoice instead of invoice
+    if (!response || (!response.invoice && !response.deletedInvoice)) {
       throw new Error("Invalid response received after cancelling invoice.");
     }
-    // The response *is* the updated (cancelled) invoice record
-    const cancelledInvoice = response.invoice;
+
+    // Use deletedInvoice if present, otherwise fall back to invoice
+    const cancelledInvoice = response.deletedInvoice || response.invoice;
 
     return {
       ...cancelledInvoice,
       // Ensure correct types and add UIDs for products from the *cancelled* record if available
-      // If backend doesn't return products on cancel, we might need to fetch them separately or use existing state
-      products: ensureProductsHaveUid(cancelledInvoice.products || []), // Assuming products might be returned
+      products: ensureProductsHaveUid(cancelledInvoice.products || []),
       customerName:
         cancelledInvoice.customerName || cancelledInvoice.customerid,
     };
@@ -263,6 +247,44 @@ export const getInvoiceById = async (
   }
 };
 
+// GET Multiple Invoices By IDs (batch fetch)
+export const getInvoicesByIds = async (
+  ids: string[]
+): Promise<ExtendedInvoiceData[]> => {
+  try {
+    if (!ids.length) return [];
+
+    // Create URL-safe parameter string (comma-separated IDs)
+    const idsParam = ids.join(",");
+
+    // Use a new backend endpoint that can handle multiple IDs
+    const response = await api.get(`/api/invoices/batch?ids=${idsParam}`);
+
+    if (!response || !Array.isArray(response)) {
+      throw new Error("Invalid response format from batch invoice endpoint");
+    }
+
+    // Map backend data to frontend ExtendedInvoiceData shape
+    return response.map((inv) => ({
+      ...inv,
+      total_excluding_tax: parseFloat(inv.total_excluding_tax || 0),
+      tax_amount: parseFloat(inv.tax_amount || 0),
+      rounding: parseFloat(inv.rounding || 0),
+      totalamountpayable: parseFloat(inv.totalamountpayable || 0),
+      products: ensureProductsHaveUid(inv.products),
+      customerName: inv.customerName || inv.customerid,
+      is_consolidated: Boolean(inv.is_consolidated || false),
+      consolidated_invoices: inv.consolidated_invoices,
+    }));
+  } catch (error) {
+    console.error(`Error batch fetching invoices:`, error);
+    const errorMessage =
+      error instanceof Error ? error.message : `Failed to fetch invoices`;
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
 // Check Duplicate Invoice Number (No changes needed if endpoint is same)
 export const checkDuplicateInvoiceNo = async (
   invoiceNo: string
@@ -285,6 +307,22 @@ export const checkDuplicateInvoiceNo = async (
       return false;
     }
     return false; // Err on the side of caution and let the server validate
+  }
+};
+
+// Sync cancellation status for an e-invoice
+export const syncCancellationStatus = async (invoiceId: string) => {
+  try {
+    const response = await api.post(
+      `/api/einvoice/cancelled/${invoiceId}/sync`
+    );
+    return response;
+  } catch (error) {
+    console.error(
+      `Error syncing cancellation status for invoice ${invoiceId}:`,
+      error
+    );
+    throw error;
   }
 };
 

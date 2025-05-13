@@ -7,7 +7,7 @@ import {
   ComboboxOption,
   Transition,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconArrowDown } from "@tabler/icons-react";
 import { useState, useEffect, Fragment } from "react";
 import clsx from "clsx";
 
@@ -109,7 +109,9 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                 disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
               )}
               // Display value based on the internal selectedOption state
-              displayValue={(option: SelectOption | null) => option?.name ?? ""}
+              displayValue={(option: SelectOption | null) =>
+                option ? `${option.name} (${option.id})` : ""
+              }
               onChange={(event) => setQuery(event.target.value)} // Update parent query state on input change
               placeholder={placeholder}
               disabled={disabled}
@@ -136,7 +138,6 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
             }}
           >
             <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-              {/* ... (Loading and No results logic remains the same) ... */}
               {isLoading && query !== "" && (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
                   Loading...
@@ -164,7 +165,8 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          {option.name}
+                          {option.name}{" "}
+                          <span className="text-gray-500">({option.id})</span>
                         </span>
                         {selected ? (
                           <span
@@ -180,16 +182,17 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                   </ComboboxOption>
                 ))
               )}
-              {/* Load More Button */}
+              {/* Load More Button - Prettier Version */}
               {!isLoading && hasMore && (
-                <div className="border-t border-gray-200 px-4 py-2">
+                <div className="border-t border-gray-200 p-2">
                   <button
                     type="button"
                     onClick={onLoadMore}
-                    className="w-full text-center text-sm text-sky-600 hover:text-sky-700 disabled:opacity-50"
+                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
                     disabled={isLoading}
                   >
-                    Load More...
+                    <IconArrowDown size={16} className="mr-1.5" />
+                    <span>Load More Customers</span>
                   </button>
                 </div>
               )}

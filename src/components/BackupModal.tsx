@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Description,
   Dialog,
   DialogPanel,
   DialogTitle,
