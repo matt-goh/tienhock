@@ -312,7 +312,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {groupedItems.Base.map((item, index) => (
           <View key={`base-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
-              <Text>{item.description}</Text>
+              <View style={{ height: 12, overflow: "hidden" }}>
+                <Text>{item.description}</Text>
+              </View>
             </View>
             <View style={[styles.tableCol, styles.rateCol]}>
               <Text>{item.rate.toFixed(2)}</Text>
@@ -342,7 +344,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {groupedItems.Tambahan.map((item, index) => (
           <View key={`tambahan-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
-              <Text>{item.description}</Text>
+              <View style={{ height: 12, overflow: "hidden" }}>
+                <Text>{item.description}</Text>
+              </View>
             </View>
             <View style={[styles.tableCol, styles.rateCol]}>
               <Text>{item.rate.toFixed(2)}</Text>
@@ -366,7 +370,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {groupedItems.Overtime.map((item, index) => (
           <View key={`ot-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
-              <Text>{item.description}</Text>
+              <View style={{ height: 12, overflow: "hidden" }}>
+                <Text>{item.description}</Text>
+              </View>
             </View>
             <View style={[styles.tableCol, styles.rateCol]}>
               <Text>{item.rate.toFixed(2)}</Text>
