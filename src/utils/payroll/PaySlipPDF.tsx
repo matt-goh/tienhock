@@ -67,12 +67,7 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: "row",
-    minHeight: 16,
-  },
-  firstTableRow: {
-    flexDirection: "row",
-    minHeight: 16,
-    paddingTop: 2, // Add top padding for first row
+    minHeight: 12,
   },
   tableColHeader: {
     borderRightWidth: 1,
@@ -83,6 +78,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#000",
     paddingHorizontal: 5,
+    paddingVertical: 3,
     fontSize: 8,
   },
   descriptionCol: {
@@ -207,7 +203,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const roundedFinalPayment = Math.round(finalPayment * 100) / 100; // Round to 2 decimal places
 
   // Track if we've already shown "JAM" for hour-based pay codes
-  let hasShownJamLabel = false;
+  const jamLabelBaseRef = React.useRef(false);
+  const jamLabelTambahanRef = React.useRef(false);
+  const jamLabelOTRef = React.useRef(false);
 
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
@@ -218,24 +216,28 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   };
 
   // Helper function to format description based on rate unit
-  const formatDescription = (item: any) => {
+  const formatDescription = (
+    item: any,
+    isOT: boolean = false,
+    flagRef: { current: boolean }
+  ) => {
     switch (item.rate_unit) {
       case "Hour":
-        if (!hasShownJamLabel) {
-          hasShownJamLabel = true;
-          return `${item.quantity.toFixed(2)} Jam`;
+        if (!flagRef.current) {
+          flagRef.current = true;
+          return `${item.quantity.toFixed(2)} Jam${isOT ? " OT" : ""}`;
         }
-        return item.quantity.toFixed(2);
+        return "";
       case "Bag":
-        return `${item.quantity.toFixed(0)} Bags`;
+        return `${item.quantity.toFixed(0)} Bag`;
       case "Trip":
         return `${item.quantity.toFixed(0)} Trip${
           item.quantity > 1 ? "s" : ""
         }`;
       case "Day":
-        return `${item.quantity.toFixed(0)} DAY${item.quantity > 1 ? "s" : ""}`;
+        return `${item.quantity.toFixed(0)} Day${item.quantity > 1 ? "s" : ""}`;
       case "Fixed":
-        return monthName; // Display the month for fixed rates
+        return monthName;
       default:
         return "";
     }
@@ -312,10 +314,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Base Pay Items */}
         {groupedItems.Base.map((item, index) => (
-          <View
-            key={`base-${index}`}
-            style={index === 0 ? styles.firstTableRow : styles.tableRow}
-          >
+          <View key={`base-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
                 <Text>{item.description}</Text>
@@ -325,7 +324,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text>{item.rate.toFixed(2)}</Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{formatDescription(item)}</Text>
+              <Text>{formatDescription(item, false, jamLabelBaseRef)}</Text>
             </View>
             <View
               style={[
@@ -341,10 +340,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Tambahan Pay Items */}
         {groupedItems.Tambahan.map((item, index) => (
-          <View
-            key={`tambahan-${index}`}
-            style={styles.tableRow}
-          >
+          <View key={`tambahan-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
                 <Text>{item.description}</Text>
@@ -354,7 +350,11 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text>{item.rate.toFixed(2)}</Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{item.is_manual ? "MANUAL" : formatDescription(item)}</Text>
+              <Text>
+                {item.is_manual && item.rate_unit !== "Hour"
+                  ? "Manual"
+                  : formatDescription(item, false, jamLabelTambahanRef)}
+              </Text>
             </View>
             <View
               style={[
@@ -370,10 +370,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Overtime Pay Items */}
         {groupedItems.Overtime.map((item, index) => (
-          <View
-            key={`ot-${index}`}
-            style={styles.tableRow}
-          >
+          <View key={`ot-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
                 <Text>{item.description}</Text>
@@ -383,11 +380,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text>{item.rate.toFixed(2)}</Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>
-                {item.rate_unit === "Hour"
-                  ? formatDescription(item) + " Jam OT"
-                  : formatDescription(item)}
-              </Text>
+              <Text>{formatDescription(item, true, jamLabelOTRef)}</Text>
             </View>
             <View
               style={[
