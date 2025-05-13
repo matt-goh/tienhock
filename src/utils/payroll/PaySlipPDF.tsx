@@ -7,15 +7,15 @@ import { groupItemsByType, getMonthName } from "./payrollUtils";
 // Create styles
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    padding: 20,
     fontFamily: "Helvetica",
-    fontSize: 10,
+    fontSize: 9,
     lineHeight: 1.3,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 5,
   },
   companySection: {
     flex: 1,
@@ -27,30 +27,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   employeeInfoTable: {
-    marginTop: 10,
+    marginTop: 5,
   },
   employeeInfoRow: {
     flexDirection: "row",
     marginBottom: 3,
   },
   employeeInfoLabel: {
-    width: 50,
-    fontSize: 9,
-    fontWeight: "bold",
+    width: 55,
   },
   employeeInfoColon: {
     width: 10,
-    fontSize: 9,
   },
   employeeInfoValue: {
     flex: 1,
-    fontSize: 9,
-    fontWeight: "medium",
   },
   payslipTitle: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: "center",
     backgroundColor: "#f0f0f0",
     padding: 8,
