@@ -287,7 +287,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {/* Table Header */}
         <View style={styles.tableHeaderRow}>
           <View style={[styles.tableColHeader, styles.descriptionCol]}>
-            <Text>Pay Code</Text>
+            <Text>Kerja</Text>
           </View>
           <View style={[styles.tableColHeader, styles.rateCol]}>
             <Text>Rate</Text>
