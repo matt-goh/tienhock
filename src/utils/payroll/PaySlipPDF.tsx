@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   payslipTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
     marginBottom: 10,
     textAlign: "center",
@@ -67,17 +67,12 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: "row",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#000",
     minHeight: 16,
   },
   tableColHeader: {
     borderRightWidth: 1,
     borderRightColor: "#000",
     paddingHorizontal: 5,
-    paddingVertical: 3,
-    fontSize: 9,
-    fontWeight: "bold",
   },
   tableCol: {
     borderRightWidth: 1,
@@ -100,30 +95,6 @@ const styles = StyleSheet.create({
   amountCol: {
     flex: 1,
     textAlign: "right",
-  },
-  totalsRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#000",
-    minHeight: 20,
-  },
-  totalsLabel: {
-    flex: 5.5,
-    textAlign: "right",
-    paddingRight: 10,
-    paddingVertical: 3,
-    fontSize: 9,
-    fontWeight: "bold",
-  },
-  totalsAmount: {
-    flex: 1,
-    borderLeftWidth: 1,
-    borderLeftColor: "#000",
-    textAlign: "right",
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    fontSize: 9,
-    fontWeight: "bold",
   },
   paymentsSection: {
     marginTop: 10,
@@ -289,13 +260,13 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {/* Table Header */}
         <View style={styles.tableHeaderRow}>
           <View style={[styles.tableColHeader, styles.descriptionCol]}>
-            <Text></Text>
+            <Text>Pay Code</Text>
           </View>
           <View style={[styles.tableColHeader, styles.rateCol]}>
-            <Text>RATE</Text>
+            <Text>Rate</Text>
           </View>
           <View style={[styles.tableColHeader, styles.descriptionNoteCol]}>
-            <Text>DESCRIPTION</Text>
+            <Text>Description</Text>
           </View>
           <View
             style={[
@@ -304,7 +275,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               { borderRightWidth: 0 },
             ]}
           >
-            <Text>AMOUNT</Text>
+            <Text>Amount</Text>
           </View>
         </View>
 
@@ -429,48 +400,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             </View>
           </View>
         ))}
-
-        {/* Rate/JAM Summary */}
-        <View style={styles.tableRow}>
-          <View style={[styles.tableCol, { flex: 5 }]}>
-            <Text></Text>
-          </View>
-          <View style={[styles.tableCol, styles.summaryCol, { flex: 1.5 }]}>
-            <Text>RATE/JAM:</Text>
-          </View>
-          <View
-            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
-          >
-            <Text>
-              {(
-                payroll.gross_pay /
-                (payroll.items && Array.isArray(payroll.items)
-                  ? payroll.items.reduce(
-                      (sum, item) =>
-                        sum +
-                        (item?.rate_unit === "Hour" ? item?.quantity || 0 : 0),
-                      0
-                    )
-                  : 1 || 1)
-              ).toFixed(2)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Gross Pay */}
-        <View style={styles.totalsRow}>
-          <View style={[styles.tableCol, { flex: 5 }]}>
-            <Text></Text>
-          </View>
-          <View style={[styles.tableCol, styles.summaryCol, { flex: 1.5 }]}>
-            <Text>JUMLAH GAJI KASAR =</Text>
-          </View>
-          <View
-            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
-          >
-            <Text>{formatCurrency(payroll.gross_pay)}</Text>
-          </View>
-        </View>
       </View>
 
       {/* Deductions Section */}
