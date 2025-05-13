@@ -321,7 +321,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Tambahan Pay Items */}
         {groupedItems.Tambahan.map((item, index) => (
-          <View key={`tambahan-${index}`} style={styles.tableRow}>
+          <View
+            key={`tambahan-${index}`}
+            style={index === 0 ? styles.firstTableRow : styles.tableRow}
+          >
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
                 <Text>{item.description}</Text>
@@ -347,7 +350,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Overtime Pay Items */}
         {groupedItems.Overtime.map((item, index) => (
-          <View key={`ot-${index}`} style={styles.tableRow}>
+          <View
+            key={`ot-${index}`}
+            style={index === 0 ? styles.firstTableRow : styles.tableRow}
+          >
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
                 <Text>{item.description}</Text>
