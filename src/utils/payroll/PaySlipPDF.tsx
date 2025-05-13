@@ -43,13 +43,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   payslipTitle: {
-    fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 10,
-    textAlign: "center",
-    backgroundColor: "#f0f0f0",
-    padding: 8,
-    borderRadius: 4,
+    marginBottom: 4,
   },
   table: {
     display: "flex",
@@ -67,7 +62,6 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: "row",
-    minHeight: 12,
   },
   tableColHeader: {
     borderRightWidth: 1,
@@ -78,7 +72,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#000",
     paddingHorizontal: 5,
-    paddingVertical: 3,
+    paddingTop: 2,
     fontSize: 8,
   },
   descriptionCol: {
