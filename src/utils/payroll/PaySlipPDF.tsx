@@ -83,7 +83,6 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#000",
     paddingHorizontal: 5,
-    paddingVertical: 2,
     fontSize: 8,
   },
   descriptionCol: {
@@ -170,14 +169,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// Helper function to format currency
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-};
-
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
@@ -214,6 +205,41 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   // Final payment
   const finalPayment = payroll.net_pay - firstPayment;
   const roundedFinalPayment = Math.round(finalPayment * 100) / 100; // Round to 2 decimal places
+
+  // Track if we've already shown "JAM" for hour-based pay codes
+  let hasShownJamLabel = false;
+
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-MY", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  // Helper function to format description based on rate unit
+  const formatDescription = (item: any) => {
+    switch (item.rate_unit) {
+      case "Hour":
+        if (!hasShownJamLabel) {
+          hasShownJamLabel = true;
+          return `${item.quantity.toFixed(2)} Jam`;
+        }
+        return item.quantity.toFixed(2);
+      case "Bag":
+        return `${item.quantity.toFixed(0)} Bags`;
+      case "Trip":
+        return `${item.quantity.toFixed(0)} Trip${
+          item.quantity > 1 ? "s" : ""
+        }`;
+      case "Day":
+        return `${item.quantity.toFixed(0)} DAY${item.quantity > 1 ? "s" : ""}`;
+      case "Fixed":
+        return monthName; // Display the month for fixed rates
+      default:
+        return "";
+    }
+  };
 
   return (
     <Page size="A4" style={styles.page}>
@@ -299,13 +325,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text>{item.rate.toFixed(2)}</Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>
-                {item.rate_unit === "Hour"
-                  ? `${item.quantity.toFixed(2)}/JAM`
-                  : item.rate_unit === "Bag"
-                  ? `${item.quantity.toFixed(0)}/KARUNG`
-                  : ""}
-              </Text>
+              <Text>{formatDescription(item)}</Text>
             </View>
             <View
               style={[
@@ -323,7 +343,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {groupedItems.Tambahan.map((item, index) => (
           <View
             key={`tambahan-${index}`}
-            style={index === 0 ? styles.firstTableRow : styles.tableRow}
+            style={styles.tableRow}
           >
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
@@ -334,7 +354,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text>{item.rate.toFixed(2)}</Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{item.is_manual ? "MANUAL" : ""}</Text>
+              <Text>{item.is_manual ? "MANUAL" : formatDescription(item)}</Text>
             </View>
             <View
               style={[
@@ -352,7 +372,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {groupedItems.Overtime.map((item, index) => (
           <View
             key={`ot-${index}`}
-            style={index === 0 ? styles.firstTableRow : styles.tableRow}
+            style={styles.tableRow}
           >
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
@@ -365,8 +385,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
               <Text>
                 {item.rate_unit === "Hour"
-                  ? `${item.quantity.toFixed(2)}/JAM/OT`
-                  : ""}
+                  ? formatDescription(item) + " Jam OT"
+                  : formatDescription(item)}
               </Text>
             </View>
             <View
