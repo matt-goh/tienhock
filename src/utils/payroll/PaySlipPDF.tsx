@@ -69,6 +69,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     minHeight: 16,
   },
+  firstTableRow: {
+    flexDirection: "row",
+    minHeight: 16,
+    paddingTop: 2, // Add top padding for first row
+  },
   tableColHeader: {
     borderRightWidth: 1,
     borderRightColor: "#000",
@@ -281,7 +286,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Base Pay Items */}
         {groupedItems.Base.map((item, index) => (
-          <View key={`base-${index}`} style={styles.tableRow}>
+          <View
+            key={`base-${index}`}
+            style={index === 0 ? styles.firstTableRow : styles.tableRow}
+          >
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
                 <Text>{item.description}</Text>
@@ -363,40 +371,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               ]}
             >
               <Text>{formatCurrency(item.amount)}</Text>
-            </View>
-          </View>
-        ))}
-
-        {/* Empty rows to match traditional payslips */}
-        {[
-          ...Array(
-            Math.max(
-              0,
-              15 -
-                groupedItems.Base.length -
-                groupedItems.Tambahan.length -
-                groupedItems.Overtime.length
-            )
-          ),
-        ].map((_, index) => (
-          <View key={`empty-${index}`} style={styles.tableRow}>
-            <View style={[styles.tableCol, styles.descriptionCol]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, styles.rateCol]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text></Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                styles.amountCol,
-                { borderRightWidth: 0 },
-              ]}
-            >
-              <Text></Text>
             </View>
           </View>
         ))}
