@@ -109,7 +109,7 @@ class GTEInvoiceSubmissionHandler {
   async pollSubmissionStatus(submissionUid) {
     let attempts = 0;
     let lastResponse = null;
-
+    await this.wait(300); // Add 0.3 second delay before starting the first polling
     while (attempts < this.MAX_POLLING_ATTEMPTS) {
       try {
         const response = await this.apiClient.makeApiCall(
@@ -134,9 +134,6 @@ class GTEInvoiceSubmissionHandler {
           // If document is in "Submitted" state for consecutive polls,
           // consider it a success (the API may take longer to fully validate)
           if (allDocumentsSubmitted && attempts > 8) {
-            console.log(
-              "Document is in Submitted state, considering successful"
-            );
             return {
               ...response,
               overallStatus: "Valid", // Override to avoid timeout error
@@ -160,9 +157,6 @@ class GTEInvoiceSubmissionHandler {
       lastResponse.documentSummary &&
       lastResponse.documentSummary.length > 0
     ) {
-      console.log(
-        "Polling timed out, but document was processed. Returning last status."
-      );
       return {
         ...lastResponse,
         overallStatus: "Valid",
@@ -171,7 +165,7 @@ class GTEInvoiceSubmissionHandler {
     }
 
     throw new Error(
-      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts`
+      `Polling timed out after ${this.MAX_POLLING_ATTEMPTS} attempts, Please check the submission status manually or try again later.`
     );
   }
 

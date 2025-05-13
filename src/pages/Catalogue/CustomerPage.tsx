@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { CustomerList, Employee } from "../../types/types";
+import { Customer } from "../../types/types";
 import {
   IconSearch,
   IconChevronLeft,
@@ -22,12 +22,14 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import {
+  EnhancedCustomerList,
   refreshCustomersCache,
   useCustomersCache,
 } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 20;
 
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
@@ -38,11 +40,11 @@ const CustomerPage: React.FC = () => {
   const [selectedSalesman, setSelectedSalesman] =
     useState<string>("All Salesmen");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [customerToDelete, setCustomerToDelete] = useState<CustomerList | null>(
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
-  const { salesmen: salesmenData, isLoading: salesmenLoading } =
-    useSalesmanCache();
+  const { salesmen: salesmenData } = useSalesmanCache();
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
 
   useEffect(() => {
     if (salesmenData.length > 0) {
@@ -51,7 +53,7 @@ const CustomerPage: React.FC = () => {
     }
   }, [salesmenData]);
 
-  const handleDeleteClick = (customer: CustomerList) => {
+  const handleDeleteClick = (customer: Customer) => {
     setCustomerToDelete(customer);
     setIsDeleteDialogOpen(true);
   };
@@ -266,7 +268,7 @@ const CustomerPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-20">
+    <div className="relative w-full mx-20 -mt-8 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-6">
           <h1 className="text-2xl text-default-700 font-bold">
@@ -286,12 +288,24 @@ const CustomerPage: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                onClick={() => setSearchTerm("")}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
           {renderSalesmanListbox()}
+          <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
+            Branch
+          </Button>
           <Button
             onClick={() => navigate("/catalogue/customer/new")}
             icon={IconPlus}
-            variant="outline"
+            color="sky"
           >
             Add Customer
           </Button>
@@ -304,11 +318,12 @@ const CustomerPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {paginatedCustomers.map((customer: CustomerList) => (
+          {paginatedCustomers.map((customer: EnhancedCustomerList) => (
             <CustomerCard
               key={customer.id}
               customer={customer}
               onDeleteClick={handleDeleteClick}
+              branchInfo={customer.branchInfo}
             />
           ))}
         </div>
@@ -341,6 +356,10 @@ const CustomerPage: React.FC = () => {
         title="Delete Customer"
         message={`Are you sure you want to remove ${customerToDelete?.name} from the customer list? This action cannot be undone.`}
         confirmButtonText="Delete"
+      />
+      <BranchLinkageModal
+        isOpen={isBranchModalOpen}
+        onClose={() => setIsBranchModalOpen(false)}
       />
     </div>
   );

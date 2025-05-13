@@ -1,12 +1,20 @@
+// src/components/Tab.tsx
 import React, { useState } from "react";
 
 interface TabProps {
   children: React.ReactElement[];
   labels: string[];
+  tabWidth?: string;
+  defaultActiveTab?: number;
 }
 
-const Tab: React.FC<TabProps> = ({ children, labels }) => {
-  const [activeTab, setActiveTab] = useState(0);
+const Tab: React.FC<TabProps> = ({
+  children,
+  labels,
+  tabWidth = "w-[8rem]",
+  defaultActiveTab = 0, // Default to first tab if not specified
+}) => {
+  const [activeTab, setActiveTab] = useState(defaultActiveTab);
 
   return (
     <div className="w-full">
@@ -17,7 +25,7 @@ const Tab: React.FC<TabProps> = ({ children, labels }) => {
           <button
             key={index}
             type="button"
-            className={`px-4 py-2 my-1 text-sm font-medium transition-all duration-200 w-[8rem] ${
+            className={`px-4 py-2 my-1 text-center text-sm font-medium transition-all duration-200 ${tabWidth} ${
               index === activeTab
                 ? "bg-white rounded-lg"
                 : "text-default-700 hover:text-default-800"

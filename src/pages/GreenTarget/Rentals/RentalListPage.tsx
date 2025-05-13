@@ -141,7 +141,7 @@ const RentalCard = ({
             <div className="w-full">
               <div className="w-full">
                 <h3
-                  className="font-semibold text-default-900 truncate cursor-pointer hover:underline max-w-[60%]"
+                  className="font-semibold text-default-900 truncate cursor-pointer hover:underline w-fit"
                   title={rental.customer_name}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -282,7 +282,8 @@ const RentalCard = ({
 
           {/* Show "View Invoice" or "Create Invoice" based on invoice status */}
           {rental?.invoice_info?.status === "active" ||
-          rental?.invoice_info?.status === "overdue" ? (
+          rental?.invoice_info?.status === "overdue" ||
+          rental?.invoice_info?.status === "paid" ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -635,7 +636,7 @@ const RentalListPage = () => {
   }
 
   return (
-    <div className="relative w-full mx-20">
+    <div className="relative w-full mx-20 -mt-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl text-default-700 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
           Rentals ({filteredRentals.length})

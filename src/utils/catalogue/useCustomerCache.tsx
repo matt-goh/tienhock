@@ -1,11 +1,22 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { CustomerList } from "../../types/types";
+import { Customer, CustomProduct } from "../../types/types";
 
 interface CachedCustomers {
-  data: CustomerList[];
+  data: EnhancedCustomerList[];
   timestamp: number;
+}
+
+export interface EnhancedCustomerList extends Customer {
+  customProducts?: CustomProduct[];
+  branchInfo?: {
+    isInBranchGroup: boolean;
+    isMainBranch: boolean;
+    groupName?: string;
+    groupId?: number;
+    branches?: { id: string; name: string; isMain: boolean }[];
+  };
 }
 
 const CACHE_KEY = "customers_cache";
@@ -17,32 +28,34 @@ export const refreshCustomersCache = async () => {
   try {
     // Remove the current cache
     localStorage.removeItem(CACHE_KEY);
-    
+
     // Fetch new data
     const data = await api.get("/api/customers");
-    
+
     // Store in cache
     const cacheData = {
       data,
       timestamp: Date.now(),
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-    
+
     // Dispatch event to notify subscribers
-    window.dispatchEvent(new CustomEvent(CUSTOMERS_UPDATED_EVENT, { detail: data }));
+    window.dispatchEvent(
+      new CustomEvent(CUSTOMERS_UPDATED_EVENT, { detail: data })
+    );
   } catch (error) {
     console.error("Error refreshing customers cache:", error);
   }
 };
 
 // Expose this to make it globally available
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   // @ts-ignore
   window.refreshCustomersCache = refreshCustomersCache;
 }
 
 export const useCustomersCache = () => {
-  const [customers, setCustomers] = useState<CustomerList[]>([]);
+  const [customers, setCustomers] = useState<EnhancedCustomerList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -81,9 +94,11 @@ export const useCustomersCache = () => {
       return data;
     } catch (error) {
       console.error("Error fetching customers:", error);
-      const err = error instanceof Error ? error : new Error("Failed to fetch customers");
+      const err =
+        error instanceof Error ? error : new Error("Failed to fetch customers");
       setError(err);
-      if (!forceRefresh) { // Only show toast for initial loads, not background refreshes
+      if (!forceRefresh) {
+        // Only show toast for initial loads, not background refreshes
         toast.error("Error fetching customers");
       }
       throw err;
@@ -109,10 +124,16 @@ export const useCustomersCache = () => {
       }
     };
 
-    window.addEventListener(CUSTOMERS_UPDATED_EVENT, handleCustomersUpdated as EventListener);
+    window.addEventListener(
+      CUSTOMERS_UPDATED_EVENT,
+      handleCustomersUpdated as EventListener
+    );
 
     return () => {
-      window.removeEventListener(CUSTOMERS_UPDATED_EVENT, handleCustomersUpdated as EventListener);
+      window.removeEventListener(
+        CUSTOMERS_UPDATED_EVENT,
+        handleCustomersUpdated as EventListener
+      );
     };
   }, []);
 

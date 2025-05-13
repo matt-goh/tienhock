@@ -7,11 +7,6 @@ import {
   CACHE_KEYS,
   CACHE_EXPIRY,
 } from "../../utils/greenTarget/cacheUtils";
-import {
-  MYINVOIS_API_BASE_URL,
-  MYINVOIS_GT_CLIENT_ID,
-  MYINVOIS_GT_CLIENT_SECRET,
-} from "../../configs/config.js";
 
 export const greenTargetApi = {
   // Customer endpoints
@@ -70,27 +65,54 @@ export const greenTargetApi = {
     api.get(`/greentarget/api/rentals/${rentalId}/do`),
 
   // Invoice endpoints
-  getInvoices: () => api.get("/greentarget/api/invoices"),
+  getInvoices: (
+    filters: {
+      customer_id?: string | number;
+      start_date?: string;
+      end_date?: string;
+      status?: string;
+    } = {}
+  ) => {
+    // Build query string from filters
+    const queryParams = new URLSearchParams();
+
+    if (filters.customer_id) {
+      queryParams.append("customer_id", filters.customer_id.toString());
+    }
+
+    if (filters.start_date) {
+      queryParams.append("start_date", filters.start_date);
+    }
+
+    if (filters.end_date) {
+      queryParams.append("end_date", filters.end_date);
+    }
+
+    if (filters.status) {
+      queryParams.append("status", filters.status);
+    }
+
+    const queryString = queryParams.toString();
+    return api.get(
+      `/greentarget/api/invoices${queryString ? `?${queryString}` : ""}`
+    );
+  },
   getInvoice: (id: any) => api.get(`/greentarget/api/invoices/${id}`),
+  getBatchInvoices: (ids: number[]) => {
+    if (!ids || ids.length === 0) return Promise.resolve([]);
+    return api.get(`/greentarget/api/invoices/batch?ids=${ids.join(",")}`);
+  },
   createInvoice: (data: any) => api.post("/greentarget/api/invoices", data),
   updateInvoice: (id: any, data: any) =>
     api.put(`/greentarget/api/invoices/${id}`, data),
   cancelInvoice: (id: number, reason?: string) =>
     api.put(`/greentarget/api/invoices/${id}/cancel`, { reason }),
-  deleteInvoice: (id: any) => api.delete(`/greentarget/api/invoices/${id}`),
 
   // e-Invoice endpoints
   submitEInvoice: async (invoiceId: number) => {
     try {
       const response = await api.post(
-        `/greentarget/api/einvoice/submit/${invoiceId}`,
-        {
-          clientConfig: {
-            MYINVOIS_API_BASE_URL,
-            MYINVOIS_GT_CLIENT_ID,
-            MYINVOIS_GT_CLIENT_SECRET,
-          },
-        }
+        `/greentarget/api/einvoice/submit/${invoiceId}`
       );
       return response;
     } catch (error) {
@@ -98,20 +120,38 @@ export const greenTargetApi = {
       throw error;
     }
   },
-
-  getEInvoiceStatus: (uuid: string) =>
-    api.get(`/greentarget/api/einvoice/status/${uuid}`),
-
-  checkEInvoiceForInvoice: (invoiceId: number) =>
-    api.get(`/greentarget/api/einvoice/check/${invoiceId}`),
+  checkEInvoiceStatus: (invoiceId: number) =>
+    api.put(`/greentarget/api/einvoice/${invoiceId}/check-einvoice-status`),
+  syncEInvoiceCancellation: (invoiceId: number) =>
+    api.put(`/greentarget/api/einvoice/${invoiceId}/sync-cancellation`),
 
   // Payment endpoints
-  getPayments: (includeCancelled = false) =>
-    api.get(
-      `/greentarget/api/payments${
-        includeCancelled ? "?include_cancelled=true" : ""
-      }`
-    ),
+  getPayments: (
+    options: {
+      invoice_id?: string | number;
+      includeCancelled?: boolean;
+      customer_id?: string | number;
+    } = {}
+  ) => {
+    const queryParams = new URLSearchParams();
+
+    if (options.invoice_id) {
+      queryParams.append("invoice_id", options.invoice_id.toString());
+    }
+
+    if (options.includeCancelled) {
+      queryParams.append("include_cancelled", "true");
+    }
+
+    if (options.customer_id) {
+      queryParams.append("customer_id", options.customer_id.toString());
+    }
+
+    const queryString = queryParams.toString();
+    return api.get(
+      `/greentarget/api/payments${queryString ? `?${queryString}` : ""}`
+    );
+  },
   getPaymentsByInvoice: (invoiceId: any, includeCancelled = false) =>
     api.get(
       `/greentarget/api/invoices/${invoiceId}/payments${

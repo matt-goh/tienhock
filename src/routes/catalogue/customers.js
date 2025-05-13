@@ -4,28 +4,158 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Get customers infos for front page display
+  // After updating the customer, sync e-Invoice fields to all branch customers
+  const syncEInvoiceFields = async (
+    clientObj,
+    customerId,
+    tinNumber,
+    idNumber,
+    idType
+  ) => {
+    // Find all branch relationships
+    const branchQuery = `
+    SELECT cbg.id AS group_id, cm.customer_id
+    FROM customer_branch_mappings cm
+    JOIN customer_branch_groups cbg ON cm.group_id = cbg.id
+    WHERE EXISTS (
+      SELECT 1 FROM customer_branch_mappings 
+      WHERE group_id = cbg.id AND customer_id = $1
+    ) AND cm.customer_id != $1  
+  `;
+
+    const branchResult = await clientObj.query(branchQuery, [customerId]);
+
+    if (branchResult.rows.length > 0) {
+      // Update e-Invoice info for all related branches
+      const updateQuery = `
+      UPDATE customers 
+      SET tin_number = $1, id_number = $2, id_type = $3
+      WHERE id = $4
+    `;
+
+      for (const row of branchResult.rows) {
+        await clientObj.query(updateQuery, [
+          tinNumber,
+          idNumber,
+          idType,
+          row.customer_id,
+        ]);
+      }
+    }
+  };
+
+  // Get all customers with products and branch info
   router.get("/", async (req, res) => {
+    const client = await pool.connect();
+
     try {
-      const query = `
+      await client.query("BEGIN");
+
+      // 1. Get all customers
+      const customersQuery = "SELECT * FROM customers ORDER BY name";
+      const customersResult = await client.query(customersQuery);
+      const customers = customersResult.rows;
+
+      // 2. Get all customer products in one query
+      const productsQuery = `
         SELECT 
-          id,
-          name,
-          salesman,
-          phone_number,
-          tin_number,
-          id_number
-        FROM customers 
-        ORDER BY name
+          cp.customer_id,
+          cp.product_id,
+          cp.custom_price,
+          cp.is_available,
+          p.description
+        FROM customer_products cp
+        JOIN products p ON cp.product_id = p.id
       `;
-      const result = await pool.query(query);
-      res.json(result.rows);
+      const productsResult = await client.query(productsQuery);
+
+      // Group products by customer_id
+      const productsByCustomer = {};
+      productsResult.rows.forEach((product) => {
+        if (!productsByCustomer[product.customer_id]) {
+          productsByCustomer[product.customer_id] = [];
+        }
+        productsByCustomer[product.customer_id].push({
+          ...product,
+          uid: crypto.randomUUID(),
+          custom_price:
+            product.custom_price !== null ? Number(product.custom_price) : 0,
+        });
+      });
+
+      // 3. Get all branch group mappings
+      const branchQuery = `
+        SELECT 
+          cbg.id AS group_id,
+          cbg.group_name,
+          cbm.customer_id,
+          cbm.is_main_branch
+        FROM customer_branch_mappings cbm
+        JOIN customer_branch_groups cbg ON cbm.group_id = cbg.id
+      `;
+      const branchResult = await client.query(branchQuery);
+
+      // Group branch info by customer
+      const branchesByGroup = {};
+      const branchInfoByCustomer = {};
+
+      // First, organize branches by group
+      branchResult.rows.forEach((branch) => {
+        if (!branchesByGroup[branch.group_id]) {
+          branchesByGroup[branch.group_id] = {
+            id: branch.group_id,
+            name: branch.group_name,
+            branches: [],
+          };
+        }
+
+        branchesByGroup[branch.group_id].branches.push({
+          id: branch.customer_id,
+          isMain: branch.is_main_branch,
+        });
+      });
+
+      // Then build customer branch info
+      branchResult.rows.forEach((branch) => {
+        const groupId = branch.group_id;
+        const groupInfo = branchesByGroup[groupId];
+        const customerBranches = groupInfo.branches.map((b) => ({
+          id: b.id,
+          name: customers.find((c) => c.id === b.id)?.name || b.id,
+          isMain: b.isMain,
+        }));
+
+        branchInfoByCustomer[branch.customer_id] = {
+          isInBranchGroup: true,
+          isMainBranch: branch.is_main_branch,
+          groupName: branch.group_name,
+          groupId: branch.group_id,
+          branches: customerBranches,
+        };
+      });
+
+      // 4. Combine all data
+      const enhancedCustomers = customers.map((customer) => ({
+        ...customer,
+        credit_used:
+          customer.credit_used !== null ? Number(customer.credit_used) : null,
+        credit_limit:
+          customer.credit_limit !== null ? Number(customer.credit_limit) : null,
+        customProducts: productsByCustomer[customer.id] || [],
+        branchInfo: branchInfoByCustomer[customer.id] || null,
+      }));
+
+      await client.query("COMMIT");
+      res.json(enhancedCustomers);
     } catch (error) {
-      console.error("Error fetching customers:", error);
+      await client.query("ROLLBACK");
+      console.error("Error fetching enhanced customers:", error);
       res.status(500).json({
-        message: "Error fetching customers",
+        message: "Error fetching enhanced customers",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 
@@ -64,86 +194,6 @@ export default function (pool) {
       console.error("Error fetching customers:", error);
       res.status(500).json({
         message: "Error fetching customers",
-        error: error.message,
-      });
-    }
-  });
-
-  // Get customers for combobox
-  router.get("/combobox", async (req, res) => {
-    const { salesman = "", search = "", page = 1, limit = 20 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
-
-    try {
-      // Base query for search across all data
-      let searchQuery = `
-        SELECT id, name
-        FROM customers
-        WHERE 1=1
-      `;
-
-      const searchValues = [];
-      let valueIndex = 1;
-
-      // Add salesman filter if provided
-      if (salesman && salesman !== "All Salesmen") {
-        searchQuery += ` AND salesman = $${valueIndex}`;
-        searchValues.push(salesman);
-        valueIndex++;
-      }
-
-      // Add search filter if provided
-      if (search) {
-        searchQuery += ` AND (LOWER(name) LIKE $${valueIndex} OR LOWER(id) LIKE $${valueIndex})`;
-        searchValues.push(`%${search.toLowerCase()}%`);
-        valueIndex++;
-      }
-
-      searchQuery += ` ORDER BY name`;
-
-      // Add pagination only for the final results
-      if (limit) {
-        searchQuery += ` LIMIT $${valueIndex} OFFSET $${valueIndex + 1}`;
-        searchValues.push(Number(limit), offset);
-      }
-
-      // Get total count for pagination
-      const countQuery = `
-        SELECT COUNT(*) 
-        FROM customers 
-        WHERE 1=1
-        ${salesman && salesman !== "All Salesmen" ? " AND salesman = $1" : ""}
-        ${
-          search
-            ? ` AND (LOWER(name) LIKE $${
-                salesman ? "2" : "1"
-              } OR LOWER(id) LIKE $${salesman ? "2" : "1"})`
-            : ""
-        }
-      `;
-
-      const countValues = [];
-      if (salesman && salesman !== "All Salesmen") countValues.push(salesman);
-      if (search) countValues.push(`%${search.toLowerCase()}%`);
-
-      const [searchResults, countResults] = await Promise.all([
-        pool.query(searchQuery, searchValues),
-        pool.query(countQuery, countValues),
-      ]);
-
-      const totalCount = parseInt(countResults.rows[0].count);
-      const totalPages = Math.ceil(totalCount / Number(limit));
-
-      res.json({
-        customers: searchResults.rows,
-        totalCount,
-        totalPages,
-        currentPage: Number(page),
-      });
-    } catch (error) {
-      console.error("Error fetching customers for combobox:", error);
-      res.status(500).json({
-        message: "Error fetching customers for combobox",
         error: error.message,
       });
     }
@@ -226,27 +276,6 @@ export default function (pool) {
     }
   });
 
-  router.get("/by-tin/:tin", async (req, res) => {
-    const { tin } = req.params;
-
-    try {
-      const query = "SELECT * FROM customers WHERE tin_number = $1";
-      const result = await pool.query(query, [tin]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      res.json(result.rows[0]);
-    } catch (error) {
-      console.error("Error fetching customer by TIN:", error);
-      res.status(500).json({
-        message: "Error fetching customer",
-        error: error.message,
-      });
-    }
-  });
-
   // Delete a single customer
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
@@ -255,7 +284,69 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // First delete associated customer products
+      // First check if the customer is part of any branch groups
+      const branchQuery = `
+      SELECT cbg.id AS group_id, cbm.is_main_branch
+      FROM customer_branch_mappings cbm
+      JOIN customer_branch_groups cbg ON cbm.group_id = cbg.id
+      WHERE cbm.customer_id = $1
+    `;
+      const branchResult = await client.query(branchQuery, [id]);
+
+      // Handle branch relationships before deletion
+      for (const row of branchResult.rows) {
+        const { group_id, is_main_branch } = row;
+
+        if (is_main_branch) {
+          // Case 1: This is a main branch - find another branch to promote or delete the group
+          const countQuery = `
+          SELECT COUNT(*) FROM customer_branch_mappings
+          WHERE group_id = $1
+        `;
+          const countResult = await client.query(countQuery, [group_id]);
+          const memberCount = parseInt(countResult.rows[0].count);
+
+          if (memberCount > 1) {
+            // Promote another branch to main
+            const nextMainQuery = `
+            UPDATE customer_branch_mappings
+            SET is_main_branch = true
+            WHERE group_id = $1 AND customer_id != $2
+            LIMIT 1
+          `;
+            await client.query(nextMainQuery, [group_id, id]);
+
+            // Now remove this branch from the group
+            const removeQuery = `
+            DELETE FROM customer_branch_mappings
+            WHERE group_id = $1 AND customer_id = $2
+          `;
+            await client.query(removeQuery, [group_id, id]);
+          } else {
+            // This is the only member, delete the entire group
+            const deleteMapQuery = `
+            DELETE FROM customer_branch_mappings
+            WHERE group_id = $1
+          `;
+            await client.query(deleteMapQuery, [group_id]);
+
+            const deleteGroupQuery = `
+            DELETE FROM customer_branch_groups
+            WHERE id = $1
+          `;
+            await client.query(deleteGroupQuery, [group_id]);
+          }
+        } else {
+          // Case 2: This is a regular branch member - just remove it from the group
+          const removeQuery = `
+          DELETE FROM customer_branch_mappings
+          WHERE group_id = $1 AND customer_id = $2
+        `;
+          await client.query(removeQuery, [group_id, id]);
+        }
+      }
+
+      // Delete associated customer products
       await client.query(
         "DELETE FROM customer_products WHERE customer_id = $1",
         [id]
@@ -274,6 +365,7 @@ export default function (pool) {
       res.json({
         message: "Customer deleted successfully",
         customer: result.rows[0],
+        branchesUpdated: branchResult.rows.length > 0,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -319,110 +411,6 @@ export default function (pool) {
     }
   });
 
-  // Get customer details AND their custom products for the form page
-  router.get("/:id/details", async (req, res) => {
-    const { id } = req.params;
-    const client = await pool.connect();
-
-    try {
-      await client.query("BEGIN"); // Start transaction
-
-      // Fetch customer details
-      const customerQuery = "SELECT * FROM customers WHERE id = $1";
-      const customerResult = await client.query(customerQuery, [id]);
-
-      if (customerResult.rows.length === 0) {
-        await client.query("ROLLBACK"); // Rollback if customer not found
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      const customerData = customerResult.rows[0];
-
-      // Convert money-related fields in customer data to numbers
-      const formattedCustomerData = {
-        ...customerData,
-        credit_used:
-          customerData.credit_used !== null
-            ? Number(customerData.credit_used)
-            : null,
-        credit_limit:
-          customerData.credit_limit !== null
-            ? Number(customerData.credit_limit)
-            : null,
-        // Ensure empty strings are handled if needed, though SELECT * usually returns null
-        tin_number: customerData.tin_number || "",
-        phone_number: customerData.phone_number || "",
-        email: customerData.email || "",
-        address: customerData.address || "",
-        city: customerData.city || "KOTA KINABALU", // Default if needed
-        state: customerData.state || "12", // Default if needed
-        id_number: customerData.id_number || "",
-        id_type: customerData.id_type || "",
-      };
-
-      // Fetch associated custom products
-      const productsQuery = `
-      SELECT 
-        cp.id, 
-        cp.customer_id, 
-        cp.product_id, 
-        cp.custom_price, 
-        cp.is_available,
-        p.description -- Get product description too
-      FROM customer_products cp
-      JOIN products p ON cp.product_id = p.id
-      WHERE cp.customer_id = $1
-      ORDER BY p.description -- Or however you want to sort them
-    `;
-      const productsResult = await client.query(productsQuery, [id]);
-
-      // Convert custom_price to a number for products
-      const customProducts = productsResult.rows.map((cp) => ({
-        ...cp,
-        custom_price: cp.custom_price !== null ? Number(cp.custom_price) : 0, // Default to 0 or handle as needed
-        is_available: cp.is_available !== undefined ? cp.is_available : true, // Default to true
-      }));
-
-      await client.query("COMMIT"); // Commit transaction
-
-      // Combine results
-      res.json({
-        customer: formattedCustomerData,
-        customProducts: customProducts,
-      });
-    } catch (error) {
-      await client.query("ROLLBACK"); // Rollback on any error
-      console.error("Error fetching customer details and products:", error);
-      res.status(500).json({
-        message: "Error fetching customer details and products",
-        error: error.message,
-      });
-    } finally {
-      client.release();
-    }
-  });
-
-  // Get customer by ID
-  router.get("/:id", async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      const query = "SELECT * FROM customers WHERE id = $1";
-      const result = await pool.query(query, [id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      res.json(result.rows[0]);
-    } catch (error) {
-      console.error("Error fetching customer:", error);
-      res
-        .status(500)
-        .json({ message: "Error fetching customer", error: error.message });
-    }
-  });
-
   // Update a customer
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
@@ -453,8 +441,6 @@ export default function (pool) {
         await client.query("BEGIN");
 
         if (isChangingId) {
-          console.log(`Changing customer ID from ${id} to ${newId}`);
-
           // 1. Check if new ID already exists
           const checkQuery = "SELECT id FROM customers WHERE id = $1";
           const checkResult = await client.query(checkQuery, [newId]);
@@ -552,6 +538,16 @@ export default function (pool) {
 
           if (result.rows.length === 0) {
             throw new Error("Customer not found");
+          }
+
+          if (tin_number !== null || id_number !== null || id_type !== null) {
+            await syncEInvoiceFields(
+              client,
+              id,
+              tin_number,
+              id_number,
+              id_type
+            );
           }
 
           await client.query("COMMIT");

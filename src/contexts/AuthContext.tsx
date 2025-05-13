@@ -23,28 +23,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializeAuth = async () => {
     try {
       const storedSession = sessionService.getStoredSession();
-      if (!storedSession?.user) {
+
+      // If we're on the login page, don't attempt to restore a session
+      // We still initialize the session ID but don't try to validate it
+      const isLoginPage = window.location.pathname === "/login";
+
+      if (isLoginPage) {
         setIsLoading(false);
         return;
       }
 
-      // Initialize session and check state
-      try {
-        await sessionService.initialize();
-        const { staff, hasActiveProfile } = await sessionService.checkState();
+      // If there's a cached user in the session, set it immediately to prevent flicker
+      if (storedSession?.user) {
+        setUser(storedSession.user);
+      }
 
-        if (staff && hasActiveProfile) {
-          setUser(staff);
-        } else {
+      // Only call initialize if not on login page
+      try {
+        const sessionState = await sessionService.initialize();
+
+        if (sessionState.staff && sessionState.hasActiveProfile) {
+          setUser(sessionState.staff);
+        } else if (storedSession?.user) {
           // Clear invalid session
           await sessionService.logout();
+          setUser(null);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
-        // Don't await here - just clear local session
         sessionService
           .logout()
           .catch((e) => console.warn("Error during forced logout:", e));
+        setUser(null);
       }
     } finally {
       setIsLoading(false);

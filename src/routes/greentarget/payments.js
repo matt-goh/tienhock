@@ -6,7 +6,7 @@ export default function (pool) {
 
   // Get all payments (with optional invoice_id filter)
   router.get("/", async (req, res) => {
-    const { invoice_id, include_cancelled } = req.query; // Add include_cancelled parameter
+    const { invoice_id, include_cancelled, customer_id } = req.query;
 
     try {
       let query = `
@@ -27,6 +27,12 @@ export default function (pool) {
         paramCounter++;
       } else {
         query += " WHERE 1=1";
+      }
+
+      if (customer_id) {
+        query += ` AND i.customer_id = $${paramCounter}`;
+        queryParams.push(customer_id);
+        paramCounter++;
       }
 
       // Only include active payments by default
@@ -115,7 +121,7 @@ export default function (pool) {
         parseFloat(invoice.balance_due) - parseFloat(amount_paid)
       );
       const currentStatus = invoice.status;
-      
+
       if (newBalanceDue === 0) {
         // If fully paid, always set to paid
         await client.query(
@@ -160,27 +166,85 @@ export default function (pool) {
   router.get("/debtors", async (req, res) => {
     try {
       const query = `
-        SELECT 
+        SELECT
           c.customer_id,
           c.name,
-          c.phone_number,
-          SUM(i.total_amount) as total_invoiced,
-          SUM(COALESCE(p.amount_paid, 0)) as total_paid,
-          SUM(i.total_amount) - SUM(COALESCE(p.amount_paid, 0)) as balance
+          /* Collect unique phone numbers as an array */
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(ph.phone_number, '')), NULL) as phone_numbers,
+          
+          -- Get pre-aggregated invoice and payment data from subquery
+          invoice_data.total_invoiced,
+          invoice_data.total_paid,
+          invoice_data.balance,
+          
+          -- Add new field to check for overdue invoices (as a subquery)
+          (SELECT EXISTS(
+            SELECT 1 FROM greentarget.invoices oi 
+            WHERE oi.customer_id = c.customer_id 
+            AND oi.status = 'overdue'
+            AND oi.status != 'cancelled'
+          )) as has_overdue
+          
         FROM greentarget.customers c
-        JOIN greentarget.invoices i ON c.customer_id = i.customer_id
+        -- Collect phone numbers from both customer and locations (existing logic)
+        LEFT JOIN LATERAL (
+          SELECT c.phone_number
+          UNION
+          SELECT l.phone_number
+          FROM greentarget.rentals r
+          JOIN greentarget.locations l ON r.location_id = l.location_id
+          WHERE r.customer_id = c.customer_id
+        ) ph ON true
+        
+        -- Use a subquery to pre-aggregate invoice and payment data per customer
         LEFT JOIN (
-          SELECT invoice_id, SUM(amount_paid) as amount_paid
-          FROM greentarget.payments
-          GROUP BY invoice_id
-        ) p ON i.invoice_id = p.invoice_id
-        GROUP BY c.customer_id, c.name, c.phone_number
-        HAVING SUM(i.total_amount) > SUM(COALESCE(p.amount_paid, 0))
-        ORDER BY balance DESC
+          SELECT 
+            i.customer_id,
+            SUM(CASE WHEN i.status != 'cancelled' THEN i.total_amount ELSE 0 END) as total_invoiced,
+            SUM(
+              COALESCE(
+                (SELECT SUM(amount_paid) 
+                FROM greentarget.payments p 
+                WHERE p.invoice_id = i.invoice_id 
+                AND (p.status IS NULL OR p.status = 'active')
+                ), 0
+              )
+            ) as total_paid,
+            SUM(CASE WHEN i.status != 'cancelled' THEN i.total_amount ELSE 0 END) - 
+            SUM(
+              COALESCE(
+                (SELECT SUM(amount_paid) 
+                FROM greentarget.payments p 
+                WHERE p.invoice_id = i.invoice_id 
+                AND (p.status IS NULL OR p.status = 'active')
+                ), 0
+              )
+            ) as balance
+          FROM greentarget.invoices i
+          GROUP BY i.customer_id
+        ) invoice_data ON c.customer_id = invoice_data.customer_id
+
+        -- Group by customer for phone number aggregation
+        GROUP BY c.customer_id, c.name, invoice_data.total_invoiced, invoice_data.total_paid, invoice_data.balance
+
+        -- Filter Groups: Only include customers who have a positive outstanding balance
+        HAVING invoice_data.balance > 0.001 -- Use a small threshold for floating point comparison
+
+        -- Order by the calculated balance
+        ORDER BY invoice_data.balance DESC;
       `;
 
       const result = await pool.query(query);
-      res.json(result.rows);
+      // Ensure numeric types are returned correctly
+      const debtors = result.rows.map((debtor) => ({
+        ...debtor,
+        phone_numbers: debtor.phone_numbers || [], // Ensure phone_numbers is always an array
+        total_invoiced: parseFloat(debtor.total_invoiced || 0),
+        total_paid: parseFloat(debtor.total_paid || 0),
+        balance: parseFloat(debtor.balance || 0),
+        has_overdue: !!debtor.has_overdue,
+      }));
+      res.json(debtors);
     } catch (error) {
       console.error("Error fetching debtors report:", error);
       res.status(500).json({

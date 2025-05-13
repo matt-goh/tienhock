@@ -2,6 +2,7 @@
 import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
+import TienHockLogo from "../../tienhock.png";
 
 // State mapping
 const stateOptions = [
@@ -212,21 +213,27 @@ interface Props {
   data: EInvoicePDFData;
   qrCodeData: string;
   isConsolidated?: boolean;
+  companyContext?: "tienhock" | "jellypolly";
 }
 
 const EInvoicePDF: React.FC<Props> = ({
   data,
   qrCodeData,
   isConsolidated = false,
+  companyContext = "tienhock",
 }) => {
   return (
     <Page size="A4" style={styles.page}>
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>
-          <Image src="../tienhock.png" style={styles.logo} />
+          <Image src={TienHockLogo} style={styles.logo} />
           <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>{data.company.name}</Text>
+            <Text style={styles.companyName}>
+              {companyContext === "jellypolly"
+                ? "JELLY POLLY FOOD INDUSTRIES"
+                : data.company.name}
+            </Text>
             <Text style={styles.companyDetail}>
               Reg. No: {data.company.reg_no}
             </Text>
@@ -283,7 +290,11 @@ const EInvoicePDF: React.FC<Props> = ({
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier Name</Text>
-              <Text style={styles.infoValue}>{data.company.name}</Text>
+              <Text style={styles.infoValue}>
+                {companyContext === "jellypolly"
+                  ? "JELLY POLLY FOOD INDUSTRIES"
+                  : data.company.name}
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier BRN:</Text>
@@ -367,27 +378,49 @@ const EInvoicePDF: React.FC<Props> = ({
         </View>
 
         {/* Table Rows */}
-        {data.orderDetails.map((item, index) => (
-          <View key={index} style={styles.tableRow}>
-            <Text style={[styles.classCol, styles.cellText]}>022</Text>
-            <Text style={[styles.itemNameCol, styles.cellText]}>
-              {item.description}
+        {data.orderDetails && data.orderDetails.length > 0 ? (
+          data.orderDetails.map((item, index) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.classCol, styles.cellText]}>022</Text>
+              <Text style={[styles.itemNameCol, styles.cellText]}>
+                {item.description}
+              </Text>
+              <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
+              <Text style={[styles.priceCol, styles.cellText]}>
+                {Number(item.price).toFixed(2)}
+              </Text>
+              <Text style={[styles.subtotalCol, styles.cellText]}>
+                {(item.qty * Number(item.price)).toFixed(2)}
+              </Text>
+              <Text style={[styles.taxCol, styles.cellText]}>
+                {Number(item.tax || 0).toFixed(2)}
+              </Text>
+              <Text style={[styles.totalCol, styles.cellText]}>
+                {typeof item.total === "string"
+                  ? Number(item.total).toFixed(2)
+                  : Number(item.total).toFixed(2)}
+              </Text>
+            </View>
+          ))
+        ) : (
+          // Render a placeholder or error message if no order details
+          <View style={styles.tableRow}>
+            <Text
+              style={[
+                styles.itemNameCol,
+                styles.cellText,
+                { textAlign: "center" },
+              ]}
+            >
+              No item details available
             </Text>
-            <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
-            <Text style={[styles.priceCol, styles.cellText]}>
-              {Number(item.price).toFixed(2)}
-            </Text>
-            <Text style={[styles.subtotalCol, styles.cellText]}>
-              {(item.qty * Number(item.price)).toFixed(2)}
-            </Text>
-            <Text style={[styles.taxCol, styles.cellText]}>
-              {Number(item.tax || 0).toFixed(2)}
-            </Text>
-            <Text style={[styles.totalCol, styles.cellText]}>
-              {Number(item.total).toFixed(2)}
-            </Text>
+            <Text style={[styles.qtyCol, styles.cellText]}></Text>
+            <Text style={[styles.priceCol, styles.cellText]}></Text>
+            <Text style={[styles.subtotalCol, styles.cellText]}></Text>
+            <Text style={[styles.taxCol, styles.cellText]}></Text>
+            <Text style={[styles.totalCol, styles.cellText]}></Text>
           </View>
-        ))}
+        )}
       </View>
 
       {/* Summary Section */}

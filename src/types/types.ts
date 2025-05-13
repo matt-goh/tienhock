@@ -341,15 +341,19 @@ export interface InvoiceData {
   einvoice_status: EInvoiceStatus; // Keep EInvoiceStatus type separate
 
   products: ProductItem[];
+  customerName?: string; // For UI display
 }
 
 // Extended invoice for UI purposes
 export interface ExtendedInvoiceData extends InvoiceData {
-  customerName?: string; // For UI display
   isEditing?: boolean; // UI state flag
   originalId?: string; // Used when invoice ID itself is changed during edit
   cancellation_date?: string | null; // ISO date string of cancellation (might come from cancelled_invoices table)
   invoice?: string;
+  payment_method?: Payment["payment_method"];
+  payment_reference?: string;
+  payment_notes?: string;
+  consolidated_part_of?: ConsolidatedInfo | null;
 }
 
 export interface ProductItem {
@@ -412,6 +416,7 @@ export interface Employee {
   birthdate: string;
   address: string;
   job: string[];
+  jobType?: string;
   location: string[];
   dateJoined: string;
   icNo: string;
@@ -426,6 +431,7 @@ export interface Employee {
   agama: string;
   dateResigned: string;
   newId: string;
+  updatedAt?: string;
 }
 
 export type FilterOptions = {
@@ -445,25 +451,19 @@ export interface InvoiceFilters {
     end: Date | null;
   };
   salespersonId: string[] | null;
-  applySalespersonFilter: boolean;
   paymentType: string | null;
-  applyPaymentTypeFilter?: boolean;
   invoiceStatus: string[];
-  applyInvoiceStatusFilter: boolean;
   eInvoiceStatus: string[];
-  applyEInvoiceStatusFilter: boolean;
+  consolidation: "all" | "individual" | "consolidated";
 }
 
-export interface CustomerList {
+export interface Customer {
   id: string;
   name: string;
   salesman: string;
   phone_number?: string;
   tin_number?: string;
   id_number?: string;
-}
-
-export interface Customer extends CustomerList {
   closeness: string;
   email?: string;
   address?: string;
@@ -499,4 +499,155 @@ export interface JobCategory {
   ikut: string;
   jv: string;
   [key: string]: string | undefined;
+}
+
+export interface InvoiceGT {
+  invoice_id: number;
+  invoice_number: string;
+  type: "regular" | "statement";
+  customer_id: number;
+  customer_name: string;
+  customer_phone_number?: string;
+  tin_number?: string;
+  id_number?: string;
+  additional_info?: string;
+  location_address?: string;
+  location_phone_number?: string;
+  date_placed?: string;
+  date_picked?: string;
+  rental_id?: number;
+  driver?: string;
+  tong_no?: string;
+  amount_before_tax: number;
+  tax_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  current_balance: number;
+  date_issued: string;
+  balance_due: number;
+  statement_period_start?: string;
+  statement_period_end?: string;
+  status: "paid" | "unpaid" | "cancelled" | "overdue";
+  consolidated_part_of?: ConsolidatedInfo | null;
+  agingData?: {
+    current: number;
+    month1: number;
+    month2: number;
+    month3Plus: number;
+    total: number;
+  };
+
+  // E-invoice fields
+  einvoice_status?: "valid" | "invalid" | "pending" | "cancelled" | null;
+  uuid: string | null; // UUID from e-invoice system
+  submission_uid: string | null;
+  long_id: string | null;
+  datetime_validated: string | null; // ISO timestamp string or null
+  is_consolidated: boolean;
+  consolidated_invoices: string[] | null; // Array of invoice IDs or null
+  cancellation_date?: string | null;
+  cancellation_reason?: string;
+}
+
+// Define the type for submission results
+export interface EInvoiceSubmissionResult {
+  success: boolean;
+  message?: string;
+  overallStatus?: string;
+  error?: string;
+  rejectedDocuments?: Array<{
+    internalId: string;
+    error: {
+      code: string;
+      message: string;
+    };
+  }>;
+}
+
+export interface ConsolidatedInfo {
+  id: string;
+  uuid: string | null;
+  long_id: string | null;
+  einvoice_status: EInvoiceStatus;
+  invoice_number?: string;
+}
+
+export interface SelectOption {
+  id: string;
+  name: string;
+}
+
+export type PayType = "Base" | "Tambahan" | "Overtime";
+export type RateUnit = "Hour" | "Bag" | "Percent" | "Fixed" | "Day" | "Trip";
+
+export interface PayCode {
+  id: string;
+  description: string;
+  pay_type: PayType;
+  rate_unit: RateUnit;
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+  is_active: boolean;
+  requires_units_input: boolean;
+  section_id?: string; // Optional field to indicate the section when used in section_pay_codes
+  override_rate_biasa?: number | null; // Used for section-specific overrides
+  override_rate_ahad?: number | null; // Used for section-specific overrides
+  override_rate_umum?: number | null; // Used for section-specific overrides
+  is_default?: boolean; // Used for section-specific settings
+}
+
+export interface JobPayCodeDetails
+  extends Omit<PayCode, "rate_biasa" | "rate_ahad" | "rate_umum"> {
+  // Omit original rates from PayCode base
+  job_id: string;
+  pay_code_id: string; // Same as id from PayCode table
+  is_default_setting: boolean;
+  // Default rates (ensure these are numbers after fetch/parse)
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+  // Override rates
+  override_rate_biasa: number | null;
+  override_rate_ahad: number | null;
+  override_rate_umum: number | null;
+}
+
+export interface EmployeePayroll {
+  id?: number;
+  monthly_payroll_id?: number;
+  employee_id: string;
+  employee_name?: string;
+  job_type: string;
+  section: string;
+  gross_pay: number;
+  net_pay: number;
+  status?: string;
+  payroll_status?: string;
+  year?: number;
+  month?: number;
+  items: PayrollItem[];
+}
+
+export interface PayrollItem {
+  id?: number;
+  pay_code_id: string;
+  description: string;
+  pay_type?: string;
+  rate: number;
+  rate_unit: string;
+  quantity: number;
+  amount: number;
+  is_manual: boolean;
+}
+
+export interface MonthlyPayroll {
+  id: number;
+  year: number;
+  month: number;
+  status: "Processing" | "Finalized";
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  employeePayrolls: EmployeePayroll[];
 }

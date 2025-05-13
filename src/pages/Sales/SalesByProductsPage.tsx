@@ -1,21 +1,14 @@
 // src/pages/Sales/SalesByProductsPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
-import { FormCombobox, FormListbox } from "../../components/FormComponents";
+import { FormCombobox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   IconSortAscending,
-  IconSortDescending,
-  IconChevronDown,
-  IconCheck,
+  IconSortDescending
 } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
+import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
 import {
   XAxis,
@@ -171,7 +164,10 @@ const SalesByProductsPage: React.FC = () => {
   }, [salesData]);
 
   // Handle month selection change
-  const handleMonthChange = (month: MonthOption) => {
+  const handleMonthChange = (monthId: string | number) => {
+    const month = monthOptions.find((m) => m.id === Number(monthId));
+    if (!month) return;
+
     setSelectedMonth(month);
 
     // If selected month is ahead of current month, use previous year
@@ -317,6 +313,9 @@ const SalesByProductsPage: React.FC = () => {
     const productMap = new Map<string, ProductSalesData>();
 
     filteredInvoices.forEach((invoice) => {
+      // Skip cancelled invoices
+      if (invoice.invoice_status === "cancelled") return;
+
       if (Array.isArray(invoice.products)) {
         invoice.products.forEach((product: any) => {
           // Skip subtotal or total rows
@@ -325,18 +324,20 @@ const SalesByProductsPage: React.FC = () => {
           const productId = product.code;
           if (!productId) return;
 
+          // Convert string fields to numbers if needed
           const quantity = Number(product.quantity) || 0;
           const price = Number(product.price) || 0;
           const total = quantity * price;
-          const foc = Number(product.freeProduct) || 0; // Get FOC quantity
-          const returns = Number(product.returnProduct) || 0; // Get Returns quantity
+          const foc = Number(product.freeProduct || product.freeproduct) || 0; // Handle both camelCase and lowercase
+          const returns =
+            Number(product.returnProduct || product.returnproduct) || 0; // Handle both camelCase and lowercase
 
           if (productMap.has(productId)) {
             const existingProduct = productMap.get(productId)!;
             existingProduct.quantity += quantity;
             existingProduct.totalSales += total;
-            existingProduct.foc += foc; // Add FOC
-            existingProduct.returns += returns; // Add Returns
+            existingProduct.foc += foc;
+            existingProduct.returns += returns;
           } else {
             // Get product type from cache
             const type = getProductType(productId);
@@ -348,8 +349,8 @@ const SalesByProductsPage: React.FC = () => {
               type,
               quantity,
               totalSales: total,
-              foc, // Initialize FOC
-              returns, // Initialize Returns
+              foc,
+              returns,
             });
           }
         });
@@ -380,119 +381,26 @@ const SalesByProductsPage: React.FC = () => {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      // Add product filter parameter
-      let url = `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`;
-      if (selectedChartProducts.length > 0) {
-        url += `&products=${selectedChartProducts.join(",")}`;
-      }
+      // Use new trends endpoint with product type
+      const url = `/api/invoices/sales/trends?type=products&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartProducts.join(
+        ","
+      )}`;
 
-      const invoices = await api.get(url);
+      const chartData = await api.get(url);
 
-      if (!Array.isArray(invoices)) {
+      if (!Array.isArray(chartData)) {
         throw new Error("Invalid response format");
       }
 
-      // Check if we received any invoices
-      if (invoices.length === 0) {
+      // Check if we received any data
+      if (chartData.length === 0) {
         toast.error("No data found for the selected products in the past year");
         setYearlyTrendData([]);
-        setIsGeneratingChart(false);
         return;
       }
 
-      // Group sales by month and product/type
-      const monthlyData = new Map<string, Record<string, number>>();
-      const allProductsOrTypes = new Set<string>();
-
-      invoices.forEach((invoice) => {
-        const invoiceDate = new Date(Number(invoice.createddate));
-        const monthYear = `${invoiceDate.getFullYear()}-${String(
-          invoiceDate.getMonth() + 1
-        ).padStart(2, "0")}`;
-
-        if (!monthlyData.has(monthYear)) {
-          monthlyData.set(monthYear, {});
-        }
-
-        if (Array.isArray(invoice.products)) {
-          invoice.products.forEach(
-            (product: {
-              issubtotal: any;
-              istotal: any;
-              code: any;
-              quantity: any;
-              price: any;
-            }) => {
-              if (product.issubtotal || product.istotal) return;
-
-              const productId = product.code;
-              const productType = getProductType(productId);
-
-              // Calculate the total for this product
-              const quantity = Number(product.quantity) || 0;
-              const price = Number(product.price) || 0;
-              const total = quantity * price;
-
-              // Track sales for the individual product if it's selected
-              if (selectedChartProducts.includes(productId)) {
-                allProductsOrTypes.add(productId);
-                const monthData = monthlyData.get(monthYear)!;
-                monthData[productId] = (monthData[productId] || 0) + total;
-              }
-
-              // Also track sales for the product type if it's selected
-              if (selectedChartProducts.includes(productType)) {
-                allProductsOrTypes.add(productType);
-                const monthData = monthlyData.get(monthYear)!;
-                monthData[productType] = (monthData[productType] || 0) + total;
-              }
-            }
-          );
-        }
-      });
-
-      // Convert to array format for chart
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const sortedMonths = Array.from(monthlyData.keys()).sort();
-
-      const chartData = sortedMonths.map((monthYear) => {
-        const [year, month] = monthYear.split("-");
-        const monthData = monthlyData.get(monthYear)!;
-
-        // Create data point with month label and selected products/types
-        const dataPoint: MonthlyTypeData = {
-          month: `${monthNames[parseInt(month) - 1]} ${year}`,
-        };
-
-        // Add values for each selected product/type
-        Array.from(allProductsOrTypes).forEach((key) => {
-          dataPoint[key] = monthData[key] || 0;
-        });
-
-        return dataPoint;
-      });
-
-      // Check if we have any data points after processing
-      if (chartData.length === 0 || allProductsOrTypes.size === 0) {
-        toast.error("No sales data found for the selected products");
-        setYearlyTrendData([]);
-      } else {
-        setYearlyTrendData(chartData);
-        toast.success("Product trend data generated successfully");
-      }
+      setYearlyTrendData(chartData);
+      toast.success("Product trend data generated successfully");
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
       toast.error("Failed to generate product trend data");
@@ -512,14 +420,18 @@ const SalesByProductsPage: React.FC = () => {
         const startTimestamp = dateRange.start.getTime().toString();
         const endTimestamp = dateRange.end.getTime().toString();
 
-        // Fetch invoices for the selected date range
-        const invoices = await api.get(
-          `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
-        );
+        // Use the new dedicated endpoint
+        let url = `/api/invoices/sales/products?startDate=${startTimestamp}&endDate=${endTimestamp}`;
 
-        if (Array.isArray(invoices)) {
-          const processedData = processInvoiceData(invoices);
-          setSalesData(processedData);
+        // Add salesman filter if not "All Salesmen"
+        if (selectedSalesman !== "All Salesmen") {
+          url += `&salesman=${selectedSalesman}`;
+        }
+
+        const data = await api.get(url);
+
+        if (Array.isArray(data)) {
+          setSalesData(data);
         } else {
           throw new Error("Invalid response format");
         }
@@ -532,11 +444,8 @@ const SalesByProductsPage: React.FC = () => {
       }
     };
 
-    // Only fetch if products are loaded
-    if (products.length > 0) {
-      fetchSalesData();
-    }
-  }, [dateRange, products, selectedSalesman]);
+    fetchSalesData();
+  }, [dateRange, selectedSalesman]);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -797,110 +706,23 @@ const SalesByProductsPage: React.FC = () => {
 
             {/* Month Selection */}
             <div className="w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                    <span className="block truncate pl-2">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                    {monthOptions.map((month) => (
-                      <ListboxOption
-                        key={month.id}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-default-900"
-                          }`
-                        }
-                        value={month}
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {month.name}
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </div>
-              </Listbox>
+              <StyledListbox
+                value={selectedMonth.id}
+                onChange={handleMonthChange}
+                options={monthOptions}
+              />
             </div>
 
             {/* Salesman Selection */}
             <div className="w-40">
-              <Listbox value={selectedSalesman} onChange={setSelectedSalesman}>
-                <div className="relative">
-                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                    <span className="block truncate pl-2">
-                      {selectedSalesman}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                    {salesmen.map((salesman) => (
-                      <ListboxOption
-                        key={salesman}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-default-900"
-                          }`
-                        }
-                        value={salesman}
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {salesman}
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </div>
-              </Listbox>
+              <StyledListbox
+                value={selectedSalesman}
+                onChange={(value) => setSelectedSalesman(value.toString())}
+                options={salesmen.map((salesman) => ({
+                  id: salesman,
+                  name: salesman,
+                }))}
+              />
             </div>
           </div>
           <div className="text-lg text-right font-bold text-default-700">
@@ -949,7 +771,6 @@ const SalesByProductsPage: React.FC = () => {
             </h2>
             {filteredAndSortedData.length > 0 ? (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                {" "}
                 {/* Added fixed height and vertical scroll */}
                 <table className="min-w-full divide-y divide-default-200">
                   <thead className="bg-default-100 sticky top-0">
@@ -1261,7 +1082,11 @@ const SalesByProductsPage: React.FC = () => {
                       // Limit selection to prevent chart overcrowding
                       if (values.length <= maxChartProducts) {
                         setSelectedChartProducts(
-                          Array.isArray(values) ? values : values ? [values] : []
+                          Array.isArray(values)
+                            ? values
+                            : values
+                            ? [values]
+                            : []
                         );
                       } else {
                         toast.error(
@@ -1269,9 +1094,11 @@ const SalesByProductsPage: React.FC = () => {
                         );
                         // Keep the first max number of selections
                         setSelectedChartProducts(
-                          Array.isArray(values) 
-                            ? values.slice(0, maxChartProducts) 
-                            : values ? [values] : []
+                          Array.isArray(values)
+                            ? values.slice(0, maxChartProducts)
+                            : values
+                            ? [values]
+                            : []
                         );
                       }
                     }}

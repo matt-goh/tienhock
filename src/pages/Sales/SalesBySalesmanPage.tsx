@@ -9,12 +9,7 @@ import {
   IconCheck,
 } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
+import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -142,7 +137,10 @@ const SalesBySalesmanPage: React.FC = () => {
   }, [salesmen, maxChartSalesmen]);
 
   // Handle month selection change
-  const handleMonthChange = (month: MonthOption) => {
+  const handleMonthChange = (monthId: string | number) => {
+    const month = monthOptions.find((m) => m.id === Number(monthId));
+    if (!month) return;
+
     setSelectedMonth(month);
 
     // If selected month is ahead of current month, use previous year
@@ -166,6 +164,9 @@ const SalesBySalesmanPage: React.FC = () => {
     const salesmanMap = new Map<string, SalesmanData>();
 
     invoices.forEach((invoice) => {
+      // Skip cancelled invoices
+      if (invoice.invoice_status === "cancelled") return;
+
       const salesmanId = invoice.salespersonid;
       if (!salesmanId) return;
 
@@ -181,7 +182,7 @@ const SalesBySalesmanPage: React.FC = () => {
           const quantity = Number(product.quantity) || 0;
           const price = Number(product.price) || 0;
 
-          // Calculate product total (same as in SalesByProductsPage)
+          // Calculate product total
           invoiceTotal += quantity * price;
           totalQuantity += quantity;
         });
@@ -228,92 +229,23 @@ const SalesBySalesmanPage: React.FC = () => {
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
 
-      // Add the salesmen parameter to filter invoices
-      const salesmenParam = selectedChartSalesmen.join(",");
-      const invoices = await api.get(
-        `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}&salesman=${salesmenParam}`
-      );
+      // Use the new dedicated trends endpoint
+      const url = `/api/invoices/sales/trends?type=salesmen&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartSalesmen.join(
+        ","
+      )}`;
 
-      if (!Array.isArray(invoices)) {
+      const chartData = await api.get(url);
+
+      if (!Array.isArray(chartData)) {
         throw new Error("Invalid response format");
       }
 
-      // Group sales by month and salesman
-      const monthlyData = new Map<string, Record<string, number>>();
-      const allSalesmen = new Set<string>(selectedChartSalesmen); // Only include selected salesmen
-
-      invoices.forEach((invoice) => {
-        // Skip if not a selected salesman
-        if (!selectedChartSalesmen.includes(invoice.salespersonid)) return;
-
-        const invoiceDate = new Date(Number(invoice.createddate));
-        const monthYear = `${invoiceDate.getFullYear()}-${String(
-          invoiceDate.getMonth() + 1
-        ).padStart(2, "0")}`;
-
-        if (!monthlyData.has(monthYear)) {
-          monthlyData.set(monthYear, {});
-        }
-
-        const salesmanId = invoice.salespersonid;
-        if (!salesmanId) return;
-
-        // Calculate total for the invoice (product quantity * price)
-        let invoiceTotal = 0;
-        if (Array.isArray(invoice.products)) {
-          invoice.products.forEach(
-            (product: {
-              issubtotal: any;
-              istotal: any;
-              quantity: any;
-              price: any;
-            }) => {
-              // Skip subtotal or total rows
-              if (product.issubtotal || product.istotal) return;
-              const quantity = Number(product.quantity) || 0;
-              const price = Number(product.price) || 0;
-              invoiceTotal += quantity * price;
-            }
-          );
-        }
-
-        const monthData = monthlyData.get(monthYear)!;
-        monthData[salesmanId] = (monthData[salesmanId] || 0) + invoiceTotal;
-      });
-
-      // Convert to array format for chart
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const sortedMonths = Array.from(monthlyData.keys()).sort();
-
-      const chartData = sortedMonths.map((monthYear) => {
-        const [year, month] = monthYear.split("-");
-        const monthData = monthlyData.get(monthYear)!;
-
-        // Create data point with month label and all salesmen
-        const dataPoint: SalesTrendData = {
-          month: `${monthNames[parseInt(month) - 1]} ${year}`,
-        };
-
-        // Add values for each salesman
-        Array.from(allSalesmen).forEach((salesmanId) => {
-          dataPoint[salesmanId] = monthData[salesmanId] || 0;
-        });
-
-        return dataPoint;
-      });
+      // Check if we received any data
+      if (chartData.length === 0) {
+        toast.error("No data found for the selected salesmen in the past year");
+        setSalesTrendData([]);
+        return;
+      }
 
       setSalesTrendData(chartData);
       toast.success("Sales trend data generated successfully");
@@ -336,14 +268,13 @@ const SalesBySalesmanPage: React.FC = () => {
         const startTimestamp = dateRange.start.getTime().toString();
         const endTimestamp = dateRange.end.getTime().toString();
 
-        // Fetch invoices for the selected date range
-        const invoices = await api.get(
-          `/api/invoices?startDate=${startTimestamp}&endDate=${endTimestamp}`
+        // Use the new dedicated endpoint
+        const data = await api.get(
+          `/api/invoices/sales/salesmen?startDate=${startTimestamp}&endDate=${endTimestamp}`
         );
 
-        if (Array.isArray(invoices)) {
-          const processedData = processInvoiceData(invoices);
-          setSalesmanData(processedData);
+        if (Array.isArray(data)) {
+          setSalesmanData(data);
         } else {
           throw new Error("Invalid response format");
         }
@@ -498,56 +429,11 @@ const SalesBySalesmanPage: React.FC = () => {
 
             {/* Month Selection */}
             <div className="w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                    <span className="block truncate pl-2">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                    {monthOptions.map((month) => (
-                      <ListboxOption
-                        key={month.id}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-default-900"
-                          }`
-                        }
-                        value={month}
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {month.name}
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </div>
-              </Listbox>
+              <StyledListbox
+                value={selectedMonth.id}
+                onChange={handleMonthChange}
+                options={monthOptions}
+              />
             </div>
 
             <div className="text-default-500 font-medium">{selectedYear}</div>

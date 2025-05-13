@@ -18,7 +18,7 @@ import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
-import { useCustomerData } from "../../hooks/useCustomerData";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import {
   checkDuplicateInvoiceNo,
   createInvoice,
@@ -72,16 +72,17 @@ const InvoiceFormPage: React.FC = () => {
     useProductsCache();
   const { salesmen: salesmenCache, isLoading: salesmenLoading } =
     useSalesmanCache();
-  const {
-    customers,
-    selectedCustomer,
-    setSelectedCustomer,
-    customerQuery,
-    setCustomerQuery,
-    loadMoreCustomers,
-    hasMoreCustomers,
-    isFetchingCustomers,
-  } = useCustomerData(invoiceData?.customerid);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerPage, setCustomerPage] = useState(1);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
+  const ITEMS_PER_PAGE = 30;
+  const { customers: allCustomers, isLoading: isCustomersLoading } =
+    useCustomersCache();
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
+  const [hasMoreCustomers, setHasMoreCustomers] = useState(false);
 
   // --- Memoized Values (remain the same) ---
   const lineItems = useMemo(
@@ -99,7 +100,7 @@ const InvoiceFormPage: React.FC = () => {
       // Initialize new invoice data (logic remains the same)
       const newInv: ExtendedInvoiceData = {
         id: "", // User must input
-        salespersonid: salesmenCache.length > 0 ? salesmenCache[0].id : "", // Default salesman
+        salespersonid: salesmenCache.length > 0 ? "KILANG" : "", // Default salesman
         customerid: "",
         createddate: Date.now().toString(),
         paymenttype: "INVOICE", // Default type
@@ -143,48 +144,137 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [invoiceData?.paymenttype, isPaid]);
 
-  const fetchCustomerProducts = useCallback(async (customerId: string) => {
-    if (!customerId) {
-      setCustomerProducts([]);
-      setCustomerTinNumber(null);
-      setCustomerIdNumber(null);
-      setSubmitAsEinvoice(false); // Reset e-invoice flag if customer cleared
-      return [];
-    }
-    try {
-      const response = await api.get(`/api/customer-products/${customerId}`);
-      if (response.products) {
-        setCustomerProducts(response.products);
-        if (response.customer) {
-          const hasTin = !!response.customer.tin_number;
-          const hasId = !!response.customer.id_number;
-          setCustomerTinNumber(hasTin ? response.customer.tin_number : null);
-          setCustomerIdNumber(hasId ? response.customer.id_number : null);
-          // Only keep e-invoice checked if both are present after fetch
-          setSubmitAsEinvoice(hasTin && hasId);
-        } else {
-          setCustomerTinNumber(null);
-          setCustomerIdNumber(null);
-          setSubmitAsEinvoice(false); // Disable if customer data structure is wrong
-        }
-        return response.products;
-      } else {
-        setCustomerProducts(response);
-        setCustomerTinNumber(null); // Legacy handling, assume no TIN/ID
-        setCustomerIdNumber(null);
-        setSubmitAsEinvoice(false);
-        return response;
+  // Filter customers when search query changes
+  useEffect(() => {
+    const filtered = customerQuery
+      ? allCustomers.filter(
+          (customer) =>
+            customer.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
+            customer.id.toLowerCase().includes(customerQuery.toLowerCase()) ||
+            (customer.phone_number &&
+              customer.phone_number
+                .toLowerCase()
+                .includes(customerQuery.toLowerCase()))
+        )
+      : [...allCustomers];
+
+    setFilteredCustomers(filtered);
+    setCustomerPage(1); // Reset to first page on new search
+
+    // Calculate initial page
+    const firstPageItems = filtered.slice(0, ITEMS_PER_PAGE);
+    setPaginatedCustomers(firstPageItems);
+    setHasMoreCustomers(filtered.length > ITEMS_PER_PAGE);
+  }, [customerQuery, allCustomers]);
+
+  // Update pagination when page changes
+  useEffect(() => {
+    const items = filteredCustomers.slice(0, customerPage * ITEMS_PER_PAGE);
+    setPaginatedCustomers(items);
+    setHasMoreCustomers(
+      filteredCustomers.length > customerPage * ITEMS_PER_PAGE
+    );
+  }, [filteredCustomers, customerPage]);
+
+  // Initialize selected customer based on invoiceData.customerid
+  useEffect(() => {
+    if (
+      allCustomers.length > 0 &&
+      invoiceData?.customerid &&
+      !selectedCustomer
+    ) {
+      const found = allCustomers.find((c) => c.id === invoiceData.customerid);
+      if (found) {
+        // Cast to Customer type as CustomerList lacks some properties
+        setSelectedCustomer(found as unknown as Customer);
       }
-    } catch (error) {
-      console.error("Error fetching customer products:", error);
-      toast.error("Could not load custom product prices.");
-      setCustomerProducts([]);
-      setCustomerTinNumber(null);
-      setCustomerIdNumber(null);
-      setSubmitAsEinvoice(false); // Disable on error
-      return [];
     }
-  }, []); // No dependencies needed if api is stable
+  }, [allCustomers, invoiceData?.customerid, selectedCustomer]);
+
+  // Function to load more customers
+  const loadMoreCustomers = useCallback(() => {
+    if (hasMoreCustomers) {
+      setCustomerPage((prev) => prev + 1);
+    }
+  }, [hasMoreCustomers]);
+
+  const fetchCustomerProducts = useCallback(
+    async (customerId: string) => {
+      if (!customerId) {
+        setCustomerProducts([]);
+        setCustomerTinNumber(null);
+        setCustomerIdNumber(null);
+        setSubmitAsEinvoice(false); // Reset e-invoice flag if customer cleared
+        return [];
+      }
+
+      // First, check if the customer is in the cache
+      const cachedCustomer = allCustomers.find((c) => c.id === customerId);
+
+      if (cachedCustomer) {
+        // We found the customer in the cache
+        console.debug(`Using cached customer data for ${customerId}`);
+
+        // Handle custom products
+        if (
+          cachedCustomer.customProducts &&
+          cachedCustomer.customProducts.length > 0
+        ) {
+          setCustomerProducts(cachedCustomer.customProducts);
+        } else {
+          setCustomerProducts([]);
+        }
+
+        // Handle TIN and ID numbers for e-invoice
+        const hasTin = !!cachedCustomer.tin_number;
+        const hasId = !!cachedCustomer.id_number;
+        setCustomerTinNumber(hasTin ? (cachedCustomer.tin_number || null) : null);
+        setCustomerIdNumber(hasId ? (cachedCustomer.id_number || null) : null);
+        setSubmitAsEinvoice(hasTin && hasId);
+
+        return cachedCustomer.customProducts || [];
+      }
+
+      // If not in cache, fallback to API call
+      console.debug(
+        `Customer ${customerId} not found in cache, fetching from API`
+      );
+      try {
+        const response = await api.get(`/api/customer-products/${customerId}`);
+        if (response.products) {
+          setCustomerProducts(response.products);
+          if (response.customer) {
+            const hasTin = !!response.customer.tin_number;
+            const hasId = !!response.customer.id_number;
+            setCustomerTinNumber(hasTin ? (response.customer.tin_number || null) : null);
+            setCustomerIdNumber(hasId ? (response.customer.id_number || null) : null);
+            // Only keep e-invoice checked if both are present after fetch
+            setSubmitAsEinvoice(hasTin && hasId);
+          } else {
+            setCustomerTinNumber(null);
+            setCustomerIdNumber(null);
+            setSubmitAsEinvoice(false); // Disable if customer data structure is wrong
+          }
+          return response.products;
+        } else {
+          setCustomerProducts(response);
+          setCustomerTinNumber(null); // Legacy handling, assume no TIN/ID
+          setCustomerIdNumber(null);
+          setSubmitAsEinvoice(false);
+          return response;
+        }
+      } catch (error) {
+        console.error("Error fetching customer products:", error);
+        toast.error("Could not load custom product prices.");
+        setCustomerProducts([]);
+        setCustomerTinNumber(null);
+        setCustomerIdNumber(null);
+        setSubmitAsEinvoice(false); // Disable on error
+        return [];
+      }
+    },
+    [allCustomers]
+  );
 
   useEffect(() => {
     if (invoiceData?.customerid) {
@@ -427,12 +517,6 @@ const InvoiceFormPage: React.FC = () => {
     }
     if (isPaid) {
       if (!paymentMethod) errors.push("Payment Method is required.");
-      if (
-        (paymentMethod === "cheque" || paymentMethod === "bank_transfer") &&
-        !paymentReference
-      ) {
-        errors.push("Payment Reference is required for Cheque/Bank Transfer.");
-      }
     }
     if (errors.length > 0) {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
@@ -453,7 +537,22 @@ const InvoiceFormPage: React.FC = () => {
 
       // 2. Create Invoice
       toast.loading("Creating invoice...", { id: toastId });
-      const savedInvoice = await createInvoice({ ...invoiceData });
+
+      // UPDATED: Prepare invoice data with payment information for CASH invoices
+      let invoiceDataToSubmit = { ...invoiceData };
+      if (invoiceData.paymenttype === "CASH" && isPaid) {
+        invoiceDataToSubmit = {
+          ...invoiceDataToSubmit,
+          payment_method: paymentMethod,
+          payment_reference:
+            paymentMethod === "cheque" || paymentMethod === "bank_transfer"
+              ? paymentReference
+              : undefined,
+          payment_notes: "Payment automatically recorded for CASH invoices",
+        };
+      }
+
+      const savedInvoice = await createInvoice(invoiceDataToSubmit);
       invoiceIdForNavigation = savedInvoice.id; // Store the successfully created ID
       toast.success(`Invoice ${invoiceIdForNavigation} created!`, {
         id: toastId,
@@ -462,37 +561,52 @@ const InvoiceFormPage: React.FC = () => {
       // 3. Create Payment (if needed)
       if (isPaid) {
         toast.loading("Recording payment...", { id: toastId });
-        const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
-          invoice_id: invoiceIdForNavigation, // Use the saved ID
-          payment_date: new Date().toISOString(),
-          amount_paid: savedInvoice.totalamountpayable,
-          payment_method: paymentMethod,
-          payment_reference:
-            paymentMethod === "cash" || paymentMethod === "online"
-              ? undefined
-              : paymentReference || undefined,
-        };
-        try {
-          await createPayment(paymentData);
-          toast.success(`Invoice ${invoiceIdForNavigation} created and paid!`, {
+
+        // Don't attempt to create a payment for CASH invoices - they are automatically paid by the backend
+        if (invoiceData.paymenttype !== "CASH") {
+          const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
+            invoice_id: invoiceIdForNavigation, // Use the saved ID
+            payment_date: new Date().toISOString(),
+            amount_paid: savedInvoice.totalamountpayable,
+            payment_method: paymentMethod,
+            payment_reference:
+              paymentMethod === "cash" || paymentMethod === "online"
+                ? undefined
+                : paymentReference || undefined,
+          };
+          try {
+            await createPayment(paymentData);
+            toast.success(
+              `Invoice ${invoiceIdForNavigation} created and paid!`,
+              {
+                id: toastId,
+              }
+            ); // Update toast
+          } catch (paymentError: any) {
+            // Payment failed, but invoice created. Show error, but proceed maybe?
+            toast.error(
+              `Invoice ${invoiceIdForNavigation} created, but payment failed: ${paymentError.message}. E-invoice submission skipped.`,
+              { id: toastId, duration: 6000 }
+            );
+            // Decide if you want to stop here or still attempt e-invoice if checked?
+            // For safety, let's stop if payment fails when expected.
+            setIsSaving(false); // Stop saving process
+            return; // Exit the function
+          }
+        } else {
+          // For CASH invoices, they are already paid by backend with our specified payment method
+          toast.success(`CASH Invoice ${invoiceIdForNavigation} created!`, {
             id: toastId,
-          }); // Update toast
-        } catch (paymentError: any) {
-          // Payment failed, but invoice created. Show error, but proceed maybe?
-          toast.error(
-            `Invoice ${invoiceIdForNavigation} created, but payment failed: ${paymentError.message}. E-invoice submission skipped.`,
-            { id: toastId, duration: 6000 }
-          );
-          // Decide if you want to stop here or still attempt e-invoice if checked?
-          // For safety, let's stop if payment fails when expected.
-          setIsSaving(false); // Stop saving process
-          return; // Exit the function
+          });
         }
       }
 
       // 4. Submit e-Invoice (if checked and eligible)
       const shouldSubmitEinvoice =
-        submitAsEinvoice && customerTinNumber && customerIdNumber;
+        submitAsEinvoice &&
+        customerTinNumber &&
+        customerIdNumber &&
+        isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
       if (shouldSubmitEinvoice) {
         // --- TRIGGER MODAL ---
@@ -592,12 +706,26 @@ const InvoiceFormPage: React.FC = () => {
     { id: "online", name: "Online" },
   ];
 
+  const isInvoiceDateEligibleForEinvoice = (
+    createdDateString: string | undefined | null
+  ): boolean => {
+    if (!createdDateString) return false;
+    const now = Date.now();
+    const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+    const cutoffTimestamp = now - threeDaysInMillis;
+    const invoiceTimestamp = parseInt(createdDateString, 10);
+    return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
+  };
+
   // Determine if e-invoice checkbox should be enabled
-  const canSubmitEinvoice = !!customerTinNumber && !!customerIdNumber;
+  const canSubmitEinvoice =
+    !!customerTinNumber &&
+    !!customerIdNumber &&
+    isInvoiceDateEligibleForEinvoice(invoiceData.createddate);
 
   // --- JSX Output ---
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-full">
+    <div className="px-4 md:px-6 pb-8 max-w-full -mt-8">
       <BackButton onClick={handleBackClick} disabled={isSaving} />
 
       {/* Header Area */}
@@ -630,7 +758,7 @@ const InvoiceFormPage: React.FC = () => {
             invoice={invoiceData}
             onInputChange={handleHeaderInputChange}
             isNewInvoice={true}
-            customers={customers}
+            customers={paginatedCustomers as unknown as Customer[]}
             salesmen={salesmenOptions}
             selectedCustomer={selectedCustomer}
             onCustomerChange={handleCustomerSelectionChange}
@@ -638,8 +766,8 @@ const InvoiceFormPage: React.FC = () => {
             setCustomerQuery={setCustomerQuery}
             onLoadMoreCustomers={loadMoreCustomers}
             hasMoreCustomers={hasMoreCustomers}
-            isFetchingCustomers={isFetchingCustomers}
-            readOnly={isSaving} // Make header read-only while saving
+            isFetchingCustomers={isCustomersLoading}
+            readOnly={isSaving}
           />
         </section>
 

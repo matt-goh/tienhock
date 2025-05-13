@@ -1,6 +1,6 @@
 // src/hooks/useCustomerNames.ts
 import { useState, useEffect, useRef } from "react";
-import { api } from "../routes/utils/api";
+import { api } from "../../routes/utils/api";
 
 const CACHE_KEY = "customers_cache"; // Reuse cache key
 

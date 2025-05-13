@@ -9,6 +9,12 @@ import {
   IconTrash,
   IconCheck,
   IconChevronDown,
+  IconClock,
+  IconAlertTriangle,
+  IconCancel,
+  IconRefresh,
+  IconFileDownload,
+  IconFiles,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -16,15 +22,21 @@ import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   Listbox,
-  // ListboxButton, // Use renamed HeadlessListboxButton
   ListboxOption,
   ListboxOptions,
   Transition, // Added Transition
-  ListboxButton as HeadlessListboxButton, // Renamed import
+  ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import clsx from "clsx"; // Added clsx
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import { SelectOption } from "../../../components/FormComponents"; // Import SelectOption if needed for payment methods
+import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
+import { SelectOption } from "../../../components/FormComponents";
+import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
+import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
+import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For PDF structure
+import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
+import { pdf, Document } from "@react-pdf/renderer";
+import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 
 interface Payment {
   payment_id: number;
@@ -35,35 +47,6 @@ interface Payment {
   payment_reference?: string;
   internal_reference?: string;
   status?: "active" | "cancelled";
-  cancellation_date?: string;
-  cancellation_reason?: string;
-}
-
-interface Invoice {
-  invoice_id: number;
-  invoice_number: string;
-  type: "regular" | "statement";
-  customer_id: number;
-  customer_name: string;
-  tin_number?: string;
-  id_number?: string;
-  rental_id?: number;
-  location_address?: string;
-  tong_no?: string;
-  date_placed?: string;
-  date_picked?: string;
-  driver?: string;
-  amount_before_tax: number;
-  tax_amount: number;
-  total_amount: number;
-  amount_paid: number;
-  current_balance: number;
-  date_issued: string;
-  balance_due: number;
-  statement_period_start?: string;
-  statement_period_end?: string;
-  einvoice_status?: "submitted" | "pending" | null;
-  status?: string;
   cancellation_date?: string;
   cancellation_reason?: string;
 }
@@ -87,7 +70,7 @@ const paymentMethodOptions: SelectOption[] = [
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [invoice, setInvoice] = useState<InvoiceGT | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +94,18 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [isCancellingInvoice, setIsCancellingInvoice] = useState(false);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
-  const [showEInvoiceErrorDialog, setShowEInvoiceErrorDialog] = useState(false);
-  const [eInvoiceErrorMessage, setEInvoiceErrorMessage] = useState("");
+  const [isCheckingEInvoice, setIsCheckingEInvoice] = useState(false);
+  const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
+    useState(false);
+  const [submissionResults, setSubmissionResults] =
+    useState<EInvoiceSubmissionResult | null>(null);
+  const [showEInvoiceConfirmDialog, setShowEInvoiceConfirmDialog] =
+    useState(false);
+  const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
+  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [consolidatedInfo, setConsolidatedInfo] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -126,6 +119,27 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   }, [state]);
 
+  useEffect(() => {
+    // Generate QR code when invoice loads and has valid e-invoice data
+    const generateQR = async () => {
+      if (
+        invoice?.uuid &&
+        invoice?.long_id &&
+        (invoice?.einvoice_status === "valid" ||
+          invoice?.einvoice_status === "cancelled")
+      ) {
+        try {
+          const qrData = await generateQRDataUrl(invoice.uuid, invoice.long_id);
+          setQrCodeData(qrData);
+        } catch (error) {
+          console.error("Error generating QR code:", error);
+        }
+      }
+    };
+
+    generateQR();
+  }, [invoice]);
+
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
       setLoading(true);
@@ -138,8 +152,8 @@ const InvoiceDetailsPage: React.FC = () => {
       const invoice = data.invoice;
 
       setInvoice(invoice);
-
       setPayments(data.payments || []);
+      setConsolidatedInfo(invoice.consolidated_part_of || null);
 
       // Pre-fill amount in payment form
       setPaymentFormData((prev) => ({
@@ -232,39 +246,45 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
-      // Fetch all payments to find unused reference numbers for the current month and year
-      const allPayments = await greenTargetApi.getPayments(true);
+      // Fetch all payments to find unused reference numbers (including cancelled ones)
+      const allPayments = await greenTargetApi.getPayments({
+        includeCancelled: true,
+      });
 
-      // Get current year (last 2 digits) and month (padded with zero)
-      const currentYear = new Date().getFullYear().toString().slice(-2);
-      const currentMonth = (new Date().getMonth() + 1)
+      // Get year and month from the INVOICE'S issued date, not payment date
+      const invoiceDate = new Date(invoice.date_issued);
+      const invoiceYear = invoiceDate.getFullYear().toString().slice(-2);
+      const invoiceMonth = (invoiceDate.getMonth() + 1)
         .toString()
         .padStart(2, "0");
 
       // Regular expression to match the format RV{year}/{month}/{number}
-      const regex = new RegExp(`^RV${currentYear}/${currentMonth}/(\\d+)$`);
+      const regex = new RegExp(`^RV${invoiceYear}/${invoiceMonth}/(\\d+)$`);
 
-      // Find the highest used number for the current month and year
+      // Find the highest used number for the invoice month and year
+      // (including cancelled payments)
       let highestNumber = 0;
-      allPayments.forEach((payment: { internal_reference: string | null }) => {
-        // Handle potential null
-        if (payment.internal_reference) {
-          const match = payment.internal_reference.match(regex);
-          if (match) {
-            const currentNumber = parseInt(match[1], 10);
-            if (currentNumber > highestNumber) {
-              highestNumber = currentNumber;
+      allPayments.forEach(
+        (payment: { internal_reference: string | null; status?: string }) => {
+          // Handle potential null and consider ALL payments regardless of status
+          if (payment.internal_reference) {
+            const match = payment.internal_reference.match(regex);
+            if (match) {
+              const currentNumber = parseInt(match[1], 10);
+              if (currentNumber > highestNumber) {
+                highestNumber = currentNumber;
+              }
             }
           }
         }
-      });
+      );
 
       // Increment by 1 to get the next number
       const nextNumber = highestNumber + 1;
 
-      // Format the reference number
+      // Format the reference number using invoice date's year/month
       const paddedNumber = nextNumber.toString().padStart(2, "0");
-      const referenceNumber = `RV${currentYear}/${currentMonth}/${paddedNumber}`;
+      const referenceNumber = `RV${invoiceYear}/${invoiceMonth}/${paddedNumber}`;
 
       const paymentData = {
         invoice_id: invoice.invoice_id,
@@ -335,56 +355,309 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const handleSubmitEInvoice = async () => {
     if (!invoice) return;
+    setShowEInvoiceConfirmDialog(true);
+  };
+
+  // Add this new function for the confirmed submission
+  const handleConfirmEInvoiceSubmission = async () => {
+    if (!invoice) return;
+
+    // Close dialog immediately before any async operations
+    setShowEInvoiceConfirmDialog(false);
+
+    // Small timeout to ensure dialog is closed before showing next UI
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
       setIsSubmittingEInvoice(true);
+      // Show the modal with loading state immediately
+      setSubmissionResults(null);
+      setShowSubmissionResultsModal(true);
+
       const toastId = toast.loading("Submitting e-Invoice...");
 
       // Call the actual e-Invoice submission API
       const response = await greenTargetApi.submitEInvoice(invoice.invoice_id);
 
-      if (response.success) {
-        toast.success("e-Invoice submitted successfully", { id: toastId });
+      // Dismiss the loading toast
+      toast.dismiss(toastId);
 
-        // Refresh invoice details to show updated status
+      // Transform the Green Target response to match the expected format
+      const transformedResponse = {
+        success: response.success,
+        message: response.message || "e-Invoice submitted successfully",
+        overallStatus:
+          response.einvoice?.einvoice_status === "valid"
+            ? "Valid"
+            : response.einvoice?.einvoice_status === "pending"
+            ? "Pending"
+            : "Unknown",
+        acceptedDocuments: response.einvoice
+          ? [
+              {
+                internalId: response.einvoice.invoice_number,
+                uuid: response.einvoice.uuid,
+                longId: response.einvoice.long_id,
+                status:
+                  response.einvoice.einvoice_status === "valid"
+                    ? "ACCEPTED"
+                    : "Submitted",
+                dateTimeValidated: response.einvoice.datetime_validated,
+              },
+            ]
+          : [],
+        rejectedDocuments:
+          !response.success && response.error
+            ? [
+                {
+                  internalId: invoice.invoice_id.toString(),
+                  error: {
+                    code: "ERROR",
+                    message: response.error.message || "Unknown error",
+                    details: response.error.details,
+                  },
+                },
+              ]
+            : [],
+      };
+
+      // Store the transformed response for the modal
+      setSubmissionResults(transformedResponse);
+
+      // Only show a toast for major failures that might prevent the modal from showing
+      if (!response.success && !response.message && !response.error) {
+        toast.error("Failed to submit e-Invoice due to an unexpected error");
+      }
+
+      // Still refresh the invoice data if successful
+      if (response.success) {
         fetchInvoiceDetails(invoice.invoice_id);
-      } else {
-        toast.error(response.message || "Failed to submit e-Invoice", {
-          id: toastId,
-        });
-        setEInvoiceErrorMessage(
-          response.message || "Failed to submit e-Invoice"
-        );
-        setShowEInvoiceErrorDialog(true);
       }
     } catch (error) {
       console.error("Error submitting e-Invoice:", error);
       toast.error("Failed to submit e-Invoice");
-      setEInvoiceErrorMessage(
-        error instanceof Error
-          ? `Failed to submit e-Invoice: ${error.message}`
-          : "Failed to submit e-Invoice due to an unknown error"
-      );
-      setShowEInvoiceErrorDialog(true);
+
+      // Create a formatted error response for the modal
+      setSubmissionResults({
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Unknown error occurred",
+        overallStatus: "Error",
+        rejectedDocuments: [
+          {
+            internalId: invoice.invoice_id.toString(),
+            error: {
+              code: "SYSTEM_ERROR",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Unknown error occurred",
+            },
+          },
+        ],
+      });
     } finally {
       setIsSubmittingEInvoice(false);
     }
   };
 
+  const handleCheckEInvoiceStatus = async () => {
+    if (!invoice?.invoice_id) return;
+
+    try {
+      setIsCheckingEInvoice(true);
+      const toastId = toast.loading("Checking e-Invoice status...");
+
+      // Call API to check status
+      const response = await greenTargetApi.checkEInvoiceStatus(
+        invoice.invoice_id
+      );
+
+      toast.dismiss(toastId);
+
+      // Format the response for the SubmissionResultsModal
+      const formattedResponse = {
+        success: response.success,
+        message: response.message || `e-Invoice status: ${response.status}`,
+        overallStatus:
+          response.status === "valid"
+            ? "Valid"
+            : response.status === "pending"
+            ? "Pending"
+            : "Invalid",
+        // Format in a way the modal can understand
+        acceptedDocuments:
+          response.status === "valid"
+            ? [
+                {
+                  internalId: invoice.invoice_id.toString(),
+                  uuid: invoice.uuid,
+                  longId: response.longId,
+                  status: "Valid",
+                  dateTimeValidated: response.dateTimeValidated,
+                },
+              ]
+            : [],
+        pendingUpdated:
+          response.status === "pending"
+            ? [
+                {
+                  id: invoice.invoice_id.toString(),
+                  status: "pending",
+                  updated: response.updated,
+                },
+              ]
+            : [],
+        rejectedDocuments:
+          response.status === "invalid"
+            ? [
+                {
+                  internalId: invoice.invoice_id.toString(),
+                  error: {
+                    code: "INVALID_EINVOICE",
+                    message: "e-Invoice is invalid",
+                  },
+                },
+              ]
+            : [],
+      };
+
+      setSubmissionResults(formattedResponse);
+      setShowSubmissionResultsModal(true);
+
+      // Refresh invoice details if status changed
+      if (response.updated) {
+        fetchInvoiceDetails(invoice.invoice_id);
+      }
+    } catch (error) {
+      console.error("Error checking e-Invoice status:", error);
+      toast.error("Failed to check e-Invoice status");
+
+      // Create error response for modal
+      setSubmissionResults({
+        success: false,
+        message: "Failed to check e-Invoice status",
+        overallStatus: "Error",
+        rejectedDocuments: [
+          {
+            internalId: invoice.invoice_id.toString(),
+            error: {
+              code: "STATUS_CHECK_ERROR",
+              message: error instanceof Error ? error.message : "Unknown error",
+            },
+          },
+        ],
+      });
+      setShowSubmissionResultsModal(true);
+    } finally {
+      setIsCheckingEInvoice(false);
+    }
+  };
+
+  const getConsolidatedInfo = (consolidatedInfo: any) => {
+    if (!consolidatedInfo) return null;
+
+    // Only show for valid consolidated invoices
+    if (consolidatedInfo.einvoice_status !== "valid") return null;
+
+    return {
+      text: "Consolidated",
+      color: "text-indigo-700",
+      bg: "bg-indigo-50",
+      border: "border-indigo-200",
+      icon: IconFiles,
+      info: consolidatedInfo,
+    };
+  };
+
+  const handleSyncCancellationStatus = async () => {
+    if (!invoice?.invoice_id) return;
+
+    try {
+      setIsSyncingCancellation(true);
+      const toastId = toast.loading("Syncing cancellation status...");
+
+      // Call API to sync cancellation status
+      const response = await greenTargetApi.syncEInvoiceCancellation(
+        invoice.invoice_id
+      );
+
+      toast.dismiss(toastId);
+
+      // Show success message
+      if (response.success) {
+        toast.success(response.message);
+
+        // Refresh invoice details
+        fetchInvoiceDetails(invoice.invoice_id);
+      } else {
+        toast.error(response.message || "Failed to sync cancellation status");
+      }
+    } catch (error) {
+      console.error("Error syncing cancellation status:", error);
+      toast.error("Failed to sync cancellation status");
+    } finally {
+      setIsSyncingCancellation(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    // Made async
+    if (!invoice || isGeneratingPDF) return;
+
+    setIsGeneratingPDF(true); // Disable button
+    const toastId = toast.loading("Generating PDF...");
+
+    try {
+      // Prepare the PDF document structure
+      const pdfComponent = (
+        <Document title={generateGTPDFFilename([invoice]).replace(".pdf", "")}>
+          <GTInvoicePDF invoice={invoice} qrCodeData={qrCodeData} />
+        </Document>
+      );
+
+      // Generate PDF blob
+      const pdfBlob = await pdf(pdfComponent).toBlob();
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      // Create and trigger download link
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = generateGTPDFFilename([invoice]); // Generate filename
+      document.body.appendChild(link);
+      link.click(); // Trigger download
+      document.body.removeChild(link); // Clean up link
+
+      // Delay slightly before revoking URL to ensure download starts
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("PDF downloaded successfully", { id: toastId });
+        setIsGeneratingPDF(false); // Re-enable button
+      }, 100);
+    } catch (error) {
+      console.error("Error generating PDF for download:", error);
+      toast.error(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+      setIsGeneratingPDF(false); // Re-enable button on error
+    }
+  };
+
   const handlePrintInvoice = () => {
-    // Placeholder for print functionality
-    toast.success("Invoice printing functionality would go here");
-    // In a real implementation, you'd either:
-    // 1. Open a print-friendly view
-    // 2. Generate a PDF and download it
-    // 3. Send to a backend endpoint for printing
+    if (!invoice || isGeneratingPDF) return;
+    setShowPrintOverlay(true); // Render the print overlay component
+    // GTPrintPDFOverlay handles the print process and calls onComplete
   };
 
   const handleCancelInvoice = async () => {
     if (!invoice) return;
 
     // Check if invoice has payments
-    if (payments.length > 0) {
+    const activePayments = payments.filter((p) => p.status === "active");
+    if (activePayments.length > 0) {
       toast.error(
         "Cannot cancel invoice: it has associated payments. Cancel the payments first."
       );
@@ -421,6 +694,26 @@ const InvoiceDetailsPage: React.FC = () => {
         return invoice && invoice.current_balance > 0
           ? "bg-amber-100 text-amber-800" // Unpaid style
           : "bg-gray-100 text-gray-800"; // Default/Unknown style
+    }
+  };
+
+  const isInvoiceDateEligibleForEinvoice = (
+    dateIssuedString: string | undefined | null
+  ): boolean => {
+    if (!dateIssuedString) return false;
+
+    try {
+      // Parse the ISO date string to a Date object
+      const dateIssued = new Date(dateIssuedString);
+      if (isNaN(dateIssued.getTime())) return false; // Invalid date
+
+      const now = new Date();
+      const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+      const cutoffDate = new Date(now.getTime() - threeDaysInMillis);
+
+      return dateIssued >= cutoffDate;
+    } catch {
+      return false;
     }
   };
 
@@ -489,7 +782,7 @@ const InvoiceDetailsPage: React.FC = () => {
     : "Select Payment Method";
 
   return (
-    <div className="container mx-auto px-8 pb-8 -mt-8">
+    <div className="container mx-auto px-8 pb-8 -mt-6">
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
         <div>
@@ -509,61 +802,155 @@ const InvoiceDetailsPage: React.FC = () => {
             >
               {invoice.invoice_number}
             </span>
-            {invoice.einvoice_status === "submitted" && (
+            {/* e-Invoice status badges */}
+            {invoice.einvoice_status === "valid" && (
               <button
                 className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 border border-green-300 text-green-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
-                title="e-Invoice Submitted"
+                title="e-Invoice Valid"
               >
                 <IconCheck size={18} stroke={1.5} />
-                <span className="truncate">e-Invoice Submitted</span>
+                <span className="truncate">e-Invoice Valid</span>
               </button>
             )}
+            {invoice.einvoice_status === "pending" && (
+              <button
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 border border-sky-300 text-sky-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                title="e-Invoice Pending"
+              >
+                <IconClock size={18} stroke={1.5} />
+                <span className="truncate">e-Invoice Pending</span>
+              </button>
+            )}
+            {invoice.einvoice_status === "invalid" && (
+              <button
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-rose-100 border border-rose-300 text-rose-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                title="e-Invoice Invalid"
+              >
+                <IconAlertTriangle size={18} stroke={1.5} />
+                <span className="truncate">e-Invoice Invalid</span>
+              </button>
+            )}
+            {/* Consolidated badge */}
+            {consolidatedInfo &&
+              consolidatedInfo.einvoice_status === "valid" && (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${consolidatedInfo.uuid}/share/${consolidatedInfo.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-3 px-3 py-1.5 text-xs font-medium bg-indigo-100 border border-indigo-300 text-indigo-600 rounded-full flex items-center gap-1 max-w-[180px]"
+                  title={`Part of consolidated invoice ${consolidatedInfo.invoice_number}`}
+                >
+                  <IconFiles size={18} stroke={1.5} />
+                  <span className="truncate">Consolidated</span>
+                </a>
+              )}
           </h1>
         </div>
 
-        <div className="flex space-x-3 mt-4 md:mt-0 md:self-end">
-          {/* e-Invoice button - only show if customer has required fields */}
-          {invoice.tin_number &&
-            invoice.id_number &&
-            !invoice.einvoice_status && (
+        <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3 mt-4 md:mt-0 w-full md:w-auto md:self-end">
+          {/* Group buttons by function using responsive flex containers */}
+          <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            {/* e-Invoice buttons */}
+            {invoice.tin_number &&
+              invoice.id_number &&
+              isInvoiceDateEligibleForEinvoice(invoice.date_issued) && (
+                <>
+                  {!invoice.einvoice_status ||
+                  invoice.einvoice_status === "invalid" ? (
+                    <Button
+                      onClick={handleSubmitEInvoice}
+                      icon={IconFileInvoice}
+                      variant="outline"
+                      color="amber"
+                      disabled={
+                        isSubmittingEInvoice || invoice.status === "cancelled"
+                      }
+                      className="w-full sm:w-auto"
+                    >
+                      {isSubmittingEInvoice
+                        ? "Submitting..."
+                        : "Submit e-Invoice"}
+                    </Button>
+                  ) : invoice.einvoice_status === "pending" ? (
+                    <Button
+                      onClick={handleCheckEInvoiceStatus}
+                      icon={IconClock}
+                      variant="outline"
+                      color="sky"
+                      disabled={isCheckingEInvoice}
+                      className="w-full sm:w-auto"
+                    >
+                      {isCheckingEInvoice ? "Checking..." : "Check Status"}
+                    </Button>
+                  ) : null}
+                </>
+              )}
+            {invoice.status === "cancelled" &&
+              invoice.einvoice_status &&
+              invoice.einvoice_status !== "cancelled" &&
+              invoice.uuid && (
+                <Button
+                  onClick={handleSyncCancellationStatus}
+                  icon={IconRefresh}
+                  variant="outline"
+                  color="rose"
+                  disabled={isSyncingCancellation}
+                  className="w-full sm:w-auto"
+                >
+                  {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+                </Button>
+              )}
+          </div>
+
+          {/* PDF action buttons */}
+          <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            <Button
+              onClick={handlePrintInvoice}
+              icon={IconPrinter}
+              variant="outline"
+              disabled={loading}
+              title="Print PDF"
+              className="flex-1 sm:flex-none"
+            >
+              Print
+            </Button>
+            <Button
+              onClick={handleDownloadInvoice}
+              icon={IconFileDownload}
+              variant="outline"
+              disabled={isGeneratingPDF || loading}
+              title="Download PDF"
+              className="flex-1 sm:flex-none"
+            >
+              {isGeneratingPDF ? "Generating..." : "Download"}
+            </Button>
+          </div>
+
+          {/* Invoice action buttons */}
+          <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            {invoice.current_balance > 0 && (
               <Button
-                onClick={handleSubmitEInvoice}
-                icon={IconFileInvoice}
+                onClick={() => setShowPaymentForm(!showPaymentForm)}
+                icon={IconCash}
                 variant="outline"
-                color="amber"
-                disabled={isSubmittingEInvoice}
+                color="sky"
+                disabled={invoice.status === "cancelled"}
+                className="flex-1 sm:flex-none"
               >
-                {isSubmittingEInvoice ? "Submitting..." : "Submit e-Invoice"}
+                {showPaymentForm ? "Cancel" : "Record Payment"}
               </Button>
             )}
-          <Button
-            onClick={handlePrintInvoice}
-            icon={IconPrinter}
-            variant="outline"
-            className="hidden md:block"
-          >
-            Print
-          </Button>
-          {invoice.current_balance > 0 && (
             <Button
-              onClick={() => setShowPaymentForm(!showPaymentForm)}
-              icon={IconCash}
+              onClick={() => setIsCancelInvoiceDialogOpen(true)}
+              icon={IconTrash}
               variant="outline"
-              color="sky"
+              color="rose"
               disabled={invoice.status === "cancelled"}
+              className="flex-1 sm:flex-none"
             >
-              {showPaymentForm ? "Cancel" : "Record Payment"}
+              {invoice.status === "cancelled" ? "Cancelled" : "Cancel Invoice"}
             </Button>
-          )}
-          <Button
-            onClick={() => setIsCancelInvoiceDialogOpen(true)}
-            icon={IconTrash}
-            variant="outline"
-            color="rose"
-            disabled={invoice.status === "cancelled"}
-          >
-            {invoice.status === "cancelled" ? "Cancelled" : "Cancel Invoice"}
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -828,9 +1215,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     Type:
                   </td>
                   <td className="py-2 font-medium text-default-900">
-                    {invoice.type === "regular"
-                      ? "Regular Invoice"
-                      : "Statement"}
+                    Regular Invoice
                   </td>
                 </tr>
                 <tr>
@@ -841,17 +1226,6 @@ const InvoiceDetailsPage: React.FC = () => {
                     {formatDate(invoice.date_issued)}
                   </td>
                 </tr>
-                {invoice.type === "statement" && (
-                  <tr>
-                    <td className="py-2 pr-4 text-default-500 font-medium align-top">
-                      Statement Period:
-                    </td>
-                    <td className="py-2 font-medium text-default-900 truncate max-w-[200px] md:max-w-none">
-                      {formatDate(invoice.statement_period_start || "")} to{" "}
-                      {formatDate(invoice.statement_period_end || "")}
-                    </td>
-                  </tr>
-                )}
                 <tr>
                   <td className="py-2 pr-4 text-default-500 font-medium align-top">
                     Customer:
@@ -1159,13 +1533,13 @@ const InvoiceDetailsPage: React.FC = () => {
                           className="px-2"
                         >
                           {payment.status === "cancelled" ? (
-                            <button className="italic cursor-not-allowed">
+                            <span className="italic cursor-not-allowed">
                               Cancelled
-                            </button>
+                            </span>
                           ) : (
-                            <button className="flex items-center gap-1">
+                            <span className="flex items-center gap-1">
                               <IconTrash size={16} /> Cancel
-                            </button>
+                            </span>
                           )}
                         </Button>
                       </td>
@@ -1177,6 +1551,146 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* e-Invoice Details Section */}
+      {invoice.einvoice_status && (
+        <div className="mt-8">
+          <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+            <div
+              className={`p-4 ${
+                invoice.einvoice_status === "valid"
+                  ? "bg-green-50 border-b border-green-200"
+                  : invoice.einvoice_status === "pending"
+                  ? "bg-sky-50 border-b border-sky-200"
+                  : invoice.einvoice_status === "invalid"
+                  ? "bg-rose-50 border-b border-rose-200"
+                  : invoice.einvoice_status === "cancelled"
+                  ? "bg-default-50 border-b border-default-200"
+                  : "bg-default-50 border-b border-default-200"
+              }`}
+            >
+              <div className="flex items-center">
+                {invoice.einvoice_status === "valid" ? (
+                  <IconCheck size={22} className="text-green-600 mr-3" />
+                ) : invoice.einvoice_status === "pending" ? (
+                  <IconClock size={22} className="text-sky-600 mr-3" />
+                ) : invoice.einvoice_status === "invalid" ? (
+                  <IconAlertTriangle size={22} className="text-rose-600 mr-3" />
+                ) : invoice.einvoice_status === "cancelled" ? (
+                  <IconCancel size={22} className="text-default-600 mr-3" />
+                ) : null}
+                <div>
+                  <h3 className="text-lg font-medium">
+                    {invoice.einvoice_status === "valid"
+                      ? "Valid e-Invoice"
+                      : invoice.einvoice_status === "pending"
+                      ? "Pending Validation"
+                      : invoice.einvoice_status === "invalid"
+                      ? "Invalid e-Invoice"
+                      : invoice.einvoice_status === "cancelled"
+                      ? "Cancelled e-Invoice"
+                      : "e-Invoice Status"}
+                  </h3>
+                  {invoice.einvoice_status === "pending" && (
+                    <p className="text-sm text-sky-600 mt-1">
+                      This e-invoice has been submitted but is still pending
+                      validation.
+                    </p>
+                  )}
+                  {invoice.einvoice_status === "invalid" && (
+                    <p className="text-sm text-rose-600 mt-1">
+                      This e-invoice has been rejected or marked as invalid.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {invoice.uuid && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      UUID
+                    </label>
+                    <div
+                      className="font-mono text-sm truncate"
+                      title={invoice.uuid}
+                    >
+                      {invoice.uuid}
+                    </div>
+                  </div>
+                )}
+                {invoice.submission_uid && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      Submission UID
+                    </label>
+                    <div
+                      className="font-mono text-sm truncate"
+                      title={invoice.submission_uid}
+                    >
+                      {invoice.submission_uid}
+                    </div>
+                  </div>
+                )}
+                {invoice.long_id && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      Long ID
+                    </label>
+                    <div
+                      className="font-mono text-sm truncate"
+                      title={invoice.long_id}
+                    >
+                      {invoice.long_id}
+                    </div>
+                  </div>
+                )}
+                {invoice.datetime_validated && (
+                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
+                    <label className="block text-xs text-default-500 mb-1">
+                      Validation Date
+                    </label>
+                    <div className="text-sm">
+                      {new Date(invoice.datetime_validated).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Add MyInvois portal link if valid */}
+              {(invoice.einvoice_status === "valid" ||
+                invoice.einvoice_status === "cancelled") &&
+                invoice.long_id && (
+                  <div className="mt-4 text-center">
+                    <a
+                      href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
+                    >
+                      View in MyInvois Portal
+                    </a>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
+      <SubmissionResultsModal
+        isOpen={showSubmissionResultsModal}
+        onClose={() => setShowSubmissionResultsModal(false)}
+        results={
+          submissionResults
+            ? {
+                ...submissionResults,
+                message: submissionResults.message || "", // Ensure message is always a string
+                overallStatus: submissionResults.overallStatus || "Unknown", // Ensure overallStatus is always a string
+              }
+            : null
+        }
+        isLoading={isSubmittingEInvoice && !submissionResults}
+      />
       <ConfirmationDialog
         isOpen={isCancelPaymentDialogOpen}
         onClose={() => setIsCancelPaymentDialogOpen(false)}
@@ -1209,16 +1723,25 @@ const InvoiceDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
+      {/* e-Invoice Confirmation Dialog */}
       <ConfirmationDialog
-        isOpen={showEInvoiceErrorDialog}
-        onClose={() => setShowEInvoiceErrorDialog(false)}
-        onConfirm={() => setShowEInvoiceErrorDialog(false)}
-        title="e-Invoice Submission Error"
-        message={eInvoiceErrorMessage}
-        confirmButtonText="Close"
-        variant="danger"
-        hideCancelButton={true}
+        isOpen={showEInvoiceConfirmDialog}
+        onClose={() => setShowEInvoiceConfirmDialog(false)}
+        onConfirm={handleConfirmEInvoiceSubmission}
+        title="Submit e-Invoice"
+        message={`Are you sure you want to submit Invoice ${invoice?.invoice_number} as an e-Invoice to MyInvois?`}
+        confirmButtonText="Submit"
+        variant="default"
       />
+      {/* PDF Handlers (Rendered conditionally) */}
+      {showPrintOverlay && invoice && (
+        <GTPrintPDFOverlay
+          invoices={[invoice]} // Pass the single detailed invoice in an array
+          onComplete={() => {
+            setShowPrintOverlay(false);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -43,6 +43,7 @@ export const GREENTARGET_INFO = {
   country_code: "12", // Sabah code for XML template
 
   // PDF-specific formatting
+  office_phone_pdf: "088719795",
   sst_id_pdf: "-",
   address_pdf: "CL.215145645, Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah",
   city_pdf: "Kota Kinabalu",

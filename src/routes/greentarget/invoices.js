@@ -1,34 +1,87 @@
 // src/routes/greentarget/invoices.js
 import { Router } from "express";
+import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 
-export default function (pool) {
+export default function (pool, defaultConfig) {
   const router = Router();
+
+  const apiClient = GTEInvoiceApiClientFactory.getInstance(defaultConfig);
+
+  // Generate a unique invoice number
+  async function generateInvoiceNumber(client, type) {
+    const year = new Date().getFullYear();
+    const sequenceName = "greentarget.regular_invoice_seq";
+
+    try {
+      const result = await client.query(
+        `SELECT nextval('${sequenceName}') as next_val`
+      );
+      const nextVal = result.rows[0].next_val;
+
+      if (type === "regular") {
+        return `${year}/${String(nextVal).padStart(5, "0")}`;
+      } else {
+        return `I${year}/${String(nextVal).padStart(4, "0")}`;
+      }
+    } catch (seqError) {
+      console.error(
+        `Error getting next value for sequence ${sequenceName}:`,
+        seqError
+      );
+      throw new Error("Failed to generate invoice number."); // Throw a more specific error
+    }
+  }
 
   // Get all invoices (with optional filters - ADDED status filter)
   router.get("/", async (req, res) => {
     // Added 'status' to destructuring
-    const { customer_id, rental_id, start_date, end_date, status } = req.query;
+    const {
+      customer_id,
+      start_date,
+      end_date,
+      status,
+      consolidated_only,
+      exclude_consolidated,
+    } = req.query;
 
     try {
       let query = `
         SELECT i.*,
-               c.name as customer_name,
-               c.phone_number as customer_phone_number,
-               c.tin_number,
-               c.id_number,
-               l.address as location_address,
-               l.phone_number as location_phone_number,
-               r.driver,
-               r.tong_no,
-               -- Calculate paid amount correctly using non-cancelled payments
-               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid
+              c.name as customer_name,
+              c.phone_number as customer_phone_number,
+              c.tin_number,
+              c.id_number,
+              c.id_type,
+              c.additional_info,
+              l.address as location_address,
+              l.phone_number as location_phone_number,
+              r.driver,
+              r.tong_no,
+              -- Calculate paid amount correctly using non-cancelled payments
+              COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
+              -- Add subquery to check if invoice is part of a consolidated invoice
+              (
+                SELECT jsonb_build_object(
+                  'id', con.invoice_id,
+                  'invoice_number', con.invoice_number,
+                  'uuid', con.uuid,
+                  'long_id', con.long_id,
+                  'einvoice_status', con.einvoice_status
+                )
+                FROM greentarget.invoices con
+                WHERE con.is_consolidated = true
+                  AND con.status != 'cancelled'
+                  AND con.consolidated_invoices ? i.invoice_number
+                LIMIT 1
+              ) as consolidated_part_of
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
         LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         -- LEFT JOIN ensures invoices without payments are included
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
-        WHERE 1=1
+        WHERE (i.is_consolidated IS NOT TRUE OR i.is_consolidated IS NULL)
+        AND i.type != 'consolidated'
       `;
 
       const queryParams = [];
@@ -37,12 +90,6 @@ export default function (pool) {
       if (customer_id) {
         query += ` AND i.customer_id = $${paramCounter}`;
         queryParams.push(customer_id);
-        paramCounter++;
-      }
-
-      if (rental_id) {
-        query += ` AND i.rental_id = $${paramCounter}`;
-        queryParams.push(rental_id);
         paramCounter++;
       }
 
@@ -60,7 +107,27 @@ export default function (pool) {
         paramCounter++;
       }
 
-      // *** ADDED Status Filter (Handles comma-separated list) ***
+      if (consolidated_only === "true") {
+        // Check if this invoice is referenced in any consolidated invoice
+        query += ` AND EXISTS (
+          SELECT 1 FROM greentarget.invoices con 
+          WHERE con.is_consolidated = true
+          AND con.status != 'cancelled'
+          AND con.consolidated_invoices ? i.invoice_number
+        )`;
+      }
+
+      if (exclude_consolidated === "true") {
+        // Check that this invoice is NOT referenced in any consolidated invoice
+        query += ` AND NOT EXISTS (
+          SELECT 1 FROM greentarget.invoices con 
+          WHERE con.is_consolidated = true
+          AND con.status != 'cancelled'
+          AND con.consolidated_invoices ? i.invoice_number
+        )`;
+      }
+
+      // *** Status Filter (Handles comma-separated list) ***
       if (status) {
         const statuses = status
           .split(",")
@@ -102,6 +169,7 @@ export default function (pool) {
           amount_paid: parseFloat(amountPaid.toFixed(2)), // Ensure correct format
           current_balance: finalBalanceDue, // Use the calculated and clamped balance
           balance_due: finalBalanceDue, // Keep balance_due consistent
+          consolidated_part_of: invoice.consolidated_part_of,
         };
       });
 
@@ -115,33 +183,110 @@ export default function (pool) {
     }
   });
 
-  // Generate a unique invoice number
-  async function generateInvoiceNumber(client, type) {
-    const year = new Date().getFullYear();
-    const sequenceName =
-      type === "regular"
-        ? "greentarget.regular_invoice_seq"
-        : "greentarget.statement_invoice_seq";
+  // GET /greentarget/api/invoices/batch - Get Multiple Invoices By IDs
+  router.get("/batch", async (req, res) => {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res
+        .status(400)
+        .json({ message: "Missing required ids parameter" });
+    }
 
     try {
-      const result = await client.query(
-        `SELECT nextval('${sequenceName}') as next_val`
-      );
-      const nextVal = result.rows[0].next_val;
+      // Split comma-separated string into array
+      const invoiceIds = ids.split(",").map((id) => parseInt(id, 10));
 
-      if (type === "regular") {
-        return `${year}/${String(nextVal).padStart(5, "0")}`;
-      } else {
-        return `I${year}/${String(nextVal).padStart(4, "0")}`;
+      // Filter out any NaN values
+      const validIds = invoiceIds.filter((id) => !isNaN(id));
+
+      // Limit batch size for performance
+      if (validIds.length > 100) {
+        return res.status(400).json({
+          message: "Too many invoices requested. Maximum batch size is 100.",
+        });
       }
-    } catch (seqError) {
-      console.error(
-        `Error getting next value for sequence ${sequenceName}:`,
-        seqError
-      );
-      throw new Error("Failed to generate invoice number."); // Throw a more specific error
+
+      if (validIds.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No valid invoice IDs provided" });
+      }
+
+      // Generate a query to fetch multiple invoices at once
+      const placeholders = validIds.map((_, i) => `$${i + 1}`).join(",");
+
+      const invoiceQuery = `
+      SELECT i.*,
+            c.name as customer_name,
+            c.phone_number as customer_phone_number,
+            c.tin_number,
+            c.id_number,
+            c.id_type,
+            r.rental_id,
+            r.tong_no,
+            r.date_placed,
+            r.date_picked,
+            r.driver,
+            l.address as location_address,
+            l.phone_number as location_phone_number,
+            -- Calculate paid amount correctly using non-cancelled payments
+            COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
+            -- Add subquery for consolidated part info
+            (
+              SELECT jsonb_build_object(
+                'id', con.invoice_id,
+                'invoice_number', con.invoice_number,
+                'uuid', con.uuid,
+                'long_id', con.long_id,
+                'einvoice_status', con.einvoice_status
+              )
+              FROM greentarget.invoices con
+              WHERE con.is_consolidated = true
+                AND con.status != 'cancelled'
+                AND con.consolidated_invoices ? i.invoice_number
+              LIMIT 1
+            ) as consolidated_part_of
+      FROM greentarget.invoices i
+      JOIN greentarget.customers c ON i.customer_id = c.customer_id
+      LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+      LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
+      LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
+      WHERE i.invoice_id IN (${placeholders})
+      GROUP BY i.invoice_id, c.customer_id, r.rental_id, l.location_id
+    `;
+
+      const result = await pool.query(invoiceQuery, validIds);
+
+      // Calculate current balance for each invoice
+      const invoicesWithBalance = result.rows.map((invoice) => {
+        const totalAmount = parseFloat(invoice.total_amount || 0);
+        const amountPaid = parseFloat(invoice.amount_paid || 0);
+        const balance = totalAmount - amountPaid;
+
+        // Ensure balance_due is consistent
+        let finalBalanceDue = invoice.status === "cancelled" ? 0 : balance;
+        // Clamp balance to zero if slightly negative due to float issues
+        finalBalanceDue = Math.max(0, parseFloat(finalBalanceDue.toFixed(2)));
+
+        return {
+          ...invoice,
+          amount_paid: parseFloat(amountPaid.toFixed(2)),
+          current_balance: finalBalanceDue,
+          balance_due: finalBalanceDue,
+          consolidated_part_of: invoice.consolidated_part_of,
+        };
+      });
+
+      res.json(invoicesWithBalance);
+    } catch (error) {
+      console.error("Error fetching batch invoices:", error);
+      res.status(500).json({
+        message: "Error fetching invoices",
+        error: error.message,
+      });
     }
-  }
+  });
 
   // Get invoice by ID
   router.get("/:invoice_id", async (req, res) => {
@@ -156,20 +301,35 @@ export default function (pool) {
       // Get invoice details with customer, rental, and payment info
       // Calculate amount_paid correctly, excluding cancelled payments
       const invoiceQuery = `
-        SELECT i.*,
-               c.name as customer_name,
-               c.phone_number as customer_phone_number,
-               c.tin_number,
-               c.id_number,
-               r.rental_id,
-               r.tong_no,
-               r.date_placed,
-               r.date_picked,
-               r.driver,
-               l.address as location_address,
-               l.phone_number as location_phone_number,
-               -- Calculate paid amount correctly using non-cancelled payments
-               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid
+              SELECT i.*,
+              c.name as customer_name,
+              c.phone_number as customer_phone_number,
+              c.tin_number,
+              c.id_number,
+              r.rental_id,
+              r.tong_no,
+              r.date_placed,
+              r.date_picked,
+              r.driver,
+              l.address as location_address,
+              l.phone_number as location_phone_number,
+              -- Calculate paid amount correctly using non-cancelled payments
+              COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
+              -- Add subquery for consolidated part info
+              (
+                SELECT jsonb_build_object(
+                  'id', con.invoice_id,
+                  'invoice_number', con.invoice_number,
+                  'uuid', con.uuid,
+                  'long_id', con.long_id,
+                  'einvoice_status', con.einvoice_status
+                )
+                FROM greentarget.invoices con
+                WHERE con.is_consolidated = true
+                  AND con.status != 'cancelled'
+                  AND con.consolidated_invoices ? i.invoice_number
+                LIMIT 1
+              ) as consolidated_part_of
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
         LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
@@ -208,6 +368,7 @@ export default function (pool) {
       invoice.current_balance = currentBalance;
       invoice.balance_due = invoice.status === "cancelled" ? 0 : currentBalance;
       invoice.amount_paid = parseFloat(amountPaid.toFixed(2)); // Ensure format
+      invoice.consolidated_part_of = invoice.consolidated_part_of;
 
       res.json({
         invoice: invoice,
@@ -234,8 +395,6 @@ export default function (pool) {
       amount_before_tax,
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
-      statement_period_start,
-      statement_period_end,
     } = req.body;
 
     const client = await pool.connect();
@@ -249,19 +408,11 @@ export default function (pool) {
           "Missing required fields: type, customer_id, amount_before_tax, date_issued."
         );
       }
-      if (!["regular", "statement"].includes(type)) {
+      if (!["regular"].includes(type)) {
         throw new Error("Invalid invoice type specified.");
       }
       if (type === "regular" && !rental_id) {
         throw new Error("Rental ID is required for regular invoices.");
-      }
-      if (
-        type === "statement" &&
-        (!statement_period_start || !statement_period_end)
-      ) {
-        throw new Error(
-          "Statement period start and end dates are required for statement invoices."
-        );
       }
       const numAmountBeforeTax = parseFloat(amount_before_tax);
       const numTaxAmount = parseFloat(tax_amount);
@@ -280,10 +431,9 @@ export default function (pool) {
         INSERT INTO greentarget.invoices (
           invoice_number, type, customer_id, rental_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
-          balance_due, -- Initially balance equals total
-          statement_period_start, statement_period_end
+          balance_due
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *;
       `;
 
@@ -297,8 +447,6 @@ export default function (pool) {
         total_amount.toFixed(2),
         date_issued,
         total_amount.toFixed(2), // Initial balance_due
-        type === "statement" ? statement_period_start : null,
-        type === "statement" ? statement_period_end : null,
       ]);
 
       // Update customer last_activity_date
@@ -355,7 +503,7 @@ export default function (pool) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT status, total_amount FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE", // Lock the row
+        "SELECT status, total_amount, uuid, einvoice_status FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE", // Lock the row
         [numericInvoiceId]
       );
 
@@ -363,8 +511,9 @@ export default function (pool) {
         await client.query("ROLLBACK"); // Release lock
         return res.status(404).json({ message: "Invoice not found" });
       }
-      const currentStatus = invoiceCheck.rows[0].status;
-      const totalAmount = parseFloat(invoiceCheck.rows[0].total_amount);
+      const invoice = invoiceCheck.rows[0];
+      const currentStatus = invoice.status;
+      const totalAmount = parseFloat(invoice.total_amount);
 
       if (currentStatus === "cancelled") {
         await client.query("ROLLBACK"); // Release lock
@@ -386,22 +535,58 @@ export default function (pool) {
         );
       }
 
+      // NEW CODE: Handle e-Invoice cancellation
+      let einvoiceCancelledApi = false;
+      let apiResponseMessage = null;
+
+      if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+        try {
+          // Call MyInvois API to cancel e-invoice
+          await apiClient.makeApiCall(
+            "PUT",
+            `/api/v1.0/documents/state/${invoice.uuid}/state`,
+            { status: "cancelled", reason: reason || "Invoice cancelled" }
+          );
+
+          einvoiceCancelledApi = true;
+          apiResponseMessage = `Successfully cancelled e-invoice ${invoice.uuid} via API.`;
+        } catch (cancelError) {
+          console.error(
+            `Error cancelling e-invoice ${invoice.uuid} via API:`,
+            cancelError
+          );
+          // Log error but continue with local cancellation
+          if (cancelError.status === 400) {
+            console.warn(
+              `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
+            );
+            einvoiceCancelledApi = true; // Assume cancelled if API fails in a way suggesting it's already done
+          }
+          apiResponseMessage = `Failed to cancel e-invoice via API: ${cancelError.message}`;
+        }
+      }
+
+      // Determine new e-Invoice status based on API result
+      const newEInvoiceStatus = einvoiceCancelledApi
+        ? "cancelled"
+        : invoice.einvoice_status;
+
       // Update the invoice status to cancelled, set balance to 0
       const updateQuery = `
         UPDATE greentarget.invoices
         SET status = 'cancelled',
             balance_due = 0, -- Set balance to 0 upon cancellation
             cancellation_date = CURRENT_TIMESTAMP,
-            cancellation_reason = $1
-        WHERE invoice_id = $2
+            cancellation_reason = $1,
+            einvoice_status = $2 -- Update e-invoice status
+        WHERE invoice_id = $3
         RETURNING *;
       `;
       const updateResult = await client.query(updateQuery, [
         reason || null,
+        newEInvoiceStatus,
         numericInvoiceId,
       ]);
-
-      // Optionally: Update related rental status if applicable? (Depends on business logic)
 
       await client.query("COMMIT");
 
@@ -414,6 +599,8 @@ export default function (pool) {
       res.json({
         message: "Invoice cancelled successfully",
         invoice: cancelledInvoice,
+        einvoice_cancelled: einvoiceCancelledApi,
+        einvoice_message: apiResponseMessage,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -429,59 +616,6 @@ export default function (pool) {
     } finally {
       client.release();
     }
-  });
-
-  // Replace the DELETE endpoint with a redirect to the cancel endpoint
-  router.delete("/:invoice_id", async (req, res, next) => {
-    // Added next
-    const { invoice_id } = req.params;
-    const numericInvoiceId = parseInt(invoice_id, 10);
-
-    if (isNaN(numericInvoiceId)) {
-      return res.status(400).json({ message: "Invalid invoice ID format" });
-    }
-
-    // Deprecation Warning (Optional but good practice)
-    console.warn(
-      `DELETE /greentarget/api/invoices/${invoice_id} is deprecated. Use PUT /greentarget/api/invoices/${invoice_id}/cancel.`
-    );
-    res.setHeader(
-      "X-Deprecated-API",
-      `DELETE /greentarget/api/invoices/:invoice_id is deprecated. Use PUT /greentarget/api/invoices/:invoice_id/cancel instead.`
-    );
-    res.setHeader("Warning", '299 - "Deprecated API Endpoint"'); // Standard warning header
-
-    // --- Option 1: Directly call the cancel logic (more efficient) ---
-    // Simulate the PUT request body if needed (e.g., if cancel expects a reason)
-    req.body = {
-      reason: req.body.reason || "Cancelled via deprecated DELETE endpoint",
-    }; // Provide a default reason
-
-    // Find the handler for the PUT route and call it
-    const putRoute = router.stack.find(
-      (layer) =>
-        layer.route &&
-        layer.route.path === "/:invoice_id/cancel" &&
-        layer.route.methods.put
-    );
-
-    if (putRoute && putRoute.route.stack[0].handle) {
-      putRoute.route.stack[0].handle(req, res, next); // Execute the PUT handler
-    } else {
-      console.error(
-        "Could not find PUT /:invoice_id/cancel handler to forward DELETE request."
-      );
-      res
-        .status(500)
-        .json({
-          message: "Internal configuration error forwarding delete request.",
-        });
-    }
-
-    // --- Option 2: Use internal Express routing (less common for this scenario) ---
-    // req.method = 'PUT';
-    // req.url = `/${numericInvoiceId}/cancel`;
-    // router.handle(req, res, next); // Re-route the request internally
   });
 
   return router;

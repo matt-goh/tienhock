@@ -12,6 +12,10 @@ import {
   FormCombobox,
 } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
+import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
+import SelectedTagsDisplay from "../../components/Catalogue/SelectedTagsDisplay";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 
 interface SelectOption {
   id: string;
@@ -50,17 +54,15 @@ const StaffAddPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
-  const [nationalities, setNationalities] = useState<SelectOption[]>([]);
-  const [races, setRaces] = useState<SelectOption[]>([]);
-  const [agamas, setAgamas] = useState<SelectOption[]>([]);
-  const [jobs, setJobs] = useState<SelectOption[]>([]);
-  const [locations, setLocations] = useState<SelectOption[]>([]);
   const [jobQuery, setJobQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
+  const { allStaffs, refreshStaffs } = useStaffsCache();
+  const { options } = useStaffFormOptions();
+  const { jobs } = useJobsCache();
 
   const genderOptions = [
-    { id: "male", name: "Male" },
-    { id: "female", name: "Female" },
+    { id: "Male", name: "Male" },
+    { id: "Female", name: "Female" },
   ];
 
   const documentOptions = [
@@ -82,26 +84,26 @@ const StaffAddPage: React.FC = () => {
     { id: "Cheque", name: "Cheque" },
   ];
 
+  // Utility function: Convert option ID to display name
+  const mapIdToDisplayName = (
+    id: string | undefined,
+    options: SelectOption[]
+  ): string => {
+    if (!id || id === "") return "";
+
+    const option = options.find((opt) => opt.id === id);
+    if (option) return option.name;
+
+    console.warn(`Could not map ID "${id}" to any option name`);
+    return "";
+  };
+
   useEffect(() => {
     // Check if form data has changed by comparing with the initial ref
     const hasChanged =
       JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
     setIsFormChanged(hasChanged);
   }, [formData]);
-
-  useEffect(() => {
-    const fetchAllOptions = async () => {
-      await Promise.all([
-        fetchOptions("nationalities", setNationalities),
-        fetchOptions("races", setRaces),
-        fetchOptions("agama", setAgamas),
-        fetchOptions("jobs", setJobs),
-        fetchOptions("locations", setLocations),
-      ]);
-    };
-
-    fetchAllOptions();
-  }, []);
 
   const handleBackClick = () => {
     if (isFormChanged) {
@@ -114,25 +116,6 @@ const StaffAddPage: React.FC = () => {
   const handleConfirmBack = () => {
     setShowBackConfirmation(false);
     navigate("/catalogue/staff");
-  };
-
-  const fetchOptions = async (
-    endpoint: string,
-    setter: {
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (value: React.SetStateAction<SelectOption[]>): void;
-      (arg0: any): void;
-    }
-  ) => {
-    try {
-      const data = await api.get(`/api/${endpoint}`);
-      setter(data);
-    } catch (error) {
-      console.error(`Error fetching ${endpoint}:`, error);
-    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,7 +147,17 @@ const StaffAddPage: React.FC = () => {
     []
   );
 
-  const validateForm = (): boolean => {
+  const checkDuplicateId = async (id: string): Promise<boolean> => {
+    try {
+      const existingStaff = allStaffs.find((staff) => staff.id === id);
+      return !!existingStaff;
+    } catch (error) {
+      console.error("Error checking ID:", error);
+      return false; // Continue with submission on check error
+    }
+  };
+
+  const validateForm = async (): Promise<boolean> => {
     const requiredFields: (keyof Employee)[] = ["id", "name"];
 
     for (const field of requiredFields) {
@@ -174,6 +167,20 @@ const StaffAddPage: React.FC = () => {
         );
         return false;
       }
+    }
+
+    // Check for duplicate ID before submission
+    const isDuplicate = await checkDuplicateId(formData.id);
+    if (isDuplicate) {
+      toast.error("A staff member with this ID already exists");
+
+      // Focus on the ID field
+      const idField = document.getElementById("id");
+      if (idField) {
+        idField.focus();
+      }
+
+      return false;
     }
 
     // Email validation (only if email is not empty)
@@ -191,21 +198,34 @@ const StaffAddPage: React.FC = () => {
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
 
-    if (!validateForm()) {
+    if (!(await validateForm())) {
       return;
     }
 
     setIsSaving(true);
 
+    // Convert option IDs back to display names for storage
     const dataToSend = {
       ...formData,
+      // Convert IDs back to display names for database storage
+      nationality: mapIdToDisplayName(
+        formData.nationality,
+        options.nationalities
+      ),
+      race: mapIdToDisplayName(formData.race, options.races),
+      agama: mapIdToDisplayName(formData.agama, options.agama),
+      // Handle date fields
       birthdate: formData.birthdate || null,
       dateJoined: formData.dateJoined || null,
       dateResigned: formData.dateResigned || null,
     };
 
     try {
-      const data = await api.post("/api/staffs", dataToSend);
+      await api.post("/api/staffs", dataToSend);
+
+      // Refresh the cache after successful creation
+      await refreshStaffs();
+
       toast.success("Staff member created successfully!");
       navigate("/catalogue/staff");
     } catch (error) {
@@ -225,7 +245,7 @@ const StaffAddPage: React.FC = () => {
     <FormInput
       name={name}
       label={label}
-      value={formData[name].toString()}
+      value={formData[name]?.toString() ?? ""}
       onChange={handleInputChange}
       type={type}
     />
@@ -239,7 +259,7 @@ const StaffAddPage: React.FC = () => {
     <FormListbox
       name={name}
       label={label}
-      value={formData[name].toString()}
+      value={formData[name]?.toString() ?? ""}
       onChange={(value) => handleListboxChange(name, value)}
       options={options}
     />
@@ -252,28 +272,46 @@ const StaffAddPage: React.FC = () => {
     query: string,
     setQuery: React.Dispatch<React.SetStateAction<string>>
   ) => (
-    <FormCombobox
-      name={name}
-      label={label}
-      value={formData[name] as string[]}
-      onChange={(value) => {
-        if (typeof value === "string") {
-          handleComboboxChange(name, [value]);
-        } else {
-          handleComboboxChange(name, value);
-        }
-      }}
-      options={options}
-      query={query}
-      setQuery={setQuery}
-    />
+    <div>
+      <FormCombobox
+        name={name}
+        label={label}
+        value={formData[name] as string[]}
+        onChange={(value) => {
+          if (typeof value === "string") {
+            handleComboboxChange(name, [value]);
+          } else {
+            handleComboboxChange(name, value);
+          }
+        }}
+        options={options}
+        query={query}
+        setQuery={setQuery}
+      />
+      {name === "location" ? (
+        <div>
+          <SelectedTagsDisplay
+            selectedItems={(formData[name] as string[]).map((locId) => {
+              const locationOption = options.find((opt) => opt.id === locId);
+              return locationOption ? `${locationOption.name}` : locId;
+            })}
+            label={label}
+          />
+        </div>
+      ) : (
+        <SelectedTagsDisplay
+          selectedItems={formData[name] as string[]}
+          label={label}
+        />
+      )}
+    </div>
   );
 
   return (
-    <div className="container mx-auto px-4">
-      <BackButton onClick={handleBackClick} className="ml-5" />
-      <div className="bg-white rounded-lg">
-        <div className="pl-6">
+    <div className="container mx-auto px-4 pb-10">
+      <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
+      <div className="bg-white rounded-lg shadow-sm border border-default-200">
+        <div className="p-6 border-b border-default-200">
           <h1 className="text-xl font-semibold text-default-900">
             Add New Staff
           </h1>
@@ -283,7 +321,7 @@ const StaffAddPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit}>
-          <div className="pl-6 pt-5">
+          <div className="p-6">
             <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -296,7 +334,11 @@ const StaffAddPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderListbox("gender", "Gender", genderOptions)}
-                  {renderListbox("nationality", "Nationality", nationalities)}
+                  {renderListbox(
+                    "nationality",
+                    "Nationality",
+                    options.nationalities
+                  )}
                   {renderInput("birthdate", "Birthdate", "date")}
                 </div>
                 <div className="grid grid-cols-1 gap-6">
@@ -309,7 +351,7 @@ const StaffAddPage: React.FC = () => {
                   {renderCombobox(
                     "location",
                     "Location",
-                    locations,
+                    options.locations,
                     locationQuery,
                     setLocationQuery
                   )}
@@ -338,14 +380,14 @@ const StaffAddPage: React.FC = () => {
                     "Payment Preference",
                     paymentPreferenceOptions
                   )}
-                  {renderListbox("race", "Race", races)}
-                  {renderListbox("agama", "Agama", agamas)}
+                  {renderListbox("race", "Race", options.races)}
+                  {renderListbox("agama", "Agama", options.agama)}
                   {renderInput("dateResigned", "Date Resigned", "date")}
                 </div>
               </div>
             </Tab>
           </div>
-          <div className="mt-8 py-3 text-right">
+          <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200">
             <Button
               type="submit"
               variant="boldOutline"

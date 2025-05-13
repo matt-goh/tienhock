@@ -16,6 +16,8 @@ import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
+import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
+import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
@@ -30,6 +32,11 @@ import {
   IconPrinter,
   IconBan,
   IconSelectAll,
+  IconFiles,
+  IconCash,
+  IconCircleCheck,
+  IconFileInvoice,
+  IconUser,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -38,15 +45,21 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { useCustomerNames } from "../../hooks/useCustomerNames";
+import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 // Import the specific utilities needed
-import { getInvoices, cancelInvoice } from "../../utils/invoice/InvoiceUtils";
-import FilterSummary from "../../components/Invoice/FilterSummary";
+import {
+  getInvoices,
+  cancelInvoice,
+  syncCancellationStatus,
+  getInvoicesByIds,
+} from "../../utils/invoice/InvoiceUtils";
 import Pagination from "../../components/Invoice/Pagination";
+import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
+import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
-const ITEMS_PER_PAGE = 15; // Number of items per page
+const ITEMS_PER_PAGE = 50; // Number of items per page
 
 interface MonthOption {
   id: number;
@@ -128,23 +141,69 @@ const InvoiceListPage: React.FC = () => {
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoices, setIsSubmittingInvoices] = useState(false);
+  const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
+  const [showEInvoiceDownloader, setShowEInvoiceDownloader] = useState(false);
+  const [eInvoicesToDownload, setEInvoicesToDownload] = useState<
+    ExtendedInvoiceData[]
+  >([]);
+  const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [selectedInvoicesForPDF, setSelectedInvoicesForPDF] = useState<
+    ExtendedInvoiceData[]
+  >([]);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
+  const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
+  const [hasViewedFilters, setHasViewedFilters] = useState(false);
+  const [isAllSelectFetching, setIsAllSelectFetching] = useState(false);
+  const cachedSelectAllIdsRef = useRef<{
+    ids: string[];
+    hash: string;
+    total: number;
+  }>({
+    ids: [],
+    hash: "",
+    total: 0,
+  });
+  const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
     (): InvoiceFilters => ({
-      dateRange: getInitialDates(), // Get dates from storage or default
+      dateRange: getInitialDates(),
       salespersonId: null,
-      applySalespersonFilter: true,
       paymentType: null,
-      applyPaymentTypeFilter: true,
-      invoiceStatus: [],
-      applyInvoiceStatusFilter: true,
+      invoiceStatus: ["paid", "Unpaid", "overdue"], // Default excludes 'cancelled'
       eInvoiceStatus: [],
-      applyEInvoiceStatusFilter: true,
+      consolidation: "all",
     }),
     []
   );
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
+
+  const DEFAULT_FILTERS: InvoiceFilters = {
+    dateRange: getInitialDates(), // This will be overridden in actual usage
+    salespersonId: null,
+    paymentType: null,
+    invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
+    eInvoiceStatus: [], // Default e-invoice status
+    consolidation: "all",
+  };
+
+  // Helper function to generate a hash of current filters
+  const getFiltersHash = useCallback(() => {
+    return JSON.stringify({
+      dateRange: {
+        start: filters.dateRange.start?.getTime(),
+        end: filters.dateRange.end?.getTime(),
+      },
+      salespersonId: filters.salespersonId?.join(","),
+      paymentType: filters.paymentType,
+      invoiceStatus: filters.invoiceStatus?.join(","),
+      eInvoiceStatus: filters.eInvoiceStatus?.join(","),
+      consolidation: filters.consolidation,
+      searchTerm,
+    });
+  }, [filters, searchTerm]);
 
   // Month Selector State
   const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
@@ -161,30 +220,43 @@ const InvoiceListPage: React.FC = () => {
   );
 
   // Data Hooks
-  const { salesmen /*, isLoading: salesmenLoading */ } = useSalesmanCache(); // Assuming salesmenLoading isn't needed directly here
+  const { salesmen } = useSalesmanCache();
   const customerIds = useMemo(
     () => invoices.map((inv) => inv.customerid),
     [invoices]
   );
   // Fetch customer names based on IDs present in the currently loaded invoices
-  const { customerNames /*, isLoading: namesLoading */ } =
-    useCustomerNames(customerIds);
+  const { customerNames } = useCustomerNames(customerIds);
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
 
   // --- Derived State ---
   // Selection state based on currently displayed invoices on the page
+  // Selection state based on currently displayed invoices and total selections
   const selectionState = useMemo(() => {
     // Ensure invoices is an array before proceeding
     if (!Array.isArray(invoices) || invoices.length === 0) {
-      return { isAllSelectedOnPage: false, isIndeterminate: false };
+      return {
+        isAllSelectedOnPage: false,
+        isIndeterminate: false,
+        selectedOnPageCount: 0,
+        totalSelectableOnPage: 0,
+        hasSelectionsOnOtherPages: false,
+      };
     }
+
     const currentPageIds = new Set(invoices.map((inv) => inv.id));
-    const selectedOnPageCount = Array.from(selectedInvoiceIds).filter((id) =>
+    const selectedOnPage = Array.from(selectedInvoiceIds).filter((id) =>
       currentPageIds.has(id)
-    ).length;
+    );
+
+    const selectedOnPageCount = selectedOnPage.length;
     const totalSelectableOnPage = invoices.length;
+
+    // Check if we have selections on other pages
+    const totalSelectedCount = selectedInvoiceIds.size;
+    const hasSelectionsOnOtherPages = totalSelectedCount > selectedOnPageCount;
 
     return {
       isAllSelectedOnPage:
@@ -192,8 +264,17 @@ const InvoiceListPage: React.FC = () => {
         totalSelectableOnPage > 0,
       isIndeterminate:
         selectedOnPageCount > 0 && selectedOnPageCount < totalSelectableOnPage,
+      selectedOnPageCount,
+      totalSelectableOnPage,
+      hasSelectionsOnOtherPages,
     };
   }, [selectedInvoiceIds, invoices]);
+
+  const hasValidEInvoices = useCallback(() => {
+    return invoices.some(
+      (inv) => selectedInvoiceIds.has(inv.id) && inv.einvoice_status === "valid"
+    );
+  }, [invoices, selectedInvoiceIds]);
 
   // --- Callbacks ---
 
@@ -215,8 +296,8 @@ const InvoiceListPage: React.FC = () => {
           currentSearchTerm // Pass the search term
         );
         setInvoices(response.data);
-        setTotalItems(response.total);
-        setTotalPages(response.totalPages);
+        setTotalItems(response.pagination.total); // FIXED - access the nested property
+        setTotalPages(response.pagination.totalPages); // FIXED - access the nested property
         setCurrentPage(pageToFetch); // Ensure page state matches fetched page
         // Optional: Clear selection when data reloads
         // setSelectedInvoiceIds(new Set());
@@ -245,31 +326,113 @@ const InvoiceListPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFetchTriggered, currentPage]); // Only re-run when page changes or triggered manually
 
+  useEffect(() => {
+    if (showEInvoiceDownloader && eInvoicesToDownload.length > 0) {
+      // The component is now in the DOM, but we need to programmatically click its button
+      // Find the button and click it
+      const downloadButton = document.querySelector(
+        '[data-einvoice-download="true"]'
+      );
+      if (downloadButton && downloadButton instanceof HTMLButtonElement) {
+        downloadButton.click();
+      }
+      // Reset the state after a delay
+      setTimeout(() => {
+        setShowEInvoiceDownloader(false);
+        setEInvoicesToDownload([]);
+      }, 500);
+    }
+  }, [showEInvoiceDownloader, eInvoicesToDownload]);
+
+  // Effect to calculate active filter count comparing against defaults
+  useEffect(() => {
+    let count = 0;
+
+    // Check if salesperson filter is active
+    if (filters.salespersonId && filters.salespersonId.length > 0) {
+      count++;
+    }
+
+    // Check if payment type filter is active
+    if (filters.paymentType !== DEFAULT_FILTERS.paymentType) {
+      count++;
+    }
+
+    // Check if invoice status filter is different from default
+    if (filters.invoiceStatus) {
+      // Need to compare arrays contents, not references
+      const isDefaultStatus =
+        DEFAULT_FILTERS.invoiceStatus.length === filters.invoiceStatus.length &&
+        filters.invoiceStatus.every((status) =>
+          DEFAULT_FILTERS.invoiceStatus.includes(status)
+        ) &&
+        DEFAULT_FILTERS.invoiceStatus.every((status) =>
+          filters.invoiceStatus.includes(status)
+        );
+
+      if (!isDefaultStatus) {
+        count++;
+      }
+    }
+
+    // Check if e-invoice status filter is active
+    if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+      count++;
+    }
+
+    // Check if consolidation filter is active
+    if (filters.consolidation !== DEFAULT_FILTERS.consolidation) {
+      count++;
+    }
+
+    setActiveFilterCount(count);
+  }, [filters]);
+
+  // Add this effect to reset hasViewedFilters
+  useEffect(() => {
+    if (activeFilterCount > 0) {
+      setHasViewedFilters(false);
+    }
+  }, [filters]); // Reset when filters change
+
+  // Effect to invalidate the cache when filters change
+  useEffect(() => {
+    // Invalidate the cache when filters or search term changes
+    cachedSelectAllIdsRef.current = { ids: [], hash: "", total: 0 };
+  }, [filters, searchTerm]);
+
   // Filter Change Handler - Receives the COMPLETE, new filter state to apply
   const handleApplyFilters = useCallback(
     (newAppliedFilters: InvoiceFilters) => {
+      // Check if there are any existing selections first
+      if (selectedInvoiceIds.size > 0) {
+        if (
+          window.confirm(
+            "Your current selections will be lost when changing filters. Continue?"
+          )
+        ) {
+          setSelectedInvoiceIds(new Set()); // Only clear if user confirms
+        } else {
+          return; // Don't apply filters if user cancels
+        }
+      }
+
       // 1. Update the main filters state
       setFilters(newAppliedFilters);
 
-      // 2. Save date range to storage IF it has changed
-      // (Compare with previous state *before* setting the new state if needed,
-      // or just save the new dates regardless)
+      // 2. Save date range to storage
       saveDatesToStorage(
         newAppliedFilters.dateRange.start,
         newAppliedFilters.dateRange.end
       );
 
       // 3. Trigger Fetch: Reset to page 1 and set trigger
-      // (Comparison with previous state isn't needed here, always reset/refetch on apply)
       if (currentPage !== 1) {
-        setCurrentPage(1); // This state change will trigger the useEffect
+        setCurrentPage(1);
       }
-      setIsFetchTriggered(true); // Ensure fetch happens even if already on page 1
-
-      // 4. Clear selection
-      setSelectedInvoiceIds(new Set());
+      setIsFetchTriggered(true);
     },
-    [currentPage] // Depends on currentPage to decide whether to reset page or just trigger
+    [currentPage, selectedInvoiceIds]
   );
 
   // --- Specific Filter Handlers (Date, Month, Remove Tag) ---
@@ -325,75 +488,6 @@ const InvoiceListPage: React.FC = () => {
     [filters, handleApplyFilters] // Depends on current filters and the apply function
   );
 
-  // Remove Filter Tag Handler (Applies Immediately)
-  const handleRemoveFilter = useCallback(
-    (filterKey: keyof InvoiceFilters, specificValue?: string) => {
-      let updatedFilters = { ...filters }; // Start with a copy of current applied filters
-
-      // --- Logic to modify the updatedFilters object based on key/value ---
-      if (specificValue) {
-        // Remove a specific value from a multi-select array
-        const currentValues = filters[filterKey];
-        if (Array.isArray(currentValues)) {
-          const newValues = currentValues.filter(
-            (val) => val !== specificValue
-          );
-          updatedFilters = {
-            ...updatedFilters,
-            [filterKey]: newValues,
-            // Optionally disable the 'apply' toggle if the array becomes empty
-            [`apply${
-              filterKey.charAt(0).toUpperCase() + filterKey.slice(1)
-            }Filter` as keyof InvoiceFilters]: newValues.length > 0,
-          };
-        }
-      } else {
-        // Remove/reset an entire filter type (clear value and disable toggle)
-        switch (filterKey) {
-          case "salespersonId":
-            updatedFilters = {
-              ...updatedFilters,
-              salespersonId: null,
-              applySalespersonFilter: false,
-            };
-            break;
-          case "paymentType":
-            updatedFilters = {
-              ...updatedFilters,
-              paymentType: null,
-              applyPaymentTypeFilter: false,
-            };
-            break;
-          case "invoiceStatus":
-            updatedFilters = {
-              ...updatedFilters,
-              invoiceStatus: [],
-              applyInvoiceStatusFilter: false,
-            };
-            break;
-          case "eInvoiceStatus":
-            updatedFilters = {
-              ...updatedFilters,
-              eInvoiceStatus: [],
-              applyEInvoiceStatusFilter: false,
-            };
-            break;
-          // Add cases for other filter types if needed
-          default:
-            console.warn(
-              "Attempted to remove unhandled filter key:",
-              filterKey
-            );
-            return; // Don't proceed if key is unknown
-        }
-      }
-
-      // --- Apply the modified filter state ---
-      handleApplyFilters(updatedFilters);
-    },
-    [filters, handleApplyFilters]
-  ); // Depends on current filters and the apply function
-
   // Search Handlers - Update state locally, trigger fetch on blur/enter
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -430,38 +524,151 @@ const InvoiceListPage: React.FC = () => {
   };
 
   // Select/Deselect a single invoice
-  const handleSelectInvoice = useCallback((invoiceId: string) => {
-    setSelectedInvoiceIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(invoiceId)) newSet.delete(invoiceId);
-      else newSet.add(invoiceId);
-      return newSet;
-    });
-  }, []);
+  const handleSelectInvoice = useCallback(
+    (invoiceId: string) => {
+      setSelectedInvoiceIds((prev) => {
+        const newSet = new Set(prev);
+        const invoice = invoices.find((inv) => inv.id === invoiceId);
 
-  // Select/Deselect all invoices visible on the current page
-  const handleSelectAllOnPage = useCallback(() => {
-    // Ensure invoices is an array
-    if (!Array.isArray(invoices)) return;
+        if (newSet.has(invoiceId)) {
+          // Deselect: remove from set and subtract amount
+          newSet.delete(invoiceId);
+          if (invoice) {
+            setSelectedInvoicesTotal((current) =>
+              Math.max(0, current - (invoice.totalamountpayable || 0))
+            );
+          }
+        } else {
+          // Select: add to set and add amount
+          newSet.add(invoiceId);
+          if (invoice) {
+            setSelectedInvoicesTotal(
+              (current) => current + (invoice.totalamountpayable || 0)
+            );
+          }
+        }
+        return newSet;
+      });
+    },
+    [invoices]
+  );
 
-    const currentPageIds = invoices.map((inv) => inv.id);
-    if (currentPageIds.length === 0) return; // Nothing to select/deselect
+  // Toggle between no selection and all invoices selected across all pages
+  const handleToggleSelectAll = useCallback(
+    async (e: { stopPropagation: () => void }) => {
+      e?.stopPropagation(); // Prevent event bubbling
 
-    setSelectedInvoiceIds((prev) => {
-      const newSet = new Set(prev);
-      // Check if ALL on the current page are already selected within the main set
-      const allCurrentlySelected = currentPageIds.every((id) => newSet.has(id));
-
-      if (allCurrentlySelected) {
-        // Deselect all on current page
-        currentPageIds.forEach((id) => newSet.delete(id));
-      } else {
-        // Select all on current page
-        currentPageIds.forEach((id) => newSet.add(id));
+      // If we already have selections, clear them and reset total
+      if (selectedInvoiceIds.size > 0) {
+        setSelectedInvoiceIds(new Set());
+        setSelectedInvoicesTotal(0);
+        return;
       }
-      return newSet;
-    });
-  }, [invoices]); // Depends on the invoices currently displayed
+
+      // Check if we have cached results with matching filters
+      const currentFiltersHash = getFiltersHash();
+      if (
+        cachedSelectAllIdsRef.current.hash === currentFiltersHash &&
+        cachedSelectAllIdsRef.current.ids.length > 0
+      ) {
+        // Use cached IDs and total
+        setSelectedInvoiceIds(new Set(cachedSelectAllIdsRef.current.ids));
+        setSelectedInvoicesTotal(cachedSelectAllIdsRef.current.total || 0);
+        return;
+      }
+
+      // Prevent duplicate API calls
+      if (isAllSelectFetching) return;
+
+      setIsAllSelectFetching(true);
+      // Otherwise, fetch all IDs matching current filters
+      try {
+        // Build query parameters matching current filters
+        const params = new URLSearchParams();
+
+        // Add date range
+        if (filters.dateRange.start) {
+          params.append(
+            "startDate",
+            filters.dateRange.start.getTime().toString()
+          );
+        }
+        if (filters.dateRange.end) {
+          params.append("endDate", filters.dateRange.end.getTime().toString());
+        }
+
+        // Add salesperson filter
+        if (filters.salespersonId && filters.salespersonId.length > 0) {
+          params.append("salesman", filters.salespersonId.join(","));
+        }
+
+        // Add payment type filter
+        if (filters.paymentType) {
+          params.append("paymentType", filters.paymentType);
+        }
+
+        // Add invoice status filter
+        if (filters.invoiceStatus && filters.invoiceStatus.length > 0) {
+          params.append("invoiceStatus", filters.invoiceStatus.join(","));
+        }
+
+        // Add e-invoice status filter
+        if (filters.eInvoiceStatus && filters.eInvoiceStatus.length > 0) {
+          params.append("eInvoiceStatus", filters.eInvoiceStatus.join(","));
+        }
+
+        // Handle consolidation filter
+        if (filters.consolidation === "consolidated") {
+          params.append("consolidated_only", "true");
+        } else if (filters.consolidation === "individual") {
+          params.append("exclude_consolidated", "true");
+        }
+
+        // Add search term
+        if (searchTerm) {
+          params.append("search", searchTerm);
+        }
+
+        // Make the API call with all parameters
+        const queryString = params.toString() ? `?${params.toString()}` : "";
+        const response = await api.get(
+          `/api/invoices/selection/ids${queryString}`
+        );
+
+        if (response && response.ids && Array.isArray(response.ids)) {
+          // Cache the results with total
+          cachedSelectAllIdsRef.current = {
+            ids: response.ids,
+            hash: currentFiltersHash,
+            total: response.total || 0,
+          };
+
+          setSelectedInvoiceIds(new Set(response.ids));
+          setSelectedInvoicesTotal(response.total || 0);
+        } else if (Array.isArray(response) && response.length === 0) {
+          toast.error("No invoices match your current filters");
+        } else {
+          toast.error("Failed to select all invoices");
+        }
+      } catch (error) {
+        console.error("Error fetching all invoice IDs:", error);
+        toast.error(
+          `Failed to select all invoices: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      } finally {
+        setIsAllSelectFetching(false);
+      }
+    },
+    [
+      filters,
+      searchTerm,
+      selectedInvoiceIds.size,
+      getFiltersHash,
+      isAllSelectFetching,
+    ]
+  );
 
   // Function to clear selection (can be called externally via ref)
   const clearCurrentSelection = useCallback(() => {
@@ -504,14 +711,14 @@ const InvoiceListPage: React.FC = () => {
   const confirmBulkCancel = async () => {
     setShowCancelConfirm(false);
     // Re-filter right before cancelling
-    const idsToCancel = invoices
-      .filter(
-        (inv) =>
-          selectedInvoiceIds.has(inv.id) && inv.invoice_status !== "cancelled"
-      )
-      .map((inv) => inv.id);
+    const idsToCancel = Array.from(selectedInvoiceIds).filter((id) => {
+      // Find invoice in current page data if available
+      const invoice = invoices.find((inv) => inv.id === id);
+      // Only include if not already cancelled
+      return !invoice || invoice.invoice_status !== "cancelled";
+    });
 
-    if (idsToCancel.length === 0) return; // Should not happen if button was enabled, but safety check
+    if (idsToCancel.length === 0) return;
 
     const toastId = toast.loading(
       `Cancelling ${idsToCancel.length} invoice(s)...`
@@ -519,31 +726,40 @@ const InvoiceListPage: React.FC = () => {
     let successCount = 0;
     let failCount = 0;
 
-    const results = await Promise.allSettled(
-      idsToCancel.map((id) => cancelInvoice(id)) // Using the utility function
-    );
+    // Process in batches of 10 to avoid too many concurrent requests
+    const BATCH_SIZE = 10;
 
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        successCount++;
-        // Update local state for the cancelled invoice immediately
-        setInvoices((prev) =>
-          prev.map((inv) =>
-            inv.id === idsToCancel[index]
-              ? { ...inv, ...result.value } // Merge update from cancelInvoice response
-              : inv
-          )
-        );
-      } else {
-        failCount++;
-        console.error(
-          `Failed to cancel invoice ${idsToCancel[index]}:`,
-          result.reason
-        );
-        // Error toast can be improved, maybe show ID
-        // toast.error(`Failed to cancel ${idsToCancel[index]}. ${result.reason?.message || ''}`);
-      }
-    });
+    for (let i = 0; i < idsToCancel.length; i += BATCH_SIZE) {
+      const batchIds = idsToCancel.slice(i, i + BATCH_SIZE);
+      toast.loading(`Cancelling invoices (${i}/${idsToCancel.length})...`, {
+        id: toastId,
+      });
+
+      const batchResults = await Promise.allSettled(
+        batchIds.map((id) => cancelInvoice(id))
+      );
+
+      batchResults.forEach((result, index) => {
+        const invoiceId = batchIds[index];
+        if (result.status === "fulfilled") {
+          successCount++;
+          // Update local state for the cancelled invoice if it's on current page
+          setInvoices((prev) =>
+            prev.map((inv) =>
+              inv.id === invoiceId
+                ? { ...inv, ...result.value } // Merge update from cancelInvoice response
+                : inv
+            )
+          );
+        } else {
+          failCount++;
+          console.error(
+            `Failed to cancel invoice ${invoiceId}:`,
+            result.reason
+          );
+        }
+      });
+    }
 
     setSelectedInvoiceIds(new Set()); // Clear selection after attempting
 
@@ -557,8 +773,73 @@ const InvoiceListPage: React.FC = () => {
         id: toastId,
       });
     }
-    // No full refresh needed if local state is updated, but can trigger one if preferred:
-    // setIsFetchTriggered(true);
+
+    // Refresh to make sure we have the latest data
+    setIsFetchTriggered(true);
+  };
+
+  const hasCancelledUnsynced = useCallback(() => {
+    return invoices.some(
+      (inv) =>
+        selectedInvoiceIds.has(inv.id) &&
+        inv.invoice_status === "cancelled" &&
+        inv.uuid &&
+        inv.einvoice_status !== "cancelled"
+    );
+  }, [invoices, selectedInvoiceIds]);
+
+  // Add this handler for batch syncing
+  const handleBatchSyncCancellation = async () => {
+    if (selectedInvoiceIds.size === 0) return;
+
+    // Filter for eligible invoices based on current data
+    const eligibleInvoices = invoices.filter(
+      (inv) =>
+        selectedInvoiceIds.has(inv.id) &&
+        inv.invoice_status === "cancelled" &&
+        inv.uuid &&
+        inv.einvoice_status !== "cancelled"
+    );
+
+    if (eligibleInvoices.length === 0) {
+      toast.error("No selected invoices are eligible for cancellation sync.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Syncing cancellation status for ${eligibleInvoices.length} invoice(s)...`
+    );
+    let successCount = 0;
+    let failCount = 0;
+
+    const results = await Promise.allSettled(
+      eligibleInvoices.map((inv) => syncCancellationStatus(inv.id))
+    );
+
+    results.forEach((result) => {
+      if (result.status === "fulfilled") {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    });
+
+    // Clear selection after attempting
+    setSelectedInvoiceIds(new Set());
+
+    if (failCount > 0) {
+      toast.error(
+        `${failCount} sync operation(s) failed. ${successCount} succeeded.`,
+        { id: toastId, duration: 5000 }
+      );
+    } else {
+      toast.success(`${successCount} invoice(s) synced successfully.`, {
+        id: toastId,
+      });
+    }
+
+    // Refresh the list to show updated statuses
+    setIsFetchTriggered(true);
   };
 
   // Initiate Bulk E-Invoice Submission
@@ -581,7 +862,7 @@ const InvoiceListPage: React.FC = () => {
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Active/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
+        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
         { duration: 8000 }
       );
       return;
@@ -667,26 +948,583 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  // Placeholder actions (implement actual logic or remove)
-  const handleBulkDownload = () =>
-    toast.error("Bulk Download PDF (Not Implemented)");
-  const handleBulkPrint = () => toast.error("Bulk Print PDF (Not Implemented)");
+  const handleDownloadValidEInvoices = () => {
+    // Get only the invoices with valid e-invoice status
+    const validEInvoices = invoices.filter(
+      (inv) => selectedInvoiceIds.has(inv.id) && inv.einvoice_status === "valid"
+    );
+
+    if (validEInvoices.length === 0) {
+      toast.error("No valid e-invoices found in selection");
+      return;
+    }
+
+    // Pass the filtered invoices directly to the downloader
+    setEInvoicesToDownload(validEInvoices);
+    setShowEInvoiceDownloader(true);
+  };
+
+  // Bulk Download PDF Handler
+  const handleBulkDownload = async () => {
+    if (selectedInvoiceIds.size === 0) {
+      toast.error("No invoices selected for download");
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Preparing ${selectedInvoiceIds.size} invoice PDFs...`
+    );
+
+    try {
+      // Get ALL selected invoice IDs from the Set
+      const selectedIds = Array.from(selectedInvoiceIds);
+
+      // Process in chunks of 50 to avoid overwhelming the server
+      const BATCH_SIZE = 50;
+      let completeInvoices:
+        | any[]
+        | ((prevState: ExtendedInvoiceData[]) => ExtendedInvoiceData[]) = [];
+
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
+        toast.loading(`Loading invoices (${i}/${selectedIds.length})...`, {
+          id: toastId,
+        });
+
+        const batchInvoices = await getInvoicesByIds(batchIds);
+        completeInvoices = completeInvoices.concat(batchInvoices);
+      }
+
+      if (completeInvoices.length === 0) {
+        throw new Error("Could not fetch required invoice details");
+      }
+
+      if (completeInvoices.length < selectedIds.length) {
+        toast.loading(
+          `Generating PDFs for ${completeInvoices.length}/${selectedIds.length} invoices...`,
+          { id: toastId }
+        );
+      }
+
+      setSelectedInvoicesForPDF(completeInvoices);
+      setIsGeneratingPDF(true);
+
+      // This will create PDFDownloadHandler but we need to programmatically click its button
+      // Give it time to render
+      setTimeout(() => {
+        const downloadButton = document.querySelector(
+          '[data-pdf-download="true"]'
+        );
+        if (downloadButton && downloadButton instanceof HTMLButtonElement) {
+          downloadButton.click();
+          toast.success("Generating PDF download...", { id: toastId });
+        } else {
+          throw new Error("Download button not found");
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Error preparing PDF download:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to prepare PDF",
+        { id: toastId }
+      );
+      setIsGeneratingPDF(false);
+      setSelectedInvoicesForPDF([]);
+    }
+  };
+
+  // Bulk Print PDF Handler
+  const handleBulkPrint = async () => {
+    if (selectedInvoiceIds.size === 0) {
+      toast.error("No invoices selected for printing");
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Preparing ${selectedInvoiceIds.size} invoices for printing...`
+    );
+
+    try {
+      // Get ALL selected invoice IDs from the Set
+      const selectedIds = Array.from(selectedInvoiceIds);
+
+      // Process in chunks of 50 to avoid overwhelming the server
+      const BATCH_SIZE = 50;
+      let completeInvoices:
+        | any[]
+        | ((prevState: ExtendedInvoiceData[]) => ExtendedInvoiceData[]) = [];
+
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
+        toast.loading(`Loading invoices (${i}/${selectedIds.length})...`, {
+          id: toastId,
+        });
+
+        const batchInvoices = await getInvoicesByIds(batchIds);
+        completeInvoices = completeInvoices.concat(batchInvoices);
+      }
+
+      if (completeInvoices.length === 0) {
+        throw new Error("Could not fetch required invoice details");
+      }
+
+      if (completeInvoices.length < selectedIds.length) {
+        toast.error(
+          `Only ${completeInvoices.length} out of ${selectedIds.length} invoices could be loaded`,
+          { id: toastId, duration: 4000 }
+        );
+      } else {
+        toast.success("Opening print dialog...", { id: toastId });
+      }
+
+      setSelectedInvoicesForPDF(completeInvoices);
+      setShowPrintOverlay(true);
+    } catch (error) {
+      console.error("Error preparing for print:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to prepare print view",
+        { id: toastId }
+      );
+    }
+  };
 
   // --- Render ---
   return (
-    <div className="flex flex-col h-full px-4 md:px-12">
+    <div className="flex flex-col w-full h-full px-4 md:px-12">
       <div className="space-y-4">
-        {/* --- Header --- */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
-          <h1 className="text-2xl md:text-3xl font-semibold text-default-900">
+        {/* --- Combined Header and Filters --- */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
+          {/* Title */}
+          <h1 className="text-2xl md:text-3xl font-semibold text-default-900 md:mr-4">
             Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
           </h1>
-          <div className="flex items-center gap-2 flex-wrap">
+
+          {/* Filters container */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap md:flex-1 md:justify-end">
+            {/* Date Range Picker */}
+            <div className="w-full sm:w-auto">
+              <DateRangePicker
+                dateRange={{
+                  start: filters.dateRange.start || new Date(),
+                  end: filters.dateRange.end || new Date(),
+                }}
+                onDateChange={handleDateChange}
+              />
+            </div>
+
+            {/* Month Selector */}
+            <div className="w-full sm:w-40">
+              <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                <div className="relative">
+                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                    <span className="block truncate pl-1">
+                      {selectedMonth.name}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <IconChevronDown
+                        className="h-5 w-5 text-default-400"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                      {monthOptions.map((month) => (
+                        <ListboxOption
+                          key={month.id}
+                          value={month}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-gray-900"
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {month.name}
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                    stroke={2.5}
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:flex-1 md:max-w-md">
+              <IconSearch
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search"
+                className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onBlur={handleSearchBlur}
+                onKeyDown={handleSearchKeyDown}
+              />
+            </div>
+
+            {/* Filter Menu Button */}
+            <div className="relative">
+              <InvoiceFilterMenu
+                currentFilters={filters}
+                onFilterChange={handleApplyFilters}
+                salesmanOptions={salesmen.map((s) => ({
+                  id: s.id,
+                  name: s.name || s.id,
+                }))}
+                onMouseEnter={() => {
+                  setIsFilterButtonHovered(true);
+                  setHasViewedFilters(true);
+                }}
+                onMouseLeave={() => setIsFilterButtonHovered(false)}
+                activeFilterCount={activeFilterCount}
+                hasViewedFilters={hasViewedFilters}
+              />
+
+              {/* Filters info dropdown panel */}
+              {isFilterButtonHovered && (
+                <div className="absolute z-30 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
+                  <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
+                    {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
+                  </h3>
+                  {activeFilterCount === 0 ? (
+                    <div className="text-default-500 py-2 px-1">
+                      No filters applied.
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {filters.salespersonId &&
+                        filters.salespersonId.length > 0 && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
+                              <IconUser size={14} className="text-sky-600" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-default-500 text-xs">
+                                Salesman
+                              </span>
+                              <div className="font-medium break-words">
+                                {filters.salespersonId.join(", ")}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+
+                      {filters.paymentType && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconCash size={14} className="text-sky-600" />
+                          </div>
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Payment Type
+                            </span>
+                            <div className="font-medium">
+                              {filters.paymentType}
+                            </div>
+                          </div>
+                        </li>
+                      )}
+
+                      {filters.invoiceStatus &&
+                        filters.invoiceStatus.length > 0 &&
+                        !(
+                          filters.invoiceStatus.length === 3 &&
+                          filters.invoiceStatus.includes("paid") &&
+                          filters.invoiceStatus.includes("Unpaid") &&
+                          filters.invoiceStatus.includes("overdue")
+                        ) && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                              <IconCircleCheck
+                                size={14}
+                                className="text-sky-600"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-default-500 text-xs">
+                                Invoice Status
+                              </span>
+                              <div className="font-medium">
+                                {filters.invoiceStatus
+                                  .map(
+                                    (status) =>
+                                      status.charAt(0).toUpperCase() +
+                                      status.slice(1)
+                                  )
+                                  .join(", ")}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+
+                      {filters.eInvoiceStatus &&
+                        filters.eInvoiceStatus.length > 0 && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                              <IconFileInvoice
+                                size={14}
+                                className="text-sky-600"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-default-500 text-xs">
+                                E-Invoice Status
+                              </span>
+                              <div className="font-medium">
+                                {filters.eInvoiceStatus
+                                  .map((status) =>
+                                    status === "null"
+                                      ? "Not Submitted"
+                                      : status.charAt(0).toUpperCase() +
+                                        status.slice(1)
+                                  )
+                                  .join(", ")}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+
+                      {filters.consolidation !== "all" && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                            <IconFiles size={14} className="text-sky-600" />
+                          </div>
+                          <div>
+                            <span className="text-default-500 text-xs">
+                              Consolidation
+                            </span>
+                            <div className="font-medium">
+                              {filters.consolidation === "consolidated"
+                                ? "Consolidated"
+                                : "Individual"}
+                            </div>
+                          </div>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* --- Batch Action Bar --- */}
+        <div
+          className={`p-3 ${
+            selectedInvoiceIds.size > 0
+              ? "bg-sky-50/95 border border-sky-200"
+              : "bg-white/95 border border-default-200"
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
+          onClick={handleToggleSelectAll}
+          title={
+            selectionState.isAllSelectedOnPage
+              ? "Deselect All on Page"
+              : "Select All on Page"
+          }
+        >
+          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+            {/* Selection checkbox - now toggles all selection across pages */}
+            <div className="relative">
+              <button
+                className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleSelectAll(e);
+                }}
+                title={
+                  selectedInvoiceIds.size > 0
+                    ? "Clear selection"
+                    : "Select all invoices across all pages"
+                }
+              >
+                {selectedInvoiceIds.size > 0 ? (
+                  <IconSquareMinusFilled className="text-sky-600" size={20} />
+                ) : (
+                  <IconSelectAll className="text-default-400" size={20} />
+                )}
+              </button>
+            </div>
+
+            {/* Selection Count and Total */}
+            <div className="flex-grow pb-0.5">
+              {/* Selection info text */}
+              {selectedInvoiceIds.size > 0 ? (
+                <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
+                  <span>{selectedInvoiceIds.size} selected</span>
+                  <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
+                  <span className="whitespace-nowrap">
+                    {/* Use the total state instead of calculating from visible invoices */}
+                    Total:{" "}
+                    {new Intl.NumberFormat("en-MY", {
+                      style: "currency",
+                      currency: "MYR",
+                    }).format(selectedInvoicesTotal)}
+                  </span>
+                </span>
+              ) : (
+                <span
+                  className="text-default-500 text-sm cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleSelectAll(e);
+                  }}
+                >
+                  Select invoices to perform actions
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons (Show only when items are selected) */}
+          <div
+            className="flex gap-2 flex-wrap w-full sm:w-auto sm:ml-auto"
+            onClick={(e) => e.stopPropagation()} // Prevent row selection click
+          >
+            {selectedInvoiceIds.size > 0 && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="rose"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkCancel();
+                  }}
+                  icon={IconBan}
+                  disabled={isLoading}
+                  aria-label="Cancel Selected Invoices"
+                  title="Cancel"
+                >
+                  Cancel
+                </Button>
+                {hasCancelledUnsynced() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="rose"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBatchSyncCancellation();
+                    }}
+                    icon={IconRefresh}
+                    disabled={isLoading}
+                    aria-label="Sync Cancellation Status"
+                    title="Sync Cancellation Status"
+                  >
+                    Sync Cancellation
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="amber"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkSubmitEInvoice();
+                  }}
+                  icon={IconSend}
+                  disabled={isLoading}
+                  aria-label="Submit Selected for E-Invoice"
+                  title="Submit e-Invoice"
+                >
+                  Submit e-Invoice
+                </Button>
+                {hasValidEInvoices() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="sky"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadValidEInvoices();
+                    }}
+                    icon={IconFileDownload}
+                    disabled={isLoading}
+                    aria-label="e-Invoice"
+                    title="Download e-Invoice"
+                  >
+                    Download e-Invoice
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkDownload();
+                  }}
+                  icon={IconFileDownload}
+                  disabled={isLoading}
+                  aria-label="Download Selected Invoices"
+                  title="Download PDF"
+                >
+                  Download
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkPrint();
+                  }}
+                  icon={IconPrinter}
+                  disabled={isLoading}
+                  aria-label="Print Selected Invoices"
+                  title="Print PDF"
+                >
+                  Print
+                </Button>
+              </>
+            )}
+
+            <Button
+              onClick={() => setShowConsolidatedModal(true)}
+              icon={IconFiles}
+              variant="outline"
+              color="amber"
+              disabled={isLoading}
+              size="sm"
+              title="Consolidated Invoice"
+              aria-label="Consolidated Invoice"
+            >
+              Consolidated
+            </Button>
             <Button
               onClick={handleRefresh}
               icon={IconRefresh}
               variant="outline"
               disabled={isLoading}
+              size="sm"
+              title="Refresh Invoices"
+              aria-label="Refresh Invoices"
             >
               Refresh
             </Button>
@@ -695,247 +1533,16 @@ const InvoiceListPage: React.FC = () => {
               icon={IconPlus}
               variant="filled"
               color="sky"
+              size="sm"
+              title="Create New Invoice"
+              aria-label="Create New Invoice"
             >
               Create New
             </Button>
           </div>
         </div>
-        {/* --- Filters Row --- */}
-        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center flex-wrap flex-shrink-0">
-          {/* Date Range Picker */}
-          <div className="flex-grow lg:flex-grow-0">
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange} // Applies immediately
-            />
-          </div>
-          {/* Month Selector */}
-          <div className="w-full sm:w-auto lg:w-40">
-            <Listbox value={selectedMonth} onChange={handleMonthChange}>
-              <div className="relative">
-                <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                  <span className="block truncate pl-1">
-                    {selectedMonth.name}
-                  </span>
-                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <IconChevronDown
-                      className="h-5 w-5 text-default-400"
-                      aria-hidden="true"
-                    />
-                  </span>
-                </ListboxButton>
-                <Transition
-                  leave="transition ease-in duration-100"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                    {monthOptions.map((month) => (
-                      <ListboxOption
-                        key={month.id}
-                        value={month}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-gray-900"
-                          }`
-                        }
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {month.name}
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                  stroke={2.5}
-                                />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </Transition>
-              </div>
-            </Listbox>
-          </div>
-          {/* Search Input */}
-          <div className="flex-grow relative min-w-[250px]">
-            {" "}
-            {/* Ensure minimum width */}
-            <IconSearch
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Search by invoice, product, amount, customer, salesman, status, payment type..."
-              className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onBlur={handleSearchBlur} // Triggers fetch
-              onKeyDown={handleSearchKeyDown} // Triggers fetch on Enter
-            />
-          </div>
-          {/* Filter Menu Button */}
-          <div className="flex-shrink-0">
-            <InvoiceFilterMenu
-              currentFilters={filters} // Pass currently applied filters
-              onFilterChange={handleApplyFilters} // Pass the main apply function
-              salesmanOptions={salesmen.map((s) => ({
-                // Pass salesmen options
-                id: s.id,
-                name: s.name || s.id,
-              }))}
-            />
-          </div>
-        </div>
-        <FilterSummary filters={filters} onRemoveFilter={handleRemoveFilter} />
-        {/* --- Batch Action Bar --- */}
-        <div
-          className={`p-3 ${
-            selectedInvoiceIds.size > 0
-              ? "bg-sky-50 border border-sky-200"
-              : "bg-white border border-dashed border-default-200"
-          } rounded-lg flex items-center gap-x-4 gap-y-2 flex-wrap sticky top-0 z-0 shadow-sm`}
-          onClick={handleSelectAllOnPage}
-          title={
-            selectionState.isAllSelectedOnPage
-              ? "Deselect All on Page"
-              : "Select All on Page"
-          }
-        >
-          {/* Selection checkbox - always visible */}
-          <button className="p-1 mr-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
-            {selectionState.isAllSelectedOnPage ? (
-              <IconSquareMinusFilled className="text-sky-600" size={20} />
-            ) : selectionState.isIndeterminate ? (
-              <IconSelectAll className="text-sky-600/70" size={20} /> // Indicate partial selection
-            ) : (
-              <IconSelectAll className="text-default-400" size={20} />
-            )}
-          </button>
-
-          {/* Selection Count and Total */}
-          <div className="flex-grow min-w-[150px]">
-            {" "}
-            {/* Allow text to wrap */}
-            {selectedInvoiceIds.size > 0 ? (
-              <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
-                <span>{selectedInvoiceIds.size} selected</span>
-                <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
-                <span className="whitespace-nowrap">
-                  Total:{" "}
-                  {new Intl.NumberFormat("en-MY", {
-                    style: "currency",
-                    currency: "MYR",
-                  }).format(
-                    invoices
-                      .filter((inv) => selectedInvoiceIds.has(inv.id))
-                      .reduce(
-                        (sum, inv) => sum + (inv.totalamountpayable || 0),
-                        0
-                      )
-                  )}
-                </span>
-              </span>
-            ) : (
-              <span
-                className="text-default-500 text-sm cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelectAllOnPage();
-                }}
-              >
-                Select invoices to perform actions
-              </span>
-            )}
-          </div>
-
-          {/* Action Buttons (Show only when items are selected) */}
-          {selectedInvoiceIds.size > 0 && (
-            <div
-              className="flex gap-2 flex-wrap ml-auto flex-shrink-0"
-              onClick={(e) => e.stopPropagation()} // Prevent row selection click
-            >
-              <Button
-                size="sm"
-                variant="outline"
-                color="rose"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkCancel();
-                }}
-                icon={IconBan}
-                disabled={isLoading}
-                aria-label="Cancel Selected Invoices"
-                title="Cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                color="amber"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkSubmitEInvoice();
-                }}
-                icon={IconSend}
-                disabled={isLoading}
-                aria-label="Submit Selected for E-Invoice"
-                title="Submit e-Invoice"
-              >
-                Submit e-Invoice
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkDownload();
-                }}
-                icon={IconFileDownload}
-                disabled={isLoading}
-                aria-label="Download Selected Invoices"
-                title="Download PDF"
-              >
-                Download
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBulkPrint();
-                }}
-                icon={IconPrinter}
-                disabled={isLoading}
-                aria-label="Print Selected Invoices"
-                title="Print PDF"
-              >
-                Print
-              </Button>
-            </div>
-          )}
-        </div>
         {/* --- Invoice Grid Area --- */}
         <div className="flex-1 min-h-[400px] relative">
-          {" "}
-          {/* Allow vertical scroll */}
           {/* Loading Overlay */}
           {isLoading && (
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
@@ -991,6 +1598,13 @@ const InvoiceListPage: React.FC = () => {
           )}
         </div>
       </div>
+      {/* Consolidated Invoice Modal */}
+      <ConsolidatedInvoiceModal
+        isOpen={showConsolidatedModal}
+        onClose={() => setShowConsolidatedModal(false)}
+        month={selectedMonth.id}
+        year={new Date().getFullYear()}
+      />
       {/* --- Submission Results Modal --- */}
       <SubmissionResultsModal
         isOpen={showSubmissionResults}
@@ -1030,6 +1644,41 @@ const InvoiceListPage: React.FC = () => {
         confirmButtonText="Submit e-Invoices"
         variant="default"
       />
+      {/* E-Invoice PDF Downloader (invisible, triggered by state) */}
+      {showEInvoiceDownloader && eInvoicesToDownload.length > 0 && (
+        <div style={{ display: "none" }}>
+          <EInvoicePDFHandler
+            invoices={eInvoicesToDownload} // Changed from einvoices to invoices
+            disabled={false}
+          />
+        </div>
+      )}
+      {/* PDF Download Handler - Hidden but functional */}
+      {isGeneratingPDF && selectedInvoicesForPDF.length > 0 && (
+        <div style={{ display: "none" }}>
+          <PDFDownloadHandler
+            invoices={selectedInvoicesForPDF}
+            disabled={false}
+            customerNames={customerNames}
+            onComplete={() => {
+              setIsGeneratingPDF(false);
+              setSelectedInvoicesForPDF([]);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Print Overlay */}
+      {showPrintOverlay && selectedInvoicesForPDF.length > 0 && (
+        <PrintPDFOverlay
+          invoices={selectedInvoicesForPDF}
+          customerNames={customerNames}
+          onComplete={() => {
+            setShowPrintOverlay(false);
+            setSelectedInvoicesForPDF([]);
+          }}
+        />
+      )}
     </div>
   );
 };

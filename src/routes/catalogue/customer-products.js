@@ -50,60 +50,6 @@ export default function (pool) {
     }
   });
 
-  // Get all custom products for a specific customer
-  router.get("/:customerId", async (req, res) => {
-    try {
-      const { customerId } = req.params;
-
-      // First check if customer exists and get customer details
-      const customerCheck = await pool.query(
-        "SELECT id, tin_number, id_number FROM customers WHERE id = $1",
-        [customerId]
-      );
-
-      if (customerCheck.rows.length === 0) {
-        return res.status(404).json({
-          // Not Found instead of continuing with empty results
-          message: "Customer not found",
-          customerId,
-        });
-      }
-
-      const customerDetails = customerCheck.rows[0];
-
-      const query = `
-      SELECT 
-        cp.id,
-        cp.customer_id,
-        cp.product_id,
-        cp.custom_price,
-        cp.is_available,
-        p.description
-      FROM customer_products cp
-      JOIN products p ON cp.product_id = p.id
-      WHERE cp.customer_id = $1
-    `;
-
-      const result = await pool.query(query, [customerId]);
-
-      // Return both customer details and products
-      res.status(200).json({
-        customer: {
-          id: customerDetails.id,
-          tin_number: customerDetails.tin_number,
-          id_number: customerDetails.id_number,
-        },
-        products: result.rows,
-      });
-    } catch (error) {
-      console.error("Error fetching custom products:", error);
-      res.status(500).json({
-        message: "Error fetching custom products",
-        error: error.message,
-      });
-    }
-  });
-
   // Batch add/update customer products
   router.post("/batch", async (req, res) => {
     const { customerId, products, deletedProductIds = [] } = req.body;
@@ -142,42 +88,31 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
+      // First apply changes directly to the original customer
       // Process deletions if any
       if (deletedProductIds && deletedProductIds.length > 0) {
-        console.log(
-          `Deleting ${deletedProductIds.length} products for customer ${customerId}`
-        );
         const deleteQuery = `
-          DELETE FROM customer_products 
-          WHERE customer_id = $1 AND product_id = ANY($2)
-        `;
+        DELETE FROM customer_products 
+        WHERE customer_id = $1 AND product_id = ANY($2)
+      `;
         await client.query(deleteQuery, [customerId, deletedProductIds]);
       }
 
-      // Process upserts
+      // Apply products to the original customer
       if (products && products.length > 0) {
-        console.log(
-          `Upserting ${products.length} products for customer ${customerId}`
-        );
-
         for (const product of products) {
           const { productId, customPrice, isAvailable } = product;
 
-          if (!productId) {
-            console.warn("Skipping product with no ID");
-            continue;
-          }
-
           const upsertQuery = `
-            INSERT INTO customer_products 
-              (customer_id, product_id, custom_price, is_available) 
-            VALUES 
-              ($1, $2, $3, $4)
-            ON CONFLICT (customer_id, product_id) 
-            DO UPDATE SET
-              custom_price = EXCLUDED.custom_price,
-              is_available = EXCLUDED.is_available
-          `;
+          INSERT INTO customer_products 
+            (customer_id, product_id, custom_price, is_available) 
+          VALUES 
+            ($1, $2, $3, $4)
+          ON CONFLICT (customer_id, product_id) 
+          DO UPDATE SET
+            custom_price = EXCLUDED.custom_price,
+            is_available = EXCLUDED.is_available
+        `;
 
           await client.query(upsertQuery, [
             customerId,
@@ -185,6 +120,83 @@ export default function (pool) {
             customPrice || 0,
             isAvailable === undefined ? true : isAvailable,
           ]);
+        }
+      }
+
+      // Now propagate changes to branch customers
+      // Find any branch groups this customer belongs to (WITHOUT excluding the current customer)
+      const branchQuery = `
+      SELECT cbg.id AS group_id, cm.customer_id
+      FROM customer_branch_mappings cm
+      JOIN customer_branch_groups cbg ON cm.group_id = cbg.id
+      WHERE EXISTS (
+        SELECT 1 FROM customer_branch_mappings 
+        WHERE group_id = cbg.id AND customer_id = $1
+      )
+      AND cm.customer_id != $1  -- Only propagate to OTHER customers, not the originating one
+    `;
+
+      const branchResult = await client.query(branchQuery, [customerId]);
+
+      if (branchResult.rows.length > 0) {
+        // Map of customers by group ID
+        const branchCustomersByGroup = branchResult.rows.reduce((acc, row) => {
+          if (!acc[row.group_id]) {
+            acc[row.group_id] = [];
+          }
+          acc[row.group_id].push(row.customer_id);
+          return acc;
+        }, {});
+
+        // For each product updated, apply to all branch customers
+        if (products && products.length > 0) {
+          for (const product of products) {
+            const { productId, customPrice, isAvailable } = product;
+
+            // For each group
+            for (const [groupId, branchCustomers] of Object.entries(
+              branchCustomersByGroup
+            )) {
+              // For each customer in the group
+              for (const branchCustomerId of branchCustomers) {
+                const upsertQuery = `
+                INSERT INTO customer_products 
+                  (customer_id, product_id, custom_price, is_available) 
+                VALUES 
+                  ($1, $2, $3, $4)
+                ON CONFLICT (customer_id, product_id) 
+                DO UPDATE SET
+                  custom_price = EXCLUDED.custom_price,
+                  is_available = EXCLUDED.is_available
+              `;
+
+                await client.query(upsertQuery, [
+                  branchCustomerId,
+                  productId,
+                  customPrice || 0,
+                  isAvailable === undefined ? true : isAvailable,
+                ]);
+              }
+            }
+          }
+        }
+
+        // Also propagate deletions if any
+        if (deletedProductIds && deletedProductIds.length > 0) {
+          for (const [groupId, branchCustomers] of Object.entries(
+            branchCustomersByGroup
+          )) {
+            for (const branchCustomerId of branchCustomers) {
+              const deleteQuery = `
+              DELETE FROM customer_products 
+              WHERE customer_id = $1 AND product_id = ANY($2)
+            `;
+              await client.query(deleteQuery, [
+                branchCustomerId,
+                deletedProductIds,
+              ]);
+            }
+          }
         }
       }
 

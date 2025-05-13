@@ -6,18 +6,20 @@ import { InvoiceData } from "../../../types/types";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { api } from "../../../routes/utils/api";
 
 const PrintPDFOverlay = ({
   invoices,
   onComplete,
+  customerNames = {},
 }: {
   invoices: InvoiceData[];
   onComplete: () => void;
+  customerNames: Record<string, string>;
 }) => {
   const [isPrinting, setIsPrinting] = useState(true);
   const [isGenerating, setIsGenerating] = useState(true);
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const hasPrintedRef = useRef(false);
   const resourcesRef = useRef<{
     printFrame: HTMLIFrameElement | null;
@@ -28,9 +30,6 @@ const PrintPDFOverlay = ({
     container: null,
     pdfUrl: null,
   });
-  const [customerNames, setCustomerNames] = useState<Record<string, string>>(
-    {}
-  );
 
   const cleanup = (fullCleanup = false) => {
     if (fullCleanup) {
@@ -72,9 +71,20 @@ const PrintPDFOverlay = ({
         document.body.appendChild(container);
         resourcesRef.current.container = container;
 
+        const isJellyPolly = window.location.pathname.includes("/jellypolly");
+
         const pdfComponent = (
-          <Document title={generatePDFFilename(invoices).replace(".pdf", "")}>
-            <InvoicePDF invoices={invoices} customerNames={customerNames} />
+          <Document
+            title={generatePDFFilename(
+              invoices,
+              isJellyPolly ? "jellypolly" : "tienhock"
+            ).replace(".pdf", "")}
+          >
+            <InvoicePDF
+              invoices={invoices}
+              customerNames={customerNames}
+              companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
+            />
           </Document>
         );
 
@@ -91,8 +101,11 @@ const PrintPDFOverlay = ({
         printFrame.onload = () => {
           if (!hasPrintedRef.current && printFrame?.contentWindow) {
             hasPrintedRef.current = true;
-            printFrame.contentWindow.print();
-            cleanup(); // Hide loading dialog only
+            // Use a slight delay to ensure content is fully loaded
+            setTimeout(() => {
+              printFrame.contentWindow?.print();
+              cleanup(); // Hide loading dialog only
+            }, 500);
 
             const onFocus = () => {
               window.removeEventListener("focus", onFocus);
@@ -111,6 +124,7 @@ const PrintPDFOverlay = ({
         printFrame.src = pdfUrl;
       } catch (error) {
         console.error("Error generating PDF:", error);
+        setError(error instanceof Error ? error.message : "Unknown error");
         toast.error("Error preparing document for print. Please try again.");
         cleanup(true);
       }
@@ -131,64 +145,6 @@ const PrintPDFOverlay = ({
     };
   }, [invoices, isPrinting, onComplete]);
 
-  // Customer names fetching logic (unchanged)
-  useEffect(() => {
-    const fetchCustomerNames = async () => {
-      const uniqueCustomerIds = Array.from(
-        new Set(invoices.map((invoice) => invoice.customerid))
-      );
-      const missingCustomerIds = uniqueCustomerIds.filter(
-        (id) => !(id in customerNames)
-      );
-      if (missingCustomerIds.length === 0) return;
-
-      try {
-        const CACHE_KEY = "customers_cache";
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        let customersFromCache: Record<string, string> = {};
-        let idsToFetch: string[] = [...missingCustomerIds];
-
-        if (cachedData) {
-          const { data } = JSON.parse(cachedData);
-          if (Array.isArray(data)) {
-            customersFromCache = data.reduce((map, customer) => {
-              if (missingCustomerIds.includes(customer.id)) {
-                map[customer.id] = customer.name;
-                idsToFetch = idsToFetch.filter((id) => id !== customer.id);
-              }
-              return map;
-            }, {} as Record<string, string>);
-          }
-        }
-
-        let customersFromApi: Record<string, string> = {};
-        if (idsToFetch.length > 0) {
-          customersFromApi = await api.post("/api/customers/names", {
-            customerIds: idsToFetch,
-          });
-        }
-
-        setCustomerNames((prev) => ({
-          ...prev,
-          ...customersFromCache,
-          ...customersFromApi,
-        }));
-      } catch (error) {
-        console.error("Error fetching customer names:", error);
-        const fallbackNames = missingCustomerIds.reduce<Record<string, string>>(
-          (map, id) => {
-            map[id] = id;
-            return map;
-          },
-          {}
-        );
-        setCustomerNames((prev) => ({ ...prev, ...fallbackNames }));
-      }
-    };
-
-    fetchCustomerNames();
-  }, [invoices, customerNames]);
-
   return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
@@ -201,6 +157,9 @@ const PrintPDFOverlay = ({
               : "Opening print dialog..."}
           </p>
           <p className="text-sm text-default-500">Please wait a moment</p>
+          {error && (
+            <p className="text-sm text-rose-600 mt-2 text-center">{error}</p>
+          )}
           <button
             onClick={() => {
               cleanup(true);
