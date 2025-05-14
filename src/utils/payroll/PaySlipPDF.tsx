@@ -265,11 +265,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const finalPayment = payroll.net_pay - firstPayment;
   const roundedFinalPayment = Math.round(finalPayment * 100) / 100; // Round to 2 decimal places
 
-  // Track if we've already shown "JAM" for hour-based pay codes
-  const jamLabelBaseRef = React.useRef(false);
-  const jamLabelTambahanRef = React.useRef(false);
-  const jamLabelOTRef = React.useRef(false);
-
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-MY", {
@@ -279,26 +274,24 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   };
 
   // Helper function to format description based on rate unit
-  const formatDescription = (
-    item: any,
-    isOT: boolean = false,
-    flagRef: { current: boolean }
-  ) => {
+  const formatDescription = (item: any) => {
     switch (item.rate_unit) {
       case "Hour":
-        if (!flagRef.current) {
-          flagRef.current = true;
-          return `${item.quantity.toFixed(2)} Jam${isOT ? " OT" : ""}`;
-        }
-        return "";
+        return `${item.quantity.toFixed(0)} Hour${
+          item.quantity > 1 ? "s" : ""
+        }`;
       case "Bag":
-        return `${item.quantity.toFixed(0)} Bag`;
+        return `${item.quantity.toFixed(0)} Bag${item.quantity > 1 ? "s" : ""}`;
       case "Trip":
         return `${item.quantity.toFixed(0)} Trip${
           item.quantity > 1 ? "s" : ""
         }`;
       case "Day":
         return `${item.quantity.toFixed(0)} Day${item.quantity > 1 ? "s" : ""}`;
+      case "Percent":
+        return `${item.quantity.toFixed(0)} Unit${
+          item.quantity > 1 ? "s" : ""
+        }`;
       case "Fixed":
         return monthName;
       default:
@@ -388,7 +381,11 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 </View>
               </View>
               <View style={[styles.tableCol, styles.rateCol]}>
-                <Text>{item.rate.toFixed(2)}</Text>
+                <Text>
+                  {item.rate_unit === "Percent"
+                    ? `${item.rate}%`
+                    : item.rate.toFixed(2)}
+                </Text>
               </View>
               <View style={[styles.tableCol, styles.descriptionNoteCol]}>
                 <Text>{itemIndex === 0 ? `${group.hours} Jam` : ""}</Text>
@@ -468,13 +465,17 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   </View>
                 </View>
                 <View style={[styles.tableCol, styles.rateCol]}>
-                  <Text>{item.rate.toFixed(2)}</Text>
+                  <Text>
+                    {item.rate_unit === "Percent"
+                      ? `${item.rate}%`
+                      : item.rate.toFixed(2)}
+                  </Text>
                 </View>
                 <View style={[styles.tableCol, styles.descriptionNoteCol]}>
                   <Text>
                     {item.is_manual && item.rate_unit !== "Hour"
                       ? "Manual"
-                      : formatDescription(item, false, jamLabelTambahanRef)}
+                      : formatDescription(item)}
                   </Text>
                 </View>
                 <View
@@ -558,7 +559,11 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                     </View>
                   </View>
                   <View style={[styles.tableCol, styles.rateCol]}>
-                    <Text>{item.rate.toFixed(2)}</Text>
+                    <Text>
+                      {item.rate_unit === "Percent"
+                        ? `${item.rate}%`
+                        : item.rate.toFixed(2)}
+                    </Text>
                   </View>
                   <View style={[styles.tableCol, styles.descriptionNoteCol]}>
                     <Text>
@@ -587,9 +592,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 <Text></Text>
               </View>
               <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  Subtotal
-                </Text>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
               </View>
               <View
                 style={[
