@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#000",
     paddingHorizontal: 5,
-    paddingTop: 2,
+    paddingTop: 3,
     fontSize: 8,
   },
   descriptionCol: {
@@ -93,6 +93,21 @@ const styles = StyleSheet.create({
   subtotalRow: {
     backgroundColor: "#f8f9fa", // Very light gray background
     borderTopWidth: 0.5,
+  },
+  sectionTitleRow: {
+    backgroundColor: "#e9ecef", // Light gray background for section titles
+    borderTopWidth: 1,
+    borderTopColor: "#000",
+  },
+  sectionTitleText: {
+    fontFamily: "Helvetica-Bold",
+  },
+  grandTotalRow: {
+    borderTopWidth: 2,
+    borderTopColor: "#000",
+  },
+  grandTotalText: {
+    fontFamily: "Helvetica-Bold",
   },
   paymentsSection: {
     marginTop: 10,
@@ -369,9 +384,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 <Text>{item.rate.toFixed(2)}</Text>
               </View>
               <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text>
-                  {itemIndex === 0 ? `${group.hours} Jam` : ""}
-                </Text>
+                <Text>{itemIndex === 0 ? `${group.hours} Jam` : ""}</Text>
               </View>
               <View
                 style={[
@@ -415,60 +428,196 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Tambahan Pay Items */}
-        {groupedItems["Tambahan"].map((item, index) => (
-          <View key={`tambahan-${index}`} style={styles.tableRow}>
-            <View style={[styles.tableCol, styles.descriptionCol]}>
-              <View style={{ height: 12, overflow: "hidden" }}>
-                <Text>{item.description}</Text>
+        {groupedItems["Tambahan"].length > 0 && (
+          <>
+            {/* Tambahan Title Row */}
+            <View style={[styles.tableRow, styles.sectionTitleRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text style={styles.sectionTitleText}>Tambahan</Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text></Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text></Text>
               </View>
             </View>
-            <View style={[styles.tableCol, styles.rateCol]}>
-              <Text>{item.rate.toFixed(2)}</Text>
+
+            {/* Tambahan Items */}
+            {groupedItems["Tambahan"].map((item, index) => (
+              <View key={`tambahan-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{item.description}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text>{item.rate.toFixed(2)}</Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>
+                    {item.is_manual && item.rate_unit !== "Hour"
+                      ? "Manual"
+                      : formatDescription(item, false, jamLabelTambahanRef)}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(item.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Tambahan Subtotal Row */}
+            <View style={[styles.tableRow, styles.subtotalRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  Subtotal
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {formatCurrency(
+                    groupedItems["Tambahan"].reduce(
+                      (sum, item) => sum + item.amount,
+                      0
+                    )
+                  )}
+                </Text>
+              </View>
             </View>
-            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>
-                {item.is_manual && item.rate_unit !== "Hour"
-                  ? "Manual"
-                  : formatDescription(item, false, jamLabelTambahanRef)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                styles.amountCol,
-                { borderRightWidth: 0 },
-              ]}
-            >
-              <Text>{formatCurrency(item.amount)}</Text>
-            </View>
-          </View>
-        ))}
+          </>
+        )}
 
         {/* Overtime Pay Items */}
-        {groupedItems.Overtime.map((item, index) => (
-          <View key={`ot-${index}`} style={styles.tableRow}>
-            <View style={[styles.tableCol, styles.descriptionCol]}>
-              <View style={{ height: 12, overflow: "hidden" }}>
-                <Text>{item.description}</Text>
+        {groupedItems.Overtime.length > 0 && (
+          <>
+            {/* Overtime Title Row */}
+            <View style={[styles.tableRow, styles.sectionTitleRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text style={styles.sectionTitleText}>Overtime</Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text></Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text></Text>
               </View>
             </View>
-            <View style={[styles.tableCol, styles.rateCol]}>
-              <Text>{item.rate.toFixed(2)}</Text>
+
+            {/* Overtime Items */}
+            {groupedItems.Overtime.map((item, index) => (
+              <View key={`ot-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{item.description}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text>{item.rate.toFixed(2)}</Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>{formatDescription(item, true, jamLabelOTRef)}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(item.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Overtime Subtotal Row */}
+            <View style={[styles.tableRow, styles.subtotalRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  Subtotal
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {formatCurrency(
+                    groupedItems.Overtime.reduce(
+                      (sum, item) => sum + item.amount,
+                      0
+                    )
+                  )}
+                </Text>
+              </View>
             </View>
-            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{formatDescription(item, true, jamLabelOTRef)}</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                styles.amountCol,
-                { borderRightWidth: 0 },
-              ]}
-            >
-              <Text>{formatCurrency(item.amount)}</Text>
-            </View>
+          </>
+        )}
+
+        {/* Grand Total Row */}
+        <View style={[styles.tableRow, styles.grandTotalRow]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
+            <Text></Text>
           </View>
-        ))}
+          <View style={[styles.tableCol, styles.rateCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.grandTotalText}>Jumlah Gaji Kasar</Text>
+          </View>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.grandTotalText}>
+              {formatCurrency(payroll.gross_pay)}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Deductions Section */}
