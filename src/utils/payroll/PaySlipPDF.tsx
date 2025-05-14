@@ -90,6 +90,10 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
+  subtotalRow: {
+    backgroundColor: "#f8f9fa", // Very light gray background
+    borderTopWidth: 0.5,
+  },
   paymentsSection: {
     marginTop: 10,
   },
@@ -179,6 +183,49 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const year = payroll.year ?? new Date().getFullYear();
   const month = payroll.month ?? new Date().getMonth() + 1;
   const monthName = getMonthName(month);
+
+  // Helper function to group items by hours and maintain order
+  const groupItemsByHours = (items: any[]) => {
+    const groupsArray: { hours: number; items: any[] }[] = [];
+    const groupsMap = new Map<number, any[]>();
+
+    // First pass: group items by hours
+    items.forEach((item) => {
+      const hours = item.quantity;
+      if (!groupsMap.has(hours)) {
+        groupsMap.set(hours, []);
+      }
+      groupsMap.get(hours)!.push(item);
+    });
+
+    // Convert to array format maintaining the order of first appearance
+    items.forEach((item) => {
+      const hours = item.quantity;
+      if (!groupsArray.some((group) => group.hours === hours)) {
+        groupsArray.push({
+          hours,
+          items: groupsMap.get(hours)!,
+        });
+      }
+    });
+
+    return groupsArray;
+  };
+
+  // Group base items by hours
+  const baseGroupedByHours = groupItemsByHours(groupedItems.Base);
+  const baseTotalAmount = groupedItems.Base.reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+
+  // Calculate total hours across all unique hour groups
+  const totalUniqueHours = baseGroupedByHours.reduce(
+    (sum, group) => sum + group.hours,
+    0
+  );
+  const averageBaseRate =
+    totalUniqueHours > 0 ? baseTotalAmount / totalUniqueHours : 0;
 
   // Calculate total deductions (for demo purposes - you'll need to add real deductions)
   const epfAmount = (payroll.gross_pay * 0.11).toFixed(2);
@@ -306,19 +353,52 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </View>
         </View>
 
-        {/* Base Pay Items */}
-        {groupedItems.Base.map((item, index) => (
-          <View key={`base-${index}`} style={styles.tableRow}>
-            <View style={[styles.tableCol, styles.descriptionCol]}>
-              <View style={{ height: 12, overflow: "hidden" }}>
-                <Text>{item.description}</Text>
+        {/* Base Pay Items - Grouped by hours */}
+        {baseGroupedByHours.map((group, groupIndex) =>
+          group.items.map((item, itemIndex) => (
+            <View
+              key={`base-${group.hours}-${itemIndex}`}
+              style={styles.tableRow}
+            >
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <View style={{ height: 12, overflow: "hidden" }}>
+                  <Text>{item.description}</Text>
+                </View>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text>{item.rate.toFixed(2)}</Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text>
+                  {itemIndex === 0 ? `${group.hours} Jam` : ""}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>{formatCurrency(item.amount)}</Text>
               </View>
             </View>
+          ))
+        )}
+
+        {/* Base Pay Subtotal Row */}
+        {groupedItems.Base.length > 0 && (
+          <View style={[styles.tableRow, styles.subtotalRow]}>
+            <View style={[styles.tableCol, styles.descriptionCol]}>
+              <Text></Text>
+            </View>
             <View style={[styles.tableCol, styles.rateCol]}>
-              <Text>{item.rate.toFixed(2)}</Text>
+              <Text></Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{formatDescription(item, false, jamLabelBaseRef)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                Rate/Jam : {averageBaseRate.toFixed(2)}
+              </Text>
             </View>
             <View
               style={[
@@ -327,13 +407,15 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 { borderRightWidth: 0 },
               ]}
             >
-              <Text>{formatCurrency(item.amount)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                {formatCurrency(baseTotalAmount)}
+              </Text>
             </View>
           </View>
-        ))}
+        )}
 
         {/* Tambahan Pay Items */}
-        {groupedItems.Tambahan.map((item, index) => (
+        {groupedItems["Tambahan"].map((item, index) => (
           <View key={`tambahan-${index}`} style={styles.tableRow}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <View style={{ height: 12, overflow: "hidden" }}>
