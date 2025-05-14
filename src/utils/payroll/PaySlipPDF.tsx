@@ -234,6 +234,13 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     0
   );
 
+  // Group additional items by hours
+  const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
+  const overtimeTotalAmount = groupedItems.Overtime.reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+
   // Calculate total hours across all unique hour groups
   const totalUniqueHours = baseGroupedByHours.reduce(
     (sum, group) => sum + group.hours,
@@ -491,9 +498,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 <Text></Text>
               </View>
               <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  Subtotal
-                </Text>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
               </View>
               <View
                 style={[
@@ -540,31 +545,38 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               </View>
             </View>
 
-            {/* Overtime Items */}
-            {groupedItems.Overtime.map((item, index) => (
-              <View key={`ot-${index}`} style={styles.tableRow}>
-                <View style={[styles.tableCol, styles.descriptionCol]}>
-                  <View style={{ height: 12, overflow: "hidden" }}>
-                    <Text>{item.description}</Text>
+            {/* Overtime Items - Grouped by hours */}
+            {overtimeGroupedByHours.map((group, groupIndex) =>
+              group.items.map((item, itemIndex) => (
+                <View
+                  key={`overtime-${group.hours}-${itemIndex}`}
+                  style={styles.tableRow}
+                >
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <View style={{ height: 12, overflow: "hidden" }}>
+                      <Text>{item.description}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{item.rate.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>
+                      {itemIndex === 0 ? `${group.hours} Jam OT` : ""}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>{formatCurrency(item.amount)}</Text>
                   </View>
                 </View>
-                <View style={[styles.tableCol, styles.rateCol]}>
-                  <Text>{item.rate.toFixed(2)}</Text>
-                </View>
-                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                  <Text>{formatDescription(item, true, jamLabelOTRef)}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.tableCol,
-                    styles.amountCol,
-                    { borderRightWidth: 0 },
-                  ]}
-                >
-                  <Text>{formatCurrency(item.amount)}</Text>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
 
             {/* Overtime Subtotal Row */}
             <View style={[styles.tableRow, styles.subtotalRow]}>
@@ -587,12 +599,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 ]}
               >
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  {formatCurrency(
-                    groupedItems.Overtime.reduce(
-                      (sum, item) => sum + item.amount,
-                      0
-                    )
-                  )}
+                  {formatCurrency(overtimeTotalAmount)}
                 </Text>
               </View>
             </View>
