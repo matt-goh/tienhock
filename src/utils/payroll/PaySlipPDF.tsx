@@ -233,6 +233,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     (sum, item) => sum + item.amount,
     0
   );
+  const baseTotalRates = groupedItems.Base.reduce(
+    (sum, item) => sum + item.rate,
+    0
+  );
 
   // Group additional items by hours
   const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
@@ -241,13 +245,16 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     0
   );
 
-  // Calculate total hours across all unique hour groups
-  const totalUniqueHours = baseGroupedByHours.reduce(
-    (sum, group) => sum + group.hours,
-    0
-  );
+  // Find the hour group with the maximum hours (latest/most hours)
+  const maxHoursGroup = baseGroupedByHours.reduce((maxGroup, currentGroup) => {
+    return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
+  }, baseGroupedByHours[0]);
+
+  // Calculate rate using the maximum hours group
   const averageBaseRate =
-    totalUniqueHours > 0 ? baseTotalAmount / totalUniqueHours : 0;
+    maxHoursGroup && maxHoursGroup.hours > 0
+      ? baseTotalAmount / maxHoursGroup.hours
+      : 0;
 
   // Calculate total deductions (for demo purposes - you'll need to add real deductions)
   const epfAmount = (payroll.gross_pay * 0.11).toFixed(2);
@@ -410,10 +417,12 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text></Text>
             </View>
             <View style={[styles.tableCol, styles.rateCol]}>
-              <Text></Text>
+              <Text style={{ fontFamily: "Helvetica-Bold"}}>
+                {baseTotalRates.toFixed(2)}
+              </Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+              <Text style={{ fontFamily: "Helvetica-Bold"}}>
                 Rate/Jam : {averageBaseRate.toFixed(2)}
               </Text>
             </View>
@@ -472,11 +481,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   </Text>
                 </View>
                 <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                  <Text>
-                    {item.is_manual && item.rate_unit !== "Hour"
-                      ? "Manual"
-                      : formatDescription(item)}
-                  </Text>
+                  <Text>{formatDescription(item)}</Text>
                 </View>
                 <View
                   style={[
@@ -584,28 +589,42 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             )}
 
             {/* Overtime Subtotal Row */}
-            <View style={[styles.tableRow, styles.subtotalRow]}>
-              <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text></Text>
+            {groupedItems.Overtime.length > 0 && (
+              <View style={[styles.tableRow, styles.subtotalRow]}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {groupedItems.Overtime.reduce(
+                      (sum, item) => sum + item.rate,
+                      0
+                    ).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    Subtotal
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {formatCurrency(
+                      groupedItems.Overtime.reduce(
+                        (sum, item) => sum + item.amount,
+                        0
+                      )
+                    )}
+                  </Text>
+                </View>
               </View>
-              <View style={[styles.tableCol, styles.rateCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
-              </View>
-              <View
-                style={[
-                  styles.tableCol,
-                  styles.amountCol,
-                  { borderRightWidth: 0 },
-                ]}
-              >
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  {formatCurrency(overtimeTotalAmount)}
-                </Text>
-              </View>
-            </View>
+            )}
           </>
         )}
 
