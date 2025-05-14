@@ -18,7 +18,10 @@ import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import PaySlipPreview from "../../components/Payroll/PaySlipPreview";
 import Tab from "../../components/Tab";
 import { EmployeePayroll } from "../../types/types";
-import { DownloadPayslipButton, PrintPayslipButton } from "../../utils/payroll/PayslipButtons";
+import {
+  DownloadPayslipButton,
+  PrintPayslipButton,
+} from "../../utils/payroll/PayslipButtons";
 
 interface PayrollItem {
   id: number;
@@ -268,10 +271,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div className="text-sm text-default-900">
-                                {formatCurrency(item.rate)}
-                                <span className="text-xs text-default-500 ml-1">
-                                  /{item.rate_unit}
-                                </span>
+                                {item.rate_unit === "Percent" ? (
+                                  <>{item.rate}%</>
+                                ) : (
+                                  <>
+                                    {formatCurrency(item.rate)}
+                                    <span className="text-xs text-default-500 ml-1">
+                                      /{item.rate_unit}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -284,6 +293,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                     ? "days"
                                     : item.rate_unit === "Fixed"
                                     ? ""
+                                    : item.rate_unit === "Percent"
+                                    ? "units"
                                     : item.rate_unit.toLowerCase()}
                                 </span>
                               </div>
@@ -368,10 +379,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div className="text-sm text-default-900">
-                                {formatCurrency(item.rate)}
-                                <span className="text-xs text-default-500 ml-1">
-                                  /{item.rate_unit}
-                                </span>
+                                {item.rate_unit === "Percent" ? (
+                                  <>{item.rate}%</>
+                                ) : (
+                                  <>
+                                    {formatCurrency(item.rate)}
+                                    <span className="text-xs text-default-500 ml-1">
+                                      /{item.rate_unit}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -384,6 +401,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                     ? "days"
                                     : item.rate_unit === "Fixed"
                                     ? ""
+                                    : item.rate_unit === "Percent"
+                                    ? "units"
                                     : item.rate_unit.toLowerCase()}
                                 </span>
                               </div>
@@ -470,10 +489,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div className="text-sm text-default-900">
-                                {formatCurrency(item.rate)}
-                                <span className="text-xs text-default-500 ml-1">
-                                  /{item.rate_unit}
-                                </span>
+                                {item.rate_unit === "Percent" ? (
+                                  <>{item.rate}%</>
+                                ) : (
+                                  <>
+                                    {formatCurrency(item.rate)}
+                                    <span className="text-xs text-default-500 ml-1">
+                                      /{item.rate_unit}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -486,6 +511,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                     ? "days"
                                     : item.rate_unit === "Fixed"
                                     ? ""
+                                    : item.rate_unit === "Percent"
+                                    ? "units"
                                     : item.rate_unit.toLowerCase()}
                                 </span>
                               </div>
