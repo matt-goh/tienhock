@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     backgroundColor: "#f0f0f0",
-    minHeight: 14,
+    paddingVertical: 3,
     alignItems: "center",
   },
   tableRow: {
@@ -214,7 +214,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
   // Final payment
   const finalPayment = payroll.net_pay - firstPayment;
-  const roundedFinalPayment = Math.round(finalPayment * 100) / 100; // Round to 2 decimal places
+  // Round final payment to whole number if and only if it ends with .95 or above
+  const roundedFinalPayment =
+    finalPayment % 1 >= 0.95 ? Math.ceil(finalPayment) : finalPayment;
 
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
@@ -675,62 +677,72 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </View>
           <View style={[styles.tableCol, styles.rateCol]}>
             <Text></Text>
-          </View>{" "}
-        </View>
-        <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-          <Text style={styles.totalText}>Jumlah Gaji Bersih</Text>
-        </View>
-        <View
-          style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
-        >
-          <Text style={styles.totalText}>
-            {formatCurrency(payroll.net_pay)}
-          </Text>
+          </View>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>Jumlah Gaji Bersih</Text>
+          </View>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>
+              {formatCurrency(payroll.net_pay)}
+            </Text>
+          </View>
         </View>
 
-        {/* Mid Month Payment Deduction - To Be Implemented Soon */}
+        {/* Mid Month Payment Deduction */}
         <View style={styles.tableRow}>
-          <View style={[styles.tableCol]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text>Bayaran Pertama (1) Gaji Pertengahan Bulan</Text>
           </View>
-          <View style={[styles.tableCol]}>
+          <View style={[styles.tableCol, styles.rateCol]}>
             <Text></Text>
           </View>
-          <View style={[styles.tableCol]}>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
             <Text></Text>
           </View>
-          <View style={[styles.tableCol]}>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
             <Text>({formatCurrency(firstPayment)})</Text>
           </View>
         </View>
 
-        <View style={styles.tableRow}>
-          <View style={[styles.tableCol]}>
+        {/* Subtotal Row */}
+        <View style={[styles.tableRow, styles.totalRow]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
-          <View style={[styles.tableCol]}>
+          <View style={[styles.tableCol, styles.rateCol]}>
             <Text></Text>
           </View>
-          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
-            <Text>Jumlah</Text>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>Jumlah</Text>
           </View>
-          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
-            <Text>{formatCurrency(finalPayment)}</Text>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>{formatCurrency(finalPayment)}</Text>
           </View>
         </View>
 
-        <View style={styles.tableRow}>
-          <View style={[styles.tableCol]}>
+        {/* Final Rounded Amount Row */}
+        <View style={[styles.tableRow]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
-          <View style={[styles.tableCol]}>
+          <View style={[styles.tableCol, styles.rateCol]}>
             <Text></Text>
           </View>
-          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
-            <Text>Jumlah Digenapkan</Text>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>Jumlah Digenapkan</Text>
           </View>
-          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
-            <Text>{formatCurrency(Math.round(roundedFinalPayment))}</Text>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>
+              {formatCurrency(roundedFinalPayment)}
+            </Text>
           </View>
         </View>
       </View>
