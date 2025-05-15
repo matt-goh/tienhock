@@ -627,6 +627,7 @@ export interface EmployeePayroll {
   year?: number;
   month?: number;
   items: PayrollItem[];
+  deductions?: PayrollDeduction[];
 }
 
 export interface PayrollItem {
@@ -685,4 +686,17 @@ export interface SIPRate {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface PayrollDeduction {
+  deduction_type: "epf" | "socso" | "sip";
+  employee_amount: number;
+  employer_amount: number;
+  wage_amount: number;
+  rate_info: {
+    rate_id: number;
+    employee_rate: number | string;
+    employer_rate: number | string;
+    age_group?: string;
+  };
 }

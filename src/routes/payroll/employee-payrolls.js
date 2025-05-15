@@ -4,6 +4,35 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  const saveDeductions = async (pool, employeePayrollId, deductions) => {
+    if (!deductions || deductions.length === 0) return;
+
+    // First, delete existing deductions for this payroll
+    await pool.query(
+      "DELETE FROM payroll_deductions WHERE employee_payroll_id = $1",
+      [employeePayrollId]
+    );
+
+    // Insert new deductions
+    for (const deduction of deductions) {
+      const insertQuery = `
+      INSERT INTO payroll_deductions (
+        employee_payroll_id, deduction_type, employee_amount, employer_amount,
+        wage_amount, rate_info
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+    `;
+
+      await pool.query(insertQuery, [
+        employeePayrollId,
+        deduction.deduction_type,
+        deduction.employee_amount,
+        deduction.employer_amount,
+        deduction.wage_amount,
+        JSON.stringify(deduction.rate_info),
+      ]);
+    }
+  };
+
   // Get multiple employee payroll details with items
   router.get("/batch", async (req, res) => {
     const { ids } = req.query;
@@ -58,10 +87,38 @@ export default function (pool) {
         return acc;
       }, {});
 
-      // Merge payrolls with their items
+      // Get all deductions for these payrolls in a single query
+      const deductionsQuery = `
+      SELECT pd.employee_payroll_id, pd.deduction_type, pd.employee_amount, 
+             pd.employer_amount, pd.wage_amount, pd.rate_info
+      FROM payroll_deductions pd
+      WHERE pd.employee_payroll_id = ANY($1)
+      ORDER BY pd.employee_payroll_id, pd.deduction_type
+    `;
+      const deductionsResult = await pool.query(deductionsQuery, [payrollIds]);
+
+      // Group deductions by employee_payroll_id
+      const deductionsByPayrollId = deductionsResult.rows.reduce(
+        (acc, deduction) => {
+          if (!acc[deduction.employee_payroll_id]) {
+            acc[deduction.employee_payroll_id] = [];
+          }
+          acc[deduction.employee_payroll_id].push({
+            ...deduction,
+            employee_amount: parseFloat(deduction.employee_amount),
+            employer_amount: parseFloat(deduction.employer_amount),
+            wage_amount: parseFloat(deduction.wage_amount),
+          });
+          return acc;
+        },
+        {}
+      );
+
+      // Merge payrolls with their items and deductions
       const response = payrollsResult.rows.map((payroll) => ({
         ...payroll,
         items: itemsByPayrollId[payroll.id] || [],
+        deductions: deductionsByPayrollId[payroll.id] || [],
         gross_pay: parseFloat(payroll.gross_pay),
         net_pay: parseFloat(payroll.net_pay),
       }));
@@ -106,6 +163,18 @@ export default function (pool) {
       `;
       const itemsResult = await pool.query(itemsQuery, [id]);
 
+      // Get payroll deductions
+      const deductionsQuery = `
+      SELECT pd.*, 
+             CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
+             CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
+             CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
+      FROM payroll_deductions pd
+      WHERE pd.employee_payroll_id = $1
+      ORDER BY pd.deduction_type
+    `;
+      const deductionsResult = await pool.query(deductionsQuery, [id]);
+
       // Format response
       const response = {
         ...payrollResult.rows[0],
@@ -115,6 +184,13 @@ export default function (pool) {
           quantity: parseFloat(item.quantity),
           amount: parseFloat(item.amount),
           is_manual: !!item.is_manual,
+        })),
+        deductions: deductionsResult.rows.map((deduction) => ({
+          ...deduction,
+          employee_amount: parseFloat(deduction.employee_amount),
+          employer_amount: parseFloat(deduction.employer_amount),
+          wage_amount: parseFloat(deduction.wage_amount),
+          rate_info: deduction.rate_info || {},
         })),
       };
 
@@ -139,6 +215,7 @@ export default function (pool) {
       net_pay,
       status = "Processing",
       items = [],
+      deductions = [],
     } = req.body;
 
     // Validate required fields
@@ -241,6 +318,11 @@ export default function (pool) {
         `;
 
         await pool.query(itemsQuery);
+      }
+
+      // Save deductions if provided
+      if (deductions && deductions.length > 0) {
+        await saveDeductions(pool, employeePayrollId, deductions);
       }
 
       await pool.query("COMMIT");
