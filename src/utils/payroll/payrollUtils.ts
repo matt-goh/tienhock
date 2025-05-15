@@ -1,6 +1,11 @@
 // src/utils/payroll/payrollUtils.ts
 import { api } from "../../routes/utils/api";
-import { EmployeePayroll, PayrollItem, RateUnit } from "../../types/types";
+import {
+  EmployeePayroll,
+  PayrollDeduction,
+  PayrollItem,
+  RateUnit,
+} from "../../types/types";
 import {
   PayrollCalculationService,
   WorkLog,
@@ -144,7 +149,7 @@ export const getEligibleEmployees = async (id: number) => {
  */
 export const saveEmployeePayroll = async (
   monthlyPayrollId: number,
-  employeePayroll: EmployeePayroll
+  employeePayroll: EmployeePayroll & { deductions?: PayrollDeduction[] }
 ) => {
   try {
     // Transform the employeePayroll object to match API expectations
@@ -164,6 +169,7 @@ export const saveEmployeePayroll = async (
         amount: item.amount,
         is_manual: item.is_manual,
       })),
+      deductions: employeePayroll.deductions || [],
     };
 
     const response = await api.post("/api/employee-payrolls", payload);
