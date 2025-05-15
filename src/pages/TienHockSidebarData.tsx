@@ -5,6 +5,7 @@ import {
   IconListDetails,
   IconUserDollar,
   IconCalendarEvent,
+  IconCalculator,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
@@ -24,6 +25,7 @@ import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
+import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
 import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
@@ -123,6 +125,13 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/holiday-calendar",
     component: HolidayCalendarPage,
     icon: IconCalendarEvent,
+  });
+
+  payrollSubItems.push({
+    name: "EPF, SOCSO & SIP",
+    path: "/payroll/contribution-rates",
+    component: ContributionRatesPage,
+    icon: IconCalculator,
   });
 
   return payrollSubItems;

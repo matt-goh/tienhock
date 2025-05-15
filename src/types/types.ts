@@ -651,3 +651,38 @@ export interface MonthlyPayroll {
   created_by: string | null;
   employeePayrolls: EmployeePayroll[];
 }
+
+export interface EPFRate {
+  id: number;
+  employee_type: string;
+  wage_threshold: number | null;
+  employee_rate_percentage: number;
+  employer_rate_percentage: number | null;
+  employer_fixed_amount: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SOCSORRate {
+  id: number;
+  wage_from: number;
+  wage_to: number;
+  employee_rate: number;
+  employer_rate: number;
+  employer_rate_over_60: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SIPRate {
+  id: number;
+  wage_from: number;
+  wage_to: number;
+  employee_rate: number;
+  employer_rate: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
