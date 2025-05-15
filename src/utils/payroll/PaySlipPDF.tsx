@@ -256,15 +256,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
       ? baseTotalAmount / maxHoursGroup.hours
       : 0;
 
-  // Calculate total deductions (for demo purposes - you'll need to add real deductions)
-  const epfAmount = (payroll.gross_pay * 0.11).toFixed(2);
-  const socsoAmount = (payroll.gross_pay * 0.005).toFixed(2);
-  const sipAmount = (payroll.gross_pay * 0.002).toFixed(2);
-
-  // Calculate total deductions
-  const totalDeductions =
-    parseFloat(epfAmount) + parseFloat(socsoAmount) + parseFloat(sipAmount);
-
   // First payment (mid-month) - for demo purposes, set to 500
   const firstPayment = 500;
 
@@ -417,12 +408,12 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               <Text></Text>
             </View>
             <View style={[styles.tableCol, styles.rateCol]}>
-              <Text style={{ fontFamily: "Helvetica-Bold"}}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
                 {baseTotalRates.toFixed(2)}
               </Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text style={{ fontFamily: "Helvetica-Bold"}}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
                 Rate/Jam : {averageBaseRate.toFixed(2)}
               </Text>
             </View>
@@ -603,9 +594,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   </Text>
                 </View>
                 <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                    Subtotal
-                  </Text>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
                 </View>
                 <View
                   style={[
@@ -651,50 +640,34 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
       {/* Deductions Section */}
       <View style={styles.paymentsSection}>
-        <View style={styles.deductionsRow}>
-          <Text style={styles.deductionLabel}>EPF (MAJIKAN)</Text>
-          <Text style={styles.deductionValue}>
-            {parseFloat(epfAmount).toFixed(2)}
-          </Text>
-          <Text style={styles.deductionDesc}>EPF (PEKERJA)</Text>
-          <Text style={styles.deductionAmount}>
-            (
-            <Text style={styles.bracketText}>
-              {parseFloat(epfAmount).toFixed(2)}
-            </Text>
-            )
-          </Text>
-        </View>
-
-        <View style={styles.deductionsRow}>
-          <Text style={styles.deductionLabel}>SOCSO (MAJIKAN)</Text>
-          <Text style={styles.deductionValue}>
-            {parseFloat(socsoAmount).toFixed(2)}
-          </Text>
-          <Text style={styles.deductionDesc}>SOCSO (PEKERJA)</Text>
-          <Text style={styles.deductionAmount}>
-            (
-            <Text style={styles.bracketText}>
-              {parseFloat(socsoAmount).toFixed(2)}
-            </Text>
-            )
-          </Text>
-        </View>
-
-        <View style={styles.deductionsRow}>
-          <Text style={styles.deductionLabel}>SIP (MAJIKAN)</Text>
-          <Text style={styles.deductionValue}>
-            {parseFloat(sipAmount).toFixed(2)}
-          </Text>
-          <Text style={styles.deductionDesc}>SIP (PEKERJA)</Text>
-          <Text style={styles.deductionAmount}>
-            (
-            <Text style={styles.bracketText}>
-              {parseFloat(sipAmount).toFixed(2)}
-            </Text>
-            )
-          </Text>
-        </View>
+        {payroll.deductions && payroll.deductions.length > 0 ? (
+          // Display actual deductions from database
+          payroll.deductions.map((deduction, index) => {
+            const deductionName = deduction.deduction_type.toUpperCase();
+            return (
+              <View key={index} style={styles.deductionsRow}>
+                <Text style={styles.deductionLabel}>
+                  {deductionName} (MAJIKAN)
+                </Text>
+                <Text style={styles.deductionValue}>
+                  {deduction.employer_amount.toFixed(2)}
+                </Text>
+                <Text style={styles.deductionDesc}>
+                  {deductionName} (PEKERJA)
+                </Text>
+                <Text style={styles.deductionAmount}>
+                  (
+                  <Text style={styles.bracketText}>
+                    {deduction.employee_amount.toFixed(2)}
+                  </Text>
+                  )
+                </Text>
+              </View>
+            );
+          })
+        ) : (
+          <></>
+        )}
 
         {/* Net Pay */}
         <View style={[styles.deductionsRow, { marginTop: 8 }]}>

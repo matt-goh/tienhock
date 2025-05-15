@@ -201,6 +201,21 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 {formatCurrency(payroll.gross_pay)}
               </p>
             </div>
+            {payroll.deductions && payroll.deductions.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <p className="text-sm text-default-500 mb-1">
+                  Total Employee Deductions
+                </p>
+                <p className="text-xl font-semibold text-default-800">
+                  {formatCurrency(
+                    payroll.deductions.reduce(
+                      (sum, deduction) => sum + deduction.employee_amount,
+                      0
+                    )
+                  )}
+                </p>
+              </div>
+            )}
             <div className="border rounded-lg p-4">
               <p className="text-sm text-default-500 mb-1">Net Pay</p>
               <p className="text-xl font-semibold text-default-800">
@@ -209,6 +224,61 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Deductions Summary */}
+        {payroll.deductions && payroll.deductions.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-medium text-default-800 mb-4">
+              Deductions Summary
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {payroll.deductions.map((deduction, index) => {
+                const deductionName = deduction.deduction_type.toUpperCase();
+                return (
+                  <div key={index} className="border rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-default-700 mb-2">
+                      {deductionName}
+                    </h3>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">Employee:</span>
+                          <span className="font-medium text-default-900">
+                            {formatCurrency(deduction.employee_amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">Employer:</span>
+                          <span className="font-medium text-default-900">
+                            {formatCurrency(deduction.employer_amount)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="border-t border-default-200 pt-2 mt-2">
+                        <div className="flex justify-between text-xs text-default-500">
+                          <span>Employee Rate:</span>
+                          <span>{deduction.rate_info.employee_rate}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-default-500">
+                          <span>Employer Rate:</span>
+                          <span>{deduction.rate_info.employer_rate}</span>
+                        </div>
+                        {deduction.rate_info.age_group && (
+                          <div className="flex justify-between text-xs text-default-500">
+                            <span>Age Group:</span>
+                            <span className="capitalize">
+                              {deduction.rate_info.age_group.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Tabs for Items and Pay Slip View */}
         <div className="mb-6">
