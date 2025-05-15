@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     backgroundColor: "#f0f0f0",
-    minHeight: 20,
+    minHeight: 14,
     alignItems: "center",
   },
   tableRow: {
@@ -102,44 +102,14 @@ const styles = StyleSheet.create({
   sectionTitleText: {
     fontFamily: "Helvetica-Bold",
   },
-  grandTotalRow: {
+  totalRow: {
     borderTopWidth: 2,
     borderTopColor: "#000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
   },
-  grandTotalText: {
+  totalText: {
     fontFamily: "Helvetica-Bold",
-  },
-  paymentsSection: {
-    marginTop: 10,
-  },
-  deductionsRow: {
-    flexDirection: "row",
-    marginTop: 3,
-  },
-  deductionLabel: {
-    width: "30%",
-    fontSize: 9,
-  },
-  deductionValue: {
-    width: "15%",
-    fontSize: 9,
-    textAlign: "right",
-  },
-  deductionDesc: {
-    width: "40%",
-    fontSize: 9,
-    paddingLeft: 10,
-  },
-  deductionAmount: {
-    width: "15%",
-    fontSize: 9,
-    textAlign: "right",
-  },
-  bracketText: {
-    textAlign: "right",
-  },
-  finalSection: {
-    marginTop: 15,
   },
   signatureSection: {
     marginTop: 40,
@@ -154,26 +124,9 @@ const styles = StyleSheet.create({
     width: "80%",
     marginBottom: 5,
   },
-  signatureLabel: {
-    fontSize: 8,
-    textAlign: "center",
-    width: "80%",
-  },
   notesSection: {
     marginTop: 20,
     fontSize: 8,
-    fontStyle: "italic",
-  },
-  summaryCol: {
-    textAlign: "right",
-    paddingVertical: 3,
-    fontSize: 9,
-    fontWeight: "bold",
-  },
-  footnote: {
-    marginTop: 20,
-    fontSize: 8,
-    textAlign: "center",
     fontStyle: "italic",
   },
 });
@@ -604,12 +557,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   ]}
                 >
                   <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                    {formatCurrency(
-                      groupedItems.Overtime.reduce(
-                        (sum, item) => sum + item.amount,
-                        0
-                      )
-                    )}
+                    {formatCurrency(overtimeTotalAmount)}
                   </Text>
                 </View>
               </View>
@@ -618,7 +566,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Grand Total Row */}
-        <View style={[styles.tableRow, styles.grandTotalRow]}>
+        <View style={[styles.tableRow, styles.totalRow]}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -626,148 +574,163 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             <Text></Text>
           </View>
           <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-            <Text style={styles.grandTotalText}>Jumlah Gaji Kasar</Text>
+            <Text style={styles.totalText}>Jumlah Gaji Kasar</Text>
           </View>
           <View
             style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
           >
-            <Text style={styles.grandTotalText}>
+            <Text style={styles.totalText}>
               {formatCurrency(payroll.gross_pay)}
             </Text>
           </View>
         </View>
-      </View>
 
-      {/* Deductions Section */}
-      <View style={styles.paymentsSection}>
-        {payroll.deductions && payroll.deductions.length > 0 ? (
-          // Display actual deductions from database
-          payroll.deductions.map((deduction, index) => {
-            const deductionName = deduction.deduction_type.toUpperCase();
-            return (
-              <View key={index} style={styles.deductionsRow}>
-                <Text style={styles.deductionLabel}>
-                  {deductionName} (MAJIKAN)
-                </Text>
-                <Text style={styles.deductionValue}>
-                  {deduction.employer_amount.toFixed(2)}
-                </Text>
-                <Text style={styles.deductionDesc}>
-                  {deductionName} (PEKERJA)
-                </Text>
-                <Text style={styles.deductionAmount}>
-                  (
-                  <Text style={styles.bracketText}>
-                    {deduction.employee_amount.toFixed(2)}
-                  </Text>
-                  )
-                </Text>
-              </View>
-            );
-          })
-        ) : (
-          <></>
+        {/* Deductions Rows */}
+        {payroll.deductions && payroll.deductions.length > 0 && (
+          <>
+            {/* EPF Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type.toUpperCase() === "EPF")
+              .map((deduction, index) => (
+                <View key="deduction-epf" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>EPF (Majikan)</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{deduction.employer_amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>EPF (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
+
+            {/* SOCSO Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type.toUpperCase() === "SOCSO")
+              .map((deduction, index) => (
+                <View key="deduction-socso" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>SOCSO (Majikan)</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{deduction.employer_amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>SOCSO (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
+
+            {/* SIP Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type.toUpperCase() === "SIP")
+              .map((deduction, index) => (
+                <View key="deduction-sip" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>SIP (Majikan)</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{deduction.employer_amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>SIP (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
+          </>
         )}
 
-        {/* Net Pay */}
-        <View style={[styles.deductionsRow, { marginTop: 8 }]}>
-          <Text style={[styles.deductionLabel, { fontWeight: "bold" }]}></Text>
-          <Text style={styles.deductionValue}></Text>
-          <Text style={[styles.deductionDesc, { fontWeight: "bold" }]}>
-            JUMLAH GAJI BERSIH=
-          </Text>
-          <Text style={[styles.deductionAmount, { fontWeight: "bold" }]}>
+        {/* Net Pay Row */}
+        <View style={[styles.tableRow, styles.totalRow]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.rateCol]}>
+            <Text></Text>
+          </View>{" "}
+        </View>
+        <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+          <Text style={styles.totalText}>Jumlah Gaji Bersih</Text>
+        </View>
+        <View
+          style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+        >
+          <Text style={styles.totalText}>
             {formatCurrency(payroll.net_pay)}
           </Text>
         </View>
-      </View>
 
-      {/* Payment Schedule Section */}
-      <View style={styles.finalSection}>
-        <View style={styles.table}>
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text>GAJI</Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
+        {/* Mid Month Payment Deduction - To Be Implemented Soon */}
+        <View style={styles.tableRow}>
+          <View style={[styles.tableCol]}>
+            <Text>Bayaran Pertama (1) Gaji Pertengahan Bulan</Text>
           </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5 }]}>
-              <Text>BAYARAN PERTAMA (1) GAJI PERTENGAHAN BULAN =</Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
-              <Text>({formatCurrency(firstPayment)})</Text>
-            </View>
+          <View style={[styles.tableCol]}>
+            <Text></Text>
           </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5 }]}>
-              <Text>BAYARAN PERTAMA (1) KE 2 PERTENGAHAN BULAN =</Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
-              <Text>({formatCurrency(0)})</Text>
-            </View>
+          <View style={[styles.tableCol]}>
+            <Text></Text>
           </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5, fontWeight: "bold" }]}>
-              <Text>JUMLAH -</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                { flex: 1.5, borderRightWidth: 0, fontWeight: "bold" },
-              ]}
-            >
-              <Text>{formatCurrency(roundedFinalPayment)}</Text>
-            </View>
+          <View style={[styles.tableCol]}>
+            <Text>({formatCurrency(firstPayment)})</Text>
           </View>
+        </View>
 
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5, fontWeight: "bold" }]}>
-              <Text>JUMLAH DIGENAPKAN =</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                { flex: 1.5, borderRightWidth: 0, fontWeight: "bold" },
-              ]}
-            >
-              <Text>{formatCurrency(Math.round(roundedFinalPayment))}</Text>
-            </View>
+        <View style={styles.tableRow}>
+          <View style={[styles.tableCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
+            <Text>Jumlah</Text>
+          </View>
+          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
+            <Text>{formatCurrency(finalPayment)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.tableRow}>
+          <View style={[styles.tableCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
+            <Text>Jumlah Digenapkan</Text>
+          </View>
+          <View style={[styles.tableCol, { fontWeight: "bold" }]}>
+            <Text>{formatCurrency(Math.round(roundedFinalPayment))}</Text>
           </View>
         </View>
       </View>
