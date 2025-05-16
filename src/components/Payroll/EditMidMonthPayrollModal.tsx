@@ -8,8 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import Button from "../Button";
-import { FormInput } from "../FormComponents";
-import StyledListbox from "../StyledListbox";
+import { FormInput, FormListbox } from "../FormComponents";
 import {
   updateMidMonthPayroll,
   MidMonthPayroll,
@@ -111,7 +110,7 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white p-6 shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 mb-4"
@@ -145,10 +144,9 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
 
                   {/* Payment Method */}
                   <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">
-                      Payment Method
-                    </label>
-                    <StyledListbox
+                    <FormListbox
+                      name="paymentMethod"
+                      label="Select payment method"
                       value={paymentMethod}
                       onChange={(value) =>
                         setPaymentMethod(value as "Cash" | "Bank" | "Cheque")
