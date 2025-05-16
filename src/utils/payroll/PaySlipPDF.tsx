@@ -93,30 +93,39 @@ const styles = StyleSheet.create({
   subtotalRow: {
     backgroundColor: "#f8f9fa", // Very light gray background
     borderTopWidth: 0.5,
-  },
-  sectionTitleRow: {
-    backgroundColor: "#e9ecef", // Light gray background for section titles
-    borderTopWidth: 1,
-    borderTopColor: "#000",
-  },
-  sectionTitleText: {
-    fontFamily: "Helvetica-Bold",
-  },
-  totalRow: {
-    borderTopWidth: 2,
     borderTopColor: "#000",
     borderBottomWidth: 1,
     borderBottomColor: "#000",
   },
+  jumlahGajiKasarRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+  jumlahGajiBersihRow: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+  jumlahRow: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#000",
+  },
   grandTotalRow: {
     borderTopWidth: 1,
     borderTopColor: "#000",
+    backgroundColor: "#f8f9fa", // Very light gray background
   },
   totalText: {
     fontFamily: "Helvetica-Bold",
   },
+  notesSection: {
+    marginTop: 3,
+    fontSize: 8,
+    fontFamily: "Helvetica-Oblique",
+  },
   signatureSection: {
-    marginTop: 40,
+    marginTop: 50,
     flexDirection: "row",
   },
   signatureBlock: {
@@ -127,11 +136,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "#000",
     width: "80%",
     marginBottom: 5,
-  },
-  notesSection: {
-    marginTop: 20,
-    fontSize: 8,
-    fontStyle: "italic",
   },
 });
 
@@ -192,6 +196,11 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   );
   const baseTotalRates = groupedItems.Base.reduce(
     (sum, item) => sum + item.rate,
+    0
+  );
+
+  const tambahanTotalAmount = groupedItems["Tambahan"].reduce(
+    (sum, item) => sum + item.amount,
     0
   );
 
@@ -393,28 +402,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {/* Tambahan Pay Items */}
         {groupedItems["Tambahan"].length > 0 && (
           <>
-            {/* Tambahan Title Row */}
-            <View style={[styles.tableRow, styles.sectionTitleRow]}>
-              <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text style={styles.sectionTitleText}>Tambahan</Text>
-              </View>
-              <View style={[styles.tableCol, styles.rateCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text></Text>
-              </View>
-              <View
-                style={[
-                  styles.tableCol,
-                  styles.amountCol,
-                  { borderRightWidth: 0 },
-                ]}
-              >
-                <Text></Text>
-              </View>
-            </View>
-
             {/* Tambahan Items */}
             {groupedItems["Tambahan"].map((item, index) => (
               <View key={`tambahan-${index}`} style={styles.tableRow}>
@@ -464,12 +451,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 ]}
               >
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  {formatCurrency(
-                    groupedItems["Tambahan"].reduce(
-                      (sum, item) => sum + item.amount,
-                      0
-                    )
-                  )}
+                  {formatCurrency(tambahanTotalAmount)}
                 </Text>
               </View>
             </View>
@@ -479,28 +461,6 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {/* Overtime Pay Items */}
         {groupedItems.Overtime.length > 0 && (
           <>
-            {/* Overtime Title Row */}
-            <View style={[styles.tableRow, styles.sectionTitleRow]}>
-              <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text style={styles.sectionTitleText}>Overtime</Text>
-              </View>
-              <View style={[styles.tableCol, styles.rateCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text></Text>
-              </View>
-              <View
-                style={[
-                  styles.tableCol,
-                  styles.amountCol,
-                  { borderRightWidth: 0 },
-                ]}
-              >
-                <Text></Text>
-              </View>
-            </View>
-
             {/* Overtime Items - Grouped by hours */}
             {overtimeGroupedByHours.map((group, groupIndex) =>
               group.items.map((item, itemIndex) => (
@@ -571,8 +531,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </>
         )}
 
-        {/* Grand Total Row */}
-        <View style={[styles.tableRow, styles.totalRow]}>
+        {/* Jumlah Gaji Kasar Row */}
+        <View style={[styles.tableRow, styles.jumlahGajiKasarRow]}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -674,8 +634,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </>
         )}
 
-        {/* Net Pay Row */}
-        <View style={[styles.tableRow, styles.totalRow]}>
+        {/* Jumlah Gaji Bersih Row */}
+        <View style={[styles.tableRow, styles.jumlahGajiBersihRow]}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -712,8 +672,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </View>
         </View>
 
-        {/* Subtotal Row */}
-        <View style={[styles.tableRow, styles.totalRow]}>
+        {/* Jumlah Row */}
+        <View style={[styles.tableRow, styles.jumlahRow]}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -762,15 +722,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
       <View style={styles.signatureSection}>
         <View style={styles.signatureBlock}></View>
         <View style={styles.signatureBlock}>
-          <Text style={{ textAlign: "right", marginRight: 10 }}>
-            RECEIVED BY
-          </Text>
-          <View
-            style={[
-              styles.signatureLine,
-              { marginLeft: "auto", marginRight: 10 },
-            ]}
-          ></View>
+          <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
+          <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
         </View>
       </View>
     </Page>
