@@ -700,3 +700,19 @@ export interface PayrollDeduction {
     age_group?: string;
   };
 }
+
+export interface MidMonthPayroll {
+  id: number;
+  employee_id: string;
+  employee_name: string;
+  year: number;
+  month: number;
+  amount: number;
+  payment_method: "Cash" | "Bank" | "Cheque";
+  status: "Pending" | "Paid" | "Cancelled";
+  created_at: string;
+  updated_at: string;
+  paid_at?: string;
+  notes?: string;
+  default_payment_method?: string;
+}

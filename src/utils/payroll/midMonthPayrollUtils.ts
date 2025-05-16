@@ -1,0 +1,195 @@
+// src/utils/payroll/midMonthPayrollUtils.ts
+import { api } from "../../routes/utils/api";
+
+export interface MidMonthPayroll {
+  id: number;
+  employee_id: string;
+  employee_name: string;
+  year: number;
+  month: number;
+  amount: number;
+  payment_method: "Cash" | "Bank" | "Cheque";
+  status: "Pending" | "Paid" | "Cancelled";
+  created_at: string;
+  updated_at: string;
+  paid_at?: string;
+  notes?: string;
+  default_payment_method?: string;
+}
+
+export interface MidMonthPayrollsResponse {
+  payrolls: MidMonthPayroll[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CreateMidMonthPayrollData {
+  employee_id: string;
+  year: number;
+  month: number;
+  amount: number;
+  payment_method: "Cash" | "Bank" | "Cheque";
+  status?: "Pending" | "Paid" | "Cancelled";
+  notes?: string;
+}
+
+export interface UpdateMidMonthPayrollData {
+  amount?: number;
+  payment_method?: "Cash" | "Bank" | "Cheque";
+  status?: "Pending" | "Paid" | "Cancelled";
+  notes?: string;
+}
+
+/**
+ * Fetch all mid-month payrolls with filtering
+ */
+export const getMidMonthPayrolls = async (
+  filters: {
+    year?: number;
+    month?: number;
+    employee_id?: string;
+    status?: string;
+    payment_method?: string;
+    page?: number;
+    limit?: number;
+  } = {}
+): Promise<MidMonthPayrollsResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    const response = await api.get(
+      `/api/mid-month-payrolls?${queryParams.toString()}`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching mid-month payrolls:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get specific mid-month payroll by ID
+ */
+export const getMidMonthPayrollById = async (
+  id: number
+): Promise<MidMonthPayroll> => {
+  try {
+    const response = await api.get(`/api/mid-month-payrolls/${id}`);
+    return response;
+  } catch (error) {
+    console.error("Error fetching mid-month payroll:", error);
+    throw error;
+  }
+};
+
+/**
+ * Create new mid-month payroll
+ */
+export const createMidMonthPayroll = async (
+  data: CreateMidMonthPayrollData
+): Promise<{ message: string; payroll: MidMonthPayroll }> => {
+  try {
+    const response = await api.post("/api/mid-month-payrolls", data);
+    return response;
+  } catch (error) {
+    console.error("Error creating mid-month payroll:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update existing mid-month payroll
+ */
+export const updateMidMonthPayroll = async (
+  id: number,
+  data: UpdateMidMonthPayrollData
+): Promise<{ message: string; payroll: MidMonthPayroll }> => {
+  try {
+    const response = await api.put(`/api/mid-month-payrolls/${id}`, data);
+    return response;
+  } catch (error) {
+    console.error("Error updating mid-month payroll:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update payment status only
+ */
+export const updateMidMonthPayrollStatus = async (
+  id: number,
+  status: "Pending" | "Paid" | "Cancelled"
+): Promise<{ message: string; payroll: MidMonthPayroll }> => {
+  try {
+    const response = await api.put(`/api/mid-month-payrolls/${id}/status`, {
+      status,
+    });
+    return response;
+  } catch (error) {
+    console.error("Error updating payment status:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete mid-month payroll
+ */
+export const deleteMidMonthPayroll = async (
+  id: number
+): Promise<{ message: string; deleted_payroll: MidMonthPayroll }> => {
+  try {
+    const response = await api.delete(`/api/mid-month-payrolls/${id}`);
+    return response;
+  } catch (error) {
+    console.error("Error deleting mid-month payroll:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get mid-month payroll by employee and date
+ */
+export const getMidMonthPayrollByEmployee = async (
+  employeeId: string,
+  year: number,
+  month: number
+): Promise<MidMonthPayroll> => {
+  try {
+    const response = await api.get(
+      `/api/mid-month-payrolls/employee/${employeeId}/${year}/${month}`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error fetching mid-month payroll by employee:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get month name from month number
+ */
+export const getMonthName = (month: number): string => {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  return months[month - 1] || "Unknown";
+};
