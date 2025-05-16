@@ -1,7 +1,7 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { IconPrinter, IconPlus, IconTrash } from "@tabler/icons-react";
+import {  IconPlus, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";

@@ -33,7 +33,7 @@ interface InputProps {
   type?: string;
   placeholder?: string;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
-  step?: string;
+  step?: string | number;
   min?: number;
   max?: number;
   required?: boolean;

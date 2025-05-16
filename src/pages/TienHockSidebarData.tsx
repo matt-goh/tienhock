@@ -6,6 +6,7 @@ import {
   IconUserDollar,
   IconCalendarEvent,
   IconCalculator,
+  IconCash,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
@@ -30,6 +31,7 @@ import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
 import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
+import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 
 // Catalogue related imports
 // Staff
@@ -117,6 +119,13 @@ const generatePayrollSubItems = (): SidebarItem[] => {
         component: EmployeePayrollDetailsPage,
       },
     ],
+  });
+
+  payrollSubItems.push({
+    name: "Mid-month Pay",
+    path: "/payroll/mid-month-payrolls",
+    component: MidMonthPayrollPage,
+    icon: IconCash,
   });
 
   // Add Holiday Calendar at the end
