@@ -32,10 +32,10 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
   currentYear,
   currentMonth,
 }) => {
+  const defaultAmount = 500; // Default amount for new payroll
   const { staffs } = useStaffsCache();
-
   const [employeeId, setEmployeeId] = useState<string>("");
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<number>(defaultAmount);
   const [paymentMethod, setPaymentMethod] = useState<
     "Cash" | "Bank" | "Cheque"
   >("Cash");
@@ -118,7 +118,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
 
   const resetForm = () => {
     setEmployeeId("");
-    setAmount(0);
+    setAmount(defaultAmount);
     setPaymentMethod("Cash");
     setSearchQuery("");
   };
@@ -156,7 +156,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white p-6 shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 mb-4"
@@ -179,6 +179,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                       query={searchQuery}
                       setQuery={setSearchQuery}
                       placeholder="Search for employee..."
+                      mode="single"
                     />
                   </div>
 

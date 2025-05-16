@@ -205,7 +205,7 @@ const MidMonthPayrollPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -228,8 +228,8 @@ const MidMonthPayrollPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
                       {format(new Date(payroll.created_at), "dd MMM yyyy")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center space-x-3">
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end space-x-3">
                         <button
                           onClick={() => handleEdit(payroll)}
                           className="text-sky-600 hover:text-sky-800"
