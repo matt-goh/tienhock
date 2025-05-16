@@ -108,6 +108,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
   },
+  grandTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#000",
+  },
   totalText: {
     fontFamily: "Helvetica-Bold",
   },
@@ -727,7 +731,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         </View>
 
         {/* Final Rounded Amount Row */}
-        <View style={[styles.tableRow]}>
+        <View style={[styles.tableRow, styles.grandTotalRow]}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
