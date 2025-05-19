@@ -87,14 +87,25 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         const activitiesWithContext = existingActivities.map((activity) => {
           const contextField = contextLinkedPayCodes[activity.payCodeId];
 
-          // For salesman with product-linked activities
+          // For salesman with product-linked activities, match by ID
           if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
-            return {
-              ...activity,
-              isContextLinked: false, // Products aren't context linked
-            };
+            // Find a matching product by ID (product_id should match payCodeId)
+            const matchingProduct = salesmanProducts.find(
+              (product) => product.product_id === activity.payCodeId
+            );
+
+            if (matchingProduct) {
+              return {
+                ...activity,
+                unitsProduced: matchingProduct.quantity,
+                // Auto-select if a matching product is found
+                isSelected: true,
+                isContextLinked: false,
+              };
+            }
           }
 
+          // Rest of existing code...
           if (contextField && contextData[contextField.id] !== undefined) {
             return {
               ...activity,
@@ -108,10 +119,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         // Apply location type adjustments for salesmen
         const activitiesWithLocationAdjustments = activitiesWithContext.map(
           (activity) => {
-            // For salesmen with outstation activities, adjust rates
-            if (isSalesman && locationType === "Outstation") {
-              // Auto select outstation activities
-            }
+            // Existing location type handling
             return activity;
           }
         );
@@ -144,6 +152,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     isSalesman,
     locationType,
     jobConfig,
+    salesmanProducts,
   ]);
 
   useEffect(() => {
@@ -262,7 +271,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       <p className="text-sm text-gray-500">Job</p>
                       <Link
                         to={`/catalogue/job?id=${jobType}`}
-                        className="hover:underline hover:text-sky-600"
+                        className="font-medium hover:underline hover:text-sky-600"
                       >
                         {jobName}
                       </Link>
@@ -569,51 +578,91 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   salesmanProducts &&
                                                   salesmanProducts.length >
                                                     0 ? (
-                                                    <select
-                                                      className={`w-32 text-center border border-gray-300 rounded p-1 text-sm ${
-                                                        activity.isContextLinked
-                                                          ? "bg-gray-100 cursor-not-allowed"
-                                                          : "disabled:bg-gray-100"
-                                                      }`}
-                                                      value={
-                                                        activity.unitsProduced?.toString() ||
-                                                        ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleUnitsChange(
-                                                          originalIndex,
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      onClick={(e) =>
-                                                        e.stopPropagation()
-                                                      }
-                                                      disabled={
-                                                        !activity.isSelected ||
-                                                        activity.isContextLinked
-                                                      }
-                                                    >
-                                                      <option value="">
-                                                        Select Product
-                                                      </option>
-                                                      {salesmanProducts.map(
-                                                        (product) => (
-                                                          <option
-                                                            key={
-                                                              product.product_id
-                                                            }
-                                                            value={
-                                                              product.quantity
-                                                            }
-                                                          >
-                                                            {
-                                                              product.product_name
-                                                            }{" "}
-                                                            ({product.quantity})
+                                                    <>
+                                                      {/* If product_id matches payCodeId, show the quantity directly */}
+                                                      {salesmanProducts.some(
+                                                        (p) =>
+                                                          p.product_id ===
+                                                          activity.payCodeId
+                                                      ) ? (
+                                                        <input
+                                                          type="number"
+                                                          className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                            !activity.isSelected
+                                                              ? "bg-gray-100 cursor-not-allowed"
+                                                              : ""
+                                                          }`}
+                                                          value={
+                                                            activity.unitsProduced?.toString() ||
+                                                            "0"
+                                                          }
+                                                          onChange={(e) =>
+                                                            handleUnitsChange(
+                                                              originalIndex,
+                                                              e.target.value
+                                                            )
+                                                          }
+                                                          onClick={(e) =>
+                                                            e.stopPropagation()
+                                                          }
+                                                          disabled={
+                                                            !activity.isSelected
+                                                          }
+                                                          min="0"
+                                                          step="1"
+                                                        />
+                                                      ) : (
+                                                        /* If no direct match, show product selection dropdown */
+                                                        <select
+                                                          className={`w-32 text-center border border-gray-300 rounded p-1 text-sm ${
+                                                            !activity.isSelected
+                                                              ? "bg-gray-100 cursor-not-allowed"
+                                                              : ""
+                                                          }`}
+                                                          value={
+                                                            activity.unitsProduced?.toString() ||
+                                                            ""
+                                                          }
+                                                          onChange={(e) =>
+                                                            handleUnitsChange(
+                                                              originalIndex,
+                                                              e.target.value
+                                                            )
+                                                          }
+                                                          onClick={(e) =>
+                                                            e.stopPropagation()
+                                                          }
+                                                          disabled={
+                                                            !activity.isSelected
+                                                          }
+                                                        >
+                                                          <option value="">
+                                                            Select Product
                                                           </option>
-                                                        )
+                                                          {salesmanProducts.map(
+                                                            (product) => (
+                                                              <option
+                                                                key={
+                                                                  product.product_id
+                                                                }
+                                                                value={
+                                                                  product.quantity
+                                                                }
+                                                              >
+                                                                {
+                                                                  product.product_name
+                                                                }{" "}
+                                                                (
+                                                                {
+                                                                  product.quantity
+                                                                }
+                                                                )
+                                                              </option>
+                                                            )
+                                                          )}
+                                                        </select>
                                                       )}
-                                                    </select>
+                                                    </>
                                                   ) : (
                                                     /* Standard numeric input for non-salesmen */
                                                     <input

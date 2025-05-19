@@ -157,7 +157,7 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     id: "SALESMAN",
     name: "Salesman",
     section: ["SALES"],
-    replaceUnits: "Product", // This triggers the alternative DailyLogEntryPage behavior
+    replaceUnits: "Bag", // This triggers the alternative DailyLogEntryPage behavior
     contextFields: [], // No context fields for salesmen
     jobIds: ["SALESMAN", "SALESMAN_IKUT"], // Job IDs for salesmen
   },
