@@ -84,8 +84,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           return item;
         }
         if (item.subItems) {
+          // Check regular subItems
           const found = findSidebarItem(item.subItems, name);
           if (found) return found;
+
+          // Check for showInPopover subItems
+          const popoverSubItem = item.subItems.find(
+            (subItem) => subItem.showInPopover && subItem.name === name
+          );
+          if (popoverSubItem) return popoverSubItem;
         }
         if (item.popoverOptions) {
           const found = item.popoverOptions.find(
@@ -456,9 +463,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                         onNavigate={() => setLastClickedSource("bookmark")}
                       />
                       {hoveredBookmarkOption === bookmark.name &&
-                        itemData.popoverOptions && (
+                        getPopoverOptionsForItem(itemData).length > 0 && (
                           <SidebarPopover
-                            options={itemData.popoverOptions}
+                            options={getPopoverOptionsForItem(itemData)}
                             onMouseEnter={handlePopoverMouseEnter}
                             onMouseLeave={() => handlePopoverMouseLeave(true)}
                             buttonRef={buttonRef}
@@ -524,7 +531,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const renderSidebarOption = (item: SidebarItem) => {
     const buttonRef = getRefForItem(item.name);
-    const hasPopover = !!item.popoverOptions && item.popoverOptions.length > 0;
+    const popoverOptions = getPopoverOptionsForItem(item);
+    const hasPopover = popoverOptions.length > 0;
     const isActive =
       activeRegularOption === item.name || hoveredRegularOption === item.name;
 
@@ -543,7 +551,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         />
         {hoveredRegularOption === item.name && hasPopover && (
           <SidebarPopover
-            options={item.popoverOptions!}
+            options={popoverOptions}
             onMouseEnter={handlePopoverMouseEnter}
             onMouseLeave={() => handlePopoverMouseLeave()}
             buttonRef={buttonRef}
@@ -552,6 +560,28 @@ const Sidebar: React.FC<SidebarProps> = ({
       </React.Fragment>
     );
   };
+
+  const getPopoverOptionsForItem = useCallback(
+    (item: SidebarItem): PopoverOption[] => {
+      // Start with any explicitly defined popover options
+      const options: PopoverOption[] = [...(item.popoverOptions || [])];
+
+      // Add subItems that have showInPopover flag
+      if (item.subItems) {
+        item.subItems.forEach((subItem) => {
+          if (subItem.showInPopover && subItem.path) {
+            options.push({
+              name: subItem.name,
+              path: subItem.path,
+            });
+          }
+        });
+      }
+
+      return options;
+    },
+    []
+  );
 
   return (
     <div
