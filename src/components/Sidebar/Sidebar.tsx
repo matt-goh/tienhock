@@ -482,23 +482,40 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       // Check if the top-level item has both a path and component
       if (item.path && item.component) {
-        // Render as a clickable button
+        const buttonRef = getRefForItem(item.name);
+        const popoverOptions = getPopoverOptionsForItem(item);
+        const hasPopover = popoverOptions.length > 0;
+
         return (
-          <SidebarButton
-            key={item.name}
-            name={item.name}
-            icon={renderIcon(item.icon)}
-            onClick={() => handleToggle(item.name)}
-            isOpen={openItems.includes(item.name)}
-            path={item.path} // Add the path
-            onNavigate={() => setLastClickedSource("regular")} // Add navigation callback
-          >
-            {openItems.includes(item.name) && item.subItems && (
-              <ul className="mt-1.5 space-y-1.5">
-                {item.subItems.map(renderSidebarOption)}
-              </ul>
+          <React.Fragment key={item.name}>
+            <SidebarButton
+              key={item.name}
+              name={item.name}
+              icon={renderIcon(item.icon)}
+              onClick={() => handleToggle(item.name)}
+              isOpen={openItems.includes(item.name)}
+              path={item.path}
+              onNavigate={() => setLastClickedSource("regular")}
+              onMouseEnter={() => handleMouseEnter(item.name)}
+              onMouseLeave={() => handleMouseLeave()}
+              buttonRef={buttonRef}
+            >
+              {openItems.includes(item.name) && item.subItems && (
+                <ul className="mt-1.5 space-y-1.5">
+                  {item.subItems.map(renderSidebarOption)}
+                </ul>
+              )}
+            </SidebarButton>
+
+            {hoveredRegularOption === item.name && hasPopover && (
+              <SidebarPopover
+                options={popoverOptions}
+                onMouseEnter={handlePopoverMouseEnter}
+                onMouseLeave={() => handlePopoverMouseLeave()}
+                buttonRef={buttonRef}
+              />
             )}
-          </SidebarButton>
+          </React.Fragment>
         );
       }
 
@@ -570,6 +587,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       if (item.subItems) {
         item.subItems.forEach((subItem) => {
           if (subItem.showInPopover && subItem.path) {
+            // Make sure we preserve the correct prefixed path
             options.push({
               name: subItem.name,
               path: subItem.path,
