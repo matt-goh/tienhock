@@ -407,16 +407,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         // Create row key for each job and set products
         selectedJobs.forEach((jobType) => {
           const rowKey = `${salesmanId}-${jobType}`;
+
           // Ensure products is always an array and has required fields
           const productArray = Array.isArray(products) ? products : [];
 
-          // Validate that each product has product_id and quantity
+          // Filter to only include products with valid data
           rowKeyProducts[rowKey] = productArray.filter(
-            (p) => p && p.product_id && typeof p.quantity === "number"
+            (p) =>
+              p &&
+              p.product_id &&
+              typeof p.quantity === "number" &&
+              p.quantity > 0
           );
         });
       });
 
+      console.log("Final processed salesmanProducts:", rowKeyProducts);
       setSalesmanProducts(rowKeyProducts);
     } catch (error) {
       console.error("Error fetching salesman products:", error);
@@ -446,51 +452,67 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobConfig?.id === "SALESMAN" &&
       Object.keys(salesmanProducts).length > 0
     ) {
+      console.log("Processing salesman products:", salesmanProducts);
+
       // For each row key and its products
       Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
         // Skip if there are no products for this employee
         if (!products || products.length === 0) {
+          console.log(`No products found for ${rowKey}`);
           return;
         }
+
+        console.log(`Products for ${rowKey}:`, products);
 
         // For this employee+job combo, update their activities
         setEmployeeActivities((prev) => {
           const currentActivities = prev[rowKey] || [];
           if (currentActivities.length === 0) {
+            console.log(`No activities found for ${rowKey}`);
             return prev;
           }
 
-          // Map the activities, updating units for matching product IDs
-          const updatedActivities = currentActivities.map((activity) => {
-            // Skip Hour-based activities for salesmen
+          // Create a new array with updated activities
+          const updatedActivities = [...currentActivities];
+
+          // For each product, find and update the matching pay code
+          products.forEach((product) => {
+            const productId = String(product.product_id);
+            const quantity = parseFloat(product.quantity) || 0;
+
+            // Find the activity with matching pay code ID
+            const activityIndex = updatedActivities.findIndex(
+              (activity) => String(activity.payCodeId) === productId
+            );
+
+            if (activityIndex !== -1) {
+              console.log(
+                `Found matching activity for product ${productId} with quantity ${quantity}`
+              );
+
+              // Update the activity with the product quantity
+              if (quantity > 0) {
+                updatedActivities[activityIndex] = {
+                  ...updatedActivities[activityIndex],
+                  unitsProduced: quantity,
+                  isSelected: true, // Auto-select products with non-zero quantity
+                };
+              }
+            }
+          });
+
+          // Auto-deselect Hour-based activities
+          updatedActivities.forEach((activity, index) => {
             if (activity.rateUnit === "Hour") {
-              return {
+              updatedActivities[index] = {
                 ...activity,
                 isSelected: false,
                 calculatedAmount: 0,
               };
             }
-
-            // Find product with matching ID - ensure string comparisons
-            const matchingProduct = products.find(
-              (p) => String(p.product_id) === String(activity.payCodeId)
-            );
-
-            if (matchingProduct) {
-              // Only update if the product has a non-zero quantity
-              if (parseFloat(matchingProduct.quantity) > 0) {
-                return {
-                  ...activity,
-                  unitsProduced: parseFloat(matchingProduct.quantity),
-                  isSelected: true, // Auto-select if there's quantity
-                };
-              }
-            }
-
-            return activity;
           });
 
-          // Recalculate amounts after updating units
+          // Recalculate amounts for all activities
           const recalculatedActivities = calculateActivitiesAmounts(
             updatedActivities,
             0, // For salesmen, hours aren't used
@@ -505,7 +527,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       });
     }
-  }, [salesmanProducts, jobConfig?.id]); // Keep dependencies simple to avoid over-triggering
+  }, [salesmanProducts, jobConfig?.id]);
 
   // Update employee hours by employee+job combination
   const handleEmployeeHoursChange = (
@@ -539,7 +561,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       );
       return;
     }
+
     // Get the products for this specific employee and job
+    const rowKey = employee.rowKey;
+    const productsForEmployee = salesmanProducts[rowKey] || [];
+
+    // First set selectedEmployee, then open the modal
     setSelectedEmployee(employee);
     setShowActivitiesModal(true);
   };

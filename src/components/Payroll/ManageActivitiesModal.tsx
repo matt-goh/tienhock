@@ -81,58 +81,54 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   useEffect(() => {
     if (isOpen && employee) {
       if (existingActivities && existingActivities.length > 0) {
-        // Check for context-linked pay codes and update their units
-        const activitiesWithContext = existingActivities.map((activity) => {
-          const contextField = contextLinkedPayCodes[activity.payCodeId];
+        // First, make a deep copy of existing activities to avoid mutation issues
+        const activitiesWithContext = JSON.parse(
+          JSON.stringify(existingActivities)
+        );
 
-          // For salesman, auto-deselect ONLY Hour-based activities
+        // Process each activity
+        for (let i = 0; i < activitiesWithContext.length; i++) {
+          const activity = activitiesWithContext[i];
+
+          // For salesman, deselect Hour-based pay codes
           if (isSalesman && activity.rateUnit === "Hour") {
-            return {
-              ...activity,
-              isSelected: false, // Force deselect Hour-based activities for salesmen
-              calculatedAmount: 0,
-            };
+            activity.isSelected = false;
+            activity.calculatedAmount = 0;
+            continue; // Skip to next activity
           }
 
-          // For salesman with product-linked activities (non-Hour based)
-          if (
-            isSalesman &&
-            jobConfig?.replaceUnits &&
-            activity.rateUnit === jobConfig.replaceUnits
-          ) {
-            // Find a matching product - ensure string comparison for IDs
+          // Process product-linked activities for salesmen
+          if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
+            // Find a matching product by ID
             const matchingProduct = salesmanProducts.find(
               (p) => String(p.product_id) === String(activity.payCodeId)
             );
 
             if (matchingProduct) {
-              // Important: Only update if there's a non-zero quantity
-              if (parseFloat(matchingProduct.quantity) > 0) {
-                return {
-                  ...activity,
-                  unitsProduced: parseFloat(matchingProduct.quantity),
-                  isSelected: true, // Auto-select if it has quantity
-                };
+              const quantity = parseFloat(matchingProduct.quantity) || 0;
+              console.log(
+                `Found matching product for ${activity.payCodeId} with quantity ${quantity}`
+              );
+
+              if (quantity > 0) {
+                activity.unitsProduced = quantity;
+                activity.isSelected = true;
               }
             }
           }
 
           // Handle context-linked fields
+          const contextField = contextLinkedPayCodes[activity.payCodeId];
           if (contextField && contextData[contextField.id] !== undefined) {
-            return {
-              ...activity,
-              unitsProduced: contextData[contextField.id],
-              isContextLinked: true,
-            };
+            activity.unitsProduced = contextData[contextField.id];
+            activity.isContextLinked = true;
           }
-
-          return activity;
-        });
+        }
 
         // Recalculate all amounts
         const calculatedActivities = calculateActivitiesAmounts(
           activitiesWithContext,
-          isSalesman ? 0 : employeeHours, // Use 0 hours for salesmen
+          isSalesman ? 0 : employeeHours,
           contextData,
           locationType
         );
