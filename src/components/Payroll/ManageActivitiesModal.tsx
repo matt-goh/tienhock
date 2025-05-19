@@ -13,13 +13,7 @@ import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
 import { ContextField, getJobConfig } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
-import {
-  IconBriefcase,
-  IconLink,
-  IconMapPin,
-  IconMapPinOff,
-  IconUser,
-} from "@tabler/icons-react";
+import { IconBriefcase, IconLink, IconUser } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
 
@@ -82,30 +76,42 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   // When initializing activities, handle context-linked pay codes
   useEffect(() => {
     if (isOpen && employee) {
+      console.log(
+        "ManageActivitiesModal initializing with salesmanProducts:",
+        salesmanProducts
+      );
+
       if (existingActivities && existingActivities.length > 0) {
         // Check for context-linked pay codes and update their units
         const activitiesWithContext = existingActivities.map((activity) => {
           const contextField = contextLinkedPayCodes[activity.payCodeId];
 
-          // For salesman with product-linked activities, match by ID
-          if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
-            // Find a matching product by ID (product_id should match payCodeId)
+          // For salesman with product-linked activities
+          if (
+            isSalesman &&
+            jobConfig?.replaceUnits &&
+            activity.rateUnit === jobConfig.replaceUnits
+          ) {
+            // Find a matching product - ensure string comparison for IDs
             const matchingProduct = salesmanProducts.find(
-              (product) => product.product_id === activity.payCodeId
+              (p) => String(p.product_id) === String(activity.payCodeId)
             );
 
             if (matchingProduct) {
+              console.log(
+                `Found matching product for ${activity.payCodeId}:`,
+                matchingProduct
+              );
               return {
                 ...activity,
-                unitsProduced: matchingProduct.quantity,
+                unitsProduced: parseFloat(matchingProduct.quantity) || 0,
                 // Auto-select if a matching product is found
                 isSelected: true,
-                isContextLinked: false,
               };
             }
           }
 
-          // Rest of existing code...
+          // Handle context-linked fields
           if (contextField && contextData[contextField.id] !== undefined) {
             return {
               ...activity,
@@ -113,27 +119,19 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               isContextLinked: true,
             };
           }
+
           return activity;
         });
 
-        // Apply location type adjustments for salesmen
-        const activitiesWithLocationAdjustments = activitiesWithContext.map(
-          (activity) => {
-            // Existing location type handling
-            return activity;
-          }
-        );
-
-        // Use our centralized calculation function with correct parameters
+        // Recalculate all amounts
         const calculatedActivities = calculateActivitiesAmounts(
-          activitiesWithLocationAdjustments,
-          // For salesmen, hours aren't used in calculations
+          activitiesWithContext,
           isSalesman ? 0 : employeeHours,
-          contextData
+          contextData,
+          locationType
         );
 
         setActivities(calculatedActivities);
-        // Store original state for cancellation
         setOriginalActivities(JSON.parse(JSON.stringify(calculatedActivities)));
       } else {
         setActivities([]);
@@ -144,7 +142,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   }, [
     isOpen,
     employee?.id,
-    employee?.jobType,
     existingActivities,
     contextLinkedPayCodes,
     contextData,
@@ -152,7 +149,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     isSalesman,
     locationType,
     jobConfig,
-    salesmanProducts,
+    salesmanProducts, // Make sure this is included
   ]);
 
   useEffect(() => {
@@ -571,100 +568,38 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 "Percent" &&
                                                 activity.isContextLinked) ? (
                                                 <div className="relative">
-                                                  {/* For salesmen with products, show product selection */}
+                                                  {/* For salesmen with products, show product units */}
                                                   {isSalesman &&
                                                   activity.rateUnit ===
-                                                    jobConfig?.replaceUnits &&
-                                                  salesmanProducts &&
-                                                  salesmanProducts.length >
-                                                    0 ? (
-                                                    <>
-                                                      {/* If product_id matches payCodeId, show the quantity directly */}
-                                                      {salesmanProducts.some(
-                                                        (p) =>
-                                                          p.product_id ===
-                                                          activity.payCodeId
-                                                      ) ? (
-                                                        <input
-                                                          type="number"
-                                                          className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
-                                                            !activity.isSelected
-                                                              ? "bg-gray-100 cursor-not-allowed"
-                                                              : ""
-                                                          }`}
-                                                          value={
-                                                            activity.unitsProduced?.toString() ||
-                                                            "0"
-                                                          }
-                                                          onChange={(e) =>
-                                                            handleUnitsChange(
-                                                              originalIndex,
-                                                              e.target.value
-                                                            )
-                                                          }
-                                                          onClick={(e) =>
-                                                            e.stopPropagation()
-                                                          }
-                                                          disabled={
-                                                            !activity.isSelected
-                                                          }
-                                                          min="0"
-                                                          step="1"
-                                                        />
-                                                      ) : (
-                                                        /* If no direct match, show product selection dropdown */
-                                                        <select
-                                                          className={`w-32 text-center border border-gray-300 rounded p-1 text-sm ${
-                                                            !activity.isSelected
-                                                              ? "bg-gray-100 cursor-not-allowed"
-                                                              : ""
-                                                          }`}
-                                                          value={
-                                                            activity.unitsProduced?.toString() ||
-                                                            ""
-                                                          }
-                                                          onChange={(e) =>
-                                                            handleUnitsChange(
-                                                              originalIndex,
-                                                              e.target.value
-                                                            )
-                                                          }
-                                                          onClick={(e) =>
-                                                            e.stopPropagation()
-                                                          }
-                                                          disabled={
-                                                            !activity.isSelected
-                                                          }
-                                                        >
-                                                          <option value="">
-                                                            Select Product
-                                                          </option>
-                                                          {salesmanProducts.map(
-                                                            (product) => (
-                                                              <option
-                                                                key={
-                                                                  product.product_id
-                                                                }
-                                                                value={
-                                                                  product.quantity
-                                                                }
-                                                              >
-                                                                {
-                                                                  product.product_name
-                                                                }{" "}
-                                                                (
-                                                                {
-                                                                  product.quantity
-                                                                }
-                                                                )
-                                                              </option>
-                                                            )
-                                                          )}
-                                                        </select>
-                                                      )}
-                                                    </>
+                                                    jobConfig?.replaceUnits ? (
+                                                    <input
+                                                      type="number"
+                                                      className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                        !activity.isSelected
+                                                          ? "bg-gray-100 cursor-not-allowed"
+                                                          : ""
+                                                      }`}
+                                                      value={
+                                                        activity.unitsProduced?.toString() ||
+                                                        "0"
+                                                      }
+                                                      onChange={(e) =>
+                                                        handleUnitsChange(
+                                                          originalIndex,
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                      disabled={
+                                                        !activity.isSelected
+                                                      }
+                                                      min="0"
+                                                      step="1"
+                                                    />
                                                   ) : (
-                                                    /* Standard numeric input for non-salesmen */
+                                                    /* Standard input for non-salesman units */
                                                     <input
                                                       type="number"
                                                       className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${

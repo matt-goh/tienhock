@@ -445,25 +445,38 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobConfig?.id === "SALESMAN" &&
       Object.keys(salesmanProducts).length > 0
     ) {
+      console.log("Processing salesman products:", salesmanProducts);
+
       // For each row key and its products
       Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
+        console.log(`Processing products for ${rowKey}:`, products);
+
         // For this employee+job combo, update their activities
         setEmployeeActivities((prev) => {
           const currentActivities = prev[rowKey] || [];
-          if (currentActivities.length === 0) return prev;
+          if (currentActivities.length === 0) {
+            console.log(`No activities found for ${rowKey}`);
+            return prev;
+          }
+
+          console.log(`Current activities for ${rowKey}:`, currentActivities);
 
           // Map the activities, updating units for matching product IDs
           const updatedActivities = currentActivities.map((activity) => {
-            // Find product with matching ID
+            // Find product with matching ID - ensure string comparisons
             const matchingProduct = products.find(
-              (p) => p.product_id === activity.payCodeId
+              (p) => String(p.product_id) === String(activity.payCodeId)
             );
 
             if (matchingProduct) {
+              console.log(
+                `Found matching product for ${activity.payCodeId}:`,
+                matchingProduct
+              );
               // If we have a matching product, set its quantity as units and auto-select
               return {
                 ...activity,
-                unitsProduced: matchingProduct.quantity,
+                unitsProduced: parseFloat(matchingProduct.quantity) || 0,
                 isSelected: true,
               };
             }
@@ -472,16 +485,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           });
 
           // Recalculate amounts after updating units
-          const [employeeId, jobId] = rowKey.split("-");
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobId] || 0;
-
           const recalculatedActivities = calculateActivitiesAmounts(
             updatedActivities,
             0, // For salesmen, hours aren't used
             formData.contextData,
             locationTypes[rowKey] || "Local"
           );
+
+          console.log("Recalculated activities:", recalculatedActivities);
 
           return {
             ...prev,
@@ -517,6 +528,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
+    console.log("Opening activities modal for:", employee);
+    console.log("Current salesmanProducts:", salesmanProducts);
+
+    // Make sure employee.rowKey is set
+    if (employee && employee.rowKey) {
+      console.log("Employee products:", salesmanProducts[employee.rowKey]);
+    }
+
     setSelectedEmployee(employee);
     setShowActivitiesModal(true);
   };
@@ -1462,8 +1481,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         dayType={formData.dayType}
         onActivitiesUpdated={handleActivitiesUpdated}
         existingActivities={employeeActivities[selectedEmployee?.rowKey || ""]}
-        contextLinkedPayCodes={contextLinkedPayCodes} // Pass context info
-        contextData={formData.contextData} // Pass current context values
+        contextLinkedPayCodes={contextLinkedPayCodes}
+        contextData={formData.contextData}
         salesmanProducts={
           selectedEmployee && selectedEmployee.rowKey
             ? salesmanProducts[selectedEmployee.rowKey] || []
