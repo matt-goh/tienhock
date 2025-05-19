@@ -636,7 +636,13 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Jumlah Gaji Bersih Row */}
-        <View style={[styles.tableRow, styles.jumlahGajiBersihRow]}>
+        <View
+          style={[
+            styles.tableRow,
+            styles.jumlahGajiBersihRow,
+            !midMonthPayroll ? { borderBottomWidth: 0 } : {},
+          ]}
+        >
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
