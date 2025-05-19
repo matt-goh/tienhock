@@ -983,7 +983,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             return {
               payCodeId: payCode.id,
               description: payCode.description,
-              payType: isSalesmanJob ? "Commission" : payCode.pay_type, // Mark as Commission for salesmen
+              payType:  payCode.pay_type,
               rateUnit: payCode.rate_unit,
               rate: rate,
               isDefault: payCode.is_default_setting,
@@ -994,7 +994,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               calculatedAmount: calculateActivityAmount(
                 {
                   isSelected,
-                  payType: isSalesmanJob ? "Commission" : payCode.pay_type,
+                  payType: payCode.pay_type,
                   rateUnit: payCode.rate_unit,
                   rate,
                   unitsProduced,
