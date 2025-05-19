@@ -38,13 +38,14 @@ export interface JobTypeConfigs {
 export const JOB_CONFIGS: JobTypeConfigs = {
   // MEE Production
   MEE: {
+    // Creates a page for MEE Production
     id: "MEE",
     name: "Mee Production",
     section: ["MEE"],
     defaultShifts: [1, 2], // Day and Night
-    requiresOvertimeCalc: true,
+    requiresOvertimeCalc: true, // true if overtime calculation is required
     defaultHours: 7,
-    jobIds: ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"],
+    jobIds: ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"], // Employees associated with these jobs will show up in this page
     contextFields: [
       {
         id: "totalBags",
@@ -54,6 +55,75 @@ export const JOB_CONFIGS: JobTypeConfigs = {
         defaultValue: 50,
         min: 0,
         linkedPayCode: "TEPUNG_S1", // This pay code will use totalBags as units
+        displayInSummary: true,
+      },
+    ],
+  },
+
+  // BIHUN Production
+  BIHUN: {
+    id: "BIHUN",
+    name: "Bihun Production",
+    section: ["BIHUN"],
+    defaultShifts: [1, 2],
+    requiresOvertimeCalc: true,
+    defaultHours: 7,
+    jobIds: [
+      "BIHUN_FOREMAN",
+      "BH_BERAS",
+      "BH_CAMPURAN",
+      "BH_SANGKUT",
+      "BH_DRYER",
+    ],
+    contextFields: [
+      {
+        id: "totalBeras",
+        label: "Beras (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 50,
+        min: 0,
+        linkedPayCode: "BH_BERAS",
+        displayInSummary: true,
+      },
+      {
+        id: "totalSago",
+        label: "Sago (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 25,
+        min: 0,
+        linkedPayCode: "BH_SAGO",
+        displayInSummary: true,
+      },
+      {
+        id: "totalJagung",
+        label: "Jagung (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 20,
+        min: 0,
+        linkedPayCode: "BH_JAGUNG",
+        displayInSummary: true,
+      },
+      {
+        id: "totalCampuran",
+        label: "Campuran (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 8,
+        min: 0,
+        linkedPayCode: "BH_CAMPURAN",
+        displayInSummary: true,
+      },
+      {
+        id: "totalBungkus",
+        label: "Bungkusan (Bags)",
+        type: "number",
+        required: true,
+        defaultValue: 0,
+        min: 0,
+        linkedPayCode: "BH_BUNGKUSAN",
         displayInSummary: true,
       },
     ],
@@ -83,7 +153,7 @@ export const JOB_CONFIGS: JobTypeConfigs = {
 
   MAINTENANCE: {
     id: "MAINTENANCE",
-    name: "Maintenance Work",
+    name: "Maintenance",
     section: ["MAINTENANCE"],
     defaultShifts: [1, 2], // Day and Night
     requiresOvertimeCalc: true,
