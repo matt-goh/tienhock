@@ -49,7 +49,7 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     contextFields: [
       {
         id: "totalBags",
-        label: "Jumlah Tepung (Bags)",
+        label: "Jumlah Tepung (Karung)",
         type: "number",
         required: true,
         defaultValue: 50,

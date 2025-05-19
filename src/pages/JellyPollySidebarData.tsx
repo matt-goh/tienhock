@@ -19,6 +19,7 @@ export const JellyPollySidebarData: SidebarItem[] = [
             name: "Create New Invoice",
             path: "/sales/invoice/new",
             component: InvoiceFormPage,
+            showInPopover: true,
           },
           // Route for viewing an existing invoice
           {

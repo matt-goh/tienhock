@@ -19,6 +19,7 @@ export interface SidebarItem {
   popoverOptions?: PopoverOption[];
   defaultOpen?: boolean;
   companyId?: string;
+  showInPopover?: boolean;
 }
 
 export interface RouteItem {

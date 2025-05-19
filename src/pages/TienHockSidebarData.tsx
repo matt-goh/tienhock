@@ -73,6 +73,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           component: (props: any) => (
             <DailyLogEntryPage jobType={jobConfig.id} {...props} />
           ),
+          showInPopover: true,
         },
         {
           name: "View Log",
@@ -172,6 +173,7 @@ export const TienHockSidebarData: SidebarItem[] = [
             name: "Create New Invoice",
             path: "/sales/invoice/new",
             component: InvoiceFormPage,
+            showInPopover: true,
           },
           // Route for viewing an existing invoice
           {
@@ -206,6 +208,7 @@ export const TienHockSidebarData: SidebarItem[] = [
             name: "New Staff",
             path: "/catalogue/staff/new",
             component: StaffAddPage,
+            showInPopover: true,
           },
           {
             name: "Staff Edit",
@@ -220,9 +223,10 @@ export const TienHockSidebarData: SidebarItem[] = [
         component: CustomerPage,
         subItems: [
           {
-            name: "New Staff",
+            name: "New Customer",
             path: "/catalogue/customer/new",
             component: CustomerAddPage,
+            showInPopover: true,
           },
           {
             name: "Staff Edit",
