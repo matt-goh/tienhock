@@ -78,7 +78,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     if (isOpen && employee) {
       console.log(
         "ManageActivitiesModal initializing with salesmanProducts:",
-        salesmanProducts
+        salesmanProducts,
+        "for employee:",
+        employee.id
       );
 
       if (existingActivities && existingActivities.length > 0) {
@@ -100,7 +102,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             if (matchingProduct) {
               console.log(
                 `Found matching product for ${activity.payCodeId}:`,
-                matchingProduct
+                matchingProduct,
+                `with quantity:`,
+                matchingProduct.quantity
               );
               return {
                 ...activity,

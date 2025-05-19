@@ -393,11 +393,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         )}&date=${formData.logDate}`
       );
 
-      // Response is now a map of salesmanId -> products array
-      // We need to convert it to a map of rowKey -> products array
+      // Important: Check the actual response structure
+      console.log("Raw API response:", response);
+
+      // Response might be directly available or in a data property
+      const responseData = response.data || response;
+
+      // Create row keys for each salesman and job type combination
       const rowKeyProducts: Record<string, any[]> = {};
 
-      Object.entries(response.data || {}).forEach(([salesmanId, products]) => {
+      Object.entries(responseData).forEach(([salesmanId, products]) => {
         // Find all selected jobs for this employee
         const selectedJobs =
           employeeSelectionState.selectedJobs[salesmanId] || [];
@@ -416,7 +421,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
 
       setSalesmanProducts(rowKeyProducts);
-      console.log("Fetched salesman products:", rowKeyProducts);
+      console.log("Processed salesman products:", rowKeyProducts);
     } catch (error) {
       console.error("Error fetching salesman products:", error);
       toast.error("Failed to fetch salesman products");
@@ -449,7 +454,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
       // For each row key and its products
       Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
-        console.log(`Processing products for ${rowKey}:`, products);
+        // Skip if there are no products for this employee
+        if (!products || products.length === 0) {
+          console.log(`No products found for ${rowKey}`);
+          return;
+        }
+
+        console.log(
+          `Processing ${products.length} products for ${rowKey}:`,
+          products
+        );
 
         // For this employee+job combo, update their activities
         setEmployeeActivities((prev) => {
@@ -471,7 +485,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             if (matchingProduct) {
               console.log(
                 `Found matching product for ${activity.payCodeId}:`,
-                matchingProduct
+                matchingProduct,
+                `with quantity:`,
+                matchingProduct.quantity
               );
               // If we have a matching product, set its quantity as units and auto-select
               return {
@@ -492,8 +508,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             locationTypes[rowKey] || "Local"
           );
 
-          console.log("Recalculated activities:", recalculatedActivities);
-
           return {
             ...prev,
             [rowKey]: recalculatedActivities,
@@ -501,7 +515,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       });
     }
-  }, [salesmanProducts, jobConfig?.id]);
+  }, [salesmanProducts, jobConfig?.id]); // Keep dependencies simple to avoid over-triggering
 
   // Update employee hours by employee+job combination
   const handleEmployeeHoursChange = (
@@ -529,12 +543,23 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     console.log("Opening activities modal for:", employee);
-    console.log("Current salesmanProducts:", salesmanProducts);
 
-    // Make sure employee.rowKey is set
-    if (employee && employee.rowKey) {
-      console.log("Employee products:", salesmanProducts[employee.rowKey]);
+    // Ensure rowKey is available
+    if (!employee.rowKey) {
+      console.error(
+        "Cannot open activities modal - employee rowKey is missing"
+      );
+      return;
     }
+
+    // Get the products for this specific employee and job
+    const employeeProducts = salesmanProducts[employee.rowKey] || [];
+    console.log(
+      "Employee products for",
+      employee.rowKey,
+      ":",
+      employeeProducts
+    );
 
     setSelectedEmployee(employee);
     setShowActivitiesModal(true);
@@ -1011,7 +1036,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   return (
     <div className="relative w-full mx-4 md:mx-6 -mt-8">
       <BackButton onClick={handleBack} />
-
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
           {mode === "edit"
