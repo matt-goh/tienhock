@@ -1,7 +1,7 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
 import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { EmployeePayroll } from "../../types/types";
+import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
 // Create styles
@@ -148,12 +148,14 @@ interface PaySlipPDFProps {
     jobName: string;
     section: string;
   };
+  midMonthPayroll?: MidMonthPayroll | null;
 }
 
 const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   payroll,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   staffDetails,
+  midMonthPayroll,
 }) => {
   const groupedItems = groupItemsByType(payroll.items || []);
   const year = payroll.year ?? new Date().getFullYear();
@@ -222,11 +224,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
       ? baseTotalAmount / maxHoursGroup.hours
       : 0;
 
-  // First payment (mid-month) - for demo purposes, set to 500
-  const firstPayment = 500;
+  const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
 
   // Final payment
-  const finalPayment = payroll.net_pay - firstPayment;
+  const finalPayment = payroll.net_pay - midMonthPayment;
   // Round final payment to whole number if and only if it ends with .95 or above
   const roundedFinalPayment =
     finalPayment % 1 >= 0.95 ? Math.ceil(finalPayment) : finalPayment;
@@ -654,41 +655,56 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </View>
         </View>
 
-        {/* Mid Month Payment Deduction */}
-        <View style={styles.tableRow}>
-          <View style={[styles.tableCol, styles.descriptionCol]}>
-            <Text>Bayaran Pertama (1) Gaji Pertengahan Bulan</Text>
-          </View>
-          <View style={[styles.tableCol, styles.rateCol]}>
-            <Text></Text>
-          </View>
-          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-            <Text></Text>
-          </View>
-          <View
-            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
-          >
-            <Text>({formatCurrency(firstPayment)})</Text>
-          </View>
-        </View>
-
-        {/* Jumlah Row */}
-        <View style={[styles.tableRow, styles.jumlahRow]}>
-          <View style={[styles.tableCol, styles.descriptionCol]}>
-            <Text></Text>
-          </View>
-          <View style={[styles.tableCol, styles.rateCol]}>
-            <Text></Text>
-          </View>
-          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-            <Text style={styles.totalText}>Jumlah</Text>
-          </View>
-          <View
-            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
-          >
-            <Text style={styles.totalText}>{formatCurrency(finalPayment)}</Text>
-          </View>
-        </View>
+        {/* Mid Month Payment Deduction - Only show if mid-month payment exists */}
+        {midMonthPayroll && (
+          <>
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text>
+                  Bayaran Pertama (1) Gaji Pertengahan Bulan (
+                  {midMonthPayroll.payment_method})
+                </Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text></Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>({formatCurrency(midMonthPayment)})</Text>
+              </View>
+            </View>
+            <View style={[styles.tableRow, styles.jumlahRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text style={styles.totalText}>Jumlah</Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text style={styles.totalText}>
+                  {formatCurrency(finalPayment)}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
 
         {/* Final Rounded Amount Row */}
         <View style={[styles.tableRow, styles.grandTotalRow]}>

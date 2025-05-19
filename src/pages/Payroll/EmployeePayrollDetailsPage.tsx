@@ -1,7 +1,7 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {  IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -22,6 +22,10 @@ import {
   DownloadPayslipButton,
   PrintPayslipButton,
 } from "../../utils/payroll/PayslipButtons";
+import {
+  getMidMonthPayrollByEmployee,
+  MidMonthPayroll,
+} from "../../utils/payroll/midMonthPayrollUtils";
 
 interface PayrollItem {
   id: number;
@@ -45,6 +49,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [midMonthPayroll, setMidMonthPayroll] =
+    useState<MidMonthPayroll | null>(null);
 
   useEffect(() => {
     fetchEmployeePayroll();
@@ -57,6 +63,22 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     try {
       const response = await getEmployeePayrollDetails(Number(id));
       setPayroll(response);
+
+      // Fetch mid-month payroll if payroll data exists
+      if (response && response.employee_id && response.year && response.month) {
+        try {
+          const midMonthResponse = await getMidMonthPayrollByEmployee(
+            response.employee_id,
+            response.year,
+            response.month
+          );
+          setMidMonthPayroll(midMonthResponse);
+        } catch (error) {
+          // It's okay if no mid-month payroll exists
+          console.log("No mid-month payroll found for this employee/month");
+          setMidMonthPayroll(null);
+        }
+      }
     } catch (error) {
       console.error("Error fetching employee payroll:", error);
       toast.error("Failed to load employee payroll details");
@@ -142,11 +164,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <div className="flex space-x-3 mt-4 md:mt-0">
             <DownloadPayslipButton
               payroll={payroll}
+              midMonthPayroll={midMonthPayroll}
               buttonText="Download PDF"
               variant="outline"
             />
             <PrintPayslipButton
               payroll={payroll}
+              midMonthPayroll={midMonthPayroll}
               buttonText="Print Pay Slip"
               variant="outline"
             />
@@ -622,7 +646,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               <h2 className="text-lg font-medium text-default-800 mb-4">
                 Pay Slip Preview
               </h2>
-              <PaySlipPreview payroll={payroll} className="max-w-4xl mx-auto" />
+              <PaySlipPreview
+                payroll={payroll}
+                midMonthPayroll={midMonthPayroll}
+                className="max-w-4xl mx-auto"
+              />
             </div>
           </Tab>
         </div>
