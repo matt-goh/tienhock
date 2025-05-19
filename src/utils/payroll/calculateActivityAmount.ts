@@ -8,7 +8,7 @@ export function calculateActivityAmount(
   if (!activity.isSelected) return 0;
 
   let calculatedAmount = 0;
-  const isSalesman = activity.payType === "Commission"; // Add a flag to check if this is a salesman activity
+  const isSalesman = activity.payType === "Commission";
 
   switch (activity.rateUnit) {
     case "Hour":
@@ -29,12 +29,28 @@ export function calculateActivityAmount(
     case "Day":
     case "Bag":
     case "Trip":
-      calculatedAmount = activity.rate * (activity.unitsProduced || 0);
+      // Important: For salesman with products, units should be calculated
+      // even if they're "Commission" type
+      if (
+        activity.unitsProduced !== null &&
+        activity.unitsProduced !== undefined
+      ) {
+        calculatedAmount = activity.rate * activity.unitsProduced;
+      } else {
+        calculatedAmount = 0;
+      }
       break;
 
     case "Percent":
       // For percentage-based rates, calculate based on units produced
-      calculatedAmount = (activity.rate * (activity.unitsProduced || 0)) / 100;
+      if (
+        activity.unitsProduced !== null &&
+        activity.unitsProduced !== undefined
+      ) {
+        calculatedAmount = (activity.rate * activity.unitsProduced) / 100;
+      } else {
+        calculatedAmount = 0;
+      }
       break;
 
     case "Fixed":
@@ -49,7 +65,7 @@ export function calculateActivityAmount(
   return Number(calculatedAmount.toFixed(2));
 }
 
-// Helper function to recalculate all activities in a list
+// Update the calculateActivitiesAmounts function too
 export function calculateActivitiesAmounts(
   activities: any[],
   hours: number = 0,
@@ -66,13 +82,15 @@ export function calculateActivitiesAmounts(
 
     // Auto-deselect zero amount activities unless they are context-linked or special types
     // Don't auto-deselect already selected items
+    const isSalesman = activity.payType === "Commission";
+
+    // IMPORTANT: Only auto-deselect Hour-based activities for salesmen
+    // Don't auto-deselect activities with units or selected activities
     const shouldAutoDeselect =
-      calculatedAmount === 0 &&
-      !activity.isContextLinked &&
-      !activity.isSelected &&
-      activity.rateUnit !== "Bag" &&
-      activity.rateUnit !== "Trip" &&
-      activity.rateUnit !== "Day";
+      (!activity.isSelected &&
+        calculatedAmount === 0 &&
+        !activity.isContextLinked) ||
+      (isSalesman && activity.rateUnit === "Hour"); // Only auto-deselect Hour for salesmen
 
     return {
       ...activity,

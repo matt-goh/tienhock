@@ -78,7 +78,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const isSalesman = jobType === "SALESMAN";
   const jobConfig = getJobConfig(jobType);
 
-  // When initializing activities, handle context-linked pay codes
   useEffect(() => {
     if (isOpen && employee) {
       if (existingActivities && existingActivities.length > 0) {
@@ -86,7 +85,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         const activitiesWithContext = existingActivities.map((activity) => {
           const contextField = contextLinkedPayCodes[activity.payCodeId];
 
-          // For salesman with product-linked activities
+          // For salesman, auto-deselect ONLY Hour-based activities
+          if (isSalesman && activity.rateUnit === "Hour") {
+            return {
+              ...activity,
+              isSelected: false, // Force deselect Hour-based activities for salesmen
+              calculatedAmount: 0,
+            };
+          }
+
+          // For salesman with product-linked activities (non-Hour based)
           if (
             isSalesman &&
             jobConfig?.replaceUnits &&
@@ -98,12 +106,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             );
 
             if (matchingProduct) {
-              return {
-                ...activity,
-                unitsProduced: parseFloat(matchingProduct.quantity) || 0,
-                // Auto-select if a matching product is found
-                isSelected: true,
-              };
+              // Important: Only update if there's a non-zero quantity
+              if (parseFloat(matchingProduct.quantity) > 0) {
+                return {
+                  ...activity,
+                  unitsProduced: parseFloat(matchingProduct.quantity),
+                  isSelected: true, // Auto-select if it has quantity
+                };
+              }
             }
           }
 
@@ -122,7 +132,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         // Recalculate all amounts
         const calculatedActivities = calculateActivitiesAmounts(
           activitiesWithContext,
-          isSalesman ? 0 : employeeHours,
+          isSalesman ? 0 : employeeHours, // Use 0 hours for salesmen
           contextData,
           locationType
         );
@@ -145,7 +155,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     isSalesman,
     locationType,
     jobConfig,
-    salesmanProducts, // Make sure this is included
+    salesmanProducts,
   ]);
 
   useEffect(() => {
@@ -188,16 +198,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     const newActivities = [...activities];
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
 
-    // Recalculate amount considering the location type for salesmen
-    if (isSalesman && locationType === "Outstation") {
-      // Apply location-specific pay code adjustments here
-    }
-
     // Use the centralized calculation function
     const updatedActivities = calculateActivitiesAmounts(
       newActivities,
-      isSalesman ? 0 : employeeHours,
-      contextData
+      isSalesman ? 0 : employeeHours, // Use 0 hours for salesmen
+      contextData,
+      locationType
     );
     setActivities(updatedActivities);
   };

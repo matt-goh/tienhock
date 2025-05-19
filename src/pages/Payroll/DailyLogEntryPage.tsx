@@ -462,18 +462,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // Map the activities, updating units for matching product IDs
           const updatedActivities = currentActivities.map((activity) => {
+            // Skip Hour-based activities for salesmen
+            if (activity.rateUnit === "Hour") {
+              return {
+                ...activity,
+                isSelected: false,
+                calculatedAmount: 0,
+              };
+            }
+
             // Find product with matching ID - ensure string comparisons
             const matchingProduct = products.find(
               (p) => String(p.product_id) === String(activity.payCodeId)
             );
 
             if (matchingProduct) {
-              // If we have a matching product, set its quantity as units and auto-select
-              return {
-                ...activity,
-                unitsProduced: parseFloat(matchingProduct.quantity) || 0,
-                isSelected: true,
-              };
+              // Only update if the product has a non-zero quantity
+              if (parseFloat(matchingProduct.quantity) > 0) {
+                return {
+                  ...activity,
+                  unitsProduced: parseFloat(matchingProduct.quantity),
+                  isSelected: true, // Auto-select if there's quantity
+                };
+              }
             }
 
             return activity;
@@ -838,6 +849,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const rowKey = `${employeeId}-${jobType}`;
           const hours =
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          const isSalesmanJob = jobConfig?.id === "SALESMAN";
 
           // Get job pay codes from cache
           const jobPayCodes = jobPayCodeDetails[jobType] || [];
@@ -845,19 +857,24 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Get employee-specific pay codes from cache
           const employeePayCodes = employeeMappings[employeeId] || [];
 
-          // Create a map of job pay codes by ID for easy lookup
-          const jobPayCodeMap = new Map(jobPayCodes.map((pc) => [pc.id, pc]));
-
           // Merge pay codes, prioritizing employee-specific ones
           const allPayCodes = new Map();
 
           // First add job pay codes
           jobPayCodes.forEach((pc) => {
+            // For salesman, skip Hour-based pay codes
+            if (isSalesmanJob && pc.rate_unit === "Hour") {
+              return;
+            }
             allPayCodes.set(pc.id, { ...pc, source: "job" });
           });
 
           // Then add/override with employee-specific pay codes
           employeePayCodes.forEach((pc) => {
+            // For salesman, skip Hour-based pay codes
+            if (isSalesmanJob && pc.rate_unit === "Hour") {
+              return;
+            }
             allPayCodes.set(pc.id, { ...pc, source: "employee" });
           });
 
@@ -867,13 +884,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Check if we already have activities for this employee/job
           const existingActivities = employeeActivities[rowKey] || [];
 
-          // Filter pay codes based on hours
-          const filteredPayCodes =
-            hours > 8
-              ? mergedPayCodes // If overtime, include all pay codes
-              : mergedPayCodes.filter(
-                  (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
-                ); // Otherwise, only Base and Tambahan
+          // For salesmen, we don't filter by hours since hours aren't applicable
+          const filteredPayCodes = isSalesmanJob
+            ? mergedPayCodes
+            : hours > 8
+            ? mergedPayCodes // If overtime, include all pay codes
+            : mergedPayCodes.filter(
+                (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
+              ); // Otherwise, only Base and Tambahan
 
           const activities = filteredPayCodes.map((payCode) => {
             // Check if this activity already exists
@@ -906,7 +924,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
             // For overtime pay codes, determine if they should be auto-selected
             const isOvertimeCode = payCode.pay_type === "Overtime";
-            const shouldAutoSelect = isOvertimeCode && hours > 8;
+            const shouldAutoSelect =
+              !isSalesmanJob && isOvertimeCode && hours > 8;
 
             // For context-linked pay codes or Bag rate units, don't auto-select
             let isSelected = existingActivity
@@ -918,6 +937,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 payCode.pay_type === "Tambahan"
               ? false // Don't auto-select context-linked pay codes or Bag rate units
               : shouldAutoSelect || payCode.is_default_setting;
+
+            // Always deselect Hour-based pay codes for salesmen
+            if (isSalesmanJob && payCode.rate_unit === "Hour") {
+              isSelected = false;
+            }
 
             // For context-linked pay codes, use context value as units
             const unitsProduced = isContextLinked
@@ -932,7 +956,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             return {
               payCodeId: payCode.id,
               description: payCode.description,
-              payType: payCode.pay_type,
+              payType: isSalesmanJob ? "Commission" : payCode.pay_type, // Mark as Commission for salesmen
               rateUnit: payCode.rate_unit,
               rate: rate,
               isDefault: payCode.is_default_setting,
@@ -943,7 +967,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               calculatedAmount: calculateActivityAmount(
                 {
                   isSelected,
-                  payType: payCode.pay_type,
+                  payType: isSalesmanJob ? "Commission" : payCode.pay_type,
                   rateUnit: payCode.rate_unit,
                   rate,
                   unitsProduced,
