@@ -30,6 +30,7 @@ import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappin
 import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal"; // Import Add modal
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal"; // Import Edit modal
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 
 type JobSelection = Job | null;
 
@@ -71,6 +72,7 @@ const JobPage: React.FC = () => {
   // --- State ---
   const location = useLocation();
   const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
+  const { staffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
@@ -282,6 +284,15 @@ const JobPage: React.FC = () => {
           ),
     [jobs, query]
   );
+
+  const associatedStaff = useMemo(() => {
+    if (!selectedJob || !staffs || loadingStaffs) return [];
+
+    return staffs.filter(
+      (staff) => Array.isArray(staff.job) && staff.job.includes(selectedJob.id)
+    );
+  }, [selectedJob, staffs, loadingStaffs]);
+
   const totalPayCodePages = useMemo(() => {
     // Filter by search term first
     let filtered = jobPayCodesDetails;
@@ -629,6 +640,36 @@ const JobPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* --- Staff Section --- */}
+          {selectedJob && (
+            <div className="mt-2 mb-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-medium text-default-700">
+                Staff Associated with this Job:
+              </h3>
+              {loadingStaffs ? (
+                <div className="flex items-center justify-center py-2">
+                  <LoadingSpinner size="sm" />
+                </div>
+              ) : associatedStaff.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {associatedStaff.map((staff) => (
+                    <Link
+                      key={staff.id}
+                      to={`/catalogue/staff/${staff.id}`}
+                      className="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-sm font-medium text-sky-800 hover:bg-sky-200 transition-colors"
+                    >
+                      {staff.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-default-500">
+                  No staff associated with this job
+                </p>
+              )}
+            </div>
+          )}
 
           {/* --- Pay Codes Section (Only shows after selection) --- */}
           <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
