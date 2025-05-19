@@ -161,24 +161,27 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {getMonthName(payroll.month)} {payroll.year}
             </p>
           </div>
-          <div className="flex space-x-3 mt-4 md:mt-0">
+          <div className="flex flex-wrap gap-3 mt-4 md:mt-0 w-full md:w-auto">
             <DownloadPayslipButton
               payroll={payroll}
               midMonthPayroll={midMonthPayroll}
               buttonText="Download PDF"
               variant="outline"
+              className="flex-1 md:flex-none"
             />
             <PrintPayslipButton
               payroll={payroll}
               midMonthPayroll={midMonthPayroll}
               buttonText="Print Pay Slip"
               variant="outline"
+              className="flex-1 md:flex-none"
             />
             {isEditable && (
               <Button
                 onClick={() => setShowAddItemModal(true)}
                 icon={IconPlus}
                 variant="outline"
+                className="flex-1 md:flex-none"
               >
                 Add Manual Item
               </Button>
@@ -218,7 +221,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <h2 className="text-lg font-medium text-default-800 mb-4">
             Payroll Summary
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            className={`grid grid-cols-1 ${
+              midMonthPayroll ? "md:grid-cols-5" : "md:grid-cols-3"
+            } gap-4`}
+          >
             <div className="border rounded-lg p-4">
               <p className="text-sm text-default-500 mb-1">Gross Pay</p>
               <p className="text-xl font-semibold text-default-800">
@@ -246,6 +253,25 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 {formatCurrency(payroll.net_pay)}
               </p>
             </div>
+            {/* Mid-Month Payment Display */}
+            {midMonthPayroll && (
+              <>
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-default-500 mb-1">
+                    Mid-Month Payment ({midMonthPayroll.payment_method})
+                  </p>
+                  <p className="text-xl font-semibold text-rose-600">
+                    {formatCurrency(midMonthPayroll.amount)}
+                  </p>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-default-500 mb-1">Final Payment</p>
+                  <p className="text-xl font-semibold text-default-800">
+                    {formatCurrency(payroll.net_pay - midMonthPayroll.amount)}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
