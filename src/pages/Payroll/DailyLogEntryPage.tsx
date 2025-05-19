@@ -33,7 +33,13 @@ import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
 } from "../../utils/payroll/calculateActivityAmount";
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from "@headlessui/react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
 import {
   IconChevronDown,
   IconCheck,
@@ -399,11 +405,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         // Create row key for each job and set products
         selectedJobs.forEach((jobType) => {
           const rowKey = `${salesmanId}-${jobType}`;
-          rowKeyProducts[rowKey] = Array.isArray(products) ? products : [];
+          // Ensure products is always an array and has required fields
+          const productArray = Array.isArray(products) ? products : [];
+
+          // Validate that each product has product_id and quantity
+          rowKeyProducts[rowKey] = productArray.filter(
+            (p) => p && p.product_id && typeof p.quantity === "number"
+          );
         });
       });
 
       setSalesmanProducts(rowKeyProducts);
+      console.log("Fetched salesman products:", rowKeyProducts);
     } catch (error) {
       console.error("Error fetching salesman products:", error);
       toast.error("Failed to fetch salesman products");
@@ -411,6 +424,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   useEffect(() => {
+    // Directly call the function when dependencies change
     if (
       jobConfig?.id === "SALESMAN" &&
       formData.logDate &&
@@ -421,9 +435,62 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   }, [
     jobConfig?.id,
     formData.logDate,
-    // Use a stringified representation of the selection state to avoid too many rerenders
-    JSON.stringify(employeeSelectionState.selectedJobs),
+    employeeSelectionState.selectedJobs, // Reference the object directly
+    JOB_IDS, // Include in dependencies since it's used inside fetchSalesmanProducts
   ]);
+
+  useEffect(() => {
+    // After salesmanProducts are updated, auto-link them to pay codes
+    if (
+      jobConfig?.id === "SALESMAN" &&
+      Object.keys(salesmanProducts).length > 0
+    ) {
+      // For each row key and its products
+      Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
+        // For this employee+job combo, update their activities
+        setEmployeeActivities((prev) => {
+          const currentActivities = prev[rowKey] || [];
+          if (currentActivities.length === 0) return prev;
+
+          // Map the activities, updating units for matching product IDs
+          const updatedActivities = currentActivities.map((activity) => {
+            // Find product with matching ID
+            const matchingProduct = products.find(
+              (p) => p.product_id === activity.payCodeId
+            );
+
+            if (matchingProduct) {
+              // If we have a matching product, set its quantity as units and auto-select
+              return {
+                ...activity,
+                unitsProduced: matchingProduct.quantity,
+                isSelected: true,
+              };
+            }
+
+            return activity;
+          });
+
+          // Recalculate amounts after updating units
+          const [employeeId, jobId] = rowKey.split("-");
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobId] || 0;
+
+          const recalculatedActivities = calculateActivitiesAmounts(
+            updatedActivities,
+            0, // For salesmen, hours aren't used
+            formData.contextData,
+            locationTypes[rowKey] || "Local"
+          );
+
+          return {
+            ...prev,
+            [rowKey]: recalculatedActivities,
+          };
+        });
+      });
+    }
+  }, [salesmanProducts, jobConfig?.id]);
 
   // Update employee hours by employee+job combination
   const handleEmployeeHoursChange = (
