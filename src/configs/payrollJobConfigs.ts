@@ -129,36 +129,25 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     ],
   },
 
-  STEAM: {
-    id: "STEAM",
-    name: "Steam Production",
-    section: ["STEAM"],
-    defaultShifts: [1, 2], // Day and Night
-    requiresOvertimeCalc: true,
-    defaultHours: 7,
-    jobIds: [],
-    contextFields: [
-      {
-        id: "coalUsage",
-        label: "Arang (Bag)",
-        type: "number",
-        required: true,
-        defaultValue: 0,
-        min: 0,
-        linkedPayCode: "STEAM_COAL_01", // Coal usage pay code
-        displayInSummary: true,
-      },
-    ],
-  },
-
   MAINTENANCE: {
     id: "MAINTENANCE",
     name: "Maintenance",
     section: ["MAINTENANCE"],
-    defaultShifts: [1, 2], // Day and Night
+    defaultShifts: [1, 2],
     requiresOvertimeCalc: true,
-    defaultHours: 8,
-    jobIds: [],
+    defaultHours: 50,
+    jobIds: ["MAINTEN"],
+    contextFields: [],
+  },
+
+  BOILER: {
+    id: "BOILER",
+    name: "Boiler",
+    section: ["BOILER"],
+    defaultShifts: [1, 2],
+    requiresOvertimeCalc: true,
+    defaultHours: 7,
+    jobIds: ["BOILER_MAN", "BOILER_JAGA"],
     contextFields: [],
   },
 };
