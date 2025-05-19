@@ -1,5 +1,6 @@
 // src/components/SelectedTagsDisplay.tsx
 import React from "react";
+import { Link } from "react-router-dom";
 
 interface SelectedTagsDisplayProps {
   selectedItems: string[];
@@ -21,12 +22,13 @@ const SelectedTagsDisplay: React.FC<SelectedTagsDisplayProps> = ({
       <div className="text-xs text-default-500 mb-1">Selected {label}:</div>
       <div className="flex flex-wrap gap-1.5">
         {selectedItems.map((item, index) => (
-          <span
+          <Link
             key={index}
+            to={`/catalogue/job?id=${item}`}
             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800"
           >
             {item}
-          </span>
+          </Link>
         ))}
       </div>
     </div>
