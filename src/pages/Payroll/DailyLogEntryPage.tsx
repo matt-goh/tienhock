@@ -815,8 +815,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
           {mode === "edit"
-            ? "Edit Mee Production Entry"
-            : "New Mee Production Entry"}
+            ? `Edit ${jobConfig?.name} Entry`
+            : `New ${jobConfig?.name} Entry`}
         </h1>
 
         {/* Header Section */}
@@ -855,7 +855,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </div>
           </div>
 
-          {/* Shift - Only Day and Night for Mee Production */}
+          {/* Shift */}
           <FormListbox
             name="shift"
             label="Shift"
@@ -868,8 +868,25 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             required
           />
 
-          {/* Context Data */}
+          {/* Show Context Form here only if 3 or fewer fields */}
+          {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
+            <div>
+              <DynamicContextForm
+                contextFields={jobConfig?.contextFields || []}
+                contextData={formData.contextData}
+                onChange={handleContextChange}
+                disabled={isSaving}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Show Context Form below if more than 3 fields */}
+        {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
           <div className="mb-6">
+            <h3 className="text-sm font-medium text-default-700 mb-3">
+              Production Details
+            </h3>
             <DynamicContextForm
               contextFields={jobConfig?.contextFields || []}
               contextData={formData.contextData}
@@ -877,7 +894,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               disabled={isSaving}
             />
           </div>
-        </div>
+        )}
 
         {/* Employees Section */}
         <div className="border-t border-default-200 pt-4 mt-4">
