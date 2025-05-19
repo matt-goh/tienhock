@@ -13,84 +13,85 @@ export default function (pool) {
       status,
       payment_method,
       page = 1,
-      limit = 50,
+      limit = 20,
     } = req.query;
 
     try {
       let query = `
-        SELECT 
-          mmp.*,
-          s.name as employee_name,
-          s.payment_preference as default_payment_method
-        FROM mid_month_payrolls mmp
-        LEFT JOIN staffs s ON mmp.employee_id = s.id
-        WHERE 1=1
-      `;
+      SELECT p.*, s.name as employee_name
+      FROM mid_month_payrolls p
+      LEFT JOIN staffs s ON p.employee_id = s.id
+      WHERE 1=1
+    `;
 
       const values = [];
       let paramCount = 1;
 
       if (year) {
-        query += ` AND mmp.year = $${paramCount}`;
+        query += ` AND p.year = $${paramCount}`;
         values.push(parseInt(year));
         paramCount++;
       }
 
       if (month) {
-        query += ` AND mmp.month = $${paramCount}`;
+        query += ` AND p.month = $${paramCount}`;
         values.push(parseInt(month));
         paramCount++;
       }
 
+      // Handle multiple employee_id values
       if (employee_id) {
-        query += ` AND mmp.employee_id = $${paramCount}`;
-        values.push(employee_id);
-        paramCount++;
+        // If employee_id is an array (multiple values)
+        if (Array.isArray(employee_id)) {
+          if (employee_id.length > 0) {
+            const placeholders = employee_id.map(
+              (_, idx) => `$${paramCount + idx}`
+            );
+            query += ` AND p.employee_id IN (${placeholders.join(", ")})`;
+            values.push(...employee_id);
+            paramCount += employee_id.length;
+          }
+        } else {
+          // Single employee_id
+          query += ` AND p.employee_id = $${paramCount}`;
+          values.push(employee_id);
+          paramCount++;
+        }
       }
 
       if (status) {
-        query += ` AND mmp.status = $${paramCount}`;
+        query += ` AND p.status = $${paramCount}`;
         values.push(status);
         paramCount++;
       }
 
       if (payment_method) {
-        query += ` AND mmp.payment_method = $${paramCount}`;
+        query += ` AND p.payment_method = $${paramCount}`;
         values.push(payment_method);
         paramCount++;
       }
 
-      query += `
-        ORDER BY mmp.year DESC, mmp.month DESC, s.name ASC
-      `;
+      query += ` ORDER BY p.year DESC, p.month DESC, p.employee_id`;
 
-      // Get total count for pagination
-      const countQuery = `
-        SELECT COUNT(*) as total
-        FROM mid_month_payrolls mmp
-        WHERE 1=1 ${query.split("WHERE 1=1")[1].split("ORDER BY")[0]}
-      `;
-
+      // Apply pagination (for standard list view)
+      const offset = (page - 1) * limit;
+      const paginatedQuery = `${query} LIMIT $${paramCount} OFFSET $${
+        paramCount + 1
+      }`;
       const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, values),
-        pool.query(query, values),
+        pool.query(
+          `SELECT COUNT(*) as total FROM (${query}) as subquery`,
+          values
+        ),
+        pool.query(paginatedQuery, [...values, parseInt(limit), offset]),
       ]);
 
-      // Apply pagination
-      const offset = (parseInt(page) - 1) * parseInt(limit);
-      const paginatedPayrolls = dataResult.rows
-        .slice(offset, offset + parseInt(limit))
-        .map((payroll) => ({
-          ...payroll,
-          amount: parseFloat(payroll.amount),
-        }));
-
       res.json({
-        payrolls: paginatedPayrolls,
+        payrolls: dataResult.rows,
         total: parseInt(countResult.rows[0].total),
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(countResult.rows[0].total / parseInt(limit)),
+        totalPages: Math.ceil(countResult.rows[0].total / limit),
       });
     } catch (error) {
       console.error("Error fetching mid-month payrolls:", error);

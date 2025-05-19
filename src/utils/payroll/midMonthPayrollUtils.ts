@@ -193,3 +193,39 @@ export const getMonthName = (month: number): string => {
   ];
   return months[month - 1] || "Unknown";
 };
+
+/**
+ * Fetch mid-month payrolls for multiple employees in a specific month/year
+ */
+export const getBatchMidMonthPayrolls = async (
+  employeeIds: string[],
+  year: number,
+  month: number
+): Promise<MidMonthPayroll[]> => {
+  if (employeeIds.length === 0) return [];
+
+  try {
+    // First try to get existing payrolls with efficient single request
+    const queryParams = new URLSearchParams();
+    queryParams.append("year", year.toString());
+    queryParams.append("month", month.toString());
+    queryParams.append("limit", employeeIds.length.toString());
+
+    // Execute the query first without employee_id filter to get all for the month
+    const response = await api.get(
+      `/api/mid-month-payrolls?${queryParams.toString()}`
+    );
+
+    // Filter locally to match the requested employee IDs
+    if (response && response.payrolls && Array.isArray(response.payrolls)) {
+      return response.payrolls.filter((payroll: { employee_id: string }) =>
+        employeeIds.includes(payroll.employee_id)
+      );
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error fetching batch mid-month payrolls:", error);
+    return []; // Return empty array instead of throwing to avoid breaking batch processing
+  }
+};
