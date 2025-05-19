@@ -76,13 +76,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   // When initializing activities, handle context-linked pay codes
   useEffect(() => {
     if (isOpen && employee) {
-      console.log(
-        "ManageActivitiesModal initializing with salesmanProducts:",
-        salesmanProducts,
-        "for employee:",
-        employee.id
-      );
-
       if (existingActivities && existingActivities.length > 0) {
         // Check for context-linked pay codes and update their units
         const activitiesWithContext = existingActivities.map((activity) => {
@@ -100,12 +93,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             );
 
             if (matchingProduct) {
-              console.log(
-                `Found matching product for ${activity.payCodeId}:`,
-                matchingProduct,
-                `with quantity:`,
-                matchingProduct.quantity
-              );
               return {
                 ...activity,
                 unitsProduced: parseFloat(matchingProduct.quantity) || 0,

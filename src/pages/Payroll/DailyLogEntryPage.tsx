@@ -393,9 +393,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         )}&date=${formData.logDate}`
       );
 
-      // Important: Check the actual response structure
-      console.log("Raw API response:", response);
-
       // Response might be directly available or in a data property
       const responseData = response.data || response;
 
@@ -421,7 +418,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
 
       setSalesmanProducts(rowKeyProducts);
-      console.log("Processed salesman products:", rowKeyProducts);
     } catch (error) {
       console.error("Error fetching salesman products:", error);
       toast.error("Failed to fetch salesman products");
@@ -450,30 +446,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobConfig?.id === "SALESMAN" &&
       Object.keys(salesmanProducts).length > 0
     ) {
-      console.log("Processing salesman products:", salesmanProducts);
-
       // For each row key and its products
       Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
         // Skip if there are no products for this employee
         if (!products || products.length === 0) {
-          console.log(`No products found for ${rowKey}`);
           return;
         }
-
-        console.log(
-          `Processing ${products.length} products for ${rowKey}:`,
-          products
-        );
 
         // For this employee+job combo, update their activities
         setEmployeeActivities((prev) => {
           const currentActivities = prev[rowKey] || [];
           if (currentActivities.length === 0) {
-            console.log(`No activities found for ${rowKey}`);
             return prev;
           }
-
-          console.log(`Current activities for ${rowKey}:`, currentActivities);
 
           // Map the activities, updating units for matching product IDs
           const updatedActivities = currentActivities.map((activity) => {
@@ -483,12 +468,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             );
 
             if (matchingProduct) {
-              console.log(
-                `Found matching product for ${activity.payCodeId}:`,
-                matchingProduct,
-                `with quantity:`,
-                matchingProduct.quantity
-              );
               // If we have a matching product, set its quantity as units and auto-select
               return {
                 ...activity,
@@ -542,8 +521,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
-    console.log("Opening activities modal for:", employee);
-
     // Ensure rowKey is available
     if (!employee.rowKey) {
       console.error(
@@ -551,16 +528,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       );
       return;
     }
-
     // Get the products for this specific employee and job
-    const employeeProducts = salesmanProducts[employee.rowKey] || [];
-    console.log(
-      "Employee products for",
-      employee.rowKey,
-      ":",
-      employeeProducts
-    );
-
     setSelectedEmployee(employee);
     setShowActivitiesModal(true);
   };
