@@ -1209,7 +1209,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
                               <td className="px-6 py-4 whitespace-nowrap text-center">
-                                <div className="relative w-full mx-auto">
+                                <div className="relative w-40 mx-auto">
                                   <Listbox
                                     value={
                                       locationTypes[row.rowKey || ""] || "Local"
