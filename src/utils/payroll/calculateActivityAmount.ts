@@ -29,7 +29,6 @@ export function calculateActivityAmount(
     case "Day":
     case "Bag":
     case "Trip":
-    case "Product": // New rate unit for salesmen
       calculatedAmount = activity.rate * (activity.unitsProduced || 0);
       break;
 
@@ -66,13 +65,14 @@ export function calculateActivitiesAmounts(
     );
 
     // Auto-deselect zero amount activities unless they are context-linked or special types
+    // Don't auto-deselect already selected items
     const shouldAutoDeselect =
       calculatedAmount === 0 &&
       !activity.isContextLinked &&
+      !activity.isSelected &&
       activity.rateUnit !== "Bag" &&
       activity.rateUnit !== "Trip" &&
-      activity.rateUnit !== "Day" &&
-      activity.rateUnit !== "Product"; // Add new Product rate unit
+      activity.rateUnit !== "Day";
 
     return {
       ...activity,
