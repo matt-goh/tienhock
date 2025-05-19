@@ -27,10 +27,11 @@ import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal"; // Import Add modal
-import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal"; // Import Edit modal
+import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal";
+import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useNavigate } from "react-router-dom";
 
 type JobSelection = Job | null;
 
@@ -71,6 +72,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
 const JobPage: React.FC = () => {
   // --- State ---
   const location = useLocation();
+  const navigate = useNavigate();
   const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
@@ -187,9 +189,16 @@ const JobPage: React.FC = () => {
         setSelectedJob(selection);
         setQuery("");
         setCurrentPage(1); // Reset pagination on job change
+
+        // Update URL with selected job ID
+        if (selection) {
+          navigate(`/catalogue/job?id=${selection.id}`, { replace: true });
+        } else {
+          navigate(`/catalogue/job`, { replace: true });
+        }
       }
     },
-    []
+    [navigate] // Add navigate to dependencies
   );
 
   // Handler for clicking the "Add New Job" card/button
@@ -201,6 +210,9 @@ const JobPage: React.FC = () => {
   const handleJobCardClick = (job: Job) => {
     setSelectedJob(job);
     setCurrentPage(1); // Reset pagination when selecting from card
+
+    // Update URL with selected job ID
+    navigate(`/catalogue/job?id=${job.id}`, { replace: true });
   };
 
   const handleJobAdded = useCallback(
@@ -265,6 +277,10 @@ const JobPage: React.FC = () => {
       toast.success(`Job "${selectedJob.name}" deleted successfully`);
       setShowDeleteJobDialog(false);
       setSelectedJob(null); // Go back to card view
+
+      // Clear the job ID from URL
+      navigate(`/catalogue/job`, { replace: true });
+
       await refreshJobs();
       await refreshPayCodeMappings(); // Ensure mappings are cleared too
     } catch (error) {
@@ -272,7 +288,7 @@ const JobPage: React.FC = () => {
       toast.error("Failed to delete job");
       setShowDeleteJobDialog(false);
     }
-  }, [selectedJob, refreshJobs, refreshPayCodeMappings]);
+  }, [selectedJob, refreshJobs, refreshPayCodeMappings, navigate]);
 
   // --- Derived State ---
   const filteredJobs = useMemo(
