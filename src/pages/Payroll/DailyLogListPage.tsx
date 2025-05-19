@@ -83,7 +83,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
 
   const shiftOptions = [
     { id: "all", name: "All Shifts" },
-    ...(jobConfig?.defaultShifts.map((shift) => ({
+    ...(jobConfig?.defaultShifts?.map((shift) => ({
       id: shift.toString(),
       name: shift === 1 ? "Day Shift" : "Night Shift",
     })) || []),

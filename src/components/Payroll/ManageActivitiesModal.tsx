@@ -11,9 +11,15 @@ import Button from "../Button";
 import { Employee } from "../../types/types";
 import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
-import { ContextField } from "../../configs/payrollJobConfigs";
+import { ContextField, getJobConfig } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
-import { IconBriefcase, IconLink, IconUser } from "@tabler/icons-react";
+import {
+  IconBriefcase,
+  IconLink,
+  IconMapPin,
+  IconMapPinOff,
+  IconUser,
+} from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
 
@@ -43,6 +49,8 @@ interface ManageActivitiesModalProps {
   existingActivities?: ActivityItem[];
   contextLinkedPayCodes?: Record<string, ContextField>;
   contextData?: Record<string, any>;
+  salesmanProducts?: any[]; // Products sold by this salesman
+  locationType?: "Local" | "Outstation"; // Location type for salesman
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -57,6 +65,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   existingActivities = [],
   contextLinkedPayCodes = {},
   contextData = {},
+  salesmanProducts = [],
+  locationType = "Local",
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -66,6 +76,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     []
   );
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const isSalesman = jobType === "SALESMAN";
+  const jobConfig = getJobConfig(jobType);
 
   // When initializing activities, handle context-linked pay codes
   useEffect(() => {
@@ -74,6 +86,15 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         // Check for context-linked pay codes and update their units
         const activitiesWithContext = existingActivities.map((activity) => {
           const contextField = contextLinkedPayCodes[activity.payCodeId];
+
+          // For salesman with product-linked activities
+          if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
+            return {
+              ...activity,
+              isContextLinked: false, // Products aren't context linked
+            };
+          }
+
           if (contextField && contextData[contextField.id] !== undefined) {
             return {
               ...activity,
@@ -84,10 +105,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
           return activity;
         });
 
-        // Use our centralized calculation function instead
+        // Apply location type adjustments for salesmen
+        const activitiesWithLocationAdjustments = activitiesWithContext.map(
+          (activity) => {
+            // For salesmen with outstation activities, adjust rates
+            if (isSalesman && locationType === "Outstation") {
+              // Auto select outstation activities
+            }
+            return activity;
+          }
+        );
+
+        // Use our centralized calculation function with correct parameters
         const calculatedActivities = calculateActivitiesAmounts(
-          activitiesWithContext,
-          employeeHours,
+          activitiesWithLocationAdjustments,
+          // For salesmen, hours aren't used in calculations
+          isSalesman ? 0 : employeeHours,
           contextData
         );
 
@@ -108,6 +141,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     contextLinkedPayCodes,
     contextData,
     employeeHours,
+    isSalesman,
+    locationType,
+    jobConfig,
   ]);
 
   useEffect(() => {
@@ -150,10 +186,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     const newActivities = [...activities];
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
 
-    // Recalculate amounts after changing units
+    // Recalculate amount considering the location type for salesmen
+    if (isSalesman && locationType === "Outstation") {
+      // Apply location-specific pay code adjustments here
+    }
+
+    // Use the centralized calculation function
     const updatedActivities = calculateActivitiesAmounts(
       newActivities,
-      employeeHours
+      isSalesman ? 0 : employeeHours,
+      contextData
     );
     setActivities(updatedActivities);
   };
@@ -226,8 +268,18 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       </Link>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Hours</p>
-                      <p className="font-medium">{employeeHours} hours</p>
+                      <p className="text-sm text-gray-500">
+                        {isSalesman && locationType ? "Location" : "Hours"}
+                      </p>
+                      <p className="font-medium">
+                        {isSalesman && locationType ? (
+                          <span className="flex items-center">
+                            {locationType}
+                          </span>
+                        ) : (
+                          `${employeeHours} hours`
+                        )}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Day Type</p>
@@ -510,36 +562,91 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 "Percent" &&
                                                 activity.isContextLinked) ? (
                                                 <div className="relative">
-                                                  <input
-                                                    type="number"
-                                                    className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
-                                                      activity.isContextLinked
-                                                        ? "bg-gray-100 cursor-not-allowed"
-                                                        : "disabled:bg-gray-100"
-                                                    }`}
-                                                    value={
-                                                      activity.unitsProduced?.toString() ||
-                                                      "0"
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleUnitsChange(
-                                                        originalIndex,
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    onClick={(e) =>
-                                                      e.stopPropagation()
-                                                    }
-                                                    disabled={
-                                                      !activity.isSelected ||
-                                                      activity.isContextLinked
-                                                    }
-                                                    min="0"
-                                                    step="1"
-                                                    readOnly={
-                                                      activity.isContextLinked
-                                                    }
-                                                  />
+                                                  {/* For salesmen with products, show product selection */}
+                                                  {isSalesman &&
+                                                  activity.rateUnit ===
+                                                    jobConfig?.replaceUnits &&
+                                                  salesmanProducts &&
+                                                  salesmanProducts.length >
+                                                    0 ? (
+                                                    <select
+                                                      className={`w-32 text-center border border-gray-300 rounded p-1 text-sm ${
+                                                        activity.isContextLinked
+                                                          ? "bg-gray-100 cursor-not-allowed"
+                                                          : "disabled:bg-gray-100"
+                                                      }`}
+                                                      value={
+                                                        activity.unitsProduced?.toString() ||
+                                                        ""
+                                                      }
+                                                      onChange={(e) =>
+                                                        handleUnitsChange(
+                                                          originalIndex,
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                      disabled={
+                                                        !activity.isSelected ||
+                                                        activity.isContextLinked
+                                                      }
+                                                    >
+                                                      <option value="">
+                                                        Select Product
+                                                      </option>
+                                                      {salesmanProducts.map(
+                                                        (product) => (
+                                                          <option
+                                                            key={
+                                                              product.product_id
+                                                            }
+                                                            value={
+                                                              product.quantity
+                                                            }
+                                                          >
+                                                            {
+                                                              product.product_name
+                                                            }{" "}
+                                                            ({product.quantity})
+                                                          </option>
+                                                        )
+                                                      )}
+                                                    </select>
+                                                  ) : (
+                                                    /* Standard numeric input for non-salesmen */
+                                                    <input
+                                                      type="number"
+                                                      className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                        activity.isContextLinked
+                                                          ? "bg-gray-100 cursor-not-allowed"
+                                                          : "disabled:bg-gray-100"
+                                                      }`}
+                                                      value={
+                                                        activity.unitsProduced?.toString() ||
+                                                        "0"
+                                                      }
+                                                      onChange={(e) =>
+                                                        handleUnitsChange(
+                                                          originalIndex,
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                      disabled={
+                                                        !activity.isSelected ||
+                                                        activity.isContextLinked
+                                                      }
+                                                      min="0"
+                                                      step="1"
+                                                      readOnly={
+                                                        activity.isContextLinked
+                                                      }
+                                                    />
+                                                  )}
                                                   {activity.isContextLinked && (
                                                     <span className="absolute -right-5 top-1/2 -translate-y-1/2">
                                                       <IconLink
