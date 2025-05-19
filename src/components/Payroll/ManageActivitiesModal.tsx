@@ -13,7 +13,12 @@ import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
 import { ContextField, getJobConfig } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
-import { IconBriefcase, IconLink, IconUser } from "@tabler/icons-react";
+import {
+  IconBriefcase,
+  IconLink,
+  IconUser,
+  IconPackage,
+} from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
 
@@ -495,6 +500,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                       Job
                                                     </span>
                                                   )}
+                                                  {isSalesman &&
+                                                    salesmanProducts.find(
+                                                      (p) =>
+                                                        String(p.product_id) ===
+                                                        String(
+                                                          activity.payCodeId
+                                                        )
+                                                    ) && (
+                                                      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                                        <IconPackage
+                                                          size={10}
+                                                          className="mr-0.5"
+                                                        />
+                                                        Product
+                                                      </span>
+                                                    )}
                                                 </span>
                                                 <div className="text-xs text-gray-500">
                                                   {activity.payType} •{" "}
