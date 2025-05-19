@@ -8,29 +8,23 @@ export function calculateActivityAmount(
   if (!activity.isSelected) return 0;
 
   let calculatedAmount = 0;
-  const isSalesman = activity.payType === "Commission";
+  // Remove the incorrect check for "Commission" pay type
 
   switch (activity.rateUnit) {
     case "Hour":
-      // Skip hour-based calculations for salesmen
-      if (isSalesman) {
-        calculatedAmount = 0;
+      // For overtime pay codes, only apply to hours beyond 8
+      if (activity.payType === "Overtime") {
+        const overtimeHours = Math.max(0, hours - 8);
+        calculatedAmount = activity.rate * overtimeHours;
       } else {
-        // For overtime pay codes, only apply to hours beyond 8
-        if (activity.payType === "Overtime") {
-          const overtimeHours = Math.max(0, hours - 8);
-          calculatedAmount = activity.rate * overtimeHours;
-        } else {
-          calculatedAmount = activity.rate * hours;
-        }
+        calculatedAmount = activity.rate * hours;
       }
       break;
 
     case "Day":
     case "Bag":
     case "Trip":
-      // Important: For salesman with products, units should be calculated
-      // even if they're "Commission" type
+      // Calculate based on units produced
       if (
         activity.unitsProduced !== null &&
         activity.unitsProduced !== undefined
@@ -82,15 +76,13 @@ export function calculateActivitiesAmounts(
 
     // Auto-deselect zero amount activities unless they are context-linked or special types
     // Don't auto-deselect already selected items
-    const isSalesman = activity.payType === "Commission";
-
-    // IMPORTANT: Only auto-deselect Hour-based activities for salesmen
-    // Don't auto-deselect activities with units or selected activities
     const shouldAutoDeselect =
-      (!activity.isSelected &&
-        calculatedAmount === 0 &&
-        !activity.isContextLinked) ||
-      (isSalesman && activity.rateUnit === "Hour"); // Only auto-deselect Hour for salesmen
+      calculatedAmount === 0 &&
+      !activity.isContextLinked &&
+      !activity.isSelected &&
+      activity.rateUnit !== "Bag" &&
+      activity.rateUnit !== "Trip" &&
+      activity.rateUnit !== "Day";
 
     return {
       ...activity,
