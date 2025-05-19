@@ -1,7 +1,8 @@
-// src/components/Payroll/PayslipButtons.tsx
+// src/utils/payroll/PayslipButtons.tsx
 import React, { useState } from "react";
 import { IconDownload, IconPrinter } from "@tabler/icons-react";
 import { EmployeePayroll } from "../../types/types";
+import { MidMonthPayroll } from "./midMonthPayrollUtils";
 import {
   downloadPayslip,
   downloadBatchPayslips,
@@ -9,6 +10,7 @@ import {
   printBatchPayslips,
   StaffDetails,
   createStaffDetailsMap,
+  createMidMonthPayrollsMap,
 } from "../../utils/payroll/PayslipManager";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
@@ -28,6 +30,7 @@ export interface PayslipButtonProps {
   color?: string;
   size?: "sm" | "md" | "lg";
   staffDetails?: StaffDetails;
+  midMonthPayroll?: MidMonthPayroll | null;
   onComplete?: () => void;
 }
 
@@ -43,6 +46,7 @@ export interface BatchPayslipButtonProps {
   color?: string;
   size?: "sm" | "md" | "lg";
   staffDetailsMap?: Record<string, StaffDetails>;
+  midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>;
   onComplete?: () => void;
 }
 
@@ -61,6 +65,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
   color = "sky",
   size = "md",
   staffDetails,
+  midMonthPayroll,
   onComplete,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -82,6 +87,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
     await downloadPayslip(payroll, details, {
       companyName,
       fileName,
+      midMonthPayroll,
       onAfterDownload: () => {
         setIsDownloading(false);
         if (onComplete) onComplete();
@@ -122,6 +128,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   color = "sky",
   size = "md",
   staffDetailsMap,
+  midMonthPayrollsMap,
   onComplete,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -148,6 +155,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
     await downloadBatchPayslips(payrolls, details, {
       companyName,
       fileName,
+      midMonthPayrollsMap,
       onAfterDownload: () => {
         setIsDownloading(false);
         if (onComplete) onComplete();
@@ -187,6 +195,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
   color = "sky",
   size = "md",
   staffDetails,
+  midMonthPayroll,
   onComplete,
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -209,6 +218,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
 
     await printPayslip(payroll, details, {
       companyName,
+      midMonthPayroll,
       onBeforePrint: () => {
         setShowOverlay(true);
       },
@@ -263,6 +273,7 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   color = "sky",
   size = "md",
   staffDetailsMap,
+  midMonthPayrollsMap,
   onComplete,
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -288,6 +299,7 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
 
     await printBatchPayslips(payrolls, details, {
       companyName,
+      midMonthPayrollsMap,
       onBeforePrint: () => {
         setShowOverlay(true);
       },

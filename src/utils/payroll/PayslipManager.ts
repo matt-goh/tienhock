@@ -2,6 +2,7 @@
 import { pdf, Document } from "@react-pdf/renderer";
 import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
+import { MidMonthPayroll } from "./midMonthPayrollUtils";
 import toast from "react-hot-toast";
 import React from "react";
 import {
@@ -19,6 +20,7 @@ export interface StaffDetails {
 
 export interface PrintOptions {
   companyName?: string;
+  midMonthPayroll?: MidMonthPayroll | null;
   onBeforePrint?: () => void;
   onAfterPrint?: () => void;
   onError?: (error: Error) => void;
@@ -28,21 +30,25 @@ export interface PrintOptions {
 export interface DownloadOptions {
   companyName?: string;
   fileName?: string;
+  midMonthPayroll?: MidMonthPayroll | null;
   onBeforeDownload?: () => void;
   onAfterDownload?: () => void;
   onError?: (error: Error) => void;
 }
+
 // Common PDF generation for both printing and downloading
 const generatePayslipPDF = async (
   payroll: EmployeePayroll,
   staffDetails?: StaffDetails,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  midMonthPayroll?: MidMonthPayroll | null
 ): Promise<Blob> => {
   // Create React elements with createElement instead of JSX
   const paySlipElement = React.createElement(PaySlipPDF, {
     payroll,
     companyName,
     staffDetails,
+    midMonthPayroll,
   });
 
   const documentElement = React.createElement(Document, {}, paySlipElement);
@@ -53,7 +59,8 @@ const generatePayslipPDF = async (
 const generateBatchPayslipPDF = async (
   payrolls: EmployeePayroll[],
   staffDetailsMap?: Record<string, StaffDetails>,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B"
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>
 ): Promise<Blob> => {
   // Map payrolls to React elements
   const paySlipElements = payrolls.map((payroll, index) =>
@@ -62,6 +69,7 @@ const generateBatchPayslipPDF = async (
       payroll,
       companyName,
       staffDetails: staffDetailsMap?.[payroll.employee_id],
+      midMonthPayroll: midMonthPayrollsMap?.[payroll.employee_id],
     })
   );
 
@@ -79,6 +87,7 @@ export const downloadPayslip = async (
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
     fileName,
+    midMonthPayroll,
     onBeforeDownload,
     onAfterDownload,
     onError,
@@ -87,7 +96,12 @@ export const downloadPayslip = async (
   try {
     if (onBeforeDownload) onBeforeDownload();
 
-    const blob = await generatePayslipPDF(payroll, staffDetails, companyName);
+    const blob = await generatePayslipPDF(
+      payroll,
+      staffDetails,
+      companyName,
+      midMonthPayroll
+    );
     const defaultFileName = `PaySlip-${payroll.employee_id}-${payroll.year}-${payroll.month}.pdf`;
     const finalFileName = fileName || defaultFileName;
 
@@ -117,11 +131,14 @@ export const downloadPayslip = async (
 export const downloadBatchPayslips = async (
   payrolls: EmployeePayroll[],
   staffDetailsMap?: Record<string, StaffDetails>,
-  options?: DownloadOptions
+  options?: DownloadOptions & {
+    midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>;
+  }
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
     fileName,
+    midMonthPayrollsMap,
     onBeforeDownload,
     onAfterDownload,
     onError,
@@ -170,7 +187,8 @@ export const downloadBatchPayslips = async (
     const blob = await generateBatchPayslipPDF(
       completePayrolls,
       staffDetailsMap,
-      companyName
+      companyName,
+      midMonthPayrollsMap
     );
 
     // Get month/year info from the first payroll
@@ -215,6 +233,7 @@ export const printPayslip = async (
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    midMonthPayroll,
     onBeforePrint,
     onAfterPrint,
     onError,
@@ -251,7 +270,8 @@ export const printPayslip = async (
     const blob = await generatePayslipPDF(
       completePayroll,
       staffDetails,
-      companyName
+      companyName,
+      midMonthPayroll
     );
     pdfUrl = URL.createObjectURL(blob);
 
@@ -296,10 +316,13 @@ export const printPayslip = async (
 export const printBatchPayslips = async (
   payrolls: EmployeePayroll[],
   staffDetailsMap?: Record<string, StaffDetails>,
-  options?: PrintOptions
+  options?: PrintOptions & {
+    midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>;
+  }
 ): Promise<void> => {
   const {
     companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    midMonthPayrollsMap,
     onBeforePrint,
     onAfterPrint,
     onError,
@@ -362,7 +385,8 @@ export const printBatchPayslips = async (
     const blob = await generateBatchPayslipPDF(
       completePayrolls,
       staffDetailsMap,
-      companyName
+      companyName,
+      midMonthPayrollsMap
     );
     pdfUrl = URL.createObjectURL(blob);
 
@@ -444,4 +468,24 @@ export const createStaffDetailsMap = (
   });
 
   return staffDetailsMap;
+};
+
+// Helper to create mid-month payrolls map
+export const createMidMonthPayrollsMap = (
+  midMonthPayrolls: MidMonthPayroll[],
+  employeeIds: string[]
+): Record<string, MidMonthPayroll | null> => {
+  const midMonthPayrollsMap: Record<string, MidMonthPayroll | null> = {};
+
+  // Initialize all employee IDs with null
+  employeeIds.forEach((id) => {
+    midMonthPayrollsMap[id] = null;
+  });
+
+  // Add existing mid-month payrolls to the map
+  midMonthPayrolls.forEach((payroll) => {
+    midMonthPayrollsMap[payroll.employee_id] = payroll;
+  });
+
+  return midMonthPayrollsMap;
 };
