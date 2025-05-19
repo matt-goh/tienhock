@@ -24,11 +24,12 @@ export interface JobTypeConfig {
   id: string;
   name: string;
   section: string[];
-  defaultShifts: number[];
+  defaultShifts?: number[];
   contextFields: ContextField[];
-  requiresOvertimeCalc: boolean;
-  defaultHours: number;
+  requiresOvertimeCalc?: boolean;
+  defaultHours?: number;
   jobIds: string[];
+  replaceUnits?: string;
 }
 
 export interface JobTypeConfigs {
@@ -149,6 +150,16 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     defaultHours: 7,
     jobIds: ["BOILER_MAN", "BOILER_JAGA"],
     contextFields: [],
+  },
+
+  // Salesman Commission
+  SALESMAN: {
+    id: "SALESMAN",
+    name: "Salesman",
+    section: ["SALES"],
+    replaceUnits: "Product", // This triggers the alternative DailyLogEntryPage behavior
+    contextFields: [], // No context fields for salesmen
+    jobIds: ["SALESMAN", "SALESMAN_IKUT"], // Job IDs for salesmen
   },
 };
 
