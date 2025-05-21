@@ -75,7 +75,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           setMidMonthPayroll(midMonthResponse);
         } catch (error) {
           // It's okay if no mid-month payroll exists
-          console.log("No mid-month payroll found for this employee/month");
           setMidMonthPayroll(null);
         }
       }

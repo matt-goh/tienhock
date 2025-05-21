@@ -106,10 +106,6 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
             if (matchingProduct) {
               const quantity = parseFloat(matchingProduct.quantity) || 0;
-              console.log(
-                `Found matching product for ${activity.payCodeId} with quantity ${quantity}`
-              );
-
               if (quantity > 0) {
                 activity.unitsProduced = quantity;
                 activity.isSelected = true;
