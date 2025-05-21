@@ -4,6 +4,16 @@ import { API_BASE_URL } from "../../configs/config.js";
 
 const handleResponse = async (response) => {
   const data = await response.json();
+
+  // Check if response status is not in the 2xx range
+  if (!response.ok) {
+    // Create an error with the response data
+    const error = new Error(data.message || "API request failed");
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
   return data;
 };
 
