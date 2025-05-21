@@ -212,9 +212,6 @@ const InvoiceFormPage: React.FC = () => {
       const cachedCustomer = allCustomers.find((c) => c.id === customerId);
 
       if (cachedCustomer) {
-        // We found the customer in the cache
-        console.debug(`Using cached customer data for ${customerId}`);
-
         // Handle custom products
         if (
           cachedCustomer.customProducts &&

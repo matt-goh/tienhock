@@ -422,7 +422,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       });
 
-      console.log("Final processed salesmanProducts:", rowKeyProducts);
       setSalesmanProducts(rowKeyProducts);
     } catch (error) {
       console.error("Error fetching salesman products:", error);
@@ -452,23 +451,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobConfig?.id === "SALESMAN" &&
       Object.keys(salesmanProducts).length > 0
     ) {
-      console.log("Processing salesman products:", salesmanProducts);
-
       // For each row key and its products
       Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
         // Skip if there are no products for this employee
         if (!products || products.length === 0) {
-          console.log(`No products found for ${rowKey}`);
           return;
         }
-
-        console.log(`Products for ${rowKey}:`, products);
 
         // For this employee+job combo, update their activities
         setEmployeeActivities((prev) => {
           const currentActivities = prev[rowKey] || [];
           if (currentActivities.length === 0) {
-            console.log(`No activities found for ${rowKey}`);
             return prev;
           }
 
@@ -486,10 +479,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             );
 
             if (activityIndex !== -1) {
-              console.log(
-                `Found matching activity for product ${productId} with quantity ${quantity}`
-              );
-
               // Update the activity with the product quantity
               if (quantity > 0) {
                 updatedActivities[activityIndex] = {
@@ -889,10 +878,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // First add job pay codes
           jobPayCodes.forEach((pc) => {
-            // For salesman, skip Hour-based pay codes
-            if (isSalesmanJob && pc.rate_unit === "Hour") {
-              return;
-            }
             allPayCodes.set(pc.id, { ...pc, source: "job" });
           });
 
@@ -983,7 +968,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             return {
               payCodeId: payCode.id,
               description: payCode.description,
-              payType:  payCode.pay_type,
+              payType: payCode.pay_type,
               rateUnit: payCode.rate_unit,
               rate: rate,
               isDefault: payCode.is_default_setting,
