@@ -43,13 +43,10 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
           Subtotal:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-1 text-gray-800 font-medium">RM</span>
-          <input
-            type="number"
-            value={formatCurrency(subtotal)}
-            className="w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
-            disabled
-          />
+          <span className="mr-2 text-gray-800 font-medium">RM</span>
+          <div className="w-[75px] py-0.5 pr-4 text-right font-medium text-gray-800">
+            {formatCurrency(subtotal)}
+          </div>
         </div>
 
         {/* Tax Row */}
@@ -57,13 +54,10 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
           Total Tax:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-1 text-gray-800 font-medium">RM</span>
-          <input
-            type="number"
-            value={formatCurrency(taxTotal)}
-            className="w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800"
-            disabled
-          />
+          <span className="mr-2 text-gray-800 font-medium">RM</span>
+          <div className="w-[75px] py-0.5 pr-4 text-right font-medium text-gray-800">
+            {formatCurrency(taxTotal)}
+          </div>
         </div>
 
         {/* Rounding Row */}
@@ -74,7 +68,7 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
           Rounding:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-1 text-gray-800 font-medium">RM</span>
+          <span className="mr-2 text-gray-800 font-medium">RM</span>
           <input
             id="rounding-input"
             type="number"
@@ -102,13 +96,10 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
           Total Payable:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-1 font-semibold text-base text-gray-900">RM</span>
-          <input
-            type="number"
-            value={formatCurrency(grandTotal)}
-            className="w-[75px] py-0.5 border border-transparent bg-transparent text-right font-semibold text-base text-gray-900"
-            disabled
-          />
+          <span className="mr-2 font-semibold text-base text-gray-900">RM</span>
+          <div className="w-[75px] py-0.5 pr-4 text-right font-semibold text-base text-gray-900">
+            {formatCurrency(grandTotal)}
+          </div>
         </div>
       </div>
     </div>
