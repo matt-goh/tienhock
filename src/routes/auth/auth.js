@@ -85,28 +85,5 @@ export default function authRouter(pool) {
     }
   });
 
-  router.get('/check-ic/:ic_no', async (req, res) => {
-    const { ic_no } = req.params;
-  
-    try {
-      const query = `
-        SELECT EXISTS(
-          SELECT 1 FROM staffs 
-          WHERE ic_no = $1 
-          AND job ? 'OFFICE'
-          AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
-        ) as exists
-      `;
-      
-      const result = await pool.query(query, [ic_no]);
-      res.json({ 
-        exists: result.rows[0].exists
-      });
-    } catch (error) {
-      console.error('Error checking IC:', error);
-      res.status(500).json({ message: 'Error checking IC number' });
-    }
-  });
-
   return router;
 }

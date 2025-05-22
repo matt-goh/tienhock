@@ -1,23 +1,28 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { IconArrowRight, IconLock, IconId } from "@tabler/icons-react";
+import {
+  IconArrowRight,
+  IconLock,
+  IconId,
+  IconEye,
+  IconEyeOff,
+} from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
-import { api } from "../../routes/utils/api";
 import { useCompany, COMPANIES } from "../../contexts/CompanyContext";
 import TienHockLogo from "../../utils/TienHockLogo";
 
 const Login: React.FC = () => {
-  const [step, setStep] = useState<"ic" | "password">("ic");
   const [ic_no, setIcNo] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const { setActiveCompany } = useCompany();
 
-  const validateIcNo = async (e: { preventDefault: () => void }) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (ic_no.length < 14) {
@@ -25,27 +30,11 @@ const Login: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      const data = await api.get(`/api/auth/check-ic/${ic_no}`);
-
-      if (data.exists) {
-        setStep("password");
-      } else {
-        toast.error(
-          "IC number not registered. Please contact admin if this is an error."
-        );
-      }
-    } catch (error) {
-      toast.error("Failed to verify IC number");
-    } finally {
-      setIsLoading(false);
+    if (!password.trim()) {
+      toast.error("Please enter your password");
+      return;
     }
-  };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
     setIsLoading(true);
 
     try {
@@ -58,13 +47,9 @@ const Login: React.FC = () => {
       if (savedCompanyId) {
         const company = COMPANIES.find((c) => c.id === savedCompanyId);
         if (company) {
-          // Set the active company in context
           setActiveCompany(company);
-
-          // Determine navigation path based on company
           targetPath = company.routePrefix ? `/${company.routePrefix}` : "/";
 
-          // Add a slight delay to ensure the company state is updated before navigation
           setTimeout(() => {
             navigate(targetPath);
           }, 50);
@@ -72,12 +57,10 @@ const Login: React.FC = () => {
         }
       }
 
-      // Default behavior if no saved company or saved company not found
       navigate(targetPath);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Login failed");
-
-      if (error instanceof Error && error.message === "Incorrect password") {
+    } catch (error: any) {
+      toast.error(error.message);
+      if (error.message === "Incorrect password") {
         setPassword("");
       }
     } finally {
@@ -101,30 +84,37 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="max-w-md w-full space-y-6 p-8 bg-white border-2 border-default-100 rounded-xl shadow-xl">
-        <div className="flex flex-col items-center">
-          <TienHockLogo width={128} height={128} className="mb-4" />
-          <h1 className="text-3xl font-bold text-center text-default-900">
-            Welcome Back
-          </h1>
-          <p className="mt-2 text-center text-default-600">
-            {step === "ic"
-              ? "Please enter your IC number"
-              : "Please enter your password"}
-          </p>
-        </div>
-
-        <form
-          onSubmit={step === "ic" ? validateIcNo : handleLogin}
-          className="mt-8 space-y-6"
-        >
-          <div className="space-y-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="relative max-w-md w-full">
+        {/* Main login card */}
+        <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl p-8 transform transition-all duration-300 hover:shadow-3xl">
+          {/* Header */}
+          <div className="flex items-center mb-8">
+            <div className="mr-6 w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg">
+              <TienHockLogo width={60} height={60} />
+            </div>
             <div>
+              <h1 className="text-3xl font-bold mb-1">Welcome Back</h1>
+              <p className="text-gray-600 text-sm">
+                Sign in to your account to continue
+              </p>
+            </div>
+          </div>
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* IC Number Field */}
+            <div className="space-y-1">
+              <label
+                htmlFor="ic_no"
+                className="block text-sm font-medium text-default-700 mb-2"
+              >
+                IC Number
+              </label>
               <div className="relative group">
-                <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
+                <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
                   <IconId
-                    className="text-default-500 group-focus-within:text-default-600 transition-colors"
+                    className="text-default-400 group-focus-within:text-default-500 transition-colors duration-200"
                     size={20}
                     stroke={1.5}
                   />
@@ -133,10 +123,9 @@ const Login: React.FC = () => {
                   id="ic_no"
                   name="ic_no"
                   type="text"
-                  placeholder="IC number"
+                  placeholder="000000-00-0000"
                   required
-                  disabled={step === "password"}
-                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors disabled:bg-default-50 focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                  className="w-full pl-12 pr-4 py-3.5 border border-default-200 rounded-xl bg-white/50 backdrop-blur-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition-all duration-200 font-medium text-default-700 placeholder-default-400"
                   value={ic_no}
                   onChange={(e) => {
                     const formatted = formatIcNo(e.target.value);
@@ -148,63 +137,80 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            {step === "password" && (
-              <div>
-                <div className="relative group">
-                  <div className="flex absolute inset-y-0 left-0 w-10 items-center justify-center">
-                    <IconLock
-                      className="text-default-500 group-focus-within:text-default-600 transition-colors"
-                      size={20}
-                      stroke={1.5}
-                    />
-                  </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Password"
-                    required
-                    className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg focus:border-default-500 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+            {/* Password Field */}
+            <div className="space-y-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-default-700 mb-2"
+              >
+                Password
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
+                  <IconLock
+                    className="text-default-400 group-focus-within:text-sky-500 transition-colors duration-200"
+                    size={20}
+                    stroke={1.5}
                   />
                 </div>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full pl-12 pr-12 py-3.5 border border-default-200 rounded-xl bg-white/50 backdrop-blur-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition-all duration-200 font-medium text-default-700 placeholder-default-400"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 w-12 flex items-center justify-center text-default-400 hover:text-default-600 transition-colors duration-200"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <IconEyeOff size={20} stroke={1.5} />
+                  ) : (
+                    <IconEye size={20} stroke={1.5} />
+                  )}
+                </button>
               </div>
-            )}
-          </div>
-
-          <div>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              icon={IconArrowRight}
-              iconPosition="right"
-              className="w-full focus:outline-none"
-              size="lg"
-            >
-              {isLoading
-                ? "Please wait..."
-                : step === "ic"
-                ? "Continue"
-                : "Sign In"}
-            </Button>
-          </div>
-
-          {step === "password" && (
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setStep("ic");
-                  setPassword("");
-                }}
-                className="-py-3 text-sm text-default-600 hover:text-default-900 hover:underline focus:outline-none"
-              >
-                Use a different IC number
-              </button>
             </div>
-          )}
-        </form>
+
+            {/* Login Button */}
+            <div className="pt-2">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                icon={IconArrowRight}
+                iconPosition="right"
+                className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold py-3.5 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-sky-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                size="lg"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Signing in...
+                  </div>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+            </div>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <p className="text-xs text-default-500">
+              Need help? Contact system admin
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom branding */}
+        <div className="text-center mt-6">
+          <p className="text-sm text-default-500">Tien Hock ERP System</p>
+        </div>
       </div>
     </div>
   );
