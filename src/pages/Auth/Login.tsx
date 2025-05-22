@@ -10,8 +10,8 @@ import {
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
-import { useCompany, COMPANIES } from "../../contexts/CompanyContext";
 import TienHockLogo from "../../utils/TienHockLogo";
+import { useCompany, COMPANIES } from "../../contexts/CompanyContext";
 
 const Login: React.FC = () => {
   const [ic_no, setIcNo] = useState("");
