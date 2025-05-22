@@ -4,7 +4,21 @@ import {
   PayType,
   EmployeePayroll,
   PayrollItem,
+  EPFRate,
+  SOCSORRate,
+  SIPRate,
+  PayrollDeduction,
 } from "../../types/types";
+import { useContributionRatesCache } from "./useContributionRatesCache";
+import {
+  getEmployeeType,
+  findEPFRate,
+  findSOCSORRate,
+  findSIPRate,
+  calculateEPF,
+  calculateSOCSO,
+  calculateSIP,
+} from "./contributionCalculations";
 
 export interface WorkLogActivity {
   pay_code_id: string;
@@ -248,5 +262,170 @@ export class PayrollCalculationService {
 
     // Return new array with added item
     return [...items, completeItem];
+  }
+
+  /**
+   * Calculate EPF, SOCSO, and SIP deductions for an employee
+   * @param grossPay The gross pay amount
+   * @param employeeId Employee ID for age/nationality lookup
+   * @param staffs Array of staff data (from cache)
+   * @param epfRates Array of EPF rates
+   * @param socsoRates Array of SOCSO rates
+   * @param sipRates Array of SIP rates
+   * @returns Array of calculated deductions
+   */
+  static calculateContributions(
+    grossPay: number,
+    employeeId: string,
+    staffs: any[],
+    epfRates: EPFRate[],
+    socsoRates: SOCSORRate[],
+    sipRates: SIPRate[]
+  ): PayrollDeduction[] {
+    const deductions: PayrollDeduction[] = [];
+
+    // Find employee in staff cache
+    const employee = staffs.find((s) => s.id === employeeId);
+    if (!employee) {
+      console.warn(`Employee ${employeeId} not found in staff cache`);
+      return deductions;
+    }
+
+    // Calculate age
+    const birthDate = new Date(employee.birthdate);
+    const age = Math.floor(
+      (Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+    );
+
+    // Get nationality
+    const nationality = employee.nationality || "Malaysian";
+
+    // Determine employee type for EPF
+    const employeeType = getEmployeeType(nationality, age);
+
+    // 1. Calculate EPF
+    const epfRate = findEPFRate(epfRates, employeeType, grossPay);
+    if (epfRate) {
+      const epfContribution = calculateEPF(epfRate, grossPay);
+      deductions.push({
+        deduction_type: "epf",
+        employee_amount: epfContribution.employee,
+        employer_amount: epfContribution.employer,
+        wage_amount: grossPay,
+        rate_info: {
+          rate_id: epfRate.id,
+          employee_rate: `${epfRate.employee_rate_percentage}%`,
+          employer_rate: epfRate.employer_rate_percentage
+            ? `${epfRate.employer_rate_percentage}%`
+            : `RM${epfRate.employer_fixed_amount}`,
+          age_group: employeeType,
+        },
+      });
+    }
+
+    // 2. Calculate SOCSO
+    const socsoRate = findSOCSORRate(socsoRates, grossPay);
+    if (socsoRate) {
+      const socsoContribution = calculateSOCSO(socsoRate, grossPay, age >= 60);
+      deductions.push({
+        deduction_type: "socso",
+        employee_amount: socsoContribution.employee,
+        employer_amount: socsoContribution.employer,
+        wage_amount: grossPay,
+        rate_info: {
+          rate_id: socsoRate.id,
+          employee_rate: age >= 60 ? "RM0.00" : `RM${socsoRate.employee_rate}`,
+          employer_rate:
+            age >= 60
+              ? `RM${socsoRate.employer_rate_over_60}`
+              : `RM${socsoRate.employer_rate}`,
+          age_group: age >= 60 ? "60_and_above" : "under_60",
+        },
+      });
+    }
+
+    // 3. Calculate SIP (only for employees under 60)
+    if (age < 60) {
+      const sipRate = findSIPRate(sipRates, grossPay);
+      if (sipRate) {
+        const sipContribution = calculateSIP(sipRate, grossPay, age);
+        deductions.push({
+          deduction_type: "sip",
+          employee_amount: sipContribution.employee,
+          employer_amount: sipContribution.employer,
+          wage_amount: grossPay,
+          rate_info: {
+            rate_id: sipRate.id,
+            employee_rate: `RM${sipRate.employee_rate}`,
+            employer_rate: `RM${sipRate.employer_rate}`,
+            age_group: "under_60",
+          },
+        });
+      }
+    }
+
+    return deductions;
+  }
+
+  /**
+   * Enhanced employee payroll processing that includes deductions
+   * @param workLogs Array of work logs for the month
+   * @param employee_id Employee ID
+   * @param job_type Job type
+   * @param section Section
+   * @param month Month (1-12)
+   * @param year Year
+   * @param staffs Array of staff data
+   * @param epfRates Array of EPF rates
+   * @param socsoRates Array of SOCSO rates
+   * @param sipRates Array of SIP rates
+   * @returns Processed employee payroll with deductions
+   */
+  static processEmployeePayrollWithDeductions(
+    workLogs: WorkLog[],
+    employee_id: string,
+    job_type: string,
+    section: string,
+    month: number,
+    year: number,
+    staffs: any[],
+    epfRates: EPFRate[],
+    socsoRates: SOCSORRate[],
+    sipRates: SIPRate[]
+  ): EmployeePayroll & { deductions: PayrollDeduction[] } {
+    // First calculate the basic payroll (without deductions)
+    const basePayroll = this.processEmployeePayroll(
+      workLogs,
+      employee_id,
+      job_type,
+      section,
+      month,
+      year
+    );
+
+    // Calculate deductions based on gross pay
+    const deductions = this.calculateContributions(
+      basePayroll.gross_pay,
+      employee_id,
+      staffs,
+      epfRates,
+      socsoRates,
+      sipRates
+    );
+
+    // Calculate total employee deductions
+    const totalEmployeeDeductions = deductions.reduce(
+      (sum, deduction) => sum + deduction.employee_amount,
+      0
+    );
+
+    // Update net pay by subtracting deductions
+    const net_pay = basePayroll.gross_pay - totalEmployeeDeductions;
+
+    return {
+      ...basePayroll,
+      net_pay: Number(net_pay.toFixed(2)),
+      deductions,
+    };
   }
 }

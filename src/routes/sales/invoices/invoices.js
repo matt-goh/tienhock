@@ -581,6 +581,142 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/salesman-products - Get products sold by multiple salesmen on a specific date
+  router.get("/salesman-products", async (req, res) => {
+    const { salesmanIds, date } = req.query;
+
+    if (!salesmanIds || !date) {
+      return res
+        .status(400)
+        .json({ message: "Missing required parameters: salesmanIds and date" });
+    }
+
+    try {
+      // Parse comma-separated salesmanIds
+      const salesmanIdArray = salesmanIds.split(",");
+
+      // Convert date to timestamp range (start of day to end of day)
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      const startTimestamp = startDate.getTime().toString();
+      const endTimestamp = endDate.getTime().toString();
+
+      // Query for main invoices products - now includes salespersonid in results and uses ANY for multiple salesmen
+      const mainInvoicesQuery = `
+      SELECT 
+        i.salespersonid,
+        od.code as product_id,
+        p.description as product_name,
+        SUM(od.quantity) as quantity
+      FROM invoices i
+      JOIN order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE i.salespersonid = ANY($1)
+        AND CAST(i.createddate AS bigint) BETWEEN $2 AND $3
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+      GROUP BY i.salespersonid, od.code, p.description
+    `;
+
+      // Query for jellypolly invoices products
+      const jellypollyInvoicesQuery = `
+      SELECT 
+        i.salespersonid,
+        od.code as product_id,
+        p.description as product_name,
+        SUM(od.quantity) as quantity
+      FROM jellypolly.invoices i
+      JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE i.salespersonid = ANY($1)
+        AND CAST(i.createddate AS bigint) BETWEEN $2 AND $3
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+      GROUP BY i.salespersonid, od.code, p.description
+    `;
+
+      // Execute both queries
+      const [mainResult, jellypollyResult] = await Promise.all([
+        pool.query(mainInvoicesQuery, [
+          salesmanIdArray,
+          startTimestamp,
+          endTimestamp,
+        ]),
+        pool.query(jellypollyInvoicesQuery, [
+          salesmanIdArray,
+          startTimestamp,
+          endTimestamp,
+        ]),
+      ]);
+
+      // Create a nested map structure: salesmanId -> productId -> product data
+      const productsBySalesman = {};
+
+      // Initialize salesmanIds in the map
+      salesmanIdArray.forEach((id) => {
+        productsBySalesman[id] = {};
+      });
+
+      // Process main invoices
+      mainResult.rows.forEach((row) => {
+        const { salespersonid, product_id, product_name, quantity } = row;
+
+        if (!productsBySalesman[salespersonid]) {
+          productsBySalesman[salespersonid] = {};
+        }
+
+        productsBySalesman[salespersonid][product_id] = {
+          product_id,
+          product_name: product_name || product_id,
+          quantity: parseInt(quantity) || 0,
+        };
+      });
+
+      // Process jellypolly invoices
+      jellypollyResult.rows.forEach((row) => {
+        const { salespersonid, product_id, product_name, quantity } = row;
+        const parsedQuantity = parseInt(quantity) || 0;
+
+        if (!productsBySalesman[salespersonid]) {
+          productsBySalesman[salespersonid] = {};
+        }
+
+        if (productsBySalesman[salespersonid][product_id]) {
+          // Add to existing product quantity
+          productsBySalesman[salespersonid][product_id].quantity +=
+            parsedQuantity;
+        } else {
+          // Create new product entry
+          productsBySalesman[salespersonid][product_id] = {
+            product_id,
+            product_name: product_name || product_id,
+            quantity: parsedQuantity,
+          };
+        }
+      });
+
+      // Convert inner maps to arrays and sort by quantity
+      const result = {};
+      Object.keys(productsBySalesman).forEach((salesmanId) => {
+        const productsMap = productsBySalesman[salesmanId];
+        result[salesmanId] = Object.values(productsMap).sort(
+          (a, b) => b.quantity - a.quantity
+        );
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching salesman products:", error);
+      res.status(500).json({
+        message: "Error fetching salesman products",
+        error: error.message,
+      });
+    }
+  });
+
   // Get order details for a specific invoice
   router.get("/details/:id/items", async (req, res) => {
     const { id } = req.params;
@@ -760,11 +896,9 @@ export default function (pool, config) {
       }
 
       if (!type || (type !== "products" && type !== "salesmen")) {
-        return res
-          .status(400)
-          .json({
-            message: "Valid type parameter (products or salesmen) is required",
-          });
+        return res.status(400).json({
+          message: "Valid type parameter (products or salesmen) is required",
+        });
       }
 
       // Parse IDs from comma-separated string if provided

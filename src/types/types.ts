@@ -627,6 +627,7 @@ export interface EmployeePayroll {
   year?: number;
   month?: number;
   items: PayrollItem[];
+  deductions?: PayrollDeduction[];
 }
 
 export interface PayrollItem {
@@ -650,4 +651,68 @@ export interface MonthlyPayroll {
   updated_at: string;
   created_by: string | null;
   employeePayrolls: EmployeePayroll[];
+}
+
+export interface EPFRate {
+  id: number;
+  employee_type: string;
+  wage_threshold: number | null;
+  employee_rate_percentage: number;
+  employer_rate_percentage: number | null;
+  employer_fixed_amount: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SOCSORRate {
+  id: number;
+  wage_from: number;
+  wage_to: number;
+  employee_rate: number;
+  employer_rate: number;
+  employer_rate_over_60: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SIPRate {
+  id: number;
+  wage_from: number;
+  wage_to: number;
+  employee_rate: number;
+  employer_rate: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PayrollDeduction {
+  deduction_type: "epf" | "socso" | "sip";
+  employee_amount: number;
+  employer_amount: number;
+  wage_amount: number;
+  rate_info: {
+    rate_id: number;
+    employee_rate: number | string;
+    employer_rate: number | string;
+    age_group?: string;
+  };
+}
+
+export interface MidMonthPayroll {
+  id: number;
+  employee_id: string;
+  employee_name: string;
+  year: number;
+  month: number;
+  amount: number;
+  payment_method: "Cash" | "Bank" | "Cheque";
+  status: "Pending" | "Paid" | "Cancelled";
+  created_at: string;
+  updated_at: string;
+  paid_at?: string;
+  notes?: string;
+  default_payment_method?: string;
 }

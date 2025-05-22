@@ -27,6 +27,7 @@ import EmployeeSelectionTooltip from "../../components/Payroll/EmployeeSelection
 import { Link } from "react-router-dom";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useContributionRatesCache } from "../../utils/payroll/useContributionRatesCache";
 
 interface EligibleEmployeesResponse {
   month: number;
@@ -56,6 +57,7 @@ const PayrollProcessingPage: React.FC = () => {
 
   const { jobs, loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
+  const { epfRates, socsoRates, sipRates } = useContributionRatesCache();
 
   useEffect(() => {
     Promise.all([fetchPayrollDetails(), fetchEligibleEmployees()])
@@ -216,16 +218,20 @@ const PayrollProcessingPage: React.FC = () => {
 
             // Calculate employee payroll
             const employeePayroll =
-              PayrollCalculationService.processEmployeePayroll(
+              PayrollCalculationService.processEmployeePayrollWithDeductions(
                 logs,
                 employeeId,
                 jobType,
                 section,
                 payroll.month,
-                payroll.year
+                payroll.year,
+                staffs, // Pass staffs for age/nationality lookup
+                epfRates,
+                socsoRates,
+                sipRates
               );
 
-            // Save to the server
+            // Save to the server (including deductions)
             await saveEmployeePayroll(payroll.id, employeePayroll);
 
             processingResults.push(employeePayroll);

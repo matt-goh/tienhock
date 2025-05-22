@@ -5,6 +5,8 @@ import {
   IconListDetails,
   IconUserDollar,
   IconCalendarEvent,
+  IconCalculator,
+  IconCash,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
@@ -24,10 +26,12 @@ import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
+import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
 import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
+import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 
 // Catalogue related imports
 // Staff
@@ -69,6 +73,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           component: (props: any) => (
             <DailyLogEntryPage jobType={jobConfig.id} {...props} />
           ),
+          showInPopover: true,
         },
         {
           name: "View Log",
@@ -117,12 +122,26 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     ],
   });
 
+  payrollSubItems.push({
+    name: "Mid-month Pay",
+    path: "/payroll/mid-month-payrolls",
+    component: MidMonthPayrollPage,
+    icon: IconCash,
+  });
+
   // Add Holiday Calendar at the end
   payrollSubItems.push({
     name: "Holiday Calendar",
     path: "/payroll/holiday-calendar",
     component: HolidayCalendarPage,
     icon: IconCalendarEvent,
+  });
+
+  payrollSubItems.push({
+    name: "EPF, SOCSO & SIP",
+    path: "/payroll/contribution-rates",
+    component: ContributionRatesPage,
+    icon: IconCalculator,
   });
 
   return payrollSubItems;
@@ -154,6 +173,7 @@ export const TienHockSidebarData: SidebarItem[] = [
             name: "Create New Invoice",
             path: "/sales/invoice/new",
             component: InvoiceFormPage,
+            showInPopover: true,
           },
           // Route for viewing an existing invoice
           {
@@ -188,6 +208,7 @@ export const TienHockSidebarData: SidebarItem[] = [
             name: "New Staff",
             path: "/catalogue/staff/new",
             component: StaffAddPage,
+            showInPopover: true,
           },
           {
             name: "Staff Edit",
@@ -202,9 +223,10 @@ export const TienHockSidebarData: SidebarItem[] = [
         component: CustomerPage,
         subItems: [
           {
-            name: "New Staff",
+            name: "New Customer",
             path: "/catalogue/customer/new",
             component: CustomerAddPage,
+            showInPopover: true,
           },
           {
             name: "Staff Edit",
