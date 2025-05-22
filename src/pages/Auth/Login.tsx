@@ -114,7 +114,7 @@ const Login: React.FC = () => {
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
                   <IconId
-                    className="text-default-400 group-focus-within:text-default-500 transition-colors duration-200"
+                    className="text-default-500 group-focus-within:text-default-600 transition-colors duration-200"
                     size={20}
                     stroke={1.5}
                   />
@@ -125,7 +125,7 @@ const Login: React.FC = () => {
                   type="text"
                   placeholder="000000-00-0000"
                   required
-                  className="w-full pl-12 pr-4 py-3.5 border border-default-200 rounded-xl bg-white/50 backdrop-blur-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition-all duration-200 font-medium text-default-700 placeholder-default-400"
+                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg  focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
                   value={ic_no}
                   onChange={(e) => {
                     const formatted = formatIcNo(e.target.value);
@@ -148,7 +148,7 @@ const Login: React.FC = () => {
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
                   <IconLock
-                    className="text-default-400 group-focus-within:text-sky-500 transition-colors duration-200"
+                    className="text-default-500 group-focus-within:text-default-600 transition-colors duration-200"
                     size={20}
                     stroke={1.5}
                   />
@@ -159,7 +159,7 @@ const Login: React.FC = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   required
-                  className="w-full pl-12 pr-12 py-3.5 border border-default-200 rounded-xl bg-white/50 backdrop-blur-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition-all duration-200 font-medium text-default-700 placeholder-default-400"
+                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg  focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />

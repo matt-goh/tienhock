@@ -202,6 +202,7 @@ class SessionService {
     }
   }
 
+  // Find this method and replace the catch block:
   async login(ic_no: string, password: string): Promise<AuthenticatedSession> {
     try {
       const data = await api.post("/api/auth/login", {
@@ -224,9 +225,12 @@ class SessionService {
       this.lastCheckTime = Date.now();
 
       return session;
-    } catch (error) {
+    } catch (error: any) {
+      // Extract the actual error message from the API response
+      const errorMessage = error?.message || "Login failed";
+
       throw this.createSessionError(
-        "Login failed",
+        errorMessage,
         "NETWORK_ERROR",
         error as Error
       );
