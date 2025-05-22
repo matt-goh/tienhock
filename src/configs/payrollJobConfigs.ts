@@ -24,11 +24,12 @@ export interface JobTypeConfig {
   id: string;
   name: string;
   section: string[];
-  defaultShifts: number[];
+  defaultShifts?: number[];
   contextFields: ContextField[];
-  requiresOvertimeCalc: boolean;
-  defaultHours: number;
+  requiresOvertimeCalc?: boolean;
+  defaultHours?: number;
   jobIds: string[];
+  replaceUnits?: string;
 }
 
 export interface JobTypeConfigs {
@@ -38,17 +39,18 @@ export interface JobTypeConfigs {
 export const JOB_CONFIGS: JobTypeConfigs = {
   // MEE Production
   MEE: {
+    // Creates a page for MEE Production
     id: "MEE",
     name: "Mee Production",
     section: ["MEE"],
     defaultShifts: [1, 2], // Day and Night
-    requiresOvertimeCalc: true,
+    requiresOvertimeCalc: true, // true if overtime calculation is required
     defaultHours: 7,
-    jobIds: ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"],
+    jobIds: ["MEE_FOREMAN", "MEE_TEPUNG", "MEE_ROLL", "MEE_SANGKUT"], // Employees associated with these jobs will show up in this page
     contextFields: [
       {
         id: "totalBags",
-        label: "Jumlah Tepung (Bags)",
+        label: "Jumlah Tepung (Karung)",
         type: "number",
         required: true,
         defaultValue: 50,
@@ -59,23 +61,70 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     ],
   },
 
-  STEAM: {
-    id: "STEAM",
-    name: "Steam Production",
-    section: ["STEAM"],
-    defaultShifts: [1, 2], // Day and Night
+  // BIHUN Production
+  BIHUN: {
+    id: "BIHUN",
+    name: "Bihun Production",
+    section: ["BIHUN"],
+    defaultShifts: [1, 2],
     requiresOvertimeCalc: true,
     defaultHours: 7,
-    jobIds: [],
+    jobIds: [
+      "BIHUN_FOREMAN",
+      "BH_BERAS",
+      "BH_CAMPURAN",
+      "BH_SANGKUT",
+      "BH_DRYER",
+    ],
     contextFields: [
       {
-        id: "coalUsage",
-        label: "Arang (Bag)",
+        id: "totalBeras",
+        label: "Beras (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 50,
+        min: 0,
+        linkedPayCode: "BH_BERAS",
+        displayInSummary: true,
+      },
+      {
+        id: "totalSago",
+        label: "Sago (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 25,
+        min: 0,
+        linkedPayCode: "BH_SAGO",
+        displayInSummary: true,
+      },
+      {
+        id: "totalJagung",
+        label: "Jagung (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 20,
+        min: 0,
+        linkedPayCode: "BH_JAGUNG",
+        displayInSummary: true,
+      },
+      {
+        id: "totalCampuran",
+        label: "Campuran (Karung)",
+        type: "number",
+        required: true,
+        defaultValue: 8,
+        min: 0,
+        linkedPayCode: "BH_CAMPURAN",
+        displayInSummary: true,
+      },
+      {
+        id: "totalBungkus",
+        label: "Bungkusan (Bags)",
         type: "number",
         required: true,
         defaultValue: 0,
         min: 0,
-        linkedPayCode: "STEAM_COAL_01", // Coal usage pay code
+        linkedPayCode: "BH_BUNGKUSAN",
         displayInSummary: true,
       },
     ],
@@ -83,13 +132,34 @@ export const JOB_CONFIGS: JobTypeConfigs = {
 
   MAINTENANCE: {
     id: "MAINTENANCE",
-    name: "Maintenance Work",
+    name: "Maintenance",
     section: ["MAINTENANCE"],
-    defaultShifts: [1, 2], // Day and Night
+    defaultShifts: [1, 2],
     requiresOvertimeCalc: true,
-    defaultHours: 8,
-    jobIds: [],
+    defaultHours: 50,
+    jobIds: ["MAINTEN"],
     contextFields: [],
+  },
+
+  BOILER: {
+    id: "BOILER",
+    name: "Boiler",
+    section: ["BOILER"],
+    defaultShifts: [1, 2],
+    requiresOvertimeCalc: true,
+    defaultHours: 7,
+    jobIds: ["BOILER_MAN", "BOILER_JAGA"],
+    contextFields: [],
+  },
+
+  // Salesman Commission
+  SALESMAN: {
+    id: "SALESMAN",
+    name: "Salesman",
+    section: ["SALES"],
+    replaceUnits: "Bag", // This triggers the alternative DailyLogEntryPage behavior
+    contextFields: [], // No context fields for salesmen
+    jobIds: ["SALESMAN", "SALESMAN_IKUT"], // Job IDs for salesmen
   },
 };
 

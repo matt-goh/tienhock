@@ -45,6 +45,8 @@ import dailyWorkLogsRouter from "./payroll/daily-work-logs.js";
 import holidaysRouter from "./payroll/holidays.js";
 import monthlyPayrollsRouter from "./payroll/monthly-payrolls.js";
 import employeePayrollsRouter from "./payroll/employee-payrolls.js";
+import contributionRatesRouter from "./payroll/contribution-rates.js";
+import midMonthPayrollsRouter from "./payroll/mid-month-payrolls.js";
 
 // Green Target routes
 import greenTargetCustomerRouter from "./greentarget/customers.js";
@@ -121,6 +123,8 @@ export default function setupRoutes(app, pool) {
   app.use("/api/holidays", holidaysRouter(pool));
   app.use("/api/monthly-payrolls", monthlyPayrollsRouter(pool));
   app.use("/api/employee-payrolls", employeePayrollsRouter(pool));
+  app.use("/api/contribution-rates", contributionRatesRouter(pool));
+  app.use("/api/mid-month-payrolls", midMonthPayrollsRouter(pool));
 
   // Green Target routes
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));

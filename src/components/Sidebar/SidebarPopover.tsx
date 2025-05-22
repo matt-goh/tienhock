@@ -1,6 +1,7 @@
 // SidebarPopover.tsx
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 
 interface SidebarPopoverProps {
   options: { name: string; path: string }[];
@@ -15,6 +16,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
   onMouseLeave,
   buttonRef,
 }) => {
+  const navigate = useNavigate();
   const [position, setPosition] = useState<{ top: number; left: number }>({
     top: 0,
     left: 0,
@@ -30,7 +32,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
 
         setPosition({
           top: rect.top + scrollTop, // Align with the top of the button
-          left: rect.right + scrollLeft + 14, // Keep the horizontal offset
+          left: rect.right + scrollLeft + 16, // Keep the horizontal offset
         });
       }
     };
@@ -44,10 +46,10 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
       window.removeEventListener("scroll", updatePosition);
     };
   }, [buttonRef]);
-  
+
   const popoverContent = (
     <div
-      className="absolute w-auto bg-white text-default-700 font-medium border border-default-200 shadow-lg rounded-lg p-2"
+      className="absolute z-[999] w-auto bg-white text-default-700 font-medium border border-default-200 shadow-lg rounded-lg p-2"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -58,12 +60,12 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
       <ul>
         {options.map((option, index) => (
           <li key={index}>
-            <a
-              href={option.path}
-              className="block py-2 px-4 hover:bg-default-200/90 active:bg-default-300/90 transition-colors duration-200 rounded-lg"
+            <div
+              onClick={() => navigate(option.path)}
+              className="block py-2 px-4 hover:bg-default-200/90 active:bg-default-300/90 transition-colors duration-200 rounded-lg cursor-pointer"
             >
               {option.name}
-            </a>
+            </div>
           </li>
         ))}
       </ul>

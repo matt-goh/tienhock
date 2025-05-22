@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useCallback,
   useRef,
+  Fragment,
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
@@ -32,6 +33,19 @@ import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
 } from "../../utils/payroll/calculateActivityAmount";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
+import {
+  IconChevronDown,
+  IconCheck,
+  IconMapPin,
+  IconMapPinOff,
+} from "@tabler/icons-react";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -81,6 +95,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeWithHours | null>(null);
   const [employeeActivities, setEmployeeActivities] = useState<
+    Record<string, any[]>
+  >({});
+  const [locationTypes, setLocationTypes] = useState<
+    Record<string, "Local" | "Outstation">
+  >({});
+  const [salesmanProducts, setSalesmanProducts] = useState<
     Record<string, any[]>
   >({});
 
@@ -329,6 +349,175 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
+  const handleLocationTypeChange = (
+    rowKey: string | undefined,
+    locationType: "Local" | "Outstation"
+  ) => {
+    if (!rowKey) return;
+
+    const [employeeId, jobType] = rowKey.split("-");
+
+    setLocationTypes((prev) => ({
+      ...prev,
+      [rowKey]: locationType,
+    }));
+
+    // Recalculate activities when location type changes
+    const activities = employeeActivities[rowKey] || [];
+
+    // Update activities based on location type
+    // This will be completed in the next implementation phase
+  };
+
+  const fetchSalesmanProducts = async () => {
+    if (jobConfig?.id !== "SALESMAN" || !formData.logDate) return;
+
+    try {
+      // Get all selected salesmen IDs
+      const salesmenIds: string[] = [];
+
+      Object.entries(employeeSelectionState.selectedJobs).forEach(
+        ([employeeId, jobTypes]) => {
+          if (jobTypes.some((jt) => JOB_IDS.includes(jt))) {
+            salesmenIds.push(employeeId);
+          }
+        }
+      );
+
+      if (salesmenIds.length === 0) return;
+
+      // Fetch products for all salesmen in one request
+      const response = await api.get(
+        `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(
+          ","
+        )}&date=${formData.logDate}`
+      );
+
+      // Response might be directly available or in a data property
+      const responseData = response.data || response;
+
+      // Create row keys for each salesman and job type combination
+      const rowKeyProducts: Record<string, any[]> = {};
+
+      Object.entries(responseData).forEach(([salesmanId, products]) => {
+        // Find all selected jobs for this employee
+        const selectedJobs =
+          employeeSelectionState.selectedJobs[salesmanId] || [];
+
+        // Create row key for each job and set products
+        selectedJobs.forEach((jobType) => {
+          const rowKey = `${salesmanId}-${jobType}`;
+
+          // Ensure products is always an array and has required fields
+          const productArray = Array.isArray(products) ? products : [];
+
+          // Filter to only include products with valid data
+          rowKeyProducts[rowKey] = productArray.filter(
+            (p) =>
+              p &&
+              p.product_id &&
+              typeof p.quantity === "number" &&
+              p.quantity > 0
+          );
+        });
+      });
+
+      setSalesmanProducts(rowKeyProducts);
+    } catch (error) {
+      console.error("Error fetching salesman products:", error);
+      toast.error("Failed to fetch salesman products");
+    }
+  };
+
+  useEffect(() => {
+    // Directly call the function when dependencies change
+    if (
+      jobConfig?.id === "SALESMAN" &&
+      formData.logDate &&
+      Object.keys(employeeSelectionState.selectedJobs).length > 0
+    ) {
+      fetchSalesmanProducts();
+    }
+  }, [
+    jobConfig?.id,
+    formData.logDate,
+    employeeSelectionState.selectedJobs, // Reference the object directly
+    JOB_IDS, // Include in dependencies since it's used inside fetchSalesmanProducts
+  ]);
+
+  useEffect(() => {
+    // After salesmanProducts are updated, auto-link them to pay codes
+    if (
+      jobConfig?.id === "SALESMAN" &&
+      Object.keys(salesmanProducts).length > 0
+    ) {
+      // For each row key and its products
+      Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
+        // Skip if there are no products for this employee
+        if (!products || products.length === 0) {
+          return;
+        }
+
+        // For this employee+job combo, update their activities
+        setEmployeeActivities((prev) => {
+          const currentActivities = prev[rowKey] || [];
+          if (currentActivities.length === 0) {
+            return prev;
+          }
+
+          // Create a new array with updated activities
+          const updatedActivities = [...currentActivities];
+
+          // For each product, find and update the matching pay code
+          products.forEach((product) => {
+            const productId = String(product.product_id);
+            const quantity = parseFloat(product.quantity) || 0;
+
+            // Find the activity with matching pay code ID
+            const activityIndex = updatedActivities.findIndex(
+              (activity) => String(activity.payCodeId) === productId
+            );
+
+            if (activityIndex !== -1) {
+              // Update the activity with the product quantity
+              if (quantity > 0) {
+                updatedActivities[activityIndex] = {
+                  ...updatedActivities[activityIndex],
+                  unitsProduced: quantity,
+                  isSelected: true, // Auto-select products with non-zero quantity
+                };
+              }
+            }
+          });
+
+          // Auto-deselect Hour-based activities
+          updatedActivities.forEach((activity, index) => {
+            if (activity.rateUnit === "Hour") {
+              updatedActivities[index] = {
+                ...activity,
+                isSelected: false,
+                calculatedAmount: 0,
+              };
+            }
+          });
+
+          // Recalculate amounts for all activities
+          const recalculatedActivities = calculateActivitiesAmounts(
+            updatedActivities,
+            0, // For salesmen, hours aren't used
+            formData.contextData,
+            locationTypes[rowKey] || "Local"
+          );
+
+          return {
+            ...prev,
+            [rowKey]: recalculatedActivities,
+          };
+        });
+      });
+    }
+  }, [salesmanProducts, jobConfig?.id]);
+
   // Update employee hours by employee+job combination
   const handleEmployeeHoursChange = (
     rowKey: string | undefined,
@@ -354,6 +543,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
+    // Ensure rowKey is available
+    if (!employee.rowKey) {
+      console.error(
+        "Cannot open activities modal - employee rowKey is missing"
+      );
+      return;
+    }
+
+    // Get the products for this specific employee and job
+    const rowKey = employee.rowKey;
+    const productsForEmployee = salesmanProducts[rowKey] || [];
+
+    // First set selectedEmployee, then open the modal
     setSelectedEmployee(employee);
     setShowActivitiesModal(true);
   };
@@ -663,15 +865,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const rowKey = `${employeeId}-${jobType}`;
           const hours =
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          const isSalesmanJob = jobConfig?.id === "SALESMAN";
 
           // Get job pay codes from cache
           const jobPayCodes = jobPayCodeDetails[jobType] || [];
 
           // Get employee-specific pay codes from cache
           const employeePayCodes = employeeMappings[employeeId] || [];
-
-          // Create a map of job pay codes by ID for easy lookup
-          const jobPayCodeMap = new Map(jobPayCodes.map((pc) => [pc.id, pc]));
 
           // Merge pay codes, prioritizing employee-specific ones
           const allPayCodes = new Map();
@@ -683,6 +883,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // Then add/override with employee-specific pay codes
           employeePayCodes.forEach((pc) => {
+            // For salesman, skip Hour-based pay codes
+            if (isSalesmanJob && pc.rate_unit === "Hour") {
+              return;
+            }
             allPayCodes.set(pc.id, { ...pc, source: "employee" });
           });
 
@@ -692,13 +896,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Check if we already have activities for this employee/job
           const existingActivities = employeeActivities[rowKey] || [];
 
-          // Filter pay codes based on hours
-          const filteredPayCodes =
-            hours > 8
-              ? mergedPayCodes // If overtime, include all pay codes
-              : mergedPayCodes.filter(
-                  (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
-                ); // Otherwise, only Base and Tambahan
+          // For salesmen, we don't filter by hours since hours aren't applicable
+          const filteredPayCodes = isSalesmanJob
+            ? mergedPayCodes
+            : hours > 8
+            ? mergedPayCodes // If overtime, include all pay codes
+            : mergedPayCodes.filter(
+                (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
+              ); // Otherwise, only Base and Tambahan
 
           const activities = filteredPayCodes.map((payCode) => {
             // Check if this activity already exists
@@ -731,7 +936,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
             // For overtime pay codes, determine if they should be auto-selected
             const isOvertimeCode = payCode.pay_type === "Overtime";
-            const shouldAutoSelect = isOvertimeCode && hours > 8;
+            const shouldAutoSelect =
+              !isSalesmanJob && isOvertimeCode && hours > 8;
 
             // For context-linked pay codes or Bag rate units, don't auto-select
             let isSelected = existingActivity
@@ -743,6 +949,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 payCode.pay_type === "Tambahan"
               ? false // Don't auto-select context-linked pay codes or Bag rate units
               : shouldAutoSelect || payCode.is_default_setting;
+
+            // Always deselect Hour-based pay codes for salesmen
+            if (isSalesmanJob && payCode.rate_unit === "Hour") {
+              isSelected = false;
+            }
 
             // For context-linked pay codes, use context value as units
             const unitsProduced = isContextLinked
@@ -799,11 +1010,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     const rowKey = selectedEmployee.rowKey;
 
-    // Store all activities (both selected and unselected)
-    setEmployeeActivities((prev) => ({
-      ...prev,
-      [rowKey]: activities,
-    }));
+    // When recalculating activities for salesmen, consider the location type
+    if (jobConfig?.id === "SALESMAN") {
+      const locationType = locationTypes[rowKey] || "Local";
+
+      // Recalculate with location type
+      const recalculatedActivities = calculateActivitiesAmounts(
+        activities,
+        0, // Hours don't matter for salesmen
+        formData.contextData,
+        locationType
+      );
+
+      setEmployeeActivities((prev) => ({
+        ...prev,
+        [rowKey]: recalculatedActivities,
+      }));
+    } else {
+      // Standard logic for non-salesmen
+      setEmployeeActivities((prev) => ({
+        ...prev,
+        [rowKey]: activities,
+      }));
+    }
 
     toast.success(`Activities updated for ${selectedEmployee.name}`);
   };
@@ -811,12 +1040,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   return (
     <div className="relative w-full mx-4 md:mx-6 -mt-8">
       <BackButton onClick={handleBack} />
-
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
           {mode === "edit"
-            ? "Edit Mee Production Entry"
-            : "New Mee Production Entry"}
+            ? `Edit ${jobConfig?.name} Entry`
+            : `New ${jobConfig?.name} Entry`}
         </h1>
 
         {/* Header Section */}
@@ -855,21 +1083,40 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </div>
           </div>
 
-          {/* Shift - Only Day and Night for Mee Production */}
-          <FormListbox
-            name="shift"
-            label="Shift"
-            value={formData.shift}
-            onChange={(value) => setFormData({ ...formData, shift: value })}
-            options={[
-              { id: "1", name: "Day Shift" },
-              { id: "2", name: "Night Shift" },
-            ]}
-            required
-          />
+          {/* Shift - Hidden for Salesman */}
+          {jobConfig?.id !== "SALESMAN" && (
+            <FormListbox
+              name="shift"
+              label="Shift"
+              value={formData.shift}
+              onChange={(value) => setFormData({ ...formData, shift: value })}
+              options={[
+                { id: "1", name: "Day Shift" },
+                { id: "2", name: "Night Shift" },
+              ]}
+              required
+            />
+          )}
 
-          {/* Context Data */}
+          {/* Show Context Form here only if 3 or fewer fields */}
+          {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
+            <div>
+              <DynamicContextForm
+                contextFields={jobConfig?.contextFields || []}
+                contextData={formData.contextData}
+                onChange={handleContextChange}
+                disabled={isSaving}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Show Context Form below if more than 3 fields */}
+        {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
           <div className="mb-6">
+            <h3 className="text-sm font-medium text-default-700 mb-3">
+              Production Details
+            </h3>
             <DynamicContextForm
               contextFields={jobConfig?.contextFields || []}
               contextData={formData.contextData}
@@ -877,7 +1124,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               disabled={isSaving}
             />
           </div>
-        </div>
+        )}
 
         {/* Employees Section */}
         <div className="border-t border-default-200 pt-4 mt-4">
@@ -937,12 +1184,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         >
                           Job Type
                         </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Hours
-                        </th>
+                        {jobConfig?.id === "SALESMAN" ? (
+                          <th
+                            scope="col"
+                            className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                          >
+                            Location
+                          </th>
+                        ) : (
+                          <th
+                            scope="col"
+                            className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                          >
+                            Hours
+                          </th>
+                        )}
                         <th
                           scope="col"
                           className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
@@ -998,40 +1254,201 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 {row.jobName}
                               </Link>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div className="flex items-center justify-end space-x-2">
-                                {hours > 8 &&
-                                  isSelected &&
-                                  jobConfig?.requiresOvertimeCalc && (
-                                    <span className="text-xs text-amber-600 font-medium">
-                                      OT
-                                    </span>
-                                  )}
-                                <input
-                                  id={`employee-hours-${row.rowKey}`}
-                                  name={`employee-hours-${row.rowKey}`}
-                                  type="number"
-                                  value={isSelected ? hours.toString() : ""}
-                                  onChange={(e) =>
-                                    handleEmployeeHoursChange(
-                                      row.rowKey,
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={() => handleHoursBlur(row.rowKey)}
-                                  className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
-                                    hours > 8 && jobConfig?.requiresOvertimeCalc
-                                      ? "border-amber-400 bg-amber-50"
-                                      : "border-default-300"
-                                  }`}
-                                  step="0.5"
-                                  min="0"
-                                  max="24"
-                                  disabled={!isSelected}
-                                  placeholder={isSelected ? "0" : "-"}
-                                />
-                              </div>
-                            </td>
+                            {jobConfig?.id === "SALESMAN" ? (
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <div className="relative w-40 mx-auto">
+                                  <Listbox
+                                    value={
+                                      locationTypes[row.rowKey || ""] || "Local"
+                                    }
+                                    onChange={(value) =>
+                                      handleLocationTypeChange(
+                                        row.rowKey,
+                                        value as "Local" | "Outstation"
+                                      )
+                                    }
+                                    disabled={!isSelected}
+                                  >
+                                    <div className="relative">
+                                      <ListboxButton
+                                        className={`relative w-full pl-3 py-1.5 text-left rounded-md border ${
+                                          !isSelected
+                                            ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
+                                            : "bg-white text-default-700 border-default-300 cursor-default focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                        }`}
+                                      >
+                                        <span className="flex items-center">
+                                          {locationTypes[row.rowKey || ""] ===
+                                          "Outstation" ? (
+                                            <IconMapPinOff
+                                              size={14}
+                                              className="mr-2 text-amber-500"
+                                            />
+                                          ) : (
+                                            <IconMapPin
+                                              size={14}
+                                              className="mr-2 text-sky-500"
+                                            />
+                                          )}
+                                          <span className="block truncate text-sm">
+                                            {locationTypes[row.rowKey || ""] ||
+                                              "Local"}
+                                          </span>
+                                        </span>
+                                        <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                          <IconChevronDown
+                                            className="w-4 h-4 text-default-400"
+                                            aria-hidden="true"
+                                          />
+                                        </span>
+                                      </ListboxButton>
+                                      <Transition
+                                        as={Fragment}
+                                        leave="transition ease-in duration-100"
+                                        leaveFrom="opacity-100"
+                                        leaveTo="opacity-0"
+                                      >
+                                        <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                          <ListboxOption
+                                            value="Local"
+                                            className={({ active }) =>
+                                              `${
+                                                active
+                                                  ? "bg-sky-100 text-sky-900"
+                                                  : "text-default-700"
+                                              } cursor-default select-none relative py-1.5 pl-3 pr-8`
+                                            }
+                                          >
+                                            {({ selected, active }) => (
+                                              <>
+                                                <div className="flex items-center">
+                                                  <IconMapPin
+                                                    size={14}
+                                                    className={`mr-2 ${
+                                                      active
+                                                        ? "text-sky-600"
+                                                        : "text-sky-500"
+                                                    }`}
+                                                  />
+                                                  <span
+                                                    className={`${
+                                                      selected
+                                                        ? "font-medium"
+                                                        : "font-normal"
+                                                    } block truncate`}
+                                                  >
+                                                    Local
+                                                  </span>
+                                                </div>
+                                                {selected ? (
+                                                  <span
+                                                    className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                      active
+                                                        ? "text-sky-600"
+                                                        : "text-sky-500"
+                                                    }`}
+                                                  >
+                                                    <IconCheck
+                                                      className="w-4 h-4"
+                                                      aria-hidden="true"
+                                                    />
+                                                  </span>
+                                                ) : null}
+                                              </>
+                                            )}
+                                          </ListboxOption>
+                                          <ListboxOption
+                                            value="Outstation"
+                                            className={({ active }) =>
+                                              `${
+                                                active
+                                                  ? "bg-amber-100 text-amber-900"
+                                                  : "text-default-700"
+                                              } cursor-default select-none relative py-1.5 pl-3 pr-8`
+                                            }
+                                          >
+                                            {({ selected, active }) => (
+                                              <>
+                                                <div className="flex items-center">
+                                                  <IconMapPinOff
+                                                    size={14}
+                                                    className={`mr-2 ${
+                                                      active
+                                                        ? "text-amber-600"
+                                                        : "text-amber-500"
+                                                    }`}
+                                                  />
+                                                  <span
+                                                    className={`${
+                                                      selected
+                                                        ? "font-medium"
+                                                        : "font-normal"
+                                                    } block truncate`}
+                                                  >
+                                                    Outstation
+                                                  </span>
+                                                </div>
+                                                {selected ? (
+                                                  <span
+                                                    className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                      active
+                                                        ? "text-amber-600"
+                                                        : "text-amber-500"
+                                                    }`}
+                                                  >
+                                                    <IconCheck
+                                                      className="w-4 h-4"
+                                                      aria-hidden="true"
+                                                    />
+                                                  </span>
+                                                ) : null}
+                                              </>
+                                            )}
+                                          </ListboxOption>
+                                        </ListboxOptions>
+                                      </Transition>
+                                    </div>
+                                  </Listbox>
+                                </div>
+                              </td>
+                            ) : (
+                              // Existing hours input cell
+                              <td className="px-6 py-4 whitespace-nowrap text-right">
+                                <div className="flex items-center justify-end space-x-2">
+                                  {hours > 8 &&
+                                    isSelected &&
+                                    jobConfig?.requiresOvertimeCalc && (
+                                      <span className="text-xs text-amber-600 font-medium">
+                                        OT
+                                      </span>
+                                    )}
+                                  <input
+                                    id={`employee-hours-${row.rowKey}`}
+                                    name={`employee-hours-${row.rowKey}`}
+                                    type="number"
+                                    value={isSelected ? hours.toString() : ""}
+                                    onChange={(e) =>
+                                      handleEmployeeHoursChange(
+                                        row.rowKey,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={() => handleHoursBlur(row.rowKey)}
+                                    className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
+                                      hours > 8 &&
+                                      jobConfig?.requiresOvertimeCalc
+                                        ? "border-amber-400 bg-amber-50"
+                                        : "border-default-300"
+                                    }`}
+                                    step="0.5"
+                                    min="0"
+                                    max="24"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                </div>
+                              </td>
+                            )}
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(
@@ -1092,8 +1509,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         dayType={formData.dayType}
         onActivitiesUpdated={handleActivitiesUpdated}
         existingActivities={employeeActivities[selectedEmployee?.rowKey || ""]}
-        contextLinkedPayCodes={contextLinkedPayCodes} // Pass context info
-        contextData={formData.contextData} // Pass current context values
+        contextLinkedPayCodes={contextLinkedPayCodes}
+        contextData={formData.contextData}
+        salesmanProducts={
+          selectedEmployee && selectedEmployee.rowKey
+            ? salesmanProducts[selectedEmployee.rowKey] || []
+            : []
+        }
+        locationType={
+          selectedEmployee && selectedEmployee.rowKey
+            ? locationTypes[selectedEmployee.rowKey] || "Local"
+            : "Local"
+        }
       />
     </div>
   );

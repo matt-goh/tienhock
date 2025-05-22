@@ -35,9 +35,10 @@ export const GreenTargetSidebarData: SidebarItem[] = [
     component: GreenTargetRentalListPage,
     subItems: [
       {
-        name: "New Rental",
+        name: "Create Rental",
         path: "/rentals/new",
         component: GreenTargetRentalFormPage,
+        showInPopover: true,
       },
       {
         name: "Edit Rental",
@@ -58,9 +59,10 @@ export const GreenTargetSidebarData: SidebarItem[] = [
     component: GreenTargetInvoiceListPage,
     subItems: [
       {
-        name: "New Invoice",
+        name: "Create Invoice",
         path: "/invoices/new",
         component: GreenTargetInvoiceFormPage,
+        showInPopover: true,
       },
       {
         name: "Edit Invoice",
@@ -90,6 +92,7 @@ export const GreenTargetSidebarData: SidebarItem[] = [
         name: "Add Customer",
         path: "/customers/new",
         component: GreenTargetCustomerFormPage,
+        showInPopover: true,
       },
       {
         name: "Edit Customer",
@@ -108,6 +111,7 @@ export const GreenTargetSidebarData: SidebarItem[] = [
         name: "Add Dumpster",
         path: "/dumpsters/new",
         component: GreenTargetDumpsterFormPage,
+        showInPopover: true,
       },
       {
         name: "Edit Dumpster",

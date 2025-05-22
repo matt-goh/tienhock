@@ -1,7 +1,7 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
 import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { EmployeePayroll } from "../../types/types";
+import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
 // Create styles
@@ -43,13 +43,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   payslipTitle: {
-    fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 10,
-    textAlign: "center",
-    backgroundColor: "#f0f0f0",
-    padding: 8,
-    borderRadius: 4,
+    marginBottom: 4,
   },
   table: {
     display: "flex",
@@ -62,17 +57,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     backgroundColor: "#f0f0f0",
-    minHeight: 20,
+    paddingVertical: 3,
     alignItems: "center",
   },
   tableRow: {
     flexDirection: "row",
-    minHeight: 16,
-  },
-  firstTableRow: {
-    flexDirection: "row",
-    minHeight: 16,
-    paddingTop: 2, // Add top padding for first row
   },
   tableColHeader: {
     borderRightWidth: 1,
@@ -83,6 +72,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#000",
     paddingHorizontal: 5,
+    paddingTop: 3,
     fontSize: 8,
   },
   descriptionCol: {
@@ -100,40 +90,42 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-  paymentsSection: {
-    marginTop: 10,
+  subtotalRow: {
+    backgroundColor: "#f8f9fa", // Very light gray background
+    borderTopWidth: 0.5,
+    borderTopColor: "#000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
   },
-  deductionsRow: {
-    flexDirection: "row",
+  jumlahGajiKasarRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+  jumlahGajiBersihRow: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+  jumlahRow: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#000",
+  },
+  grandTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#000",
+    backgroundColor: "#f8f9fa", // Very light gray background
+  },
+  totalText: {
+    fontFamily: "Helvetica-Bold",
+  },
+  notesSection: {
     marginTop: 3,
-  },
-  deductionLabel: {
-    width: "30%",
-    fontSize: 9,
-  },
-  deductionValue: {
-    width: "15%",
-    fontSize: 9,
-    textAlign: "right",
-  },
-  deductionDesc: {
-    width: "40%",
-    fontSize: 9,
-    paddingLeft: 10,
-  },
-  deductionAmount: {
-    width: "15%",
-    fontSize: 9,
-    textAlign: "right",
-  },
-  bracketText: {
-    textAlign: "right",
-  },
-  finalSection: {
-    marginTop: 15,
+    fontSize: 8,
+    fontFamily: "Helvetica-Oblique",
   },
   signatureSection: {
-    marginTop: 40,
+    marginTop: 50,
     flexDirection: "row",
   },
   signatureBlock: {
@@ -144,28 +136,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "#000",
     width: "80%",
     marginBottom: 5,
-  },
-  signatureLabel: {
-    fontSize: 8,
-    textAlign: "center",
-    width: "80%",
-  },
-  notesSection: {
-    marginTop: 20,
-    fontSize: 8,
-    fontStyle: "italic",
-  },
-  summaryCol: {
-    textAlign: "right",
-    paddingVertical: 3,
-    fontSize: 9,
-    fontWeight: "bold",
-  },
-  footnote: {
-    marginTop: 20,
-    fontSize: 8,
-    textAlign: "center",
-    fontStyle: "italic",
   },
 });
 
@@ -178,36 +148,89 @@ interface PaySlipPDFProps {
     jobName: string;
     section: string;
   };
+  midMonthPayroll?: MidMonthPayroll | null;
 }
 
 const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   payroll,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   staffDetails,
+  midMonthPayroll,
 }) => {
   const groupedItems = groupItemsByType(payroll.items || []);
   const year = payroll.year ?? new Date().getFullYear();
   const month = payroll.month ?? new Date().getMonth() + 1;
   const monthName = getMonthName(month);
 
-  // Calculate total deductions (for demo purposes - you'll need to add real deductions)
-  const epfAmount = (payroll.gross_pay * 0.11).toFixed(2);
-  const socsoAmount = (payroll.gross_pay * 0.005).toFixed(2);
-  const sipAmount = (payroll.gross_pay * 0.002).toFixed(2);
+  // Helper function to group items by hours and maintain order
+  const groupItemsByHours = (items: any[]) => {
+    const groupsArray: { hours: number; items: any[] }[] = [];
+    const groupsMap = new Map<number, any[]>();
 
-  // Calculate total deductions
-  const totalDeductions =
-    parseFloat(epfAmount) + parseFloat(socsoAmount) + parseFloat(sipAmount);
+    // First pass: group items by hours
+    items.forEach((item) => {
+      const hours = item.quantity;
+      if (!groupsMap.has(hours)) {
+        groupsMap.set(hours, []);
+      }
+      groupsMap.get(hours)!.push(item);
+    });
 
-  // First payment (mid-month) - for demo purposes, set to 500
-  const firstPayment = 500;
+    // Convert to array format maintaining the order of first appearance
+    items.forEach((item) => {
+      const hours = item.quantity;
+      if (!groupsArray.some((group) => group.hours === hours)) {
+        groupsArray.push({
+          hours,
+          items: groupsMap.get(hours)!,
+        });
+      }
+    });
+
+    return groupsArray;
+  };
+
+  // Group base items by hours
+  const baseGroupedByHours = groupItemsByHours(groupedItems.Base);
+  const baseTotalAmount = groupedItems.Base.reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+  const baseTotalRates = groupedItems.Base.reduce(
+    (sum, item) => sum + item.rate,
+    0
+  );
+
+  const tambahanTotalAmount = groupedItems["Tambahan"].reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+
+  // Group additional items by hours
+  const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
+  const overtimeTotalAmount = groupedItems.Overtime.reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+
+  // Find the hour group with the maximum hours (latest/most hours)
+  const maxHoursGroup = baseGroupedByHours.reduce((maxGroup, currentGroup) => {
+    return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
+  }, baseGroupedByHours[0]);
+
+  // Calculate rate using the maximum hours group
+  const averageBaseRate =
+    maxHoursGroup && maxHoursGroup.hours > 0
+      ? baseTotalAmount / maxHoursGroup.hours
+      : 0;
+
+  const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
 
   // Final payment
-  const finalPayment = payroll.net_pay - firstPayment;
-  const roundedFinalPayment = Math.round(finalPayment * 100) / 100; // Round to 2 decimal places
-
-  // Track if we've already shown "JAM" for hour-based pay codes
-  let hasShownJamLabel = false;
+  const finalPayment = payroll.net_pay - midMonthPayment;
+  // Round final payment to whole number if and only if it ends with .95 or above
+  const roundedFinalPayment =
+    finalPayment % 1 >= 0.95 ? Math.ceil(finalPayment) : finalPayment;
 
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
@@ -221,21 +244,23 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const formatDescription = (item: any) => {
     switch (item.rate_unit) {
       case "Hour":
-        if (!hasShownJamLabel) {
-          hasShownJamLabel = true;
-          return `${item.quantity.toFixed(2)} Jam`;
-        }
-        return item.quantity.toFixed(2);
+        return `${item.quantity.toFixed(0)} Hour${
+          item.quantity > 1 ? "s" : ""
+        }`;
       case "Bag":
-        return `${item.quantity.toFixed(0)} Bags`;
+        return `${item.quantity.toFixed(0)} Bag${item.quantity > 1 ? "s" : ""}`;
       case "Trip":
         return `${item.quantity.toFixed(0)} Trip${
           item.quantity > 1 ? "s" : ""
         }`;
       case "Day":
-        return `${item.quantity.toFixed(0)} DAY${item.quantity > 1 ? "s" : ""}`;
+        return `${item.quantity.toFixed(0)} Day${item.quantity > 1 ? "s" : ""}`;
+      case "Percent":
+        return `${item.quantity.toFixed(0)} Unit${
+          item.quantity > 1 ? "s" : ""
+        }`;
       case "Fixed":
-        return monthName; // Display the month for fixed rates
+        return monthName;
       default:
         return "";
     }
@@ -291,7 +316,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {/* Table Header */}
         <View style={styles.tableHeaderRow}>
           <View style={[styles.tableColHeader, styles.descriptionCol]}>
-            <Text>Pay Code</Text>
+            <Text>Kerja</Text>
           </View>
           <View style={[styles.tableColHeader, styles.rateCol]}>
             <Text>Rate</Text>
@@ -310,83 +335,55 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </View>
         </View>
 
-        {/* Base Pay Items */}
-        {groupedItems.Base.map((item, index) => (
-          <View
-            key={`base-${index}`}
-            style={index === 0 ? styles.firstTableRow : styles.tableRow}
-          >
-            <View style={[styles.tableCol, styles.descriptionCol]}>
-              <View style={{ height: 12, overflow: "hidden" }}>
-                <Text>{item.description}</Text>
-              </View>
-            </View>
-            <View style={[styles.tableCol, styles.rateCol]}>
-              <Text>{item.rate.toFixed(2)}</Text>
-            </View>
-            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{formatDescription(item)}</Text>
-            </View>
+        {/* Base Pay Items - Grouped by hours */}
+        {baseGroupedByHours.map((group, groupIndex) =>
+          group.items.map((item, itemIndex) => (
             <View
-              style={[
-                styles.tableCol,
-                styles.amountCol,
-                { borderRightWidth: 0 },
-              ]}
+              key={`base-${group.hours}-${itemIndex}`}
+              style={styles.tableRow}
             >
-              <Text>{formatCurrency(item.amount)}</Text>
-            </View>
-          </View>
-        ))}
-
-        {/* Tambahan Pay Items */}
-        {groupedItems.Tambahan.map((item, index) => (
-          <View
-            key={`tambahan-${index}`}
-            style={styles.tableRow}
-          >
-            <View style={[styles.tableCol, styles.descriptionCol]}>
-              <View style={{ height: 12, overflow: "hidden" }}>
-                <Text>{item.description}</Text>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <View style={{ height: 12, overflow: "hidden" }}>
+                  <Text>{item.description}</Text>
+                </View>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text>
+                  {item.rate_unit === "Percent"
+                    ? `${item.rate}%`
+                    : item.rate.toFixed(2)}
+                </Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text>{itemIndex === 0 ? `${group.hours} Jam` : ""}</Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>{formatCurrency(item.amount)}</Text>
               </View>
             </View>
-            <View style={[styles.tableCol, styles.rateCol]}>
-              <Text>{item.rate.toFixed(2)}</Text>
-            </View>
-            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>{item.is_manual ? "MANUAL" : formatDescription(item)}</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                styles.amountCol,
-                { borderRightWidth: 0 },
-              ]}
-            >
-              <Text>{formatCurrency(item.amount)}</Text>
-            </View>
-          </View>
-        ))}
+          ))
+        )}
 
-        {/* Overtime Pay Items */}
-        {groupedItems.Overtime.map((item, index) => (
-          <View
-            key={`ot-${index}`}
-            style={styles.tableRow}
-          >
+        {/* Base Pay Subtotal Row */}
+        {groupedItems.Base.length > 0 && (
+          <View style={[styles.tableRow, styles.subtotalRow]}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
-              <View style={{ height: 12, overflow: "hidden" }}>
-                <Text>{item.description}</Text>
-              </View>
+              <Text></Text>
             </View>
             <View style={[styles.tableCol, styles.rateCol]}>
-              <Text>{item.rate.toFixed(2)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                {baseTotalRates.toFixed(2)}
+              </Text>
             </View>
             <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-              <Text>
-                {item.rate_unit === "Hour"
-                  ? formatDescription(item) + " Jam OT"
-                  : formatDescription(item)}
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                Rate/Jam : {averageBaseRate.toFixed(2)}
               </Text>
             </View>
             <View
@@ -396,158 +393,342 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 { borderRightWidth: 0 },
               ]}
             >
-              <Text>{formatCurrency(item.amount)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                {formatCurrency(baseTotalAmount)}
+              </Text>
             </View>
           </View>
-        ))}
-      </View>
+        )}
 
-      {/* Deductions Section */}
-      <View style={styles.paymentsSection}>
-        <View style={styles.deductionsRow}>
-          <Text style={styles.deductionLabel}>EPF (MAJIKAN)</Text>
-          <Text style={styles.deductionValue}>
-            {parseFloat(epfAmount).toFixed(2)}
-          </Text>
-          <Text style={styles.deductionDesc}>EPF (PEKERJA)</Text>
-          <Text style={styles.deductionAmount}>
-            (
-            <Text style={styles.bracketText}>
-              {parseFloat(epfAmount).toFixed(2)}
+        {/* Tambahan Pay Items */}
+        {groupedItems["Tambahan"].length > 0 && (
+          <>
+            {/* Tambahan Items */}
+            {groupedItems["Tambahan"].map((item, index) => (
+              <View key={`tambahan-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{item.description}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text>
+                    {item.rate_unit === "Percent"
+                      ? `${item.rate}%`
+                      : item.rate.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>{formatDescription(item)}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(item.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Tambahan Subtotal Row */}
+            <View style={[styles.tableRow, styles.subtotalRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {formatCurrency(tambahanTotalAmount)}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Overtime Pay Items */}
+        {groupedItems.Overtime.length > 0 && (
+          <>
+            {/* Overtime Items - Grouped by hours */}
+            {overtimeGroupedByHours.map((group, groupIndex) =>
+              group.items.map((item, itemIndex) => (
+                <View
+                  key={`overtime-${group.hours}-${itemIndex}`}
+                  style={styles.tableRow}
+                >
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <View style={{ height: 12, overflow: "hidden" }}>
+                      <Text>{item.description}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>
+                      {item.rate_unit === "Percent"
+                        ? `${item.rate}%`
+                        : item.rate.toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>
+                      {itemIndex === 0 ? `${group.hours} Jam OT` : ""}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>{formatCurrency(item.amount)}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* Overtime Subtotal Row */}
+            {groupedItems.Overtime.length > 0 && (
+              <View style={[styles.tableRow, styles.subtotalRow]}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {groupedItems.Overtime.reduce(
+                      (sum, item) => sum + item.rate,
+                      0
+                    ).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {formatCurrency(overtimeTotalAmount)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Jumlah Gaji Kasar Row */}
+        <View style={[styles.tableRow, styles.jumlahGajiKasarRow]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.rateCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>Jumlah Gaji Kasar</Text>
+          </View>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>
+              {formatCurrency(payroll.gross_pay)}
             </Text>
-            )
-          </Text>
+          </View>
         </View>
 
-        <View style={styles.deductionsRow}>
-          <Text style={styles.deductionLabel}>SOCSO (MAJIKAN)</Text>
-          <Text style={styles.deductionValue}>
-            {parseFloat(socsoAmount).toFixed(2)}
-          </Text>
-          <Text style={styles.deductionDesc}>SOCSO (PEKERJA)</Text>
-          <Text style={styles.deductionAmount}>
-            (
-            <Text style={styles.bracketText}>
-              {parseFloat(socsoAmount).toFixed(2)}
+        {/* Deductions Rows */}
+        {payroll.deductions && payroll.deductions.length > 0 && (
+          <>
+            {/* EPF Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type.toUpperCase() === "EPF")
+              .map((deduction, index) => (
+                <View key="deduction-epf" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>EPF (Majikan)</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{deduction.employer_amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>EPF (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
+
+            {/* SOCSO Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type.toUpperCase() === "SOCSO")
+              .map((deduction, index) => (
+                <View key="deduction-socso" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>SOCSO (Majikan)</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{deduction.employer_amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>SOCSO (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
+
+            {/* SIP Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type.toUpperCase() === "SIP")
+              .map((deduction, index) => (
+                <View key="deduction-sip" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>SIP (Majikan)</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>{deduction.employer_amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>SIP (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
+          </>
+        )}
+
+        {/* Jumlah Gaji Bersih Row */}
+        <View
+          style={[
+            styles.tableRow,
+            styles.jumlahGajiBersihRow,
+            !midMonthPayroll ? { borderBottomWidth: 0 } : {},
+          ]}
+        >
+          <View style={[styles.tableCol, styles.descriptionCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.rateCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>Jumlah Gaji Bersih</Text>
+          </View>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>
+              {formatCurrency(payroll.net_pay)}
             </Text>
-            )
-          </Text>
+          </View>
         </View>
 
-        <View style={styles.deductionsRow}>
-          <Text style={styles.deductionLabel}>SIP (MAJIKAN)</Text>
-          <Text style={styles.deductionValue}>
-            {parseFloat(sipAmount).toFixed(2)}
-          </Text>
-          <Text style={styles.deductionDesc}>SIP (PEKERJA)</Text>
-          <Text style={styles.deductionAmount}>
-            (
-            <Text style={styles.bracketText}>
-              {parseFloat(sipAmount).toFixed(2)}
+        {/* Mid Month Payment Deduction - Only show if mid-month payment exists */}
+        {midMonthPayroll && (
+          <>
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text>
+                  Bayaran Pertama (1) Gaji Pertengahan Bulan (
+                  {midMonthPayroll.payment_method})
+                </Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text></Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>({formatCurrency(midMonthPayment)})</Text>
+              </View>
+            </View>
+            <View style={[styles.tableRow, styles.jumlahRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text style={styles.totalText}>Jumlah</Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text style={styles.totalText}>
+                  {formatCurrency(finalPayment)}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Final Rounded Amount Row */}
+        <View style={[styles.tableRow, styles.grandTotalRow]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.rateCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>Jumlah Digenapkan</Text>
+          </View>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>
+              {formatCurrency(roundedFinalPayment)}
             </Text>
-            )
-          </Text>
-        </View>
-
-        {/* Net Pay */}
-        <View style={[styles.deductionsRow, { marginTop: 8 }]}>
-          <Text style={[styles.deductionLabel, { fontWeight: "bold" }]}></Text>
-          <Text style={styles.deductionValue}></Text>
-          <Text style={[styles.deductionDesc, { fontWeight: "bold" }]}>
-            JUMLAH GAJI BERSIH=
-          </Text>
-          <Text style={[styles.deductionAmount, { fontWeight: "bold" }]}>
-            {formatCurrency(payroll.net_pay)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Payment Schedule Section */}
-      <View style={styles.finalSection}>
-        <View style={styles.table}>
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text>GAJI</Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-          </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5 }]}>
-              <Text>BAYARAN PERTAMA (1) GAJI PERTENGAHAN BULAN =</Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
-              <Text>({formatCurrency(firstPayment)})</Text>
-            </View>
-          </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5 }]}>
-              <Text>BAYARAN PERTAMA (1) KE 2 PERTENGAHAN BULAN =</Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
-              <Text>({formatCurrency(0)})</Text>
-            </View>
-          </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5, fontWeight: "bold" }]}>
-              <Text>JUMLAH -</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                { flex: 1.5, borderRightWidth: 0, fontWeight: "bold" },
-              ]}
-            >
-              <Text>{formatCurrency(roundedFinalPayment)}</Text>
-            </View>
-          </View>
-
-          <View style={styles.tableRow}>
-            <View style={[styles.tableCol, { flex: 3, borderRightWidth: 0 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 1 }]}>
-              <Text></Text>
-            </View>
-            <View style={[styles.tableCol, { flex: 2.5, fontWeight: "bold" }]}>
-              <Text>JUMLAH DIGENAPKAN =</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCol,
-                { flex: 1.5, borderRightWidth: 0, fontWeight: "bold" },
-              ]}
-            >
-              <Text>{formatCurrency(Math.round(roundedFinalPayment))}</Text>
-            </View>
           </View>
         </View>
       </View>
@@ -563,15 +744,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
       <View style={styles.signatureSection}>
         <View style={styles.signatureBlock}></View>
         <View style={styles.signatureBlock}>
-          <Text style={{ textAlign: "right", marginRight: 10 }}>
-            RECEIVED BY
-          </Text>
-          <View
-            style={[
-              styles.signatureLine,
-              { marginLeft: "auto", marginRight: 10 },
-            ]}
-          ></View>
+          <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
+          <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
         </View>
       </View>
     </Page>

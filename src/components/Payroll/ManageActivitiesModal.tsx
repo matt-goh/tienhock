@@ -11,9 +11,14 @@ import Button from "../Button";
 import { Employee } from "../../types/types";
 import Checkbox from "../Checkbox";
 import LoadingSpinner from "../LoadingSpinner";
-import { ContextField } from "../../configs/payrollJobConfigs";
+import { ContextField, getJobConfig } from "../../configs/payrollJobConfigs";
 import ContextLinkedBadge from "./ContextLinkedBadge";
-import { IconBriefcase, IconLink, IconUser } from "@tabler/icons-react";
+import {
+  IconBriefcase,
+  IconLink,
+  IconUser,
+  IconPackage,
+} from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
 
@@ -43,6 +48,8 @@ interface ManageActivitiesModalProps {
   existingActivities?: ActivityItem[];
   contextLinkedPayCodes?: Record<string, ContextField>;
   contextData?: Record<string, any>;
+  salesmanProducts?: any[]; // Products sold by this salesman
+  locationType?: "Local" | "Outstation"; // Location type for salesman
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -57,6 +64,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   existingActivities = [],
   contextLinkedPayCodes = {},
   contextData = {},
+  salesmanProducts = [],
+  locationType = "Local",
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -66,33 +75,61 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     []
   );
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const isSalesman = jobType === "SALESMAN";
+  const jobConfig = getJobConfig(jobType);
 
-  // When initializing activities, handle context-linked pay codes
   useEffect(() => {
     if (isOpen && employee) {
       if (existingActivities && existingActivities.length > 0) {
-        // Check for context-linked pay codes and update their units
-        const activitiesWithContext = existingActivities.map((activity) => {
+        // First, make a deep copy of existing activities to avoid mutation issues
+        const activitiesWithContext = JSON.parse(
+          JSON.stringify(existingActivities)
+        );
+
+        // Process each activity
+        for (let i = 0; i < activitiesWithContext.length; i++) {
+          const activity = activitiesWithContext[i];
+
+          // For salesman, deselect Hour-based pay codes
+          if (isSalesman && activity.rateUnit === "Hour") {
+            activity.isSelected = false;
+            activity.calculatedAmount = 0;
+            continue; // Skip to next activity
+          }
+
+          // Process product-linked activities for salesmen
+          if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
+            // Find a matching product by ID
+            const matchingProduct = salesmanProducts.find(
+              (p) => String(p.product_id) === String(activity.payCodeId)
+            );
+
+            if (matchingProduct) {
+              const quantity = parseFloat(matchingProduct.quantity) || 0;
+              if (quantity > 0) {
+                activity.unitsProduced = quantity;
+                activity.isSelected = true;
+              }
+            }
+          }
+
+          // Handle context-linked fields
           const contextField = contextLinkedPayCodes[activity.payCodeId];
           if (contextField && contextData[contextField.id] !== undefined) {
-            return {
-              ...activity,
-              unitsProduced: contextData[contextField.id],
-              isContextLinked: true,
-            };
+            activity.unitsProduced = contextData[contextField.id];
+            activity.isContextLinked = true;
           }
-          return activity;
-        });
+        }
 
-        // Use our centralized calculation function instead
+        // Recalculate all amounts
         const calculatedActivities = calculateActivitiesAmounts(
           activitiesWithContext,
-          employeeHours,
-          contextData
+          isSalesman ? 0 : employeeHours,
+          contextData,
+          locationType
         );
 
         setActivities(calculatedActivities);
-        // Store original state for cancellation
         setOriginalActivities(JSON.parse(JSON.stringify(calculatedActivities)));
       } else {
         setActivities([]);
@@ -103,11 +140,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   }, [
     isOpen,
     employee?.id,
-    employee?.jobType,
     existingActivities,
     contextLinkedPayCodes,
     contextData,
     employeeHours,
+    isSalesman,
+    locationType,
+    jobConfig,
+    salesmanProducts,
   ]);
 
   useEffect(() => {
@@ -150,10 +190,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     const newActivities = [...activities];
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
 
-    // Recalculate amounts after changing units
+    // Use the centralized calculation function
     const updatedActivities = calculateActivitiesAmounts(
       newActivities,
-      employeeHours
+      isSalesman ? 0 : employeeHours, // Use 0 hours for salesmen
+      contextData,
+      locationType
     );
     setActivities(updatedActivities);
   };
@@ -220,14 +262,24 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       <p className="text-sm text-gray-500">Job</p>
                       <Link
                         to={`/catalogue/job?id=${jobType}`}
-                        className="hover:underline hover:text-sky-600"
+                        className="font-medium hover:underline hover:text-sky-600"
                       >
                         {jobName}
                       </Link>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Hours</p>
-                      <p className="font-medium">{employeeHours} hours</p>
+                      <p className="text-sm text-gray-500">
+                        {isSalesman && locationType ? "Location" : "Hours"}
+                      </p>
+                      <p className="font-medium">
+                        {isSalesman && locationType ? (
+                          <span className="flex items-center">
+                            {locationType}
+                          </span>
+                        ) : (
+                          `${employeeHours} hours`
+                        )}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Day Type</p>
@@ -446,6 +498,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                       Job
                                                     </span>
                                                   )}
+                                                  {isSalesman &&
+                                                    salesmanProducts.find(
+                                                      (p) =>
+                                                        String(p.product_id) ===
+                                                        String(
+                                                          activity.payCodeId
+                                                        )
+                                                    ) && (
+                                                      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                                        <IconPackage
+                                                          size={10}
+                                                          className="mr-0.5"
+                                                        />
+                                                        Product
+                                                      </span>
+                                                    )}
                                                 </span>
                                                 <div className="text-xs text-gray-500">
                                                   {activity.payType} •{" "}
@@ -510,36 +578,69 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 "Percent" &&
                                                 activity.isContextLinked) ? (
                                                 <div className="relative">
-                                                  <input
-                                                    type="number"
-                                                    className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
-                                                      activity.isContextLinked
-                                                        ? "bg-gray-100 cursor-not-allowed"
-                                                        : "disabled:bg-gray-100"
-                                                    }`}
-                                                    value={
-                                                      activity.unitsProduced?.toString() ||
-                                                      "0"
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleUnitsChange(
-                                                        originalIndex,
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    onClick={(e) =>
-                                                      e.stopPropagation()
-                                                    }
-                                                    disabled={
-                                                      !activity.isSelected ||
-                                                      activity.isContextLinked
-                                                    }
-                                                    min="0"
-                                                    step="1"
-                                                    readOnly={
-                                                      activity.isContextLinked
-                                                    }
-                                                  />
+                                                  {/* For salesmen with products, show product units */}
+                                                  {isSalesman &&
+                                                  activity.rateUnit ===
+                                                    jobConfig?.replaceUnits ? (
+                                                    <input
+                                                      type="number"
+                                                      className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                        !activity.isSelected
+                                                          ? "bg-gray-100 cursor-not-allowed"
+                                                          : ""
+                                                      }`}
+                                                      value={
+                                                        activity.unitsProduced?.toString() ||
+                                                        "0"
+                                                      }
+                                                      onChange={(e) =>
+                                                        handleUnitsChange(
+                                                          originalIndex,
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                      disabled={
+                                                        !activity.isSelected
+                                                      }
+                                                      min="0"
+                                                      step="1"
+                                                    />
+                                                  ) : (
+                                                    /* Standard input for non-salesman units */
+                                                    <input
+                                                      type="number"
+                                                      className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                        activity.isContextLinked
+                                                          ? "bg-gray-100 cursor-not-allowed"
+                                                          : "disabled:bg-gray-100"
+                                                      }`}
+                                                      value={
+                                                        activity.unitsProduced?.toString() ||
+                                                        "0"
+                                                      }
+                                                      onChange={(e) =>
+                                                        handleUnitsChange(
+                                                          originalIndex,
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                      disabled={
+                                                        !activity.isSelected ||
+                                                        activity.isContextLinked
+                                                      }
+                                                      min="0"
+                                                      step="1"
+                                                      readOnly={
+                                                        activity.isContextLinked
+                                                      }
+                                                    />
+                                                  )}
                                                   {activity.isContextLinked && (
                                                     <span className="absolute -right-5 top-1/2 -translate-y-1/2">
                                                       <IconLink

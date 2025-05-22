@@ -1,6 +1,6 @@
 // src/components/Payroll/PaySlipPreview.tsx
 import React from "react";
-import { EmployeePayroll } from "../../types/types";
+import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import {
   groupItemsByType,
   getMonthName,
@@ -11,6 +11,7 @@ interface PaySlipPreviewProps {
   companyName?: string;
   showPrintHeader?: boolean;
   className?: string;
+  midMonthPayroll?: MidMonthPayroll | null;
 }
 
 const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
@@ -18,6 +19,7 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   showPrintHeader = true,
   className = "",
+  midMonthPayroll,
 }) => {
   const groupedItems = groupItemsByType(
     payroll.items.map((item) => ({
@@ -225,7 +227,7 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
         </div>
 
         {/* Summary */}
-        <div className="mt-8 border-t border-default-200 pt-4">
+        <div className="border-t border-default-200">
           <div className="flex justify-between py-2">
             <span className="font-medium">Gross Pay:</span>
             <span className="font-medium">
@@ -233,12 +235,76 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
             </span>
           </div>
 
-          {/* In the future, we could add deductions here */}
+          {/* Deductions Section */}
+          {payroll.deductions && payroll.deductions.length > 0 && (
+            <div className="border-t border-default-200 pt-2">
+              <h3 className="font-medium text-default-800 mb-3">Deductions</h3>
+              <div className="space-y-3">
+                {payroll.deductions.map((deduction, index) => {
+                  const deductionName = deduction.deduction_type.toUpperCase();
+                  return (
+                    <div key={index} className="grid grid-cols-2 gap-8">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-default-600">
+                          {deductionName} (Employer):
+                        </span>
+                        <span className="text-sm font-medium">
+                          {formatCurrency(deduction.employer_amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-default-600">
+                          {deductionName} (Employee):
+                        </span>
+                        <span className="text-sm font-medium text-rose-600">
+                          -{formatCurrency(deduction.employee_amount)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="border-t border-default-200 pt-2 mt-3">
+                  <div className="flex justify-between font-medium">
+                    <span className="text-default-700">
+                      Total Employee Deductions:
+                    </span>
+                    <span className="text-rose-600">
+                      -
+                      {formatCurrency(
+                        payroll.deductions.reduce(
+                          (sum, deduction) => sum + deduction.employee_amount,
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mid-Month Payment Section */}
+          {midMonthPayroll && (
+            <div className="border-t border-default-200 pt-2 mt-2">
+              <div className="flex justify-between py-2">
+                <span className="text-default-600">
+                  Mid-Month Payment ({midMonthPayroll.payment_method}):
+                </span>
+                <span className="font-medium text-rose-600">
+                  -{formatCurrency(midMonthPayroll.amount)}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-between py-2 border-t border-default-200 mt-2">
             <span className="font-medium">Net Pay:</span>
             <span className="font-medium">
-              {formatCurrency(payroll.net_pay)}
+              {formatCurrency(
+                midMonthPayroll
+                  ? payroll.net_pay - midMonthPayroll.amount
+                  : payroll.net_pay
+              )}
             </span>
           </div>
         </div>

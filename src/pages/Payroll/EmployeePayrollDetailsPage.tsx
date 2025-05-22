@@ -1,7 +1,7 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { IconPrinter, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -18,7 +18,14 @@ import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import PaySlipPreview from "../../components/Payroll/PaySlipPreview";
 import Tab from "../../components/Tab";
 import { EmployeePayroll } from "../../types/types";
-import { DownloadPayslipButton, PrintPayslipButton } from "../../utils/payroll/PayslipButtons";
+import {
+  DownloadPayslipButton,
+  PrintPayslipButton,
+} from "../../utils/payroll/PayslipButtons";
+import {
+  getMidMonthPayrollByEmployee,
+  MidMonthPayroll,
+} from "../../utils/payroll/midMonthPayrollUtils";
 
 interface PayrollItem {
   id: number;
@@ -42,6 +49,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<PayrollItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [midMonthPayroll, setMidMonthPayroll] =
+    useState<MidMonthPayroll | null>(null);
 
   useEffect(() => {
     fetchEmployeePayroll();
@@ -54,6 +63,21 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     try {
       const response = await getEmployeePayrollDetails(Number(id));
       setPayroll(response);
+
+      // Fetch mid-month payroll if payroll data exists
+      if (response && response.employee_id && response.year && response.month) {
+        try {
+          const midMonthResponse = await getMidMonthPayrollByEmployee(
+            response.employee_id,
+            response.year,
+            response.month
+          );
+          setMidMonthPayroll(midMonthResponse);
+        } catch (error) {
+          // It's okay if no mid-month payroll exists
+          setMidMonthPayroll(null);
+        }
+      }
     } catch (error) {
       console.error("Error fetching employee payroll:", error);
       toast.error("Failed to load employee payroll details");
@@ -136,22 +160,27 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {getMonthName(payroll.month)} {payroll.year}
             </p>
           </div>
-          <div className="flex space-x-3 mt-4 md:mt-0">
+          <div className="flex flex-wrap gap-3 mt-4 md:mt-0 w-full md:w-auto">
             <DownloadPayslipButton
               payroll={payroll}
+              midMonthPayroll={midMonthPayroll}
               buttonText="Download PDF"
               variant="outline"
+              className="flex-1 md:flex-none"
             />
             <PrintPayslipButton
               payroll={payroll}
+              midMonthPayroll={midMonthPayroll}
               buttonText="Print Pay Slip"
               variant="outline"
+              className="flex-1 md:flex-none"
             />
             {isEditable && (
               <Button
                 onClick={() => setShowAddItemModal(true)}
                 icon={IconPlus}
                 variant="outline"
+                className="flex-1 md:flex-none"
               >
                 Add Manual Item
               </Button>
@@ -191,21 +220,114 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <h2 className="text-lg font-medium text-default-800 mb-4">
             Payroll Summary
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            className={`grid grid-cols-1 ${
+              midMonthPayroll ? "md:grid-cols-5" : "md:grid-cols-3"
+            } gap-4`}
+          >
             <div className="border rounded-lg p-4">
               <p className="text-sm text-default-500 mb-1">Gross Pay</p>
               <p className="text-xl font-semibold text-default-800">
                 {formatCurrency(payroll.gross_pay)}
               </p>
             </div>
+            {payroll.deductions && payroll.deductions.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <p className="text-sm text-default-500 mb-1">
+                  Total Employee Deductions
+                </p>
+                <p className="text-xl font-semibold text-default-800">
+                  {formatCurrency(
+                    payroll.deductions.reduce(
+                      (sum, deduction) => sum + deduction.employee_amount,
+                      0
+                    )
+                  )}
+                </p>
+              </div>
+            )}
             <div className="border rounded-lg p-4">
               <p className="text-sm text-default-500 mb-1">Net Pay</p>
               <p className="text-xl font-semibold text-default-800">
                 {formatCurrency(payroll.net_pay)}
               </p>
             </div>
+            {/* Mid-Month Payment Display */}
+            {midMonthPayroll && (
+              <>
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-default-500 mb-1">
+                    Mid-Month Payment ({midMonthPayroll.payment_method})
+                  </p>
+                  <p className="text-xl font-semibold text-rose-600">
+                    {formatCurrency(midMonthPayroll.amount)}
+                  </p>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-default-500 mb-1">Final Payment</p>
+                  <p className="text-xl font-semibold text-default-800">
+                    {formatCurrency(payroll.net_pay - midMonthPayroll.amount)}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Deductions Summary */}
+        {payroll.deductions && payroll.deductions.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-medium text-default-800 mb-4">
+              Deductions Summary
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {payroll.deductions.map((deduction, index) => {
+                const deductionName = deduction.deduction_type.toUpperCase();
+                return (
+                  <div key={index} className="border rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-default-700 mb-2">
+                      {deductionName}
+                    </h3>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">Employee:</span>
+                          <span className="font-medium text-default-900">
+                            {formatCurrency(deduction.employee_amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">Employer:</span>
+                          <span className="font-medium text-default-900">
+                            {formatCurrency(deduction.employer_amount)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="border-t border-default-200 pt-2 mt-2">
+                        <div className="flex justify-between text-xs text-default-500">
+                          <span>Employee Rate:</span>
+                          <span>{deduction.rate_info.employee_rate}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-default-500">
+                          <span>Employer Rate:</span>
+                          <span>{deduction.rate_info.employer_rate}</span>
+                        </div>
+                        {deduction.rate_info.age_group && (
+                          <div className="flex justify-between text-xs text-default-500">
+                            <span>Age Group:</span>
+                            <span className="capitalize">
+                              {deduction.rate_info.age_group.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Tabs for Items and Pay Slip View */}
         <div className="mb-6">
@@ -268,10 +390,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div className="text-sm text-default-900">
-                                {formatCurrency(item.rate)}
-                                <span className="text-xs text-default-500 ml-1">
-                                  /{item.rate_unit}
-                                </span>
+                                {item.rate_unit === "Percent" ? (
+                                  <>{item.rate}%</>
+                                ) : (
+                                  <>
+                                    {formatCurrency(item.rate)}
+                                    <span className="text-xs text-default-500 ml-1">
+                                      /{item.rate_unit}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -284,6 +412,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                     ? "days"
                                     : item.rate_unit === "Fixed"
                                     ? ""
+                                    : item.rate_unit === "Percent"
+                                    ? "units"
                                     : item.rate_unit.toLowerCase()}
                                 </span>
                               </div>
@@ -368,10 +498,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div className="text-sm text-default-900">
-                                {formatCurrency(item.rate)}
-                                <span className="text-xs text-default-500 ml-1">
-                                  /{item.rate_unit}
-                                </span>
+                                {item.rate_unit === "Percent" ? (
+                                  <>{item.rate}%</>
+                                ) : (
+                                  <>
+                                    {formatCurrency(item.rate)}
+                                    <span className="text-xs text-default-500 ml-1">
+                                      /{item.rate_unit}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -384,6 +520,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                     ? "days"
                                     : item.rate_unit === "Fixed"
                                     ? ""
+                                    : item.rate_unit === "Percent"
+                                    ? "units"
                                     : item.rate_unit.toLowerCase()}
                                 </span>
                               </div>
@@ -470,10 +608,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div className="text-sm text-default-900">
-                                {formatCurrency(item.rate)}
-                                <span className="text-xs text-default-500 ml-1">
-                                  /{item.rate_unit}
-                                </span>
+                                {item.rate_unit === "Percent" ? (
+                                  <>{item.rate}%</>
+                                ) : (
+                                  <>
+                                    {formatCurrency(item.rate)}
+                                    <span className="text-xs text-default-500 ml-1">
+                                      /{item.rate_unit}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -486,6 +630,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                     ? "days"
                                     : item.rate_unit === "Fixed"
                                     ? ""
+                                    : item.rate_unit === "Percent"
+                                    ? "units"
                                     : item.rate_unit.toLowerCase()}
                                 </span>
                               </div>
@@ -525,7 +671,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               <h2 className="text-lg font-medium text-default-800 mb-4">
                 Pay Slip Preview
               </h2>
-              <PaySlipPreview payroll={payroll} className="max-w-4xl mx-auto" />
+              <PaySlipPreview
+                payroll={payroll}
+                midMonthPayroll={midMonthPayroll}
+                className="max-w-4xl mx-auto"
+              />
             </div>
           </Tab>
         </div>

@@ -27,9 +27,11 @@ import NewJobModal from "../../components/Catalogue/NewJobModal";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import Button from "../../components/Button";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal"; // Import Add modal
-import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal"; // Import Edit modal
+import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal";
+import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useNavigate } from "react-router-dom";
 
 type JobSelection = Job | null;
 
@@ -70,7 +72,9 @@ const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
 const JobPage: React.FC = () => {
   // --- State ---
   const location = useLocation();
+  const navigate = useNavigate();
   const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
+  const { staffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
@@ -185,9 +189,16 @@ const JobPage: React.FC = () => {
         setSelectedJob(selection);
         setQuery("");
         setCurrentPage(1); // Reset pagination on job change
+
+        // Update URL with selected job ID
+        if (selection) {
+          navigate(`/catalogue/job?id=${selection.id}`, { replace: true });
+        } else {
+          navigate(`/catalogue/job`, { replace: true });
+        }
       }
     },
-    []
+    [navigate] // Add navigate to dependencies
   );
 
   // Handler for clicking the "Add New Job" card/button
@@ -199,6 +210,9 @@ const JobPage: React.FC = () => {
   const handleJobCardClick = (job: Job) => {
     setSelectedJob(job);
     setCurrentPage(1); // Reset pagination when selecting from card
+
+    // Update URL with selected job ID
+    navigate(`/catalogue/job?id=${job.id}`, { replace: true });
   };
 
   const handleJobAdded = useCallback(
@@ -263,6 +277,10 @@ const JobPage: React.FC = () => {
       toast.success(`Job "${selectedJob.name}" deleted successfully`);
       setShowDeleteJobDialog(false);
       setSelectedJob(null); // Go back to card view
+
+      // Clear the job ID from URL
+      navigate(`/catalogue/job`, { replace: true });
+
       await refreshJobs();
       await refreshPayCodeMappings(); // Ensure mappings are cleared too
     } catch (error) {
@@ -270,7 +288,7 @@ const JobPage: React.FC = () => {
       toast.error("Failed to delete job");
       setShowDeleteJobDialog(false);
     }
-  }, [selectedJob, refreshJobs, refreshPayCodeMappings]);
+  }, [selectedJob, refreshJobs, refreshPayCodeMappings, navigate]);
 
   // --- Derived State ---
   const filteredJobs = useMemo(
@@ -282,6 +300,15 @@ const JobPage: React.FC = () => {
           ),
     [jobs, query]
   );
+
+  const associatedStaff = useMemo(() => {
+    if (!selectedJob || !staffs || loadingStaffs) return [];
+
+    return staffs.filter(
+      (staff) => Array.isArray(staff.job) && staff.job.includes(selectedJob.id)
+    );
+  }, [selectedJob, staffs, loadingStaffs]);
+
   const totalPayCodePages = useMemo(() => {
     // Filter by search term first
     let filtered = jobPayCodesDetails;
@@ -629,6 +656,36 @@ const JobPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* --- Staff Section --- */}
+          {selectedJob && (
+            <div className="mt-2 mb-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-medium text-default-700">
+                Staff Associated with this Job:
+              </h3>
+              {loadingStaffs ? (
+                <div className="flex items-center justify-center py-2">
+                  <LoadingSpinner size="sm" />
+                </div>
+              ) : associatedStaff.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {associatedStaff.map((staff) => (
+                    <Link
+                      key={staff.id}
+                      to={`/catalogue/staff/${staff.id}`}
+                      className="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-sm font-medium text-sky-800 hover:bg-sky-200 transition-colors"
+                    >
+                      {staff.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-default-500">
+                  No staff associated with this job
+                </p>
+              )}
+            </div>
+          )}
 
           {/* --- Pay Codes Section (Only shows after selection) --- */}
           <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">

@@ -12,6 +12,9 @@ interface SidebarButtonProps {
   children?: React.ReactNode;
   path?: string;
   onNavigate?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  buttonRef?: React.RefObject<HTMLElement>;
 }
 
 const SidebarButton: React.FC<SidebarButtonProps> = ({
@@ -22,6 +25,9 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   children,
   path,
   onNavigate,
+  onMouseEnter,
+  onMouseLeave,
+  buttonRef,
 }) => {
   const navigate = useNavigate();
 
@@ -39,7 +45,12 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   };
 
   return (
-    <li className="m-1.5 my-1">
+    <li
+      className="m-1.5 my-1"
+      ref={buttonRef as React.RefObject<HTMLLIElement>}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <button
         onClick={handleClick}
         className="relative group/button flex items-center py-2 pl-4 pr-2 hover:bg-default-200/90 hover:text-default-800 active:bg-default-300/90 transition-colors duration-200 rounded-lg focus:outline-none w-full text-left"

@@ -561,6 +561,7 @@ const StaffFormPage: React.FC = () => {
         <SelectedTagsDisplay
           selectedItems={formData[name] as string[]}
           label={label}
+          navigable={true}
         />
       )}
     </div>

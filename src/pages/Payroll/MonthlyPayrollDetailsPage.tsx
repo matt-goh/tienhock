@@ -35,7 +35,15 @@ import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialo
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { FormListbox } from "../../components/FormComponents";
 import Checkbox from "../../components/Checkbox";
-import { DownloadBatchPayslipsButton, PrintBatchPayslipsButton } from "../../utils/payroll/PayslipButtons";
+import {
+  DownloadBatchPayslipsButton,
+  PrintBatchPayslipsButton,
+} from "../../utils/payroll/PayslipButtons";
+import {
+  getBatchMidMonthPayrolls,
+  MidMonthPayroll,
+} from "../../utils/payroll/midMonthPayrollUtils";
+import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
 
 const MonthlyPayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +65,10 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     Record<string, boolean>
   >({});
   const [isAllSelected, setIsAllSelected] = useState(false);
+  const [midMonthPayrollsMap, setMidMonthPayrollsMap] = useState<
+    Record<string, MidMonthPayroll | null>
+  >({});
+  const [isFetchingMidMonth, setIsFetchingMidMonth] = useState(false);
 
   useEffect(() => {
     fetchPayrollDetails();
@@ -88,6 +100,34 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
       toast.error("Failed to load payroll details");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchMidMonthPayrollsForSelected = async () => {
+    const selectedPayrolls = getSelectedPayrolls();
+    if (!payroll || selectedPayrolls.length === 0) return null;
+
+    setIsFetchingMidMonth(true);
+    try {
+      const employeeIds = selectedPayrolls.map((emp) => emp.employee_id);
+      const midMonthPayrolls = await getBatchMidMonthPayrolls(
+        employeeIds,
+        payroll.year,
+        payroll.month
+      );
+
+      // Create a map of employee IDs to mid-month payrolls
+      const payrollsMap = createMidMonthPayrollsMap(
+        midMonthPayrolls,
+        employeeIds
+      );
+      setMidMonthPayrollsMap(payrollsMap);
+      return payrollsMap;
+    } catch (error) {
+      console.error("Error fetching mid-month payrolls:", error);
+      return null;
+    } finally {
+      setIsFetchingMidMonth(false);
     }
   };
 
@@ -162,6 +202,14 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     () => Object.values(selectedEmployeePayrolls).filter(Boolean).length,
     [selectedEmployeePayrolls]
   );
+
+  useEffect(() => {
+    // Only fetch if we have selections and we're not already fetching
+    const selectedPayrolls = getSelectedPayrolls();
+    if (selectedPayrolls.length > 0 && !isFetchingMidMonth) {
+      fetchMidMonthPayrollsForSelected();
+    }
+  }, [selectedCount]);
 
   // Handle employee selection
   const handleSelectEmployee = (
@@ -504,14 +552,26 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                     size="sm"
                     variant="outline"
                     color="sky"
-                    buttonText={`Download ${selectedCount} PDFs`}
+                    buttonText={
+                      isFetchingMidMonth
+                        ? "Loading mid-month data..."
+                        : `Download ${selectedCount} PDFs`
+                    }
+                    disabled={isFetchingMidMonth || selectedCount === 0}
+                    midMonthPayrollsMap={midMonthPayrollsMap}
                   />
                   <PrintBatchPayslipsButton
                     payrolls={getSelectedPayrolls()}
                     size="sm"
                     variant="outline"
                     color="sky"
-                    buttonText={`Print ${selectedCount} Payslips`}
+                    buttonText={
+                      isFetchingMidMonth
+                        ? "Loading mid-month data..."
+                        : `Print ${selectedCount} Payslips`
+                    }
+                    disabled={isFetchingMidMonth || selectedCount === 0}
+                    midMonthPayrollsMap={midMonthPayrollsMap}
                   />
                 </>
               )}
