@@ -60,9 +60,6 @@ const Login: React.FC = () => {
       navigate(targetPath);
     } catch (error: any) {
       toast.error(error.message);
-      if (error.message === "Incorrect password") {
-        setPassword("");
-      }
     } finally {
       setIsLoading(false);
     }
