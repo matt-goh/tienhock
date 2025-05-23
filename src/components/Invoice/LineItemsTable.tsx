@@ -45,20 +45,27 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
 
   const handleProductSelect = useCallback(
     (index: number, selectedProduct: ProductItem | null) => {
-      // Expect Product | null
       if (!selectedProduct) return;
       const newItems = [...items];
       const item = { ...newItems[index] };
       const customProduct = customerProducts.find(
         (cp) => cp.product_id === String(selectedProduct.id) && cp.is_available
       );
-      // Use price_per_unit from Product type
       const price = customProduct
         ? Number(customProduct.custom_price)
         : Number(selectedProduct.price) || 0;
 
-      item.code = String(selectedProduct.id); // Use id from Product (convert to string)
-      item.description = selectedProduct.description || "";
+      item.code = String(selectedProduct.id);
+
+      // Only set description automatically if it's NOT "OTH"
+      if (String(selectedProduct.id) !== "OTH") {
+        item.description = selectedProduct.description || "";
+      }
+      // For "OTH", keep the existing description or set empty if none exists
+      else if (!item.description) {
+        item.description = "";
+      }
+
       item.price = price;
       item.tax = 0;
       const quantity = Number(item.quantity) || 0;
@@ -220,20 +227,67 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
     );
   };
 
+  const DescriptionInputCell = ({
+    rowIndex,
+    value,
+    isEditable,
+  }: {
+    rowIndex: number;
+    value: string;
+    isEditable: boolean;
+  }) => {
+    const [localValue, setLocalValue] = useState<string>(value || "");
+
+    useEffect(() => {
+      setLocalValue(value || "");
+    }, [value]);
+
+    if (!isEditable) {
+      return (
+        <span className="px-2 py-1 text-sm text-gray-900">{value || ""}</span>
+      );
+    }
+
+    return (
+      <input
+        type="text"
+        value={localValue}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          setLocalValue(e.target.value);
+        }}
+        onBlur={(e) => {
+          handleItemChange(rowIndex, "description", e.target.value);
+        }}
+        className="w-full py-1 px-2 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-sm"
+        placeholder="Enter custom description..."
+        disabled={readOnly}
+      />
+    );
+  };
+
   // --- Table Rendering ---
   return (
     <div>
       <table className="min-w-full divide-y divide-gray-200 border border-default-200 rounded-lg table-fixed">
         <colgroup>
-          <col className="w-[10%]" />{/* Code */}
-          <col className="w-[38%]" />{/* Product */}
-          <col className="w-[8%]" />{/* QTY */}
-          <col className="w-[10%]" />{/* Price */}
-          <col className="w-[8%]" />{/* FOC */}
-          <col className="w-[8%]" />{/* RTN */}
-          <col className="w-[8%]" />{/* Tax */}
-          <col className="w-[10%]" />{/* Total */}
-          {!readOnly && <col className="w-[40px]" />}{/* Delete */}
+          <col className="w-[10%]" />
+          {/* Code */}
+          <col className="w-[38%]" />
+          {/* Product */}
+          <col className="w-[8%]" />
+          {/* QTY */}
+          <col className="w-[10%]" />
+          {/* Price */}
+          <col className="w-[8%]" />
+          {/* FOC */}
+          <col className="w-[8%]" />
+          {/* RTN */}
+          <col className="w-[8%]" />
+          {/* Tax */}
+          <col className="w-[10%]" />
+          {/* Total */}
+          {!readOnly && <col className="w-[40px]" />}
+          {/* Delete */}
         </colgroup>
         <thead className="bg-gray-50">
           <tr>
@@ -301,8 +355,21 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                 <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-500 align-middle">
                   {item.code}
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  <ProductComboboxCell rowIndex={index} item={item} />
+                <td className="px-1 py-1 text-sm text-gray-900 align-middle">
+                  {item.code === "OTH" ? (
+                    <div className="space-y-1">
+                      <ProductComboboxCell rowIndex={index} item={item} />
+                      <DescriptionInputCell
+                        rowIndex={index}
+                        value={item.description || ""}
+                        isEditable={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <ProductComboboxCell rowIndex={index} item={item} />
+                    </div>
+                  )}
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
                   <NumericInputCell
