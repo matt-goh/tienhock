@@ -13,7 +13,7 @@ interface ConfirmationDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message: string | React.ReactNode;
   confirmButtonText?: string;
   variant?: "danger" | "success" | "default";
   hideCancelButton?: boolean;

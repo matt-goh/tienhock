@@ -139,7 +139,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
 // --- FormListbox ---
 interface ListboxProps {
   name: string;
-  label: string | React.ReactNode;
+  label?: string | React.ReactNode;
   value: string | number | undefined;
   onChange: (value: string) => void;
   options: SelectOption[];
