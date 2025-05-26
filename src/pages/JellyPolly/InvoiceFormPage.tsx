@@ -512,7 +512,7 @@ const InvoiceFormPage: React.FC = () => {
           );
         if (Number(item.quantity || 0) <= 0)
           errors.push(`Item #${index + 1}: Quantity must be positive.`);
-        if (Number(item.price || 0) < 0)
+        if (item.code !== "LESS" && Number(item.price || 0) < 0)
           errors.push(`Item #${index + 1}: Price cannot be negative.`);
       });
     }
