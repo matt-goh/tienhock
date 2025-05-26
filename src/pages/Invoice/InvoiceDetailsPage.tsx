@@ -1,7 +1,12 @@
 // src/pages/Invoice/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { ExtendedInvoiceData, Payment, ProductItem } from "../../types/types";
+import {
+  ExtendedInvoiceData,
+  InvoiceData,
+  Payment,
+  ProductItem,
+} from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -32,10 +37,13 @@ import {
   IconSend,
   IconRefresh,
   IconFiles,
+  IconPrinter,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
+import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
+import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -179,6 +187,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
   const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -334,6 +343,16 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsSubmittingInvoice(false);
       setIsSubmittingEInvoice(false);
     }
+  };
+
+  const handlePrintInvoice = () => {
+    if (invoiceData) {
+      setIsPrinting(true);
+    }
+  };
+
+  const handlePrintComplete = () => {
+    setIsPrinting(false);
   };
 
   const handleSyncCancellationStatus = async () => {
@@ -632,6 +651,11 @@ const InvoiceDetailsPage: React.FC = () => {
     { id: "online", name: "Online" },
   ];
 
+  const customerNamesForPDF: Record<string, string> =
+    invoiceData.customerid && invoiceData.customerName
+      ? { [invoiceData.customerid]: invoiceData.customerName }
+      : {};
+
   return (
     <div className="px-4 md:px-12 pb-8 w-full relative">
       {/* Loading Overlay */}
@@ -732,6 +756,26 @@ const InvoiceDetailsPage: React.FC = () => {
                 size="md"
               />
             </div>
+          )}
+          {/* Print Button */}
+          <Button
+            onClick={handlePrintInvoice}
+            icon={IconPrinter}
+            variant="outline"
+            color="default"
+            size="md"
+            disabled={isLoading || isPrinting || !invoiceData}
+          >
+            {isPrinting ? "Printing..." : "Print"}
+          </Button>
+
+          {/* Download PDF Button */}
+          {invoiceData && (
+            <PDFDownloadHandler
+              invoices={[invoiceData as InvoiceData]}
+              customerNames={customerNamesForPDF}
+              disabled={isLoading}
+            />
           )}
           {!isCancelled && !isPaid && (
             <Button
@@ -1213,6 +1257,14 @@ const InvoiceDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
+      {/* Print PDF Overlay */}
+      {isPrinting && invoiceData && (
+        <PrintPDFOverlay
+          invoices={[invoiceData as InvoiceData]}
+          customerNames={customerNamesForPDF}
+          onComplete={handlePrintComplete}
+        />
+      )}
     </div>
   );
 };
