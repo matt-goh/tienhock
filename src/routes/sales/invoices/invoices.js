@@ -581,6 +581,348 @@ export default function (pool, config) {
     }
   });
 
+  // POST /api/invoices/sales/summary - Get comprehensive sales summary data
+  router.post("/sales/summary", async (req, res) => {
+    const { startDate, endDate, summaries } = req.body;
+
+    if (!startDate || !endDate || !summaries || !Array.isArray(summaries)) {
+      return res.status(400).json({
+        message: "Missing required parameters: startDate, endDate, summaries",
+      });
+    }
+
+    try {
+      // Query to get all invoices with products in the date range
+      const query = `
+      SELECT 
+        i.id,
+        i.salespersonid,
+        i.paymenttype,
+        i.rounding,
+        i.totalamountpayable,
+        i.invoice_status,
+        json_agg(
+          json_build_object(
+            'code', od.code,
+            'description', od.description,
+            'quantity', od.quantity,
+            'price', od.price,
+            'freeproduct', od.freeproduct,
+            'returnproduct', od.returnproduct,
+            'total', od.total
+          ) ORDER BY od.id
+        ) FILTER (WHERE od.id IS NOT NULL) as products
+      FROM invoices i
+      LEFT JOIN order_details od ON i.id = od.invoiceid
+      WHERE 
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+      GROUP BY i.id
+    `;
+
+      const result = await pool.query(query, [startDate, endDate]);
+
+      // Process the data for different summary types
+      const summaryData = {};
+
+      // Initialize data structures for each summary type
+      if (summaries.includes("all_sales")) {
+        summaryData.all_sales = processAllSales(result.rows);
+      }
+      if (summaries.includes("all_salesmen")) {
+        summaryData.all_salesmen = processSalesmenSummary(result.rows, null);
+      }
+      if (summaries.includes("mee_salesmen")) {
+        summaryData.mee_salesmen = processSalesmenSummary(result.rows, "MEE");
+      }
+      if (summaries.includes("bihun_salesmen")) {
+        summaryData.bihun_salesmen = processSalesmenSummary(result.rows, "BH");
+      }
+      if (summaries.includes("jp_salesmen")) {
+        summaryData.jp_salesmen = processSalesmenSummary(result.rows, "JP");
+      }
+      if (summaries.includes("sisa_sales")) {
+        summaryData.sisa_sales = processSisaSales(result.rows);
+      }
+
+      res.json(summaryData);
+    } catch (error) {
+      console.error("Error fetching sales summary:", error);
+      res.status(500).json({
+        message: "Error fetching sales summary",
+        error: error.message,
+      });
+    }
+  });
+
+  // Helper functions for processing summary data
+  function processAllSales(invoices) {
+    const categories = {
+      category_1: { quantity: 0, amount: 0, products: [] }, // ID starts with "1-"
+      category_2: { quantity: 0, amount: 0, products: [] }, // ID starts with "2-"
+      category_meq: { quantity: 0, amount: 0, products: [] }, // ID starts with "MEQ-"
+      category_s: { quantity: 0, amount: 0, products: [] }, // ID starts with "S-"
+      category_oth: { quantity: 0, amount: 0, products: [] }, // ID "OTH"
+      category_we_mnl: { quantity: 0, amount: 0, products: [] }, // ID "WE-MNL"
+      category_we_2udg: { quantity: 0, amount: 0, products: [] }, // ID "WE-2UDG"
+      category_we_300g: { quantity: 0, amount: 0, products: [] }, // ID "WE-300G"
+      category_we_600g: { quantity: 0, amount: 0, products: [] }, // ID "WE-600G"
+      category_empty_bag: { quantity: 0, amount: 0, products: [] }, // ID starts with "EMPTY_BAG"
+      category_sbh: { quantity: 0, amount: 0, products: [] }, // ID "SBH"
+      category_smee: { quantity: 0, amount: 0, products: [] }, // ID "SMEE"
+      category_we_others: { quantity: 0, amount: 0, products: [] }, // WE-360(5PK), WE-360, WE-3UDG, WE-420
+      category_returns: { quantity: 0, amount: 0, products: [] }, // Products with returnproduct > 0
+      category_less: { quantity: 0, amount: 0, products: [] }, // ID "LESS"
+      total_rounding: 0,
+    };
+
+    const productMap = new Map();
+    const typeStats = {
+      MEE: { quantity: 0, amount: 0 },
+      BH: { quantity: 0, amount: 0 },
+      JP: { quantity: 0, amount: 0 },
+    };
+
+    let cashTotal = 0;
+    let invoiceTotal = 0;
+    let cashCount = 0;
+    let invoiceCount = 0;
+
+    invoices.forEach((invoice) => {
+      // Track payment types
+      if (invoice.paymenttype === "CASH") {
+        cashTotal += parseFloat(invoice.totalamountpayable || 0);
+        cashCount++;
+      } else {
+        invoiceTotal += parseFloat(invoice.totalamountpayable || 0);
+        invoiceCount++;
+      }
+
+      // Add rounding
+      categories.total_rounding += parseFloat(invoice.rounding || 0);
+
+      // Process products
+      if (!invoice.products) return;
+
+      invoice.products.forEach((product) => {
+        const code = product.code;
+        const quantity = parseInt(product.quantity || 0);
+        const price = parseFloat(product.price || 0);
+        const total = quantity * price;
+        const returnQty = parseInt(product.returnproduct || 0);
+
+        // Group products by category
+        let category = null;
+        if (code.startsWith("1-")) category = "category_1";
+        else if (code.startsWith("2-")) category = "category_2";
+        else if (code.startsWith("MEQ-")) category = "category_meq";
+        else if (code.startsWith("S-")) category = "category_s";
+        else if (code === "OTH") category = "category_oth";
+        else if (code === "WE-MNL") category = "category_we_mnl";
+        else if (code === "WE-2UDG") category = "category_we_2udg";
+        else if (code === "WE-300G") category = "category_we_300g";
+        else if (code === "WE-600G") category = "category_we_600g";
+        else if (code.startsWith("EMPTY_BAG")) category = "category_empty_bag";
+        else if (code === "SBH") category = "category_sbh";
+        else if (code === "SMEE") category = "category_smee";
+        else if (["WE-360(5PK)", "WE-360", "WE-3UDG", "WE-420"].includes(code))
+          category = "category_we_others";
+        else if (code === "LESS") category = "category_less";
+
+        if (category) {
+          categories[category].quantity += quantity;
+          categories[category].amount += total;
+
+          // Track individual products
+          const key = `${category}_${code}`;
+          if (!productMap.has(key)) {
+            productMap.set(key, {
+              code,
+              description: product.description || code,
+              quantity: 0,
+              amount: 0,
+            });
+          }
+          const prod = productMap.get(key);
+          prod.quantity += quantity;
+          prod.amount += total;
+        }
+
+        // Handle returns separately
+        if (returnQty > 0) {
+          categories.category_returns.quantity += returnQty;
+          categories.category_returns.amount += returnQty * price;
+        }
+
+        // Track type statistics (need to fetch product type from cache)
+        // This will be done in the frontend since we have the product cache there
+      });
+    });
+
+    // Convert product map to arrays
+    for (const [key, product] of productMap) {
+      const category = key.split("_")[0] + "_" + key.split("_")[1];
+      if (categories[category]) {
+        categories[category].products.push(product);
+      }
+    }
+
+    return {
+      categories,
+      totals: {
+        cashSales: { count: cashCount, amount: cashTotal },
+        creditSales: { count: invoiceCount, amount: invoiceTotal },
+        grandTotal: cashTotal + invoiceTotal,
+      },
+    };
+  }
+
+  function processSalesmenSummary(invoices, productType) {
+    const salesmenData = {};
+    const focProducts = new Map();
+    const returnProducts = new Map();
+
+    invoices.forEach((invoice) => {
+      const salesmanId = invoice.salespersonid;
+
+      if (!salesmenData[salesmanId]) {
+        salesmenData[salesmanId] = {
+          products: new Map(),
+          total: { quantity: 0, amount: 0 },
+        };
+      }
+
+      if (!invoice.products) return;
+
+      invoice.products.forEach((product) => {
+        // Filter by product type if specified
+        if (productType) {
+          // This filtering will be done in frontend with product cache
+        }
+
+        const code = product.code;
+        const quantity = parseInt(product.quantity || 0);
+        const price = parseFloat(product.price || 0);
+        const total = quantity * price;
+        const foc = parseInt(product.freeproduct || 0);
+        const returns = parseInt(product.returnproduct || 0);
+
+        // Add to salesman's products
+        if (!salesmenData[salesmanId].products.has(code)) {
+          salesmenData[salesmanId].products.set(code, {
+            code,
+            description: product.description || code,
+            quantity: 0,
+            amount: 0,
+          });
+        }
+
+        const prod = salesmenData[salesmanId].products.get(code);
+        prod.quantity += quantity;
+        prod.amount += total;
+
+        salesmenData[salesmanId].total.quantity += quantity;
+        salesmenData[salesmanId].total.amount += total;
+
+        // Track FOC and returns
+        if (foc > 0) {
+          if (!focProducts.has(code)) {
+            focProducts.set(code, {
+              code,
+              description: product.description || code,
+              quantity: 0,
+            });
+          }
+          focProducts.get(code).quantity += foc;
+        }
+
+        if (returns > 0) {
+          if (!returnProducts.has(code)) {
+            returnProducts.set(code, {
+              code,
+              description: product.description || code,
+              quantity: 0,
+            });
+          }
+          returnProducts.get(code).quantity += returns;
+        }
+      });
+    });
+
+    // Convert maps to arrays
+    const result = {
+      salesmen: {},
+      foc: Array.from(focProducts.values()),
+      returns: Array.from(returnProducts.values()),
+    };
+
+    for (const [salesmanId, data] of Object.entries(salesmenData)) {
+      result.salesmen[salesmanId] = {
+        products: Array.from(data.products.values()),
+        total: data.total,
+      };
+    }
+
+    return result;
+  }
+
+  function processSisaSales(invoices) {
+    const categories = {
+      empty_bag: { quantity: 0, amount: 0, products: [] },
+      sbh: { quantity: 0, amount: 0, products: [] },
+      smee: { quantity: 0, amount: 0, products: [] },
+    };
+
+    const productMap = new Map();
+
+    invoices.forEach((invoice) => {
+      if (!invoice.products) return;
+
+      invoice.products.forEach((product) => {
+        const code = product.code;
+        const quantity = parseInt(product.quantity || 0);
+        const price = parseFloat(product.price || 0);
+        const total = quantity * price;
+
+        let category = null;
+        if (code.startsWith("EMPTY_BAG")) category = "empty_bag";
+        else if (code === "SBH") category = "sbh";
+        else if (code === "SMEE") category = "smee";
+
+        if (category) {
+          categories[category].quantity += quantity;
+          categories[category].amount += total;
+
+          // Track individual products
+          const key = `${category}_${code}`;
+          if (!productMap.has(key)) {
+            productMap.set(key, {
+              code,
+              description: product.description || code,
+              quantity: 0,
+              amount: 0,
+            });
+          }
+          const prod = productMap.get(key);
+          prod.quantity += quantity;
+          prod.amount += total;
+        }
+      });
+    });
+
+    // Convert product map to arrays
+    for (const [key, product] of productMap) {
+      const category =
+        key.split("_")[0] + (key.split("_")[1] ? "_" + key.split("_")[1] : "");
+      if (categories[category]) {
+        categories[category].products.push(product);
+      }
+    }
+
+    return categories;
+  }
+
   // GET /api/invoices/salesman-products - Get products sold by multiple salesmen on a specific date
   router.get("/salesman-products", async (req, res) => {
     const { salesmanIds, date } = req.query;

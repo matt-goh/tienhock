@@ -3,10 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
 import { FormCombobox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import {
-  IconSortAscending,
-  IconSortDescending
-} from "@tabler/icons-react";
+import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
 import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
@@ -203,6 +200,17 @@ const SalesByProductsPage: React.FC = () => {
     return options;
   }, [products]);
 
+  useEffect(() => {
+    // Dispatch month selection event when it changes
+    if (selectedMonth && selectedYear) {
+      window.dispatchEvent(
+        new CustomEvent("monthSelectionChanged", {
+          detail: { month: selectedMonth.id, year: selectedYear },
+        })
+      );
+    }
+  }, [selectedMonth, selectedYear]);
+
   // Clear chart data when product selection changes
   useEffect(() => {
     if (yearlyTrendData.length > 0) {
@@ -298,66 +306,6 @@ const SalesByProductsPage: React.FC = () => {
     return `#${r.toString(16).padStart(2, "0")}${g
       .toString(16)
       .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-  };
-
-  // Process invoice data to get product sales
-  const processInvoiceData = (invoices: any[]) => {
-    // Filter invoices by selected salesman if not "All Salesmen"
-    const filteredInvoices =
-      selectedSalesman === "All Salesmen"
-        ? invoices
-        : invoices.filter(
-            (invoice) => invoice.salespersonid === selectedSalesman
-          );
-
-    const productMap = new Map<string, ProductSalesData>();
-
-    filteredInvoices.forEach((invoice) => {
-      // Skip cancelled invoices
-      if (invoice.invoice_status === "cancelled") return;
-
-      if (Array.isArray(invoice.products)) {
-        invoice.products.forEach((product: any) => {
-          // Skip subtotal or total rows
-          if (product.issubtotal || product.istotal) return;
-
-          const productId = product.code;
-          if (!productId) return;
-
-          // Convert string fields to numbers if needed
-          const quantity = Number(product.quantity) || 0;
-          const price = Number(product.price) || 0;
-          const total = quantity * price;
-          const foc = Number(product.freeProduct || product.freeproduct) || 0; // Handle both camelCase and lowercase
-          const returns =
-            Number(product.returnProduct || product.returnproduct) || 0; // Handle both camelCase and lowercase
-
-          if (productMap.has(productId)) {
-            const existingProduct = productMap.get(productId)!;
-            existingProduct.quantity += quantity;
-            existingProduct.totalSales += total;
-            existingProduct.foc += foc;
-            existingProduct.returns += returns;
-          } else {
-            // Get product type from cache
-            const type = getProductType(productId);
-            const description = getProductDescription(productId);
-
-            productMap.set(productId, {
-              id: productId,
-              description,
-              type,
-              quantity,
-              totalSales: total,
-              foc,
-              returns,
-            });
-          }
-        });
-      }
-    });
-
-    return Array.from(productMap.values());
   };
 
   // Get top products for summary cards
@@ -687,9 +635,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full p-6 pt-0 max-w-[88rem] mx-auto space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Sales by Products</h1>
-
+    <div className="w-full pt-0 max-w-[88rem] mt-4 mx-auto space-y-6">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">

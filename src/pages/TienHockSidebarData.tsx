@@ -17,6 +17,7 @@ import InvoiceFormPage from "./Invoice/InvoiceFormPage";
 import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 
 // Sales related imports
+import SalesSummaryPage from "./Sales/SalesSummaryPage";
 import SalesByProductsPage from "./Sales/SalesByProductsPage";
 import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
 
@@ -184,14 +185,9 @@ export const TienHockSidebarData: SidebarItem[] = [
         ],
       },
       {
-        name: "Sales by Products",
-        path: "/sales/sales-by-products",
-        component: SalesByProductsPage,
-      },
-      {
-        name: "Sales by Salesman",
-        path: "/sales/sales-by-salesman",
-        component: SalesBySalesmanPage,
+        name: "Sales Summary",
+        path: "/sales/summary",
+        component: SalesSummaryPage,
       },
     ],
   },
