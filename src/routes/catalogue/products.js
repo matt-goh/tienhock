@@ -27,7 +27,7 @@ export default function (pool) {
       } else {
         // Default: Return only BH and MEE type products (excluding tax)
         query =
-          "SELECT id, description, price_per_unit, type FROM products WHERE type IN ('BH', 'MEE')";
+          "SELECT id, description, price_per_unit, type FROM products WHERE type IN ('BH', 'MEE', 'JP')";
       }
 
       const result = await pool.query(query);

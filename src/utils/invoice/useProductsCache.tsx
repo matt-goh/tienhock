@@ -95,7 +95,7 @@ const filterProducts = (
       return products.filter((product) => product.type === "BH");
     case "default":
     default:
-      return products.filter((product) => ["MEE", "BH"].includes(product.type));
+      return products.filter((product) => ["MEE", "BH", "OTH"].includes(product.type));
   }
 };
 
