@@ -1,90 +1,62 @@
-// src/utils/invoice/useProductsCache.tsx - UPDATED
+// src/utils/invoice/useProductsCache.tsx
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 
-// Define cache keys for different product types
-const CACHE_KEYS = {
-  ALL: "products_cache_all",
-  JP: "products_cache_jp",
-  DEFAULT: "products_cache_default", // BH and MEE
-};
+interface Product {
+  id: string;
+  description: string;
+  price_per_unit: number;
+  type: string;
+}
 
 interface CachedProducts {
-  data: Array<{
-    id: string;
-    description: string;
-    price_per_unit: number;
-    type: string;
-  }>;
+  data: Product[];
   timestamp: number;
 }
 
+const CACHE_KEY = "products_cache";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const PRODUCTS_UPDATED_EVENT = "products-updated";
 
-// Create global functions to refresh specific product caches
-export const refreshProductsCache = async (type?: "all" | "jp" | "default") => {
+// Create a global function to refresh products cache
+export const refreshProductsCache = async () => {
   try {
-    const cacheKeys = type
-      ? [getCacheKeyForType(type)]
-      : Object.values(CACHE_KEYS);
+    // Remove the current cache
+    localStorage.removeItem(CACHE_KEY);
 
-    // For each cache type we need to refresh
-    for (const cacheKey of cacheKeys) {
-      // Remove the current cache
-      localStorage.removeItem(cacheKey);
+    // Fetch all products
+    const data = await api.get("/api/products?all");
 
-      // Fetch new data based on the cache type
-      let queryParam = "";
-      if (cacheKey === CACHE_KEYS.ALL) queryParam = "?all";
-      else if (cacheKey === CACHE_KEYS.JP) queryParam = "?JP";
+    // Store in cache
+    const cacheData = {
+      data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
-      const data = await api.get(`/api/products${queryParam}`);
-
-      // Store in cache
-      const cacheData = {
-        data,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-
-      // Dispatch event to notify subscribers with cache type info
-      window.dispatchEvent(
-        new CustomEvent(PRODUCTS_UPDATED_EVENT, {
-          detail: { data, type: getCacheTypeFromKey(cacheKey) },
-        })
-      );
-    }
+    // Dispatch event to notify subscribers
+    window.dispatchEvent(
+      new CustomEvent(PRODUCTS_UPDATED_EVENT, { detail: data })
+    );
   } catch (error) {
     console.error("Error refreshing products cache:", error);
   }
 };
 
-// Helper to get cache key from type
-const getCacheKeyForType = (type: "all" | "jp" | "default"): string => {
-  switch (type) {
-    case "all":
-      return CACHE_KEYS.ALL;
-    case "jp":
-      return CACHE_KEYS.JP;
-    case "default":
-    default:
-      return CACHE_KEYS.DEFAULT;
-  }
-};
-
-// Helper to get type from cache key
-const getCacheTypeFromKey = (cacheKey: string): "all" | "jp" | "default" => {
-  switch (cacheKey) {
-    case CACHE_KEYS.ALL:
-      return "all";
-    case CACHE_KEYS.JP:
-      return "jp";
-    case CACHE_KEYS.DEFAULT:
-    default:
-      return "default";
-  }
+// Clean up old cache keys
+export const cleanupOldCaches = () => {
+  const oldKeys = [
+    "products_cache_all",
+    "products_cache_jp",
+    "products_cache_default",
+  ];
+  oldKeys.forEach((key) => {
+    if (localStorage.getItem(key)) {
+      localStorage.removeItem(key);
+      console.log(`Cleaned up old cache key: ${key}`);
+    }
+  });
 };
 
 // Expose this to make it globally available
@@ -93,20 +65,55 @@ if (typeof window !== "undefined") {
   window.refreshProductsCache = refreshProductsCache;
 }
 
+// Client-side filtering function
+const filterProducts = (
+  products: Product[],
+  filterType: string | string[]
+): Product[] => {
+  // Handle array of types
+  if (Array.isArray(filterType)) {
+    return products.filter((product) => filterType.includes(product.type));
+  }
+
+  // Handle comma-separated string
+  if (typeof filterType === "string" && filterType.includes(",")) {
+    const types = filterType.split(",").map((t) => t.trim().toUpperCase());
+    return products.filter((product) => types.includes(product.type));
+  }
+
+  // Handle single type
+  switch (filterType) {
+    case "all":
+      return products;
+    case "jp":
+      return products.filter((product) => product.type === "JP");
+    case "oth":
+      return products.filter((product) => product.type === "OTH");
+    case "mee":
+      return products.filter((product) => product.type === "MEE");
+    case "bh":
+      return products.filter((product) => product.type === "BH");
+    case "default":
+    default:
+      return products.filter((product) => ["MEE", "BH"].includes(product.type));
+  }
+};
+
 export const useProductsCache = (
-  type: "all" | "jp" | "default" = "default"
+  type:
+    | "all"
+    | "jp"
+    | "oth"
+    | "mee"
+    | "bh"
+    | "default"
+    | string
+    | string[] = "default"
 ) => {
-  const [products, setProducts] = useState<
-    Array<{
-      id: string;
-      description: string;
-      price_per_unit: number;
-      type: string;
-    }>
-  >([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const cacheKey = getCacheKeyForType(type);
 
   const fetchProducts = async (forceRefresh = false) => {
     setIsLoading(true);
@@ -114,13 +121,14 @@ export const useProductsCache = (
       // Skip cache if force refresh is requested
       if (!forceRefresh) {
         // Check cache first
-        const cachedData = localStorage.getItem(cacheKey);
+        const cachedData = localStorage.getItem(CACHE_KEY);
         if (cachedData) {
           const { data, timestamp }: CachedProducts = JSON.parse(cachedData);
           const isExpired = Date.now() - timestamp > CACHE_DURATION;
 
           if (!isExpired) {
-            setProducts(data);
+            setAllProducts(data);
+            setProducts(filterProducts(data, type));
             setIsLoading(false);
             setError(null);
             return data;
@@ -129,30 +137,25 @@ export const useProductsCache = (
       }
 
       // If cache is missing, expired, or force refresh is requested, fetch fresh data
-      let queryParam = "";
-      if (type === "all") queryParam = "?all";
-      else if (type === "jp") queryParam = "?JP";
-
-      const data = await api.get(`/api/products${queryParam}`);
+      const data = await api.get("/api/products?all");
 
       // Update cache
       const cacheData: CachedProducts = {
         data,
         timestamp: Date.now(),
       };
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
-      setProducts(data);
+      setAllProducts(data);
+      setProducts(filterProducts(data, type));
       setError(null);
       return data;
     } catch (error) {
-      console.error(`Error fetching ${type} products:`, error);
+      console.error(`Error fetching products:`, error);
       const err =
-        error instanceof Error
-          ? error
-          : new Error(`Failed to fetch ${type} products`);
+        error instanceof Error ? error : new Error(`Failed to fetch products`);
       setError(err);
-      toast.error(`Error fetching ${type} products`);
+      toast.error(`Error fetching products`);
       throw err;
     } finally {
       setIsLoading(false);
@@ -162,19 +165,23 @@ export const useProductsCache = (
   // Initial load
   useEffect(() => {
     fetchProducts();
-  }, [type]); // Re-fetch when type changes
+  }, []); // Only run on mount
+
+  // Update filtered products when type changes
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      setProducts(filterProducts(allProducts, type));
+    }
+  }, [type, allProducts]);
 
   // Listen for product updates
   useEffect(() => {
     const handleProductsUpdated = (event: CustomEvent) => {
-      // Check if the event is for our product type
-      if (event.detail && (!event.detail.type || event.detail.type === type)) {
-        if (event.detail.data) {
-          setProducts(event.detail.data);
-        } else {
-          // Otherwise refresh from cache or API
-          fetchProducts(true);
-        }
+      if (event.detail) {
+        setAllProducts(event.detail);
+        setProducts(filterProducts(event.detail, type));
+      } else {
+        fetchProducts(true);
       }
     };
 
@@ -192,7 +199,7 @@ export const useProductsCache = (
   }, [type]);
 
   const invalidateCache = () => {
-    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(CACHE_KEY);
   };
 
   const refreshProducts = async () => {
@@ -201,6 +208,7 @@ export const useProductsCache = (
 
   return {
     products,
+    allProducts, // Expose all products for components that need them
     isLoading,
     error,
     invalidateCache,

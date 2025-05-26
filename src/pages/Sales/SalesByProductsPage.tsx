@@ -123,7 +123,7 @@ const SalesByProductsPage: React.FC = () => {
     products,
     isLoading: isProductsLoading,
     error: productsError,
-  } = useProductsCache();
+  } = useProductsCache("all");
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
   const [selectedChartProducts, setSelectedChartProducts] = useState<string[]>(
