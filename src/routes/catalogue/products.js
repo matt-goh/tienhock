@@ -7,18 +7,23 @@ export default function (pool) {
   // Get products based on params
   router.get("/", async (req, res) => {
     try {
-      // Check if we should return all products or filter by type
-      const showAll = req.query.all !== undefined;
-      const showJP = req.query.JP !== undefined;
+      // Check for specific type filters
+      const { type, all } = req.query;
 
       let query;
-      if (showAll) {
+      let whereClause = "";
+
+      if (all !== undefined) {
         // Return all products with all columns /api/products?all
         query = "SELECT * FROM products";
-      } else if (showJP) {
-        // Return only JP type products (excluding tax) /api/products?JP
-        query =
-          "SELECT id, description, price_per_unit, type FROM products WHERE type = 'JP'";
+      } else if (type) {
+        // Filter by specific type(s) /api/products?type=JP or /api/products?type=MEE,BH
+        const types = type
+          .split(",")
+          .map((t) => `'${t.trim()}'`)
+          .join(",");
+        whereClause = `WHERE type IN (${types})`;
+        query = `SELECT id, description, price_per_unit, type FROM products ${whereClause}`;
       } else {
         // Default: Return only BH and MEE type products (excluding tax)
         query =
@@ -35,7 +40,7 @@ export default function (pool) {
             ? Number(product.price_per_unit)
             : null,
       }));
-      res.status(200).json(productsWithNumberValues); // Explicitly use 200 OK
+      res.status(200).json(productsWithNumberValues);
     } catch (error) {
       console.error("Error fetching products:", error);
       res
