@@ -19,89 +19,113 @@ interface SummaryData {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    paddingHorizontal: 30,
+    paddingVertical: 25,
     fontFamily: "Helvetica",
-    fontSize: 9,
+    fontSize: 8,
     lineHeight: 1.4,
   },
   companyHeader: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 3,
+    marginBottom: 2,
     textAlign: "left",
   },
   reportTitle: {
-    fontSize: 10,
-    marginBottom: 2,
+    fontSize: 9,
+    fontFamily: "Helvetica", // Keep it normal weight for subtitle
+    marginBottom: 1,
+    textAlign: "left",
+  },
+  salesmanInfo: {
+    fontSize: 9,
+    fontFamily: "Helvetica",
+    marginBottom: 8,
     textAlign: "left",
   },
   table: {
-    marginBottom: 15,
+    marginBottom: 10, // Reduced bottom margin for table
   },
   tableHeader: {
     flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: "#000",
-    borderBottomWidth: 1,
-    borderBottomColor: "#000",
-    marginBottom: 2,
-    paddingVertical: 2,
-    paddingTop: 3,
+    borderTopWidth: 0.5,
+    borderTopColor: "#333",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#333",
+    paddingVertical: 3,
+    backgroundColor: "#f8f8f8", // Light grey for header background
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 1,
-    minHeight: 14,
+    paddingVertical: 1.5,
+    borderBottomWidth: 0.3, // Very faint line between data rows
+    borderBottomColor: "#e9e9e9",
+    minHeight: 15,
   },
-  colID: {
-    width: "15%",
-    paddingHorizontal: 2,
-  },
-  colQty: {
-    width: "12%",
-    textAlign: "right",
-    paddingRight: 8,
-  },
-  colDescription: {
-    width: "45%",
-    paddingHorizontal: 2,
-  },
-  colAmount: {
-    width: "20%",
-    textAlign: "right",
-  },
+  // Standard Column Styles
+  colID: { width: "18%", paddingHorizontal: 3 },
+  colDescription: { width: "42%", paddingHorizontal: 3 },
+  colQty: { width: "15%", textAlign: "right", paddingRight: 8 },
+  colAmount: { width: "25%", textAlign: "right", paddingRight: 3 },
+
   headerText: {
     fontFamily: "Helvetica-Bold",
+    fontSize: 8, // Header text size
   },
-  solidLine: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#000",
-    marginVertical: 2,
+  dashedLineAboveSubtotal: {
+    flexDirection: "row",
+    marginTop: 1, // Space before dashed line
+  },
+  // Generic dashed line cell style (apply width and paddingRight dynamically)
+  dashedLineCell: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#333",
+    borderTopStyle: "dashed",
+    height: 1,
+    marginTop: 1,
+    marginBottom: 0.5,
   },
   subtotalRow: {
-    paddingTop: 2,
+    paddingVertical: 1.5, // Consistent padding
+    // No border here, solidLine below will handle separation
+  },
+  solidLine: {
+    // Used to separate category/salesman blocks
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#333",
+    marginVertical: 1,
   },
   totalRow: {
+    // For Grand Total row
     fontFamily: "Helvetica-Bold",
-    paddingVertical: 3,
+    paddingVertical: 2,
+    borderTopWidth: 1, // Thicker line for grand total
+    borderTopColor: "#000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    marginTop: 2,
   },
   sectionTitle: {
-    fontSize: 10,
+    // For "Quantity Breakdown", "Amount Breakdown"
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
+    marginBottom: 4, // Space after section title
+    marginTop: 5, // Space before section title
   },
   breakdownSection: {
     flexDirection: "row",
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 12,
   },
   breakdownColumn: {
     width: "50%",
-    paddingHorizontal: 10,
+    paddingRight: 15, // Space between columns
   },
   breakdownRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 2,
+    marginBottom: 0.5, // Tighter spacing
+    paddingVertical: 0.5,
   },
   breakdownLabel: {
     fontSize: 8,
@@ -110,25 +134,40 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
   },
+  breakdownSeparator: {
+    height: 0.5,
+    backgroundColor: "#888",
+    marginVertical: 2,
+  },
   salesmanSection: {
-    marginBottom: 2,
+    // No specific style needed, separation achieved by salesmanHeader and lines
   },
   salesmanHeader: {
+    // For Salesman Name
     fontFamily: "Helvetica-Bold",
+    fontSize: 10,
+    marginTop: 10, // More space before a new salesman block
     marginBottom: 3,
-    marginTop: 3,
+    textAlign: "left", // Ensure salesman name is left aligned
   },
   pageNumber: {
     position: "absolute",
-    fontSize: 8,
-    bottom: 20,
+    fontSize: 7,
+    bottom: 15,
     right: 30,
-    color: "#666",
+    color: "#555",
   },
+  // Column Styles for Sisa Sales Page (5 columns)
+  sisaColID: { width: "15%", paddingHorizontal: 3 }, // STOCK
+  sisaColQty: { width: "12%", textAlign: "right", paddingRight: 8 }, // QTY
+  sisaColDescription: { width: "38%", paddingHorizontal: 3 }, // DESCRIPTION
+  sisaColUPrice: { width: "15%", textAlign: "right", paddingRight: 8 }, // U/PRICE
+  sisaColAmount: { width: "20%", textAlign: "right", paddingRight: 3 }, // AMOUNT
 });
 
 // Helper function to format numbers with commas
 const formatNumber = (num: number): string => {
+  if (num == null || num === 0) return "0"; // Show "0" instead of ".00" for quantity
   return num.toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
@@ -137,6 +176,7 @@ const formatNumber = (num: number): string => {
 
 // Helper function to format currency
 const formatCurrency = (amount: number): string => {
+  if (amount == null || amount === 0) return "0.00";
   return amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -150,49 +190,56 @@ export const generateSalesSummaryPDF = async (
   action: "download" | "print"
 ) => {
   try {
-    const monthName = new Date(year, month).toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
+    const dateForMonthName = new Date(year, month);
+    // Format: MM/YYYY, e.g., 03/2025 for March 2025
+    const monthYearFormatted = `${(dateForMonthName.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}/${dateForMonthName.getFullYear()}`;
 
     const doc = (
-      <Document title={`Sales Summary - ${monthName}`}>
+      <Document title={`Sales Summary - ${monthYearFormatted}`}>
         {data.all_sales && (
-          <AllSalesPage data={data.all_sales} monthFormat={monthName} />
+          <AllSalesPage
+            data={data.all_sales}
+            monthFormat={monthYearFormatted}
+          />
         )}
         {data.all_salesmen && (
           <SalesmenPage
             data={data.all_salesmen}
-            title="Summary of all sales by salesman"
-            monthFormat={monthName}
+            title="MONTHLY SUMMARY SALES (INVOICE/CASH/FOC)"
+            monthFormat={monthYearFormatted}
           />
         )}
         {data.mee_salesmen && (
           <SalesmenPage
             data={data.mee_salesmen}
-            title="Summary of Mee sales by salesmen"
-            monthFormat={monthName}
+            title="MONTHLY SUMMARY MEE SALES (INVOICE/CASH/FOC)"
+            monthFormat={monthYearFormatted}
             productType="MEE"
           />
         )}
         {data.bihun_salesmen && (
           <SalesmenPage
             data={data.bihun_salesmen}
-            title="Summary of Bihun sales by salesmen"
-            monthFormat={monthName}
+            title="MONTHLY SUMMARY BIHUN SALES (INVOICE/CASH/FOC)"
+            monthFormat={monthYearFormatted}
             productType="BIHUN"
           />
         )}
         {data.jp_salesmen && (
           <SalesmenPage
             data={data.jp_salesmen}
-            title="Summary of Jellypolly sales by salesmen"
-            monthFormat={monthName}
+            title="MONTHLY SUMMARY JELLYPOLLY SALES (INVOICE/CASH/FOC)"
+            monthFormat={monthYearFormatted}
             productType="JP"
           />
         )}
         {data.sisa_sales && (
-          <SisaSalesPage data={data.sisa_sales} monthFormat={monthName} />
+          <SisaSalesPage
+            data={data.sisa_sales}
+            monthFormat={monthYearFormatted}
+          />
         )}
       </Document>
     );
@@ -203,13 +250,16 @@ export const generateSalesSummaryPDF = async (
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Sales_Summary_${monthName.replace(" ", "_")}.pdf`;
+      link.download = `Sales_Summary_${monthYearFormatted.replace(
+        "/",
+        "_"
+      )}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } else {
-      // Print - Fixed version
+      // Print
       const url = URL.createObjectURL(pdfBlob);
       const printFrame = document.createElement("iframe");
       printFrame.style.display = "none";
@@ -217,28 +267,32 @@ export const generateSalesSummaryPDF = async (
 
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
-          printFrame.contentWindow?.print();
-
-          const handleFocus = () => {
-            window.removeEventListener("focus", handleFocus);
-            setTimeout(() => {
-              document.body.removeChild(printFrame);
+          try {
+            printFrame.contentWindow.print();
+          } catch (e) {
+            console.error("Print failed:", e);
+            // Fallback or error message
+          } finally {
+            // Robust cleanup
+            const cleanup = () => {
+              window.removeEventListener("focus", cleanupFocus);
+              if (document.body.contains(printFrame)) {
+                document.body.removeChild(printFrame);
+              }
               URL.revokeObjectURL(url);
-            }, 100);
-          };
+            };
 
-          window.addEventListener("focus", handleFocus);
+            const cleanupFocus = () => {
+              // Delay slightly to allow print dialog to close fully
+              setTimeout(cleanup, 100);
+            };
 
-          setTimeout(() => {
-            window.removeEventListener("focus", handleFocus);
-            if (document.body.contains(printFrame)) {
-              document.body.removeChild(printFrame);
-              URL.revokeObjectURL(url);
-            }
-          }, 60000);
+            window.addEventListener("focus", cleanupFocus);
+            // Fallback timeout if focus event doesn't fire (e.g. print cancelled quickly)
+            setTimeout(cleanup, 30000); // Reduced from 60s
+          }
         }
       };
-
       printFrame.src = url;
     }
   } catch (error) {
@@ -254,55 +308,115 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
 }) => {
   const { categories, totals } = data;
   return (
-    <Page size="A4" style={styles.page}>
-      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
-      <Text style={styles.reportTitle}>
-        Summary of all sales as at {monthFormat}
+    <Page size="A4" style={styles.page} wrap>
+      <Text style={styles.companyHeader}>
+        TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
       </Text>
+      <Text style={styles.reportTitle}>
+        REPORT: MONTHLY SUMMARY CASH/INVOICE SALES AS AT {monthFormat}
+      </Text>
+      <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>
 
       <View style={styles.table}>
         {/* Table Header */}
         <View style={styles.tableHeader}>
-          <Text style={[styles.colID, styles.headerText]}>ID</Text>
-          <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
+          <Text style={[styles.colID, styles.headerText]}>STOCK</Text>
           <Text style={[styles.colDescription, styles.headerText]}>
-            Description
+            DESCRIPTION
           </Text>
-          <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+          <Text style={[styles.colQty, styles.headerText]}>QTY</Text>
+          <Text style={[styles.colAmount, styles.headerText]}>AMOUNT</Text>
         </View>
 
         {/* Category rows */}
         {Object.entries(categories).map(([key, category]: [string, any]) => {
-          if (key === "total_rounding") return null;
-          if (category.quantity === 0 && category.amount === 0) return null;
+          if (key === "total_rounding") return null; // Assuming rounding is handled in totals or as a specific line item if needed
+          if (
+            category.products.length === 0 &&
+            !(key === "less" && category.amount !== 0)
+          )
+            return null; // Hide empty categories, unless it's LESS with an amount
 
-          const rows = category.products.map((product: any, index: number) => (
-            <View key={`${key}-${index}`} style={styles.tableRow}>
-              <Text style={styles.colID}>{product.code}</Text>
-              <Text style={styles.colQty}>
-                {product.quantity > 0 ? formatNumber(product.quantity) : "0"}
-              </Text>
-              <Text style={styles.colDescription}>{product.description}</Text>
-              <Text style={styles.colAmount}>
-                {formatCurrency(product.amount)}
-              </Text>
-            </View>
-          ));
+          const productRows = category.products.map(
+            (product: any, index: number) => (
+              <View
+                key={`${key}-${index}-${product.code}`}
+                style={styles.tableRow}
+              >
+                <Text style={styles.colID}>{product.code}</Text>
+                <Text style={styles.colDescription}>{product.description}</Text>
+                <Text style={styles.colQty}>
+                  {product.quantity > 0 ||
+                  (key === "less" && product.quantity === 0)
+                    ? formatNumber(product.quantity)
+                    : ""}
+                </Text>
+                <Text style={styles.colAmount}>
+                  {formatCurrency(product.amount)}
+                </Text>
+              </View>
+            )
+          );
+
+          // For "LESS" category, if it has no products but an amount (direct deduction)
+          const lessDirectDeductionRow =
+            key === "less" &&
+            category.products.length === 0 &&
+            category.amount !== 0 ? (
+              <View key={`${key}-direct`} style={styles.tableRow}>
+                <Text style={styles.colID}>{category.id || "LESS"}</Text>
+                <Text style={styles.colDescription}>
+                  {category.description || "LESS"}
+                </Text>
+                <Text style={styles.colQty}>0</Text>
+                <Text style={styles.colAmount}>
+                  {formatCurrency(category.amount)}
+                </Text>
+              </View>
+            ) : null;
 
           return (
             <React.Fragment key={key}>
-              {rows}
+              {productRows}
+              {lessDirectDeductionRow}
               {/* Category subtotal */}
-              {category.products.length > 1 && (
+              {(category.products.length > 0 || lessDirectDeductionRow) && (
                 <>
-                  <View style={styles.solidLine} />
-                  <View style={[styles.tableRow, styles.subtotalRow]}>
+                  <View style={styles.dashedLineAboveSubtotal}>
                     <Text style={styles.colID}></Text>
-                    <Text style={styles.colQty}>
+                    <Text style={styles.colDescription}></Text>
+                    <View
+                      style={[
+                        styles.dashedLineCell,
+                        {
+                          width: styles.colQty.width,
+                          paddingRight: styles.colQty.paddingRight,
+                        },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.dashedLineCell,
+                        {
+                          width: styles.colAmount.width,
+                          paddingRight: styles.colAmount.paddingRight,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <View
+                    style={[
+                      styles.tableRow,
+                      styles.subtotalRow,
+                      { borderBottomWidth: 0 },
+                    ]}
+                  >
+                    <Text style={styles.colID}></Text>
+                    <Text style={styles.colDescription}></Text>
+                    <Text style={[styles.colQty, styles.headerText]}>
                       {formatNumber(category.quantity)}
                     </Text>
-                    <Text style={styles.colDescription}></Text>
-                    <Text style={styles.colAmount}>
+                    <Text style={[styles.colAmount, styles.headerText]}>
                       {formatCurrency(category.amount)}
                     </Text>
                   </View>
@@ -313,113 +427,176 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           );
         })}
 
-        {/* LESS row */}
-        {categories.less && categories.less.amount !== 0 && (
-          <>
-            <View style={styles.tableRow}>
-              <Text style={styles.colID}>LESS</Text>
-              <Text style={styles.colQty}>0</Text>
-              <Text style={styles.colDescription}>LESS</Text>
-              <Text style={styles.colAmount}>
-                {formatCurrency(categories.less.amount)}
-              </Text>
-            </View>
-            <View style={styles.solidLine} />
-            <View style={[styles.tableRow, styles.subtotalRow]}>
-              <Text style={styles.colID}></Text>
-              <Text style={styles.colQty}>0</Text>
-              <Text style={styles.colDescription}></Text>
-              <Text style={styles.colAmount}>
-                {formatCurrency(categories.less.amount)}
-              </Text>
-            </View>
-            <View style={styles.solidLine} />
-          </>
-        )}
+        {/* ADJ - Rounding Adjustment (if provided as a category, similar to sample) */}
+        {categories.total_rounding &&
+          categories.total_rounding.products &&
+          categories.total_rounding.products.length > 0 && (
+            <React.Fragment key="total_rounding_display">
+              {categories.total_rounding.products.map(
+                (product: any, index: number) => (
+                  <View
+                    key={`rounding-${index}-${product.code}`}
+                    style={styles.tableRow}
+                  >
+                    <Text style={styles.colID}>{product.code || "ADJ"}</Text>
+                    <Text style={styles.colDescription}>
+                      {product.description || "ROUNDING ADJ"}
+                    </Text>
+                    <Text style={styles.colQty}>
+                      {formatNumber(product.quantity)}
+                    </Text>
+                    <Text style={styles.colAmount}>
+                      {formatCurrency(product.amount)}
+                    </Text>
+                  </View>
+                )
+              )}
+              <View style={styles.dashedLineAboveSubtotal}>
+                <Text style={styles.colID}></Text>
+                <Text style={styles.colDescription}></Text>
+                <View
+                  style={[
+                    styles.dashedLineCell,
+                    {
+                      width: styles.colQty.width,
+                      paddingRight: styles.colQty.paddingRight,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dashedLineCell,
+                    {
+                      width: styles.colAmount.width,
+                      paddingRight: styles.colAmount.paddingRight,
+                    },
+                  ]}
+                />
+              </View>
+              <View
+                style={[
+                  styles.tableRow,
+                  styles.subtotalRow,
+                  { borderBottomWidth: 0 },
+                ]}
+              >
+                <Text style={styles.colID}></Text>
+                <Text style={styles.colDescription}></Text>
+                <Text style={[styles.colQty, styles.headerText]}>
+                  {formatNumber(categories.total_rounding.quantity)}
+                </Text>
+                <Text style={[styles.colAmount, styles.headerText]}>
+                  {formatCurrency(categories.total_rounding.amount)}
+                </Text>
+              </View>
+              <View style={styles.solidLine} />
+            </React.Fragment>
+          )}
 
         {/* Grand Total */}
-        <View style={styles.solidLine} />
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={styles.colID}>Total :</Text>
+          <Text style={[styles.colID, styles.headerText]}>TOTAL :</Text>
+          <Text style={styles.colDescription}></Text>
           <Text style={[styles.colQty, styles.headerText]}>
             {formatNumber(totals.totalQuantity || 0)}
           </Text>
-          <Text style={styles.colDescription}></Text>
           <Text style={[styles.colAmount, styles.headerText]}>
-            {formatCurrency(totals.grandTotal)}
+            {formatCurrency(totals.grandTotalAmount)}
           </Text>
         </View>
-        <View style={styles.solidLine} />
-        {/* Breakdown section */}
-        <View style={styles.breakdownSection}>
-          <View style={styles.breakdownColumn}>
-            <Text style={[styles.sectionTitle]}>Quantity Breakdown</Text>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Mee + Bihun:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatNumber(totals.meeBihunQuantity || 0)}
-              </Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Jelly Polly:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatNumber(totals.jpQuantity || 0)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.breakdownRow,
-                { borderTopWidth: 0.5, paddingTop: 2 },
-              ]}
-            >
-              <Text style={styles.breakdownLabel}>Total Quantity:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatNumber(totals.totalQuantity || 0)}
-              </Text>
-            </View>
+      </View>
+
+      {/* Breakdown section */}
+      <View style={styles.breakdownSection}>
+        <View style={styles.breakdownColumn}>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>MEE (QTY) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(totals.meeQuantity || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>BIHUN (QTY) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(totals.bihunQuantity || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>MEE + BIHUN (QTY) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(totals.meeBihunQuantity || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>JELLY POLLY (QTY) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(totals.jpQuantity || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CASH SALES =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(totals.cashSalesAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CR SALES =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(totals.creditSalesAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={[styles.breakdownLabel, styles.headerText]}>
+              GRAND TOTAL =
+            </Text>
+            <Text style={[styles.breakdownValue, styles.headerText]}>
+              {formatCurrency(totals.grandTotalInvoicesAmount || 0)}
+            </Text>
           </View>
         </View>
-        <View style={styles.breakdownSection}>
-          <View style={styles.breakdownColumn}>
-            <Text style={[styles.sectionTitle]}>Amount Breakdown</Text>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Mee + Bihun:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatCurrency(totals.meeBihunAmount || 0)}
-              </Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Jelly Polly:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatCurrency(totals.jpAmount || 0)}
-              </Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Cash Sales:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatCurrency(totals.cashSales.amount)}
-              </Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Credit Sales:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatCurrency(totals.creditSales.amount)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.breakdownRow,
-                { borderTopWidth: 0.5, paddingTop: 2 },
-              ]}
-            >
-              <Text style={styles.breakdownLabel}>Grand Total:</Text>
-              <Text style={styles.breakdownValue}>
-                {formatCurrency(totals.grandTotal)}
-              </Text>
-            </View>
+        <View style={styles.breakdownColumn}>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>MEE (AMOUNT) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(totals.meeAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>BIHUN (AMOUNT) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(totals.bihunAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>MEE + BIHUN (AMOUNT) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(totals.meeBihunAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>JELLY POLLY (AMOUNT) =</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(totals.jpAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={[styles.breakdownLabel, styles.headerText]}>
+              GRAND TOTAL =
+            </Text>
+            <Text style={[styles.breakdownValue, styles.headerText]}>
+              {formatCurrency(totals.totalProductsAmount || 0)}
+            </Text>
           </View>
         </View>
       </View>
+      <Text
+        style={styles.pageNumber}
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+        fixed
+      />
     </Page>
   );
 };
@@ -430,123 +607,221 @@ const SalesmenPage: React.FC<{
   title: string;
   monthFormat: string;
   productType?: string;
-}> = ({ data, title, monthFormat, productType }) => {
+}> = ({ data, title, monthFormat }) => {
   const { salesmen, foc, returns } = data;
 
   return (
-    <Page size="A4" style={styles.page}>
-      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
-      <Text style={styles.reportTitle}>
-        {title} as at {monthFormat}
+    <Page size="A4" style={styles.page} wrap>
+      <Text style={styles.companyHeader}>
+        TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
       </Text>
-
-      {/* Table Header */}
+      <Text style={styles.reportTitle}>
+        {title} AS AT {monthFormat}
+      </Text>
+      <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>{" "}
+      {/* Or dynamically set if per salesman view */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.colID, styles.headerText]}>ID</Text>
-        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
+        <Text style={[styles.colID, styles.headerText]}>STOCK</Text>
         <Text style={[styles.colDescription, styles.headerText]}>
-          Description
+          DESCRIPTION
         </Text>
-        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.colQty, styles.headerText]}>QTY</Text>
+        <Text style={[styles.colAmount, styles.headerText]}>AMOUNT</Text>
       </View>
-
-      {/* Salesmen sections */}
       {Object.entries(salesmen).map(
-        ([salesmanId, salesmanData]: [string, any]) => {
+        ([salesmanName, salesmanData]: [string, any]) => {
+          if (salesmanData.products.length === 0) return null;
           return (
-            <View key={salesmanId} style={styles.salesmanSection}>
-              <Text style={styles.salesmanHeader}>{salesmanId}</Text>
-              <View style={styles.solidLine} />
-
+            <View key={salesmanName} style={styles.salesmanSection}>
+              <Text style={styles.salesmanHeader}>
+                {salesmanName.toUpperCase()}
+              </Text>
+              {/* <View style={styles.solidLine} /> Removed line under salesman name, header stands out */}
               {salesmanData.products.map((product: any, index: number) => (
-                <View key={index} style={styles.tableRow}>
+                <View
+                  key={`${salesmanName}-${index}-${product.code}`}
+                  style={styles.tableRow}
+                >
                   <Text style={styles.colID}>{product.code}</Text>
-                  <Text style={styles.colQty}>
-                    {formatNumber(product.quantity)}
-                  </Text>
                   <Text style={styles.colDescription}>
                     {product.description}
+                  </Text>
+                  <Text style={styles.colQty}>
+                    {formatNumber(product.quantity)}
                   </Text>
                   <Text style={styles.colAmount}>
                     {formatCurrency(product.amount)}
                   </Text>
                 </View>
               ))}
-
-              <View style={styles.solidLine} />
-              <View style={[styles.tableRow, styles.subtotalRow]}>
+              <View style={styles.dashedLineAboveSubtotal}>
                 <Text style={styles.colID}></Text>
+                <Text style={styles.colDescription}></Text>
+                <View
+                  style={[
+                    styles.dashedLineCell,
+                    {
+                      width: styles.colQty.width,
+                      paddingRight: styles.colQty.paddingRight,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dashedLineCell,
+                    {
+                      width: styles.colAmount.width,
+                      paddingRight: styles.colAmount.paddingRight,
+                    },
+                  ]}
+                />
+              </View>
+              <View
+                style={[
+                  styles.tableRow,
+                  styles.subtotalRow,
+                  { borderBottomWidth: 0 },
+                ]}
+              >
+                <Text style={styles.colID}></Text>
+                <Text style={styles.colDescription}></Text>
                 <Text style={[styles.colQty, styles.headerText]}>
                   {formatNumber(salesmanData.total.quantity)}
                 </Text>
-                <Text style={styles.colDescription}></Text>
                 <Text style={[styles.colAmount, styles.headerText]}>
                   {formatCurrency(salesmanData.total.amount)}
                 </Text>
               </View>
-              <View style={styles.solidLine} />
+              <View style={styles.solidLine} />{" "}
+              {/* Line after each salesman's total */}
             </View>
           );
         }
       )}
-
       {/* FOC section */}
-      {foc && foc.length > 0 && (
+      {foc && foc.products && foc.products.length > 0 && (
         <View style={styles.salesmanSection}>
           <Text style={styles.salesmanHeader}>FOC</Text>
-          <View style={styles.solidLine} />
-          {foc.map((product: any, index: number) => (
-            <View key={index} style={styles.tableRow}>
+          {foc.products.map((product: any, index: number) => (
+            <View key={`foc-${index}-${product.code}`} style={styles.tableRow}>
               <Text style={styles.colID}>{product.code}</Text>
+              <Text style={styles.colDescription}>{product.description}</Text>
               <Text style={styles.colQty}>
                 {formatNumber(product.quantity)}
               </Text>
-              <Text style={styles.colDescription}>{product.description}</Text>
               <Text style={styles.colAmount}>.00</Text>
             </View>
           ))}
-          <View style={styles.solidLine} />
-          <View style={[styles.tableRow, styles.subtotalRow]}>
+          <View style={styles.dashedLineAboveSubtotal}>
             <Text style={styles.colID}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
-              {formatNumber(
-                foc.reduce((sum: number, p: any) => sum + p.quantity, 0)
-              )}
-            </Text>
             <Text style={styles.colDescription}></Text>
+            <View
+              style={[
+                styles.dashedLineCell,
+                {
+                  width: styles.colQty.width,
+                  paddingRight: styles.colQty.paddingRight,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.dashedLineCell,
+                {
+                  width: styles.colAmount.width,
+                  paddingRight: styles.colAmount.paddingRight,
+                  borderTopWidth: 0,
+                },
+              ]}
+            />{" "}
+            {/* No dash for amount .00 */}
+          </View>
+          <View
+            style={[
+              styles.tableRow,
+              styles.subtotalRow,
+              { borderBottomWidth: 0 },
+            ]}
+          >
+            <Text style={styles.colID}></Text>
+            <Text style={styles.colDescription}></Text>
+            <Text style={[styles.colQty, styles.headerText]}>
+              {formatNumber(foc.total.quantity)}
+            </Text>
             <Text style={[styles.colAmount, styles.headerText]}>.00</Text>
           </View>
+          <View style={styles.solidLine} />
         </View>
       )}
-
       {/* Returns section */}
-      {returns && returns.length > 0 && (
+      {returns && returns.products && returns.products.length > 0 && (
         <View style={styles.salesmanSection}>
-          <Text style={styles.salesmanHeader}>Return Products</Text>
-          <View style={styles.solidLine} />
-          {returns.map((product: any, index: number) => (
-            <View key={index} style={styles.tableRow}>
+          <Text style={styles.salesmanHeader}>RETURN PRODUCTS</Text>
+          {returns.products.map((product: any, index: number) => (
+            <View
+              key={`return-${index}-${product.code}`}
+              style={styles.tableRow}
+            >
               <Text style={styles.colID}>{product.code}</Text>
+              <Text style={styles.colDescription}>{product.description}</Text>
               <Text style={styles.colQty}>
                 {formatNumber(product.quantity)}
               </Text>
-              <Text style={styles.colDescription}>{product.description}</Text>
-              <Text style={styles.colAmount}>-</Text>
+              <Text style={styles.colAmount}>
+                {product.amount !== 0 ? formatCurrency(product.amount) : "-"}
+              </Text>
             </View>
           ))}
-          <View style={styles.solidLine} />
-          <View style={[styles.tableRow, styles.subtotalRow]}>
+          <View style={styles.dashedLineAboveSubtotal}>
             <Text style={styles.colID}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
-              {formatNumber(
-                returns.reduce((sum: number, p: any) => sum + p.quantity, 0)
-              )}
-            </Text>
             <Text style={styles.colDescription}></Text>
-            <Text style={[styles.colAmount, styles.headerText]}>-</Text>
+            <View
+              style={[
+                styles.dashedLineCell,
+                {
+                  width: styles.colQty.width,
+                  paddingRight: styles.colQty.paddingRight,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.dashedLineCell,
+                {
+                  width: styles.colAmount.width,
+                  paddingRight: styles.colAmount.paddingRight,
+                  borderTopWidth: 0,
+                },
+              ]}
+            />{" "}
+            {/* No dash for amount '-' */}
           </View>
+          <View
+            style={[
+              styles.tableRow,
+              styles.subtotalRow,
+              { borderBottomWidth: 0 },
+            ]}
+          >
+            <Text style={styles.colID}></Text>
+            <Text style={styles.colDescription}></Text>
+            <Text style={[styles.colQty, styles.headerText]}>
+              {formatNumber(returns.total.quantity)}
+            </Text>
+            <Text style={[styles.colAmount, styles.headerText]}>
+              {returns.total.amount !== 0
+                ? formatCurrency(returns.total.amount)
+                : "-"}
+            </Text>
+          </View>
+          <View style={styles.solidLine} />
         </View>
       )}
+      <Text
+        style={styles.pageNumber}
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+        fixed
+      />
     </Page>
   );
 };
@@ -556,56 +831,104 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
   data,
   monthFormat,
 }) => {
+  const categories = [
+    { key: "empty_bag", data: data.empty_bag, label: "EMPTY BAG" }, // Label for breakdown
+    { key: "sbh", data: data.sbh, label: "SISA BIHUN" },
+    { key: "smee", data: data.smee, label: "SISA MEE" },
+  ];
+  const totalSisaQuantity = categories.reduce(
+    (sum, cat) => sum + (cat.data?.quantity || 0),
+    0
+  );
+  const totalSisaAmount = categories.reduce(
+    (sum, cat) => sum + (cat.data?.amount || 0),
+    0
+  );
+
   return (
-    <Page size="A4" style={styles.page}>
-      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
-      <Text style={styles.reportTitle}>
-        Summary of Sisa sales as at {monthFormat}
+    <Page size="A4" style={styles.page} wrap>
+      <Text style={styles.companyHeader}>
+        TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
       </Text>
+      <Text style={styles.reportTitle}>
+        REPORT: MONTHLY SUMMARY SISA SALES AS AT {monthFormat}
+      </Text>
+      <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>
 
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-          <Text style={[styles.colID, styles.headerText]}>ID</Text>
-          <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
-          <Text style={[styles.colDescription, styles.headerText]}>
-            Description
+          <Text style={[styles.sisaColID, styles.headerText]}>STOCK</Text>
+          <Text style={[styles.sisaColDescription, styles.headerText]}>
+            DESCRIPTION
           </Text>
-          <Text style={[styles.colAmount, styles.headerText]}>U/Price</Text>
-          <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+          <Text style={[styles.sisaColQty, styles.headerText]}>QTY</Text>
+          <Text style={[styles.sisaColUPrice, styles.headerText]}>U/PRICE</Text>
+          <Text style={[styles.sisaColAmount, styles.headerText]}>AMOUNT</Text>
         </View>
 
-        {/* Render each category */}
-        {["empty_bag", "sbh", "smee"].map((categoryKey) => {
-          const category = data[categoryKey];
-          if (!category || category.products.length === 0) return null;
+        {categories.map(({ key, data: categoryData }) => {
+          if (!categoryData || categoryData.products.length === 0) return null;
 
           return (
-            <React.Fragment key={categoryKey}>
-              {category.products.map((product: any, index: number) => (
-                <View key={`${categoryKey}-${index}`} style={styles.tableRow}>
-                  <Text style={styles.colID}>{product.code}</Text>
-                  <Text style={styles.colQty}>
-                    {formatNumber(product.quantity)}
-                  </Text>
-                  <Text style={styles.colDescription}>
+            <React.Fragment key={key}>
+              {categoryData.products.map((product: any, index: number) => (
+                <View
+                  key={`${key}-${index}-${product.code}`}
+                  style={styles.tableRow}
+                >
+                  <Text style={styles.sisaColID}>{product.code}</Text>
+                  <Text style={styles.sisaColDescription}>
                     {product.description}
                   </Text>
-                  <Text style={styles.colAmount}></Text>
-                  <Text style={styles.colAmount}>
+                  <Text style={styles.sisaColQty}>
+                    {formatNumber(product.quantity)}
+                  </Text>
+                  <Text style={styles.sisaColUPrice}>
+                    {product.u_price ? formatCurrency(product.u_price) : ""}
+                  </Text>
+                  <Text style={styles.sisaColAmount}>
                     {formatCurrency(product.amount)}
                   </Text>
                 </View>
               ))}
-              <View style={styles.solidLine} />
-              <View style={[styles.tableRow, styles.subtotalRow]}>
-                <Text style={styles.colID}></Text>
-                <Text style={styles.colQty}>
-                  {formatNumber(category.quantity)}
+              <View style={styles.dashedLineAboveSubtotal}>
+                <Text style={styles.sisaColID}></Text>
+                <Text style={styles.sisaColDescription}></Text>
+                <Text style={styles.sisaColUPrice}></Text>
+                <View
+                  style={[
+                    styles.dashedLineCell,
+                    {
+                      width: styles.sisaColQty.width,
+                      paddingRight: styles.sisaColQty.paddingRight,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dashedLineCell,
+                    {
+                      width: styles.sisaColAmount.width,
+                      paddingRight: styles.sisaColAmount.paddingRight,
+                    },
+                  ]}
+                />
+              </View>
+              <View
+                style={[
+                  styles.tableRow,
+                  styles.subtotalRow,
+                  { borderBottomWidth: 0 },
+                ]}
+              >
+                <Text style={styles.sisaColID}></Text>
+                <Text style={styles.sisaColDescription}></Text>
+                <Text style={[styles.sisaColQty, styles.headerText]}>
+                  {formatNumber(categoryData.quantity)}
                 </Text>
-                <Text style={styles.colDescription}></Text>
-                <Text style={styles.colAmount}></Text>
-                <Text style={styles.colAmount}>
-                  {formatCurrency(category.amount)}
+                <Text style={styles.sisaColUPrice}></Text>
+                <Text style={[styles.sisaColAmount, styles.headerText]}>
+                  {formatCurrency(categoryData.amount)}
                 </Text>
               </View>
               <View style={styles.solidLine} />
@@ -614,78 +937,74 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         })}
 
         {/* TOTAL */}
-        <View style={styles.solidLine} />
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={styles.colID}>Total :</Text>
-          <Text style={[styles.colQty, styles.headerText]}>
-            {formatNumber(
-              (data.empty_bag?.quantity || 0) +
-                (data.sbh?.quantity || 0) +
-                (data.smee?.quantity || 0)
-            )}
+          <Text style={[styles.sisaColID, styles.headerText]}>TOTAL :</Text>
+          <Text style={styles.sisaColDescription}></Text>
+          <Text style={[styles.sisaColQty, styles.headerText]}>
+            {formatNumber(totalSisaQuantity)}
           </Text>
-          <Text style={styles.colDescription}></Text>
-          <Text style={styles.colAmount}></Text>
-          <Text style={[styles.colAmount, styles.headerText]}>
-            {formatCurrency(
-              (data.empty_bag?.amount || 0) +
-                (data.sbh?.amount || 0) +
-                (data.smee?.amount || 0)
-            )}
+          <Text style={styles.sisaColUPrice}></Text>
+          <Text style={[styles.sisaColAmount, styles.headerText]}>
+            {formatCurrency(totalSisaAmount)}
           </Text>
         </View>
-        <View style={styles.solidLine} />
       </View>
 
       {/* Breakdown section */}
       <View style={styles.breakdownSection}>
         <View style={styles.breakdownColumn}>
-          <Text style={[styles.sectionTitle, { fontSize: 9 }]}>
-            Quantity Breakdown
-          </Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>EMPTY_BAG:</Text>
-            <Text style={styles.breakdownValue}>
-              {data.empty_bag.quantity.toLocaleString()}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>SBH:</Text>
-            <Text style={styles.breakdownValue}>
-              {data.sbh.quantity.toLocaleString()}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>SMEE:</Text>
-            <Text style={styles.breakdownValue}>
-              {data.smee.quantity.toLocaleString()}
-            </Text>
-          </View>
+          {categories.map(({ key, data: catData, label }) => {
+            if (!catData) return null;
+            // Show EMPTY BAG last in breakdown as per plan
+            if (key === "empty_bag") return null;
+            return (
+              <View style={styles.breakdownRow} key={`${key}-qtybrk`}>
+                <Text style={styles.breakdownLabel}>{label} (QTY) =</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(catData.quantity || 0)}
+                </Text>
+              </View>
+            );
+          })}
+          {/* EMPTY BAG QTY last */}
+          {data.empty_bag && (
+            <View style={styles.breakdownRow} key="empty_bag-qtybrk">
+              <Text style={styles.breakdownLabel}>EMPTY BAG (QTY) =</Text>
+              <Text style={styles.breakdownValue}>
+                {formatNumber(data.empty_bag.quantity || 0)}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.breakdownColumn}>
-          <Text style={[styles.sectionTitle, { fontSize: 9 }]}>
-            Amount Breakdown
-          </Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>EMPTY_BAG:</Text>
-            <Text style={styles.breakdownValue}>
-              {data.empty_bag.amount.toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>SBH:</Text>
-            <Text style={styles.breakdownValue}>
-              {data.sbh.amount.toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>SMEE:</Text>
-            <Text style={styles.breakdownValue}>
-              {data.smee.amount.toFixed(2)}
-            </Text>
-          </View>
+          {categories.map(({ key, data: catData, label }) => {
+            if (!catData) return null;
+            if (key === "empty_bag") return null;
+            return (
+              <View style={styles.breakdownRow} key={`${key}-amtbrk`}>
+                <Text style={styles.breakdownLabel}>{label} (AMOUNT) =</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(catData.amount || 0)}
+                </Text>
+              </View>
+            );
+          })}
+          {/* EMPTY BAG AMOUNT last */}
+          {data.empty_bag && (
+            <View style={styles.breakdownRow} key="empty_bag-amtbrk">
+              <Text style={styles.breakdownLabel}>EMPTY BAG (AMOUNT) =</Text>
+              <Text style={styles.breakdownValue}>
+                {formatCurrency(data.empty_bag.amount || 0)}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
+      <Text
+        style={styles.pageNumber}
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+        fixed
+      />
     </Page>
   );
 };
