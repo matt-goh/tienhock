@@ -19,53 +19,41 @@ interface SummaryData {
 
 const styles = StyleSheet.create({
   page: {
-    paddingHorizontal: 30,
-    paddingVertical: 25,
+    padding: 20,
     fontFamily: "Helvetica",
-    fontSize: 8,
-    lineHeight: 1.4,
+    fontSize: 9,
+    lineHeight: 1.3,
   },
   companyHeader: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 2,
+    marginBottom: 4,
     textAlign: "left",
   },
   reportTitle: {
-    fontSize: 9,
     fontFamily: "Helvetica", // Keep it normal weight for subtitle
-    marginBottom: 1,
+    marginBottom: 3,
     textAlign: "left",
   },
-  salesmanInfo: {
-    fontSize: 9,
-    fontFamily: "Helvetica",
-    marginBottom: 8,
-    textAlign: "left",
-  },
-  table: {
-    marginBottom: 10, // Reduced bottom margin for table
-  },
+  table: {},
   tableHeader: {
     flexDirection: "row",
     borderTopWidth: 0.5,
     borderTopColor: "#333",
     borderBottomWidth: 0.5,
     borderBottomColor: "#333",
-    paddingVertical: 3,
+    paddingVertical: 2,
+    marginBottom: 4, // Space below header
     backgroundColor: "#f8f8f8", // Light grey for header background
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 1.5,
-    minHeight: 15,
   },
   // Standard Column Styles
   colID: { width: "18%", paddingHorizontal: 3 },
   colDescription: { width: "42%", paddingHorizontal: 3 },
   colQty: { width: "15%", textAlign: "right", paddingRight: 8 },
   colAmount: { width: "25%", textAlign: "right", paddingRight: 3 },
-
   headerText: {
     fontFamily: "Helvetica-Bold",
     fontSize: 8, // Header text size
@@ -81,7 +69,6 @@ const styles = StyleSheet.create({
     borderTopStyle: "dashed",
     height: 1,
     marginTop: 1,
-    marginBottom: 0.5,
   },
   subtotalRow: {
     paddingVertical: 1.5, // Consistent padding
@@ -105,14 +92,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     // For "Quantity Breakdown", "Amount Breakdown"
-    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     marginBottom: 4, // Space after section title
-    marginTop: 5, // Space before section title
+    marginTop: 2, // Space before section title
   },
   breakdownSection: {
     flexDirection: "row",
-    marginTop: 8,
+    marginTop: 4,
     marginBottom: 12,
   },
   breakdownColumn: {
@@ -226,10 +212,10 @@ export const generateSalesSummaryPDF = async (
 ) => {
   try {
     const dateForMonthName = new Date(year, month);
-    // Format: MM/YYYY, e.g., 03/2025 for March 2025
-    const monthYearFormatted = `${(dateForMonthName.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")}/${dateForMonthName.getFullYear()}`;
+    // Format: Month YYYY, e.g., May 2025
+    const monthYearFormatted = `${dateForMonthName.toLocaleDateString("en-US", {
+      month: "long",
+    })} ${dateForMonthName.getFullYear()}`;
 
     const doc = (
       <Document title={`Sales Summary - ${monthYearFormatted}`}>
@@ -242,14 +228,14 @@ export const generateSalesSummaryPDF = async (
         {data.all_salesmen && (
           <SalesmenPage
             data={data.all_salesmen}
-            title="MONTHLY SUMMARY SALES (INVOICE/CASH/FOC)"
+            title="MONTHLY SUMMARY SALES"
             monthFormat={monthYearFormatted}
           />
         )}
         {data.mee_salesmen && (
           <SalesmenPage
             data={data.mee_salesmen}
-            title="MONTHLY SUMMARY MEE SALES (INVOICE/CASH/FOC)"
+            title="MONTHLY SUMMARY MEE SALES"
             monthFormat={monthYearFormatted}
             productType="MEE"
           />
@@ -257,7 +243,7 @@ export const generateSalesSummaryPDF = async (
         {data.bihun_salesmen && (
           <SalesmenPage
             data={data.bihun_salesmen}
-            title="MONTHLY SUMMARY BIHUN SALES (INVOICE/CASH/FOC)"
+            title="MONTHLY SUMMARY BIHUN SALES"
             monthFormat={monthYearFormatted}
             productType="BIHUN"
           />
@@ -265,7 +251,7 @@ export const generateSalesSummaryPDF = async (
         {data.jp_salesmen && (
           <SalesmenPage
             data={data.jp_salesmen}
-            title="MONTHLY SUMMARY JELLYPOLLY SALES (INVOICE/CASH/FOC)"
+            title="MONTHLY SUMMARY JELLYPOLLY SALES"
             monthFormat={monthYearFormatted}
             productType="JP"
           />
@@ -365,13 +351,10 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
 
   return (
     <Page size="A4" style={styles.page} wrap>
-      <Text style={styles.companyHeader}>
-        TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
-      </Text>
+      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        REPORT: MONTHLY SUMMARY CASH/INVOICE SALES AS AT {monthFormat}
+        Monthly Summary Sales as at {monthFormat}
       </Text>
-      <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>
 
       {/* Render each category as a separate section */}
       {Object.entries(categories).map(([key, category]: [string, any]) => {
@@ -388,13 +371,13 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
             {/* Category Table */}
             <View style={styles.table}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.colID, styles.headerText]}>STOCK</Text>
+                <Text style={[styles.colID, styles.headerText]}>ID</Text>
                 <Text style={[styles.colDescription, styles.headerText]}>
-                  DESCRIPTION
+                  Description
                 </Text>
-                <Text style={[styles.colQty, styles.headerText]}>QTY</Text>
+                <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
                 <Text style={[styles.colAmount, styles.headerText]}>
-                  AMOUNT
+                  Amount
                 </Text>
               </View>
 
@@ -418,20 +401,21 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
               ))}
 
               {/* Direct deduction for categories without products */}
-              {(!category.products || category.products.length === 0) && category.amount !== 0 && (
-                <View style={styles.tableRow}>
-                  <Text style={styles.colID}>
-                    {category.id || key.toUpperCase()}
-                  </Text>
-                  <Text style={styles.colDescription}>
-                    {category.description || categoryNames[key] || key}
-                  </Text>
-                  <Text style={styles.colQty}>0</Text>
-                  <Text style={styles.colAmount}>
-                    {formatCurrency(category.amount)}
-                  </Text>
-                </View>
-              )}
+              {(!category.products || category.products.length === 0) &&
+                category.amount !== 0 && (
+                  <View style={styles.tableRow}>
+                    <Text style={styles.colID}>
+                      {category.id || key.toUpperCase()}
+                    </Text>
+                    <Text style={styles.colDescription}>
+                      {category.description || categoryNames[key] || key}
+                    </Text>
+                    <Text style={styles.colQty}>0</Text>
+                    <Text style={styles.colAmount}>
+                      {formatCurrency(category.amount)}
+                    </Text>
+                  </View>
+                )}
 
               {/* Category subtotal */}
               <View style={styles.dashedLineAboveSubtotal}>
@@ -457,12 +441,12 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
                 />
               </View>
               <View style={[styles.tableRow, styles.subtotalRow]}>
-                <Text style={[styles.colID, styles.headerText]}>Subtotal:</Text>
+                <Text style={[styles.colID]}></Text>
                 <Text style={styles.colDescription}></Text>
-                <Text style={[styles.colQty, styles.headerText]}>
+                <Text style={[styles.colQty]}>
                   {formatNumber(category.quantity)}
                 </Text>
-                <Text style={[styles.colAmount, styles.headerText]}>
+                <Text style={[styles.colAmount]}>
                   {formatCurrency(category.amount)}
                 </Text>
               </View>
@@ -541,7 +525,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       <View style={styles.grandTotalSection}>
         <View style={styles.table}>
           <View style={[styles.tableRow, styles.totalRow]}>
-            <Text style={[styles.colID, styles.headerText]}>GRAND TOTAL:</Text>
+            <Text style={[styles.colID, styles.headerText]}>Grand Total:</Text>
             <Text style={styles.colDescription}></Text>
             <Text style={[styles.colQty, styles.headerText]}>
               {formatNumber(totals.totalQuantity || 0)}
@@ -556,39 +540,40 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       {/* Breakdown section remains the same */}
       <View style={styles.breakdownSection}>
         <View style={styles.breakdownColumn}>
+          <Text style={styles.sectionTitle}>Quantity Breakdown</Text>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>MEE (QTY) =</Text>
+            <Text style={styles.breakdownLabel}>Mee =</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.meeQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>BIHUN (QTY) =</Text>
+            <Text style={styles.breakdownLabel}>Bihun =</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.bihunQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>MEE + BIHUN (QTY) =</Text>
+            <Text style={styles.breakdownLabel}>Mee + Bihun =</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.meeBihunQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>JELLY POLLY (QTY) =</Text>
+            <Text style={styles.breakdownLabel}>Jelly Polly =</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.jpQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>CASH SALES =</Text>
+            <Text style={styles.breakdownLabel}>Cash Sales =</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.cashSalesAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>CR SALES =</Text>
+            <Text style={styles.breakdownLabel}>CR Sales =</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.creditSalesAmount || 0)}
             </Text>
@@ -596,7 +581,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
-              GRAND TOTAL =
+              Grand Total =
             </Text>
             <Text style={[styles.breakdownValue, styles.headerText]}>
               {formatCurrency(totals.grandTotalInvoicesAmount || 0)}
@@ -604,26 +589,27 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           </View>
         </View>
         <View style={styles.breakdownColumn}>
+          <Text style={styles.sectionTitle}>Amount Breakdown</Text>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>MEE (AMOUNT) =</Text>
+            <Text style={styles.breakdownLabel}>Mee =</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.meeAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>BIHUN (AMOUNT) =</Text>
+            <Text style={styles.breakdownLabel}>Bihun =</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.bihunAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>MEE + BIHUN (AMOUNT) =</Text>
+            <Text style={styles.breakdownLabel}>Mee + Bihun =</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.meeBihunAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>JELLY POLLY (AMOUNT) =</Text>
+            <Text style={styles.breakdownLabel}>Jelly Polly =</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.jpAmount || 0)}
             </Text>
@@ -631,7 +617,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
-              GRAND TOTAL =
+              Grand Total =
             </Text>
             <Text style={[styles.breakdownValue, styles.headerText]}>
               {formatCurrency(totals.totalProductsAmount || 0)}
@@ -659,21 +645,17 @@ const SalesmenPage: React.FC<{
 
   return (
     <Page size="A4" style={styles.page} wrap>
-      <Text style={styles.companyHeader}>
-        TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
-      </Text>
+      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        {title} AS AT {monthFormat}
+        {title} as at {monthFormat}
       </Text>
-      <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>{" "}
-      {/* Or dynamically set if per salesman view */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.colID, styles.headerText]}>STOCK</Text>
+        <Text style={[styles.colID, styles.headerText]}>ID</Text>
         <Text style={[styles.colDescription, styles.headerText]}>
-          DESCRIPTION
+          Description
         </Text>
-        <Text style={[styles.colQty, styles.headerText]}>QTY</Text>
-        <Text style={[styles.colAmount, styles.headerText]}>AMOUNT</Text>
+        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
+        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
       </View>
       {Object.entries(salesmen).map(
         ([salesmanName, salesmanData]: [string, any]) => {
@@ -803,7 +785,7 @@ const SalesmenPage: React.FC<{
       {/* Returns section */}
       {returns && returns.products && returns.products.length > 0 && (
         <View style={styles.salesmanSection}>
-          <Text style={styles.salesmanHeader}>RETURN PRODUCTS</Text>
+          <Text style={styles.salesmanHeader}>Return Products</Text>
           {returns.products.map((product: any, index: number) => (
             <View
               key={`return-${index}-${product.code}`}
@@ -898,23 +880,18 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
       </Text>
       <Text style={styles.reportTitle}>
-        REPORT: MONTHLY SUMMARY SISA SALES AS AT {monthFormat}
+        Monthly Summary Sales as at {monthFormat}
       </Text>
-      <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>
 
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-          <Text style={[styles.sisaColID, styles.headerText]}>STOCK</Text>
+          <Text style={[styles.sisaColID, styles.headerText]}>ID</Text>
           <Text style={[styles.sisaColDescription, styles.headerText]}>
-            DESCRIPTION
+            Description
           </Text>
-          <Text style={[styles.sisaColQty, styles.headerText]}>QTY</Text>
-          <Text style={[styles.sisaColUPrice, styles.headerText]}>
-            U/PRICE
-          </Text>
-          <Text style={[styles.sisaColAmount, styles.headerText]}>
-            AMOUNT
-          </Text>
+          <Text style={[styles.sisaColQty, styles.headerText]}>Quantity</Text>
+          <Text style={[styles.sisaColUPrice, styles.headerText]}>U/Price</Text>
+          <Text style={[styles.sisaColAmount, styles.headerText]}>Amount</Text>
         </View>
 
         {categories.map(({ key, data: categoryData }) => {
@@ -989,7 +966,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
 
         {/* TOTAL */}
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.sisaColID, styles.headerText]}>TOTAL :</Text>
+          <Text style={[styles.sisaColID, styles.headerText]}>Total :</Text>
           <Text style={styles.sisaColDescription}></Text>
           <Text style={[styles.sisaColQty, styles.headerText]}>
             {formatNumber(totalSisaQuantity)}
