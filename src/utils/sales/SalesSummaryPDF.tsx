@@ -61,6 +61,7 @@ const styles = StyleSheet.create({
   dashedLineAboveSubtotal: {
     flexDirection: "row",
     marginTop: 1, // Space before dashed line
+    paddingTop: 1,
   },
   // Generic dashed line cell style (apply width and paddingRight dynamically)
   dashedLineCell: {
@@ -69,6 +70,13 @@ const styles = StyleSheet.create({
     borderTopStyle: "dashed",
     height: 1,
     marginTop: 1,
+  },
+  categorySubtotalRow: {
+    paddingTop: 2,
+    paddingBottom: 1.5,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#ccc",
+    backgroundColor: "#fafafa", // Subtle background for subtotals
   },
   subtotalRow: {
     paddingVertical: 1.5, // Consistent padding
@@ -356,7 +364,17 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         Monthly Summary Sales as at {monthFormat}
       </Text>
 
-      {/* Render each category as a separate section */}
+      {/* Single Table Header */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.colID, styles.headerText]}>ID</Text>
+        <Text style={[styles.colDescription, styles.headerText]}>
+          Description
+        </Text>
+        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
+        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+      </View>
+
+      {/* All Categories Content */}
       {Object.entries(categories).map(([key, category]: [string, any]) => {
         if (
           (!category.products || category.products.length === 0) &&
@@ -367,89 +385,73 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         }
 
         return (
-          <View key={key} style={styles.categorySection}>
-            {/* Category Table */}
-            <View style={styles.table}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.colID, styles.headerText]}>ID</Text>
-                <Text style={[styles.colDescription, styles.headerText]}>
-                  Description
+          <View key={key}>
+            {/* Product rows */}
+            {category.products?.map((product: any, index: number) => (
+              <View
+                key={`${key}-${index}-${product.code}`}
+                style={styles.tableRow}
+              >
+                <Text style={styles.colID}>{product.code}</Text>
+                <Text style={styles.colDescription}>{product.description}</Text>
+                <Text style={styles.colQty}>
+                  {product.quantity > 0 ? formatNumber(product.quantity) : ""}
                 </Text>
-                <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
-                <Text style={[styles.colAmount, styles.headerText]}>
-                  Amount
+                <Text style={styles.colAmount}>
+                  {formatCurrency(product.amount)}
                 </Text>
               </View>
+            ))}
 
-              {/* Product rows */}
-              {category.products?.map((product: any, index: number) => (
-                <View
-                  key={`${key}-${index}-${product.code}`}
-                  style={styles.tableRow}
-                >
-                  <Text style={styles.colID}>{product.code}</Text>
+            {/* Direct deduction for categories without products */}
+            {(!category.products || category.products.length === 0) &&
+              category.amount !== 0 && (
+                <View style={styles.tableRow}>
+                  <Text style={styles.colID}>
+                    {category.id || key.toUpperCase()}
+                  </Text>
                   <Text style={styles.colDescription}>
-                    {product.description}
+                    {category.description || categoryNames[key] || key}
                   </Text>
-                  <Text style={styles.colQty}>
-                    {product.quantity > 0 ? formatNumber(product.quantity) : ""}
-                  </Text>
+                  <Text style={styles.colQty}>0</Text>
                   <Text style={styles.colAmount}>
-                    {formatCurrency(product.amount)}
+                    {formatCurrency(category.amount)}
                   </Text>
                 </View>
-              ))}
+              )}
 
-              {/* Direct deduction for categories without products */}
-              {(!category.products || category.products.length === 0) &&
-                category.amount !== 0 && (
-                  <View style={styles.tableRow}>
-                    <Text style={styles.colID}>
-                      {category.id || key.toUpperCase()}
-                    </Text>
-                    <Text style={styles.colDescription}>
-                      {category.description || categoryNames[key] || key}
-                    </Text>
-                    <Text style={styles.colQty}>0</Text>
-                    <Text style={styles.colAmount}>
-                      {formatCurrency(category.amount)}
-                    </Text>
-                  </View>
-                )}
-
-              {/* Category subtotal */}
-              <View style={styles.dashedLineAboveSubtotal}>
-                <Text style={styles.colID}></Text>
-                <Text style={styles.colDescription}></Text>
-                <View
-                  style={[
-                    styles.dashedLineCell,
-                    {
-                      width: styles.colQty.width,
-                      paddingRight: styles.colQty.paddingRight,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.dashedLineCell,
-                    {
-                      width: styles.colAmount.width,
-                      paddingRight: styles.colAmount.paddingRight,
-                    },
-                  ]}
-                />
-              </View>
-              <View style={[styles.tableRow, styles.subtotalRow]}>
-                <Text style={[styles.colID]}></Text>
-                <Text style={styles.colDescription}></Text>
-                <Text style={[styles.colQty]}>
-                  {formatNumber(category.quantity)}
-                </Text>
-                <Text style={[styles.colAmount]}>
-                  {formatCurrency(category.amount)}
-                </Text>
-              </View>
+            {/* Category subtotal */}
+            <View style={styles.dashedLineAboveSubtotal}>
+              <Text style={styles.colID}></Text>
+              <Text style={styles.colDescription}></Text>
+              <View
+                style={[
+                  styles.dashedLineCell,
+                  {
+                    width: styles.colQty.width,
+                    paddingRight: styles.colQty.paddingRight,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.dashedLineCell,
+                  {
+                    width: styles.colAmount.width,
+                    paddingRight: styles.colAmount.paddingRight,
+                  },
+                ]}
+              />
+            </View>
+            <View style={[styles.tableRow, styles.categorySubtotalRow]}>
+              <Text style={styles.colID}></Text>
+              <Text style={styles.colDescription}></Text>
+              <Text style={[styles.colQty]}>
+                {formatNumber(category.quantity)}
+              </Text>
+              <Text style={[styles.colAmount]}>
+                {formatCurrency(category.amount)}
+              </Text>
             </View>
           </View>
         );
@@ -459,7 +461,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       {categories.total_rounding &&
         categories.total_rounding.products &&
         categories.total_rounding.products.length > 0 && (
-          <React.Fragment key="total_rounding_display">
+          <View key="total_rounding_display">
             {categories.total_rounding.products.map(
               (product: any, index: number) => (
                 <View
@@ -501,39 +503,30 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
                 ]}
               />
             </View>
-            <View
-              style={[
-                styles.tableRow,
-                styles.subtotalRow,
-                { borderBottomWidth: 0 },
-              ]}
-            >
+            <View style={[styles.tableRow, styles.categorySubtotalRow]}>
               <Text style={styles.colID}></Text>
               <Text style={styles.colDescription}></Text>
-              <Text style={[styles.colQty, styles.headerText]}>
+              <Text style={[styles.colQty]}>
                 {formatNumber(categories.total_rounding.quantity)}
               </Text>
-              <Text style={[styles.colAmount, styles.headerText]}>
+              <Text style={[styles.colAmount]}>
                 {formatCurrency(categories.total_rounding.amount)}
               </Text>
             </View>
-            <View style={styles.solidLine} />
-          </React.Fragment>
+          </View>
         )}
 
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
-        <View style={styles.table}>
-          <View style={[styles.tableRow, styles.totalRow]}>
-            <Text style={[styles.colID, styles.headerText]}>Grand Total:</Text>
-            <Text style={styles.colDescription}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
-              {formatNumber(totals.totalQuantity || 0)}
-            </Text>
-            <Text style={[styles.colAmount, styles.headerText]}>
-              {formatCurrency(totals.grandTotalAmount)}
-            </Text>
-          </View>
+        <View style={[styles.tableRow, styles.totalRow]}>
+          <Text style={[styles.colID, styles.headerText]}>Grand Total:</Text>
+          <Text style={styles.colDescription}></Text>
+          <Text style={[styles.colQty, styles.headerText]}>
+            {formatNumber(totals.totalQuantity || 0)}
+          </Text>
+          <Text style={[styles.colAmount, styles.headerText]}>
+            {formatCurrency(totals.grandTotalAmount)}
+          </Text>
         </View>
       </View>
 
