@@ -58,8 +58,6 @@ const styles = StyleSheet.create({
   tableRow: {
     flexDirection: "row",
     paddingVertical: 1.5,
-    borderBottomWidth: 0.3, // Very faint line between data rows
-    borderBottomColor: "#e9e9e9",
     minHeight: 15,
   },
   // Standard Column Styles
@@ -156,6 +154,43 @@ const styles = StyleSheet.create({
     bottom: 15,
     right: 30,
     color: "#555",
+  },
+  categorySection: {
+    marginBottom: 8, // Space between category sections
+  },
+  categoryHeader: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 3,
+    marginTop: 6,
+    paddingVertical: 2,
+    backgroundColor: "#f3f3f3",
+    paddingHorizontal: 3,
+  },
+  salesmanSectionContainer: {
+    marginBottom: 12, // More space between salesmen
+    borderWidth: 0.5,
+    borderColor: "#ddd",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  salesmanHeaderEnhanced: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    backgroundColor: "#f0f0f0",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#333",
+  },
+  salesmanContent: {
+    paddingTop: 2,
+  },
+  grandTotalSection: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 2,
+    borderTopColor: "#000",
   },
   // Column Styles for Sisa Sales Page (5 columns)
   sisaColID: { width: "15%", paddingHorizontal: 3 }, // STOCK
@@ -307,6 +342,27 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
   monthFormat,
 }) => {
   const { categories, totals } = data;
+
+  // Define category display names
+  const categoryNames: Record<string, string> = {
+    "1-": "Products Starting with 1-",
+    "2-": "Products Starting with 2-",
+    "MEQ-": "Products Starting with MEQ-",
+    "S-": "Products Starting with S-",
+    OTH: "Other Products",
+    "WE-MNL": "WE-MNL Products",
+    "WE-2UDG": "WE-2UDG Products",
+    "WE-300G": "WE-300G Products",
+    "WE-600G": "WE-600G Products",
+    EMPTY_BAG: "Empty Bag Products",
+    SBH: "SBH Products",
+    SMEE: "SMEE Products",
+    "WE-360": "WE-360 Series Products",
+    returns: "Return Products",
+    less: "Less/Deductions",
+    total_rounding: "Rounding Adjustments",
+  };
+
   return (
     <Page size="A4" style={styles.page} wrap>
       <Text style={styles.companyHeader}>
@@ -317,140 +373,67 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       </Text>
       <Text style={styles.salesmanInfo}>SALESMAN: ALL</Text>
 
-      <View style={styles.table}>
-        {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.colID, styles.headerText]}>STOCK</Text>
-          <Text style={[styles.colDescription, styles.headerText]}>
-            DESCRIPTION
-          </Text>
-          <Text style={[styles.colQty, styles.headerText]}>QTY</Text>
-          <Text style={[styles.colAmount, styles.headerText]}>AMOUNT</Text>
-        </View>
+      {/* Render each category as a separate section */}
+      {Object.entries(categories).map(([key, category]: [string, any]) => {
+        if (
+          (!category.products || category.products.length === 0) &&
+          !(key === "less" && category.amount !== 0) &&
+          !(key === "total_rounding" && category.amount !== 0)
+        ) {
+          return null;
+        }
 
-        {/* Category rows */}
-        {Object.entries(categories).map(([key, category]: [string, any]) => {
-          if (key === "total_rounding") return null; // Assuming rounding is handled in totals or as a specific line item if needed
-          if (
-            category.products.length === 0 &&
-            !(key === "less" && category.amount !== 0)
-          )
-            return null; // Hide empty categories, unless it's LESS with an amount
-
-          const productRows = category.products.map(
-            (product: any, index: number) => (
-              <View
-                key={`${key}-${index}-${product.code}`}
-                style={styles.tableRow}
-              >
-                <Text style={styles.colID}>{product.code}</Text>
-                <Text style={styles.colDescription}>{product.description}</Text>
-                <Text style={styles.colQty}>
-                  {product.quantity > 0 ||
-                  (key === "less" && product.quantity === 0)
-                    ? formatNumber(product.quantity)
-                    : ""}
+        return (
+          <View key={key} style={styles.categorySection}>
+            {/* Category Table */}
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.colID, styles.headerText]}>STOCK</Text>
+                <Text style={[styles.colDescription, styles.headerText]}>
+                  DESCRIPTION
                 </Text>
-                <Text style={styles.colAmount}>
-                  {formatCurrency(product.amount)}
+                <Text style={[styles.colQty, styles.headerText]}>QTY</Text>
+                <Text style={[styles.colAmount, styles.headerText]}>
+                  AMOUNT
                 </Text>
               </View>
-            )
-          );
 
-          // For "LESS" category, if it has no products but an amount (direct deduction)
-          const lessDirectDeductionRow =
-            key === "less" &&
-            category.products.length === 0 &&
-            category.amount !== 0 ? (
-              <View key={`${key}-direct`} style={styles.tableRow}>
-                <Text style={styles.colID}>{category.id || "LESS"}</Text>
-                <Text style={styles.colDescription}>
-                  {category.description || "LESS"}
-                </Text>
-                <Text style={styles.colQty}>0</Text>
-                <Text style={styles.colAmount}>
-                  {formatCurrency(category.amount)}
-                </Text>
-              </View>
-            ) : null;
+              {/* Product rows */}
+              {category.products?.map((product: any, index: number) => (
+                <View
+                  key={`${key}-${index}-${product.code}`}
+                  style={styles.tableRow}
+                >
+                  <Text style={styles.colID}>{product.code}</Text>
+                  <Text style={styles.colDescription}>
+                    {product.description}
+                  </Text>
+                  <Text style={styles.colQty}>
+                    {product.quantity > 0 ? formatNumber(product.quantity) : ""}
+                  </Text>
+                  <Text style={styles.colAmount}>
+                    {formatCurrency(product.amount)}
+                  </Text>
+                </View>
+              ))}
 
-          return (
-            <React.Fragment key={key}>
-              {productRows}
-              {lessDirectDeductionRow}
+              {/* Direct deduction for categories without products */}
+              {(!category.products || category.products.length === 0) && category.amount !== 0 && (
+                <View style={styles.tableRow}>
+                  <Text style={styles.colID}>
+                    {category.id || key.toUpperCase()}
+                  </Text>
+                  <Text style={styles.colDescription}>
+                    {category.description || categoryNames[key] || key}
+                  </Text>
+                  <Text style={styles.colQty}>0</Text>
+                  <Text style={styles.colAmount}>
+                    {formatCurrency(category.amount)}
+                  </Text>
+                </View>
+              )}
+
               {/* Category subtotal */}
-              {(category.products.length > 0 || lessDirectDeductionRow) && (
-                <>
-                  <View style={styles.dashedLineAboveSubtotal}>
-                    <Text style={styles.colID}></Text>
-                    <Text style={styles.colDescription}></Text>
-                    <View
-                      style={[
-                        styles.dashedLineCell,
-                        {
-                          width: styles.colQty.width,
-                          paddingRight: styles.colQty.paddingRight,
-                        },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.dashedLineCell,
-                        {
-                          width: styles.colAmount.width,
-                          paddingRight: styles.colAmount.paddingRight,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <View
-                    style={[
-                      styles.tableRow,
-                      styles.subtotalRow,
-                      { borderBottomWidth: 0 },
-                    ]}
-                  >
-                    <Text style={styles.colID}></Text>
-                    <Text style={styles.colDescription}></Text>
-                    <Text style={[styles.colQty, styles.headerText]}>
-                      {formatNumber(category.quantity)}
-                    </Text>
-                    <Text style={[styles.colAmount, styles.headerText]}>
-                      {formatCurrency(category.amount)}
-                    </Text>
-                  </View>
-                  <View style={styles.solidLine} />
-                </>
-              )}
-            </React.Fragment>
-          );
-        })}
-
-        {/* ADJ - Rounding Adjustment (if provided as a category, similar to sample) */}
-        {categories.total_rounding &&
-          categories.total_rounding.products &&
-          categories.total_rounding.products.length > 0 && (
-            <React.Fragment key="total_rounding_display">
-              {categories.total_rounding.products.map(
-                (product: any, index: number) => (
-                  <View
-                    key={`rounding-${index}-${product.code}`}
-                    style={styles.tableRow}
-                  >
-                    <Text style={styles.colID}>{product.code || "ADJ"}</Text>
-                    <Text style={styles.colDescription}>
-                      {product.description || "ROUNDING ADJ"}
-                    </Text>
-                    <Text style={styles.colQty}>
-                      {formatNumber(product.quantity)}
-                    </Text>
-                    <Text style={styles.colAmount}>
-                      {formatCurrency(product.amount)}
-                    </Text>
-                  </View>
-                )
-              )}
               <View style={styles.dashedLineAboveSubtotal}>
                 <Text style={styles.colID}></Text>
                 <Text style={styles.colDescription}></Text>
@@ -473,40 +456,104 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
                   ]}
                 />
               </View>
-              <View
-                style={[
-                  styles.tableRow,
-                  styles.subtotalRow,
-                  { borderBottomWidth: 0 },
-                ]}
-              >
-                <Text style={styles.colID}></Text>
+              <View style={[styles.tableRow, styles.subtotalRow]}>
+                <Text style={[styles.colID, styles.headerText]}>Subtotal:</Text>
                 <Text style={styles.colDescription}></Text>
                 <Text style={[styles.colQty, styles.headerText]}>
-                  {formatNumber(categories.total_rounding.quantity)}
+                  {formatNumber(category.quantity)}
                 </Text>
                 <Text style={[styles.colAmount, styles.headerText]}>
-                  {formatCurrency(categories.total_rounding.amount)}
+                  {formatCurrency(category.amount)}
                 </Text>
               </View>
-              <View style={styles.solidLine} />
-            </React.Fragment>
-          )}
+            </View>
+          </View>
+        );
+      })}
 
-        {/* Grand Total */}
-        <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.colID, styles.headerText]}>TOTAL :</Text>
-          <Text style={styles.colDescription}></Text>
-          <Text style={[styles.colQty, styles.headerText]}>
-            {formatNumber(totals.totalQuantity || 0)}
-          </Text>
-          <Text style={[styles.colAmount, styles.headerText]}>
-            {formatCurrency(totals.grandTotalAmount)}
-          </Text>
+      {/* ADJ - Rounding Adjustment (if provided as a category, similar to sample) */}
+      {categories.total_rounding &&
+        categories.total_rounding.products &&
+        categories.total_rounding.products.length > 0 && (
+          <React.Fragment key="total_rounding_display">
+            {categories.total_rounding.products.map(
+              (product: any, index: number) => (
+                <View
+                  key={`rounding-${index}-${product.code}`}
+                  style={styles.tableRow}
+                >
+                  <Text style={styles.colID}>{product.code || "ADJ"}</Text>
+                  <Text style={styles.colDescription}>
+                    {product.description || "ROUNDING ADJ"}
+                  </Text>
+                  <Text style={styles.colQty}>
+                    {formatNumber(product.quantity)}
+                  </Text>
+                  <Text style={styles.colAmount}>
+                    {formatCurrency(product.amount)}
+                  </Text>
+                </View>
+              )
+            )}
+            <View style={styles.dashedLineAboveSubtotal}>
+              <Text style={styles.colID}></Text>
+              <Text style={styles.colDescription}></Text>
+              <View
+                style={[
+                  styles.dashedLineCell,
+                  {
+                    width: styles.colQty.width,
+                    paddingRight: styles.colQty.paddingRight,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.dashedLineCell,
+                  {
+                    width: styles.colAmount.width,
+                    paddingRight: styles.colAmount.paddingRight,
+                  },
+                ]}
+              />
+            </View>
+            <View
+              style={[
+                styles.tableRow,
+                styles.subtotalRow,
+                { borderBottomWidth: 0 },
+              ]}
+            >
+              <Text style={styles.colID}></Text>
+              <Text style={styles.colDescription}></Text>
+              <Text style={[styles.colQty, styles.headerText]}>
+                {formatNumber(categories.total_rounding.quantity)}
+              </Text>
+              <Text style={[styles.colAmount, styles.headerText]}>
+                {formatCurrency(categories.total_rounding.amount)}
+              </Text>
+            </View>
+            <View style={styles.solidLine} />
+          </React.Fragment>
+        )}
+
+      {/* Grand Total Section */}
+      <View style={styles.grandTotalSection}>
+        <View style={styles.table}>
+          <View style={[styles.tableRow, styles.totalRow]}>
+            <Text style={[styles.colID, styles.headerText]}>GRAND TOTAL:</Text>
+            <Text style={styles.colDescription}></Text>
+            <Text style={[styles.colQty, styles.headerText]}>
+              {formatNumber(totals.totalQuantity || 0)}
+            </Text>
+            <Text style={[styles.colAmount, styles.headerText]}>
+              {formatCurrency(totals.grandTotalAmount)}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* Breakdown section */}
+      {/* Breakdown section remains the same */}
       <View style={styles.breakdownSection}>
         <View style={styles.breakdownColumn}>
           <View style={styles.breakdownRow}>
@@ -862,8 +909,12 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
             DESCRIPTION
           </Text>
           <Text style={[styles.sisaColQty, styles.headerText]}>QTY</Text>
-          <Text style={[styles.sisaColUPrice, styles.headerText]}>U/PRICE</Text>
-          <Text style={[styles.sisaColAmount, styles.headerText]}>AMOUNT</Text>
+          <Text style={[styles.sisaColUPrice, styles.headerText]}>
+            U/PRICE
+          </Text>
+          <Text style={[styles.sisaColAmount, styles.headerText]}>
+            AMOUNT
+          </Text>
         </View>
 
         {categories.map(({ key, data: categoryData }) => {
