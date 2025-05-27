@@ -169,7 +169,7 @@ const SalesSummarySelectionTooltip: React.FC<
 
       toast.success(
         `Sales summary ${
-          action === "print" ? "sent to printer" : "downloaded"
+          action === "print" ? "generated" : "downloaded"
         } successfully`
       );
     } catch (error) {
