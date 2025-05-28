@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: "#333",
     paddingVertical: 2,
+    paddingTop: 3, // More space above header
     marginBottom: 4, // Space below header
     backgroundColor: "#f8f8f8", // Light grey for header background
   },
@@ -131,9 +132,8 @@ const styles = StyleSheet.create({
   salesmanHeader: {
     // For Salesman Name
     fontFamily: "Helvetica-Bold",
-    fontSize: 10,
-    marginTop: 10, // More space before a new salesman block
     marginBottom: 3,
+    paddingHorizontal: 3,
     textAlign: "left", // Ensure salesman name is left aligned
   },
   pageNumber: {
@@ -172,6 +172,61 @@ const formatCurrency = (amount: number): string => {
   return amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  });
+};
+
+// Helper function to determine product category order
+const getProductCategoryOrder = (productCode: string): number => {
+  const categoryOrder = [
+    "1-",
+    "2-",
+    "MEQ-",
+    "S-",
+    "OTH",
+    "WE-MNL",
+    "WE-2UDG",
+    "WE-300G",
+    "WE-600G",
+    "EMPTY_BAG",
+    "SBH",
+    "SMEE",
+    "WE-360",
+    "returns",
+    "less",
+    "total_rounding",
+  ];
+
+  // Check for exact matches first
+  const exactMatch = categoryOrder.findIndex((cat) => productCode === cat);
+  if (exactMatch !== -1) return exactMatch;
+
+  // Check for prefix matches
+  const prefixMatch = categoryOrder.findIndex((cat) => {
+    if (cat.endsWith("-")) {
+      return productCode.startsWith(cat);
+    }
+    if (cat === "WE-360") {
+      return productCode.match(/^(WE-360\(5PK\)|WE-360|WE-3UDG|WE-420)$/);
+    }
+    if (cat === "EMPTY_BAG") {
+      return productCode.startsWith("EMPTY_BAG");
+    }
+    return false;
+  });
+
+  return prefixMatch !== -1 ? prefixMatch : 999; // Unknown products go to end
+};
+
+// Helper function to sort products by category order
+const sortProductsByCategory = (products: any[]): any[] => {
+  return [...products].sort((a, b) => {
+    const orderA = getProductCategoryOrder(a.code);
+    const orderB = getProductCategoryOrder(b.code);
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    // If same category, sort by code alphabetically
+    return a.code.localeCompare(b.code);
   });
 };
 
@@ -342,8 +397,13 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         if (
           (!category.products || category.products.length === 0) &&
           !(key === "less" && category.amount !== 0) &&
-          !(key === "total_rounding" && category.amount !== 0)
+          !(key === "returns" && category.amount !== 0)
         ) {
+          return null;
+        }
+
+        // Skip total_rounding if amount is 0
+        if (key === "total_rounding" && category === 0) {
           return null;
         }
 
@@ -544,6 +604,8 @@ const SalesmenPage: React.FC<{
       <Text style={styles.reportTitle}>
         {title} as at {monthFormat}
       </Text>
+
+      {/* Single Table Header */}
       <View style={styles.tableHeader}>
         <Text style={[styles.colID, styles.headerText]}>ID</Text>
         <Text style={[styles.colDescription, styles.headerText]}>
@@ -552,16 +614,23 @@ const SalesmenPage: React.FC<{
         <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
         <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
       </View>
+
+      {/* Salesmen Sections */}
       {Object.entries(salesmen).map(
         ([salesmanName, salesmanData]: [string, any]) => {
           if (salesmanData.products.length === 0) return null;
+
+          // Sort products by category order
+          const sortedProducts = sortProductsByCategory(salesmanData.products);
+
           return (
-            <View key={salesmanName} style={styles.salesmanSection}>
+            <View key={salesmanName} style={styles.categorySection}>
               <Text style={styles.salesmanHeader}>
                 {salesmanName.toUpperCase()}
               </Text>
-              {/* <View style={styles.solidLine} /> Removed line under salesman name, header stands out */}
-              {salesmanData.products.map((product: any, index: number) => (
+
+              {/* Product rows */}
+              {sortedProducts.map((product: any, index: number) => (
                 <View
                   key={`${salesmanName}-${index}-${product.code}`}
                   style={styles.tableRow}
@@ -578,6 +647,8 @@ const SalesmenPage: React.FC<{
                   </Text>
                 </View>
               ))}
+
+              {/* Dashed line above subtotal */}
               <View style={styles.dashedLineAboveSubtotal}>
                 <Text style={styles.colID}></Text>
                 <Text style={styles.colDescription}></Text>
@@ -600,13 +671,9 @@ const SalesmenPage: React.FC<{
                   ]}
                 />
               </View>
-              <View
-                style={[
-                  styles.tableRow,
-                  styles.subtotalRow,
-                  { borderBottomWidth: 0 },
-                ]}
-              >
+
+              {/* Salesman subtotal */}
+              <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.colID}></Text>
                 <Text style={styles.colDescription}></Text>
                 <Text style={[styles.colQty, styles.headerText]}>
@@ -616,26 +683,34 @@ const SalesmenPage: React.FC<{
                   {formatCurrency(salesmanData.total.amount)}
                 </Text>
               </View>
-              <View style={styles.solidLine} />{" "}
-              {/* Line after each salesman's total */}
             </View>
           );
         }
       )}
-      {/* FOC section */}
+
+      {/* FOC Section */}
       {foc && foc.products && foc.products.length > 0 && (
-        <View style={styles.salesmanSection}>
+        <View style={styles.categorySection}>
           <Text style={styles.salesmanHeader}>FOC</Text>
-          {foc.products.map((product: any, index: number) => (
-            <View key={`foc-${index}-${product.code}`} style={styles.tableRow}>
-              <Text style={styles.colID}>{product.code}</Text>
-              <Text style={styles.colDescription}>{product.description}</Text>
-              <Text style={styles.colQty}>
-                {formatNumber(product.quantity)}
-              </Text>
-              <Text style={styles.colAmount}>.00</Text>
-            </View>
-          ))}
+
+          {/* Sort FOC products by category order */}
+          {sortProductsByCategory(foc.products).map(
+            (product: any, index: number) => (
+              <View
+                key={`foc-${index}-${product.code}`}
+                style={styles.tableRow}
+              >
+                <Text style={styles.colID}>{product.code}</Text>
+                <Text style={styles.colDescription}>{product.description}</Text>
+                <Text style={styles.colQty}>
+                  {formatNumber(product.quantity)}
+                </Text>
+                <Text style={styles.colAmount}>0.00</Text>
+              </View>
+            )
+          )}
+
+          {/* Dashed line above FOC subtotal */}
           <View style={styles.dashedLineAboveSubtotal}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
@@ -654,48 +729,51 @@ const SalesmenPage: React.FC<{
                 {
                   width: styles.colAmount.width,
                   paddingRight: styles.colAmount.paddingRight,
-                  borderTopWidth: 0,
+                  borderTopWidth: 0, // No dash for amount column since it's always 0.00
                 },
               ]}
-            />{" "}
-            {/* No dash for amount .00 */}
+            />
           </View>
-          <View
-            style={[
-              styles.tableRow,
-              styles.subtotalRow,
-              { borderBottomWidth: 0 },
-            ]}
-          >
+
+          {/* FOC subtotal */}
+          <View style={[styles.tableRow, styles.categorySubtotalRow]}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
             <Text style={[styles.colQty, styles.headerText]}>
               {formatNumber(foc.total.quantity)}
             </Text>
-            <Text style={[styles.colAmount, styles.headerText]}>.00</Text>
+            <Text style={[styles.colAmount, styles.headerText]}>0.00</Text>
           </View>
-          <View style={styles.solidLine} />
         </View>
       )}
-      {/* Returns section */}
+
+      {/* Returns Section */}
       {returns && returns.products && returns.products.length > 0 && (
-        <View style={styles.salesmanSection}>
-          <Text style={styles.salesmanHeader}>Return Products</Text>
-          {returns.products.map((product: any, index: number) => (
-            <View
-              key={`return-${index}-${product.code}`}
-              style={styles.tableRow}
-            >
-              <Text style={styles.colID}>{product.code}</Text>
-              <Text style={styles.colDescription}>{product.description}</Text>
-              <Text style={styles.colQty}>
-                {formatNumber(product.quantity)}
-              </Text>
-              <Text style={styles.colAmount}>
-                {product.amount !== 0 ? formatCurrency(product.amount) : "-"}
-              </Text>
-            </View>
-          ))}
+        <View style={styles.categorySection}>
+          <Text style={styles.salesmanHeader}>RETURN PRODUCTS</Text>
+
+          {/* Sort return products by category order */}
+          {sortProductsByCategory(returns.products).map(
+            (product: any, index: number) => (
+              <View
+                key={`return-${index}-${product.code}`}
+                style={styles.tableRow}
+              >
+                <Text style={styles.colID}>{product.code}</Text>
+                <Text style={styles.colDescription}>{product.description}</Text>
+                <Text style={styles.colQty}>
+                  {formatNumber(product.quantity)}
+                </Text>
+                <Text style={styles.colAmount}>
+                  {product.amount !== 0
+                    ? formatCurrency(product.amount)
+                    : "0.00"}
+                </Text>
+              </View>
+            )
+          )}
+
+          {/* Dashed line above returns subtotal */}
           <View style={styles.dashedLineAboveSubtotal}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
@@ -714,19 +792,13 @@ const SalesmenPage: React.FC<{
                 {
                   width: styles.colAmount.width,
                   paddingRight: styles.colAmount.paddingRight,
-                  borderTopWidth: 0,
                 },
               ]}
-            />{" "}
-            {/* No dash for amount '-' */}
+            />
           </View>
-          <View
-            style={[
-              styles.tableRow,
-              styles.subtotalRow,
-              { borderBottomWidth: 0 },
-            ]}
-          >
+
+          {/* Returns subtotal */}
+          <View style={[styles.tableRow, styles.categorySubtotalRow]}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
             <Text style={[styles.colQty, styles.headerText]}>
@@ -735,12 +807,12 @@ const SalesmenPage: React.FC<{
             <Text style={[styles.colAmount, styles.headerText]}>
               {returns.total.amount !== 0
                 ? formatCurrency(returns.total.amount)
-                : "-"}
+                : "0.00"}
             </Text>
           </View>
-          <View style={styles.solidLine} />
         </View>
       )}
+
       <Text
         style={styles.pageNumber}
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
