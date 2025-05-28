@@ -420,66 +420,6 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         );
       })}
 
-      {/* ADJ - Rounding Adjustment (if provided as a category, similar to sample) */}
-      {categories.total_rounding &&
-        categories.total_rounding.products &&
-        categories.total_rounding.products.length > 0 &&
-        categories.total_rounding.amount !== 0 && (
-          <View key="total_rounding_display" style={styles.categorySection}>
-            {categories.total_rounding.products.map(
-              (product: any, index: number) => (
-                <View
-                  key={`rounding-${index}-${product.code}`}
-                  style={styles.tableRow}
-                >
-                  <Text style={styles.colID}>{product.code || "ADJ"}</Text>
-                  <Text style={styles.colDescription}>
-                    {product.description || "ROUNDING ADJ"}
-                  </Text>
-                  <Text style={styles.colQty}>
-                    {formatNumber(product.quantity)}
-                  </Text>
-                  <Text style={styles.colAmount}>
-                    {formatCurrency(product.amount)}
-                  </Text>
-                </View>
-              )
-            )}
-            <View style={styles.dashedLineAboveSubtotal}>
-              <Text style={styles.colID}></Text>
-              <Text style={styles.colDescription}></Text>
-              <View
-                style={[
-                  styles.dashedLineCell,
-                  {
-                    width: styles.colQty.width,
-                    paddingRight: styles.colQty.paddingRight,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.dashedLineCell,
-                  {
-                    width: styles.colAmount.width,
-                    paddingRight: styles.colAmount.paddingRight,
-                  },
-                ]}
-              />
-            </View>
-            <View style={[styles.tableRow, styles.categorySubtotalRow]}>
-              <Text style={styles.colID}></Text>
-              <Text style={styles.colDescription}></Text>
-              <Text style={[styles.colQty]}>
-                {formatNumber(categories.total_rounding.quantity)}
-              </Text>
-              <Text style={[styles.colAmount]}>
-                {formatCurrency(categories.total_rounding.amount)}
-              </Text>
-            </View>
-          </View>
-        )}
-
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
