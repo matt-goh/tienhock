@@ -828,10 +828,11 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
   monthFormat,
 }) => {
   const categories = [
-    { key: "empty_bag", data: data.empty_bag, label: "EMPTY BAG" }, // Label for breakdown
+    { key: "empty_bag", data: data.empty_bag, label: "EMPTY BAG" },
     { key: "sbh", data: data.sbh, label: "SISA BIHUN" },
     { key: "smee", data: data.smee, label: "SISA MEE" },
   ];
+
   const totalSisaQuantity = categories.reduce(
     (sum, cat) => sum + (cat.data?.quantity || 0),
     0
@@ -843,118 +844,49 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
 
   return (
     <Page size="A4" style={styles.page} wrap>
-      <Text style={styles.companyHeader}>
-        TIEN HOCK FOOD INDUSTRIES S/B (953309-T)
-      </Text>
+      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
         Monthly Summary Sales as at {monthFormat}
       </Text>
 
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.sisaColID, styles.headerText]}>ID</Text>
-          <Text style={[styles.sisaColDescription, styles.headerText]}>
-            Description
-          </Text>
-          <Text style={[styles.sisaColQty, styles.headerText]}>Quantity</Text>
-          <Text style={[styles.sisaColUPrice, styles.headerText]}>U/Price</Text>
-          <Text style={[styles.sisaColAmount, styles.headerText]}>Amount</Text>
-        </View>
+      {/* Single Table Header */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.sisaColID, styles.headerText]}>ID</Text>
+        <Text style={[styles.sisaColDescription, styles.headerText]}>
+          Description
+        </Text>
+        <Text style={[styles.sisaColQty, styles.headerText]}>Quantity</Text>
+        <Text style={[styles.sisaColUPrice, styles.headerText]}>U/Price</Text>
+        <Text style={[styles.sisaColAmount, styles.headerText]}>Amount</Text>
+      </View>
 
-        {categories.map(({ key, data: categoryData, label }) => {
-          if (!categoryData) return null;
+      {/* Categories Content */}
+      {categories.map(({ key, data: categoryData, label }) => {
+        if (!categoryData) return null;
 
-          // Handle categories with no products but have totals (like sbh, smee)
-          if (categoryData.quantity > 0 || categoryData.amount > 0) {
-            return (
-              <React.Fragment key={key}>
-                <View style={styles.tableRow}>
-                  <Text style={styles.sisaColID}>{key.toUpperCase()}</Text>
-                  <Text style={styles.sisaColDescription}>{label}</Text>
-                  <Text style={styles.sisaColQty}>
-                    {formatNumber(categoryData.quantity)}
-                  </Text>
-                  <Text style={styles.sisaColUPrice}>
-                    {categoryData.quantity > 0
-                      ? formatCurrency(
-                          categoryData.amount / categoryData.quantity
-                        )
-                      : ""}
-                  </Text>
-                  <Text style={styles.sisaColAmount}>
-                    {formatCurrency(categoryData.amount)}
-                  </Text>
-                </View>
-                <View style={styles.dashedLineAboveSubtotal}>
-                  <Text style={styles.sisaColID}></Text>
-                  <Text style={styles.sisaColDescription}></Text>
-                  <Text style={styles.sisaColUPrice}></Text>
-                  <View
-                    style={[
-                      styles.dashedLineCell,
-                      {
-                        width: styles.sisaColQty.width,
-                        paddingRight: styles.sisaColQty.paddingRight,
-                      },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.dashedLineCell,
-                      {
-                        width: styles.sisaColAmount.width,
-                        paddingRight: styles.sisaColAmount.paddingRight,
-                      },
-                    ]}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.tableRow,
-                    styles.subtotalRow,
-                    { borderBottomWidth: 0 },
-                  ]}
-                >
-                  <Text style={styles.sisaColID}></Text>
-                  <Text style={styles.sisaColDescription}></Text>
-                  <Text style={[styles.sisaColQty, styles.headerText]}>
-                    {formatNumber(categoryData.quantity)}
-                  </Text>
-                  <Text style={styles.sisaColUPrice}></Text>
-                  <Text style={[styles.sisaColAmount, styles.headerText]}>
-                    {formatCurrency(categoryData.amount)}
-                  </Text>
-                </View>
-                <View style={styles.solidLine} />
-              </React.Fragment>
-            );
-          }
-
-          // Handle categories with products
-          if (categoryData.products.length === 0) return null;
-
+        // Handle categories with no products but have totals (like sbh, smee)
+        if (categoryData.quantity > 0 || categoryData.amount > 0) {
           return (
-            <React.Fragment key={key}>
-              {categoryData.products.map((product: any, index: number) => (
-                <View
-                  key={`${key}-${index}-${product.code}`}
-                  style={styles.tableRow}
-                >
-                  <Text style={styles.sisaColID}>{product.code}</Text>
-                  <Text style={styles.sisaColDescription}>
-                    {product.description}
-                  </Text>
-                  <Text style={styles.sisaColQty}>
-                    {formatNumber(product.quantity)}
-                  </Text>
-                  <Text style={styles.sisaColUPrice}>
-                    {product.u_price ? formatCurrency(product.u_price) : ""}
-                  </Text>
-                  <Text style={styles.sisaColAmount}>
-                    {formatCurrency(product.amount)}
-                  </Text>
-                </View>
-              ))}
+            <View key={key} style={styles.categorySection}>
+              <View style={styles.tableRow}>
+                <Text style={styles.sisaColID}>{key.toUpperCase()}</Text>
+                <Text style={styles.sisaColDescription}>{label}</Text>
+                <Text style={styles.sisaColQty}>
+                  {formatNumber(categoryData.quantity)}
+                </Text>
+                <Text style={styles.sisaColUPrice}>
+                  {categoryData.quantity > 0
+                    ? formatCurrency(
+                        categoryData.amount / categoryData.quantity
+                      )
+                    : ""}
+                </Text>
+                <Text style={styles.sisaColAmount}>
+                  {formatCurrency(categoryData.amount)}
+                </Text>
+              </View>
+
+              {/* Dashed line above subtotal */}
               <View style={styles.dashedLineAboveSubtotal}>
                 <Text style={styles.sisaColID}></Text>
                 <Text style={styles.sisaColDescription}></Text>
@@ -978,13 +910,9 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
                   ]}
                 />
               </View>
-              <View
-                style={[
-                  styles.tableRow,
-                  styles.subtotalRow,
-                  { borderBottomWidth: 0 },
-                ]}
-              >
+
+              {/* Category subtotal */}
+              <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.sisaColID}></Text>
                 <Text style={styles.sisaColDescription}></Text>
                 <Text style={[styles.sisaColQty, styles.headerText]}>
@@ -995,14 +923,83 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
                   {formatCurrency(categoryData.amount)}
                 </Text>
               </View>
-              <View style={styles.solidLine} />
-            </React.Fragment>
+            </View>
           );
-        })}
+        }
 
-        {/* TOTAL */}
+        // Handle categories with products
+        if (!categoryData.products || categoryData.products.length === 0)
+          return null;
+
+        return (
+          <View key={key} style={styles.categorySection}>
+            {/* Product rows */}
+            {categoryData.products.map((product: any, index: number) => (
+              <View
+                key={`${key}-${index}-${product.code}`}
+                style={styles.tableRow}
+              >
+                <Text style={styles.sisaColID}>{product.code}</Text>
+                <Text style={styles.sisaColDescription}>
+                  {product.description}
+                </Text>
+                <Text style={styles.sisaColQty}>
+                  {formatNumber(product.quantity)}
+                </Text>
+                <Text style={styles.sisaColUPrice}>
+                  {product.u_price ? formatCurrency(product.u_price) : ""}
+                </Text>
+                <Text style={styles.sisaColAmount}>
+                  {formatCurrency(product.amount)}
+                </Text>
+              </View>
+            ))}
+
+            {/* Dashed line above subtotal */}
+            <View style={styles.dashedLineAboveSubtotal}>
+              <Text style={styles.sisaColID}></Text>
+              <Text style={styles.sisaColDescription}></Text>
+              <Text style={styles.sisaColUPrice}></Text>
+              <View
+                style={[
+                  styles.dashedLineCell,
+                  {
+                    width: styles.sisaColQty.width,
+                    paddingRight: styles.sisaColQty.paddingRight,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.dashedLineCell,
+                  {
+                    width: styles.sisaColAmount.width,
+                    paddingRight: styles.sisaColAmount.paddingRight,
+                  },
+                ]}
+              />
+            </View>
+
+            {/* Category subtotal */}
+            <View style={[styles.tableRow, styles.categorySubtotalRow]}>
+              <Text style={styles.sisaColID}></Text>
+              <Text style={styles.sisaColDescription}></Text>
+              <Text style={[styles.sisaColQty, styles.headerText]}>
+                {formatNumber(categoryData.quantity)}
+              </Text>
+              <Text style={styles.sisaColUPrice}></Text>
+              <Text style={[styles.sisaColAmount, styles.headerText]}>
+                {formatCurrency(categoryData.amount)}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+
+      {/* Grand Total Section */}
+      <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.sisaColID, styles.headerText]}>Total :</Text>
+          <Text style={[styles.sisaColID, styles.headerText]}>Total:</Text>
           <Text style={styles.sisaColDescription}></Text>
           <Text style={[styles.sisaColQty, styles.headerText]}>
             {formatNumber(totalSisaQuantity)}
@@ -1023,7 +1020,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
             if (key === "empty_bag") return null;
             return (
               <View style={styles.breakdownRow} key={`${key}-qtybrk`}>
-                <Text style={styles.breakdownLabel}>{label} (QTY) =</Text>
+                <Text style={styles.breakdownLabel}>{label} =</Text>
                 <Text style={styles.breakdownValue}>
                   {formatNumber(catData.quantity || 0)}
                 </Text>
@@ -1033,7 +1030,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           {/* EMPTY BAG QTY last */}
           {data.empty_bag && (
             <View style={styles.breakdownRow} key="empty_bag-qtybrk">
-              <Text style={styles.breakdownLabel}>EMPTY BAG (QTY) =</Text>
+              <Text style={styles.breakdownLabel}>EMPTY BAG =</Text>
               <Text style={styles.breakdownValue}>
                 {formatNumber(data.empty_bag.quantity || 0)}
               </Text>
@@ -1046,7 +1043,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
             if (key === "empty_bag") return null;
             return (
               <View style={styles.breakdownRow} key={`${key}-amtbrk`}>
-                <Text style={styles.breakdownLabel}>{label} (AMOUNT) =</Text>
+                <Text style={styles.breakdownLabel}>{label} =</Text>
                 <Text style={styles.breakdownValue}>
                   {formatCurrency(catData.amount || 0)}
                 </Text>
@@ -1056,7 +1053,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           {/* EMPTY BAG AMOUNT last */}
           {data.empty_bag && (
             <View style={styles.breakdownRow} key="empty_bag-amtbrk">
-              <Text style={styles.breakdownLabel}>EMPTY BAG (AMOUNT) =</Text>
+              <Text style={styles.breakdownLabel}>EMPTY BAG =</Text>
               <Text style={styles.breakdownValue}>
                 {formatCurrency(data.empty_bag.amount || 0)}
               </Text>
@@ -1064,6 +1061,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           )}
         </View>
       </View>
+
       <Text
         style={styles.pageNumber}
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
