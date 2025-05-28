@@ -98,6 +98,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000",
   },
+  sectionTitle: {
+    // For "Quantity Breakdown", "Amount Breakdown"
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 3, // Space after section title
+    marginTop: 2, // Space before section title
+  },
   breakdownSection: {
     flexDirection: "row",
     marginTop: 3,
@@ -560,9 +566,10 @@ const AllSalesPage: React.FC<{
         </View>
       </View>
 
-      {/* UPDATED Breakdown section - USE CALCULATED VALUES */}
+      {/* Breakdown section */}
       <View style={styles.breakdownSection}>
         <View style={styles.leftBreakdownColumn}>
+          <Text style={styles.sectionTitle}>Quantity</Text>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee</Text>
             <Text style={styles.breakdownValue}>
@@ -589,19 +596,6 @@ const AllSalesPage: React.FC<{
           </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Cash Sales</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.cashSalesAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>CR Sales</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.creditSalesAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownSeparator} />
-          <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
               Grand Total
             </Text>
@@ -611,6 +605,7 @@ const AllSalesPage: React.FC<{
           </View>
         </View>
         <View style={styles.rightBreakdownColumn}>
+          <Text style={styles.sectionTitle}>Amount</Text>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee</Text>
             <Text style={styles.breakdownValue}>
@@ -633,6 +628,19 @@ const AllSalesPage: React.FC<{
             <Text style={styles.breakdownLabel}>Jelly Polly</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(breakdownTotals.jpAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Cash Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.cashSalesAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CR Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.creditSalesAmount)}
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
