@@ -500,38 +500,38 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       <View style={styles.breakdownSection}>
         <View style={styles.leftBreakdownColumn}>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee =</Text>
+            <Text style={styles.breakdownLabel}>Mee</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.meeQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Bihun =</Text>
+            <Text style={styles.breakdownLabel}>Bihun</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.bihunQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee + Bihun =</Text>
+            <Text style={styles.breakdownLabel}>Mee + Bihun</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.meeBihunQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Jelly Polly =</Text>
+            <Text style={styles.breakdownLabel}>Jelly Polly</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(totals.jpQuantity || 0)}
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Cash Sales =</Text>
+            <Text style={styles.breakdownLabel}>Cash Sales</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.cashSalesAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>CR Sales =</Text>
+            <Text style={styles.breakdownLabel}>CR Sales</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.creditSalesAmount || 0)}
             </Text>
@@ -539,7 +539,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
-              Grand Total =
+              Grand Total
             </Text>
             <Text style={[styles.breakdownValue, styles.headerText]}>
               {formatCurrency(totals.grandTotalInvoicesAmount || 0)}
@@ -548,25 +548,25 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         </View>
         <View style={styles.rightBreakdownColumn}>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee =</Text>
+            <Text style={styles.breakdownLabel}>Mee</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.meeAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Bihun =</Text>
+            <Text style={styles.breakdownLabel}>Bihun</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.bihunAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee + Bihun =</Text>
+            <Text style={styles.breakdownLabel}>Mee + Bihun </Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.meeBihunAmount || 0)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Jelly Polly =</Text>
+            <Text style={styles.breakdownLabel}>Jelly Polly</Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(totals.jpAmount || 0)}
             </Text>
@@ -574,7 +574,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
-              Grand Total =
+              Grand Total
             </Text>
             <Text style={[styles.breakdownValue, styles.headerText]}>
               {formatCurrency(totals.totalProductsAmount || 0)}
