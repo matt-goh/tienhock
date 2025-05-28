@@ -8,6 +8,7 @@ import { useMonthSelection } from "../../hooks/useMonthSelection";
 import { generateSalesSummaryPDF } from "../../utils/sales/SalesSummaryPDF";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 interface SalesSummarySelectionTooltipProps {
   activeTab: number;
@@ -70,6 +71,7 @@ const SalesSummarySelectionTooltip: React.FC<
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { allProducts } = useProductsCache("all");
   const { selectedMonth, selectedYear } = useMonthSelection(activeTab);
 
   useEffect(() => {
@@ -159,12 +161,13 @@ const SalesSummarySelectionTooltip: React.FC<
         ),
       });
 
-      // Generate PDF
+      // Generate PDF - ADD allProducts parameter here
       await generateSalesSummaryPDF(
         response,
         selectedMonth,
         selectedYear,
-        action
+        action,
+        allProducts // Add this parameter
       );
 
       toast.success(
