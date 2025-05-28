@@ -861,8 +861,77 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           <Text style={[styles.sisaColAmount, styles.headerText]}>Amount</Text>
         </View>
 
-        {categories.map(({ key, data: categoryData }) => {
-          if (!categoryData || categoryData.products.length === 0) return null;
+        {categories.map(({ key, data: categoryData, label }) => {
+          if (!categoryData) return null;
+
+          // Handle categories with no products but have totals (like sbh, smee)
+          if (categoryData.quantity > 0 || categoryData.amount > 0) {
+            return (
+              <React.Fragment key={key}>
+                <View style={styles.tableRow}>
+                  <Text style={styles.sisaColID}>{key.toUpperCase()}</Text>
+                  <Text style={styles.sisaColDescription}>{label}</Text>
+                  <Text style={styles.sisaColQty}>
+                    {formatNumber(categoryData.quantity)}
+                  </Text>
+                  <Text style={styles.sisaColUPrice}>
+                    {categoryData.quantity > 0
+                      ? formatCurrency(
+                          categoryData.amount / categoryData.quantity
+                        )
+                      : ""}
+                  </Text>
+                  <Text style={styles.sisaColAmount}>
+                    {formatCurrency(categoryData.amount)}
+                  </Text>
+                </View>
+                <View style={styles.dashedLineAboveSubtotal}>
+                  <Text style={styles.sisaColID}></Text>
+                  <Text style={styles.sisaColDescription}></Text>
+                  <Text style={styles.sisaColUPrice}></Text>
+                  <View
+                    style={[
+                      styles.dashedLineCell,
+                      {
+                        width: styles.sisaColQty.width,
+                        paddingRight: styles.sisaColQty.paddingRight,
+                      },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.dashedLineCell,
+                      {
+                        width: styles.sisaColAmount.width,
+                        paddingRight: styles.sisaColAmount.paddingRight,
+                      },
+                    ]}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.tableRow,
+                    styles.subtotalRow,
+                    { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <Text style={styles.sisaColID}></Text>
+                  <Text style={styles.sisaColDescription}></Text>
+                  <Text style={[styles.sisaColQty, styles.headerText]}>
+                    {formatNumber(categoryData.quantity)}
+                  </Text>
+                  <Text style={styles.sisaColUPrice}></Text>
+                  <Text style={[styles.sisaColAmount, styles.headerText]}>
+                    {formatCurrency(categoryData.amount)}
+                  </Text>
+                </View>
+                <View style={styles.solidLine} />
+              </React.Fragment>
+            );
+          }
+
+          // Handle categories with products
+          if (categoryData.products.length === 0) return null;
 
           return (
             <React.Fragment key={key}>
