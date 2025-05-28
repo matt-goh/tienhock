@@ -486,10 +486,12 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           <Text style={[styles.colID, styles.headerText]}>Grand Total:</Text>
           <Text style={styles.colDescription}></Text>
           <Text style={[styles.colQty, styles.headerText]}>
-            {formatNumber(totals.totalQuantity || 0)}
+            {formatNumber(
+              totals.cashSales.count + totals.creditSales.count || 0
+            )}
           </Text>
           <Text style={[styles.colAmount, styles.headerText]}>
-            {formatCurrency(totals.grandTotalAmount)}
+            {formatCurrency(totals.grandTotal)}
           </Text>
         </View>
       </View>
