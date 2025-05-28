@@ -56,7 +56,6 @@ const styles = StyleSheet.create({
   colAmount: { width: "25%", textAlign: "right", paddingRight: 3 },
   headerText: {
     fontFamily: "Helvetica-Bold",
-    fontSize: 8, // Header text size
   },
   dashedLineAboveSubtotal: {
     flexDirection: "row",
@@ -92,26 +91,24 @@ const styles = StyleSheet.create({
     // For Grand Total row
     fontFamily: "Helvetica-Bold",
     paddingVertical: 2,
+    paddingTop: 3, // More space above grand total
     borderTopWidth: 1, // Thicker line for grand total
     borderTopColor: "#000",
     borderBottomWidth: 1,
     borderBottomColor: "#000",
-    marginTop: 2,
-  },
-  sectionTitle: {
-    // For "Quantity Breakdown", "Amount Breakdown"
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 4, // Space after section title
-    marginTop: 2, // Space before section title
   },
   breakdownSection: {
     flexDirection: "row",
-    marginTop: 4,
+    marginTop: 3,
     marginBottom: 12,
   },
-  breakdownColumn: {
+  leftBreakdownColumn: {
     width: "50%",
     paddingRight: 15, // Space between columns
+  },
+  rightBreakdownColumn: {
+    width: "50%",
+    paddingRight: 3, // No padding on right column
   },
   breakdownRow: {
     flexDirection: "row",
@@ -119,11 +116,8 @@ const styles = StyleSheet.create({
     marginBottom: 0.5, // Tighter spacing
     paddingVertical: 0.5,
   },
-  breakdownLabel: {
-    fontSize: 8,
-  },
+  breakdownLabel: {},
   breakdownValue: {
-    fontSize: 8,
     fontFamily: "Helvetica-Bold",
   },
   breakdownSeparator: {
@@ -150,41 +144,10 @@ const styles = StyleSheet.create({
     color: "#555",
   },
   categorySection: {
-    marginBottom: 8, // Space between category sections
-  },
-  categoryHeader: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 3,
-    marginTop: 6,
-    paddingVertical: 2,
-    backgroundColor: "#f3f3f3",
-    paddingHorizontal: 3,
-  },
-  salesmanSectionContainer: {
-    marginBottom: 12, // More space between salesmen
-    borderWidth: 0.5,
-    borderColor: "#ddd",
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  salesmanHeaderEnhanced: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    backgroundColor: "#f0f0f0",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#333",
-  },
-  salesmanContent: {
-    paddingTop: 2,
+    marginBottom: 6, // Space between category sections
   },
   grandTotalSection: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 2,
-    borderTopColor: "#000",
+    marginTop: -7,
   },
   // Column Styles for Sisa Sales Page (5 columns)
   sisaColID: { width: "15%", paddingHorizontal: 3 }, // STOCK
@@ -385,7 +348,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         }
 
         return (
-          <View key={key}>
+          <View key={key} style={styles.categorySection}>
             {/* Product rows */}
             {category.products?.map((product: any, index: number) => (
               <View
@@ -460,8 +423,9 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       {/* ADJ - Rounding Adjustment (if provided as a category, similar to sample) */}
       {categories.total_rounding &&
         categories.total_rounding.products &&
-        categories.total_rounding.products.length > 0 && (
-          <View key="total_rounding_display">
+        categories.total_rounding.products.length > 0 &&
+        categories.total_rounding.amount !== 0 && (
+          <View key="total_rounding_display" style={styles.categorySection}>
             {categories.total_rounding.products.map(
               (product: any, index: number) => (
                 <View
@@ -532,8 +496,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
 
       {/* Breakdown section remains the same */}
       <View style={styles.breakdownSection}>
-        <View style={styles.breakdownColumn}>
-          <Text style={styles.sectionTitle}>Quantity Breakdown</Text>
+        <View style={styles.leftBreakdownColumn}>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee =</Text>
             <Text style={styles.breakdownValue}>
@@ -581,8 +544,7 @@ const AllSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
             </Text>
           </View>
         </View>
-        <View style={styles.breakdownColumn}>
-          <Text style={styles.sectionTitle}>Amount Breakdown</Text>
+        <View style={styles.rightBreakdownColumn}>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee =</Text>
             <Text style={styles.breakdownValue}>
@@ -973,7 +935,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
 
       {/* Breakdown section */}
       <View style={styles.breakdownSection}>
-        <View style={styles.breakdownColumn}>
+        <View style={styles.leftBreakdownColumn}>
           {categories.map(({ key, data: catData, label }) => {
             if (!catData) return null;
             // Show EMPTY BAG last in breakdown as per plan
@@ -997,7 +959,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
             </View>
           )}
         </View>
-        <View style={styles.breakdownColumn}>
+        <View style={styles.rightBreakdownColumn}>
           {categories.map(({ key, data: catData, label }) => {
             if (!catData) return null;
             if (key === "empty_bag") return null;
