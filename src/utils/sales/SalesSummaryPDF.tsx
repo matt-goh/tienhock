@@ -49,6 +49,7 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: "row",
+    paddingVertical: 1, // Consistent padding for rows
   },
   // Standard Column Styles
   colID: { width: "18%", paddingHorizontal: 3 },
@@ -378,11 +379,45 @@ const AllSalesPage: React.FC<{
       bihunAmount = 0;
     let jpQuantity = 0,
       jpAmount = 0;
+    let emptyBagQuantity = 0,
+      emptyBagAmount = 0;
+    let sisaQuantity = 0,
+      sisaAmount = 0; // SBH + SMEE
+    let othersQuantity = 0,
+      othersAmount = 0;
+    let lessQuantity = 0,
+      lessAmount = 0; // LESS deductions
 
     // Iterate through all categories and their products
     Object.entries(categories).forEach(([key, category]: [string, any]) => {
       if (key === "total_rounding") return; // Skip rounding
 
+      // Handle specific categories by key
+      if (key === "category_empty_bag") {
+        emptyBagQuantity += category.quantity || 0;
+        emptyBagAmount += category.amount || 0;
+        return;
+      }
+
+      if (key === "category_sbh" || key === "category_smee") {
+        sisaQuantity += category.quantity || 0;
+        sisaAmount += category.amount || 0;
+        return;
+      }
+
+      if (key === "category_oth") {
+        othersQuantity += category.quantity || 0;
+        othersAmount += category.amount || 0;
+        return;
+      }
+
+      if (key === "category_less") {
+        lessQuantity += category.quantity || 0;
+        lessAmount += category.amount || 0;
+        return;
+      }
+
+      // Handle products by type
       if (category.products && Array.isArray(category.products)) {
         category.products.forEach((product: any) => {
           const productType = productTypeMap[product.code];
@@ -402,6 +437,10 @@ const AllSalesPage: React.FC<{
               jpQuantity += quantity;
               jpAmount += amount;
               break;
+            case "OTH":
+              othersQuantity += quantity;
+              othersAmount += amount;
+              break;
           }
         });
       }
@@ -416,10 +455,25 @@ const AllSalesPage: React.FC<{
       meeBihunAmount: meeAmount + bihunAmount,
       jpQuantity,
       jpAmount,
+      emptyBagQuantity,
+      emptyBagAmount,
+      sisaQuantity,
+      sisaAmount,
+      othersQuantity,
+      othersAmount,
+      lessQuantity,
+      lessAmount,
       cashSalesAmount: totals.cashSales?.amount || 0,
       creditSalesAmount: totals.creditSales?.amount || 0,
       grandTotalInvoicesAmount: totals.grandTotal || 0,
-      totalProductsAmount: meeAmount + bihunAmount + jpAmount,
+      totalProductsAmount:
+        meeAmount +
+        bihunAmount +
+        jpAmount +
+        emptyBagAmount +
+        sisaAmount +
+        othersAmount +
+        lessAmount,
     };
   };
 
@@ -483,7 +537,12 @@ const AllSalesPage: React.FC<{
             {category.products?.map((product: any, index: number) => (
               <View
                 key={`${key}-${index}-${product.code}`}
-                style={styles.tableRow}
+                style={[
+                  styles.tableRow,
+                  ...(category.products && category.products.length === 1
+                    ? [{ paddingVertical: 0 }]
+                    : []),
+                ]}
               >
                 <Text style={styles.colID}>{product.code}</Text>
                 <Text style={styles.colDescription}>{product.description}</Text>
@@ -594,6 +653,43 @@ const AllSalesPage: React.FC<{
               {formatNumber(breakdownTotals.jpQuantity)}
             </Text>
           </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Empty Bag</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(breakdownTotals.emptyBagQuantity)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Sisa</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(breakdownTotals.sisaQuantity)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Others</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(breakdownTotals.othersQuantity)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Less</Text>
+            <Text style={styles.breakdownValue}>
+              {formatNumber(breakdownTotals.lessQuantity)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Cash Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.cashSalesAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CR Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.creditSalesAmount)}
+            </Text>
+          </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
@@ -619,7 +715,7 @@ const AllSalesPage: React.FC<{
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee + Bihun</Text>
+            <Text style={styles.breakdownLabel}>Mee + Bihun </Text>
             <Text style={styles.breakdownValue}>
               {formatCurrency(breakdownTotals.meeBihunAmount)}
             </Text>
@@ -630,17 +726,28 @@ const AllSalesPage: React.FC<{
               {formatCurrency(breakdownTotals.jpAmount)}
             </Text>
           </View>
-          <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Cash Sales</Text>
+            <Text style={styles.breakdownLabel}>Empty Bag</Text>
             <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.cashSalesAmount)}
+              {formatCurrency(breakdownTotals.emptyBagAmount)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>CR Sales</Text>
+            <Text style={styles.breakdownLabel}>Sisa</Text>
             <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.creditSalesAmount)}
+              {formatCurrency(breakdownTotals.sisaAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Others</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.othersAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Less</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.lessAmount)}
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
@@ -707,7 +814,12 @@ const SalesmenPage: React.FC<{
               {sortedProducts.map((product: any, index: number) => (
                 <View
                   key={`${salesmanName}-${index}-${product.code}`}
-                  style={styles.tableRow}
+                  style={[
+                    styles.tableRow,
+                    ...(sortedProducts.length === 1
+                      ? [{ paddingVertical: 0 }]
+                      : []),
+                  ]}
                 >
                   <Text style={styles.colID}>{product.code}</Text>
                   <Text style={styles.colDescription}>
