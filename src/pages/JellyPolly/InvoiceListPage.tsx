@@ -52,7 +52,7 @@ import {
   cancelInvoice,
   syncCancellationStatus,
   getInvoicesByIds,
-} from "../../utils/JellyPolly/InvoiceUtils";
+} from "../../utils/jellypolly/InvoiceUtils";
 import Pagination from "../../components/Invoice/Pagination";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";

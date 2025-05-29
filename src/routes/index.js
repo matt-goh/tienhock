@@ -68,6 +68,8 @@ import {
   MYINVOIS_CLIENT_SECRET,
   MYINVOIS_GT_CLIENT_ID,
   MYINVOIS_GT_CLIENT_SECRET,
+  MYINVOIS_JP_CLIENT_ID,
+  MYINVOIS_JP_CLIENT_SECRET,
 } from "../configs/config.js";
 
 const checkRestoreState = (req, res, next) => {
@@ -97,6 +99,11 @@ export default function setupRoutes(app, pool) {
     MYINVOIS_API_BASE_URL,
     MYINVOIS_GT_CLIENT_ID,
     MYINVOIS_GT_CLIENT_SECRET,
+  };
+  const myInvoisJPConfig = {
+    MYINVOIS_API_BASE_URL,
+    MYINVOIS_JP_CLIENT_ID,
+    MYINVOIS_JP_CLIENT_SECRET,
   };
 
   // Auth routes
@@ -144,12 +151,12 @@ export default function setupRoutes(app, pool) {
   // Jellypolly routes
   app.use(
     "/jellypolly/api/invoices",
-    jellypollyInvoiceRouter(pool, myInvoisConfig)
+    jellypollyInvoiceRouter(pool, myInvoisJPConfig)
   );
   app.use("/jellypolly/api/payments", jellypollyPaymentRouter(pool));
   app.use(
     "/jellypolly/api/einvoice",
-    jellypollyEInvoiceRouter(pool, myInvoisConfig)
+    jellypollyEInvoiceRouter(pool, myInvoisJPConfig)
   );
 
   // Catalogue - Main routes

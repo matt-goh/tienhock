@@ -23,7 +23,7 @@ import {
   checkDuplicateInvoiceNo,
   createInvoice,
   createPayment,
-} from "../../utils/JellyPolly/InvoiceUtils";
+} from "../../utils/jellypolly/InvoiceUtils";
 import toast from "react-hot-toast";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
