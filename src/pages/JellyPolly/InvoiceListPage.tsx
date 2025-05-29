@@ -54,8 +54,8 @@ import {
   getInvoicesByIds,
 } from "../../utils/JellyPolly/InvoiceUtils";
 import Pagination from "../../components/Invoice/Pagination";
-import JPConsolidatedInvoiceModal from "../../components/Invoice/JPConsolidatedInvoiceModal";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
+import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFiltersJP_v2"; // Use a unique key

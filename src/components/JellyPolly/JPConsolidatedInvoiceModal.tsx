@@ -33,9 +33,9 @@ import {
   parseDatabaseTimestamp,
   formatDisplayDate,
 } from "../../utils/invoice/dateUtils";
-import SubmissionResultsModal from "./SubmissionResultsModal";
-import ConsolidatedInfoTooltip from "./ConsolidatedInfoTooltip";
-import ConsolidationStatusPanel from "./ConsolidationStatusPanel";
+import SubmissionResultsModal from "../Invoice/SubmissionResultsModal";
+import ConsolidatedInfoTooltip from "../Invoice/ConsolidatedInfoTooltip";
+import ConsolidationStatusPanel from "../Invoice/ConsolidationStatusPanel";
 import EInvoicePrintHandler from "../../utils/invoice/einvoice/EInvoicePrintHandler";
 
 // Interfaces remain the same
@@ -220,11 +220,14 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     setShowSubmissionResults(true);
     try {
       const invoicesToSubmit = Array.from(selectedInvoices);
-      const response = await api.post("/jellypolly/api/einvoice/submit-consolidated", {
-        invoices: invoicesToSubmit,
-        month,
-        year,
-      });
+      const response = await api.post(
+        "/jellypolly/api/einvoice/submit-consolidated",
+        {
+          invoices: invoicesToSubmit,
+          month,
+          year,
+        }
+      );
       setSubmissionResults(response);
       if (response.success && response.overallStatus !== "Error") {
         fetchEligibleInvoices();

@@ -49,3 +49,29 @@ export const GREENTARGET_INFO = {
   city_pdf: "Kota Kinabalu",
   state_pdf: "Sabah",
 };
+
+export const JELLYPOLLY_INFO = {
+  // Common fields
+  name: "GOH THAI HO",
+  tin: "IG7139779050",
+  reg_no: "550308125181",
+  msic_code: "",
+  msic_description: "",
+  phone: "0198829922",
+  email: "tienhockfood@gmail.com",
+  postcode: "88811",
+
+  // XML-specific formatting
+  sst_id_xml: "-",
+  address_xml: "2KM, JALAN KASIGUI, KAMPUNG KIBABAIG, PENAMPANG",
+  city_xml: "KOTA KINABALU",
+  country_code: "12", // Sabah code for XML template
+
+  // PDF-specific formatting
+  office_phone_pdf: "088719795",
+  sst_id_pdf: "-",
+  address_pdf:
+    "2KM, Jalan Kasigui, Kg. Kibabaig, Penampang, Kota Kinabalu, Sabah",
+  city_pdf: "Kota Kinabalu",
+  state_pdf: "Sabah",
+};
