@@ -641,6 +641,7 @@ const AllSalesPage: React.FC<{
               {formatNumber(breakdownTotals.bihunQuantity)}
             </Text>
           </View>
+          <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee + Bihun</Text>
             <Text style={styles.breakdownValue}>
@@ -678,27 +679,6 @@ const AllSalesPage: React.FC<{
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Cash Sales</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.cashSalesAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>CR Sales</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.creditSalesAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownSeparator} />
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, styles.headerText]}>
-              Grand Total
-            </Text>
-            <Text style={[styles.breakdownValue, styles.headerText]}>
-              {formatCurrency(breakdownTotals.grandTotalInvoicesAmount)}
-            </Text>
-          </View>
         </View>
         <View style={styles.rightBreakdownColumn}>
           <Text style={styles.sectionTitle}>Amount</Text>
@@ -714,6 +694,7 @@ const AllSalesPage: React.FC<{
               {formatCurrency(breakdownTotals.bihunAmount)}
             </Text>
           </View>
+          <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee + Bihun </Text>
             <Text style={styles.breakdownValue}>
@@ -752,11 +733,24 @@ const AllSalesPage: React.FC<{
           </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Cash Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.cashSalesAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CR Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {formatCurrency(breakdownTotals.creditSalesAmount)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, styles.headerText]}>
               Grand Total
             </Text>
             <Text style={[styles.breakdownValue, styles.headerText]}>
-              {formatCurrency(breakdownTotals.totalProductsAmount)}
+              {formatCurrency(breakdownTotals.grandTotalInvoicesAmount)}
             </Text>
           </View>
         </View>
