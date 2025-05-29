@@ -34,6 +34,10 @@ export const {
   // Green Target MyInvois Configuration
   MYINVOIS_GT_CLIENT_ID,
   MYINVOIS_GT_CLIENT_SECRET,
+
+  // Jelly Polly MyInvois Configuration
+  MYINVOIS_JP_CLIENT_ID,
+  MYINVOIS_JP_CLIENT_SECRET,
 } = {
   // API Configuration
   API_BASE_URL: getEnvVariable("API_BASE_URL", getDefaultApiBaseUrl()),
@@ -56,6 +60,10 @@ export const {
   // Green Target MyInvois Configuration
   MYINVOIS_GT_CLIENT_ID: getEnvVariable("MYINVOIS_GT_CLIENT_ID", ""),
   MYINVOIS_GT_CLIENT_SECRET: getEnvVariable("MYINVOIS_GT_CLIENT_SECRET", ""),
+
+  // JellyPolly MyInvois Configuration
+  MYINVOIS_JP_CLIENT_ID: getEnvVariable("MYINVOIS_JP_CLIENT_ID", ""),
+  MYINVOIS_JP_CLIENT_SECRET: getEnvVariable("MYINVOIS_JP_CLIENT_SECRET", ""),
 };
 
 // Debug logging in development

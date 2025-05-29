@@ -5,12 +5,17 @@ import EInvoiceApiClientFactory from "../invoice/einvoice/EInvoiceApiClientFacto
 import EInvoiceSubmissionHandler from "../invoice/einvoice/EInvoiceSubmissionHandler.js";
 import GTEInvoiceApiClientFactory from "../greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 import GTEInvoiceSubmissionHandler from "../greenTarget/einvoice/GTEInvoiceSubmissionHandler.js";
+import { JPEInvoiceConsolidatedTemplate } from "../jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
+import JPEInvoiceApiClientFactory from "../jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
+import JPEInvoiceSubmissionHandler from "../jellypolly/einvoice/JPEInvoiceSubmissionHandler.js";
 import {
   MYINVOIS_API_BASE_URL,
   MYINVOIS_CLIENT_ID,
   MYINVOIS_CLIENT_SECRET,
   MYINVOIS_GT_CLIENT_ID,
   MYINVOIS_GT_CLIENT_SECRET,
+  MYINVOIS_JP_CLIENT_ID,
+  MYINVOIS_JP_CLIENT_SECRET,
 } from "../../configs/config.js";
 
 // Hard-coded values
@@ -549,16 +554,16 @@ async function processJellypollyConsolidation(client, invoices, month, year) {
     // Use config from environment variables/imports
     const apiConfig = {
       MYINVOIS_API_BASE_URL,
-      MYINVOIS_CLIENT_ID,
-      MYINVOIS_CLIENT_SECRET,
+      MYINVOIS_JP_CLIENT_ID,
+      MYINVOIS_JP_CLIENT_SECRET,
     };
 
     // Initialize API client and submission handler
-    const apiClient = EInvoiceApiClientFactory.getInstance(apiConfig);
-    const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
+    const apiClient = JPEInvoiceApiClientFactory.getInstance(apiConfig);
+    const submissionHandler = new JPEInvoiceSubmissionHandler(apiClient);
 
     // Generate consolidated XML
-    const consolidatedXml = await EInvoiceConsolidatedTemplate(
+    const consolidatedXml = await JPEInvoiceConsolidatedTemplate(
       invoices,
       month,
       year

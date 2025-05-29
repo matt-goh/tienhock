@@ -20,7 +20,7 @@ import {
   createPayment,
   cancelPayment,
   syncCancellationStatus,
-} from "../../utils/JellyPolly/InvoiceUtils";
+} from "../../utils/jellypolly/InvoiceUtils";
 import {
   parseDatabaseTimestamp,
   formatDisplayDate,

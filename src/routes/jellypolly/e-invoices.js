@@ -1,10 +1,10 @@
 // src/routes/jellypolly/sales/invoices/e-invoice.js
-import { EInvoiceTemplate } from "../../utils/invoice/einvoice/EInvoiceTemplate.js";
+import { JPEInvoiceTemplate } from "../../utils/jellypolly/einvoice/JPEInvoiceTemplate.js";
 import { Router } from "express";
 import { createHash } from "crypto";
-import EInvoiceSubmissionHandler from "../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
-import EInvoiceApiClientFactory from "../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
-import { EInvoiceConsolidatedTemplate } from "../../utils/invoice/einvoice/EInvoiceConsolidatedTemplate.js";
+import JPEInvoiceSubmissionHandler from "../../utils/jellypolly/einvoice/JPEInvoiceSubmissionHandler.js";
+import JPEInvoiceApiClientFactory from "../../utils/jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
+import { JPEInvoiceConsolidatedTemplate } from "../../utils/jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
 
 // Function to fetch customer data
 async function fetchCustomerData(pool, customerId) {
@@ -113,8 +113,8 @@ const getInvoices = async (pool, invoiceId) => {
 
 export default function (pool, config) {
   const router = Router();
-  const apiClient = EInvoiceApiClientFactory.getInstance(config);
-  const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
+  const apiClient = JPEInvoiceApiClientFactory.getInstance(config);
+  const submissionHandler = new JPEInvoiceSubmissionHandler(apiClient);
 
   // Login/token endpoint
   router.post("/login", async (req, res) => {
@@ -283,7 +283,7 @@ export default function (pool, config) {
             invoiceData.customerid
           );
 
-          const transformedInvoice = await EInvoiceTemplate(
+          const transformedInvoice = await JPEInvoiceTemplate(
             invoiceData,
             customerData
           );
@@ -870,7 +870,7 @@ export default function (pool, config) {
       }
 
       // Generate consolidated invoice XML
-      const consolidatedXml = await EInvoiceConsolidatedTemplate(
+      const consolidatedXml = await JPEInvoiceConsolidatedTemplate(
         invoiceData,
         month,
         year

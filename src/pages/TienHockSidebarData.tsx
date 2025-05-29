@@ -18,8 +18,6 @@ import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 
 // Sales related imports
 import SalesSummaryPage from "./Sales/SalesSummaryPage";
-import SalesByProductsPage from "./Sales/SalesByProductsPage";
-import SalesBySalesmanPage from "./Sales/SalesBySalesmanPage";
 
 // Payroll related imports
 import DailyLogListPage from "./Payroll/DailyLogListPage";
