@@ -1,5 +1,5 @@
 // src/utils/jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js
-import { JELLYPOLLY_INFO } from "../../../utils/invoice/einvoice/companyInfo.js";
+import { JELLYPOLLY_INFO } from "../../invoice/einvoice/companyInfo";
 
 // Helper function to format ISO date (YYYY-MM-DD)
 const formatDate = (date) => {
@@ -80,10 +80,10 @@ export async function JPEInvoiceConsolidatedTemplate(invoices, month, year) {
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cbc:IndustryClassificationCode name="${
-        JELLYPOLLY_INFO.msic_description ||
-        "10501"
+        JELLYPOLLY_INFO.msic_description || "10501"
       }">${
-      JELLYPOLLY_INFO.msic_code || "Manufacture of ice cream and other edible ice such as sorbet"
+      JELLYPOLLY_INFO.msic_code ||
+      "Manufacture of ice cream and other edible ice such as sorbet"
     }</cbc:IndustryClassificationCode>
       <cac:PartyIdentification>
         <cbc:ID schemeID="TIN">${JELLYPOLLY_INFO.tin}</cbc:ID>
