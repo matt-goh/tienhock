@@ -46,7 +46,10 @@ export interface EInvoicePDFData {
 }
 
 // Fetch customer data from API
-const fetchCustomerData = async (customerId: string): Promise<any> => {
+const fetchCustomerData = async (
+  customerId: string,
+  context: "tienhock" | "jellypolly" = "tienhock"
+): Promise<any> => {
   try {
     // Check if customer ID is valid
     if (!customerId || customerId === "Consolidated customers") {
@@ -63,6 +66,7 @@ const fetchCustomerData = async (customerId: string): Promise<any> => {
       };
     }
 
+    // Use the shared customer endpoint for both Tien Hock and JellyPolly
     const customerData = await api.get(`/api/customers/${customerId}`);
     return customerData;
   } catch (error) {
@@ -150,7 +154,7 @@ export const preparePDFData = async (
 
     // Fetch customer data
     const customerId = einvoiceData.receiver_id || einvoiceData.customerid;
-    const customerDetails = await fetchCustomerData(customerId);
+    const customerDetails = await fetchCustomerData(customerId, companyContext);
 
     // Parse invoice date and time
     const createdDateString = einvoiceData.createddate || Date.now().toString();
