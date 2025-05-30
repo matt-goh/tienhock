@@ -172,7 +172,7 @@ const InvoiceListPage: React.FC = () => {
       dateRange: getInitialDates(),
       salespersonId: null,
       paymentType: null,
-      invoiceStatus: ["paid", "Unpaid", "overdue"], // Default excludes 'cancelled'
+      invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default excludes 'cancelled'
       eInvoiceStatus: [],
       consolidation: "all",
     }),
@@ -184,7 +184,7 @@ const InvoiceListPage: React.FC = () => {
     dateRange: getInitialDates(), // This will be overridden in actual usage
     salespersonId: null,
     paymentType: null,
-    invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
+    invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
     eInvoiceStatus: [], // Default e-invoice status
     consolidation: "all",
   };
