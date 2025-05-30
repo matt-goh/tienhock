@@ -1,5 +1,5 @@
 // src/utils/jellypolly/einvoice/JPEInvoiceTemplate.js
-import { JELLYPOLLY_INFO } from "../../../utils/invoice/einvoice/companyInfo.js";
+import { JELLYPOLLY_INFO } from "../../invoice/einvoice/companyInfo";
 
 // Helper function to format ISO date (YYYY-MM-DD)
 const formatDate = (timestamp) => {
