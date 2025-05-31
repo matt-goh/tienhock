@@ -45,7 +45,7 @@ export interface EInvoicePDFData {
   }>;
 }
 
-// Fetch customer data from API
+// Fetch customer data from cache or API
 const fetchCustomerData = async (
   customerId: string,
   context: "tienhock" | "jellypolly" = "tienhock"
@@ -66,7 +66,26 @@ const fetchCustomerData = async (
       };
     }
 
-    // Use the shared customer endpoint for both Tien Hock and JellyPolly
+    // Try to get from localStorage cache first
+    const CACHE_KEY = "customers_cache";
+    const cachedData = localStorage.getItem(CACHE_KEY);
+
+    if (cachedData) {
+      try {
+        const { data } = JSON.parse(cachedData);
+        // Find the customer in the cached array
+        const customer = data.find((c: any) => c.id === customerId);
+
+        if (customer) {
+          return customer;
+        }
+      } catch (e) {
+        console.warn("Error parsing customer cache:", e);
+      }
+    }
+
+    // If not in cache, fall back to API call
+    console.log(`Customer ${customerId} not found in cache, fetching from API`);
     const customerData = await api.get(`/api/customers/${customerId}`);
     return customerData;
   } catch (error) {
