@@ -473,6 +473,8 @@ const AllSalesPage: React.FC<{
         sisaAmount +
         othersAmount +
         lessAmount,
+      totalTax: categories.total_tax || 0,
+      totalRounding: categories.total_rounding || 0,
     };
   };
 
@@ -616,7 +618,8 @@ const AllSalesPage: React.FC<{
           <Text style={[styles.colQty, styles.headerText]}>
             {formatNumber(
               totals.cashSales.count + totals.creditSales.count || 0
-            )} Bills
+            )}{" "}
+            Bills
           </Text>
           <Text style={[styles.colAmount, styles.headerText]}>
             {formatCurrency(totals.grandTotal)}
@@ -730,6 +733,24 @@ const AllSalesPage: React.FC<{
               {formatCurrency(breakdownTotals.lessAmount)}
             </Text>
           </View>
+          {/* Add Tax row only if not zero */}
+          {breakdownTotals.totalTax !== 0 && (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Tax</Text>
+              <Text style={styles.breakdownValue}>
+                {formatCurrency(breakdownTotals.totalTax)}
+              </Text>
+            </View>
+          )}
+          {/* Add Rounding row only if not zero */}
+          {breakdownTotals.totalRounding !== 0 && (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Rounding</Text>
+              <Text style={styles.breakdownValue}>
+                {formatCurrency(breakdownTotals.totalRounding)}
+              </Text>
+            </View>
+          )}
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Cash Sales</Text>
