@@ -592,8 +592,8 @@ export default function (pool, config) {
     }
 
     try {
-      // Query to get all invoices with products in the date range
-      const query = `
+      // Query to get all invoices with products in the date range from main schema
+      const mainQuery = `
       SELECT 
         i.id,
         i.salespersonid,
@@ -621,29 +621,65 @@ export default function (pool, config) {
       GROUP BY i.id
     `;
 
-      const result = await pool.query(query, [startDate, endDate]);
+      // Query to get all invoices with products in the date range from jellypolly schema
+      const jellypollyQuery = `
+      SELECT 
+        i.id,
+        i.salespersonid,
+        i.paymenttype,
+        i.rounding,
+        i.totalamountpayable,
+        i.invoice_status,
+        json_agg(
+          json_build_object(
+            'code', od.code,
+            'description', od.description,
+            'quantity', od.quantity,
+            'price', od.price,
+            'freeproduct', od.freeproduct,
+            'returnproduct', od.returnproduct,
+            'total', od.total
+          ) ORDER BY od.id
+        ) FILTER (WHERE od.id IS NOT NULL) as products
+      FROM jellypolly.invoices i
+      LEFT JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      WHERE 
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+      GROUP BY i.id
+    `;
+
+      // Execute both queries in parallel
+      const [mainResult, jellypollyResult] = await Promise.all([
+        pool.query(mainQuery, [startDate, endDate]),
+        pool.query(jellypollyQuery, [startDate, endDate]),
+      ]);
+
+      // Combine results from both schemas
+      const allInvoices = [...mainResult.rows, ...jellypollyResult.rows];
 
       // Process the data for different summary types
       const summaryData = {};
 
       // Initialize data structures for each summary type
       if (summaries.includes("all_sales")) {
-        summaryData.all_sales = processAllSales(result.rows);
+        summaryData.all_sales = processAllSales(allInvoices);
       }
       if (summaries.includes("all_salesmen")) {
-        summaryData.all_salesmen = processSalesmenSummary(result.rows, null);
+        summaryData.all_salesmen = processSalesmenSummary(allInvoices, null);
       }
       if (summaries.includes("mee_salesmen")) {
-        summaryData.mee_salesmen = processSalesmenSummary(result.rows, "MEE");
+        summaryData.mee_salesmen = processSalesmenSummary(allInvoices, "MEE");
       }
       if (summaries.includes("bihun_salesmen")) {
-        summaryData.bihun_salesmen = processSalesmenSummary(result.rows, "BH");
+        summaryData.bihun_salesmen = processSalesmenSummary(allInvoices, "BH");
       }
       if (summaries.includes("jp_salesmen")) {
-        summaryData.jp_salesmen = processSalesmenSummary(result.rows, "JP");
+        summaryData.jp_salesmen = processSalesmenSummary(allInvoices, "JP");
       }
       if (summaries.includes("sisa_sales")) {
-        summaryData.sisa_sales = processSisaSales(result.rows);
+        summaryData.sisa_sales = processSisaSales(allInvoices);
       }
 
       res.json(summaryData);
