@@ -20,9 +20,8 @@ import {
 } from "@headlessui/react";
 import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
-
 import { api } from "../../routes/utils/api";
-import { PayCode, Employee } from "../../types/types"; // Type updated to exclude 'code'
+import { PayCode } from "../../types/types"; // Type updated to exclude 'code'
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";

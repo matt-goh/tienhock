@@ -310,12 +310,31 @@ const SalesByProductsPage: React.FC = () => {
 
   // Get top products for summary cards
   const topProductSummary = useMemo(() => {
-    // Sort by sales amount in descending order
-    const sortedProducts = [...salesData].sort(
-      (a, b) => b.totalSales - a.totalSales
-    );
-    // Take top 12 (or fewer if there aren't 12 products)
-    return sortedProducts.slice(0, 12);
+    // Define product type order for sorting
+    const typeOrder: Record<string, number> = {
+      MEE: 1,
+      BH: 2,
+      JP: 3,
+      OTH: 4,
+      OTHER: 5,
+    };
+
+    // Sort by product type first, then by sales amount within each type
+    const sortedProducts = [...salesData].sort((a, b) => {
+      const typeOrderA = typeOrder[a.type] || 999;
+      const typeOrderB = typeOrder[b.type] || 999;
+
+      // First sort by type order
+      if (typeOrderA !== typeOrderB) {
+        return typeOrderA - typeOrderB;
+      }
+
+      // Then sort by sales amount (descending) within the same type
+      return b.totalSales - a.totalSales;
+    });
+
+    // Return all products (remove the slice limit)
+    return sortedProducts;
   }, [salesData]);
 
   // Fetch yearly trend data for the product mix chart
@@ -676,28 +695,33 @@ const SalesByProductsPage: React.FC = () => {
           </div>
         </div>
         {/* Product cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Get top 6 products by sales instead of 12 */}
-          {topProductSummary.map((product) => (
-            <div
-              key={product.id}
-              className="bg-default-100/75 rounded-lg p-3 border-l-4 overflow-hidden"
-              style={{ borderColor: categoryColors[product.type] || "#a0aec0" }}
-            >
+        <div className="max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-2">
+            {topProductSummary.map((product) => (
               <div
-                className="text-base text-default-500 font-medium truncate"
-                title={product.description}
+                key={product.id}
+                className="bg-default-100/75 rounded-lg p-3 border-l-4 overflow-hidden flex-shrink-0"
+                style={{
+                  borderColor: categoryColors[product.type] || "#a0aec0",
+                }}
               >
-                {product.description || product.id}
+                <div
+                  className="text-base text-default-500 font-medium truncate"
+                  title={`${
+                    product.description
+                  } • ${product.quantity.toLocaleString()} units`}
+                >
+                  {product.description || product.id}
+                  {" • "}
+                  {product.quantity.toLocaleString()} units
+                </div>
+                <div className="text-lg font-bold mt-1">
+                  {formatCurrency(product.totalSales)}
+                </div>
+                <div className="text-sm text-default-500 font-medium mt-1"></div>
               </div>
-              <div className="text-lg font-bold mt-1">
-                {formatCurrency(product.totalSales)}
-              </div>
-              <div className="text-sm text-default-500 font-medium mt-1">
-                {product.quantity.toLocaleString()} units
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
       {isLoading ? (
