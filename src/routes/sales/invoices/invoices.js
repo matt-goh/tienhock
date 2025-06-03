@@ -704,10 +704,10 @@ export default function (pool, config) {
       category_we_2udg: { quantity: 0, amount: 0, products: [] }, // ID "WE-2UDG"
       category_we_300g: { quantity: 0, amount: 0, products: [] }, // ID "WE-300G"
       category_we_600g: { quantity: 0, amount: 0, products: [] }, // ID "WE-600G"
+      category_we_others: { quantity: 0, amount: 0, products: [] }, // WE-360(5PK), WE-360, WE-3UDG, WE-420
       category_empty_bag: { quantity: 0, amount: 0, products: [] }, // ID starts with "EMPTY_BAG"
       category_sbh: { quantity: 0, amount: 0, products: [] }, // ID "SBH"
       category_smee: { quantity: 0, amount: 0, products: [] }, // ID "SMEE"
-      category_we_others: { quantity: 0, amount: 0, products: [] }, // WE-360(5PK), WE-360, WE-3UDG, WE-420
       category_returns: { quantity: 0, amount: 0, products: [] }, // Products with returnproduct > 0
       category_less: { quantity: 0, amount: 0, products: [] }, // ID "LESS"
       total_rounding: 0,
@@ -759,11 +759,11 @@ export default function (pool, config) {
         else if (code === "WE-2UDG") category = "category_we_2udg";
         else if (code === "WE-300G") category = "category_we_300g";
         else if (code === "WE-600G") category = "category_we_600g";
+        else if (["WE-360(5PK)", "WE-360", "WE-3UDG", "WE-420"].includes(code))
+          category = "category_we_others";
         else if (code.startsWith("EMPTY_BAG")) category = "category_empty_bag";
         else if (code === "SBH") category = "category_sbh";
         else if (code === "SMEE") category = "category_smee";
-        else if (["WE-360(5PK)", "WE-360", "WE-3UDG", "WE-420"].includes(code))
-          category = "category_we_others";
         else if (code === "LESS") category = "category_less";
 
         if (category) {
