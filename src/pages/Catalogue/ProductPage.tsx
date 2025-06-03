@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -11,6 +11,8 @@ import {
 } from "../../utils/invoice/useProductsCache";
 import { IconPlus, IconEdit, IconTrash } from "@tabler/icons-react";
 import { FormListbox } from "../../components/FormComponents";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import CustomersUsingProductTooltip from "../../components/Catalogue/CustomersUsingProductTooltip";
 
 interface Product {
   id: string;
@@ -34,6 +36,11 @@ const ProductPage: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const {
+    customers,
+    isLoading: isCustomersLoading,
+    error: customersError,
+  } = useCustomersCache();
 
   const filteredProducts = React.useMemo(() => {
     if (typeFilter === "all") {
@@ -41,6 +48,39 @@ const ProductPage: React.FC = () => {
     }
     return products.filter((product: Product) => product.type === typeFilter);
   }, [products, typeFilter]);
+
+  const productToCustomersMap = useMemo(() => {
+    // Create reverse mapping: productId -> customer info[]
+    const reverseMap: Record<
+      string,
+      Array<{
+        customer_id: string;
+        customer_name: string;
+        custom_price: number;
+        is_available: boolean;
+      }>
+    > = {};
+
+    // Go through each customer and their custom products
+    customers.forEach((customer) => {
+      if (customer.customProducts && customer.customProducts.length > 0) {
+        customer.customProducts.forEach((customProduct) => {
+          const productId = customProduct.product_id;
+          if (!reverseMap[productId]) {
+            reverseMap[productId] = [];
+          }
+          reverseMap[productId].push({
+            customer_id: customer.id,
+            customer_name: customer.name,
+            custom_price: customProduct.custom_price,
+            is_available: customProduct.is_available,
+          });
+        });
+      }
+    });
+
+    return reverseMap;
+  }, [customers]);
 
   useEffect(() => {
     if (cachedProductsData) {
@@ -156,10 +196,26 @@ const ProductPage: React.FC = () => {
     setProductToDelete(null);
   }, []);
 
-  if (cacheLoading && products.length === 0) {
+  if ((cacheLoading && products.length === 0) || isCustomersLoading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
         <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (cacheError || customersError) {
+    return (
+      <div className="w-full p-6">
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+          {typeof cacheError === "object" && cacheError instanceof Error
+            ? cacheError.message
+            : cacheError ||
+              (typeof customersError === "object" &&
+              customersError instanceof Error
+                ? customersError.message
+                : customersError)}
+        </div>
       </div>
     );
   }
@@ -230,7 +286,14 @@ const ProductPage: React.FC = () => {
                 {filteredProducts.map((product: Product) => (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-[15%]">
-                      {product.id}
+                      <div className="flex items-center">
+                        {product.id}
+                        <CustomersUsingProductTooltip
+                          productId={product.id}
+                          customersMap={productToCustomersMap}
+                          className="ml-1"
+                        />
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[35%]">
                       <div className="truncate" title={product.description}>
