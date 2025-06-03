@@ -598,6 +598,7 @@ export default function (pool, config) {
         i.id,
         i.salespersonid,
         i.paymenttype,
+        i.tax_amount,
         i.rounding,
         i.totalamountpayable,
         i.invoice_status,
@@ -627,6 +628,7 @@ export default function (pool, config) {
         i.id,
         i.salespersonid,
         i.paymenttype,
+        i.tax_amount,
         i.rounding,
         i.totalamountpayable,
         i.invoice_status,
@@ -711,6 +713,7 @@ export default function (pool, config) {
       category_returns: { quantity: 0, amount: 0, products: [] }, // Products with returnproduct > 0
       category_less: { quantity: 0, amount: 0, products: [] }, // ID "LESS"
       total_rounding: 0,
+      total_tax: 0,
     };
 
     // Use Map to track products by category (fix the key issue)
@@ -732,12 +735,6 @@ export default function (pool, config) {
       category_less: new Map(),
     };
 
-    const typeStats = {
-      MEE: { quantity: 0, amount: 0 },
-      BH: { quantity: 0, amount: 0 },
-      JP: { quantity: 0, amount: 0 },
-    };
-
     let cashTotal = 0;
     let invoiceTotal = 0;
     let cashCount = 0;
@@ -755,6 +752,9 @@ export default function (pool, config) {
 
       // Add rounding
       categories.total_rounding += parseFloat(invoice.rounding || 0);
+
+      // Add tax from invoice level
+      categories.total_tax += parseFloat(invoice.tax_amount || 0);
 
       // Process products
       if (!invoice.products) return;
