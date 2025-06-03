@@ -713,7 +713,25 @@ export default function (pool, config) {
       total_rounding: 0,
     };
 
-    const productMap = new Map();
+    // Use Map to track products by category (fix the key issue)
+    const productsByCategory = {
+      category_1: new Map(),
+      category_2: new Map(),
+      category_meq: new Map(),
+      category_s: new Map(),
+      category_oth: new Map(),
+      category_we_mnl: new Map(),
+      category_we_2udg: new Map(),
+      category_we_300g: new Map(),
+      category_we_600g: new Map(),
+      category_we_others: new Map(),
+      category_empty_bag: new Map(),
+      category_sbh: new Map(),
+      category_smee: new Map(),
+      category_returns: new Map(),
+      category_less: new Map(),
+    };
+
     const typeStats = {
       MEE: { quantity: 0, amount: 0 },
       BH: { quantity: 0, amount: 0 },
@@ -770,17 +788,16 @@ export default function (pool, config) {
           categories[category].quantity += quantity;
           categories[category].amount += total;
 
-          // Track individual products
-          const key = `${category}_${code}`;
-          if (!productMap.has(key)) {
-            productMap.set(key, {
+          // Track individual products using the category-specific Map
+          if (!productsByCategory[category].has(code)) {
+            productsByCategory[category].set(code, {
               code,
               description: product.description || code,
               quantity: 0,
               amount: 0,
             });
           }
-          const prod = productMap.get(key);
+          const prod = productsByCategory[category].get(code);
           prod.quantity += quantity;
           prod.amount += total;
         }
@@ -789,6 +806,19 @@ export default function (pool, config) {
         if (returnQty > 0) {
           categories.category_returns.quantity += returnQty;
           categories.category_returns.amount += returnQty * price;
+
+          // Track return products
+          if (!productsByCategory.category_returns.has(code)) {
+            productsByCategory.category_returns.set(code, {
+              code,
+              description: product.description || code,
+              quantity: 0,
+              amount: 0,
+            });
+          }
+          const returnProd = productsByCategory.category_returns.get(code);
+          returnProd.quantity += returnQty;
+          returnProd.amount += returnQty * price;
         }
 
         // Track type statistics (need to fetch product type from cache)
@@ -796,13 +826,14 @@ export default function (pool, config) {
       });
     });
 
-    // Convert product map to arrays
-    for (const [key, product] of productMap) {
-      const category = key.split("_")[0] + "_" + key.split("_")[1];
-      if (categories[category]) {
-        categories[category].products.push(product);
+    // Convert Maps to arrays and assign to categories
+    Object.keys(productsByCategory).forEach((categoryKey) => {
+      if (categories[categoryKey]) {
+        categories[categoryKey].products = Array.from(
+          productsByCategory[categoryKey].values()
+        );
       }
-    }
+    });
 
     return {
       categories,

@@ -616,7 +616,7 @@ const AllSalesPage: React.FC<{
           <Text style={[styles.colQty, styles.headerText]}>
             {formatNumber(
               totals.cashSales.count + totals.creditSales.count || 0
-            )}
+            )} Bills
           </Text>
           <Text style={[styles.colAmount, styles.headerText]}>
             {formatCurrency(totals.grandTotal)}
