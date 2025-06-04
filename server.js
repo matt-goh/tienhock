@@ -98,7 +98,7 @@ cron.schedule(
 
 // --- Auto-consolidation scheduler ---
 cron.schedule(
-  "38 8 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
+  "50 8 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
   async () => {
     try {
       // Check if any consolidations are due today
