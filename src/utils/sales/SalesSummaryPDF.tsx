@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   breakdownSection: {
     flexDirection: "row",
     marginTop: 3,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   leftBreakdownColumn: {
     width: "50%",
@@ -161,6 +161,13 @@ const styles = StyleSheet.create({
   sisaColDescription: { width: "38%", paddingHorizontal: 3 }, // DESCRIPTION
   sisaColUPrice: { width: "15%", textAlign: "right", paddingRight: 8 }, // U/PRICE
   sisaColAmount: { width: "20%", textAlign: "right", paddingRight: 3 }, // AMOUNT
+  sectionSeparator: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  sectionHeader: {
+    marginVertical: 5,
+  },
 });
 
 // Helper function to format numbers with commas
@@ -245,57 +252,84 @@ export const generateSalesSummaryPDF = async (
 ) => {
   try {
     const dateForMonthName = new Date(year, month);
-    // Format: Month YYYY, e.g., May 2025
     const monthYearFormatted = `${dateForMonthName.toLocaleDateString("en-US", {
       month: "long",
     })} ${dateForMonthName.getFullYear()}`;
 
     const doc = (
       <Document title={`Sales Summary - ${monthYearFormatted}`}>
-        {data.all_sales && (
-          <AllSalesPage
-            data={data.all_sales}
-            monthFormat={monthYearFormatted}
-            allProducts={allProducts}
+        <Page size="A4" style={styles.page} wrap>
+          {/* All Sales Section */}
+          {data.all_sales && (
+            <>
+              <AllSalesSection
+                data={data.all_sales}
+                monthFormat={monthYearFormatted}
+                allProducts={allProducts}
+              />
+              {(data.all_salesmen ||
+                data.mee_salesmen ||
+                data.bihun_salesmen ||
+                data.jp_salesmen ||
+                data.sisa_sales) && <View style={styles.sectionSeparator} />}
+            </>
+          )}
+
+          {/* All Salesmen Section */}
+          {data.all_salesmen && (
+            <SalesmenSection
+              data={data.all_salesmen}
+              title="Monthly Summary Sales by Salesmen"
+              monthFormat={monthYearFormatted}
+            />
+          )}
+
+          {/* Mee Salesmen Section */}
+          {data.mee_salesmen && (
+            <SalesmenSection
+              data={data.mee_salesmen}
+              title="Monthly Summary Mee Sales by Salesmen"
+              monthFormat={monthYearFormatted}
+              productType="MEE"
+            />
+          )}
+
+          {/* Bihun Salesmen Section */}
+          {data.bihun_salesmen && (
+            <SalesmenSection
+              data={data.bihun_salesmen}
+              title="Monthly Summary Bihun Sales by Salesmen"
+              monthFormat={monthYearFormatted}
+              productType="BIHUN"
+            />
+          )}
+
+          {/* JP Salesmen Section */}
+          {data.jp_salesmen && (
+            <SalesmenSection
+              data={data.jp_salesmen}
+              title="Monthly Summary JellyPolly Sales by Salesmen"
+              monthFormat={monthYearFormatted}
+              productType="JP"
+            />
+          )}
+
+          {/* Sisa Sales Section */}
+          {data.sisa_sales && (
+            <SisaSalesSection
+              data={data.sisa_sales}
+              monthFormat={monthYearFormatted}
+            />
+          )}
+
+          <Text
+            style={styles.pageNumber}
+            render={({ pageNumber, totalPages }) =>
+              `${pageNumber} / ${totalPages}`
+            }
+            fixed
           />
-        )}
-        {data.all_salesmen && (
-          <SalesmenPage
-            data={data.all_salesmen}
-            title="Monthly Summary Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-          />
-        )}
-        {data.mee_salesmen && (
-          <SalesmenPage
-            data={data.mee_salesmen}
-            title="Monthly Summary Mee Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-            productType="MEE"
-          />
-        )}
-        {data.bihun_salesmen && (
-          <SalesmenPage
-            data={data.bihun_salesmen}
-            title="Monthly Summary Bihun Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-            productType="BIHUN"
-          />
-        )}
-        {data.jp_salesmen && (
-          <SalesmenPage
-            data={data.jp_salesmen}
-            title="Monthly Summary JellyPolly Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-            productType="JP"
-          />
-        )}
-        {data.sisa_sales && (
-          <SisaSalesPage
-            data={data.sisa_sales}
-            monthFormat={monthYearFormatted}
-          />
-        )}
+        </Page>
       </Document>
     );
 
@@ -357,7 +391,7 @@ export const generateSalesSummaryPDF = async (
 };
 
 // Component for All Sales Summary
-const AllSalesPage: React.FC<{
+const AllSalesSection: React.FC<{
   data: any;
   monthFormat: string;
   allProducts: any[];
@@ -501,7 +535,7 @@ const AllSalesPage: React.FC<{
   };
 
   return (
-    <Page size="A4" style={styles.page} wrap>
+    <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
         Monthly Summary Sales as at {monthFormat}
@@ -780,12 +814,12 @@ const AllSalesPage: React.FC<{
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
         fixed
       />
-    </Page>
+    </View>
   );
 };
 
 // Component for Salesmen Summary Pages
-const SalesmenPage: React.FC<{
+const SalesmenSection: React.FC<{
   data: any;
   title: string;
   monthFormat: string;
@@ -794,7 +828,7 @@ const SalesmenPage: React.FC<{
   const { salesmen, foc, returns } = data;
 
   return (
-    <Page size="A4" style={styles.page} wrap>
+    <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
         {title} as at {monthFormat}
@@ -1018,12 +1052,12 @@ const SalesmenPage: React.FC<{
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
         fixed
       />
-    </Page>
+    </View>
   );
 };
 
 // Component for Sisa Sales Summary
-const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
+const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
   data,
   monthFormat,
 }) => {
@@ -1043,7 +1077,7 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
   );
 
   return (
-    <Page size="A4" style={styles.page} wrap>
+    <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
         Monthly Summary Sisa Sales as at {monthFormat}
@@ -1276,6 +1310,6 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
         fixed
       />
-    </Page>
+    </View>
   );
 };
