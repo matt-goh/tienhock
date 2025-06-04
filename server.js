@@ -101,7 +101,7 @@ cron.schedule(
 
 // --- Auto-consolidation scheduler ---
 cron.schedule(
-  "30 14 * * *", // Run at 2:30 PM every day
+  "50 14 * * *", // Run at 2:30 PM every day
   async () => {
     try {
       // Check if any consolidations are due today
