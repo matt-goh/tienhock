@@ -1,11 +1,11 @@
 // src/utils/invoice/autoConsolidation.js
 import { EInvoiceConsolidatedTemplate } from "../invoice/einvoice/EInvoiceConsolidatedTemplate.js";
 import { GTEInvoiceConsolidatedTemplate } from "../greenTarget/einvoice/GTEInvoiceConsolidatedTemplate.js";
+import { JPEInvoiceConsolidatedTemplate } from "../jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
 import EInvoiceApiClientFactory from "../invoice/einvoice/EInvoiceApiClientFactory.js";
 import EInvoiceSubmissionHandler from "../invoice/einvoice/EInvoiceSubmissionHandler.js";
 import GTEInvoiceApiClientFactory from "../greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 import GTEInvoiceSubmissionHandler from "../greenTarget/einvoice/GTEInvoiceSubmissionHandler.js";
-import { JPEInvoiceConsolidatedTemplate } from "../jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
 import JPEInvoiceApiClientFactory from "../jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
 import JPEInvoiceSubmissionHandler from "../jellypolly/einvoice/JPEInvoiceSubmissionHandler.js";
 import {
