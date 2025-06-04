@@ -119,6 +119,17 @@ const SalesBySalesmanPage: React.FC = () => {
   const [maxChartSalesmen] = useState(5); // Limit to prevent chart legend overcrowding
 
   useEffect(() => {
+    // Dispatch month selection event when it changes
+    if (selectedMonth && selectedYear) {
+      window.dispatchEvent(
+        new CustomEvent("monthSelectionChanged", {
+          detail: { month: selectedMonth.id, year: selectedYear },
+        })
+      );
+    }
+  }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
     if (salesmenData.length > 0) {
       const salesmenIds = salesmenData.map((employee) => employee.id);
       setSalesmen(["All Salesmen", ...salesmenIds]);
@@ -157,65 +168,6 @@ const SalesBySalesmanPage: React.FC = () => {
 
     // Update date range
     setDateRange({ start: startDate, end: endDate });
-  };
-
-  // Process invoice data to get salesman sales
-  const processInvoiceData = (invoices: any[]) => {
-    const salesmanMap = new Map<string, SalesmanData>();
-
-    invoices.forEach((invoice) => {
-      // Skip cancelled invoices
-      if (invoice.invoice_status === "cancelled") return;
-
-      const salesmanId = invoice.salespersonid;
-      if (!salesmanId) return;
-
-      // Calculate total sales and quantity for this invoice (excluding taxes and rounding)
-      let invoiceTotal = 0;
-      let totalQuantity = 0;
-
-      if (Array.isArray(invoice.products)) {
-        invoice.products.forEach((product: any) => {
-          // Skip subtotal or total rows
-          if (product.issubtotal || product.istotal) return;
-
-          const quantity = Number(product.quantity) || 0;
-          const price = Number(product.price) || 0;
-
-          // Calculate product total
-          invoiceTotal += quantity * price;
-          totalQuantity += quantity;
-        });
-      }
-
-      const isCashBill = invoice.paymenttype === "CASH";
-
-      if (salesmanMap.has(salesmanId)) {
-        const existingSalesman = salesmanMap.get(salesmanId)!;
-        existingSalesman.totalSales += invoiceTotal;
-        existingSalesman.totalQuantity += totalQuantity;
-        existingSalesman.salesCount += 1;
-
-        // Increment the appropriate counter based on invoice type
-        if (isCashBill) {
-          existingSalesman.cashCount = (existingSalesman.cashCount || 0) + 1;
-        } else {
-          existingSalesman.invoiceCount =
-            (existingSalesman.invoiceCount || 0) + 1;
-        }
-      } else {
-        salesmanMap.set(salesmanId, {
-          id: salesmanId,
-          totalSales: invoiceTotal,
-          totalQuantity: totalQuantity,
-          salesCount: 1,
-          cashCount: isCashBill ? 1 : 0,
-          invoiceCount: isCashBill ? 0 : 1,
-        });
-      }
-    });
-
-    return Array.from(salesmanMap.values());
   };
 
   // Fetch yearly trend data for the sales trend chart
@@ -410,9 +362,7 @@ const SalesBySalesmanPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full p-6 pt-0 max-w-[88rem] mx-auto space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Sales by Salesman</h1>
-
+    <div className="w-full pt-0 max-w-[88rem] mt-4 mx-auto space-y-6">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">

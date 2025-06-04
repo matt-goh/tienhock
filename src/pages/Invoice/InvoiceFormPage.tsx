@@ -225,8 +225,8 @@ const InvoiceFormPage: React.FC = () => {
         // Handle TIN and ID numbers for e-invoice
         const hasTin = !!cachedCustomer.tin_number;
         const hasId = !!cachedCustomer.id_number;
-        setCustomerTinNumber(hasTin ? (cachedCustomer.tin_number || null) : null);
-        setCustomerIdNumber(hasId ? (cachedCustomer.id_number || null) : null);
+        setCustomerTinNumber(hasTin ? cachedCustomer.tin_number || null : null);
+        setCustomerIdNumber(hasId ? cachedCustomer.id_number || null : null);
         setSubmitAsEinvoice(hasTin && hasId);
 
         return cachedCustomer.customProducts || [];
@@ -243,8 +243,12 @@ const InvoiceFormPage: React.FC = () => {
           if (response.customer) {
             const hasTin = !!response.customer.tin_number;
             const hasId = !!response.customer.id_number;
-            setCustomerTinNumber(hasTin ? (response.customer.tin_number || null) : null);
-            setCustomerIdNumber(hasId ? (response.customer.id_number || null) : null);
+            setCustomerTinNumber(
+              hasTin ? response.customer.tin_number || null : null
+            );
+            setCustomerIdNumber(
+              hasId ? response.customer.id_number || null : null
+            );
             // Only keep e-invoice checked if both are present after fetch
             setSubmitAsEinvoice(hasTin && hasId);
           } else {
@@ -508,7 +512,7 @@ const InvoiceFormPage: React.FC = () => {
           );
         if (Number(item.quantity || 0) <= 0)
           errors.push(`Item #${index + 1}: Quantity must be positive.`);
-        if (Number(item.price || 0) < 0)
+        if (item.code !== "LESS" && Number(item.price || 0) < 0)
           errors.push(`Item #${index + 1}: Price cannot be negative.`);
       });
     }

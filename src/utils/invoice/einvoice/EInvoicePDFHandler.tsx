@@ -194,8 +194,9 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
       variant="outline"
       size={size}
       data-einvoice-download="true"
+      color="sky"
     >
-      {isGenerating ? "Generating..." : "Download"}
+      {isGenerating ? "Generating..." : "Download e-invoice"}
     </Button>
   );
 };

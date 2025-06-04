@@ -3,10 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
 import { FormCombobox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import {
-  IconSortAscending,
-  IconSortDescending
-} from "@tabler/icons-react";
+import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
 import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
@@ -123,7 +120,7 @@ const SalesByProductsPage: React.FC = () => {
     products,
     isLoading: isProductsLoading,
     error: productsError,
-  } = useProductsCache();
+  } = useProductsCache("all");
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
   const [selectedChartProducts, setSelectedChartProducts] = useState<string[]>(
@@ -202,6 +199,17 @@ const SalesByProductsPage: React.FC = () => {
 
     return options;
   }, [products]);
+
+  useEffect(() => {
+    // Dispatch month selection event when it changes
+    if (selectedMonth && selectedYear) {
+      window.dispatchEvent(
+        new CustomEvent("monthSelectionChanged", {
+          detail: { month: selectedMonth.id, year: selectedYear },
+        })
+      );
+    }
+  }, [selectedMonth, selectedYear]);
 
   // Clear chart data when product selection changes
   useEffect(() => {
@@ -300,74 +308,33 @@ const SalesByProductsPage: React.FC = () => {
       .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   };
 
-  // Process invoice data to get product sales
-  const processInvoiceData = (invoices: any[]) => {
-    // Filter invoices by selected salesman if not "All Salesmen"
-    const filteredInvoices =
-      selectedSalesman === "All Salesmen"
-        ? invoices
-        : invoices.filter(
-            (invoice) => invoice.salespersonid === selectedSalesman
-          );
-
-    const productMap = new Map<string, ProductSalesData>();
-
-    filteredInvoices.forEach((invoice) => {
-      // Skip cancelled invoices
-      if (invoice.invoice_status === "cancelled") return;
-
-      if (Array.isArray(invoice.products)) {
-        invoice.products.forEach((product: any) => {
-          // Skip subtotal or total rows
-          if (product.issubtotal || product.istotal) return;
-
-          const productId = product.code;
-          if (!productId) return;
-
-          // Convert string fields to numbers if needed
-          const quantity = Number(product.quantity) || 0;
-          const price = Number(product.price) || 0;
-          const total = quantity * price;
-          const foc = Number(product.freeProduct || product.freeproduct) || 0; // Handle both camelCase and lowercase
-          const returns =
-            Number(product.returnProduct || product.returnproduct) || 0; // Handle both camelCase and lowercase
-
-          if (productMap.has(productId)) {
-            const existingProduct = productMap.get(productId)!;
-            existingProduct.quantity += quantity;
-            existingProduct.totalSales += total;
-            existingProduct.foc += foc;
-            existingProduct.returns += returns;
-          } else {
-            // Get product type from cache
-            const type = getProductType(productId);
-            const description = getProductDescription(productId);
-
-            productMap.set(productId, {
-              id: productId,
-              description,
-              type,
-              quantity,
-              totalSales: total,
-              foc,
-              returns,
-            });
-          }
-        });
-      }
-    });
-
-    return Array.from(productMap.values());
-  };
-
   // Get top products for summary cards
   const topProductSummary = useMemo(() => {
-    // Sort by sales amount in descending order
-    const sortedProducts = [...salesData].sort(
-      (a, b) => b.totalSales - a.totalSales
-    );
-    // Take top 12 (or fewer if there aren't 12 products)
-    return sortedProducts.slice(0, 12);
+    // Define product type order for sorting
+    const typeOrder: Record<string, number> = {
+      MEE: 1,
+      BH: 2,
+      JP: 3,
+      OTH: 4,
+      OTHER: 5,
+    };
+
+    // Sort by product type first, then by sales amount within each type
+    const sortedProducts = [...salesData].sort((a, b) => {
+      const typeOrderA = typeOrder[a.type] || 999;
+      const typeOrderB = typeOrder[b.type] || 999;
+
+      // First sort by type order
+      if (typeOrderA !== typeOrderB) {
+        return typeOrderA - typeOrderB;
+      }
+
+      // Then sort by sales amount (descending) within the same type
+      return b.totalSales - a.totalSales;
+    });
+
+    // Return all products (remove the slice limit)
+    return sortedProducts;
   }, [salesData]);
 
   // Fetch yearly trend data for the product mix chart
@@ -687,9 +654,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full p-6 pt-0 max-w-[88rem] mx-auto space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Sales by Products</h1>
-
+    <div className="w-full pt-0 max-w-[88rem] mt-4 mx-auto space-y-6">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
@@ -730,28 +695,33 @@ const SalesByProductsPage: React.FC = () => {
           </div>
         </div>
         {/* Product cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Get top 6 products by sales instead of 12 */}
-          {topProductSummary.map((product) => (
-            <div
-              key={product.id}
-              className="bg-default-100/75 rounded-lg p-3 border-l-4 overflow-hidden"
-              style={{ borderColor: categoryColors[product.type] || "#a0aec0" }}
-            >
+        <div className="max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-2">
+            {topProductSummary.map((product) => (
               <div
-                className="text-base text-default-500 font-medium truncate"
-                title={product.description}
+                key={product.id}
+                className="bg-default-100/75 rounded-lg p-3 border-l-4 overflow-hidden flex-shrink-0"
+                style={{
+                  borderColor: categoryColors[product.type] || "#a0aec0",
+                }}
               >
-                {product.description || product.id}
+                <div
+                  className="text-base text-default-500 font-medium truncate"
+                  title={`${
+                    product.description
+                  } • ${product.quantity.toLocaleString()} units`}
+                >
+                  {product.description || product.id}
+                  {" • "}
+                  {product.quantity.toLocaleString()} units
+                </div>
+                <div className="text-lg font-bold mt-1">
+                  {formatCurrency(product.totalSales)}
+                </div>
+                <div className="text-sm text-default-500 font-medium mt-1"></div>
               </div>
-              <div className="text-lg font-bold mt-1">
-                {formatCurrency(product.totalSales)}
-              </div>
-              <div className="text-sm text-default-500 font-medium mt-1">
-                {product.quantity.toLocaleString()} units
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
       {isLoading ? (

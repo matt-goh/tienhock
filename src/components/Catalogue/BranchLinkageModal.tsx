@@ -14,7 +14,6 @@ import toast from "react-hot-toast";
 import {
   useCustomersCache,
   refreshCustomersCache,
-  EnhancedCustomerList,
 } from "../../utils/catalogue/useCustomerCache";
 import { CustomerCombobox } from "../Invoice/CustomerCombobox";
 import { FormInput } from "../FormComponents";

@@ -1,6 +1,6 @@
 // src/routes/admin/backup.js
 import express from 'express';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -257,6 +257,147 @@ export default function backupRouter(pool) {
       maintenanceMode: pool.pool.maintenanceMode
     });
   });
+  
+router.get('/download/:filename', async (req, res) => {
+  try {
+    if (pool.pool.maintenanceMode) {
+      return res.status(503).json({ 
+        error: 'Service temporarily unavailable',
+        message: 'Database restore in progress. Please try again in a few moments.'
+      });
+    }
+
+    const { filename } = req.params;
+    if (!filename) {
+      return res.status(400).json({ error: 'Filename is required' });
+    }
+
+    const envBackupDir = path.join(backupDir, env);
+    const filePath = path.join(envBackupDir, filename);
+
+    // Verify file exists and is within backup directory
+    if (!filePath.startsWith(envBackupDir)) {
+      return res.status(400).json({ error: 'Invalid backup file path' });
+    }
+
+    try {
+      await fs.access(filePath);
+    } catch {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+
+    // Convert .gz to .sql filename for download
+    const sqlFilename = filename.replace('.gz', '.sql');
+    
+    // Set headers for file download
+    res.setHeader('Content-Type', 'application/sql');
+    res.setHeader('Content-Disposition', `attachment; filename="${sqlFilename}"`);
+    
+    // Create a temporary database name
+    const tempDbName = `temp_restore_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    try {
+      console.log(`Creating temporary database: ${tempDbName}`);
+      
+      // Step 1: Create temporary database
+      await execAsync(`PGPASSWORD="${DB_PASSWORD}" createdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" "${tempDbName}"`);
+      
+      console.log(`Restoring backup to temporary database: ${tempDbName}`);
+      
+      // Step 2: Restore backup to temporary database
+      await execAsync(`PGPASSWORD="${DB_PASSWORD}" pg_restore -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${tempDbName}" --no-owner --no-privileges --clean --if-exists -v "${filePath}"`);
+      
+      console.log(`Dumping temporary database with INSERT statements`);
+      
+      // Step 3: Dump temporary database as SQL with INSERT statements
+      const pgDumpArgs = [
+        '-h', DB_HOST,
+        '-p', DB_PORT,
+        '-U', DB_USER,
+        '-d', tempDbName,
+        '--clean',
+        '--if-exists',
+        '--no-owner',
+        '--no-privileges',
+        '--inserts',  // Use INSERT with column names
+        '--disable-triggers', // Disable triggers during insert
+        '--verbose'
+      ];
+
+      const pgDump = spawn('pg_dump', pgDumpArgs, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          PGPASSWORD: DB_PASSWORD
+        }
+      });
+      
+      // Pipe stdout to response
+      pgDump.stdout.pipe(res);
+      
+      let stderrOutput = '';
+      pgDump.stderr.on('data', (data) => {
+        stderrOutput += data.toString();
+        console.error('pg_dump stderr:', data.toString());
+      });
+      
+      pgDump.on('error', (error) => {
+        console.error('pg_dump spawn error:', error);
+        cleanupTempDb(tempDbName);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to start pg_dump process' });
+        }
+      });
+      
+      pgDump.on('close', async (code) => {
+        console.log(`pg_dump process exited with code ${code}`);
+        
+        // Clean up temporary database
+        await cleanupTempDb(tempDbName);
+        
+        if (code !== 0 && !res.headersSent) {
+          console.error(`pg_dump failed with code ${code}`);
+          console.error('pg_dump stderr:', stderrOutput);
+          res.status(500).json({ 
+            error: 'Failed to generate SQL dump with INSERT statements',
+            details: stderrOutput 
+          });
+        }
+      });
+      
+      // Handle client disconnect
+      req.on('close', async () => {
+        if (!pgDump.killed) {
+          pgDump.kill();
+        }
+        await cleanupTempDb(tempDbName);
+      });
+      
+    } catch (error) {
+      console.error('Error during backup conversion:', error);
+      await cleanupTempDb(tempDbName);
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Download failed:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Download failed', details: error.message });
+    }
+  }
+
+  // Helper function to clean up temporary database
+  async function cleanupTempDb(dbName) {
+    try {
+      console.log(`Cleaning up temporary database: ${dbName}`);
+      await execAsync(`PGPASSWORD="${DB_PASSWORD}" dropdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" "${dbName}"`);
+      console.log(`Successfully dropped temporary database: ${dbName}`);
+    } catch (cleanupError) {
+      console.error(`Failed to cleanup temporary database ${dbName}:`, cleanupError);
+      // Don't throw here - just log the error
+    }
+  }
+});
 
   router.post('/restore', async (req, res) => {
     const { filename } = req.body;

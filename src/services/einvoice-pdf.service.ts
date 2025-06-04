@@ -2,6 +2,7 @@
 import { api } from "../routes/utils/api";
 import {
   TIENHOCK_INFO,
+  JELLYPOLLY_INFO,
 } from "../utils/invoice/einvoice/companyInfo";
 import { ExtendedInvoiceData } from "../types/types";
 
@@ -44,8 +45,11 @@ export interface EInvoicePDFData {
   }>;
 }
 
-// Fetch customer data from API
-const fetchCustomerData = async (customerId: string): Promise<any> => {
+// Fetch customer data from cache or API
+const fetchCustomerData = async (
+  customerId: string,
+  context: "tienhock" | "jellypolly" = "tienhock"
+): Promise<any> => {
   try {
     // Check if customer ID is valid
     if (!customerId || customerId === "Consolidated customers") {
@@ -62,6 +66,26 @@ const fetchCustomerData = async (customerId: string): Promise<any> => {
       };
     }
 
+    // Try to get from localStorage cache first
+    const CACHE_KEY = "customers_cache";
+    const cachedData = localStorage.getItem(CACHE_KEY);
+
+    if (cachedData) {
+      try {
+        const { data } = JSON.parse(cachedData);
+        // Find the customer in the cached array
+        const customer = data.find((c: any) => c.id === customerId);
+
+        if (customer) {
+          return customer;
+        }
+      } catch (e) {
+        console.warn("Error parsing customer cache:", e);
+      }
+    }
+
+    // If not in cache, fall back to API call
+    console.log(`Customer ${customerId} not found in cache, fetching from API`);
     const customerData = await api.get(`/api/customers/${customerId}`);
     return customerData;
   } catch (error) {
@@ -80,20 +104,13 @@ const fetchCustomerData = async (customerId: string): Promise<any> => {
   }
 };
 
-// Helper function to format date
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12;
-  hours = hours ? hours : 12; // Convert 0 to 12
-
-  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+const getCompanyInfo = (context: "tienhock" | "greentarget" | "jellypolly") => {
+  switch (context) {
+    case "jellypolly":
+      return JELLYPOLLY_INFO;
+    default:
+      return TIENHOCK_INFO;
+  }
 };
 
 // Helper function to create consolidated order details
@@ -143,16 +160,20 @@ const createConsolidatedOrderDetails = async (einvoiceData: any) => {
 
 // Original function to prepare PDF data from standard e-invoice format
 export const preparePDFData = async (
-  einvoiceData: any
+  einvoiceData: any,
+  companyContext: "tienhock" | "jellypolly" = "tienhock"
 ): Promise<EInvoicePDFData> => {
   const isConsolidated =
     einvoiceData.is_consolidated ||
     (einvoiceData.internal_id && einvoiceData.internal_id.startsWith("CON-"));
 
   try {
+    // Get appropriate company info
+    const companyInfo = getCompanyInfo(companyContext);
+
     // Fetch customer data
     const customerId = einvoiceData.receiver_id || einvoiceData.customerid;
-    const customerDetails = await fetchCustomerData(customerId);
+    const customerDetails = await fetchCustomerData(customerId, companyContext);
 
     // Parse invoice date and time
     const createdDateString = einvoiceData.createddate || Date.now().toString();
@@ -201,7 +222,7 @@ export const preparePDFData = async (
 
     // Combine all data
     return {
-      company: TIENHOCK_INFO, // Default to TIENHOCK_INFO, can be customized based on data
+      company: companyInfo,
       invoice: {
         number: einvoiceData.internal_id || einvoiceData.id,
         uuid: einvoiceData.uuid || "",
@@ -247,31 +268,36 @@ export const preparePDFData = async (
 
 // Function to prepare PDF data from ExtendedInvoiceData
 export const preparePDFDataFromInvoice = async (
-  invoice: ExtendedInvoiceData
+  invoice: ExtendedInvoiceData,
+  companyContext: "tienhock" | "jellypolly" = "tienhock"
 ): Promise<EInvoicePDFData> => {
   // If we already have extended invoice data, just use the existing preparePDFData function
   // with required property mapping
-  return preparePDFData({
-    internal_id: invoice.id,
-    receiver_id: invoice.customerid,
-    uuid: invoice.uuid,
-    long_id: invoice.long_id,
-    createddate: invoice.createddate,
-    total_excluding_tax: invoice.total_excluding_tax,
-    tax_amount: invoice.tax_amount,
-    total_rounding: invoice.rounding,
-    total_payable_amount: invoice.totalamountpayable,
-    submission_uid: invoice.submission_uid,
-    datetime_validated: invoice.datetime_validated,
-    is_consolidated: invoice.is_consolidated,
-    orderDetails: invoice.products,
-    type_name: invoice.paymenttype,
-  });
+  return preparePDFData(
+    {
+      internal_id: invoice.id,
+      receiver_id: invoice.customerid,
+      uuid: invoice.uuid,
+      long_id: invoice.long_id,
+      createddate: invoice.createddate,
+      total_excluding_tax: invoice.total_excluding_tax,
+      tax_amount: invoice.tax_amount,
+      total_rounding: invoice.rounding,
+      total_payable_amount: invoice.totalamountpayable,
+      submission_uid: invoice.submission_uid,
+      datetime_validated: invoice.datetime_validated,
+      is_consolidated: invoice.is_consolidated,
+      orderDetails: invoice.products,
+      type_name: invoice.paymenttype,
+    },
+    companyContext
+  );
 };
 
 // Function to handle batch preparation of PDF data
 export const prepareBatchPDFData = async (
-  invoices: ExtendedInvoiceData[]
+  invoices: ExtendedInvoiceData[],
+  companyContext: "tienhock" | "jellypolly" = "tienhock"
 ): Promise<
   Array<{
     pdfData: EInvoicePDFData;
@@ -283,7 +309,10 @@ export const prepareBatchPDFData = async (
   for (const invoice of invoices) {
     try {
       if (invoice.einvoice_status === "valid" && invoice.uuid) {
-        const pdfData = await preparePDFDataFromInvoice(invoice);
+        const pdfData = await preparePDFDataFromInvoice(
+          invoice,
+          companyContext
+        );
         results.push({ pdfData, invoice });
       }
     } catch (error) {
