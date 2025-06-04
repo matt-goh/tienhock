@@ -1,4 +1,4 @@
-// src/utils/jellypolly/einvoice/JPEInvoiceApiClient.js
+// src/utils/JellyPolly/einvoice/JPEInvoiceApiClient.js
 import { request } from "https";
 import { stringify } from "querystring";
 

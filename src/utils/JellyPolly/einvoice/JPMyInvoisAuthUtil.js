@@ -1,4 +1,4 @@
-// src/utils/jellypolly/einvoice/JPMyInvoisAuthUtil.js
+// src/utils/JellyPolly/einvoice/JPMyInvoisAuthUtil.js
 import JPEInvoiceApiClientFactory from "./JPEInvoiceApiClientFactory.js";
 
 // Simple in-memory token cache
