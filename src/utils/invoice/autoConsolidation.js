@@ -1,13 +1,13 @@
 // src/utils/invoice/autoConsolidation.js
 import { EInvoiceConsolidatedTemplate } from "../invoice/einvoice/EInvoiceConsolidatedTemplate.js";
 import { GTEInvoiceConsolidatedTemplate } from "../greenTarget/einvoice/GTEInvoiceConsolidatedTemplate.js";
-import { JPEInvoiceConsolidatedTemplate } from "../jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
+import { JPEInvoiceConsolidatedTemplate } from "../JellyPolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
 import EInvoiceApiClientFactory from "../invoice/einvoice/EInvoiceApiClientFactory.js";
 import EInvoiceSubmissionHandler from "../invoice/einvoice/EInvoiceSubmissionHandler.js";
 import GTEInvoiceApiClientFactory from "../greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 import GTEInvoiceSubmissionHandler from "../greenTarget/einvoice/GTEInvoiceSubmissionHandler.js";
-import JPEInvoiceApiClientFactory from "../jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
-import JPEInvoiceSubmissionHandler from "../jellypolly/einvoice/JPEInvoiceSubmissionHandler.js";
+import JPEInvoiceApiClientFactory from "../JellyPolly/einvoice/JPEInvoiceApiClientFactory.js";
+import JPEInvoiceSubmissionHandler from "../JellyPolly/einvoice/JPEInvoiceSubmissionHandler.js";
 import {
   MYINVOIS_API_BASE_URL,
   MYINVOIS_CLIENT_ID,
