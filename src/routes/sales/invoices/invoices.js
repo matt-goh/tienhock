@@ -610,11 +610,13 @@ export default function (pool, config) {
             'price', od.price,
             'freeproduct', od.freeproduct,
             'returnproduct', od.returnproduct,
-            'total', od.total
+            'total', od.total,
+            'type', p.type
           ) ORDER BY od.id
         ) FILTER (WHERE od.id IS NOT NULL) as products
       FROM invoices i
       LEFT JOIN order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
       WHERE 
         CAST(i.createddate AS bigint) BETWEEN $1 AND $2
         AND i.invoice_status != 'cancelled'
@@ -640,11 +642,13 @@ export default function (pool, config) {
             'price', od.price,
             'freeproduct', od.freeproduct,
             'returnproduct', od.returnproduct,
-            'total', od.total
+            'total', od.total,
+            'type', p.type
           ) ORDER BY od.id
         ) FILTER (WHERE od.id IS NOT NULL) as products
       FROM jellypolly.invoices i
       LEFT JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
       WHERE 
         CAST(i.createddate AS bigint) BETWEEN $1 AND $2
         AND i.invoice_status != 'cancelled'
@@ -865,7 +869,17 @@ export default function (pool, config) {
       invoice.products.forEach((product) => {
         // Filter by product type if specified
         if (productType) {
-          // This filtering will be done in frontend with product cache
+          // Map product types to filter criteria
+          const productTypeMap = {
+            MEE: ["MEE"],
+            BH: ["BH"],
+            JP: ["JP"],
+          };
+
+          const allowedTypes = productTypeMap[productType];
+          if (!allowedTypes || !allowedTypes.includes(product.type)) {
+            return; // Skip this product if it doesn't match the filter
+          }
         }
 
         const code = product.code;
@@ -892,7 +906,7 @@ export default function (pool, config) {
         salesmenData[salesmanId].total.quantity += quantity;
         salesmenData[salesmanId].total.amount += total;
 
-        // Track FOC and returns
+        // Track FOC and returns (also apply the same filtering)
         if (foc > 0) {
           if (!focProducts.has(code)) {
             focProducts.set(code, {
@@ -920,8 +934,25 @@ export default function (pool, config) {
     // Convert maps to arrays
     const result = {
       salesmen: {},
-      foc: Array.from(focProducts.values()),
-      returns: Array.from(returnProducts.values()),
+      foc: {
+        products: Array.from(focProducts.values()),
+        total: {
+          quantity: Array.from(focProducts.values()).reduce(
+            (sum, p) => sum + p.quantity,
+            0
+          ),
+        },
+      },
+      returns: {
+        products: Array.from(returnProducts.values()),
+        total: {
+          quantity: Array.from(returnProducts.values()).reduce(
+            (sum, p) => sum + p.quantity,
+            0
+          ),
+          amount: 0, // Returns typically don't have amount in this context
+        },
+      },
     };
 
     for (const [salesmanId, data] of Object.entries(salesmenData)) {
