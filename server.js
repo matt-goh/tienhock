@@ -9,10 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";
-import {
-  checkAndProcessDueConsolidations,
-  scheduleNextMonthConsolidation,
-} from "./src/utils/invoice/autoConsolidation.js";
+import { checkAndProcessDueConsolidations } from "./src/utils/invoice/autoConsolidation.js";
 
 dotenv.config();
 
@@ -101,21 +98,11 @@ cron.schedule(
 
 // --- Auto-consolidation scheduler ---
 cron.schedule(
-  "50 7 * * *", // Run at 3:28 PM every day
+  "38 8 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
   async () => {
     try {
       // Check if any consolidations are due today
       await checkAndProcessDueConsolidations(pool);
-
-      // Schedule next month's consolidation if we're at month-end
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      // If today is the last day of the month, schedule next month's consolidation
-      if (now.getMonth() !== tomorrow.getMonth()) {
-        await scheduleNextMonthConsolidation(pool);
-      }
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error in auto-consolidation job:`,
