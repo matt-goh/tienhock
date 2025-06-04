@@ -35,7 +35,6 @@ import {
 } from "../../utils/invoice/dateUtils";
 import SubmissionResultsModal from "./SubmissionResultsModal";
 import ConsolidatedInfoTooltip from "./ConsolidatedInfoTooltip";
-import ConsolidationStatusPanel from "./ConsolidationStatusPanel";
 import EInvoicePrintHandler from "../../utils/invoice/einvoice/EInvoicePrintHandler";
 
 // Interfaces remain the same
@@ -95,9 +94,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isAutoConsolidationEnabled, setIsAutoConsolidationEnabled] =
     useState(false);
-  const [activeTab, setActiveTab] = useState<"eligible" | "history">(
-    "history"
-  );
+  const [activeTab, setActiveTab] = useState<"eligible" | "history">("history");
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState<any>(null);
   const [processingHistoryId, setProcessingHistoryId] = useState<string | null>(
@@ -441,6 +438,39 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
   if (!isOpen) return null;
 
+  const getConsolidationWindowInfo = () => {
+    const now = new Date();
+    const currentDay = now.getUTCDate();
+    const currentMonth = now.getUTCMonth();
+    const currentYear = now.getUTCFullYear();
+
+    if (currentDay <= 7) {
+      // We're in consolidation window for previous month
+      let targetMonth = currentMonth - 1;
+      let targetYear = currentYear;
+
+      if (targetMonth < 0) {
+        targetMonth = 11;
+        targetYear = currentYear - 1;
+      }
+
+      return {
+        inWindow: true,
+        targetMonth,
+        targetYear,
+        dayInWindow: currentDay,
+        windowEnd: new Date(currentYear, currentMonth, 7),
+      };
+    }
+
+    return {
+      inWindow: false,
+      targetMonth: currentMonth,
+      targetYear: currentYear,
+      nextWindowStart: new Date(currentYear, currentMonth + 1, 1),
+    };
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex justify-center items-center p-4 backdrop-blur-sm">
       {/* Modal Container */}
@@ -488,7 +518,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           </div>
         </div>
 
-        {/* Auto-consolidation toggle - simplified version */}
+        {/* Auto-consolidation toggle */}
         <div className="px-5 py-4 border-b border-default-200 flex flex-col bg-default-50/60 flex-shrink-0">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
@@ -497,8 +527,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   Auto Consolidation (Monthly)
                 </div>
                 <p className="text-xs text-default-500 mt-0.5">
-                  Automatically consolidate eligible invoices 1 day after
-                  month-end, with retries for up to 7 days.
+                  Automatically consolidate eligible invoices during the first 7
+                  days of each month for the previous month's invoices.
                 </p>
               </div>
             </div>
@@ -529,11 +559,64 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           {/* Status panel - only show if auto-consolidation is enabled */}
           {isAutoConsolidationEnabled && (
             <div className="mt-4">
-              <ConsolidationStatusPanel
-                company="tienhock"
-                year={selectedYear}
-                month={selectedMonth}
-              />
+              {(() => {
+                const windowInfo = getConsolidationWindowInfo();
+
+                return (
+                  <div className="mb-3">
+                    <h4 className="text-sm font-medium text-default-700 mb-2">
+                      Auto-Consolidation Status
+                    </h4>
+
+                    {windowInfo.inWindow ? (
+                      <div className="text-xs text-default-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div className="flex items-center mb-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                          <strong className="text-green-800">
+                            Active Consolidation Window
+                          </strong>
+                        </div>
+                        <div className="mb-1">
+                          <strong>Processing:</strong>{" "}
+                          {new Date(
+                            windowInfo.targetYear,
+                            windowInfo.targetMonth
+                          ).toLocaleDateString("en-US", {
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          invoices
+                        </div>
+                        <div className="mb-1">
+                          <strong>Day:</strong> {windowInfo.dayInWindow} of 7 in
+                          consolidation window
+                        </div>
+                        <div>
+                          <strong>Window ends:</strong>{" "}
+                          {windowInfo.windowEnd?.toLocaleDateString() || "N/A"}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-default-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-center mb-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                          <strong className="text-blue-800">
+                            Outside Consolidation Window
+                          </strong>
+                        </div>
+                        <div className="mb-1">
+                          <strong>Next window starts:</strong>{" "}
+                          {windowInfo.nextWindowStart?.toLocaleDateString() || "N/A"}
+                        </div>
+                        <div>
+                          Auto-consolidation runs during the first 7 days of
+                          each month for the previous month's eligible invoices.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
