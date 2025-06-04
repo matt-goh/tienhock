@@ -1,4 +1,4 @@
-// src/utils/jellypolly/einvoice/JPEInvoiceSubmissionHandler.js
+// src/utils/JellyPolly/einvoice/JPEInvoiceSubmissionHandler.js
 import { createHash } from "crypto";
 
 class JPEInvoiceSubmissionHandler {

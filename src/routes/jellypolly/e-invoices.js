@@ -1,10 +1,10 @@
 // src/routes/jellypolly/sales/invoices/e-invoice.js
-import { JPEInvoiceTemplate } from "../../utils/jellypolly/einvoice/JPEInvoiceTemplate.js";
+import { JPEInvoiceTemplate } from "../../utils/JellyPolly/einvoice/JPEInvoiceTemplate.js";
 import { Router } from "express";
 import { createHash } from "crypto";
-import JPEInvoiceSubmissionHandler from "../../utils/jellypolly/einvoice/JPEInvoiceSubmissionHandler.js";
-import JPEInvoiceApiClientFactory from "../../utils/jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
-import { JPEInvoiceConsolidatedTemplate } from "../../utils/jellypolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
+import JPEInvoiceSubmissionHandler from "../../utils/JellyPolly/einvoice/JPEInvoiceSubmissionHandler.js";
+import JPEInvoiceApiClientFactory from "../../utils/JellyPolly/einvoice/JPEInvoiceApiClientFactory.js";
+import { JPEInvoiceConsolidatedTemplate } from "../../utils/JellyPolly/einvoice/JPEInvoiceConsolidatedTemplate.js";
 
 // Function to fetch customer data
 async function fetchCustomerData(pool, customerId) {
