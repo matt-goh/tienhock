@@ -1,4 +1,4 @@
-// src/utils/jellypolly/einvoice/JPEInvoiceApiClientFactory.js
+// src/utils/JellyPolly/einvoice/JPEInvoiceApiClientFactory.js
 import JPEInvoiceApiClient from "./JPEInvoiceApiClient.js";
 
 // Singleton instance

@@ -1,4 +1,4 @@
-// src/utils/jellypolly/einvoice/JPEInvoiceTemplate.js
+// src/utils/JellyPolly/einvoice/JPEInvoiceTemplate.js
 import { JELLYPOLLY_INFO } from "../../invoice/einvoice/companyInfo.js";
 
 // Helper function to format ISO date (YYYY-MM-DD)
