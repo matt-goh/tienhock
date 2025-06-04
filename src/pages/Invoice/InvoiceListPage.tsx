@@ -1259,7 +1259,8 @@ const InvoiceListPage: React.FC = () => {
                           filters.invoiceStatus.length === 3 &&
                           filters.invoiceStatus.includes("paid") &&
                           filters.invoiceStatus.includes("Unpaid") &&
-                          filters.invoiceStatus.includes("overdue")
+                          filters.invoiceStatus.includes("overdue") &&
+                          filters.invoiceStatus.includes("cancelled")
                         ) && (
                           <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                             <div className="bg-sky-100 p-1 rounded-md mr-2">
