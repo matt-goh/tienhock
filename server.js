@@ -100,9 +100,16 @@ cron.schedule(
 );
 
 // --- Auto-consolidation scheduler ---
-cron.schedule(
-  "10 15 * * *", // Run at 3:10 PM every day
+console.log(
+  `[${new Date().toISOString()}] Setting up auto-consolidation cron job for 3:10 PM daily (Asia/Kuala_Lumpur timezone)`
+);
+
+const consolidationJob = cron.schedule(
+  "25 15 * * *", // Run at 3:10 PM every day
   async () => {
+    console.log(
+      `[${new Date().toISOString()}] Auto-consolidation cron job triggered`
+    );
     try {
       // Check if any consolidations are due today
       await checkAndProcessDueConsolidations(pool);
@@ -114,8 +121,15 @@ cron.schedule(
 
       // If today is the last day of the month, schedule next month's consolidation
       if (now.getMonth() !== tomorrow.getMonth()) {
+        console.log(
+          `[${new Date().toISOString()}] End of month detected, scheduling next month's consolidation`
+        );
         await scheduleNextMonthConsolidation(pool);
       }
+
+      console.log(
+        `[${new Date().toISOString()}] Auto-consolidation job completed successfully`
+      );
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error in auto-consolidation job:`,
@@ -128,6 +142,75 @@ cron.schedule(
     timezone: "Asia/Kuala_Lumpur",
   }
 );
+
+// Log cron job status
+console.log(
+  `[${new Date().toISOString()}] Auto-consolidation cron job scheduled: ${
+    consolidationJob.scheduled
+  }`
+);
+
+// Add manual trigger endpoint for testing
+app.get("/api/admin/test-consolidation", async (req, res) => {
+  try {
+    console.log(
+      `[${new Date().toISOString()}] Manual consolidation test triggered`
+    );
+
+    // Log current server time in different timezones
+    const now = new Date();
+    console.log(`Server UTC time: ${now.toISOString()}`);
+    console.log(`Server local time: ${now.toString()}`);
+    console.log(
+      `Malaysia time: ${now.toLocaleString("en-US", {
+        timeZone: "Asia/Kuala_Lumpur",
+      })}`
+    );
+
+    await checkAndProcessDueConsolidations(pool);
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (now.getMonth() !== tomorrow.getMonth()) {
+      await scheduleNextMonthConsolidation(pool);
+    }
+
+    res.json({
+      message: "Consolidation test completed successfully",
+      serverTime: {
+        utc: now.toISOString(),
+        local: now.toString(),
+        malaysia: now.toLocaleString("en-US", {
+          timeZone: "Asia/Kuala_Lumpur",
+        }),
+      },
+    });
+  } catch (error) {
+    console.error("Manual consolidation test failed:", error);
+    res.status(500).json({
+      error: "Consolidation test failed",
+      details: error.message,
+    });
+  }
+});
+
+// Add cron status endpoint
+app.get("/api/admin/cron-status", (req, res) => {
+  const now = new Date();
+  res.json({
+    consolidationJob: {
+      scheduled: consolidationJob.scheduled,
+      running: consolidationJob.running,
+    },
+    serverTime: {
+      utc: now.toISOString(),
+      local: now.toString(),
+      malaysia: now.toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }),
+    },
+    nextRun: "Daily at 3:10 PM Malaysia time",
+  });
+});
 
 // Handle react routing (Catch-all for client-side routing)
 // This should generally be AFTER your API routes
