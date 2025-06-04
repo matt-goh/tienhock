@@ -18,289 +18,392 @@ import {
   MYINVOIS_JP_CLIENT_SECRET,
 } from "../../configs/config.js";
 
-// Hard-coded values
-const CONSOLIDATION_DAY = 1; // 1 day after month end
-const RETRY_DAYS = 7; // Retry for 7 days
-
 /**
- * Checks for consolidations that should be processed today and handles them
+ * Checks for consolidations that should be processed and handles them
+ * Now includes immediate processing for eligible invoices in the 7-day window after month-end
  */
 export const checkAndProcessDueConsolidations = async (pool) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    // Get current date in Malaysia timezone
+    // Get current date in UTC (since server is UTC)
     const now = new Date();
-    const malaysiaTime = new Date(
-      now.toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" })
+    const currentDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    console.log(
+      `[${now.toISOString()}] Starting auto-consolidation check for ${currentDate}`
     );
-    const currentDate = malaysiaTime.toISOString().split("T")[0]; // YYYY-MM-DD
 
-    // Find consolidations scheduled for today
-    const pendingQuery = `
-      SELECT ct.*
-      FROM consolidation_tracking ct
-      JOIN consolidation_settings cs ON ct.company_id = cs.company_id
-      WHERE ct.status = 'pending'
-      AND cs.auto_consolidation_enabled = true
-      AND (
-        -- Either it's scheduled for today
-        DATE(ct.next_attempt) = DATE($1)
-        -- Or it failed previously and is within the retry window
-        OR (
-          ct.status = 'pending' 
-          AND ct.attempt_count > 0
-          AND DATE(ct.next_attempt) <= DATE($1)
-          AND DATE($1) <= (DATE_TRUNC('month', ct.next_attempt) + INTERVAL '1 month' + INTERVAL '${RETRY_DAYS} days')
-        )
-      )
-    `;
+    // Check if we're in the 7-day window after month-end
+    const isInConsolidationWindow = checkIfInConsolidationWindow(now);
+    console.log(
+      `[${now.toISOString()}] In consolidation window: ${
+        isInConsolidationWindow.inWindow
+      }`
+    );
 
-    const pendingResult = await client.query(pendingQuery, [currentDate]);
+    if (isInConsolidationWindow.inWindow) {
+      console.log(
+        `[${now.toISOString()}] Processing consolidations for ${
+          isInConsolidationWindow.targetMonth
+        }/${isInConsolidationWindow.targetYear}`
+      );
 
-    for (const task of pendingResult.rows) {
-      try {
-        const company = task.company_id;
-        const year = task.year;
-        const month = task.month;
+      // Get companies with auto-consolidation enabled
+      const settingsQuery = `SELECT * FROM consolidation_settings WHERE auto_consolidation_enabled = true`;
+      const settingsResult = await client.query(settingsQuery);
 
-        // Check if we're still within the retry window
-        const monthEndDate = new Date(year, month + 1, 0); // Last day of the target month
-        const cutoffDate = new Date(monthEndDate);
-        cutoffDate.setDate(cutoffDate.getDate() + RETRY_DAYS);
-
-        if (malaysiaTime > cutoffDate) {
-          await client.query(
-            `UPDATE consolidation_tracking SET 
-              status = 'expired', 
-              error = 'Consolidation window expired',
-              last_attempt = CURRENT_TIMESTAMP
-            WHERE id = $1`,
-            [task.id]
-          );
-          continue;
-        }
-
-        // Get eligible invoices
-        const isGreentarget = company === "greentarget";
-        let eligibleInvoices = [];
+      for (const settings of settingsResult.rows) {
+        const company = settings.company_id;
+        console.log(
+          `[${now.toISOString()}] Checking ${company} for eligible invoices...`
+        );
 
         try {
-          // Mark task as in progress
-          await client.query(
-            `UPDATE consolidation_tracking SET 
-              status = 'processing',
-              last_attempt = CURRENT_TIMESTAMP,
-              attempt_count = attempt_count + 1
-            WHERE id = $1`,
-            [task.id]
+          // Check if we already have a completed consolidation for this month
+          const existingConsolidationQuery = `
+            SELECT * FROM consolidation_tracking 
+            WHERE company_id = $1 AND year = $2 AND month = $3 AND status = 'completed'
+          `;
+
+          const existingResult = await client.query(
+            existingConsolidationQuery,
+            [
+              company,
+              isInConsolidationWindow.targetYear,
+              isInConsolidationWindow.targetMonth,
+            ]
           );
 
-          // Get eligible invoices based on company
-          if (isGreentarget) {
-            // Green Target logic
-            const invoiceQuery = `
-              SELECT i.*, c.name as customer_name, c.phone_number, c.tin_number, c.id_type, c.id_number 
-              FROM greentarget.invoices i
-              JOIN greentarget.customers c ON i.customer_id = c.customer_id
-              WHERE EXTRACT(MONTH FROM i.date_issued) = $1 + 1
-              AND EXTRACT(YEAR FROM i.date_issued) = $2
-              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
-              AND i.status != 'cancelled'
-              AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-            `;
-
-            const invoiceResult = await client.query(invoiceQuery, [
-              month,
-              year,
-            ]);
-            eligibleInvoices = invoiceResult.rows;
-          } else if (company === "jellypolly") {
-            // Jellypolly logic
-            const startOfMonth = new Date(year, month, 1).getTime().toString();
-            const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
-              .getTime()
-              .toString();
-
-            const invoiceQuery = `
-              SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
-              FROM jellypolly.invoices i
-              JOIN customers c ON i.customerid = c.id
-              WHERE i.createddate::bigint >= $1
-              AND i.createddate::bigint <= $2
-              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
-              AND i.invoice_status != 'cancelled'
-              AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-            `;
-
-            const invoiceResult = await client.query(invoiceQuery, [
-              startOfMonth,
-              endOfMonth,
-            ]);
-
-            // Also get order details for each invoice
-            for (const invoice of invoiceResult.rows) {
-              const orderDetailsQuery = `
-                SELECT *
-                FROM jellypolly.order_details
-                WHERE invoiceid = $1
-                ORDER BY id
-              `;
-
-              const orderDetailsResult = await client.query(orderDetailsQuery, [
-                invoice.id,
-              ]);
-              invoice.orderDetails = orderDetailsResult.rows;
-            }
-
-            eligibleInvoices = invoiceResult.rows;
-          } else {
-            // Tien Hock logic
-            const startOfMonth = new Date(year, month, 1).getTime().toString();
-            const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
-              .getTime()
-              .toString();
-
-            const invoiceQuery = `
-              SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
-              FROM invoices i
-              JOIN customers c ON i.customerid = c.id
-              WHERE i.createddate::bigint >= $1
-              AND i.createddate::bigint <= $2
-              AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
-              AND i.invoice_status != 'cancelled'
-              AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-            `;
-
-            const invoiceResult = await client.query(invoiceQuery, [
-              startOfMonth,
-              endOfMonth,
-            ]);
-
-            // Also get order details for each invoice
-            for (const invoice of invoiceResult.rows) {
-              const orderDetailsQuery = `
-                SELECT *
-                FROM order_details
-                WHERE invoiceid = $1
-                ORDER BY id
-              `;
-
-              const orderDetailsResult = await client.query(orderDetailsQuery, [
-                invoice.id,
-              ]);
-              invoice.orderDetails = orderDetailsResult.rows;
-            }
-
-            eligibleInvoices = invoiceResult.rows;
+          if (existingResult.rows.length > 0) {
+            console.log(
+              `[${now.toISOString()}] ${company} already has completed consolidation for ${
+                isInConsolidationWindow.targetYear
+              }-${isInConsolidationWindow.targetMonth + 1}`
+            );
+            continue;
           }
-        } catch (error) {
-          console.error(
-            `Error getting eligible invoices for ${company} ${year}-${
-              month + 1
-            }:`,
-            error
-          );
-          throw new Error(`Failed to get eligible invoices: ${error.message}`);
-        }
 
-        if (eligibleInvoices.length === 0) {
-          await client.query(
-            `UPDATE consolidation_tracking SET 
-              status = 'skipped', 
-              error = 'No eligible invoices found',
-              last_attempt = CURRENT_TIMESTAMP
-            WHERE id = $1`,
-            [task.id]
-          );
-          continue;
-        }
+          // Get eligible invoices that haven't been consolidated yet
+          let eligibleInvoices = [];
 
-        try {
-          // Perform the actual consolidation based on company
+          if (company === "greentarget") {
+            eligibleInvoices = await getEligibleGreentargetInvoices(
+              client,
+              isInConsolidationWindow.targetMonth,
+              isInConsolidationWindow.targetYear
+            );
+          } else if (company === "jellypolly") {
+            eligibleInvoices = await getEligibleJellypollyInvoices(
+              client,
+              isInConsolidationWindow.targetMonth,
+              isInConsolidationWindow.targetYear
+            );
+          } else {
+            eligibleInvoices = await getEligibleTienhockInvoices(
+              client,
+              isInConsolidationWindow.targetMonth,
+              isInConsolidationWindow.targetYear
+            );
+          }
+
+          console.log(
+            `[${now.toISOString()}] Found ${
+              eligibleInvoices.length
+            } eligible invoices for ${company}`
+          );
+
+          if (eligibleInvoices.length === 0) {
+            console.log(
+              `[${now.toISOString()}] No eligible invoices found for ${company}`
+            );
+
+            // Create or update tracking record as skipped
+            await upsertConsolidationTracking(
+              client,
+              company,
+              isInConsolidationWindow.targetYear,
+              isInConsolidationWindow.targetMonth,
+              "skipped",
+              "No eligible invoices found"
+            );
+            continue;
+          }
+
+          // Create or update tracking record as processing
+          await upsertConsolidationTracking(
+            client,
+            company,
+            isInConsolidationWindow.targetYear,
+            isInConsolidationWindow.targetMonth,
+            "processing",
+            null
+          );
+
+          // Perform the actual consolidation
           let result;
-          if (isGreentarget) {
+          if (company === "greentarget") {
             result = await processGreentargetConsolidation(
               client,
               eligibleInvoices,
-              month,
-              year
+              isInConsolidationWindow.targetMonth,
+              isInConsolidationWindow.targetYear
             );
           } else if (company === "jellypolly") {
             result = await processJellypollyConsolidation(
               client,
               eligibleInvoices,
-              month,
-              year
+              isInConsolidationWindow.targetMonth,
+              isInConsolidationWindow.targetYear
             );
           } else {
             result = await processTienhockConsolidation(
               client,
               eligibleInvoices,
-              month,
-              year
+              isInConsolidationWindow.targetMonth,
+              isInConsolidationWindow.targetYear
             );
           }
 
           // Update tracking record with result
           if (result.success) {
-            await client.query(
-              `UPDATE consolidation_tracking SET 
-                status = 'completed',
-                consolidated_invoice_id = $2,
-                error = NULL
-              WHERE id = $1`,
-              [task.id, result.consolidated_invoice_id]
+            await upsertConsolidationTracking(
+              client,
+              company,
+              isInConsolidationWindow.targetYear,
+              isInConsolidationWindow.targetMonth,
+              "completed",
+              null,
+              result.consolidated_invoice_id
+            );
+            console.log(
+              `[${now.toISOString()}] Successfully consolidated ${company} invoices into ${
+                result.consolidated_invoice_id
+              }`
             );
           } else {
             throw new Error(result.message || "Consolidation failed");
           }
         } catch (error) {
           console.error(
-            `Error during consolidation for ${company} ${year}-${month + 1}:`,
+            `[${now.toISOString()}] Error consolidating ${company}:`,
             error
           );
 
-          // Schedule retry if still within window
-          const nextRetry = new Date(malaysiaTime);
-          nextRetry.setDate(nextRetry.getDate() + 1);
-
-          if (nextRetry <= cutoffDate) {
-            await client.query(
-              `UPDATE consolidation_tracking SET 
-                status = 'pending',
-                error = $2,
-                next_attempt = $3
-              WHERE id = $1`,
-              [task.id, error.message || "Consolidation error", nextRetry]
-            );
-          } else {
-            await client.query(
-              `UPDATE consolidation_tracking SET 
-                status = 'failed',
-                error = $2
-              WHERE id = $1`,
-              [task.id, error.message || "Consolidation error"]
-            );
-          }
+          await upsertConsolidationTracking(
+            client,
+            company,
+            isInConsolidationWindow.targetYear,
+            isInConsolidationWindow.targetMonth,
+            "failed",
+            error.message || "Consolidation error"
+          );
         }
-      } catch (error) {
-        console.error(
-          `Error processing ${task.company_id} consolidation:`,
-          error
-        );
       }
+    } else {
+      console.log(
+        `[${now.toISOString()}] Not in consolidation window, skipping auto-consolidation`
+      );
     }
 
     await client.query("COMMIT");
+    console.log(`[${now.toISOString()}] Auto-consolidation check completed`);
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error in auto-consolidation check:", error);
+    console.error(
+      `[${now.toISOString()}] Error in auto-consolidation check:`,
+      error
+    );
   } finally {
     client.release();
   }
 };
+
+/**
+ * Check if current date is within 7 days after month-end
+ */
+function checkIfInConsolidationWindow(currentDate) {
+  const now = new Date(currentDate);
+  const currentDay = now.getUTCDate();
+  const currentMonth = now.getUTCMonth();
+  const currentYear = now.getUTCFullYear();
+
+  // Check if we're in the first 7 days of the month (consolidating previous month)
+  if (currentDay <= 7) {
+    // We're in the consolidation window for the previous month
+    let targetMonth = currentMonth - 1;
+    let targetYear = currentYear;
+
+    if (targetMonth < 0) {
+      targetMonth = 11; // December
+      targetYear = currentYear - 1;
+    }
+
+    return {
+      inWindow: true,
+      targetMonth,
+      targetYear,
+      dayInWindow: currentDay,
+    };
+  }
+
+  return {
+    inWindow: false,
+    targetMonth: null,
+    targetYear: null,
+    dayInWindow: null,
+  };
+}
+
+/**
+ * Upsert consolidation tracking record
+ */
+async function upsertConsolidationTracking(
+  client,
+  companyId,
+  year,
+  month,
+  status,
+  error = null,
+  consolidatedInvoiceId = null
+) {
+  const upsertQuery = `
+    INSERT INTO consolidation_tracking (company_id, year, month, status, error, consolidated_invoice_id, last_attempt, attempt_count)
+    VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, 1)
+    ON CONFLICT (company_id, year, month)
+    DO UPDATE SET 
+      status = EXCLUDED.status,
+      error = EXCLUDED.error,
+      consolidated_invoice_id = COALESCE(EXCLUDED.consolidated_invoice_id, consolidation_tracking.consolidated_invoice_id),
+      last_attempt = CURRENT_TIMESTAMP,
+      attempt_count = consolidation_tracking.attempt_count + 1
+  `;
+
+  await client.query(upsertQuery, [
+    companyId,
+    year,
+    month,
+    status,
+    error,
+    consolidatedInvoiceId,
+  ]);
+}
+
+/**
+ * Get eligible Tien Hock invoices that haven't been consolidated
+ */
+async function getEligibleTienhockInvoices(client, month, year) {
+  const startOfMonth = new Date(year, month, 1).getTime().toString();
+  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+    .getTime()
+    .toString();
+
+  const invoiceQuery = `
+    SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
+    FROM invoices i
+    JOIN customers c ON i.customerid = c.id
+    WHERE i.createddate::bigint >= $1
+    AND i.createddate::bigint <= $2
+    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
+    AND i.invoice_status != 'cancelled'
+    AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    AND NOT EXISTS (
+      SELECT 1 FROM invoices con 
+      WHERE con.is_consolidated = true 
+      AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+      AND con.invoice_status != 'cancelled'
+    )
+  `;
+
+  const invoiceResult = await client.query(invoiceQuery, [
+    startOfMonth,
+    endOfMonth,
+  ]);
+
+  // Get order details for each invoice
+  for (const invoice of invoiceResult.rows) {
+    const orderDetailsQuery = `
+      SELECT * FROM order_details WHERE invoiceid = $1 ORDER BY id
+    `;
+    const orderDetailsResult = await client.query(orderDetailsQuery, [
+      invoice.id,
+    ]);
+    invoice.orderDetails = orderDetailsResult.rows;
+  }
+
+  return invoiceResult.rows;
+}
+
+/**
+ * Get eligible Jellypolly invoices that haven't been consolidated
+ */
+async function getEligibleJellypollyInvoices(client, month, year) {
+  const startOfMonth = new Date(year, month, 1).getTime().toString();
+  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+    .getTime()
+    .toString();
+
+  const invoiceQuery = `
+    SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
+    FROM jellypolly.invoices i
+    JOIN customers c ON i.customerid = c.id
+    WHERE i.createddate::bigint >= $1
+    AND i.createddate::bigint <= $2
+    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
+    AND i.invoice_status != 'cancelled'
+    AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    AND NOT EXISTS (
+      SELECT 1 FROM jellypolly.invoices con 
+      WHERE con.is_consolidated = true 
+      AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+      AND con.invoice_status != 'cancelled'
+    )
+  `;
+
+  const invoiceResult = await client.query(invoiceQuery, [
+    startOfMonth,
+    endOfMonth,
+  ]);
+
+  // Get order details for each invoice
+  for (const invoice of invoiceResult.rows) {
+    const orderDetailsQuery = `
+      SELECT * FROM jellypolly.order_details WHERE invoiceid = $1 ORDER BY id
+    `;
+    const orderDetailsResult = await client.query(orderDetailsQuery, [
+      invoice.id,
+    ]);
+    invoice.orderDetails = orderDetailsResult.rows;
+  }
+
+  return invoiceResult.rows;
+}
+
+/**
+ * Get eligible Green Target invoices that haven't been consolidated
+ */
+async function getEligibleGreentargetInvoices(client, month, year) {
+  const invoiceQuery = `
+    SELECT i.*, c.name as customer_name, c.phone_number, c.tin_number, c.id_type, c.id_number 
+    FROM greentarget.invoices i
+    JOIN greentarget.customers c ON i.customer_id = c.customer_id
+    WHERE EXTRACT(MONTH FROM i.date_issued) = $1 + 1
+    AND EXTRACT(YEAR FROM i.date_issued) = $2
+    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
+    AND i.status != 'cancelled'
+    AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    AND NOT EXISTS (
+      SELECT 1 FROM greentarget.invoices con 
+      WHERE con.is_consolidated = true 
+      AND con.consolidated_invoices::jsonb ? CAST(i.invoice_number AS TEXT)
+      AND con.status != 'cancelled'
+    )
+  `;
+
+  const invoiceResult = await client.query(invoiceQuery, [month, year]);
+  return invoiceResult.rows;
+}
 
 /**
  * Process Tien Hock consolidation
@@ -660,63 +763,3 @@ async function processJellypollyConsolidation(client, invoices, month, year) {
     };
   }
 }
-
-/**
- * Schedules next month's consolidation
- */
-export const scheduleNextMonthConsolidation = async (pool) => {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    // Get settings for all companies
-    const settingsQuery = `SELECT * FROM consolidation_settings WHERE auto_consolidation_enabled = true`;
-    const settingsResult = await client.query(settingsQuery);
-
-    // Calculate next month
-    const now = new Date();
-    const nextMonth = (now.getMonth() + 1) % 12;
-    const nextYear =
-      now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
-
-    for (const settings of settingsResult.rows) {
-      const company = settings.company_id;
-
-      // Check if already scheduled
-      const existingQuery = `
-        SELECT * FROM consolidation_tracking 
-        WHERE company_id = $1 AND year = $2 AND month = $3
-      `;
-
-      const existingResult = await client.query(existingQuery, [
-        company,
-        nextYear,
-        nextMonth,
-      ]);
-
-      if (existingResult.rows.length > 0) {
-        continue;
-      }
-
-      // Calculate the scheduled date (N days after month end)
-      const monthEndDate = new Date(nextYear, nextMonth + 1, 0); // Last day of the target month
-      const scheduledDate = new Date(monthEndDate);
-      scheduledDate.setDate(scheduledDate.getDate() + CONSOLIDATION_DAY);
-
-      // Create the tracking record
-      await client.query(
-        `INSERT INTO consolidation_tracking 
-          (company_id, year, month, status, next_attempt) 
-         VALUES ($1, $2, $3, 'pending', $4)`,
-        [company, nextYear, nextMonth, scheduledDate]
-      );
-    }
-
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error scheduling next month consolidation:", error);
-  } finally {
-    client.release();
-  }
-};
