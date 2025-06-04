@@ -300,7 +300,7 @@ const EInvoicePDF: React.FC<Props> = ({
               <Text style={styles.infoLabel}>Supplier Name</Text>
               <Text style={styles.infoValue}>
                 {companyContext === "jellypolly"
-                  ? JELLYPOLLY_INFO.name
+                  ? "JELLY POLLY FOOD INDUSTRIES"
                   : data.company.name}
               </Text>
             </View>

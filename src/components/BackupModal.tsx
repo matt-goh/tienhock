@@ -15,9 +15,10 @@ import {
   IconAlertTriangle,
   IconClock,
 } from "@tabler/icons-react";
-import { DB_NAME, NODE_ENV } from "../configs/config";
+import { API_BASE_URL, DB_NAME, NODE_ENV } from "../configs/config";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "./ConfirmationDialog";
+import { sessionService } from "../services/SessionService";
 
 interface BackupModalProps {
   isOpen: boolean;
@@ -204,8 +205,72 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleDownload = async (filename: string) => {
+    try {
+      setLoading(true);
+
+      // Use the same pattern as the api utility but handle blob response
+      const sessionId = sessionService.getSessionId();
+      const response = await fetch(
+        `${API_BASE_URL}/api/backup/download/${encodeURIComponent(filename)}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-id": sessionId,
+          },
+        }
+      );
+
+      // Check if response is ok before trying to get blob
+      if (!response.ok) {
+        // Try to get error message from JSON response
+        try {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || errorData.error || "Download failed"
+          );
+        } catch {
+          throw new Error(`Download failed with status: ${response.status}`);
+        }
+      }
+
+      // Get the filename from response headers or use the original filename
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let downloadFilename = filename.replace(".gz", ".sql");
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          downloadFilename = filenameMatch[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = downloadFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Backup downloaded successfully!");
+    } catch (error: any) {
+      console.error("Download failed:", error);
+      toast.error(`Failed to download backup: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const formatSize = (bytes: number) => {
@@ -367,10 +432,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                     >
                       <table className="w-full table-fixed">
                         <colgroup>
-                          <col className="w-[40%]" />
-                          <col className="w-[25%]" />
-                          <col className="w-[15%]" />
+                          <col className="w-[35%]" />
                           <col className="w-[20%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[30%]" />
                         </colgroup>
                         <thead>
                           <tr>
@@ -398,10 +463,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                     >
                       <table className="w-full table-fixed">
                         <colgroup>
-                          <col className="w-[40%]" />
-                          <col className="w-[25%]" />
-                          <col className="w-[15%]" />
+                          <col className="w-[35%]" />
                           <col className="w-[20%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[30%]" />
                         </colgroup>
                         <tbody className="bg-white">
                           {loading ? (
@@ -461,11 +526,22 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                               );
                                               setShowConfirmDialog(true);
                                             }}
-                                            disabled={restoring}
+                                            disabled={restoring || loading}
                                             variant="outline"
                                             size="sm"
                                           >
                                             Restore
+                                          </Button>
+                                          <Button
+                                            onClick={() =>
+                                              handleDownload(backup.filename)
+                                            }
+                                            disabled={restoring || loading}
+                                            variant="outline"
+                                            size="sm"
+                                            color="sky"
+                                          >
+                                            Download
                                           </Button>
                                           <Button
                                             onClick={() => {
@@ -474,7 +550,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                               );
                                               setShowDeleteConfirmDialog(true);
                                             }}
-                                            disabled={restoring}
+                                            disabled={restoring || loading}
                                             variant="outline"
                                             size="sm"
                                             color="rose"
