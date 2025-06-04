@@ -30,11 +30,27 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
     (index: number, field: keyof ProductItem, value: any) => {
       const newItems = [...items];
       const item = { ...newItems[index] };
-      (item as any)[field] = value;
+
+      if (item.code === "LESS") {
+        if (field === "price") {
+          const numericValue = Number(value);
+          // Store price as negative if user enters positive for LESS item
+          (item as any)[field] =
+            numericValue > 0 ? -numericValue : numericValue;
+        } else if (field === "tax") {
+          // Force tax to 0 for LESS items
+          (item as any)[field] = 0;
+        } else {
+          (item as any)[field] = value;
+        }
+      } else {
+        (item as any)[field] = value;
+      }
+
       if (field === "quantity" || field === "price" || field === "tax") {
         const quantity = Number(item.quantity) || 0;
-        const price = Number(item.price) || 0;
-        const tax = Number(item.tax) || 0;
+        const price = Number(item.price) || 0; // Will be negative for LESS items
+        const tax = Number(item.tax) || 0; // Will be 0 for LESS items
         item.total = (quantity * price + tax).toFixed(2);
       }
       newItems[index] = item;
@@ -45,24 +61,48 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
 
   const handleProductSelect = useCallback(
     (index: number, selectedProduct: ProductItem | null) => {
-      // Expect Product | null
       if (!selectedProduct) return;
       const newItems = [...items];
       const item = { ...newItems[index] };
-      const customProduct = customerProducts.find(
-        (cp) => cp.product_id === String(selectedProduct.id) && cp.is_available
-      );
-      // Use price_per_unit from Product type
-      const price = customProduct
-        ? Number(customProduct.custom_price)
-        : Number(selectedProduct.price) || 0;
 
-      item.code = String(selectedProduct.id); // Use id from Product (convert to string)
-      item.description = selectedProduct.description || "";
-      item.price = price;
-      item.tax = 0;
-      const quantity = Number(item.quantity) || 0;
-      item.total = (quantity * price).toFixed(2);
+      item.code = String(selectedProduct.id);
+
+      if (String(selectedProduct.id) === "LESS") {
+        item.description = selectedProduct.description || "LESS AMOUNT";
+        item.price = 0; // Default price for LESS to 0, user inputs the actual deduction
+        item.tax = 0; // Default tax for LESS to 0 and ensure it stays 0
+        item.quantity = 1; // Default quantity to 1 for LESS
+      } else if (String(selectedProduct.id) === "OTH") {
+        // Only set description automatically if it's NOT "OTH"
+        // For "OTH", keep the existing description or set empty if none exists
+        if (!item.description) {
+          item.description = "";
+        }
+        // Price for OTH products comes from selection or custom product logic
+        const customProductOTH = customerProducts.find(
+          (cp) =>
+            cp.product_id === String(selectedProduct.id) && cp.is_available
+        );
+        item.price = customProductOTH
+          ? Number(customProductOTH.custom_price)
+          : Number(selectedProduct.price) || 0;
+        item.tax = 0; // Default tax
+      } else {
+        item.description = selectedProduct.description || "";
+        const customProduct = customerProducts.find(
+          (cp) =>
+            cp.product_id === String(selectedProduct.id) && cp.is_available
+        );
+        item.price = customProduct
+          ? Number(customProduct.custom_price)
+          : Number(selectedProduct.price) || 0;
+        item.tax = 0; // Default tax
+      }
+
+      const quantity = Number(item.quantity) || 1; // Default to 1 if not set
+      const priceForCalc = Number(item.price) || 0;
+      const taxForCalc = Number(item.tax) || 0; // Will be 0 for LESS
+      item.total = (quantity * priceForCalc + taxForCalc).toFixed(2);
 
       newItems[index] = item;
       onItemsChange(newItems);
@@ -85,41 +125,51 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
     field,
     value,
     min = 0,
+    itemCode, // Added itemCode prop
   }: {
     rowIndex: number;
     field: keyof ProductItem;
     value: number | undefined;
     min?: number;
+    itemCode?: string; // Added itemCode prop
   }) => {
-    // Add local state to track input during typing
     const [localValue, setLocalValue] = useState<string>(
       value?.toString() || ""
     );
 
-    // Update local state when prop value changes
     useEffect(() => {
+      // For 'LESS' items, price is stored negatively but user might interact with positive.
+      // However, to keep it simple, we'll display the stored value (which will be negative for price).
       setLocalValue(value?.toString() || "");
     }, [value]);
+
+    const effectiveMin =
+      field === "price" && itemCode === "LESS" ? undefined : min;
 
     return (
       <input
         type="number"
-        min={min}
-        step={field === "price" || field === "tax" ? "0.1" : "1"}
-        // Use local state for display during editing
+        min={effectiveMin}
+        step={field === "price" || field === "tax" ? "0.01" : "1"} // Allow finer steps for price/tax
         value={localValue}
-        // Update local state only without triggering parent updates
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           setLocalValue(e.target.value);
         }}
-        // Only update parent state when finished typing
         onBlur={(e) => {
-          const newValue =
-            e.target.value === "" ? undefined : parseFloat(e.target.value);
-          handleItemChange(rowIndex, field, newValue);
+          let finalValue: number | undefined = parseFloat(e.target.value);
+          if (isNaN(finalValue)) {
+            finalValue = field === "price" || field === "tax" ? 0.0 : 0; // Default to 0 or 0.00
+          }
+          handleItemChange(rowIndex, field, finalValue);
         }}
         className="w-full py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right text-sm"
-        disabled={readOnly}
+        disabled={
+          readOnly ||
+          (itemCode === "LESS" &&
+            (field === "tax" ||
+              field === "returnProduct" ||
+              field === "freeProduct"))
+        } // Disable tax, returnProduct, and freeProduct input for LESS items
       />
     );
   };
@@ -220,20 +270,67 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
     );
   };
 
+  const DescriptionInputCell = ({
+    rowIndex,
+    value,
+    isEditable,
+  }: {
+    rowIndex: number;
+    value: string;
+    isEditable: boolean;
+  }) => {
+    const [localValue, setLocalValue] = useState<string>(value || "");
+
+    useEffect(() => {
+      setLocalValue(value || "");
+    }, [value]);
+
+    if (!isEditable) {
+      return (
+        <span className="px-2 py-1 text-sm text-gray-900">{value || ""}</span>
+      );
+    }
+
+    return (
+      <input
+        type="text"
+        value={localValue}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          setLocalValue(e.target.value);
+        }}
+        onBlur={(e) => {
+          handleItemChange(rowIndex, "description", e.target.value);
+        }}
+        className="w-full py-1 px-2 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-sm"
+        placeholder="Enter custom description..."
+        disabled={readOnly}
+      />
+    );
+  };
+
   // --- Table Rendering ---
   return (
     <div>
       <table className="min-w-full divide-y divide-gray-200 border border-default-200 rounded-lg table-fixed">
         <colgroup>
-          <col className="w-[10%]" />{/* Code */}
-          <col className="w-[38%]" />{/* Product */}
-          <col className="w-[8%]" />{/* QTY */}
-          <col className="w-[10%]" />{/* Price */}
-          <col className="w-[8%]" />{/* FOC */}
-          <col className="w-[8%]" />{/* RTN */}
-          <col className="w-[8%]" />{/* Tax */}
-          <col className="w-[10%]" />{/* Total */}
-          {!readOnly && <col className="w-[40px]" />}{/* Delete */}
+          <col className="w-[10%]" />
+          {/* Code */}
+          <col className="w-[38%]" />
+          {/* Product */}
+          <col className="w-[8%]" />
+          {/* QTY */}
+          <col className="w-[10%]" />
+          {/* Price */}
+          <col className="w-[8%]" />
+          {/* FOC */}
+          <col className="w-[8%]" />
+          {/* RTN */}
+          <col className="w-[8%]" />
+          {/* Tax */}
+          <col className="w-[10%]" />
+          {/* Total */}
+          {!readOnly && <col className="w-[40px]" />}
+          {/* Delete */}
         </colgroup>
         <thead className="bg-gray-50">
           <tr>
@@ -301,14 +398,28 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                 <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-500 align-middle">
                   {item.code}
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
-                  <ProductComboboxCell rowIndex={index} item={item} />
+                <td className="px-1 py-1 text-sm text-gray-900 align-middle">
+                  {item.code === "OTH" ? (
+                    <div className="space-y-1">
+                      <ProductComboboxCell rowIndex={index} item={item} />
+                      <DescriptionInputCell
+                        rowIndex={index}
+                        value={item.description || ""}
+                        isEditable={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <ProductComboboxCell rowIndex={index} item={item} />
+                    </div>
+                  )}
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="quantity"
                     value={item.quantity}
+                    itemCode={item.code}
                   />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
@@ -316,6 +427,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     rowIndex={index}
                     field="price"
                     value={item.price}
+                    itemCode={item.code}
                   />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
@@ -323,6 +435,8 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     rowIndex={index}
                     field="freeProduct"
                     value={item.freeProduct}
+                    itemCode={item.code}
+                    min={0}
                   />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
@@ -330,6 +444,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     rowIndex={index}
                     field="returnProduct"
                     value={item.returnProduct}
+                    itemCode={item.code} // Pass itemCode
                   />
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
@@ -337,6 +452,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     rowIndex={index}
                     field="tax"
                     value={item.tax}
+                    itemCode={item.code}
                   />
                 </td>
                 <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900 text-right align-middle">

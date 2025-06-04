@@ -199,6 +199,35 @@ export default function (pool) {
     }
   });
 
+  router.get("/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const query = `
+      SELECT 
+        id, name, salesman, phone_number, tin_number, 
+        id_number, id_type, closeness, email, address, 
+        city, state, credit_limit, credit_used
+      FROM customers 
+      WHERE id = $1
+    `;
+
+      const result = await pool.query(query, [id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+      res.status(500).json({
+        message: "Error fetching customer",
+        error: error.message,
+      });
+    }
+  });
+
   // Create a new customer
   router.post("/", async (req, res) => {
     const {

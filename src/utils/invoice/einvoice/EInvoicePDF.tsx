@@ -3,6 +3,7 @@ import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
 import TienHockLogo from "../../tienhock.png";
+import { JELLYPOLLY_INFO } from "./companyInfo";
 
 // State mapping
 const stateOptions = [
@@ -235,7 +236,10 @@ const EInvoicePDF: React.FC<Props> = ({
                 : data.company.name}
             </Text>
             <Text style={styles.companyDetail}>
-              Reg. No: {data.company.reg_no}
+              Reg. No:{" "}
+              {companyContext === "jellypolly"
+                ? JELLYPOLLY_INFO.reg_no
+                : data.company.reg_no}
             </Text>
             <Text style={styles.companyDetail}>{data.company.address_pdf}</Text>
             <Text style={styles.companyDetail}>
@@ -286,7 +290,11 @@ const EInvoicePDF: React.FC<Props> = ({
           <View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier TIN</Text>
-              <Text style={styles.infoValue}>{data.company.tin}</Text>
+              <Text style={styles.infoValue}>
+                {companyContext === "jellypolly"
+                  ? JELLYPOLLY_INFO.tin
+                  : data.company.tin}
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier Name</Text>
@@ -298,7 +306,11 @@ const EInvoicePDF: React.FC<Props> = ({
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier BRN:</Text>
-              <Text style={styles.infoValue}>{data.company.reg_no}</Text>
+              <Text style={styles.infoValue}>
+                {companyContext === "jellypolly"
+                  ? JELLYPOLLY_INFO.reg_no
+                  : data.company.reg_no}
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Supplier SST No.</Text>

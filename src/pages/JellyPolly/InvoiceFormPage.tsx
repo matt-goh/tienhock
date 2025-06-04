@@ -23,7 +23,7 @@ import {
   checkDuplicateInvoiceNo,
   createInvoice,
   createPayment,
-} from "../../utils/JellyPolly/InvoiceUtils";
+} from "../../utils/jellypolly/InvoiceUtils";
 import toast from "react-hot-toast";
 import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -512,7 +512,7 @@ const InvoiceFormPage: React.FC = () => {
           );
         if (Number(item.quantity || 0) <= 0)
           errors.push(`Item #${index + 1}: Quantity must be positive.`);
-        if (Number(item.price || 0) < 0)
+        if (item.code !== "LESS" && Number(item.price || 0) < 0)
           errors.push(`Item #${index + 1}: Price cannot be negative.`);
       });
     }

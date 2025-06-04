@@ -54,7 +54,7 @@ app.use(async (req, res, next) => {
 // conditional CORS configuration based on environment
 const corsConfig =
   process.env.NODE_ENV === "production"
-    ? { origin: false } // In production, Nginx likely handles CORS
+    ? { origin: false } // In production, Nginx handles CORS
     : {
         // In development, Express handles CORS
         origin: ["http://localhost:3000", "http://localhost:5000"], // Allow frontend and potentially backend itself
@@ -101,7 +101,7 @@ cron.schedule(
 
 // --- Auto-consolidation scheduler ---
 cron.schedule(
-  "0 8 * * *", // Run at 8 AM every day
+  "30 14 * * *", // Run at 2:30 PM every day
   async () => {
     try {
       // Check if any consolidations are due today

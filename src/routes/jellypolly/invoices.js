@@ -1,6 +1,6 @@
 // src/routes/jellypolly/invoices.js
 import { Router } from "express";
-import EInvoiceApiClientFactory from "../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
+import JPEInvoiceApiClientFactory from "../../utils/jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
 
 // Helper function to update customer credit
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -29,7 +29,7 @@ const updateCustomerCredit = async (client, customerId, amount) => {
 export default function (pool, config) {
   const router = Router();
 
-  const apiClient = EInvoiceApiClientFactory.getInstance(config);
+  const apiClient = JPEInvoiceApiClientFactory.getInstance(config);
 
   // GET /api/invoices - List Invoices (Updated Schema)
   router.get("/", async (req, res) => {

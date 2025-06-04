@@ -1,4 +1,4 @@
-// SidebarPopover.tsx
+// src/components/Sidebar/SidebarPopover.tsx
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -17,10 +17,11 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
   buttonRef,
 }) => {
   const navigate = useNavigate();
-  const [position, setPosition] = useState<{ top: number; left: number }>({
-    top: 0,
-    left: 0,
-  });
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null); // Changed to null initially
+  const [isPositioned, setIsPositioned] = useState(false); // Track if positioned
 
   useEffect(() => {
     const updatePosition = () => {
@@ -31,9 +32,10 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
           window.scrollX || document.documentElement.scrollLeft;
 
         setPosition({
-          top: rect.top + scrollTop, // Align with the top of the button
-          left: rect.right + scrollLeft + 16, // Keep the horizontal offset
+          top: rect.top + scrollTop,
+          left: rect.right + scrollLeft + 16,
         });
+        setIsPositioned(true); // Mark as positioned
       }
     };
 
@@ -47,12 +49,18 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
     };
   }, [buttonRef]);
 
+  // Don't render until position is calculated
+  if (!position || !isPositioned) {
+    return null;
+  }
+
   const popoverContent = (
     <div
-      className="absolute z-[999] w-auto bg-white text-default-700 font-medium border border-default-200 shadow-lg rounded-lg p-2"
+      className="absolute z-[999] w-auto bg-white text-default-700 font-medium border border-default-200 shadow-lg rounded-lg p-2 transition-opacity duration-75"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
+        opacity: isPositioned ? 1 : 0, // Additional safety with opacity
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

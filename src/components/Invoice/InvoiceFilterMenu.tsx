@@ -30,37 +30,6 @@ interface FilterTagsProps {
   label: string; // e.g., "Salesman", "Customer"
 }
 
-// Generic Tag Component for displaying selected items
-const SelectedFilterTags: React.FC<FilterTagsProps> = ({
-  items,
-  onRemove,
-  label,
-}) => (
-  <div className="px-2.5 pt-1 pb-1">
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((item) => (
-        <span
-          key={`${label}-${item}`}
-          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800 cursor-default" // cursor-default as click handled by button
-        >
-          {item}
-          <button
-            type="button"
-            className="ml-1 p-0.5 text-sky-600 hover:text-sky-800 rounded-full hover:bg-sky-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent menu closing if needed
-              onRemove(item);
-            }}
-            aria-label={`Remove ${item}`}
-          >
-            <IconX size={12} stroke={2.5} />
-          </button>
-        </span>
-      ))}
-    </div>
-  </div>
-);
-
 type InvoiceFilterMenuProps = {
   onFilterChange: (filters: InvoiceFilters) => void; // Changed to accept full InvoiceFilters
   currentFilters: InvoiceFilters;
@@ -147,23 +116,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     );
   };
 
-  // Function to remove single status tags
-  const removePendingInvoiceStatus = (statusToRemove: string) => {
-    const currentSelection = pendingFilters.invoiceStatus ?? [];
-    handlePendingFilterChange(
-      "invoiceStatus",
-      currentSelection.filter((status) => status !== statusToRemove)
-    );
-  };
-
-  const removePendingEInvoiceStatus = (statusToRemove: string) => {
-    const currentSelection = pendingFilters.eInvoiceStatus ?? [];
-    handlePendingFilterChange(
-      "eInvoiceStatus",
-      currentSelection.filter((status) => status !== statusToRemove)
-    );
-  };
-
   // --- Function to clear PENDING filters ---
   const clearPendingFilters = () => {
     const clearedPending: InvoiceFilters = {
@@ -171,7 +123,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       dateRange: currentFilters.dateRange, // Preserve date range from applied filters
       salespersonId: null,
       paymentType: null,
-      invoiceStatus: ["paid", "Unpaid", "overdue"], // Default invoice status
+      invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
       eInvoiceStatus: [], // Default e-invoice status
       consolidation: "all",
     };
@@ -182,11 +134,6 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
   const applyFilters = () => {
     onFilterChange(pendingFilters); // Send the complete pending state
     setIsOpen(false); // Close the menu
-  };
-
-  // --- Function to CANCEL changes ---
-  const cancelFilters = () => {
-    setIsOpen(false); // Just close the menu, pending changes are discarded implicitly
   };
 
   // --- Effect for closing menu on outside click (no change needed) ---
