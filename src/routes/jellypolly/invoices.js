@@ -1,6 +1,6 @@
 // src/routes/jellypolly/invoices.js
 import { Router } from "express";
-import JPEInvoiceApiClientFactory from "../../utils/jellypolly/einvoice/JPEInvoiceApiClientFactory.js";
+import JPEInvoiceApiClientFactory from "../../utils/JellyPolly/einvoice/JPEInvoiceApiClientFactory.js";
 
 // Helper function to update customer credit
 const updateCustomerCredit = async (client, customerId, amount) => {

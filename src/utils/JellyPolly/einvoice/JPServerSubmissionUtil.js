@@ -1,4 +1,4 @@
-// src/utils/jellypolly/einvoice/JPServerSubmissionUtil.js
+// src/utils/JellyPolly/einvoice/JPServerSubmissionUtil.js
 import { ensureValidToken } from "./JPMyInvoisAuthUtil.js";
 import { JPEInvoiceTemplate } from "./JPEInvoiceTemplate.js";
 import JPEInvoiceSubmissionHandler from "./JPEInvoiceSubmissionHandler.js";
