@@ -493,9 +493,23 @@ async function processTienhockConsolidation(client, invoices, month, year) {
       );
     }
 
-    // Get consolidation details from the response
-    const documentDetails = submissionResult.acceptedDocuments[0];
-    const status = documentDetails.longId ? "valid" : "pending";
+    // Get consolidation details from the response with proper null checks
+    let documentDetails = null;
+    let uuid = null;
+    let longId = null;
+    let dateTimeValidated = null;
+    let status = "pending"; // Default to pending
+
+    if (
+      submissionResult.acceptedDocuments &&
+      submissionResult.acceptedDocuments.length > 0
+    ) {
+      documentDetails = submissionResult.acceptedDocuments[0];
+      uuid = documentDetails.uuid || null;
+      longId = documentDetails.longId || null;
+      dateTimeValidated = documentDetails.dateTimeValidated || null;
+      status = longId ? "valid" : "pending";
+    }
 
     // Insert consolidated record with API response details
     const invoiceIds = invoices.map((inv) => inv.id);
@@ -509,10 +523,10 @@ async function processTienhockConsolidation(client, invoices, month, year) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         consolidatedId,
-        documentDetails.uuid,
-        submissionResult.submissionUid,
-        documentDetails.longId || null,
-        documentDetails.dateTimeValidated || null,
+        uuid,
+        submissionResult.submissionUid || null,
+        longId,
+        dateTimeValidated ? new Date(dateTimeValidated) : null,
         totalExcludingTax,
         taxAmount,
         rounding,
@@ -603,9 +617,20 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
       );
     }
 
-    // Get consolidation details from the response
-    const documentDetails = submissionResult.document;
-    const status = documentDetails.longId ? "valid" : "pending";
+    // Get consolidation details from the response with proper null checks
+    let documentDetails = null;
+    let uuid = null;
+    let longId = null;
+    let dateTimeValidated = null;
+    let status = "pending"; // Default to pending
+
+    if (submissionResult.document) {
+      documentDetails = submissionResult.document;
+      uuid = documentDetails.uuid || null;
+      longId = documentDetails.longId || null;
+      dateTimeValidated = documentDetails.dateTimeValidated || null;
+      status = longId ? "valid" : "pending";
+    }
 
     // Insert consolidated record with API response details
     const invoiceIds = invoices.map((inv) => inv.invoice_number);
@@ -626,10 +651,10 @@ async function processGreentargetConsolidation(client, invoices, month, year) {
         totalAmount.toFixed(2),
         totalAmount.toFixed(2), // Initial balance due equals total
         JSON.stringify(invoiceIds),
-        documentDetails.uuid,
-        submissionResult.submissionUid,
-        documentDetails.longId || null,
-        documentDetails.dateTimeValidated || null,
+        uuid,
+        submissionResult.submissionUid || null,
+        longId,
+        dateTimeValidated ? new Date(dateTimeValidated) : null,
         status, // einvoice_status based on API response
       ]
     );
@@ -714,9 +739,30 @@ async function processJellypollyConsolidation(client, invoices, month, year) {
       );
     }
 
-    // Get consolidation details from the response
-    const documentDetails = submissionResult.document;
-    const status = documentDetails.longId ? "valid" : "pending";
+    // Get consolidation details from the response with proper null checks
+    let documentDetails = null;
+    let uuid = null;
+    let longId = null;
+    let dateTimeValidated = null;
+    let status = "pending"; // Default to pending
+
+    // Check if we have document details in the response
+    if (submissionResult.document) {
+      documentDetails = submissionResult.document;
+      uuid = documentDetails.uuid || null;
+      longId = documentDetails.longId || null;
+      dateTimeValidated = documentDetails.dateTimeValidated || null;
+      status = longId ? "valid" : "pending";
+    } else if (
+      submissionResult.acceptedDocuments &&
+      submissionResult.acceptedDocuments.length > 0
+    ) {
+      documentDetails = submissionResult.acceptedDocuments[0];
+      uuid = documentDetails.uuid || null;
+      longId = documentDetails.longId || null;
+      dateTimeValidated = documentDetails.dateTimeValidated || null;
+      status = longId ? "valid" : "pending";
+    }
 
     // Insert consolidated record with API response details
     const invoiceIds = invoices.map((inv) => inv.id);
@@ -730,10 +776,10 @@ async function processJellypollyConsolidation(client, invoices, month, year) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         consolidatedInvoiceNumber,
-        documentDetails.uuid,
-        submissionResult.submissionUid,
-        documentDetails.longId || null,
-        documentDetails.dateTimeValidated || null,
+        uuid,
+        submissionResult.submissionUid || null,
+        longId,
+        dateTimeValidated ? new Date(dateTimeValidated) : null,
         totalExcludingTax,
         taxAmount,
         rounding,
