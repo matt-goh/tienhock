@@ -714,8 +714,8 @@ export default function (pool, config) {
       category_empty_bag: { quantity: 0, amount: 0, products: [] }, // ID starts with "EMPTY_BAG"
       category_sbh: { quantity: 0, amount: 0, products: [] }, // ID "SBH"
       category_smee: { quantity: 0, amount: 0, products: [] }, // ID "SMEE"
-      category_returns: { quantity: 0, amount: 0, products: [] }, // Products with returnproduct > 0
       category_less: { quantity: 0, amount: 0, products: [] }, // ID "LESS"
+      category_returns: { quantity: 0, amount: 0, products: [] }, // Products with returnproduct > 0
       total_rounding: 0,
       total_tax: 0,
     };
@@ -735,8 +735,8 @@ export default function (pool, config) {
       category_empty_bag: new Map(),
       category_sbh: new Map(),
       category_smee: new Map(),
-      category_returns: new Map(),
       category_less: new Map(),
+      category_returns: new Map(),
     };
 
     let cashTotal = 0;
