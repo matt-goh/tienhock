@@ -468,7 +468,7 @@ export const generateSalesSummaryPDF = async (
                   {section.type === "all_salesmen" && (
                     <SalesmenSection
                       data={section.data}
-                      title="Monthly Summary Sales by Salesmen"
+                      title="Monthly Summary of Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                     />
                   )}
@@ -476,7 +476,7 @@ export const generateSalesSummaryPDF = async (
                   {section.type === "mee_salesmen" && (
                     <SalesmenSection
                       data={section.data}
-                      title="Monthly Summary Mee Sales by Salesmen"
+                      title="Monthly Summary of Mee Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                       productType="MEE"
                     />
@@ -485,7 +485,7 @@ export const generateSalesSummaryPDF = async (
                   {section.type === "bihun_salesmen" && (
                     <SalesmenSection
                       data={section.data}
-                      title="Monthly Summary Bihun Sales by Salesmen"
+                      title="Monthly Summary of Bihun Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                       productType="BIHUN"
                     />
@@ -494,7 +494,7 @@ export const generateSalesSummaryPDF = async (
                   {section.type === "jp_salesmen" && (
                     <SalesmenSection
                       data={section.data}
-                      title="Monthly Summary JellyPolly Sales by Salesmen"
+                      title="Monthly Summary of JellyPolly Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                       productType="JP"
                     />
@@ -710,8 +710,8 @@ const AllSalesSection: React.FC<{
     SBH: "SBH Products",
     SMEE: "SMEE Products",
     "WE-360": "WE-360 Series Products",
-    returns: "Return Products",
     less: "Less/Deductions",
+    returns: "Return Products",
     total_rounding: "Rounding Adjustments",
   };
 
@@ -719,7 +719,7 @@ const AllSalesSection: React.FC<{
     <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        Monthly Summary Sales as at {monthFormat}
+        Monthly Summary of Sales in {monthFormat}
       </Text>
 
       {/* Single Table Header */}
@@ -1007,7 +1007,7 @@ const SalesmenSection: React.FC<{
     <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        {title} as at {monthFormat}
+        {title} in {monthFormat}
       </Text>
 
       {/* Single Table Header */}
@@ -1249,7 +1249,7 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
     <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        Monthly Summary Sisa Sales as at {monthFormat}
+        Monthly Summary of Sisa Sales in {monthFormat}
       </Text>
 
       {/* Single Table Header */}
