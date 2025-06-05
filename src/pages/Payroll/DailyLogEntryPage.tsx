@@ -1274,7 +1274,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         className={`relative w-full pl-3 py-1.5 text-left rounded-md border ${
                                           !isSelected
                                             ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
-                                            : "bg-white text-default-700 border-default-300 cursor-default focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                            : "bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500"
                                         }`}
                                       >
                                         <span className="flex items-center">
@@ -1316,7 +1316,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                                 active
                                                   ? "bg-sky-100 text-sky-900"
                                                   : "text-default-700"
-                                              } cursor-default select-none relative py-1.5 pl-3 pr-8`
+                                              } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
                                             }
                                           >
                                             {({ selected, active }) => (
@@ -1364,7 +1364,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                                 active
                                                   ? "bg-amber-100 text-amber-900"
                                                   : "text-default-700"
-                                              } cursor-default select-none relative py-1.5 pl-3 pr-8`
+                                              } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
                                             }
                                           >
                                             {({ selected, active }) => (

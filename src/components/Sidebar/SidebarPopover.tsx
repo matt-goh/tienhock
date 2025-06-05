@@ -56,7 +56,7 @@ const SidebarPopover: React.FC<SidebarPopoverProps> = ({
 
   const popoverContent = (
     <div
-      className="absolute z-[999] w-auto bg-white text-default-700 font-medium border border-default-200 shadow-lg rounded-lg p-2 transition-opacity duration-75"
+      className="absolute z-[999] w-auto bg-white text-default-700 font-medium border border-default-200 shadow-lg rounded-lg p-1 transition-opacity duration-75"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
