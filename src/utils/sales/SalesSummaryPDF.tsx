@@ -829,9 +829,12 @@ const AllSalesSection: React.FC<{
           <Text style={styles.colDescription}></Text>
           <Text style={[styles.colQty, styles.headerText]}>
             {formatNumber(
-              totals.cashSales.count + totals.creditSales.count || 0
-            )}{" "}
-            Bills
+              Object.values(categories).reduce((sum: number, category: any) => {
+                // Skip total_rounding as it's not a category object
+                if (typeof category === "number") return sum;
+                return sum + (category.quantity || 0);
+              }, 0)
+            )}
           </Text>
           <Text style={[styles.colAmount, styles.headerText]}>
             {formatCurrency(totals.grandTotal)}
@@ -890,6 +893,19 @@ const AllSalesSection: React.FC<{
             <Text style={styles.breakdownLabel}>Less</Text>
             <Text style={styles.breakdownValue}>
               {formatNumber(breakdownTotals.lessQuantity)}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Cash Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {totals.cashSales.count || 0}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CR Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {totals.creditSales.count || 0}
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
@@ -1218,6 +1234,33 @@ const SalesmenSection: React.FC<{
           </View>
         </View>
       )}
+
+      {/* Grand Total Section */}
+      <View style={styles.grandTotalSection}>
+        <View style={[styles.tableRow, styles.totalRow]}>
+          <Text style={[styles.colID, styles.headerText]}>Total:</Text>
+          <Text style={styles.colDescription}></Text>
+          <Text style={[styles.colQty, styles.headerText]}>
+            {formatNumber(
+              Object.values(salesmen).reduce(
+                (sum, salesman: any) => sum + salesman.total.quantity,
+                0
+              ) +
+                (foc?.total?.quantity || 0) +
+                (returns?.total?.quantity || 0)
+            )}
+          </Text>
+          <Text style={[styles.colAmount, styles.headerText]}>
+            {formatCurrency(
+              Object.values(salesmen).reduce(
+                (sum, salesman: any) => sum + salesman.total.amount,
+                0
+              ) + (returns?.total?.amount || 0)
+              // Note: FOC has no amount value, so we don't add it to the total amount
+            )}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 };
