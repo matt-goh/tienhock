@@ -69,7 +69,6 @@ const styles = StyleSheet.create({
   },
   dashedLineAboveSubtotal: {
     flexDirection: "row",
-    marginTop: 1, // Space before dashed line
     paddingTop: 1,
   },
   // Generic dashed line cell style (apply width and paddingRight dynamically)
@@ -146,15 +145,15 @@ const styles = StyleSheet.create({
   salesmanHeader: {
     // For Salesman Name
     fontFamily: "Helvetica-Bold",
-    marginBottom: 3,
+    marginVertical: 2,
     paddingHorizontal: 3,
     textAlign: "left", // Ensure salesman name is left aligned
   },
   categorySection: {
-    marginBottom: 6, // Space between category sections
+    marginBottom: 3, // Space between category sections
   },
   grandTotalSection: {
-    marginTop: -7,
+    marginTop: -4,
   },
   // Column Styles for Sisa Sales Page (5 columns)
   sisaColID: { width: "15%", paddingHorizontal: 3 }, // STOCK
