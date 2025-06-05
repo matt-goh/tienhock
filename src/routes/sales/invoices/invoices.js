@@ -912,6 +912,7 @@ export default function (pool, config) {
             focProducts.set(code, {
               code,
               description: product.description || code,
+              price: price,
               quantity: 0,
             });
           }
@@ -923,6 +924,7 @@ export default function (pool, config) {
             returnProducts.set(code, {
               code,
               description: product.description || code,
+              price: price,
               quantity: 0,
             });
           }
@@ -950,7 +952,10 @@ export default function (pool, config) {
             (sum, p) => sum + p.quantity,
             0
           ),
-          amount: 0, // Returns typically don't have amount in this context
+          amount: Array.from(returnProducts.values()).reduce(
+            (sum, p) => sum + p.quantity * p.price,
+            0
+          ),
         },
       },
     };

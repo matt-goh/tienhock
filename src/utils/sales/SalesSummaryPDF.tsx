@@ -150,13 +150,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     textAlign: "left", // Ensure salesman name is left aligned
   },
-  pageNumber: {
-    position: "absolute",
-    fontSize: 7,
-    bottom: 15,
-    right: 30,
-    color: "#555",
-  },
   categorySection: {
     marginBottom: 6, // Space between category sections
   },
@@ -516,14 +509,6 @@ export const generateSalesSummaryPDF = async (
                 </React.Fragment>
               );
             })}
-
-            <Text
-              style={styles.pageNumber}
-              render={({ pageNumber, totalPages }) =>
-                `${pageNumber} / ${totalPages}`
-              }
-              fixed
-            />
           </Page>
         ))}
       </Document>
@@ -1005,11 +990,6 @@ const AllSalesSection: React.FC<{
           </View>
         </View>
       </View>
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
     </View>
   );
 };
@@ -1159,7 +1139,6 @@ const SalesmenSection: React.FC<{
                 {
                   width: styles.colAmount.width,
                   paddingRight: styles.colAmount.paddingRight,
-                  borderTopWidth: 0, // No dash for amount column since it's always 0.00
                 },
               ]}
             />
@@ -1180,7 +1159,7 @@ const SalesmenSection: React.FC<{
       {/* Returns Section */}
       {returns && returns.products && returns.products.length > 0 && (
         <View style={styles.categorySection}>
-          <Text style={styles.salesmanHeader}>RETURN PRODUCTS</Text>
+          <Text style={styles.salesmanHeader}>RETURN</Text>
 
           {/* Sort return products by category order */}
           {sortProductsByCategory(returns.products).map(
@@ -1195,8 +1174,8 @@ const SalesmenSection: React.FC<{
                   {formatNumber(product.quantity)}
                 </Text>
                 <Text style={styles.colAmount}>
-                  {product.amount !== 0
-                    ? formatCurrency(product.amount)
+                  {product.price !== 0
+                    ? formatCurrency(product.price * product.quantity)
                     : "0.00"}
                 </Text>
               </View>
@@ -1242,12 +1221,6 @@ const SalesmenSection: React.FC<{
           </View>
         </View>
       )}
-
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
     </View>
   );
 };
@@ -1500,12 +1473,6 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
           )}
         </View>
       </View>
-
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
     </View>
   );
 };
