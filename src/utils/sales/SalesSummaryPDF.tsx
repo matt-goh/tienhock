@@ -17,6 +17,14 @@ interface SummaryData {
   sisa_sales?: any;
 }
 
+const ROWS_PER_PAGE = 60; // Approximate number of rows per page
+const HEADER_ROWS = 2; // Company header + report title
+const TABLE_HEADER_ROWS = 1; // Table header row
+const SECTION_SEPARATOR_ROWS = 1; // Space between sections
+const CATEGORY_SUBTOTAL_ROWS = 3; // Dashed line + subtotal + spacing
+const BREAKDOWN_SECTION_ROWS = 20; // Approximate rows for breakdown sections
+const SALESMAN_HEADER_ROWS = 1; // Salesman name header
+
 const styles = StyleSheet.create({
   page: {
     padding: 20,
@@ -170,6 +178,193 @@ const styles = StyleSheet.create({
   },
 });
 
+const calculateAllSalesRows = (data: any, allProducts: any[]): number => {
+  const { categories } = data;
+  let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
+
+  // Count rows for each category
+  Object.entries(categories).forEach(([key, category]: [string, any]) => {
+    if (key === "total_rounding" && category === 0) return;
+
+    if (category.products && category.products.length > 0) {
+      totalRows += category.products.length; // Product rows
+      totalRows += CATEGORY_SUBTOTAL_ROWS; // Subtotal with dashed line
+    } else if (category.amount !== 0) {
+      totalRows += 1; // Single row for direct deduction
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    }
+  });
+
+  // Grand total section
+  totalRows += 2; // Grand total row with borders
+
+  // Breakdown section
+  totalRows += BREAKDOWN_SECTION_ROWS;
+
+  return totalRows;
+};
+
+const calculateSalesmenRows = (data: any): number => {
+  const { salesmen, foc, returns } = data;
+  let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
+
+  // Count rows for each salesman
+  Object.entries(salesmen).forEach(([_, salesmanData]: [string, any]) => {
+    if (salesmanData.products.length > 0) {
+      totalRows += SALESMAN_HEADER_ROWS;
+      totalRows += salesmanData.products.length;
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    }
+  });
+
+  // FOC section
+  if (foc && foc.products && foc.products.length > 0) {
+    totalRows += SALESMAN_HEADER_ROWS;
+    totalRows += foc.products.length;
+    totalRows += CATEGORY_SUBTOTAL_ROWS;
+  }
+
+  // Returns section
+  if (returns && returns.products && returns.products.length > 0) {
+    totalRows += SALESMAN_HEADER_ROWS;
+    totalRows += returns.products.length;
+    totalRows += CATEGORY_SUBTOTAL_ROWS;
+  }
+
+  return totalRows;
+};
+
+const calculateSisaSalesRows = (data: any): number => {
+  let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
+
+  const categories = [
+    { key: "empty_bag", data: data.empty_bag },
+    { key: "sbh", data: data.sbh },
+    { key: "smee", data: data.smee },
+  ];
+
+  categories.forEach(({ data: categoryData }) => {
+    if (!categoryData) return;
+
+    if (categoryData.products && categoryData.products.length > 0) {
+      totalRows += categoryData.products.length;
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    } else if (categoryData.quantity > 0 || categoryData.amount > 0) {
+      totalRows += 1; // Single row
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    }
+  });
+
+  // Grand total section
+  totalRows += 2;
+
+  // Breakdown section
+  totalRows += 10; // Smaller breakdown for sisa
+
+  return totalRows;
+};
+
+const paginateSections = (data: SummaryData, allProducts: any[]) => {
+  const sections: Array<{
+    type: string;
+    data: any;
+    rows: number;
+    component: React.ReactNode;
+  }> = [];
+
+  // Calculate rows for each section
+  if (data.all_sales) {
+    const rows = calculateAllSalesRows(data.all_sales, allProducts);
+    sections.push({
+      type: "all_sales",
+      data: data.all_sales,
+      rows,
+      component: null, // Will be set later
+    });
+  }
+
+  if (data.all_salesmen) {
+    const rows = calculateSalesmenRows(data.all_salesmen);
+    sections.push({
+      type: "all_salesmen",
+      data: data.all_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.mee_salesmen) {
+    const rows = calculateSalesmenRows(data.mee_salesmen);
+    sections.push({
+      type: "mee_salesmen",
+      data: data.mee_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.bihun_salesmen) {
+    const rows = calculateSalesmenRows(data.bihun_salesmen);
+    sections.push({
+      type: "bihun_salesmen",
+      data: data.bihun_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.jp_salesmen) {
+    const rows = calculateSalesmenRows(data.jp_salesmen);
+    sections.push({
+      type: "jp_salesmen",
+      data: data.jp_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.sisa_sales) {
+    const rows = calculateSisaSalesRows(data.sisa_sales);
+    sections.push({
+      type: "sisa_sales",
+      data: data.sisa_sales,
+      rows,
+      component: null,
+    });
+  }
+
+  // Group sections into pages
+  const pages: Array<typeof sections> = [];
+  let currentPage: typeof sections = [];
+  let currentPageRows = 0;
+
+  sections.forEach((section, index) => {
+    const sectionRows =
+      section.rows + (currentPage.length > 0 ? SECTION_SEPARATOR_ROWS : 0);
+
+    // Check if adding this section exceeds page limit
+    if (
+      currentPageRows + sectionRows > ROWS_PER_PAGE &&
+      currentPage.length > 0
+    ) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentPageRows = 0;
+    }
+
+    currentPage.push(section);
+    currentPageRows +=
+      section.rows + (currentPage.length > 1 ? SECTION_SEPARATOR_ROWS : 0);
+  });
+
+  // Add the last page if it has content
+  if (currentPage.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+};
+
 // Helper function to format numbers with commas
 const formatNumber = (num: number): string => {
   if (num == null || num === 0) return "0"; // Show "0" instead of ".00" for quantity
@@ -256,80 +451,81 @@ export const generateSalesSummaryPDF = async (
       month: "long",
     })} ${dateForMonthName.getFullYear()}`;
 
+    // Paginate sections
+    const pages = paginateSections(data, allProducts);
+
     const doc = (
       <Document title={`Sales Summary - ${monthYearFormatted}`}>
-        <Page size="A4" style={styles.page} wrap>
-          {/* All Sales Section */}
-          {data.all_sales && (
-            <>
-              <AllSalesSection
-                data={data.all_sales}
-                monthFormat={monthYearFormatted}
-                allProducts={allProducts}
-              />
-              {(data.all_salesmen ||
-                data.mee_salesmen ||
-                data.bihun_salesmen ||
-                data.jp_salesmen ||
-                data.sisa_sales) && <View style={styles.sectionSeparator} />}
-            </>
-          )}
+        {pages.map((pageSections, pageIndex) => (
+          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
+            {pageSections.map((section, sectionIndex) => {
+              const isLastSection = sectionIndex === pageSections.length - 1;
 
-          {/* All Salesmen Section */}
-          {data.all_salesmen && (
-            <SalesmenSection
-              data={data.all_salesmen}
-              title="Monthly Summary Sales by Salesmen"
-              monthFormat={monthYearFormatted}
+              return (
+                <React.Fragment key={`${section.type}-${sectionIndex}`}>
+                  {/* Render section based on type */}
+                  {section.type === "all_sales" && (
+                    <AllSalesSection
+                      data={section.data}
+                      monthFormat={monthYearFormatted}
+                      allProducts={allProducts}
+                    />
+                  )}
+
+                  {section.type === "all_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                    />
+                  )}
+
+                  {section.type === "mee_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary Mee Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="MEE"
+                    />
+                  )}
+
+                  {section.type === "bihun_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary Bihun Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="BIHUN"
+                    />
+                  )}
+
+                  {section.type === "jp_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary JellyPolly Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="JP"
+                    />
+                  )}
+
+                  {section.type === "sisa_sales" && (
+                    <SisaSalesSection
+                      data={section.data}
+                      monthFormat={monthYearFormatted}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+
+            <Text
+              style={styles.pageNumber}
+              render={({ pageNumber, totalPages }) =>
+                `${pageNumber} / ${totalPages}`
+              }
+              fixed
             />
-          )}
-
-          {/* Mee Salesmen Section */}
-          {data.mee_salesmen && (
-            <SalesmenSection
-              data={data.mee_salesmen}
-              title="Monthly Summary Mee Sales by Salesmen"
-              monthFormat={monthYearFormatted}
-              productType="MEE"
-            />
-          )}
-
-          {/* Bihun Salesmen Section */}
-          {data.bihun_salesmen && (
-            <SalesmenSection
-              data={data.bihun_salesmen}
-              title="Monthly Summary Bihun Sales by Salesmen"
-              monthFormat={monthYearFormatted}
-              productType="BIHUN"
-            />
-          )}
-
-          {/* JP Salesmen Section */}
-          {data.jp_salesmen && (
-            <SalesmenSection
-              data={data.jp_salesmen}
-              title="Monthly Summary JellyPolly Sales by Salesmen"
-              monthFormat={monthYearFormatted}
-              productType="JP"
-            />
-          )}
-
-          {/* Sisa Sales Section */}
-          {data.sisa_sales && (
-            <SisaSalesSection
-              data={data.sisa_sales}
-              monthFormat={monthYearFormatted}
-            />
-          )}
-
-          <Text
-            style={styles.pageNumber}
-            render={({ pageNumber, totalPages }) =>
-              `${pageNumber} / ${totalPages}`
-            }
-            fixed
-          />
-        </Page>
+          </Page>
+        ))}
       </Document>
     );
 
@@ -662,7 +858,7 @@ const AllSalesSection: React.FC<{
       </View>
 
       {/* Breakdown section */}
-      <View style={styles.breakdownSection}>
+      <View style={styles.breakdownSection} wrap={false}>
         <View style={styles.leftBreakdownColumn}>
           <Text style={styles.sectionTitle}>Quantity</Text>
           <View style={styles.breakdownRow}>
@@ -716,7 +912,7 @@ const AllSalesSection: React.FC<{
           </View>
           <View style={styles.breakdownSeparator} />
         </View>
-        <View style={styles.rightBreakdownColumn}>
+        <View style={styles.rightBreakdownColumn} wrap={false}>
           <Text style={styles.sectionTitle}>Amount</Text>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee</Text>
