@@ -1249,20 +1249,18 @@ const SalesmenSection: React.FC<{
           <Text style={[styles.colQty, styles.headerText]}>
             {formatNumber(
               Object.values(salesmen).reduce(
-                (sum, salesman: any) => sum + salesman.total.quantity,
+                (sum: number, salesman: any) =>
+                  sum + (salesman.total?.quantity || 0),
                 0
-              ) +
-                (foc?.total?.quantity || 0) +
-                (returns?.total?.quantity || 0)
+              )
             )}
           </Text>
           <Text style={[styles.colAmount, styles.headerText]}>
             {formatCurrency(
               Object.values(salesmen).reduce(
-                (sum, salesman: any) => sum + salesman.total.amount,
+                (sum: number, salesman: any) => sum + salesman.total.amount,
                 0
-              ) + (returns?.total?.amount || 0)
-              // Note: FOC has no amount value, so we don't add it to the total amount
+              )
             )}
           </Text>
         </View>
