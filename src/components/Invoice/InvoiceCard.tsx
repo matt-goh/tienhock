@@ -203,9 +203,9 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
       {/* Body - Uses parent's horizontal padding */}
       <div className="space-y-2">
-        <p className="flex flex-col w-fit font-medium">
+        <p className="flex flex-col w-auto font-medium">
           <span
-            className="truncate text-default-800 hover:underline cursor-pointer"
+            className="w-auto truncate text-default-800 hover:underline cursor-pointer"
             title={invoice.customerName || invoice.customerid}
             onClick={(e) => {
               e.stopPropagation();
