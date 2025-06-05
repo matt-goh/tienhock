@@ -801,11 +801,17 @@ export default function (pool, config) {
               description: product.description || code,
               quantity: 0,
               amount: 0,
+              descriptions: new Set([product.description || code]), // Track unique descriptions
             });
           }
           const prod = productsByCategory[category].get(code);
           prod.quantity += quantity;
           prod.amount += total;
+
+          // Add description to the set if it's different
+          if (product.description && product.description.trim()) {
+            prod.descriptions.add(product.description.trim());
+          }
         }
 
         // Handle returns separately
@@ -837,7 +843,15 @@ export default function (pool, config) {
       if (categories[categoryKey]) {
         categories[categoryKey].products = Array.from(
           productsByCategory[categoryKey].values()
-        );
+        ).map((product) => ({
+          ...product,
+          // Convert descriptions Set to comma-separated string
+          description:
+            product.descriptions && product.descriptions.size > 0
+              ? Array.from(product.descriptions).join(", ")
+              : product.description,
+          descriptions: undefined, // Remove the Set from final output
+        }));
       }
     });
 
@@ -898,12 +912,18 @@ export default function (pool, config) {
             description: product.description || code,
             quantity: 0,
             amount: 0,
+            descriptions: new Set([product.description || code]), // Track unique descriptions
           });
         }
 
         const prod = salesmenData[salesmanId].products.get(code);
         prod.quantity += quantity;
         prod.amount += total;
+
+        // Add description to the set if it's different
+        if (product.description && product.description.trim()) {
+          prod.descriptions.add(product.description.trim());
+        }
 
         salesmenData[salesmanId].total.quantity += quantity;
         salesmenData[salesmanId].total.amount += total;
@@ -964,7 +984,14 @@ export default function (pool, config) {
 
     for (const [salesmanId, data] of Object.entries(salesmenData)) {
       result.salesmen[salesmanId] = {
-        products: Array.from(data.products.values()),
+        products: Array.from(data.products.values()).map((product) => ({
+          ...product,
+          // Convert descriptions Set to comma-separated string
+          description: product.descriptions
+            ? Array.from(product.descriptions).join(", ")
+            : product.description || product.code,
+          descriptions: undefined, // Remove the Set from final output
+        })),
         total: data.total,
       };
     }
