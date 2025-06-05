@@ -829,11 +829,17 @@ const AllSalesSection: React.FC<{
           <Text style={styles.colDescription}></Text>
           <Text style={[styles.colQty, styles.headerText]}>
             {formatNumber(
-              Object.values(categories).reduce((sum: number, category: any) => {
-                // Skip total_rounding as it's not a category object
-                if (typeof category === "number") return sum;
-                return sum + (category.quantity || 0);
-              }, 0)
+              Object.entries(categories).reduce(
+                (sum: number, [key, category]: [string, any]) => {
+                  // Skip total_rounding as it's not a category object
+                  if (typeof category === "number") return sum;
+                  // Skip category_returns and category_less quantities
+                  if (key === "category_returns" || key === "category_less")
+                    return sum;
+                  return sum + (category.quantity || 0);
+                },
+                0
+              )
             )}
           </Text>
           <Text style={[styles.colAmount, styles.headerText]}>
