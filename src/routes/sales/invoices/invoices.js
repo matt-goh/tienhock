@@ -621,6 +621,7 @@ export default function (pool, config) {
         CAST(i.createddate AS bigint) BETWEEN $1 AND $2
         AND i.invoice_status != 'cancelled'
         AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
       GROUP BY i.id
     `;
 
@@ -653,6 +654,7 @@ export default function (pool, config) {
         CAST(i.createddate AS bigint) BETWEEN $1 AND $2
         AND i.invoice_status != 'cancelled'
         AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
       GROUP BY i.id
     `;
 
