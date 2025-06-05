@@ -80,8 +80,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   categorySubtotalRow: {
-    paddingTop: 2,
-    paddingBottom: 1.5,
+    paddingVertical: 2,
     borderBottomWidth: 0.5,
     borderBottomColor: "#ccc",
   },
@@ -733,11 +732,7 @@ const AllSalesSection: React.FC<{
 
       {/* All Categories Content */}
       {Object.entries(categories).map(([key, category]: [string, any]) => {
-        if (
-          (!category.products || category.products.length === 0) &&
-          !(key === "less" && category.amount !== 0) &&
-          !(key === "returns" && category.amount !== 0)
-        ) {
+        if (!category.products || category.products.length === 0) {
           return null;
         }
 
@@ -760,7 +755,10 @@ const AllSalesSection: React.FC<{
                 ]}
               >
                 <Text style={styles.colID}>{product.code}</Text>
-                <Text style={styles.colDescription}>{product.description}</Text>
+                <Text style={styles.colDescription}>
+                  {product.description}
+                  {key === "category_returns" && " (Returned)"}
+                </Text>
                 <Text style={styles.colQty}>
                   {product.quantity > 0 ? formatNumber(product.quantity) : ""}
                 </Text>
