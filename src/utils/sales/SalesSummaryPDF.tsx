@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   colDescription: { width: "42%", paddingHorizontal: 3 },
   colQty: { width: "15%", textAlign: "right", paddingRight: 8 },
   colAmount: { width: "25%", textAlign: "right", paddingRight: 3 },
-  headerText: {
+  boldText: {
     fontFamily: "Helvetica-Bold",
   },
   dashedLineAboveSubtotal: {
@@ -722,12 +722,12 @@ const AllSalesSection: React.FC<{
 
       {/* Single Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.colID, styles.headerText]}>ID</Text>
-        <Text style={[styles.colDescription, styles.headerText]}>
+        <Text style={[styles.colID, styles.boldText]}>ID</Text>
+        <Text style={[styles.colDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
-        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.colQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.colAmount, styles.boldText]}>Amount</Text>
       </View>
 
       {/* All Categories Content */}
@@ -785,7 +785,7 @@ const AllSalesSection: React.FC<{
                 </View>
               )}
 
-            {/* Category subtotal */}
+            {/* Dashed line above subtotal */}
             <View style={styles.dashedLineAboveSubtotal}>
               <Text style={styles.colID}></Text>
               <Text style={styles.colDescription}></Text>
@@ -808,13 +808,15 @@ const AllSalesSection: React.FC<{
                 ]}
               />
             </View>
+
+            {/* Category subtotal */}
             <View style={[styles.tableRow, styles.categorySubtotalRow]}>
               <Text style={styles.colID}></Text>
               <Text style={styles.colDescription}></Text>
-              <Text style={[styles.colQty]}>
+              <Text style={[styles.colQty, styles.boldText]}>
                 {formatNumber(category.quantity)}
               </Text>
-              <Text style={[styles.colAmount]}>
+              <Text style={[styles.colAmount, styles.boldText]}>
                 {formatCurrency(category.amount)}
               </Text>
             </View>
@@ -825,9 +827,9 @@ const AllSalesSection: React.FC<{
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.colID, styles.headerText]}>Grand Total:</Text>
+          <Text style={[styles.colID, styles.boldText]}>Grand Total:</Text>
           <Text style={styles.colDescription}></Text>
-          <Text style={[styles.colQty, styles.headerText]}>
+          <Text style={[styles.colQty, styles.boldText]}>
             {formatNumber(
               Object.entries(categories).reduce(
                 (sum: number, [key, category]: [string, any]) => {
@@ -842,7 +844,7 @@ const AllSalesSection: React.FC<{
               )
             )}
           </Text>
-          <Text style={[styles.colAmount, styles.headerText]}>
+          <Text style={[styles.colAmount, styles.boldText]}>
             {formatCurrency(totals.grandTotal)}
           </Text>
         </View>
@@ -1000,10 +1002,10 @@ const AllSalesSection: React.FC<{
           </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, styles.headerText]}>
+            <Text style={[styles.breakdownLabel, styles.boldText]}>
               Grand Total
             </Text>
-            <Text style={[styles.breakdownValue, styles.headerText]}>
+            <Text style={[styles.breakdownValue, styles.boldText]}>
               {formatCurrency(breakdownTotals.grandTotalInvoicesAmount)}
             </Text>
           </View>
@@ -1031,12 +1033,12 @@ const SalesmenSection: React.FC<{
 
       {/* Single Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.colID, styles.headerText]}>ID</Text>
-        <Text style={[styles.colDescription, styles.headerText]}>
+        <Text style={[styles.colID, styles.boldText]}>ID</Text>
+        <Text style={[styles.colDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
-        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.colQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.colAmount, styles.boldText]}>Amount</Text>
       </View>
 
       {/* Salesmen Sections */}
@@ -1105,10 +1107,10 @@ const SalesmenSection: React.FC<{
               <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.colID}></Text>
                 <Text style={styles.colDescription}></Text>
-                <Text style={[styles.colQty, styles.headerText]}>
+                <Text style={[styles.colQty, styles.boldText]}>
                   {formatNumber(salesmanData.total.quantity)}
                 </Text>
-                <Text style={[styles.colAmount, styles.headerText]}>
+                <Text style={[styles.colAmount, styles.boldText]}>
                   {formatCurrency(salesmanData.total.amount)}
                 </Text>
               </View>
@@ -1167,10 +1169,10 @@ const SalesmenSection: React.FC<{
           <View style={[styles.tableRow, styles.categorySubtotalRow]}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
+            <Text style={[styles.colQty, styles.boldText]}>
               {formatNumber(foc.total.quantity)}
             </Text>
-            <Text style={[styles.colAmount, styles.headerText]}>0.00</Text>
+            <Text style={[styles.colAmount, styles.boldText]}>0.00</Text>
           </View>
         </View>
       )}
@@ -1229,10 +1231,10 @@ const SalesmenSection: React.FC<{
           <View style={[styles.tableRow, styles.categorySubtotalRow]}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
+            <Text style={[styles.colQty, styles.boldText]}>
               {formatNumber(returns.total.quantity)}
             </Text>
-            <Text style={[styles.colAmount, styles.headerText]}>
+            <Text style={[styles.colAmount, styles.boldText]}>
               {returns.total.amount !== 0
                 ? formatCurrency(returns.total.amount)
                 : "0.00"}
@@ -1244,9 +1246,9 @@ const SalesmenSection: React.FC<{
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.colID, styles.headerText]}>Total:</Text>
+          <Text style={[styles.colID, styles.boldText]}>Total:</Text>
           <Text style={styles.colDescription}></Text>
-          <Text style={[styles.colQty, styles.headerText]}>
+          <Text style={[styles.colQty, styles.boldText]}>
             {formatNumber(
               Object.values(salesmen).reduce(
                 (sum: number, salesman: any) =>
@@ -1255,7 +1257,7 @@ const SalesmenSection: React.FC<{
               )
             )}
           </Text>
-          <Text style={[styles.colAmount, styles.headerText]}>
+          <Text style={[styles.colAmount, styles.boldText]}>
             {formatCurrency(
               Object.values(salesmen).reduce(
                 (sum: number, salesman: any) => sum + salesman.total.amount,
@@ -1298,13 +1300,13 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
 
       {/* Single Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.sisaColID, styles.headerText]}>ID</Text>
-        <Text style={[styles.sisaColDescription, styles.headerText]}>
+        <Text style={[styles.sisaColID, styles.boldText]}>ID</Text>
+        <Text style={[styles.sisaColDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.sisaColQty, styles.headerText]}>Quantity</Text>
-        <Text style={[styles.sisaColUPrice, styles.headerText]}>U/Price</Text>
-        <Text style={[styles.sisaColAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.sisaColQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.sisaColUPrice, styles.boldText]}>U/Price</Text>
+        <Text style={[styles.sisaColAmount, styles.boldText]}>Amount</Text>
       </View>
 
       {/* Categories Content */}
@@ -1372,11 +1374,11 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
               <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.sisaColID}></Text>
                 <Text style={styles.sisaColDescription}></Text>
-                <Text style={[styles.sisaColQty, styles.headerText]}>
+                <Text style={[styles.sisaColQty, styles.boldText]}>
                   {formatNumber(categoryData.quantity)}
                 </Text>
                 <Text style={styles.sisaColUPrice}></Text>
-                <Text style={[styles.sisaColAmount, styles.headerText]}>
+                <Text style={[styles.sisaColAmount, styles.boldText]}>
                   {formatCurrency(categoryData.amount)}
                 </Text>
               </View>
@@ -1435,11 +1437,11 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
               <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.sisaColID}></Text>
                 <Text style={styles.sisaColDescription}></Text>
-                <Text style={[styles.sisaColQty, styles.headerText]}>
+                <Text style={[styles.sisaColQty, styles.boldText]}>
                   {formatNumber(categoryData.quantity)}
                 </Text>
                 <Text style={styles.sisaColUPrice}></Text>
-                <Text style={[styles.sisaColAmount, styles.headerText]}>
+                <Text style={[styles.sisaColAmount, styles.boldText]}>
                   {formatCurrency(categoryData.amount)}
                 </Text>
               </View>
@@ -1453,13 +1455,13 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.sisaColID, styles.headerText]}>Total:</Text>
+          <Text style={[styles.sisaColID, styles.boldText]}>Total:</Text>
           <Text style={styles.sisaColDescription}></Text>
-          <Text style={[styles.sisaColQty, styles.headerText]}>
+          <Text style={[styles.sisaColQty, styles.boldText]}>
             {formatNumber(totalSisaQuantity)}
           </Text>
           <Text style={styles.sisaColUPrice}></Text>
-          <Text style={[styles.sisaColAmount, styles.headerText]}>
+          <Text style={[styles.sisaColAmount, styles.boldText]}>
             {formatCurrency(totalSisaAmount)}
           </Text>
         </View>
