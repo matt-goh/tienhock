@@ -1277,6 +1277,11 @@ export default function (pool, config) {
           existingProduct.totalSales += total;
           existingProduct.foc += foc;
           existingProduct.returns += returns;
+
+          // Add description to the set if it's different
+          if (product.description && product.description.trim()) {
+            existingProduct.descriptions.add(product.description.trim());
+          }
         } else {
           productMap.set(productId, {
             id: productId,
@@ -1286,12 +1291,18 @@ export default function (pool, config) {
             totalSales: total,
             foc,
             returns,
+            descriptions: new Set([product.description || productId]), // Track unique descriptions
           });
         }
       });
 
       // Convert Map to Array for response
-      const productData = Array.from(productMap.values());
+      const productData = Array.from(productMap.values()).map((product) => ({
+        ...product,
+        // Convert descriptions Set to comma-separated string
+        description: Array.from(product.descriptions).join(", "),
+        descriptions: undefined, // Remove the Set from final output
+      }));
 
       res.json(productData);
     } catch (error) {
