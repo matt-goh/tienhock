@@ -1254,7 +1254,9 @@ const SalesmenSection: React.FC<{
                 (sum: number, salesman: any) =>
                   sum + (salesman.total?.quantity || 0),
                 0
-              )
+              ) +
+                (foc?.total?.quantity || 0) +
+                (returns?.total?.quantity || 0)
             )}
           </Text>
           <Text style={[styles.colAmount, styles.boldText]}>
