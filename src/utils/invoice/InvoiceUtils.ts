@@ -326,8 +326,6 @@ export const syncCancellationStatus = async (invoiceId: string) => {
   }
 };
 
-// --- NEW Payment Utilities ---
-
 // CREATE Payment
 export const createPayment = async (
   paymentData: Omit<Payment, "payment_id" | "created_at">
@@ -343,6 +341,24 @@ export const createPayment = async (
     const errorMessage =
       error.response?.data?.message || // Use backend error message if available
       (error instanceof Error ? error.message : "Failed to record payment");
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
+// CONFIRM Payment (mark pending payment as paid)
+export const confirmPayment = async (paymentId: number): Promise<Payment> => {
+  try {
+    const response = await api.put(`/api/payments/${paymentId}/confirm`);
+    if (!response || !response.payment) {
+      throw new Error("Invalid response received after confirming payment.");
+    }
+    return response.payment;
+  } catch (error: any) {
+    console.error(`Error confirming payment ${paymentId}:`, error);
+    const errorMessage =
+      error.response?.data?.message ||
+      (error instanceof Error ? error.message : "Failed to confirm payment");
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }
