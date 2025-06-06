@@ -602,7 +602,7 @@ const AllSalesSection: React.FC<{
 
     // Iterate through all categories and their products
     Object.entries(categories).forEach(([key, category]: [string, any]) => {
-      if (key === "total_rounding") return; // Skip rounding
+      if (key === "total_rounding" || key === "category_returns") return;
 
       // Handle specific categories by key
       if (key === "category_empty_bag") {
