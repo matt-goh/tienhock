@@ -129,14 +129,17 @@ export default function (pool) {
       }
 
       // 3. Insert the payment record
-      // (Removed internal_reference generation logic - assume not needed or handled elsewhere)
       const insertPaymentQuery = `
-        INSERT INTO jellypolly.payments (
-          invoice_id, payment_date, amount_paid, payment_method,
-          payment_reference, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-      `;
+  INSERT INTO jellypolly.payments (
+    invoice_id, payment_date, amount_paid, payment_method,
+    payment_reference, notes, status
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+  RETURNING *
+`;
+
+      // Determine initial status based on payment method
+      const initialStatus = payment_method === "cheque" ? "pending" : "active";
+
       const paymentValues = [
         invoice_id,
         payment_date,
@@ -144,6 +147,7 @@ export default function (pool) {
         payment_method,
         payment_reference || null, // Use null if empty/undefined
         notes || null,
+        initialStatus, // Set initial status based on payment method
       ];
       const paymentResult = await client.query(
         insertPaymentQuery,
@@ -151,42 +155,48 @@ export default function (pool) {
       );
       const createdPayment = paymentResult.rows[0];
 
-      // 4. Update Invoice balance and status
-      const newBalance = Math.max(0, currentBalance - parseFloat(amount_paid));
-      // Round to 2 decimal places to avoid floating point issues
-      const finalNewBalance = parseFloat(newBalance.toFixed(2));
-
-      // Get current invoice status to maintain overdue status for partial payments
-      let newStatus;
-      if (finalNewBalance <= 0) {
-        newStatus = "paid"; // Always paid if balance is 0
-      } else {
-        // If still has balance, maintain "overdue" status if it was already overdue
-        if (invoice.invoice_status === "overdue") {
-          newStatus = "overdue"; // Maintain overdue status for partial payments
-        } else {
-          newStatus = "Unpaid"; // Otherwise use normal unpaid status
-        }
-      }
-
-      const updateInvoiceQuery = `
-        UPDATE jellypolly.invoices
-        SET balance_due = $1, invoice_status = $2
-        WHERE id = $3
-      `;
-      await client.query(updateInvoiceQuery, [
-        finalNewBalance,
-        newStatus,
-        invoice_id,
-      ]);
-
-      // 5. Update Customer Credit if it was an INVOICE payment
-      if (invoice.paymenttype === "INVOICE") {
-        await updateCustomerCredit(
-          client,
-          invoice.customerid,
-          -parseFloat(amount_paid) // Reduce credit used
+      // Only update invoice balance and customer credit if payment is active (not pending)
+      if (initialStatus === "active") {
+        // 4. Update Invoice balance and status
+        const newBalance = Math.max(
+          0,
+          currentBalance - parseFloat(amount_paid)
         );
+        // Round to 2 decimal places to avoid floating point issues
+        const finalNewBalance = parseFloat(newBalance.toFixed(2));
+
+        // Get current invoice status to maintain overdue status for partial payments
+        let newStatus;
+        if (finalNewBalance <= 0) {
+          newStatus = "paid"; // Always paid if balance is 0
+        } else {
+          // If still has balance, maintain "overdue" status if it was already overdue
+          if (invoice.invoice_status === "overdue") {
+            newStatus = "overdue"; // Maintain overdue status for partial payments
+          } else {
+            newStatus = "Unpaid"; // Otherwise use normal unpaid status
+          }
+        }
+
+        const updateInvoiceQuery = `
+    UPDATE jellypolly.invoices
+    SET balance_due = $1, invoice_status = $2
+    WHERE id = $3
+  `;
+        await client.query(updateInvoiceQuery, [
+          finalNewBalance,
+          newStatus,
+          invoice_id,
+        ]);
+
+        // 5. Update Customer Credit if it was an INVOICE payment
+        if (invoice.paymenttype === "INVOICE") {
+          await updateCustomerCredit(
+            client,
+            invoice.customerid,
+            -parseFloat(amount_paid) // Reduce credit used
+          );
+        }
       }
 
       await client.query("COMMIT");
@@ -205,6 +215,119 @@ export default function (pool) {
       res
         .status(500)
         .json({ message: "Error creating payment", error: error.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PUT /api/payments/:payment_id/confirm - Mark pending payment as paid ---
+  router.put("/:payment_id/confirm", async (req, res) => {
+    const { payment_id } = req.params;
+    const paymentIdNum = parseInt(payment_id);
+
+    if (isNaN(paymentIdNum)) {
+      return res.status(400).json({ message: "Invalid payment ID." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. Get Payment details & Lock Invoice Row
+      const paymentQuery = `
+      SELECT p.*, i.customerid, i.paymenttype, i.invoice_status, i.balance_due
+      FROM jellypolly.payments p
+      JOIN jellypolly.invoices i ON p.invoice_id = i.id
+      WHERE p.payment_id = $1 AND p.status = 'pending'
+      FOR UPDATE OF i -- Lock the associated invoice row
+    `;
+      const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
+
+      if (paymentResult.rows.length === 0) {
+        throw new Error(
+          `Payment ${paymentIdNum} not found or not in pending status.`
+        );
+      }
+      const payment = paymentResult.rows[0];
+      const {
+        invoice_id,
+        amount_paid,
+        customerid,
+        paymenttype,
+        invoice_status,
+      } = payment;
+      const paidAmount = parseFloat(amount_paid || 0);
+
+      // Prevent confirming payment if invoice is cancelled
+      if (invoice_status === "cancelled") {
+        throw new Error(
+          `Cannot confirm payment for a cancelled invoice (${invoice_id}).`
+        );
+      }
+
+      // 2. Update payment status to active
+      const updatePaymentQuery = `
+      UPDATE jellypolly.payments 
+      SET status = 'active'
+      WHERE payment_id = $1
+      RETURNING *
+    `;
+      const updateResult = await client.query(updatePaymentQuery, [
+        paymentIdNum,
+      ]);
+      const confirmedPayment = updateResult.rows[0];
+
+      // 3. Update Invoice balance and status (same logic as original payment creation)
+      const currentBalance = parseFloat(payment.balance_due || 0);
+      const newBalance = Math.max(0, currentBalance - paidAmount);
+      const finalNewBalance = parseFloat(newBalance.toFixed(2));
+
+      let newStatus;
+      if (finalNewBalance <= 0) {
+        newStatus = "paid";
+      } else {
+        if (invoice_status === "overdue") {
+          newStatus = "overdue";
+        } else {
+          newStatus = "Unpaid";
+        }
+      }
+
+      const updateInvoiceQuery = `
+      UPDATE jellypolly.invoices
+      SET balance_due = $1, invoice_status = $2
+      WHERE id = $3
+    `;
+      await client.query(updateInvoiceQuery, [
+        finalNewBalance,
+        newStatus,
+        invoice_id,
+      ]);
+
+      // 4. Update Customer Credit if it was an INVOICE payment
+      if (paymenttype === "INVOICE") {
+        await updateCustomerCredit(
+          client,
+          customerid,
+          -paidAmount // Reduce credit used
+        );
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Payment confirmed successfully",
+        payment: {
+          ...confirmedPayment,
+          amount_paid: parseFloat(confirmedPayment.amount_paid || 0),
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error confirming payment:", error);
+      res
+        .status(500)
+        .json({ message: "Error confirming payment", error: error.message });
     } finally {
       client.release();
     }

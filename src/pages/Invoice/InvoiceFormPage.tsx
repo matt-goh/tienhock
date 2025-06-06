@@ -867,12 +867,15 @@ const InvoiceFormPage: React.FC = () => {
                     className="w-2/3"
                   />
                   {(paymentMethod === "cheque" ||
-                    paymentMethod === "bank_transfer") && (
+                    paymentMethod === "bank_transfer" ||
+                    paymentMethod === "online") && (
                     <FormInput
                       name="paymentReference"
                       label={
                         paymentMethod === "cheque"
                           ? "Cheque Number"
+                          : paymentMethod === "online"
+                          ? "Transaction ID"
                           : "Transaction Ref"
                       }
                       value={paymentReference}
