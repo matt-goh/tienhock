@@ -967,7 +967,9 @@ export default function (pool, config) {
           prod.descriptions.add(product.description.trim());
         }
 
-        salesmenData[salesmanId].total.quantity += quantity;
+        if (code !== "LESS") {
+          salesmenData[salesmanId].total.quantity += quantity;
+        }
         salesmenData[salesmanId].total.amount += total;
 
         // Track FOC and returns (also apply the same filtering)
