@@ -88,7 +88,10 @@ export const createInvoice = async (
         delete (dataToSubmit as Record<string, any>)[key]
     );
 
-    const response = await api.post("/jellypolly/api/invoices/submit", dataToSubmit); // Use the correct create endpoint
+    const response = await api.post(
+      "/jellypolly/api/invoices/submit",
+      dataToSubmit
+    ); // Use the correct create endpoint
 
     if (!response || !response.invoice) {
       throw new Error("Invalid response received after creating invoice.");
@@ -258,7 +261,9 @@ export const getInvoicesByIds = async (
     const idsParam = ids.join(",");
 
     // Use a new backend endpoint that can handle multiple IDs
-    const response = await api.get(`/jellypolly/api/invoices/batch?ids=${idsParam}`);
+    const response = await api.get(
+      `/jellypolly/api/invoices/batch?ids=${idsParam}`
+    );
 
     if (!response || !Array.isArray(response)) {
       throw new Error("Invalid response format from batch invoice endpoint");
@@ -326,7 +331,25 @@ export const syncCancellationStatus = async (invoiceId: string) => {
   }
 };
 
-// --- NEW Payment Utilities ---
+// CONFIRM Payment (mark pending payment as paid)
+export const confirmPayment = async (paymentId: number): Promise<Payment> => {
+  try {
+    const response = await api.put(
+      `/jellypolly/api/payments/${paymentId}/confirm`
+    );
+    if (!response || !response.payment) {
+      throw new Error("Invalid response received after confirming payment.");
+    }
+    return response.payment;
+  } catch (error: any) {
+    console.error(`Error confirming payment ${paymentId}:`, error);
+    const errorMessage =
+      error.response?.data?.message ||
+      (error instanceof Error ? error.message : "Failed to confirm payment");
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
 
 // CREATE Payment
 export const createPayment = async (
@@ -378,9 +401,12 @@ export const cancelPayment = async (
   reason?: string
 ): Promise<Payment> => {
   try {
-    const response = await api.put(`/jellypolly/api/payments/${paymentId}/cancel`, {
-      reason,
-    });
+    const response = await api.put(
+      `/jellypolly/api/payments/${paymentId}/cancel`,
+      {
+        reason,
+      }
+    );
     if (!response || !response.payment) {
       throw new Error("Invalid response received after cancelling payment.");
     }
