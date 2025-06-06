@@ -717,6 +717,7 @@ export default function (pool, config) {
       category_sbh: { quantity: 0, amount: 0, products: [] }, // ID "SBH"
       category_smee: { quantity: 0, amount: 0, products: [] }, // ID "SMEE"
       category_less: { quantity: 0, amount: 0, products: [] }, // ID "LESS"
+      category_tax_rounding: { quantity: 0, amount: 0, products: [] },
       category_returns: { quantity: 0, amount: 0, products: [] }, // Products with returnproduct > 0
       total_rounding: 0,
       total_tax: 0,
@@ -738,6 +739,7 @@ export default function (pool, config) {
       category_sbh: new Map(),
       category_smee: new Map(),
       category_less: new Map(),
+      category_tax_rounding: new Map(),
       category_returns: new Map(),
     };
 
@@ -757,10 +759,50 @@ export default function (pool, config) {
       }
 
       // Add rounding
-      categories.total_rounding += parseFloat(invoice.rounding || 0);
+      const roundingAmount = parseFloat(invoice.rounding || 0);
+      categories.total_rounding += roundingAmount;
 
       // Add tax from invoice level
-      categories.total_tax += parseFloat(invoice.tax_amount || 0);
+      const taxAmount = parseFloat(invoice.tax_amount || 0);
+      categories.total_tax += taxAmount;
+
+      // Add tax and rounding to the new category if they exist
+      if (roundingAmount !== 0) {
+        categories.category_tax_rounding.quantity += 1;
+        categories.category_tax_rounding.amount += roundingAmount;
+
+        if (!productsByCategory.category_tax_rounding.has("ROUNDING")) {
+          productsByCategory.category_tax_rounding.set("ROUNDING", {
+            code: "ROUNDING",
+            description: "Rounding Adjustment",
+            quantity: 0,
+            amount: 0,
+            descriptions: new Set(["Rounding Adjustment"]),
+          });
+        }
+        const roundingProd =
+          productsByCategory.category_tax_rounding.get("ROUNDING");
+        roundingProd.quantity += 1;
+        roundingProd.amount += roundingAmount;
+      }
+
+      if (taxAmount !== 0) {
+        categories.category_tax_rounding.quantity += 1;
+        categories.category_tax_rounding.amount += taxAmount;
+
+        if (!productsByCategory.category_tax_rounding.has("TAX")) {
+          productsByCategory.category_tax_rounding.set("TAX", {
+            code: "TAX",
+            description: "Tax Amount",
+            quantity: 0,
+            amount: 0,
+            descriptions: new Set(["Tax Amount"]),
+          });
+        }
+        const taxProd = productsByCategory.category_tax_rounding.get("TAX");
+        taxProd.quantity += 1;
+        taxProd.amount += taxAmount;
+      }
 
       // Process products
       if (!invoice.products) return;
