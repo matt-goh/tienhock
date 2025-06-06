@@ -20,6 +20,7 @@ import {
   createPayment,
   cancelPayment,
   syncCancellationStatus,
+  confirmPayment,
 } from "../../utils/JellyPolly/InvoiceUtils";
 import {
   parseDatabaseTimestamp,
@@ -180,6 +181,12 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
+  const [showConfirmPaymentDialog, setShowConfirmPaymentDialog] =
+    useState(false);
+  const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(
+    null
+  );
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
@@ -468,6 +475,40 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error("Failed to record payment.", { id: toastId });
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  const handleConfirmPaymentClick = (payment: Payment) => {
+    if (invoiceData?.invoice_status === "cancelled") {
+      toast.error("Cannot confirm payment for a cancelled invoice.");
+      return;
+    }
+
+    if (payment.status !== "pending") {
+      toast.error("Only pending payments can be confirmed.");
+      return;
+    }
+
+    setPaymentToConfirm(payment);
+    setShowConfirmPaymentDialog(true);
+  };
+
+  const handleConfirmPaymentConfirm = async () => {
+    if (!paymentToConfirm || isConfirmingPayment) return;
+
+    setIsConfirmingPayment(true);
+    setShowConfirmPaymentDialog(false);
+    const toastId = toast.loading("Confirming payment...");
+
+    try {
+      await confirmPayment(paymentToConfirm.payment_id);
+      toast.success("Payment confirmed successfully.", { id: toastId });
+      await fetchDetails(); // Refresh invoice and payment data
+    } catch (error) {
+      toast.error("Failed to confirm payment.", { id: toastId });
+    } finally {
+      setIsConfirmingPayment(false);
+      setPaymentToConfirm(null);
     }
   };
 
@@ -835,12 +876,15 @@ const InvoiceDetailsPage: React.FC = () => {
                 options={paymentMethodOptions}
               />
               {(paymentFormData.payment_method === "cheque" ||
-                paymentFormData.payment_method === "bank_transfer") && (
+                paymentFormData.payment_method === "bank_transfer" ||
+                paymentFormData.payment_method === "online") && (
                 <FormInput
                   name="payment_reference"
                   label={
                     paymentFormData.payment_method === "cheque"
                       ? "Cheque Number"
+                      : paymentFormData.payment_method === "online"
+                      ? "Transaction ID"
                       : "Transaction Ref"
                   }
                   value={paymentFormData.payment_reference || ""}
@@ -1113,22 +1157,25 @@ const InvoiceDetailsPage: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                       Date
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                       Method
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Reference
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                      Status
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
                       Notes
                     </th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                       Amount
                     </th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Action
                     </th>
                   </tr>
@@ -1140,18 +1187,22 @@ const InvoiceDetailsPage: React.FC = () => {
                       className={`hover:bg-gray-50 transition-colors ${
                         p.status === "cancelled"
                           ? "bg-gray-50 text-gray-400 line-through"
+                          : p.status === "pending"
+                          ? "bg-yellow-50"
                           : ""
                       }`}
                       title={
                         isCancelled
-                          ? "Cannot cancel payment for cancelled invoice"
+                          ? "Cannot modify payment for cancelled invoice"
                           : p.status === "cancelled"
                           ? p.cancellation_date
                             ? `Cancelled on ${formatDisplayDate(
                                 new Date(p.cancellation_date)
                               )}`
                             : "Payment cancelled"
-                          : "Paid"
+                          : p.status === "pending"
+                          ? "Payment pending confirmation"
+                          : "Payment confirmed"
                       }
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -1165,6 +1216,23 @@ const InvoiceDetailsPage: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600">
                         {p.payment_reference || "-"}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            p.status === "cancelled"
+                              ? "bg-red-100 text-red-700"
+                              : p.status === "pending"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {p.status === "cancelled"
+                            ? "Cancelled"
+                            : p.status === "pending"
+                            ? "Pending"
+                            : "Paid"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-gray-600 truncate max-w-xs">
                         {p.notes || "-"}
                       </td>
@@ -1172,30 +1240,53 @@ const InvoiceDetailsPage: React.FC = () => {
                         {formatCurrency(p.amount_paid)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
-                        {p.status === "cancelled" ? (
-                          // Show a disabled 'Cancelled' indicator if the payment is already cancelled
-                          <span className="italic text-gray-500 ml-auto">
-                            Cancelled
-                          </span>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            color="rose"
-                            onClick={() => handleCancelPaymentClick(p)}
-                            disabled={isCancellingPayment || isCancelled}
-                            title={
-                              isCancelled
-                                ? "Cannot cancel payment for cancelled invoice"
-                                : "Cancel Payment"
-                            }
-                            className="ml-auto"
-                          >
-                            <span className="flex items-center gap-1">
-                              <IconTrash size={16} /> Delete
+                        <div className="flex justify-center gap-1">
+                          {p.status === "cancelled" ? (
+                            <span className="italic text-gray-500 text-sm">
+                              Cancelled
                             </span>
-                          </Button>
-                        )}
+                          ) : p.status === "pending" ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                color="sky"
+                                onClick={() => handleConfirmPaymentClick(p)}
+                                disabled={isConfirmingPayment || isCancelled}
+                                title="Confirm Payment"
+                              >
+                                <span className="flex items-center gap-1">
+                                  <IconCircleCheck size={16} /> Paid
+                                </span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                color="rose"
+                                onClick={() => handleCancelPaymentClick(p)}
+                                disabled={isCancellingPayment || isCancelled}
+                                title="Cancel Payment"
+                              >
+                                <span className="flex items-center gap-1">
+                                  <IconTrash size={16} />
+                                </span>
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              color="rose"
+                              onClick={() => handleCancelPaymentClick(p)}
+                              disabled={isCancellingPayment || isCancelled}
+                              title="Cancel Payment"
+                            >
+                              <span className="flex items-center gap-1">
+                                <IconTrash size={16} /> Delete
+                              </span>
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1231,6 +1322,21 @@ const InvoiceDetailsPage: React.FC = () => {
             : "Submit e-Invoice"
         }
         variant="default"
+      />
+      <ConfirmationDialog
+        isOpen={showConfirmPaymentDialog}
+        onClose={() => setShowConfirmPaymentDialog(false)}
+        onConfirm={handleConfirmPaymentConfirm}
+        title="Confirm Payment"
+        message={`Are you sure you want to confirm this ${
+          paymentToConfirm?.payment_method
+        } payment of ${formatCurrency(
+          paymentToConfirm?.amount_paid
+        )}? This will mark the payment as paid and update the invoice balance.`}
+        confirmButtonText={
+          isConfirmingPayment ? "Confirming..." : "Confirm Payment"
+        }
+        variant="success"
       />
       <ConfirmationDialog
         isOpen={showCancelConfirm}
