@@ -554,10 +554,6 @@ export const generateSalesSummaryPDF = async (
               // Delay slightly to allow print dialog to close fully
               setTimeout(cleanup, 100);
             };
-
-            window.addEventListener("focus", cleanupFocus);
-            // Fallback timeout if focus event doesn't fire (e.g. print cancelled quickly)
-            setTimeout(cleanup, 30000); // Reduced from 60s
           }
         }
       };

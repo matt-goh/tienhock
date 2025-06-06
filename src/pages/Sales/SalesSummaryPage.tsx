@@ -5,7 +5,7 @@ import SalesBySalesmanPage from "./SalesBySalesmanPage";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 
 const SalesSummaryPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab] = useState(0);
 
   return (
     <div className="w-full p-6 pt-0 max-w-[88rem] mx-auto">
