@@ -836,7 +836,11 @@ const AllSalesSection: React.FC<{
                   // Skip total_rounding as it's not a category object
                   if (typeof category === "number") return sum;
                   // Skip category_returns and category_less quantities
-                  if (key === "category_returns" || key === "category_less")
+                  if (
+                    key === "category_returns" ||
+                    key === "category_less" ||
+                    key === "category_tax_rounding"
+                  )
                     return sum;
                   return sum + (category.quantity || 0);
                 },
