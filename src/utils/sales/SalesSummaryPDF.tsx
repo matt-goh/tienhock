@@ -17,6 +17,14 @@ interface SummaryData {
   sisa_sales?: any;
 }
 
+const ROWS_PER_PAGE = 60; // Approximate number of rows per page
+const HEADER_ROWS = 2; // Company header + report title
+const TABLE_HEADER_ROWS = 1; // Table header row
+const SECTION_SEPARATOR_ROWS = 1; // Space between sections
+const CATEGORY_SUBTOTAL_ROWS = 3; // Dashed line + subtotal + spacing
+const BREAKDOWN_SECTION_ROWS = 20; // Approximate rows for breakdown sections
+const SALESMAN_HEADER_ROWS = 1; // Salesman name header
+
 const styles = StyleSheet.create({
   page: {
     padding: 20,
@@ -56,12 +64,11 @@ const styles = StyleSheet.create({
   colDescription: { width: "42%", paddingHorizontal: 3 },
   colQty: { width: "15%", textAlign: "right", paddingRight: 8 },
   colAmount: { width: "25%", textAlign: "right", paddingRight: 3 },
-  headerText: {
+  boldText: {
     fontFamily: "Helvetica-Bold",
   },
   dashedLineAboveSubtotal: {
     flexDirection: "row",
-    marginTop: 1, // Space before dashed line
     paddingTop: 1,
   },
   // Generic dashed line cell style (apply width and paddingRight dynamically)
@@ -73,8 +80,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   categorySubtotalRow: {
-    paddingTop: 2,
-    paddingBottom: 1.5,
+    paddingVertical: 2,
     borderBottomWidth: 0.5,
     borderBottomColor: "#ccc",
   },
@@ -107,7 +113,7 @@ const styles = StyleSheet.create({
   breakdownSection: {
     flexDirection: "row",
     marginTop: 3,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   leftBreakdownColumn: {
     width: "50%",
@@ -138,22 +144,15 @@ const styles = StyleSheet.create({
   salesmanHeader: {
     // For Salesman Name
     fontFamily: "Helvetica-Bold",
-    marginBottom: 3,
+    marginVertical: 2,
     paddingHorizontal: 3,
     textAlign: "left", // Ensure salesman name is left aligned
   },
-  pageNumber: {
-    position: "absolute",
-    fontSize: 7,
-    bottom: 15,
-    right: 30,
-    color: "#555",
-  },
   categorySection: {
-    marginBottom: 6, // Space between category sections
+    marginBottom: 3, // Space between category sections
   },
   grandTotalSection: {
-    marginTop: -7,
+    marginTop: -4,
   },
   // Column Styles for Sisa Sales Page (5 columns)
   sisaColID: { width: "15%", paddingHorizontal: 3 }, // STOCK
@@ -161,7 +160,201 @@ const styles = StyleSheet.create({
   sisaColDescription: { width: "38%", paddingHorizontal: 3 }, // DESCRIPTION
   sisaColUPrice: { width: "15%", textAlign: "right", paddingRight: 8 }, // U/PRICE
   sisaColAmount: { width: "20%", textAlign: "right", paddingRight: 3 }, // AMOUNT
+  sectionSeparator: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  sectionHeader: {
+    marginVertical: 5,
+  },
 });
+
+const calculateAllSalesRows = (data: any, allProducts: any[]): number => {
+  const { categories } = data;
+  let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
+
+  // Count rows for each category
+  Object.entries(categories).forEach(([key, category]: [string, any]) => {
+    if (key === "total_rounding" && category === 0) return;
+
+    if (category.products && category.products.length > 0) {
+      totalRows += category.products.length; // Product rows
+      totalRows += CATEGORY_SUBTOTAL_ROWS; // Subtotal with dashed line
+    } else if (category.amount !== 0) {
+      totalRows += 1; // Single row for direct deduction
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    }
+  });
+
+  // Grand total section
+  totalRows += 2; // Grand total row with borders
+
+  // Breakdown section
+  totalRows += BREAKDOWN_SECTION_ROWS;
+
+  return totalRows;
+};
+
+const calculateSalesmenRows = (data: any): number => {
+  const { salesmen, foc, returns } = data;
+  let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
+
+  // Count rows for each salesman
+  Object.entries(salesmen).forEach(([_, salesmanData]: [string, any]) => {
+    if (salesmanData.products.length > 0) {
+      totalRows += SALESMAN_HEADER_ROWS;
+      totalRows += salesmanData.products.length;
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    }
+  });
+
+  // FOC section
+  if (foc && foc.products && foc.products.length > 0) {
+    totalRows += SALESMAN_HEADER_ROWS;
+    totalRows += foc.products.length;
+    totalRows += CATEGORY_SUBTOTAL_ROWS;
+  }
+
+  // Returns section
+  if (returns && returns.products && returns.products.length > 0) {
+    totalRows += SALESMAN_HEADER_ROWS;
+    totalRows += returns.products.length;
+    totalRows += CATEGORY_SUBTOTAL_ROWS;
+  }
+
+  return totalRows;
+};
+
+const calculateSisaSalesRows = (data: any): number => {
+  let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
+
+  const categories = [
+    { key: "empty_bag", data: data.empty_bag },
+    { key: "sbh", data: data.sbh },
+    { key: "smee", data: data.smee },
+  ];
+
+  categories.forEach(({ data: categoryData }) => {
+    if (!categoryData) return;
+
+    if (categoryData.products && categoryData.products.length > 0) {
+      totalRows += categoryData.products.length;
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    } else if (categoryData.quantity > 0 || categoryData.amount > 0) {
+      totalRows += 1; // Single row
+      totalRows += CATEGORY_SUBTOTAL_ROWS;
+    }
+  });
+
+  // Grand total section
+  totalRows += 2;
+
+  // Breakdown section
+  totalRows += 10; // Smaller breakdown for sisa
+
+  return totalRows;
+};
+
+const paginateSections = (data: SummaryData, allProducts: any[]) => {
+  const sections: Array<{
+    type: string;
+    data: any;
+    rows: number;
+    component: React.ReactNode;
+  }> = [];
+
+  // Calculate rows for each section
+  if (data.all_sales) {
+    const rows = calculateAllSalesRows(data.all_sales, allProducts);
+    sections.push({
+      type: "all_sales",
+      data: data.all_sales,
+      rows,
+      component: null, // Will be set later
+    });
+  }
+
+  if (data.all_salesmen) {
+    const rows = calculateSalesmenRows(data.all_salesmen);
+    sections.push({
+      type: "all_salesmen",
+      data: data.all_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.mee_salesmen) {
+    const rows = calculateSalesmenRows(data.mee_salesmen);
+    sections.push({
+      type: "mee_salesmen",
+      data: data.mee_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.bihun_salesmen) {
+    const rows = calculateSalesmenRows(data.bihun_salesmen);
+    sections.push({
+      type: "bihun_salesmen",
+      data: data.bihun_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.jp_salesmen) {
+    const rows = calculateSalesmenRows(data.jp_salesmen);
+    sections.push({
+      type: "jp_salesmen",
+      data: data.jp_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (data.sisa_sales) {
+    const rows = calculateSisaSalesRows(data.sisa_sales);
+    sections.push({
+      type: "sisa_sales",
+      data: data.sisa_sales,
+      rows,
+      component: null,
+    });
+  }
+
+  // Group sections into pages
+  const pages: Array<typeof sections> = [];
+  let currentPage: typeof sections = [];
+  let currentPageRows = 0;
+
+  sections.forEach((section, index) => {
+    const sectionRows =
+      section.rows + (currentPage.length > 0 ? SECTION_SEPARATOR_ROWS : 0);
+
+    // Check if adding this section exceeds page limit
+    if (
+      currentPageRows + sectionRows > ROWS_PER_PAGE &&
+      currentPage.length > 0
+    ) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentPageRows = 0;
+    }
+
+    currentPage.push(section);
+    currentPageRows +=
+      section.rows + (currentPage.length > 1 ? SECTION_SEPARATOR_ROWS : 0);
+  });
+
+  // Add the last page if it has content
+  if (currentPage.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+};
 
 // Helper function to format numbers with commas
 const formatNumber = (num: number): string => {
@@ -245,57 +438,77 @@ export const generateSalesSummaryPDF = async (
 ) => {
   try {
     const dateForMonthName = new Date(year, month);
-    // Format: Month YYYY, e.g., May 2025
     const monthYearFormatted = `${dateForMonthName.toLocaleDateString("en-US", {
       month: "long",
     })} ${dateForMonthName.getFullYear()}`;
 
+    // Paginate sections
+    const pages = paginateSections(data, allProducts);
+
     const doc = (
       <Document title={`Sales Summary - ${monthYearFormatted}`}>
-        {data.all_sales && (
-          <AllSalesPage
-            data={data.all_sales}
-            monthFormat={monthYearFormatted}
-            allProducts={allProducts}
-          />
-        )}
-        {data.all_salesmen && (
-          <SalesmenPage
-            data={data.all_salesmen}
-            title="Monthly Summary Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-          />
-        )}
-        {data.mee_salesmen && (
-          <SalesmenPage
-            data={data.mee_salesmen}
-            title="Monthly Summary Mee Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-            productType="MEE"
-          />
-        )}
-        {data.bihun_salesmen && (
-          <SalesmenPage
-            data={data.bihun_salesmen}
-            title="Monthly Summary Bihun Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-            productType="BIHUN"
-          />
-        )}
-        {data.jp_salesmen && (
-          <SalesmenPage
-            data={data.jp_salesmen}
-            title="Monthly Summary JellyPolly Sales by Salesmen"
-            monthFormat={monthYearFormatted}
-            productType="JP"
-          />
-        )}
-        {data.sisa_sales && (
-          <SisaSalesPage
-            data={data.sisa_sales}
-            monthFormat={monthYearFormatted}
-          />
-        )}
+        {pages.map((pageSections, pageIndex) => (
+          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
+            {pageSections.map((section, sectionIndex) => {
+              const isLastSection = sectionIndex === pageSections.length - 1;
+
+              return (
+                <React.Fragment key={`${section.type}-${sectionIndex}`}>
+                  {/* Render section based on type */}
+                  {section.type === "all_sales" && (
+                    <AllSalesSection
+                      data={section.data}
+                      monthFormat={monthYearFormatted}
+                      allProducts={allProducts}
+                    />
+                  )}
+
+                  {section.type === "all_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary of Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                    />
+                  )}
+
+                  {section.type === "mee_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary of Mee Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="MEE"
+                    />
+                  )}
+
+                  {section.type === "bihun_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary of Bihun Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="BIHUN"
+                    />
+                  )}
+
+                  {section.type === "jp_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary of JellyPolly Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="JP"
+                    />
+                  )}
+
+                  {section.type === "sisa_sales" && (
+                    <SisaSalesSection
+                      data={section.data}
+                      monthFormat={monthYearFormatted}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </Page>
+        ))}
       </Document>
     );
 
@@ -341,10 +554,6 @@ export const generateSalesSummaryPDF = async (
               // Delay slightly to allow print dialog to close fully
               setTimeout(cleanup, 100);
             };
-
-            window.addEventListener("focus", cleanupFocus);
-            // Fallback timeout if focus event doesn't fire (e.g. print cancelled quickly)
-            setTimeout(cleanup, 30000); // Reduced from 60s
           }
         }
       };
@@ -357,7 +566,7 @@ export const generateSalesSummaryPDF = async (
 };
 
 // Component for All Sales Summary
-const AllSalesPage: React.FC<{
+const AllSalesSection: React.FC<{
   data: any;
   monthFormat: string;
   allProducts: any[];
@@ -389,7 +598,7 @@ const AllSalesPage: React.FC<{
 
     // Iterate through all categories and their products
     Object.entries(categories).forEach(([key, category]: [string, any]) => {
-      if (key === "total_rounding") return; // Skip rounding
+      if (key === "total_rounding" || key === "category_returns") return;
 
       // Handle specific categories by key
       if (key === "category_empty_bag") {
@@ -495,35 +704,31 @@ const AllSalesPage: React.FC<{
     SBH: "SBH Products",
     SMEE: "SMEE Products",
     "WE-360": "WE-360 Series Products",
-    returns: "Return Products",
     less: "Less/Deductions",
+    returns: "Return Products",
     total_rounding: "Rounding Adjustments",
   };
 
   return (
-    <Page size="A4" style={styles.page} wrap>
+    <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        Monthly Summary Sales as at {monthFormat}
+        Monthly Summary of Sales in {monthFormat}
       </Text>
 
       {/* Single Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.colID, styles.headerText]}>ID</Text>
-        <Text style={[styles.colDescription, styles.headerText]}>
+        <Text style={[styles.colID, styles.boldText]}>ID</Text>
+        <Text style={[styles.colDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
-        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.colQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.colAmount, styles.boldText]}>Amount</Text>
       </View>
 
       {/* All Categories Content */}
       {Object.entries(categories).map(([key, category]: [string, any]) => {
-        if (
-          (!category.products || category.products.length === 0) &&
-          !(key === "less" && category.amount !== 0) &&
-          !(key === "returns" && category.amount !== 0)
-        ) {
+        if (!category.products || category.products.length === 0) {
           return null;
         }
 
@@ -546,7 +751,10 @@ const AllSalesPage: React.FC<{
                 ]}
               >
                 <Text style={styles.colID}>{product.code}</Text>
-                <Text style={styles.colDescription}>{product.description}</Text>
+                <Text style={styles.colDescription}>
+                  {product.description}
+                  {key === "category_returns" && " (Returned)"}
+                </Text>
                 <Text style={styles.colQty}>
                   {product.quantity > 0 ? formatNumber(product.quantity) : ""}
                 </Text>
@@ -573,7 +781,7 @@ const AllSalesPage: React.FC<{
                 </View>
               )}
 
-            {/* Category subtotal */}
+            {/* Dashed line above subtotal */}
             <View style={styles.dashedLineAboveSubtotal}>
               <Text style={styles.colID}></Text>
               <Text style={styles.colDescription}></Text>
@@ -596,13 +804,15 @@ const AllSalesPage: React.FC<{
                 ]}
               />
             </View>
+
+            {/* Category subtotal */}
             <View style={[styles.tableRow, styles.categorySubtotalRow]}>
               <Text style={styles.colID}></Text>
               <Text style={styles.colDescription}></Text>
-              <Text style={[styles.colQty]}>
+              <Text style={[styles.colQty, styles.boldText]}>
                 {formatNumber(category.quantity)}
               </Text>
-              <Text style={[styles.colAmount]}>
+              <Text style={[styles.colAmount, styles.boldText]}>
                 {formatCurrency(category.amount)}
               </Text>
             </View>
@@ -613,22 +823,35 @@ const AllSalesPage: React.FC<{
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.colID, styles.headerText]}>Grand Total:</Text>
+          <Text style={[styles.colID, styles.boldText]}>Grand Total:</Text>
           <Text style={styles.colDescription}></Text>
-          <Text style={[styles.colQty, styles.headerText]}>
+          <Text style={[styles.colQty, styles.boldText]}>
             {formatNumber(
-              totals.cashSales.count + totals.creditSales.count || 0
-            )}{" "}
-            Bills
+              Object.entries(categories).reduce(
+                (sum: number, [key, category]: [string, any]) => {
+                  // Skip total_rounding as it's not a category object
+                  if (typeof category === "number") return sum;
+                  // Skip category_returns and category_less quantities
+                  if (
+                    key === "category_returns" ||
+                    key === "category_less" ||
+                    key === "category_tax_rounding"
+                  )
+                    return sum;
+                  return sum + (category.quantity || 0);
+                },
+                0
+              )
+            )}
           </Text>
-          <Text style={[styles.colAmount, styles.headerText]}>
+          <Text style={[styles.colAmount, styles.boldText]}>
             {formatCurrency(totals.grandTotal)}
           </Text>
         </View>
       </View>
 
       {/* Breakdown section */}
-      <View style={styles.breakdownSection}>
+      <View style={styles.breakdownSection} wrap={false}>
         <View style={styles.leftBreakdownColumn}>
           <Text style={styles.sectionTitle}>Quantity</Text>
           <View style={styles.breakdownRow}>
@@ -681,8 +904,21 @@ const AllSalesPage: React.FC<{
             </Text>
           </View>
           <View style={styles.breakdownSeparator} />
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Cash Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {totals.cashSales.count || 0}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>CR Sales</Text>
+            <Text style={styles.breakdownValue}>
+              {totals.creditSales.count || 0}
+            </Text>
+          </View>
+          <View style={styles.breakdownSeparator} />
         </View>
-        <View style={styles.rightBreakdownColumn}>
+        <View style={styles.rightBreakdownColumn} wrap={false}>
           <Text style={styles.sectionTitle}>Amount</Text>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Mee</Text>
@@ -766,26 +1002,21 @@ const AllSalesPage: React.FC<{
           </View>
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, styles.headerText]}>
+            <Text style={[styles.breakdownLabel, styles.boldText]}>
               Grand Total
             </Text>
-            <Text style={[styles.breakdownValue, styles.headerText]}>
+            <Text style={[styles.breakdownValue, styles.boldText]}>
               {formatCurrency(breakdownTotals.grandTotalInvoicesAmount)}
             </Text>
           </View>
         </View>
       </View>
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
-    </Page>
+    </View>
   );
 };
 
 // Component for Salesmen Summary Pages
-const SalesmenPage: React.FC<{
+const SalesmenSection: React.FC<{
   data: any;
   title: string;
   monthFormat: string;
@@ -794,20 +1025,20 @@ const SalesmenPage: React.FC<{
   const { salesmen, foc, returns } = data;
 
   return (
-    <Page size="A4" style={styles.page} wrap>
+    <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        {title} as at {monthFormat}
+        {title} in {monthFormat}
       </Text>
 
       {/* Single Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.colID, styles.headerText]}>ID</Text>
-        <Text style={[styles.colDescription, styles.headerText]}>
+        <Text style={[styles.colID, styles.boldText]}>ID</Text>
+        <Text style={[styles.colDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.colQty, styles.headerText]}>Quantity</Text>
-        <Text style={[styles.colAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.colQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.colAmount, styles.boldText]}>Amount</Text>
       </View>
 
       {/* Salesmen Sections */}
@@ -876,10 +1107,10 @@ const SalesmenPage: React.FC<{
               <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.colID}></Text>
                 <Text style={styles.colDescription}></Text>
-                <Text style={[styles.colQty, styles.headerText]}>
+                <Text style={[styles.colQty, styles.boldText]}>
                   {formatNumber(salesmanData.total.quantity)}
                 </Text>
-                <Text style={[styles.colAmount, styles.headerText]}>
+                <Text style={[styles.colAmount, styles.boldText]}>
                   {formatCurrency(salesmanData.total.amount)}
                 </Text>
               </View>
@@ -929,7 +1160,6 @@ const SalesmenPage: React.FC<{
                 {
                   width: styles.colAmount.width,
                   paddingRight: styles.colAmount.paddingRight,
-                  borderTopWidth: 0, // No dash for amount column since it's always 0.00
                 },
               ]}
             />
@@ -939,10 +1169,10 @@ const SalesmenPage: React.FC<{
           <View style={[styles.tableRow, styles.categorySubtotalRow]}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
+            <Text style={[styles.colQty, styles.boldText]}>
               {formatNumber(foc.total.quantity)}
             </Text>
-            <Text style={[styles.colAmount, styles.headerText]}>0.00</Text>
+            <Text style={[styles.colAmount, styles.boldText]}>0.00</Text>
           </View>
         </View>
       )}
@@ -950,7 +1180,7 @@ const SalesmenPage: React.FC<{
       {/* Returns Section */}
       {returns && returns.products && returns.products.length > 0 && (
         <View style={styles.categorySection}>
-          <Text style={styles.salesmanHeader}>RETURN PRODUCTS</Text>
+          <Text style={styles.salesmanHeader}>RETURN</Text>
 
           {/* Sort return products by category order */}
           {sortProductsByCategory(returns.products).map(
@@ -965,8 +1195,8 @@ const SalesmenPage: React.FC<{
                   {formatNumber(product.quantity)}
                 </Text>
                 <Text style={styles.colAmount}>
-                  {product.amount !== 0
-                    ? formatCurrency(product.amount)
+                  {product.price !== 0
+                    ? formatCurrency(product.price * product.quantity)
                     : "0.00"}
                 </Text>
               </View>
@@ -1001,10 +1231,10 @@ const SalesmenPage: React.FC<{
           <View style={[styles.tableRow, styles.categorySubtotalRow]}>
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
-            <Text style={[styles.colQty, styles.headerText]}>
+            <Text style={[styles.colQty, styles.boldText]}>
               {formatNumber(returns.total.quantity)}
             </Text>
-            <Text style={[styles.colAmount, styles.headerText]}>
+            <Text style={[styles.colAmount, styles.boldText]}>
               {returns.total.amount !== 0
                 ? formatCurrency(returns.total.amount)
                 : "0.00"}
@@ -1013,17 +1243,38 @@ const SalesmenPage: React.FC<{
         </View>
       )}
 
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
-    </Page>
+      {/* Grand Total Section */}
+      <View style={styles.grandTotalSection}>
+        <View style={[styles.tableRow, styles.totalRow]}>
+          <Text style={[styles.colID, styles.boldText]}>Total:</Text>
+          <Text style={styles.colDescription}></Text>
+          <Text style={[styles.colQty, styles.boldText]}>
+            {formatNumber(
+              Object.values(salesmen).reduce(
+                (sum: number, salesman: any) =>
+                  sum + (salesman.total?.quantity || 0),
+                0
+              ) +
+                (foc?.total?.quantity || 0) +
+                (returns?.total?.quantity || 0)
+            )}
+          </Text>
+          <Text style={[styles.colAmount, styles.boldText]}>
+            {formatCurrency(
+              Object.values(salesmen).reduce(
+                (sum: number, salesman: any) => sum + salesman.total.amount,
+                0
+              )
+            )}
+          </Text>
+        </View>
+      </View>
+    </View>
   );
 };
 
 // Component for Sisa Sales Summary
-const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
+const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
   data,
   monthFormat,
 }) => {
@@ -1043,21 +1294,21 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
   );
 
   return (
-    <Page size="A4" style={styles.page} wrap>
+    <View style={styles.sectionHeader}>
       <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
       <Text style={styles.reportTitle}>
-        Monthly Summary Sisa Sales as at {monthFormat}
+        Monthly Summary of Sisa Sales in {monthFormat}
       </Text>
 
       {/* Single Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.sisaColID, styles.headerText]}>ID</Text>
-        <Text style={[styles.sisaColDescription, styles.headerText]}>
+        <Text style={[styles.sisaColID, styles.boldText]}>ID</Text>
+        <Text style={[styles.sisaColDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.sisaColQty, styles.headerText]}>Quantity</Text>
-        <Text style={[styles.sisaColUPrice, styles.headerText]}>U/Price</Text>
-        <Text style={[styles.sisaColAmount, styles.headerText]}>Amount</Text>
+        <Text style={[styles.sisaColQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.sisaColUPrice, styles.boldText]}>U/Price</Text>
+        <Text style={[styles.sisaColAmount, styles.boldText]}>Amount</Text>
       </View>
 
       {/* Categories Content */}
@@ -1125,11 +1376,11 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
               <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.sisaColID}></Text>
                 <Text style={styles.sisaColDescription}></Text>
-                <Text style={[styles.sisaColQty, styles.headerText]}>
+                <Text style={[styles.sisaColQty, styles.boldText]}>
                   {formatNumber(categoryData.quantity)}
                 </Text>
                 <Text style={styles.sisaColUPrice}></Text>
-                <Text style={[styles.sisaColAmount, styles.headerText]}>
+                <Text style={[styles.sisaColAmount, styles.boldText]}>
                   {formatCurrency(categoryData.amount)}
                 </Text>
               </View>
@@ -1188,11 +1439,11 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
               <View style={[styles.tableRow, styles.categorySubtotalRow]}>
                 <Text style={styles.sisaColID}></Text>
                 <Text style={styles.sisaColDescription}></Text>
-                <Text style={[styles.sisaColQty, styles.headerText]}>
+                <Text style={[styles.sisaColQty, styles.boldText]}>
                   {formatNumber(categoryData.quantity)}
                 </Text>
                 <Text style={styles.sisaColUPrice}></Text>
-                <Text style={[styles.sisaColAmount, styles.headerText]}>
+                <Text style={[styles.sisaColAmount, styles.boldText]}>
                   {formatCurrency(categoryData.amount)}
                 </Text>
               </View>
@@ -1206,13 +1457,13 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
       {/* Grand Total Section */}
       <View style={styles.grandTotalSection}>
         <View style={[styles.tableRow, styles.totalRow]}>
-          <Text style={[styles.sisaColID, styles.headerText]}>Total:</Text>
+          <Text style={[styles.sisaColID, styles.boldText]}>Total:</Text>
           <Text style={styles.sisaColDescription}></Text>
-          <Text style={[styles.sisaColQty, styles.headerText]}>
+          <Text style={[styles.sisaColQty, styles.boldText]}>
             {formatNumber(totalSisaQuantity)}
           </Text>
           <Text style={styles.sisaColUPrice}></Text>
-          <Text style={[styles.sisaColAmount, styles.headerText]}>
+          <Text style={[styles.sisaColAmount, styles.boldText]}>
             {formatCurrency(totalSisaAmount)}
           </Text>
         </View>
@@ -1270,12 +1521,6 @@ const SisaSalesPage: React.FC<{ data: any; monthFormat: string }> = ({
           )}
         </View>
       </View>
-
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-        fixed
-      />
-    </Page>
+    </View>
   );
 };

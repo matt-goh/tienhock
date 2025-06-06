@@ -19,6 +19,7 @@ import {
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 import { useNavigate } from "react-router-dom";
+import { useCompany } from "../../contexts/CompanyContext";
 
 interface InvoiceCardProps {
   invoice: ExtendedInvoiceData;
@@ -117,6 +118,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     invoice.consolidated_part_of
   );
   const ConsolidatedIcon = consolidatedStatusInfo?.icon;
+  const { activeCompany } = useCompany();
   const navigate = useNavigate();
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -203,9 +205,9 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
       {/* Body - Uses parent's horizontal padding */}
       <div className="space-y-2">
-        <p className="flex flex-col w-fit font-medium">
+        <p className="flex flex-col w-auto font-medium">
           <span
-            className="truncate text-default-800 hover:underline cursor-pointer"
+            className="w-auto truncate text-default-800 hover:underline cursor-pointer"
             title={invoice.customerName || invoice.customerid}
             onClick={(e) => {
               e.stopPropagation();
@@ -247,11 +249,12 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               invoiceStatusStyle.label === "Unpaid" ||
               invoiceStatusStyle.label === "Overdue"
             ) {
-              e.stopPropagation();
-              // Navigate directly to details page with payment form open
-              navigate(`/sales/invoice/${invoice.id}`, {
+                e.stopPropagation();
+                // Navigate directly to details page with payment form open
+                const basePath = activeCompany.id === "jellypolly" ? "/jellypolly" : "";
+                navigate(`${basePath}/sales/invoice/${invoice.id}`, {
                 state: { showPaymentForm: true },
-              });
+                });
             }
           }}
         >
