@@ -27,7 +27,7 @@ interface Holiday {
 
 const HolidayCalendarPage: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [holidayToDelete, setHolidayToDelete] = useState<Holiday | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -35,11 +35,7 @@ const HolidayCalendarPage: React.FC = () => {
   const [holidayToEdit, setHolidayToEdit] = useState<Holiday | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
 
-  const {
-    holidays: allHolidays,
-    isLoading,
-    refreshHolidays,
-  } = useHolidayCache();
+  const { holidays: allHolidays, refreshHolidays } = useHolidayCache();
 
   const holidays = React.useMemo(() => {
     return allHolidays.filter((holiday) => {

@@ -309,7 +309,7 @@ export default function (pool) {
     const { tong_no } = req.params;
 
     try {
-      // First check if the dumpster is in use in any rentals
+      // Check for associated rentals
       const rentalCheck = await pool.query(
         "SELECT COUNT(*) FROM greentarget.rentals WHERE tong_no = $1",
         [tong_no]
@@ -319,6 +319,40 @@ export default function (pool) {
         return res.status(400).json({
           message:
             "Cannot delete dumpster: it is being used in one or more rentals",
+          associationType: "rentals",
+        });
+      }
+
+      // Check for associated invoices (through rentals)
+      const invoiceCheck = await pool.query(
+        `SELECT COUNT(*) FROM greentarget.invoices i 
+       JOIN greentarget.rentals r ON i.rental_id = r.rental_id 
+       WHERE r.tong_no = $1`,
+        [tong_no]
+      );
+
+      if (parseInt(invoiceCheck.rows[0].count) > 0) {
+        return res.status(400).json({
+          message:
+            "Cannot delete dumpster: it has associated invoices through rentals",
+          associationType: "invoices",
+        });
+      }
+
+      // Check for associated payments (through invoices and rentals)
+      const paymentCheck = await pool.query(
+        `SELECT COUNT(*) FROM greentarget.payments p 
+       JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id 
+       JOIN greentarget.rentals r ON i.rental_id = r.rental_id 
+       WHERE r.tong_no = $1`,
+        [tong_no]
+      );
+
+      if (parseInt(paymentCheck.rows[0].count) > 0) {
+        return res.status(400).json({
+          message:
+            "Cannot delete dumpster: it has associated payments through invoices",
+          associationType: "payments",
         });
       }
 

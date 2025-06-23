@@ -635,7 +635,7 @@ const InvoiceListPage: React.FC = () => {
   // Define default filter values as constants
   const DEFAULT_FILTERS: InvoiceFilters = {
     customer_id: null,
-    status: ["active", "overdue", "paid"],
+    status: ["active", "overdue", "paid", "cancelled"],
     consolidation: "all",
   };
 

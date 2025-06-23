@@ -593,7 +593,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         </div>
                         <div>
                           <strong>Window ends:</strong>{" "}
-                          {windowInfo.windowEnd?.toLocaleDateString() || "N/A"}
+                          {windowInfo.windowEnd?.toLocaleDateString("en-GB") || "N/A"}
                         </div>
                       </div>
                     ) : (
