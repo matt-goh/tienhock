@@ -1020,7 +1020,7 @@ export default function (pool, config) {
     }
   });
 
-  // Fetch submission details by UUID and update missing longId
+  // Fetch submission details by UUID and update missing longId 
   router.get("/submission/:uuid", async (req, res) => {
     const { uuid } = req.params;
 
