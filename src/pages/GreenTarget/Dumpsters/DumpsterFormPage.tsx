@@ -43,6 +43,7 @@ const DumpsterFormPage: React.FC = () => {
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -182,6 +183,56 @@ const DumpsterFormPage: React.FC = () => {
         toast.error("An unexpected error occurred.");
       }
     } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteDumpster = async () => {
+    try {
+      setIsSaving(true);
+
+      if (!formData.tong_no) {
+        toast.error("Cannot delete: dumpster number is missing");
+        return;
+      }
+
+      const response = await greenTargetApi.deleteDumpster(formData.tong_no);
+
+      // Check if the response contains an error message
+      if (
+        response.error ||
+        (response.message && response.message.includes("Cannot delete"))
+      ) {
+        // Show specific error message based on association type
+        let errorMessage =
+          response.message || "Cannot delete dumpster: unknown error occurred";
+
+        if (response.associationType === "rentals") {
+          errorMessage =
+            "Cannot delete dumpster: it is currently being used in active rentals. Please complete or remove the rentals first.";
+        } else if (response.associationType === "invoices") {
+          errorMessage =
+            "Cannot delete dumpster: it has associated invoices. Please handle the invoices first.";
+        } else if (response.associationType === "payments") {
+          errorMessage =
+            "Cannot delete dumpster: it has associated payments. Please handle the payments first.";
+        }
+
+        toast.error(errorMessage);
+      } else {
+        // Show success message and navigate back to dumpster list
+        toast.success("Dumpster deleted successfully");
+        navigate("/greentarget/dumpsters");
+      }
+    } catch (error) {
+      console.error("Error deleting dumpster:", error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to delete dumpster");
+      }
+    } finally {
+      setIsDeleteDialogOpen(false);
       setIsSaving(false);
     }
   };
@@ -484,6 +535,17 @@ const DumpsterFormPage: React.FC = () => {
           )}
 
           <div className="mt-6 py-3 text-right">
+            {isEditMode && (
+              <Button
+                type="button"
+                color="rose"
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="mr-3"
+              >
+                Delete
+              </Button>
+            )}
             <Button
               type="submit"
               variant="boldOutline"
@@ -505,6 +567,15 @@ const DumpsterFormPage: React.FC = () => {
         title="Discard Changes"
         message="Are you sure you want to go back? All unsaved changes will be lost."
         confirmButtonText="Discard"
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteDumpster}
+        title="Delete Dumpster"
+        message={`Are you sure you want to delete dumpster ${formData.tong_no}? This action cannot be undone.`}
+        confirmButtonText="Delete"
         variant="danger"
       />
     </div>

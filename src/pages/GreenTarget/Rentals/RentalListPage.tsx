@@ -345,7 +345,7 @@ const RentalListPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeOnly, setActiveOnly] = useState(true);
+  const [activeOnly, setActiveOnly] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
   const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
