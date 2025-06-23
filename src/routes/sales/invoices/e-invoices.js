@@ -1020,6 +1020,83 @@ export default function (pool, config) {
     }
   });
 
+  // Fetch submission details by UUID and update missing longId
+  router.get("/submission/:uuid", async (req, res) => {
+    const { uuid } = req.params;
+
+    if (!uuid) {
+      return res.status(400).json({
+        success: false,
+        message: "UUID is required",
+      });
+    }
+
+    try {
+      // Call the MyInvois API to get document details
+      const documentDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${uuid}/details`
+      );
+
+      // Filter down to only the fields we need
+      const filteredResponse = {
+        uuid: documentDetails.uuid,
+        longId: documentDetails.longId || "",
+        dateTimeValidated: documentDetails.dateTimeValidated || null,
+        status:
+          documentDetails.status === "Submitted"
+            ? "Valid"
+            : documentDetails.status,
+      };
+
+      // Update our database if we have new information (particularly the longId)
+      if (documentDetails.longId) {
+        try {
+          const dbResult = await pool.query(
+            `UPDATE invoices 
+           SET long_id = $1, datetime_validated = $2, einvoice_status = $3
+           WHERE uuid = $4 AND (long_id IS NULL OR long_id = '')
+           RETURNING *`,
+            [
+              documentDetails.longId,
+              documentDetails.dateTimeValidated,
+              "valid",
+              uuid,
+            ]
+          );
+
+          console.log(`Updated invoice record for UUID ${uuid}`);
+        } catch (dbError) {
+          console.error("Error updating invoice record:", dbError);
+          // Continue with the response even if DB update fails
+        }
+      }
+
+      return res.status(200).json({
+        // OK for successful status check
+        success: true,
+        data: filteredResponse,
+      });
+    } catch (error) {
+      console.error("Error fetching document details:", error);
+
+      // Check for specific error responses from the MyInvois API
+      if (error.status === 404) {
+        return res.status(404).json({
+          success: false,
+          message: "Document not found",
+          error: "The requested document does not exist or is not accessible",
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch document details",
+        error: error.message,
+      });
+    }
+  });
+
   // Get all invoices eligible for consolidation
   router.get("/eligible-for-consolidation", async (req, res) => {
     try {
