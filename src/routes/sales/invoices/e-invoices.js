@@ -507,10 +507,13 @@ export default function (pool, config) {
       );
 
       // Add validation errors to the result if there are any
+      // Separate validation errors from actual submission rejections
       if (validationErrors.length > 0) {
+        // Keep validation errors separate - they shouldn't update database status
+        submissionResult.validationErrors = validationErrors;
         submissionResult.rejectedDocuments = [
           ...(submissionResult.rejectedDocuments || []),
-          ...validationErrors,
+          ...validationErrors, // Include in response for client but handle differently in DB updates
         ];
         submissionResult.overallStatus = "Partial";
       }
@@ -530,12 +533,12 @@ export default function (pool, config) {
             try {
               await client.query(
                 `UPDATE invoices SET 
-                uuid = $1,
-                submission_uid = $2,
-                long_id = $3, 
-                datetime_validated = $4,
-                einvoice_status = $5
-              WHERE id = $6`,
+            uuid = $1,
+            submission_uid = $2,
+            long_id = $3, 
+            datetime_validated = $4,
+            einvoice_status = $5
+          WHERE id = $6`,
                 [
                   doc.uuid,
                   doc.submissionUid,
@@ -554,42 +557,36 @@ export default function (pool, config) {
           }
 
           // Update each rejected document to mark as 'invalid'
-          // Update status for actual rejections vs validation errors
+          // BUT skip validation errors (they should remain empty)
           if (submissionResult.rejectedDocuments?.length > 0) {
             for (const doc of submissionResult.rejectedDocuments) {
               const invoiceId = doc.internalId || doc.invoiceCodeNumber;
               if (!invoiceId) continue;
 
-              // Determine if this is a validation error or actual MyInvois rejection
-              const errorMessage = (doc.error?.message || "").toLowerCase();
-              const errorCode = doc.error?.code || "";
-
-              const isMissingTinId =
-                errorMessage.includes("tin") ||
-                errorMessage.includes("id number") ||
-                errorCode === "MISSING_TIN";
-
+              // Skip updating status for validation errors (especially missing TIN/ID)
               const isValidationError =
-                errorCode === "CF001" ||
-                errorCode === "MISSING_TIN" ||
-                isMissingTinId;
+                doc.error?.code === "MISSING_TIN" ||
+                doc.error?.code === "CF001" ||
+                doc.error?.message?.toLowerCase().includes("tin") ||
+                doc.error?.message?.toLowerCase().includes("id number");
+
+              if (isValidationError) {
+                console.log(
+                  `Skipping status update for validation error on invoice ${invoiceId}: ${doc.error?.message}`
+                );
+                continue;
+              }
 
               try {
-                if (isValidationError) {
-                  // For validation errors (missing TIN/ID), leave einvoice_status empty (NULL)
-                  // Don't update the status at all - let it remain as is
-                  console.log(
-                    `Skipping einvoice_status update for validation error on invoice ${invoiceId}`
-                  );
-                } else {
-                  // For actual MyInvois rejections, set to 'invalid'
-                  await client.query(
-                    `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
-                    [invoiceId]
-                  );
-                }
+                await client.query(
+                  `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
+                  [invoiceId]
+                );
               } catch (error) {
-                console.error(`Failed to update invoice ${invoiceId}:`, error);
+                console.error(
+                  `Failed to update invoice ${invoiceId} to invalid:`,
+                  error
+                );
               }
             }
           }
