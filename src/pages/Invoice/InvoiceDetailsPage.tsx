@@ -65,23 +65,29 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[12%]">
               Code
             </th>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[35%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[28%]">
               Description
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              FOC
+            </th>
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              RTN
+            </th>
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
               Qty
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-              Price (RM)
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+              Price
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
-              Tax (RM)
+              Tax
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-              Total (RM)
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[14%]">
+              Total
             </th>
           </tr>
         </thead>
@@ -106,6 +112,20 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
                   }`}
                 >
                   {item.description}
+                </td>
+                <td
+                  className={`px-4 py-2 text-right text-sm ${
+                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                  }`}
+                >
+                  {isSubtotal ? "" : item.freeProduct || 0}
+                </td>
+                <td
+                  className={`px-4 py-2 text-right text-sm ${
+                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                  }`}
+                >
+                  {isSubtotal ? "" : item.returnProduct || 0}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
