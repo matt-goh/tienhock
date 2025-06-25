@@ -1858,7 +1858,7 @@ export default function (pool, config) {
           tax_amount: 0, // <<< Hardcoded to 0 as per requirement
           rounding: Number(invoice.rounding || 0),
           totalamountpayable: Number(invoice.totalAmountPayable || 0),
-          invoice_status: isCash ? "paid" : "active", // Mark CASH as paid immediately
+          invoice_status: isCash ? "paid" : "Unpaid", // Mark CASH as paid immediately
           balance_due: isCash ? 0 : totalPayable, // Zero balance for CASH
           // Initialize e-invoice fields as null
           uuid: null,
