@@ -1672,7 +1672,7 @@ export default function (pool, config) {
     }
   });
 
-  // POST /api/invoices/submit - Create Invoice (Updated Schema, ID immutable after this)
+  // POST /api/invoices/submit - Create Invoice
   router.post("/submit", async (req, res) => {
     const client = await pool.connect();
     try {
