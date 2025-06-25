@@ -362,11 +362,17 @@ const CustomerFormPage: React.FC = () => {
         toast.error("Please select a product for all custom pricing rows.");
         return false;
       }
+
+      const priceValue =
+        typeof product.custom_price === "string"
+          ? parseFloat(product.custom_price)
+          : product.custom_price;
+
       if (
-        product.custom_price === undefined ||
-        product.custom_price === null ||
-        isNaN(Number(product.custom_price)) ||
-        Number(product.custom_price) < 0
+        priceValue === undefined ||
+        priceValue === null ||
+        isNaN(priceValue) ||
+        priceValue < 0
       ) {
         toast.error(
           `Invalid custom price for product ID ${product.product_id}. Price must be a non-negative number.`
@@ -623,7 +629,7 @@ const CustomerFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-4 -mt-36">
+    <div className="container mx-auto px-4 pb-4 -mt-24">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
