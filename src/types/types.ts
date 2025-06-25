@@ -387,7 +387,7 @@ export interface CustomProduct {
   customer_id: string;
   product_id: string;
   description?: string;
-  custom_price: number;
+  custom_price: number | string;
   is_available: boolean;
 }
 

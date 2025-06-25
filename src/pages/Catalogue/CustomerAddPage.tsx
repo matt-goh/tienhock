@@ -207,22 +207,22 @@ const CustomerAddPage: React.FC = () => {
         toast.error("Please select a product for all custom pricing rows.");
         return false;
       }
+
+      const priceValue =
+        typeof product.custom_price === "string"
+          ? parseFloat(product.custom_price)
+          : product.custom_price;
+
       if (
-        product.custom_price === undefined ||
-        product.custom_price === null ||
-        isNaN(Number(product.custom_price)) || // Check if it's a number or can be parsed
-        Number(product.custom_price) < 0
+        priceValue === undefined ||
+        priceValue === null ||
+        isNaN(priceValue) ||
+        priceValue < 0
       ) {
-        // Allow temporary string state like "12." during input, but validate final number
-        if (
-          typeof product.custom_price !== "string" ||
-          !String(product.custom_price).endsWith(".")
-        ) {
-          toast.error(
-            `Invalid custom price for product ID ${product.product_id}. Price must be a non-negative number.`
-          );
-          return false;
-        }
+        toast.error(
+          `Invalid custom price for product ID ${product.product_id}. Price must be a non-negative number.`
+        );
+        return false;
       }
     }
 
