@@ -1,12 +1,9 @@
 // src/components/Catalogue/CustomerProductsTab.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { CustomProduct } from "../../types/types";
 import Button from "../Button";
-import {
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { FormListbox } from "../FormComponents";
 import clsx from "clsx";
@@ -76,29 +73,20 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     onProductsChange(updated); // Pass the entire updated array up
   };
 
-  const handlePriceChange = (
-    uid: string | undefined,
-    newPriceStr: string // Receive string from input
-  ) => {
+  const handlePriceChange = (uid: string | undefined, newPriceStr: string) => {
     if (!uid) return;
 
-    // Allow empty string, numbers, and one decimal point ending
-    if (
-      newPriceStr !== "" &&
-      !/^\d*\.?\d{0,2}$/.test(newPriceStr) &&
-      !/^\d+\.$/.test(newPriceStr)
-    ) {
-      // Optionally provide feedback or just ignore invalid characters
-      // toast.error("Invalid price format");
-      return; // Prevent updating state with invalid format
+    // Allow empty string, numbers with optional decimal places (up to 2)
+    if (newPriceStr !== "" && !/^\d*\.?\d{0,2}$/.test(newPriceStr)) {
+      return; // Invalid format - ignore the input
     }
 
-    // Store the raw string value to allow intermediate states like "12."
+    // Store the string value temporarily to allow intermediate states like "12."
     const updated = customerProducts.map((p) =>
       p.uid === uid
         ? {
             ...p,
-            custom_price: newPriceStr === "" ? 0 : parseFloat(newPriceStr) || 0,
+            custom_price: newPriceStr, // Store as string during editing
           }
         : p
     );
@@ -110,32 +98,16 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     currentPriceStr: string
   ) => {
     if (!uid) return;
+
     // On blur, finalize the value to a number
-    const priceValue = parseFloat(currentPriceStr) || 0; // Default to 0 if empty/invalid
+    const priceValue = parseFloat(currentPriceStr) || 0;
     const clampedPrice = Math.max(0, priceValue); // Ensure non-negative
 
     const updated = customerProducts.map(
       (p) => (p.uid === uid ? { ...p, custom_price: clampedPrice } : p) // Store as number
     );
 
-    // Only call update if the final numeric value is different from what might be stored
-    const currentProduct = customerProducts.find((p) => p.uid === uid);
-    // Check if the stored value (could be string "12." or number 12) is numerically different
-    if (
-      currentProduct &&
-      Number(currentProduct.custom_price) !== clampedPrice
-    ) {
-      onProductsChange(updated);
-    } else if (!currentProduct) {
-      onProductsChange(updated); // Should not happen, but safety
-    } else if (
-      currentProduct &&
-      typeof currentProduct.custom_price === "string" &&
-      currentProduct.custom_price !== String(clampedPrice)
-    ) {
-      // If it was stored as a string like "12." and now becomes 12, update state
-      onProductsChange(updated);
-    }
+    onProductsChange(updated);
   };
 
   const handleAvailabilityChange = (
