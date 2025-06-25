@@ -554,21 +554,42 @@ export default function (pool, config) {
           }
 
           // Update each rejected document to mark as 'invalid'
+          // Update status for actual rejections vs validation errors
           if (submissionResult.rejectedDocuments?.length > 0) {
             for (const doc of submissionResult.rejectedDocuments) {
               const invoiceId = doc.internalId || doc.invoiceCodeNumber;
               if (!invoiceId) continue;
 
+              // Determine if this is a validation error or actual MyInvois rejection
+              const errorMessage = (doc.error?.message || "").toLowerCase();
+              const errorCode = doc.error?.code || "";
+
+              const isMissingTinId =
+                errorMessage.includes("tin") ||
+                errorMessage.includes("id number") ||
+                errorCode === "MISSING_TIN";
+
+              const isValidationError =
+                errorCode === "CF001" ||
+                errorCode === "MISSING_TIN" ||
+                isMissingTinId;
+
               try {
-                await client.query(
-                  `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
-                  [invoiceId]
-                );
+                if (isValidationError) {
+                  // For validation errors (missing TIN/ID), leave einvoice_status empty (NULL)
+                  // Don't update the status at all - let it remain as is
+                  console.log(
+                    `Skipping einvoice_status update for validation error on invoice ${invoiceId}`
+                  );
+                } else {
+                  // For actual MyInvois rejections, set to 'invalid'
+                  await client.query(
+                    `UPDATE invoices SET einvoice_status = 'invalid' WHERE id = $1`,
+                    [invoiceId]
+                  );
+                }
               } catch (error) {
-                console.error(
-                  `Failed to mark invoice ${invoiceId} as invalid:`,
-                  error
-                );
+                console.error(`Failed to update invoice ${invoiceId}:`, error);
               }
             }
           }
@@ -1020,7 +1041,7 @@ export default function (pool, config) {
     }
   });
 
-  // Fetch submission details by UUID and update missing longId 
+  // Fetch submission details by UUID and update missing longId
   router.get("/submission/:uuid", async (req, res) => {
     const { uuid } = req.params;
 

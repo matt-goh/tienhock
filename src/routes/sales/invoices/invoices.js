@@ -1882,7 +1882,7 @@ export default function (pool, config) {
             };
           }
 
-          // --- Fetch Product Descriptions (Keep if needed) ---
+          // --- Fetch Product Descriptions ---
           let productDescriptions = {};
           if (invoice.products && invoice.products.length > 0) {
             const productCodes = invoice.products
@@ -1900,7 +1900,7 @@ export default function (pool, config) {
           }
           // --- End Fetch Product Descriptions ---
 
-          // Insert Invoice Record (using NEW schema columns)
+          // Insert Invoice Record
           const insertInvoiceQuery = `
             INSERT INTO invoices (
               id, salespersonid, customerid, createddate, paymenttype,
