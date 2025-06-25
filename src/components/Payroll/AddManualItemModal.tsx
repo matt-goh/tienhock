@@ -447,7 +447,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                     type="number"
                     value={rate}
                     onChange={(e) => setRate(e.target.value)}
-                    step="1"
+                    step="0.01"
                     min={0}
                     required
                   />
