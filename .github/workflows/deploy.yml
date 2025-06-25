@@ -26,6 +26,10 @@ jobs:
             # Navigate to application directory
             cd ~/tienhock-erp
             
+            # Check available disk space
+            echo "Disk space before cleanup:"
+            df -h
+            
             # Pull latest changes
             git checkout production
             git pull origin production
@@ -33,21 +37,31 @@ jobs:
             # Make sure backup script is executable
             chmod +x backup.sh
             
-            # Restart services
+            # Stop containers (preserves volumes/database)
             cd prod
             docker-compose down
-            docker-compose up --build -d
+            
+            # Clean up Docker to free space (PRESERVES VOLUMES)
+            docker system prune -f
+            docker builder prune -f
+            
+            # Check disk space after cleanup
+            echo "Disk space after cleanup:"
+            df -h
+            
+            # Build and start services with no-cache to prevent build cache issues
+            docker-compose up --build --force-recreate -d
             
             # Show container status
             docker ps
             
             # Check logs of each service
             echo "=== Cloudflared logs ==="
-            docker logs --tail 20 cloudflared
+            docker logs --tail 20 cloudflared || echo "Cloudflared container not found"
             
             echo "=== API Gateway logs ==="
-            docker logs --tail 20 api_gateway
+            docker logs --tail 20 api_gateway || echo "API Gateway container not found"
             
             echo "=== Server logs ==="
-            docker logs --tail 20 tienhock_prod_server
+            docker logs --tail 20 tienhock_prod_server || echo "Server container not found"
           EOF
