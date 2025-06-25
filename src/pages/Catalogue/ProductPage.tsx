@@ -72,7 +72,7 @@ const ProductPage: React.FC = () => {
           reverseMap[productId].push({
             customer_id: customer.id,
             customer_name: customer.name,
-            custom_price: customProduct.custom_price,
+            custom_price: Number(customProduct.custom_price),
             is_available: customProduct.is_available,
           });
         });
