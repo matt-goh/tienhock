@@ -1291,7 +1291,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             <>
               {/* Main Employee Table */}
               <div className="bg-white rounded-lg border shadow-sm">
-                <div>``
+                <div>
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
@@ -1361,7 +1361,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           ] ??
                           jobConfig?.defaultHours ??
                           7;
-                        const followers = followedBySalesman[row.id] || [];
 
                         return (
                           <tr key={row.rowKey}>
@@ -1721,16 +1720,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-default-200">
-                          {salesmanIkutEmployees.map((row) => {
+                          {salesmanIkutEmployees.map((row, index) => {
                             const isSelected =
                               employeeSelectionState.selectedJobs[
                                 row.id
-                              ]?.includes(row.jobType) || false;
+                              ]?.includes(row.jobType);
+                            const selectedSalesman =
+                              salesmanIkutRelations[row.rowKey || ""] || "";
                             const bagCounts = ikutBagCounts[
                               row.rowKey || ""
                             ] || { muatMee: 0, muatBihun: 0 };
-                            const selectedSalesman =
-                              salesmanIkutRelations[row.rowKey || ""] || "";
+                            const isLastRow =
+                              index === salesmanIkutEmployees.length - 1; // Add this line
 
                             return (
                               <tr key={row.rowKey}>
@@ -1848,7 +1849,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           leaveFrom="opacity-100"
                                           leaveTo="opacity-0"
                                         >
-                                          <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-left text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                          <ListboxOptions
+                                            className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
+                                              isLastRow
+                                                ? "bottom-full mb-1"
+                                                : "mt-1"
+                                            }`}
+                                          >
                                             <ListboxOption
                                               value=""
                                               className={({ active }) =>
