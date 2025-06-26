@@ -1291,7 +1291,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             <>
               {/* Main Employee Table */}
               <div className="bg-white rounded-lg border shadow-sm">
-                <div className="overflow-x-auto">
+                <div>``
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
@@ -1624,7 +1624,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               {jobConfig?.id === "SALESMAN" &&
                 salesmanIkutEmployees.length > 0 && (
                   <div className="bg-white rounded-lg border shadow-sm mt-6">
-                    <div className="overflow-x-auto">
+                    <div>
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
