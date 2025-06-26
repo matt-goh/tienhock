@@ -603,39 +603,61 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleSaveForm = async () => {
-    // Validate form
-    if (!formData.logDate) {
-      toast.error("Please select a date");
+    const allSelectedEmployees = Object.entries(
+      employeeSelectionState.selectedJobs
+    ).filter(([_, jobTypes]) => jobTypes.length > 0);
+
+    if (allSelectedEmployees.length === 0) {
+      toast.error("Please select at least one employee");
       return;
     }
 
-    // Get all selected employees with their hours
-    const selectedEmployeeData = Object.entries(
-      employeeSelectionState.selectedJobs
-    ).flatMap(([employeeId, jobTypes]) => {
-      return jobTypes.map((jobType) => {
-        const hours =
-          employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-        const rowKey = `${employeeId}-${jobType}`;
-        const activities = employeeActivities[rowKey] || [];
+    // Validate that all selected employees have hours
+    const invalidEmployees = allSelectedEmployees.filter(
+      ([employeeId, jobTypes]) => {
+        return jobTypes.some((jobType) => {
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          return hours <= 0;
+        });
+      }
+    );
 
-        // Add additional data for SALESMAN_IKUT
-        const additionalData: any = {};
-        if (jobType === "SALESMAN_IKUT") {
-          additionalData.followingSalesmanId = salesmanIkutRelations[rowKey];
-          additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
-          additionalData.muatBihunBags = ikutBagCounts[rowKey]?.muatBihun || 0;
-        }
+    if (invalidEmployees.length > 0) {
+      toast.error("All selected employees must have hours greater than 0");
+      return;
+    }
 
-        return {
-          employeeId,
-          jobType,
-          hours,
-          activities,
-          ...additionalData,
-        };
-      });
-    });
+    // Build the employee data with all selected jobs
+    const selectedEmployeeData = allSelectedEmployees
+      .map(([employeeId, jobTypes]) => {
+        return jobTypes.map((jobType) => {
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          const rowKey = `${employeeId}-${jobType}`;
+          const activities = employeeActivities[rowKey] || [];
+
+          // Add additional data for different job types
+          const additionalData: any = {};
+          if (jobType === "SALESMAN_IKUT") {
+            additionalData.followingSalesmanId = salesmanIkutRelations[rowKey];
+            additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
+            additionalData.muatBihunBags =
+              ikutBagCounts[rowKey]?.muatBihun || 0;
+          } else if (jobType === "SALESMAN") {
+            additionalData.locationType = locationTypes[rowKey] || "Local";
+          }
+
+          return {
+            employeeId,
+            jobType,
+            hours,
+            activities,
+            ...additionalData,
+          };
+        });
+      })
+      .flat();
 
     if (selectedEmployeeData.length === 0) {
       toast.error("No employees selected");
@@ -822,6 +844,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
       const newEmployeeActivities: Record<string, any[]> = {};
+      const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
+
       // Restore SALESMAN_IKUT relations and bag counts
       const newSalesmanIkutRelations: Record<string, string> = {};
       const newIkutBagCounts: Record<
@@ -830,20 +854,68 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       > = {};
 
       existingWorkLog.employeeEntries.forEach((entry: any) => {
-        if (entry.job_id === "SALESMAN_IKUT") {
-          const rowKey = `${entry.employee_id}-${entry.job_id}`;
+        const rowKey = `${entry.employee_id}-${entry.job_id}`;
 
-          if (entry.followingSalesmanId) {
-            newSalesmanIkutRelations[rowKey] = entry.followingSalesmanId;
+        // Restore employee selection and hours
+        if (!newSelectedJobs[entry.employee_id]) {
+          newSelectedJobs[entry.employee_id] = [];
+        }
+        newSelectedJobs[entry.employee_id].push(entry.job_id);
+
+        if (!newJobHours[entry.employee_id]) {
+          newJobHours[entry.employee_id] = {};
+        }
+        newJobHours[entry.employee_id][entry.job_id] = parseFloat(
+          entry.total_hours
+        );
+
+        // Restore activities
+        if (entry.activities && entry.activities.length > 0) {
+          newEmployeeActivities[rowKey] = entry.activities.map(
+            (activity: any) => ({
+              payCodeId: activity.pay_code_id,
+              description: activity.description,
+              payType: activity.pay_type,
+              rateUnit: activity.rate_unit,
+              rate: parseFloat(activity.rate_used),
+              unitsProduced: activity.units_produced
+                ? parseFloat(activity.units_produced)
+                : 0,
+              hoursApplied: activity.hours_applied
+                ? parseFloat(activity.hours_applied)
+                : null,
+              calculatedAmount: parseFloat(activity.calculated_amount),
+              isSelected: true,
+              isContextLinked: false,
+            })
+          );
+        }
+
+        // Restore SALESMAN_IKUT specific data
+        if (entry.job_id === "SALESMAN_IKUT") {
+          if (entry.following_salesman_id) {
+            newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
           }
 
           newIkutBagCounts[rowKey] = {
-            muatMee: entry.muatMeeBags || 0,
-            muatBihun: entry.muatBihunBags || 0,
+            muatMee: entry.muat_mee_bags || 0,
+            muatBihun: entry.muat_bihun_bags || 0,
           };
+        }
+
+        // Restore SALESMAN location types
+        if (entry.job_id === "SALESMAN") {
+          newLocationTypes[rowKey] = entry.location_type || "Local";
         }
       });
 
+      // Apply all the restored state
+      setEmployeeSelectionState({
+        selectedJobs: newSelectedJobs,
+        jobHours: newJobHours,
+      });
+      setEmployeeActivities(newEmployeeActivities);
+      setLocationTypes(newLocationTypes);
       setSalesmanIkutRelations(newSalesmanIkutRelations);
       setIkutBagCounts(newIkutBagCounts);
     }
@@ -854,6 +926,45 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     loadingJobs,
     loadingPayCodeMappings,
   ]);
+
+  useEffect(() => {
+    if (jobConfig?.id !== "SALESMAN") return;
+
+    // Update activities based on ikutBagCounts changes
+    setEmployeeActivities((prev) => {
+      const updatedActivities = { ...prev };
+
+      Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+        const currentActivities = updatedActivities[rowKey] || [];
+
+        const updatedRowActivities = currentActivities.map((activity) => {
+          // Link Muat Mee paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_MEE_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatMee,
+              isContextLinked: true,
+            };
+          }
+
+          // Link Muat Bihun paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_BIHUN_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatBihun,
+              isContextLinked: true,
+            };
+          }
+
+          return activity;
+        });
+
+        updatedActivities[rowKey] = updatedRowActivities;
+      });
+
+      return updatedActivities;
+    });
+  }, [ikutBagCounts, jobConfig?.id]);
 
   // Separate effect for fetching activities after selection changes
   useEffect(() => {
@@ -1274,13 +1385,24 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 {row.id}
                               </Link>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                              {row.name}
-                              {followers.length > 0 && (
-                                <span className="ml-2 text-xs text-default-500">
-                                  (Followed by {followers.join(", ")})
-                                </span>
-                              )}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                              <span className="font-medium">{row.name}</span>
+                              {followedBySalesman[row.id] &&
+                                followedBySalesman[row.id].length > 0 && (
+                                  <span className="text-xs text-default-500 block mt-1">
+                                    (Followed by{" "}
+                                    {followedBySalesman[row.id]
+                                      .map((ikutEmployeeId) => {
+                                        const ikutEmployee =
+                                          availableEmployees.find(
+                                            (emp) => emp.id === ikutEmployeeId
+                                          );
+                                        return ikutEmployee?.name;
+                                      })
+                                      .join(", ")}
+                                    )
+                                  </span>
+                                )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                               <Link
