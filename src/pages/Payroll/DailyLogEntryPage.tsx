@@ -274,7 +274,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const salesmanEmployees = useMemo(() => {
     if (jobConfig?.id !== "SALESMAN") return [];
     return expandedEmployees.filter(
-      (emp: { jobType: string }) => emp.jobType === "SALESMAN"
+      (emp: { jobType: string; id: string }) =>
+        emp.jobType === "SALESMAN" && emp.id !== "KILANG"
     );
   }, [expandedEmployees, jobConfig?.id]);
 
