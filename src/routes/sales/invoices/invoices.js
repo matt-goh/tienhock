@@ -2155,6 +2155,25 @@ export default function (pool, config) {
               for (const doc of einvoiceResults.rejectedDocuments) {
                 const invoiceId = doc.internalId || doc.invoiceCodeNumber;
                 if (!invoiceId) continue;
+
+                // Skip updating status for validation errors (especially missing TIN/ID)
+                const isValidationError =
+                  doc.error?.code === "MISSING_REQUIRED_ID" ||
+                  doc.error?.code === "MISSING_TIN" ||
+                  doc.error?.code === "CF001" ||
+                  doc.error?.message?.toLowerCase().includes("tin") ||
+                  doc.error?.message?.toLowerCase().includes("id number") ||
+                  doc.error?.message
+                    ?.toLowerCase()
+                    .includes("missing tin number or id number");
+
+                if (isValidationError) {
+                  console.log(
+                    `Skipping einvoice_status update for validation error on invoice ${invoiceId}: ${doc.error?.message}`
+                  );
+                  continue;
+                }
+
                 try {
                   await updateClient.query(updateRejectedQuery, [invoiceId]);
                 } catch (updateError) {
