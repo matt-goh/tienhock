@@ -698,6 +698,7 @@ export interface PayrollDeduction {
     employee_rate: number | string;
     employer_rate: number | string;
     age_group?: string;
+    wage_ceiling_used?: number;
   };
 }
 

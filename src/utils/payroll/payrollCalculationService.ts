@@ -9,7 +9,6 @@ import {
   SIPRate,
   PayrollDeduction,
 } from "../../types/types";
-import { useContributionRatesCache } from "./useContributionRatesCache";
 import {
   getEmployeeType,
   findEPFRate,
@@ -18,6 +17,7 @@ import {
   calculateEPF,
   calculateSOCSO,
   calculateSIP,
+  getEPFWageCeiling,
 } from "./contributionCalculations";
 
 export interface WorkLogActivity {
@@ -307,6 +307,10 @@ export class PayrollCalculationService {
     const epfRate = findEPFRate(epfRates, employeeType, grossPay);
     if (epfRate) {
       const epfContribution = calculateEPF(epfRate, grossPay);
+
+      // Get the wage ceiling for display purposes
+      const wageCeiling = getEPFWageCeiling(grossPay);
+
       deductions.push({
         deduction_type: "epf",
         employee_amount: epfContribution.employee,
@@ -319,6 +323,8 @@ export class PayrollCalculationService {
             ? `${epfRate.employer_rate_percentage}%`
             : `RM${epfRate.employer_fixed_amount}`,
           age_group: employeeType,
+          // Add wage ceiling info for transparency
+          wage_ceiling_used: wageCeiling,
         },
       });
     }
