@@ -1502,11 +1502,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               {jobConfig?.id === "SALESMAN" &&
                 salesmanIkutEmployees.length > 0 && (
                   <div className="bg-white rounded-lg border shadow-sm mt-6">
-                    <div className="bg-default-100 p-2 border-b">
-                      <h3 className="text-lg font-semibold text-default-800">
-                        Salesman Ikut Lori
-                      </h3>
-                    </div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
