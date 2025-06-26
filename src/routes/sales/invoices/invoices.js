@@ -1906,8 +1906,8 @@ export default function (pool, config) {
               id, salespersonid, customerid, createddate, paymenttype,
               total_excluding_tax, tax_amount, rounding, totalamountpayable, invoice_status,
               uuid, submission_uid, long_id, datetime_validated, is_consolidated,
-              consolidated_invoices, einvoice_status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+              consolidated_invoices, einvoice_status, balance_due
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING *`;
           const invoiceResult = await client.query(insertInvoiceQuery, [
             transformedInvoice.id,
@@ -1927,6 +1927,7 @@ export default function (pool, config) {
             transformedInvoice.is_consolidated,
             transformedInvoice.consolidated_invoices,
             transformedInvoice.einvoice_status,
+            transformedInvoice.balance_due,
           ]);
           const savedInvoice = invoiceResult.rows[0];
 
