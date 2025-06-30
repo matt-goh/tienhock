@@ -316,7 +316,6 @@ export const groupItemsByType = (items: PayrollItem[]) => {
       }
     }
   });
-
   return grouped;
 };
 
