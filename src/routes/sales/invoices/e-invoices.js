@@ -177,15 +177,40 @@ export default function (pool, config) {
         status: invoice.einvoice_status,
       }));
 
-      // STEP 2: Identify and process any pending invoices next
+      // STEP 2: Identify and process any pending invoices next (including those with null status but have UUID)
       const pendingQuery = `
-      SELECT id, uuid, submission_uid 
+      SELECT id, uuid, submission_uid, einvoice_status
       FROM invoices 
-      WHERE id = ANY($1) AND einvoice_status = 'pending' AND uuid IS NOT NULL
+      WHERE id = ANY($1) 
+      AND uuid IS NOT NULL 
       AND (long_id IS NULL OR long_id = '')
+      AND (einvoice_status = 'pending' OR einvoice_status IS NULL)
       `;
       const pendingResult = await pool.query(pendingQuery, [invoiceIds]);
       const pendingInvoices = pendingResult.rows;
+
+      // Normalize any invoices that have UUID but null einvoice_status to 'pending'
+      if (pendingInvoices.length > 0) {
+        const invoicesToNormalize = pendingInvoices.filter(
+          (inv) => inv.einvoice_status === null
+        );
+
+        if (invoicesToNormalize.length > 0) {
+          const normalizeQuery = `
+      UPDATE invoices 
+      SET einvoice_status = 'pending' 
+      WHERE id = ANY($1) AND uuid IS NOT NULL AND einvoice_status IS NULL
+    `;
+          const invoiceIdsToNormalize = invoicesToNormalize.map(
+            (inv) => inv.id
+          );
+          await pool.query(normalizeQuery, [invoiceIdsToNormalize]);
+
+          console.log(
+            `Normalized ${invoicesToNormalize.length} invoices from null to pending status`
+          );
+        }
+      }
 
       // Track results of status updates for pending invoices
       const statusUpdateResults = {
