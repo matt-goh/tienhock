@@ -634,7 +634,7 @@ export interface PayrollItem {
   id?: number;
   pay_code_id: string;
   description: string;
-  pay_type?: string;
+  pay_type: string;
   rate: number;
   rate_unit: string;
   quantity: number;
@@ -698,6 +698,7 @@ export interface PayrollDeduction {
     employee_rate: number | string;
     employer_rate: number | string;
     age_group?: string;
+    wage_ceiling_used?: number;
   };
 }
 

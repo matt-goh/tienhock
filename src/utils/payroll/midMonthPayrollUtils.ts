@@ -161,13 +161,19 @@ export const getMidMonthPayrollByEmployee = async (
   employeeId: string,
   year: number,
   month: number
-): Promise<MidMonthPayroll> => {
+): Promise<MidMonthPayroll | null> => {
   try {
     const response = await api.get(
       `/api/mid-month-payrolls/employee/${employeeId}/${year}/${month}`
     );
     return response;
-  } catch (error) {
+  } catch (error: any) {
+    // Handle 404 (not found) gracefully - this is expected when no mid-month payroll exists
+    if (error?.response?.status === 404 || error?.status === 404) {
+      return null;
+    }
+
+    // For other errors, still throw them as they indicate real problems
     console.error("Error fetching mid-month payroll by employee:", error);
     throw error;
   }

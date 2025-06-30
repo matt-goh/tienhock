@@ -1906,8 +1906,8 @@ export default function (pool, config) {
               id, salespersonid, customerid, createddate, paymenttype,
               total_excluding_tax, tax_amount, rounding, totalamountpayable, invoice_status,
               uuid, submission_uid, long_id, datetime_validated, is_consolidated,
-              consolidated_invoices, einvoice_status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+              consolidated_invoices, einvoice_status, balance_due
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING *`;
           const invoiceResult = await client.query(insertInvoiceQuery, [
             transformedInvoice.id,
@@ -1927,6 +1927,7 @@ export default function (pool, config) {
             transformedInvoice.is_consolidated,
             transformedInvoice.consolidated_invoices,
             transformedInvoice.einvoice_status,
+            transformedInvoice.balance_due,
           ]);
           const savedInvoice = invoiceResult.rows[0];
 
@@ -2123,11 +2124,16 @@ export default function (pool, config) {
             // Update Accepted
             if (einvoiceResults.acceptedDocuments?.length > 0) {
               const updateAcceptedQuery = `
-                UPDATE invoices SET uuid = $1, submission_uid = $2, long_id = $3,
-                       datetime_validated = $4, einvoice_status = $5
-                WHERE id = $6`;
+    UPDATE invoices SET uuid = $1, submission_uid = $2, long_id = $3,
+           datetime_validated = $4, einvoice_status = $5
+    WHERE id = $6`;
               for (const doc of einvoiceResults.acceptedDocuments) {
-                const status = doc.longId ? "valid" : "pending";
+                // Ensure proper status determination: valid if has longId, pending if has UUID but no longId
+                const status = doc.longId
+                  ? "valid"
+                  : doc.uuid
+                  ? "pending"
+                  : null;
                 const validatedTime = doc.dateTimeValidated
                   ? new Date(doc.dateTimeValidated)
                   : null;
@@ -2155,6 +2161,25 @@ export default function (pool, config) {
               for (const doc of einvoiceResults.rejectedDocuments) {
                 const invoiceId = doc.internalId || doc.invoiceCodeNumber;
                 if (!invoiceId) continue;
+
+                // Skip updating status for validation errors (especially missing TIN/ID)
+                const isValidationError =
+                  doc.error?.code === "MISSING_REQUIRED_ID" ||
+                  doc.error?.code === "MISSING_TIN" ||
+                  doc.error?.code === "CF001" ||
+                  doc.error?.message?.toLowerCase().includes("tin") ||
+                  doc.error?.message?.toLowerCase().includes("id number") ||
+                  doc.error?.message
+                    ?.toLowerCase()
+                    .includes("missing tin number or id number");
+
+                if (isValidationError) {
+                  console.log(
+                    `Skipping einvoice_status update for validation error on invoice ${invoiceId}: ${doc.error?.message}`
+                  );
+                  continue;
+                }
+
                 try {
                   await updateClient.query(updateRejectedQuery, [invoiceId]);
                 } catch (updateError) {

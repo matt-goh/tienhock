@@ -126,12 +126,14 @@ export default function (pool) {
         dwle.*,
         CAST(dwle.total_hours AS NUMERIC(10, 2)) as total_hours,
         s.name as employee_name,
-        j.name as job_name
+        j.name as job_name,
+        fs.name as following_salesman_name
       FROM daily_work_log_entries dwle
       LEFT JOIN staffs s ON dwle.employee_id = s.id
       LEFT JOIN jobs j ON dwle.job_id = j.id
+      LEFT JOIN staffs fs ON dwle.following_salesman_id = fs.id
       WHERE dwle.work_log_id = $1
-      `;
+    `;
       const entriesResult = await pool.query(entriesQuery, [id]);
 
       // Get activities for each entry
@@ -257,8 +259,9 @@ export default function (pool) {
         // Insert employee entry
         const entryQuery = `
           INSERT INTO daily_work_log_entries (
-            work_log_id, employee_id, job_id, total_hours
-          ) VALUES ($1, $2, $3, $4)
+            work_log_id, employee_id, job_id, total_hours,
+            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
         `;
 
@@ -267,6 +270,10 @@ export default function (pool) {
           employeeId,
           jobType,
           hours,
+          entry.followingSalesmanId || null,
+          entry.muatMeeBags || 0,
+          entry.muatBihunBags || 0,
+          entry.locationType || "Local",
         ]);
 
         const entryId = entryResult.rows[0].id;
@@ -412,8 +419,9 @@ export default function (pool) {
         // Insert employee entry
         const entryQuery = `
           INSERT INTO daily_work_log_entries (
-            work_log_id, employee_id, job_id, total_hours
-          ) VALUES ($1, $2, $3, $4)
+            work_log_id, employee_id, job_id, total_hours, 
+            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
         `;
 
@@ -422,6 +430,10 @@ export default function (pool) {
           employeeId,
           jobType,
           hours,
+          entry.followingSalesmanId || null,
+          entry.muatMeeBags || 0,
+          entry.muatBihunBags || 0,
+          entry.locationType || "Local",
         ]);
 
         const entryId = entryResult.rows[0].id;

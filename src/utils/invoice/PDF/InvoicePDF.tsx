@@ -596,6 +596,13 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
             <Text style={styles.infoValue}>{customerName}</Text>
           </View>
           <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={styles.infoValue}>
+              {invoice.invoice_status.charAt(0).toUpperCase() +
+                invoice.invoice_status.slice(1)}
+            </Text>
+          </View>
+          <View style={styles.infoCell}>
             <Text style={styles.infoLabel}>Type</Text>
             <Text style={styles.infoValue}>{invoice.paymenttype}</Text>
           </View>

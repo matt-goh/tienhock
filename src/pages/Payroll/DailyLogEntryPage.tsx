@@ -103,6 +103,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [salesmanProducts, setSalesmanProducts] = useState<
     Record<string, any[]>
   >({});
+  const [salesmanIkutRelations, setSalesmanIkutRelations] = useState<
+    Record<string, string> // rowKey of SALESMAN_IKUT -> SALESMAN employee ID
+  >({});
+  const [ikutBagCounts, setIkutBagCounts] = useState<
+    Record<string, { muatMee: number; muatBihun: number }> // rowKey -> bag counts
+  >({});
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
 
@@ -238,12 +244,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     > = [];
 
     availableEmployees.forEach((employee) => {
-      // Filter to only include job types from the current job configuration
       const configJobs = (employee.job || []).filter((jobId: string) =>
         JOB_IDS.includes(jobId)
       );
 
-      // Create a row for each job type this employee has
       configJobs.forEach((jobId: any) => {
         const jobName = jobs.find((j) => j.id === jobId)?.name || jobId;
 
@@ -256,13 +260,52 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
     });
 
-    // Sort by employee name first, then job name
-    return expanded.sort((a, b) => {
-      const jobCompare = (a.jobName || "").localeCompare(b.jobName || "");
-      if (jobCompare !== 0) return jobCompare;
-      return a.name.localeCompare(b.name);
-    });
+    // Sort by job name first, then employee name
+    return expanded.sort(
+      (a: { jobName: any; name: string }, b: { jobName: any; name: any }) => {
+        const jobCompare = (a.jobName || "").localeCompare(b.jobName || "");
+        if (jobCompare !== 0) return jobCompare;
+        return a.name.localeCompare(b.name);
+      }
+    );
   }, [availableEmployees, jobs, JOB_IDS]);
+
+  // Add new computed values for SALESMAN specific views
+  const salesmanEmployees = useMemo(() => {
+    if (jobConfig?.id !== "SALESMAN") return [];
+    return expandedEmployees.filter(
+      (emp: { jobType: string; id: string }) =>
+        emp.jobType === "SALESMAN" && emp.id !== "KILANG"
+    );
+  }, [expandedEmployees, jobConfig?.id]);
+
+  const salesmanIkutEmployees = useMemo(() => {
+    if (jobConfig?.id !== "SALESMAN") return [];
+    return expandedEmployees.filter(
+      (emp: { jobType: string }) => emp.jobType === "SALESMAN_IKUT"
+    );
+  }, [expandedEmployees, jobConfig?.id]);
+
+  // Get employees followed by each salesman
+  const followedBySalesman = useMemo(() => {
+    const followedMap: Record<string, string[]> = {};
+
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        const ikutEmployee = salesmanIkutEmployees.find(
+          (emp) => emp.rowKey === ikutRowKey
+        );
+        if (ikutEmployee) {
+          if (!followedMap[salesmanId]) {
+            followedMap[salesmanId] = [];
+          }
+          followedMap[salesmanId].push(ikutEmployee.id);
+        }
+      }
+    );
+
+    return followedMap;
+  }, [salesmanIkutRelations, salesmanIkutEmployees]);
 
   // Update day type when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -561,30 +604,61 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleSaveForm = async () => {
-    // Validate form
-    if (!formData.logDate) {
-      toast.error("Please select a date");
+    const allSelectedEmployees = Object.entries(
+      employeeSelectionState.selectedJobs
+    ).filter(([_, jobTypes]) => jobTypes.length > 0);
+
+    if (allSelectedEmployees.length === 0) {
+      toast.error("Please select at least one employee");
       return;
     }
 
-    // Get all selected employees with their hours
-    const selectedEmployeeData = Object.entries(
-      employeeSelectionState.selectedJobs
-    ).flatMap(([employeeId, jobTypes]) => {
-      return jobTypes.map((jobType) => {
-        const hours =
-          employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-        const rowKey = `${employeeId}-${jobType}`;
-        const activities = employeeActivities[rowKey] || [];
+    // Validate that all selected employees have hours
+    const invalidEmployees = allSelectedEmployees.filter(
+      ([employeeId, jobTypes]) => {
+        return jobTypes.some((jobType) => {
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          return hours <= 0;
+        });
+      }
+    );
 
-        return {
-          employeeId,
-          jobType,
-          hours,
-          activities,
-        };
-      });
-    });
+    if (invalidEmployees.length > 0) {
+      toast.error("All selected employees must have hours greater than 0");
+      return;
+    }
+
+    // Build the employee data with all selected jobs
+    const selectedEmployeeData = allSelectedEmployees
+      .map(([employeeId, jobTypes]) => {
+        return jobTypes.map((jobType) => {
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          const rowKey = `${employeeId}-${jobType}`;
+          const activities = employeeActivities[rowKey] || [];
+
+          // Add additional data for different job types
+          const additionalData: any = {};
+          if (jobType === "SALESMAN_IKUT") {
+            additionalData.followingSalesmanId = salesmanIkutRelations[rowKey];
+            additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
+            additionalData.muatBihunBags =
+              ikutBagCounts[rowKey]?.muatBihun || 0;
+          } else if (jobType === "SALESMAN") {
+            additionalData.locationType = locationTypes[rowKey] || "Local";
+          }
+
+          return {
+            employeeId,
+            jobType,
+            hours,
+            activities,
+            ...additionalData,
+          };
+        });
+      })
+      .flat();
 
     if (selectedEmployeeData.length === 0) {
       toast.error("No employees selected");
@@ -633,9 +707,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
 
-      expandedEmployees.forEach((employee) => {
+      expandedEmployees.forEach((employee: { id: any; jobType: any }) => {
         const employeeId = employee.id;
         const jobType = employee.jobType;
+
+        // Skip SALESMAN_IKUT employees from default selection
+        if (jobType === "SALESMAN_IKUT") {
+          return;
+        }
 
         // Initialize the arrays if they don't exist yet
         if (!newSelectedJobs[employeeId]) {
@@ -676,7 +755,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           ...prev.jobHours,
         };
 
-        expandedEmployees.forEach((employee) => {
+        expandedEmployees.forEach((employee: { id: any; jobType: any }) => {
           const employeeId = employee.id;
           const jobType = employee.jobType;
 
@@ -703,6 +782,86 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
 
     setSelectAll(!selectAll);
+  };
+
+  const handleIkutChange = (ikutRowKey: string, salesmanId: string) => {
+    setSalesmanIkutRelations((prev) => ({
+      ...prev,
+      [ikutRowKey]: salesmanId,
+    }));
+
+    // Auto-select the SALESMAN_IKUT employee when a salesman is chosen
+    if (salesmanId) {
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+          const newJobHours = { ...prevState.jobHours };
+
+          // Initialize if needed
+          if (!newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = [];
+          }
+          if (!newJobHours[ikutEmployee.id]) {
+            newJobHours[ikutEmployee.id] = {};
+          }
+
+          // Add SALESMAN_IKUT to selected jobs if not already selected
+          if (!newSelectedJobs[ikutEmployee.id].includes("SALESMAN_IKUT")) {
+            newSelectedJobs[ikutEmployee.id].push("SALESMAN_IKUT");
+          }
+
+          // Set default hours if not already set
+          if (!newJobHours[ikutEmployee.id]["SALESMAN_IKUT"]) {
+            newJobHours[ikutEmployee.id]["SALESMAN_IKUT"] = 7;
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: newJobHours,
+          };
+        });
+      }
+    } else {
+      // Auto-deselect the SALESMAN_IKUT employee when salesman selection is cleared
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+
+          if (newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = newSelectedJobs[
+              ikutEmployee.id
+            ].filter((jobType) => jobType !== "SALESMAN_IKUT");
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: prevState.jobHours, // Keep hours for potential re-selection
+          };
+        });
+      }
+    }
+  };
+
+  const handleBagCountChange = (
+    rowKey: string,
+    field: "muatMee" | "muatBihun",
+    value: string
+  ) => {
+    const numValue = value === "" ? 0 : parseInt(value) || 0;
+
+    setIkutBagCounts((prev) => ({
+      ...prev,
+      [rowKey]: {
+        ...prev[rowKey],
+        [field]: numValue,
+      },
+    }));
   };
 
   // Update select all state based on individual selections
@@ -748,79 +907,127 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
       const newEmployeeActivities: Record<string, any[]> = {};
+      const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
+
+      // Restore SALESMAN_IKUT relations and bag counts
+      const newSalesmanIkutRelations: Record<string, string> = {};
+      const newIkutBagCounts: Record<
+        string,
+        { muatMee: number; muatBihun: number }
+      > = {};
 
       existingWorkLog.employeeEntries.forEach((entry: any) => {
-        const employeeId = entry.employee_id;
-        const jobId = entry.job_id;
+        const rowKey = `${entry.employee_id}-${entry.job_id}`;
 
-        if (!newSelectedJobs[employeeId]) {
-          newSelectedJobs[employeeId] = [];
+        // Restore employee selection and hours
+        if (!newSelectedJobs[entry.employee_id]) {
+          newSelectedJobs[entry.employee_id] = [];
         }
-        newSelectedJobs[employeeId].push(jobId);
+        newSelectedJobs[entry.employee_id].push(entry.job_id);
 
-        if (!newJobHours[employeeId]) {
-          newJobHours[employeeId] = {};
+        if (!newJobHours[entry.employee_id]) {
+          newJobHours[entry.employee_id] = {};
         }
-        newJobHours[employeeId][jobId] = parseFloat(entry.total_hours);
+        newJobHours[entry.employee_id][entry.job_id] = parseFloat(
+          entry.total_hours
+        );
 
-        const rowKey = `${employeeId}-${jobId}`;
-
-        // Get all possible pay codes for this job
-        const jobPayCodes = jobPayCodeDetails[jobId] || [];
-
-        // Create a map of existing activities for quick lookup
-        const existingActivityMap = new Map<string, any>();
-        entry.activities.forEach((activity: any) => {
-          existingActivityMap.set(activity.pay_code_id, activity);
-        });
-
-        // Map all pay codes, marking the ones that were selected
-        newEmployeeActivities[rowKey] = jobPayCodes.map((payCode) => {
-          const existingActivity = existingActivityMap.get(payCode.id);
-
-          if (existingActivity) {
-            // This was a selected activity
-            return {
-              payCodeId: existingActivity.pay_code_id,
-              description: existingActivity.description || payCode.description,
-              payType: existingActivity.pay_type || payCode.pay_type,
-              rateUnit: existingActivity.rate_unit || payCode.rate_unit,
-              rate: existingActivity.rate_used || payCode.rate_biasa,
+        // Restore activities
+        if (entry.activities && entry.activities.length > 0) {
+          newEmployeeActivities[rowKey] = entry.activities.map(
+            (activity: any) => ({
+              payCodeId: activity.pay_code_id,
+              description: activity.description,
+              payType: activity.pay_type,
+              rateUnit: activity.rate_unit,
+              rate: parseFloat(activity.rate_used),
+              unitsProduced: activity.units_produced
+                ? parseFloat(activity.units_produced)
+                : 0,
+              hoursApplied: activity.hours_applied
+                ? parseFloat(activity.hours_applied)
+                : null,
+              calculatedAmount: parseFloat(activity.calculated_amount),
               isSelected: true,
-              calculatedAmount: existingActivity.calculated_amount,
-              unitsProduced: existingActivity.units_produced,
-            };
-          } else {
-            // This was not selected
-            return {
-              payCodeId: payCode.id,
-              description: payCode.description,
-              payType: payCode.pay_type,
-              rateUnit: payCode.rate_unit,
-              rate: payCode.rate_biasa,
-              isSelected: false,
-              calculatedAmount: 0,
-              unitsProduced: payCode.requires_units_input ? 0 : null,
-            };
+              isContextLinked: false,
+            })
+          );
+        }
+
+        // Restore SALESMAN_IKUT specific data
+        if (entry.job_id === "SALESMAN_IKUT") {
+          if (entry.following_salesman_id) {
+            newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
           }
-        });
+
+          newIkutBagCounts[rowKey] = {
+            muatMee: entry.muat_mee_bags || 0,
+            muatBihun: entry.muat_bihun_bags || 0,
+          };
+        }
+
+        // Restore SALESMAN location types
+        if (entry.job_id === "SALESMAN") {
+          newLocationTypes[rowKey] = entry.location_type || "Local";
+        }
       });
 
+      // Apply all the restored state
       setEmployeeSelectionState({
         selectedJobs: newSelectedJobs,
         jobHours: newJobHours,
       });
       setEmployeeActivities(newEmployeeActivities);
+      setLocationTypes(newLocationTypes);
+      setSalesmanIkutRelations(newSalesmanIkutRelations);
+      setIkutBagCounts(newIkutBagCounts);
     }
   }, [
     mode,
     existingWorkLog,
-    availableEmployees,
     loadingStaffs,
     loadingJobs,
     loadingPayCodeMappings,
-    jobPayCodeDetails,
   ]);
+
+  useEffect(() => {
+    if (jobConfig?.id !== "SALESMAN") return;
+
+    // Update activities based on ikutBagCounts changes
+    setEmployeeActivities((prev) => {
+      const updatedActivities = { ...prev };
+
+      Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+        const currentActivities = updatedActivities[rowKey] || [];
+
+        const updatedRowActivities = currentActivities.map((activity) => {
+          // Link Muat Mee paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_MEE_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatMee,
+              isContextLinked: true,
+            };
+          }
+
+          // Link Muat Bihun paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_BIHUN_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatBihun,
+              isContextLinked: true,
+            };
+          }
+
+          return activity;
+        });
+
+        updatedActivities[rowKey] = updatedRowActivities;
+      });
+
+      return updatedActivities;
+    });
+  }, [ikutBagCounts, jobConfig?.id]);
 
   // Separate effect for fetching activities after selection changes
   useEffect(() => {
@@ -1114,9 +1321,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         {/* Show Context Form below if more than 3 fields */}
         {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
           <div className="mb-6">
-            <h3 className="text-sm font-medium text-default-700 mb-3">
+            <span className="text-sm font-medium text-default-700 mb-3">
               Production Details
-            </h3>
+            </span>
             <DynamicContextForm
               contextFields={jobConfig?.contextFields || []}
               contextData={formData.contextData}
@@ -1138,25 +1345,20 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </p>
           </div>
 
-          {loadingJobs || loadingStaffs ? (
-            <div className="flex justify-center py-8">
+          {/* Employee Selection Table */}
+          {loadingStaffs || loadingJobs ? (
+            <div className="flex justify-center items-center h-48">
               <LoadingSpinner />
             </div>
-          ) : expandedEmployees.length === 0 ? (
-            <div className="text-center py-8 text-default-500">
-              No employees found with Mee Production job types
-            </div>
           ) : (
-            <div className="overflow-x-auto mt-4">
-              <div className="relative border border-default-200 rounded-lg overflow-hidden">
-                <div className="max-h-[1200px] overflow-y-auto">
+            <>
+              {/* Main Employee Table */}
+              <div className="bg-white rounded-lg border shadow-sm">
+                <div>
                   <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-100 sticky top-0 z-10">
+                    <thead className="bg-default-50">
                       <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
+                        <th scope="col" className="px-6 py-3 text-left">
                           <Checkbox
                             checked={selectAll}
                             onChange={handleSelectAll}
@@ -1182,7 +1384,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                         >
-                          Job Type
+                          Job
                         </th>
                         {jobConfig?.id === "SALESMAN" ? (
                           <th
@@ -1208,8 +1410,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-default-200">
-                      {expandedEmployees.map((row) => {
-                        // Determine selection and hours from the central state
+                      {(jobConfig?.id === "SALESMAN"
+                        ? salesmanEmployees
+                        : expandedEmployees
+                      ).map((row) => {
                         const isSelected =
                           employeeSelectionState.selectedJobs[row.id]?.includes(
                             row.jobType
@@ -1219,7 +1423,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             row.jobType
                           ] ??
                           jobConfig?.defaultHours ??
-                          7; // Use config default hours
+                          7;
 
                         return (
                           <tr key={row.rowKey}>
@@ -1243,8 +1447,24 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 {row.id}
                               </Link>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                              {row.name}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                              <span className="font-medium">{row.name}</span>
+                              {followedBySalesman[row.id] &&
+                                followedBySalesman[row.id].length > 0 && (
+                                  <span className="text-xs text-default-500 block mt-1">
+                                    (Followed by{" "}
+                                    {followedBySalesman[row.id]
+                                      .map((ikutEmployeeId) => {
+                                        const ikutEmployee =
+                                          availableEmployees.find(
+                                            (emp) => emp.id === ikutEmployeeId
+                                          );
+                                        return ikutEmployee?.name;
+                                      })
+                                      .join(", ")}
+                                    )
+                                  </span>
+                                )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                               <Link
@@ -1255,7 +1475,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </Link>
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <td className="px-6 py-4 whitespace-nowrap text-left">
                                 <div className="relative w-40 mx-auto">
                                   <Listbox
                                     value={
@@ -1412,19 +1632,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 </div>
                               </td>
                             ) : (
-                              // Existing hours input cell
                               <td className="px-6 py-4 whitespace-nowrap text-right">
-                                <div className="flex items-center justify-end space-x-2">
-                                  {hours > 8 &&
-                                    isSelected &&
-                                    jobConfig?.requiresOvertimeCalc && (
-                                      <span className="text-xs text-amber-600 font-medium">
-                                        OT
-                                      </span>
-                                    )}
+                                <div className="flex justify-end">
                                   <input
-                                    id={`employee-hours-${row.rowKey}`}
-                                    name={`employee-hours-${row.rowKey}`}
                                     type="number"
                                     value={isSelected ? hours.toString() : ""}
                                     onChange={(e) =>
@@ -1471,7 +1681,332 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   </table>
                 </div>
               </div>
-            </div>
+
+              {/* SALESMAN_IKUT Table - Only show for SALESMAN job type */}
+              {jobConfig?.id === "SALESMAN" &&
+                salesmanIkutEmployees.length > 0 && (
+                  <div className="bg-white rounded-lg border shadow-sm mt-6">
+                    <div>
+                      <table className="min-w-full divide-y divide-default-200">
+                        <thead className="bg-default-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left">
+                              <Checkbox
+                                checked={salesmanIkutEmployees.every((emp) =>
+                                  employeeSelectionState.selectedJobs[
+                                    emp.id
+                                  ]?.includes(emp.jobType)
+                                )}
+                                onChange={() => {
+                                  const allSelected =
+                                    salesmanIkutEmployees.every((emp) =>
+                                      employeeSelectionState.selectedJobs[
+                                        emp.id
+                                      ]?.includes(emp.jobType)
+                                    );
+
+                                  setEmployeeSelectionState((prev) => {
+                                    const newState = { ...prev };
+                                    salesmanIkutEmployees.forEach((emp) => {
+                                      if (allSelected) {
+                                        // Deselect all and clear salesman relations
+                                        newState.selectedJobs[emp.id] = (
+                                          newState.selectedJobs[emp.id] || []
+                                        ).filter((job) => job !== emp.jobType);
+
+                                        // Clear salesman relation when deselecting
+                                        setSalesmanIkutRelations(
+                                          (prevRelations) => {
+                                            const newRelations = {
+                                              ...prevRelations,
+                                            };
+                                            delete newRelations[
+                                              emp.rowKey || ""
+                                            ];
+                                            return newRelations;
+                                          }
+                                        );
+                                      } else {
+                                        // Don't auto-select - user must choose salesman first
+                                        // This prevents selecting without a salesman assignment
+                                      }
+                                    });
+                                    return newState;
+                                  });
+                                }}
+                                size={20}
+                                checkedColor="text-sky-600"
+                                ariaLabel="Select all ikut lori employees"
+                                buttonClassName="p-1 rounded-lg"
+                              />
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              ID
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              Name
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              Job
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              Muat Mee (Bag)
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              Muat Bihun (Bag)
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              Ikut
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                            >
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-default-200">
+                          {salesmanIkutEmployees.map((row, index) => {
+                            const isSelected =
+                              employeeSelectionState.selectedJobs[
+                                row.id
+                              ]?.includes(row.jobType);
+                            const selectedSalesman =
+                              salesmanIkutRelations[row.rowKey || ""] || "";
+                            const bagCounts = ikutBagCounts[
+                              row.rowKey || ""
+                            ] || { muatMee: 0, muatBihun: 0 };
+                            const isLastRow =
+                              index === salesmanIkutEmployees.length - 1; // Add this line
+
+                            return (
+                              <tr key={row.rowKey}>
+                                <td className="px-6 py-4 whitespace-nowrap align-middle">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onChange={() =>
+                                      handleEmployeeSelection(row.rowKey)
+                                    }
+                                    size={20}
+                                    checkedColor="text-sky-600"
+                                    ariaLabel={`Select employee ${row.name}`}
+                                    buttonClassName="p-1 rounded-lg"
+                                  />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
+                                  <Link
+                                    to={`/catalogue/staff/${row.id}`}
+                                    className="hover:underline hover:text-sky-600"
+                                  >
+                                    {row.id}
+                                  </Link>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                                  {row.name}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
+                                  <Link
+                                    to={`/catalogue/job?id=${row.jobType}`}
+                                    className="hover:underline hover:text-sky-600"
+                                  >
+                                    {row.jobName}
+                                  </Link>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                  <input
+                                    type="number"
+                                    value={
+                                      isSelected
+                                        ? (bagCounts.muatMee || 0).toString()
+                                        : ""
+                                    }
+                                    onChange={(e) =>
+                                      handleBagCountChange(
+                                        row.rowKey || "",
+                                        "muatMee",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                    min="0"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                  <input
+                                    type="number"
+                                    value={
+                                      isSelected
+                                        ? (bagCounts.muatBihun || 0).toString()
+                                        : ""
+                                    }
+                                    onChange={(e) =>
+                                      handleBagCountChange(
+                                        row.rowKey || "",
+                                        "muatBihun",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                    min="0"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                  <div className="relative w-48 mx-auto">
+                                    <Listbox
+                                      value={selectedSalesman}
+                                      onChange={(value) =>
+                                        handleIkutChange(
+                                          row.rowKey || "",
+                                          value
+                                        )
+                                      }
+                                    >
+                                      <div className="relative">
+                                        <ListboxButton
+                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
+                                        >
+                                          <span className="block truncate text-sm">
+                                            {selectedSalesman
+                                              ? salesmanEmployees.find(
+                                                  (s) =>
+                                                    s.id === selectedSalesman
+                                                )?.name || "Select Salesman"
+                                              : "Select Salesman"}
+                                          </span>
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                            <IconChevronDown
+                                              className="w-4 h-4 text-default-400"
+                                              aria-hidden="true"
+                                            />
+                                          </span>
+                                        </ListboxButton>
+                                        <Transition
+                                          as={Fragment}
+                                          leave="transition ease-in duration-100"
+                                          leaveFrom="opacity-100"
+                                          leaveTo="opacity-0"
+                                        >
+                                          <ListboxOptions
+                                            className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
+                                              isLastRow
+                                                ? "bottom-full mb-1"
+                                                : "mt-1"
+                                            }`}
+                                          >
+                                            <ListboxOption
+                                              value=""
+                                              className={({ active }) =>
+                                                `${
+                                                  active
+                                                    ? "bg-default-100 text-default-900"
+                                                    : "text-default-700"
+                                                } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
+                                              }
+                                            >
+                                              <span className="block truncate">
+                                                None
+                                              </span>
+                                            </ListboxOption>
+                                            {salesmanEmployees
+                                              .filter((s) =>
+                                                employeeSelectionState.selectedJobs[
+                                                  s.id
+                                                ]?.includes(s.jobType)
+                                              )
+                                              .map((salesman) => (
+                                                <ListboxOption
+                                                  key={salesman.id}
+                                                  value={salesman.id}
+                                                  className={({ active }) =>
+                                                    `${
+                                                      active
+                                                        ? "bg-sky-100 text-sky-900"
+                                                        : "text-default-700"
+                                                    } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
+                                                  }
+                                                >
+                                                  {({ selected, active }) => (
+                                                    <>
+                                                      <span
+                                                        className={`${
+                                                          selected
+                                                            ? "font-medium"
+                                                            : "font-normal"
+                                                        } block truncate`}
+                                                      >
+                                                        {salesman.name}
+                                                      </span>
+                                                      {selected ? (
+                                                        <span
+                                                          className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                            active
+                                                              ? "text-sky-600"
+                                                              : "text-sky-500"
+                                                          }`}
+                                                        >
+                                                          <IconCheck
+                                                            className="w-4 h-4"
+                                                            aria-hidden="true"
+                                                          />
+                                                        </span>
+                                                      ) : null}
+                                                    </>
+                                                  )}
+                                                </ListboxOption>
+                                              ))}
+                                          </ListboxOptions>
+                                        </Transition>
+                                      </div>
+                                    </Listbox>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <ActivitiesTooltip
+                                    activities={(
+                                      employeeActivities[row.rowKey || ""] || []
+                                    ).filter((activity) => activity.isSelected)}
+                                    employeeName={row.name}
+                                    className={
+                                      !isSelected
+                                        ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                        : ""
+                                    }
+                                    disabled={!isSelected}
+                                    onClick={() => handleManageActivities(row)}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+            </>
           )}
         </div>
 
