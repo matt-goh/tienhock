@@ -711,6 +711,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         const employeeId = employee.id;
         const jobType = employee.jobType;
 
+        // Skip SALESMAN_IKUT employees from default selection
+        if (jobType === "SALESMAN_IKUT") {
+          return;
+        }
+
         // Initialize the arrays if they don't exist yet
         if (!newSelectedJobs[employeeId]) {
           newSelectedJobs[employeeId] = [];
@@ -784,6 +789,63 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       ...prev,
       [ikutRowKey]: salesmanId,
     }));
+
+    // Auto-select the SALESMAN_IKUT employee when a salesman is chosen
+    if (salesmanId) {
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+          const newJobHours = { ...prevState.jobHours };
+
+          // Initialize if needed
+          if (!newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = [];
+          }
+          if (!newJobHours[ikutEmployee.id]) {
+            newJobHours[ikutEmployee.id] = {};
+          }
+
+          // Add SALESMAN_IKUT to selected jobs if not already selected
+          if (!newSelectedJobs[ikutEmployee.id].includes("SALESMAN_IKUT")) {
+            newSelectedJobs[ikutEmployee.id].push("SALESMAN_IKUT");
+          }
+
+          // Set default hours if not already set
+          if (!newJobHours[ikutEmployee.id]["SALESMAN_IKUT"]) {
+            newJobHours[ikutEmployee.id]["SALESMAN_IKUT"] = 7;
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: newJobHours,
+          };
+        });
+      }
+    } else {
+      // Auto-deselect the SALESMAN_IKUT employee when salesman selection is cleared
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+
+          if (newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = newSelectedJobs[
+              ikutEmployee.id
+            ].filter((jobType) => jobType !== "SALESMAN_IKUT");
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: prevState.jobHours, // Keep hours for potential re-selection
+          };
+        });
+      }
+    }
   };
 
   const handleBagCountChange = (
@@ -1647,24 +1709,26 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     const newState = { ...prev };
                                     salesmanIkutEmployees.forEach((emp) => {
                                       if (allSelected) {
-                                        // Deselect all
+                                        // Deselect all and clear salesman relations
                                         newState.selectedJobs[emp.id] = (
                                           newState.selectedJobs[emp.id] || []
-                                        ).filter((j) => j !== emp.jobType);
+                                        ).filter((job) => job !== emp.jobType);
+
+                                        // Clear salesman relation when deselecting
+                                        setSalesmanIkutRelations(
+                                          (prevRelations) => {
+                                            const newRelations = {
+                                              ...prevRelations,
+                                            };
+                                            delete newRelations[
+                                              emp.rowKey || ""
+                                            ];
+                                            return newRelations;
+                                          }
+                                        );
                                       } else {
-                                        // Select all
-                                        if (!newState.selectedJobs[emp.id]) {
-                                          newState.selectedJobs[emp.id] = [];
-                                        }
-                                        if (
-                                          !newState.selectedJobs[
-                                            emp.id
-                                          ].includes(emp.jobType)
-                                        ) {
-                                          newState.selectedJobs[emp.id].push(
-                                            emp.jobType
-                                          );
-                                        }
+                                        // Don't auto-select - user must choose salesman first
+                                        // This prevents selecting without a salesman assignment
                                       }
                                     });
                                     return newState;
@@ -1819,15 +1883,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           value
                                         )
                                       }
-                                      disabled={!isSelected}
                                     >
                                       <div className="relative">
                                         <ListboxButton
-                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border ${
-                                            !isSelected
-                                              ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
-                                              : "bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500"
-                                          }`}
+                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
                                         >
                                           <span className="block truncate text-sm">
                                             {selectedSalesman
