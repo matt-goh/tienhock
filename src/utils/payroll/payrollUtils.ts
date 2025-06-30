@@ -330,3 +330,22 @@ export const getMonthName = (month: number | undefined) => {
     month: "long",
   });
 };
+
+/**
+ * Recalculates contributions for an employee payroll
+ * @param employeePayrollId Employee payroll ID
+ * @returns Updated payroll data with recalculated contributions
+ */
+export const recalculatePayrollContributions = async (
+  employeePayrollId: number
+): Promise<EmployeePayroll> => {
+  try {
+    const response = await api.put(
+      `/api/employee-payrolls/${employeePayrollId}/recalculate-contributions`
+    );
+    return response;
+  } catch (error) {
+    console.error("Error recalculating payroll contributions:", error);
+    throw error;
+  }
+};
