@@ -2124,11 +2124,16 @@ export default function (pool, config) {
             // Update Accepted
             if (einvoiceResults.acceptedDocuments?.length > 0) {
               const updateAcceptedQuery = `
-                UPDATE invoices SET uuid = $1, submission_uid = $2, long_id = $3,
-                       datetime_validated = $4, einvoice_status = $5
-                WHERE id = $6`;
+    UPDATE invoices SET uuid = $1, submission_uid = $2, long_id = $3,
+           datetime_validated = $4, einvoice_status = $5
+    WHERE id = $6`;
               for (const doc of einvoiceResults.acceptedDocuments) {
-                const status = doc.longId ? "valid" : "pending";
+                // Ensure proper status determination: valid if has longId, pending if has UUID but no longId
+                const status = doc.longId
+                  ? "valid"
+                  : doc.uuid
+                  ? "pending"
+                  : null;
                 const validatedTime = doc.dateTimeValidated
                   ? new Date(doc.dateTimeValidated)
                   : null;
