@@ -19,6 +19,7 @@ import {
   calculateSIP,
   getEPFWageCeiling,
 } from "./contributionCalculations";
+import { groupItemsByType } from "./payrollUtils";
 
 export interface WorkLogActivity {
   pay_code_id: string;
@@ -117,6 +118,7 @@ export class PayrollCalculationService {
             aggregatedItems[pay_code_id] = {
               pay_code_id,
               description: activity.description,
+              pay_type: activity.pay_type,
               rate: activity.rate_used,
               rate_unit: activity.rate_unit,
               quantity: 0,
@@ -244,7 +246,10 @@ export class PayrollCalculationService {
    */
   static addManualPayrollItem(
     items: PayrollItem[],
-    newItem: Omit<PayrollItem, "amount" | "is_manual"> & { rate_unit: RateUnit }
+    newItem: Omit<PayrollItem, "amount" | "is_manual"> & {
+      rate_unit: RateUnit;
+      pay_type: PayType;
+    }
   ): PayrollItem[] {
     // Calculate amount for the new item
     const amount = this.calculateAmount(
@@ -301,14 +306,13 @@ export class PayrollCalculationService {
     const nationality = employee.nationality || "Malaysian";
 
     // Group payroll items by type
-    const groupedItems = this.groupItemsByType(payrollItems);
+    const groupedItems = groupItemsByType(payrollItems);
 
     // Calculate EPF gross pay (excludes Overtime)
     const epfGrossPay =
       groupedItems.Base.reduce((sum, item) => sum + item.amount, 0) +
       groupedItems.Tambahan.reduce((sum, item) => sum + item.amount, 0);
 
-    console.log(`EPF Gross Pay: ${epfGrossPay}`);
     // Calculate total gross pay (includes all pay types for SOCSO and SIP)
     const totalGrossPay = payrollItems.reduce(
       (sum, item) => sum + item.amount,
@@ -390,52 +394,6 @@ export class PayrollCalculationService {
     }
 
     return deductions;
-  }
-
-  /**
-   * Groups payroll items by pay type (Base, Tambahan, Overtime)
-   * @param items Array of payroll items
-   * @returns Object with items grouped by pay type
-   */
-  private static groupItemsByType(items: PayrollItem[]) {
-    const grouped: Record<string, PayrollItem[]> = {
-      Base: [],
-      Tambahan: [],
-      Overtime: [],
-    };
-
-    // Check to handle undefined items
-    if (!items || !Array.isArray(items)) {
-      return grouped;
-    }
-
-    items.forEach((item) => {
-      // Use the pay_type returned from the backend
-      if (item.pay_type === "Overtime") {
-        grouped["Overtime"].push(item);
-      } else if (item.pay_type === "Tambahan") {
-        grouped["Tambahan"].push(item);
-      } else if (item.pay_type === "Base") {
-        grouped["Base"].push(item);
-      } else {
-        // Fallback for items without pay_type (using previous logic)
-        if (
-          item.description.toLowerCase().includes("overtime") ||
-          item.description.toLowerCase().includes("ot")
-        ) {
-          grouped["Overtime"].push(item);
-        } else if (
-          item.is_manual ||
-          item.description.toLowerCase().includes("tambahan")
-        ) {
-          grouped["Tambahan"].push(item);
-        } else {
-          grouped["Base"].push(item);
-        }
-      }
-    });
-
-    return grouped;
   }
 
   /**
