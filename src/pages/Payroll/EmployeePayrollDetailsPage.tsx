@@ -66,17 +66,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
       // Fetch mid-month payroll if payroll data exists
       if (response && response.employee_id && response.year && response.month) {
-        try {
-          const midMonthResponse = await getMidMonthPayrollByEmployee(
-            response.employee_id,
-            response.year,
-            response.month
-          );
-          setMidMonthPayroll(midMonthResponse);
-        } catch (error) {
-          // It's okay if no mid-month payroll exists
-          setMidMonthPayroll(null);
-        }
+        const midMonthResponse = await getMidMonthPayrollByEmployee(
+          response.employee_id,
+          response.year,
+          response.month
+        );
+        setMidMonthPayroll(midMonthResponse); // This will be null if not found, which is fine
       }
     } catch (error) {
       console.error("Error fetching employee payroll:", error);

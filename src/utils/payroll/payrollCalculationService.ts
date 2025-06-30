@@ -9,7 +9,6 @@ import {
   SIPRate,
   PayrollDeduction,
 } from "../../types/types";
-import { useContributionRatesCache } from "./useContributionRatesCache";
 import {
   getEmployeeType,
   findEPFRate,
@@ -18,7 +17,9 @@ import {
   calculateEPF,
   calculateSOCSO,
   calculateSIP,
+  getEPFWageCeiling,
 } from "./contributionCalculations";
+import { groupItemsByType } from "./payrollUtils";
 
 export interface WorkLogActivity {
   pay_code_id: string;
@@ -117,6 +118,7 @@ export class PayrollCalculationService {
             aggregatedItems[pay_code_id] = {
               pay_code_id,
               description: activity.description,
+              pay_type: activity.pay_type,
               rate: activity.rate_used,
               rate_unit: activity.rate_unit,
               quantity: 0,
@@ -244,7 +246,10 @@ export class PayrollCalculationService {
    */
   static addManualPayrollItem(
     items: PayrollItem[],
-    newItem: Omit<PayrollItem, "amount" | "is_manual"> & { rate_unit: RateUnit }
+    newItem: Omit<PayrollItem, "amount" | "is_manual"> & {
+      rate_unit: RateUnit;
+      pay_type: PayType;
+    }
   ): PayrollItem[] {
     // Calculate amount for the new item
     const amount = this.calculateAmount(
@@ -266,7 +271,7 @@ export class PayrollCalculationService {
 
   /**
    * Calculate EPF, SOCSO, and SIP deductions for an employee
-   * @param grossPay The gross pay amount
+   * @param payrollItems Array of payroll items to calculate separate totals
    * @param employeeId Employee ID for age/nationality lookup
    * @param staffs Array of staff data (from cache)
    * @param epfRates Array of EPF rates
@@ -275,7 +280,7 @@ export class PayrollCalculationService {
    * @returns Array of calculated deductions
    */
   static calculateContributions(
-    grossPay: number,
+    payrollItems: PayrollItem[],
     employeeId: string,
     staffs: any[],
     epfRates: EPFRate[],
@@ -300,18 +305,36 @@ export class PayrollCalculationService {
     // Get nationality
     const nationality = employee.nationality || "Malaysian";
 
+    // Group payroll items by type
+    const groupedItems = groupItemsByType(payrollItems);
+
+    // Calculate EPF gross pay (excludes Overtime)
+    const epfGrossPay =
+      groupedItems.Base.reduce((sum, item) => sum + item.amount, 0) +
+      groupedItems.Tambahan.reduce((sum, item) => sum + item.amount, 0);
+
+    // Calculate total gross pay (includes all pay types for SOCSO and SIP)
+    const totalGrossPay = payrollItems.reduce(
+      (sum, item) => sum + item.amount,
+      0
+    );
+
     // Determine employee type for EPF
     const employeeType = getEmployeeType(nationality, age);
 
-    // 1. Calculate EPF
-    const epfRate = findEPFRate(epfRates, employeeType, grossPay);
+    // 1. Calculate EPF (using EPF gross pay without overtime)
+    const epfRate = findEPFRate(epfRates, employeeType, epfGrossPay);
     if (epfRate) {
-      const epfContribution = calculateEPF(epfRate, grossPay);
+      const epfContribution = calculateEPF(epfRate, epfGrossPay);
+
+      // Get the wage ceiling for display purposes
+      const wageCeiling = getEPFWageCeiling(epfGrossPay);
+
       deductions.push({
         deduction_type: "epf",
         employee_amount: epfContribution.employee,
         employer_amount: epfContribution.employer,
-        wage_amount: grossPay,
+        wage_amount: epfGrossPay, // Show the amount used for EPF calculation
         rate_info: {
           rate_id: epfRate.id,
           employee_rate: `${epfRate.employee_rate_percentage}%`,
@@ -319,19 +342,25 @@ export class PayrollCalculationService {
             ? `${epfRate.employer_rate_percentage}%`
             : `RM${epfRate.employer_fixed_amount}`,
           age_group: employeeType,
+          // Add wage ceiling info for transparency
+          wage_ceiling_used: wageCeiling,
         },
       });
     }
 
-    // 2. Calculate SOCSO
-    const socsoRate = findSOCSORRate(socsoRates, grossPay);
+    // 2. Calculate SOCSO (using total gross pay including overtime)
+    const socsoRate = findSOCSORRate(socsoRates, totalGrossPay);
     if (socsoRate) {
-      const socsoContribution = calculateSOCSO(socsoRate, grossPay, age >= 60);
+      const socsoContribution = calculateSOCSO(
+        socsoRate,
+        totalGrossPay,
+        age >= 60
+      );
       deductions.push({
         deduction_type: "socso",
         employee_amount: socsoContribution.employee,
         employer_amount: socsoContribution.employer,
-        wage_amount: grossPay,
+        wage_amount: totalGrossPay,
         rate_info: {
           rate_id: socsoRate.id,
           employee_rate: age >= 60 ? "RM0.00" : `RM${socsoRate.employee_rate}`,
@@ -344,16 +373,16 @@ export class PayrollCalculationService {
       });
     }
 
-    // 3. Calculate SIP (only for employees under 60)
+    // 3. Calculate SIP (using total gross pay including overtime, only for employees under 60)
     if (age < 60) {
-      const sipRate = findSIPRate(sipRates, grossPay);
+      const sipRate = findSIPRate(sipRates, totalGrossPay);
       if (sipRate) {
-        const sipContribution = calculateSIP(sipRate, grossPay, age);
+        const sipContribution = calculateSIP(sipRate, totalGrossPay, age);
         deductions.push({
           deduction_type: "sip",
           employee_amount: sipContribution.employee,
           employer_amount: sipContribution.employer,
-          wage_amount: grossPay,
+          wage_amount: totalGrossPay,
           rate_info: {
             rate_id: sipRate.id,
             employee_rate: `RM${sipRate.employee_rate}`,
@@ -405,7 +434,7 @@ export class PayrollCalculationService {
 
     // Calculate deductions based on gross pay
     const deductions = this.calculateContributions(
-      basePayroll.gross_pay,
+      basePayroll.items,
       employee_id,
       staffs,
       epfRates,

@@ -47,6 +47,37 @@ export const findEPFRate = (
   return applicableRates[0];
 };
 
+/**
+ * Get the EPF wage ceiling based on salary range
+ * @param wageAmount The actual wage amount
+ * @returns The ceiling amount to use for EPF calculation
+ */
+export const getEPFWageCeiling = (wageAmount: number): number => {
+  // No EPF deduction for wages <= 10
+  if (wageAmount <= 10) {
+    return 0;
+  }
+
+  // For wages from 10.01 to 5000, use interval of 20
+  if (wageAmount <= 5000) {
+    // For wages between 10.01 and 20.00, return 20
+    if (wageAmount <= 20) {
+      return 20;
+    }
+
+    // For wages above 20, find the appropriate ceiling
+    // The ranges are: 20.01-40, 40.01-60, 60.01-80, etc.
+    const rangeNumber = Math.ceil(wageAmount / 20);
+    return rangeNumber * 20;
+  }
+
+  // For wages above 5000, use interval of 100
+  const baseAmount = 5000;
+  const excessAmount = wageAmount - baseAmount;
+  const rangeNumber = Math.ceil(excessAmount / 100);
+  return baseAmount + rangeNumber * 100;
+};
+
 // Helper to find the applicable SOCSO rate
 export const findSOCSORRate = (
   socsoRates: SOCSORRate[],
@@ -78,18 +109,29 @@ export const calculateEPF = (
 ): { employee: number; employer: number } => {
   if (!epfRate) return { employee: 0, employer: 0 };
 
-  const employee = (wageAmount * epfRate.employee_rate_percentage) / 100;
+  // Get the wage ceiling based on the range
+  const wageCeiling = getEPFWageCeiling(wageAmount);
 
+  // If wage ceiling is 0 (wages <= 10), no EPF deduction
+  if (wageCeiling === 0) {
+    return { employee: 0, employer: 0 };
+  }
+
+  // Calculate employee contribution using the wage ceiling
+  const employee = (wageCeiling * epfRate.employee_rate_percentage) / 100;
+
+  // Calculate employer contribution
   let employer = 0;
   if (epfRate.employer_rate_percentage !== null) {
-    employer = (wageAmount * epfRate.employer_rate_percentage) / 100;
+    employer = (wageCeiling * epfRate.employer_rate_percentage) / 100;
   } else if (epfRate.employer_fixed_amount !== null) {
     employer = epfRate.employer_fixed_amount;
   }
 
+  // Apply Math.ceil() to the results
   return {
-    employee: Math.round(employee * 100) / 100,
-    employer: Math.round(employer * 100) / 100,
+    employee: Math.ceil(employee),
+    employer: Math.ceil(employer),
   };
 };
 

@@ -41,6 +41,7 @@ interface PayCodeOption {
   rate_unit: RateUnit;
   rate_biasa: number;
   description: string;
+  pay_type?: string;
 }
 
 const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
@@ -224,6 +225,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
       await addManualPayrollItem(employeePayrollId, {
         pay_code_id: selectedPayCode,
         description: customDescription.trim(),
+        pay_type: selectedPayCodeDetails.pay_type || "Tambahan",
         rate: parseFloat(rate),
         rate_unit: selectedPayCodeDetails.rate_unit,
         quantity: parseFloat(quantity),
@@ -447,7 +449,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                     type="number"
                     value={rate}
                     onChange={(e) => setRate(e.target.value)}
-                    step="1"
+                    step="0.01"
                     min={0}
                     required
                   />
