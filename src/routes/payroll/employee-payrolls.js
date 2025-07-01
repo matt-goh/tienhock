@@ -1,37 +1,272 @@
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
 
-export default function (pool) {
-  const router = Router();
-
-  const saveDeductions = async (pool, employeePayrollId, deductions) => {
-    if (!deductions || deductions.length === 0) return;
-
-    // First, delete existing deductions for this payroll
+// Moved to top-level to be reusable
+const saveDeductions = async (pool, employeePayrollId, deductions) => {
+  if (!deductions || deductions.length === 0) {
+    // If no deductions, just ensure none exist in the DB for this payroll
     await pool.query(
       "DELETE FROM payroll_deductions WHERE employee_payroll_id = $1",
       [employeePayrollId]
     );
+    return;
+  }
 
-    // Insert new deductions
-    for (const deduction of deductions) {
-      const insertQuery = `
-      INSERT INTO payroll_deductions (
-        employee_payroll_id, deduction_type, employee_amount, employer_amount,
-        wage_amount, rate_info
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-    `;
+  // First, delete existing deductions for this payroll
+  await pool.query(
+    "DELETE FROM payroll_deductions WHERE employee_payroll_id = $1",
+    [employeePayrollId]
+  );
 
-      await pool.query(insertQuery, [
-        employeePayrollId,
-        deduction.deduction_type,
-        deduction.employee_amount,
-        deduction.employer_amount,
-        deduction.wage_amount,
-        JSON.stringify(deduction.rate_info),
-      ]);
+  // Insert new deductions
+  for (const deduction of deductions) {
+    const insertQuery = `
+    INSERT INTO payroll_deductions (
+      employee_payroll_id, deduction_type, employee_amount, employer_amount,
+      wage_amount, rate_info
+    ) VALUES ($1, $2, $3, $4, $5, $6)
+  `;
+
+    await pool.query(insertQuery, [
+      employeePayrollId,
+      deduction.deduction_type,
+      deduction.employee_amount,
+      deduction.employer_amount,
+      deduction.wage_amount,
+      JSON.stringify(deduction.rate_info),
+    ]);
+  }
+};
+
+/**
+ * Recalculates and updates an employee's entire payroll (gross pay, deductions, net pay)
+ * based on their current payroll items. This function contains all necessary business logic
+ * ported from the client-side services to ensure server-side data integrity.
+ * @param {any} pool - The database connection pool.
+ * @param {number} employeePayrollId - The ID of the employee payroll to recalculate.
+ */
+const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
+  await pool.query("BEGIN");
+  try {
+    // 1. FETCH ALL NECESSARY DATA
+    // Get employee_id from the payroll
+    const payrollDetails = await pool.query(
+      "SELECT employee_id FROM employee_payrolls WHERE id = $1",
+      [employeePayrollId]
+    );
+    if (payrollDetails.rows.length === 0)
+      throw new Error("Employee payroll not found");
+    const { employee_id } = payrollDetails.rows[0];
+
+    // Get employee's birthdate and nationality for contribution calculations
+    const employeeInfoRes = await pool.query(
+      "SELECT birthdate, nationality FROM staffs WHERE id = $1",
+      [employee_id]
+    );
+    if (employeeInfoRes.rows.length === 0)
+      throw new Error(`Employee ${employee_id} not found`);
+    const employeeInfo = employeeInfoRes.rows[0];
+
+    // Get all current payroll items
+    const itemsRes = await pool.query(
+      `
+      SELECT pi.*, pc.pay_type
+      FROM payroll_items pi
+      LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+      WHERE pi.employee_payroll_id = $1
+    `,
+      [employeePayrollId]
+    );
+    const payrollItems = itemsRes.rows.map((item) => ({
+      ...item,
+      amount: parseFloat(item.amount),
+    }));
+
+    // Get all active contribution rates
+    const [epfRatesRes, socsoRatesRes, sipRatesRes] = await Promise.all([
+      pool.query("SELECT * FROM epf_rates WHERE is_active = true"),
+      pool.query(
+        "SELECT * FROM socso_rates WHERE is_active = true ORDER BY wage_from"
+      ),
+      pool.query(
+        "SELECT * FROM sip_rates WHERE is_active = true ORDER BY wage_from"
+      ),
+    ]);
+    const epfRates = epfRatesRes.rows;
+    const socsoRates = socsoRatesRes.rows;
+    const sipRates = sipRatesRes.rows;
+
+    // 2. PERFORM CALCULATIONS (Server-side implementation of client logic)
+
+    // --- Calculation Helpers ---
+    const getEmployeeType = (nationality, age) => {
+      const isLocal = (nationality || "").toLowerCase() === "malaysian";
+      if (isLocal && age < 60) return "local_under_60";
+      if (isLocal && age >= 60) return "local_over_60";
+      if (!isLocal && age < 60) return "foreign_under_60";
+      return "foreign_over_60";
+    };
+
+    const findEPFRate = (rates, type, wage) => {
+      const applicable = rates.filter((r) => r.employee_type === type);
+      if (!applicable.length) return null;
+      if (type.startsWith("local_")) {
+        const over = applicable.find((r) => r.wage_threshold === null);
+        const under = applicable.find((r) => r.wage_threshold !== null);
+        return under && wage <= parseFloat(under.wage_threshold)
+          ? under
+          : over || null;
+      }
+      return applicable[0];
+    };
+
+    const findRateByWage = (rates, wage) =>
+      rates.find(
+        (r) => wage >= parseFloat(r.wage_from) && wage <= parseFloat(r.wage_to)
+      ) || null;
+
+    const getEPFWageCeiling = (wageAmount) => {
+      if (wageAmount <= 10) return 0;
+      if (wageAmount <= 20) return 20;
+      if (wageAmount <= 5000) return Math.ceil(wageAmount / 20) * 20;
+      return 5000 + Math.ceil((wageAmount - 5000) / 100) * 100;
+    };
+
+    // --- Main Calculation Logic ---
+    const grossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
+
+    const groupedItems = payrollItems.reduce(
+      (acc, item) => {
+        const type = item.pay_type || "Tambahan"; // Default to Tambahan
+        if (!acc[type]) acc[type] = [];
+        acc[type].push(item);
+        return acc;
+      },
+      { Base: [], Tambahan: [], Overtime: [] }
+    );
+
+    const epfGrossPay =
+      (groupedItems.Base?.reduce((s, i) => s + i.amount, 0) || 0) +
+      (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0);
+
+    const age = Math.floor(
+      (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
+        (365.25 * 24 * 60 * 60 * 1000)
+    );
+    const employeeType = getEmployeeType(
+      employeeInfo.nationality || "Malaysian",
+      age
+    );
+
+    const deductions = [];
+
+    // Calculate EPF
+    const epfRate = findEPFRate(epfRates, employeeType, epfGrossPay);
+    if (epfRate) {
+      const wageCeiling = getEPFWageCeiling(epfGrossPay);
+      if (wageCeiling > 0) {
+        const employeeContribution = Math.ceil(
+          (wageCeiling * parseFloat(epfRate.employee_rate_percentage)) / 100
+        );
+        const employerContribution =
+          epfRate.employer_rate_percentage !== null
+            ? Math.ceil(
+                (wageCeiling * parseFloat(epfRate.employer_rate_percentage)) /
+                  100
+              )
+            : parseFloat(epfRate.employer_fixed_amount);
+
+        deductions.push({
+          deduction_type: "epf",
+          employee_amount: employeeContribution || 0,
+          employer_amount: employerContribution || 0,
+          wage_amount: epfGrossPay,
+          rate_info: {
+            rate_id: epfRate.id,
+            employee_rate: `${epfRate.employee_rate_percentage}%`,
+            employer_rate: epfRate.employer_rate_percentage
+              ? `${epfRate.employer_rate_percentage}%`
+              : `RM${epfRate.employer_fixed_amount}`,
+            age_group: employeeType,
+            wage_ceiling_used: wageCeiling,
+          },
+        });
+      }
     }
-  };
+
+    // Calculate SOCSO
+    const socsoRate = findRateByWage(socsoRates, grossPay);
+    if (socsoRate) {
+      const isOver60 = age >= 60;
+      const employee_amount = isOver60
+        ? 0
+        : parseFloat(socsoRate.employee_rate);
+      const employer_amount = isOver60
+        ? parseFloat(socsoRate.employer_rate_over_60)
+        : parseFloat(socsoRate.employer_rate);
+
+      deductions.push({
+        deduction_type: "socso",
+        employee_amount: employee_amount || 0,
+        employer_amount: employer_amount || 0,
+        wage_amount: grossPay,
+        rate_info: {
+          rate_id: socsoRate.id,
+          employee_rate: isOver60 ? "RM0.00" : `RM${socsoRate.employee_rate}`,
+          employer_rate: isOver60
+            ? `RM${socsoRate.employer_rate_over_60}`
+            : `RM${socsoRate.employer_rate}`,
+          age_group: isOver60 ? "60_and_above" : "under_60",
+        },
+      });
+    }
+
+    // Calculate SIP
+    if (age < 60) {
+      const sipRate = findRateByWage(sipRates, grossPay);
+      if (sipRate) {
+        deductions.push({
+          deduction_type: "sip",
+          employee_amount: parseFloat(sipRate.employee_rate) || 0,
+          employer_amount: parseFloat(sipRate.employer_rate) || 0,
+          wage_amount: grossPay,
+          rate_info: {
+            rate_id: sipRate.id,
+            employee_rate: `RM${sipRate.employee_rate}`,
+            employer_rate: `RM${sipRate.employer_rate}`,
+            age_group: "under_60",
+          },
+        });
+      }
+    }
+
+    // 3. UPDATE DATABASE
+    const totalEmployeeDeductions = deductions.reduce(
+      (sum, d) => sum + d.employee_amount,
+      0
+    );
+    const netPay = grossPay - totalEmployeeDeductions;
+
+    // Update gross pay and net pay
+    await pool.query(
+      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2 WHERE id = $3`,
+      [grossPay.toFixed(2), netPay.toFixed(2), employeePayrollId]
+    );
+
+    // Save the newly calculated deductions
+    await saveDeductions(pool, employeePayrollId, deductions);
+
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    // Re-throw the error to be caught by the route handler's catch block
+    console.error("Error during payroll recalculation:", error);
+    throw error;
+  }
+};
+
+export default function (pool) {
+  const router = Router();
 
   // Get multiple employee payroll details with items
   router.get("/batch", async (req, res) => {
@@ -176,8 +411,11 @@ export default function (pool) {
       const deductionsResult = await pool.query(deductionsQuery, [id]);
 
       // Format response
+      const payrollData = payrollResult.rows[0];
       const response = {
-        ...payrollResult.rows[0],
+        ...payrollData,
+        gross_pay: parseFloat(payrollData.gross_pay),
+        net_pay: parseFloat(payrollData.net_pay),
         items: itemsResult.rows.map((item) => ({
           ...item,
           rate: parseFloat(item.rate),
@@ -414,27 +652,11 @@ export default function (pool) {
         finalAmount,
       ]);
 
-      // Update the employee payroll totals
-      await pool.query(
-        `
-        UPDATE employee_payrolls
-        SET gross_pay = (
-          SELECT COALESCE(SUM(amount), 0)
-          FROM payroll_items
-          WHERE employee_payroll_id = $1
-        ),
-        net_pay = (
-          SELECT COALESCE(SUM(amount), 0)
-          FROM payroll_items
-          WHERE employee_payroll_id = $1
-        )
-        WHERE id = $1
-      `,
-        [id]
-      );
+      // Recalculate totals and deductions
+      await recalculateAndUpdatePayroll(pool, id);
 
       res.status(201).json({
-        message: "Manual payroll item added successfully",
+        message: "Manual payroll item added successfully and payroll updated.",
         item: {
           ...insertResult.rows[0],
           rate: parseFloat(insertResult.rows[0].rate),
@@ -481,27 +703,11 @@ export default function (pool) {
       // Delete the item
       await pool.query("DELETE FROM payroll_items WHERE id = $1", [itemId]);
 
-      // Update the employee payroll totals
-      await pool.query(
-        `
-        UPDATE employee_payrolls
-        SET gross_pay = (
-          SELECT COALESCE(SUM(amount), 0)
-          FROM payroll_items
-          WHERE employee_payroll_id = $1
-        ),
-        net_pay = (
-          SELECT COALESCE(SUM(amount), 0)
-          FROM payroll_items
-          WHERE employee_payroll_id = $1
-        )
-        WHERE id = $1
-      `,
-        [employeePayrollId]
-      );
+      // Recalculate totals and deductions
+      await recalculateAndUpdatePayroll(pool, employeePayrollId);
 
       res.json({
-        message: "Payroll item deleted successfully",
+        message: "Payroll item deleted successfully and payroll updated.",
         employee_payroll_id: employeePayrollId,
       });
     } catch (error) {
