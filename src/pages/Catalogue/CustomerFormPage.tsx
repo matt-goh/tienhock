@@ -85,8 +85,9 @@ const CustomerFormPage: React.FC = () => {
     branches: { id: string; name: string; isMain: boolean }[];
   } | null>(null);
   const { customers, isLoading } = useCustomersCache();
-
-  // Options
+  const [validationWarnings, setValidationWarnings] = useState<{
+    phoneNumber?: boolean;
+  }>({});
   const [salesmen, setSalesmen] = useState<SelectOption[]>([]);
 
   const closenessOptions: SelectOption[] = [
@@ -354,6 +355,12 @@ const CustomerFormPage: React.FC = () => {
         );
         return false;
       }
+      // Reset warnings
+      setValidationWarnings({});
+
+      if (!formData.phone_number || formData.phone_number.trim() === "") {
+        setValidationWarnings({ phoneNumber: true });
+      }
     }
 
     // Validate custom product entries (ensure product is selected and price is valid)
@@ -578,6 +585,64 @@ const CustomerFormPage: React.FC = () => {
     );
   };
 
+  const renderPhoneInput = () => {
+    const hasWarning = validationWarnings.phoneNumber;
+
+    return (
+      <div className="space-y-2">
+        {/* Custom Label with Warning Indicator */}
+        <div className="flex items-center space-x-2">
+          <label
+            htmlFor="phone_number"
+            className="block text-sm font-medium text-default-700"
+          >
+            Phone Number
+          </label>
+          {hasWarning && (
+            <span className="text-amber-500 text-xs flex items-center">
+              <svg
+                className="h-4 w-4 mr-1"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Recommended for e-Invoice
+            </span>
+          )}
+        </div>
+
+        {/* Custom Input Field - Replicating FormInput styling */}
+        <input
+          id="phone_number"
+          name="phone_number"
+          type="tel"
+          value={formData.phone_number || ""}
+          onChange={handleInputChange}
+          disabled={isSaving}
+          maxLength={20}
+          placeholder="e.g., +60123456789"
+          className={`
+          block w-full rounded-md border-0 py-1.5 px-3 text-default-900 
+          shadow-sm ring-1 ring-inset placeholder:text-default-400 
+          focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6
+          disabled:cursor-not-allowed disabled:bg-default-50 disabled:text-default-500
+          ${
+            hasWarning
+              ? "ring-amber-300 focus:ring-amber-500"
+              : "ring-default-300 focus:ring-blue-600"
+          }
+          ${isSaving ? "opacity-50" : ""}
+        `.trim()}
+        />
+      </div>
+    );
+  };
+
   const renderListbox = (
     name: keyof Customer,
     label: string,
@@ -671,7 +736,7 @@ const CustomerFormPage: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                    {renderInput("phone_number", "Phone Number", "tel")}
+                    {renderPhoneInput()}
                     {renderInput("email", "Email", "email")}
                   </div>
 

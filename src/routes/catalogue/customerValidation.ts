@@ -6,6 +6,7 @@ import { api } from "../utils/api";
 interface ValidationResponse {
   isValid: boolean;
   message?: string;
+  hasPhoneWarning?: boolean;
 }
 
 export async function validateCustomerIdentity(
@@ -29,16 +30,35 @@ export async function validateCustomerIdentity(
     };
   }
 
+  // Check phone number and show warning if missing
+  let hasPhoneWarning = false;
+  if (!customer.phone_number || customer.phone_number.trim() === "") {
+    toast(" Phone number is needed for e-Invoice compliance", {
+      icon: "⚠️",
+      style: {
+        borderLeft: "4px solid #f59e0b",
+        backgroundColor: "#fef3c7",
+      },
+      duration: 4000,
+    });
+    hasPhoneWarning = true;
+  }
+
   try {
     const response = await api.get(
       `/api/customer-validation/validate/${customer.tin_number}?idType=${customer.id_type}&idValue=${customer.id_number}`
     );
 
     if (response.success) {
-      toast.success("Customer e-Invoice IDs validated successfully");
+      const successMessage = hasPhoneWarning
+        ? "Customer e-Invoice IDs validated successfully (phone number needed)"
+        : "Customer e-Invoice IDs validated successfully";
+
+      toast.success(successMessage);
       return {
         isValid: true,
         message: "Validation successful",
+        hasPhoneWarning,
       };
     }
 
@@ -47,6 +67,7 @@ export async function validateCustomerIdentity(
     return {
       isValid: false,
       message: response.message || "Validation failed",
+      hasPhoneWarning,
     };
   } catch (error: any) {
     console.error("Validation API Error:", error);
@@ -57,6 +78,7 @@ export async function validateCustomerIdentity(
       isValid: false,
       message:
         error.message || "An unexpected error occurred during validation",
+      hasPhoneWarning,
     };
   }
 }
