@@ -10,7 +10,7 @@ import {
   getEmployeePayrollDetails,
   deletePayrollItem,
   groupItemsByType,
-  getMonthName
+  getMonthName,
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -139,6 +139,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       ...item,
       id: item.id || 0, // Ensure id is always a number
     }))
+  );
+
+  // Calculate totals for each group
+  const baseTotal = groupedItems["Base"].reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+  const tambahanTotal = groupedItems["Tambahan"].reduce(
+    (sum, item) => sum + item.amount,
+    0
+  );
+  const overtimeTotal = groupedItems["Overtime"].reduce(
+    (sum, item) => sum + item.amount,
+    0
   );
 
   return (
@@ -421,6 +435,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot className="bg-default-50 border-t-2 border-default-200">
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="px-6 py-3 text-right text-sm font-medium text-default-600"
+                          >
+                            Total Base Pay
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
+                            {formatCurrency(baseTotal)}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
@@ -546,6 +573,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot className="bg-default-50 border-t-2 border-default-200">
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="px-6 py-3 text-right text-sm font-medium text-default-600"
+                          >
+                            Total Tambahan Pay
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
+                            {formatCurrency(tambahanTotal)}
+                          </td>
+                          {isEditable && <td className="px-6 py-4"></td>}
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
@@ -639,6 +680,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot className="bg-default-50 border-t-2 border-default-200">
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="px-6 py-3 text-right text-sm font-medium text-default-600"
+                          >
+                            Total Overtime Pay
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
+                            {formatCurrency(overtimeTotal)}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
