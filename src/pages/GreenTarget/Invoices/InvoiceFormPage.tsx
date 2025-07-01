@@ -675,7 +675,8 @@ const InvoiceFormPage: React.FC = () => {
   );
   const canSubmitEinvoice = !!(
     selectedCustomerForEinvoice?.tin_number &&
-    selectedCustomerForEinvoice?.id_number
+    selectedCustomerForEinvoice?.id_number &&
+    selectedCustomerForEinvoice?.phone_number
   );
 
   return (
@@ -1166,9 +1167,10 @@ const InvoiceFormPage: React.FC = () => {
                       navigate(`/greentarget/customers/${formData.customer_id}`)
                     }
                     className="text-sm text-default-500 hover:text-sky-800 hover:underline focus:outline-none"
-                    title="Add TIN & ID for customer"
+                    title="Add TIN & ID or phone number for customer"
                   >
-                    Cannot submit e-Invoice. Customer missing TIN or ID.
+                    Cannot submit e-Invoice. Customer missing TIN & ID or phone
+                    number.
                   </button>
                 </div>
               )}
