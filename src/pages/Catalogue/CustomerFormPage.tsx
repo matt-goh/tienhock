@@ -952,7 +952,7 @@ const CustomerFormPage: React.FC = () => {
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
         title="Discard Changes"
-        message="You have unsaved changes. Are you sure you want to go back? All changes will be lost."
+        message="You might have unsaved changes. Are you sure you want to go back? All changes will be lost."
         confirmButtonText="Discard"
       />
     </div>
