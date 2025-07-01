@@ -530,7 +530,7 @@ export default function (pool, config) {
       LEFT JOIN customers c ON i.customerid = c.id
       LEFT JOIN order_details od ON i.id = od.invoiceid
       WHERE i.id IN (${placeholders})
-      GROUP BY i.id, c.name, c.tin_number, c.id_number
+      GROUP BY i.id, c.name, c.tin_number, c.id_number, c.phone_number
     `;
 
       const result = await pool.query(query, invoiceIds);
