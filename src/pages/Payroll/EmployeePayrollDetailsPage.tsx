@@ -10,8 +10,7 @@ import {
   getEmployeePayrollDetails,
   deletePayrollItem,
   groupItemsByType,
-  getMonthName,
-  recalculatePayrollContributions,
+  getMonthName
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -79,38 +78,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       toast.error("Failed to load employee payroll details");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleItemAdded = async () => {
-    if (!id) return;
-
-    try {
-      // Recalculate contributions after manual item is added
-      const updatedPayroll = await recalculatePayrollContributions(Number(id));
-      setPayroll(updatedPayroll);
-
-      // Fetch mid-month payroll data again if needed
-      if (
-        updatedPayroll &&
-        updatedPayroll.employee_id &&
-        updatedPayroll.year &&
-        updatedPayroll.month
-      ) {
-        const midMonthResponse = await getMidMonthPayrollByEmployee(
-          updatedPayroll.employee_id,
-          updatedPayroll.year,
-          updatedPayroll.month
-        );
-        setMidMonthPayroll(midMonthResponse);
-      }
-
-      toast.success("Payroll updated and contributions recalculated");
-    } catch (error) {
-      console.error("Error recalculating contributions:", error);
-      toast.error("Failed to recalculate contributions");
-      // Fallback to normal refresh
-      fetchEmployeePayroll();
     }
   };
 
@@ -714,7 +681,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         isOpen={showAddItemModal}
         onClose={() => setShowAddItemModal(false)}
         employeePayrollId={Number(id)}
-        onItemAdded={handleItemAdded}
+        onItemAdded={fetchEmployeePayroll}
       />
 
       {/* Delete Item Confirmation Dialog */}
