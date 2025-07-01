@@ -435,19 +435,53 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-default-50 border-t-2 border-default-200">
+                        <tfoot className="bg-default-50 border-t-2 border-default-200">
                         <tr>
                           <td
-                            colSpan={3}
-                            className="px-6 py-3 text-right text-sm font-medium text-default-600"
+                          colSpan={3}
+                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
                           >
-                            Total Base Pay
+                          Total Base Pay
+                          {(() => {
+                            // Group base items by hours to find average rate
+                            const baseGroupedByHours = groupedItems["Base"]
+                            .filter(item => item.rate_unit === "Hour")
+                            .reduce((acc, item) => {
+                              const existing = acc.find(group => group.hours === item.quantity);
+                              if (existing) {
+                              existing.amount += item.amount;
+                              } else {
+                              acc.push({ hours: item.quantity, amount: item.amount });
+                              }
+                              return acc;
+                            }, [] as { hours: number; amount: number }[]);
+
+                            if (baseGroupedByHours.length > 0) {
+                            // Find the hour group with the maximum hours (latest/most hours)
+                            const maxHoursGroup = baseGroupedByHours.reduce((maxGroup, currentGroup) => {
+                              return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
+                            }, baseGroupedByHours[0]);
+
+                            // Calculate rate using the maximum hours group
+                            const averageBaseRate =
+                              maxHoursGroup && maxHoursGroup.hours > 0
+                              ? baseTotal / maxHoursGroup.hours
+                              : 0;
+
+                            return (
+                              <div className="text-xs text-default-500 mt-1">
+                              Avg Rate: {formatCurrency(averageBaseRate)}/hour
+                              </div>
+                            );
+                            }
+                            return null;
+                          })()}
                           </td>
                           <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
-                            {formatCurrency(baseTotal)}
+                          {formatCurrency(baseTotal)}
                           </td>
                         </tr>
-                      </tfoot>
+                        </tfoot>
                     </table>
                   </div>
                 </div>
