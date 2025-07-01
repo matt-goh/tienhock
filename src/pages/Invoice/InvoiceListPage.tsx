@@ -857,13 +857,15 @@ const InvoiceListPage: React.FC = () => {
         // Validate customer has necessary identification
         inv.customerTin &&
         inv.customerIdNumber && // Ensure both TIN and ID number are present
+        inv.customerPhone && // Ensure phone number is present
+        // Check if invoice date is within the last 3 days
         isInvoiceDateEligibleForEinvoice(inv.createddate)
     );
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
-        { duration: 8000 }
+        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID and phone number, and not already Valid/Cancelled).",
+        { duration: 12000 }
       );
       return;
     }
@@ -871,7 +873,7 @@ const InvoiceListPage: React.FC = () => {
       const ineligibleCount = selectedInvoiceIds.size - eligibleInvoices.length;
       toast.error(
         `${ineligibleCount} selected invoice(s) are ineligible (check date, status, customer info). Proceeding with ${eligibleInvoices.length} eligible invoice(s).`,
-        { duration: 6000 }
+        { duration: 8000 }
       );
     }
 
