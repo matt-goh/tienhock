@@ -2,12 +2,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
-import { EPFRate, SOCSORRate, SIPRate } from "../../types/types";
+import { EPFRate, SOCSORRate, SIPRate, IncomeTaxRate } from "../../types/types";
 
 export interface ContributionRatesData {
   epfRates: EPFRate[];
   socsoRates: SOCSORRate[];
   sipRates: SIPRate[];
+  incomeTaxRates: IncomeTaxRate[];
   timestamp: number;
 }
 
@@ -21,10 +22,11 @@ export const refreshContributionRatesCache = async () => {
     localStorage.removeItem(CACHE_KEY);
 
     // Fetch fresh data
-    const [epfData, socsoData, sipData] = await Promise.all([
+    const [epfData, socsoData, sipData, incomeTaxData] = await Promise.all([
       api.get("/api/contribution-rates/epf"),
       api.get("/api/contribution-rates/socso"),
       api.get("/api/contribution-rates/sip"),
+      api.get("/api/contribution-rates/income-tax"),
     ]);
 
     // Store in cache
@@ -32,6 +34,7 @@ export const refreshContributionRatesCache = async () => {
       epfRates: epfData,
       socsoRates: socsoData,
       sipRates: sipData,
+      incomeTaxRates: incomeTaxData,
       timestamp: Date.now(),
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -55,6 +58,7 @@ export const useContributionRatesCache = () => {
   const [epfRates, setEpfRates] = useState<EPFRate[]>([]);
   const [socsoRates, setSocsoRates] = useState<SOCSORRate[]>([]);
   const [sipRates, setSipRates] = useState<SIPRate[]>([]);
+  const [incomeTaxRates, setIncomeTaxRates] = useState<IncomeTaxRate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -70,6 +74,7 @@ export const useContributionRatesCache = () => {
             epfRates,
             socsoRates,
             sipRates,
+            incomeTaxRates,
             timestamp,
           }: ContributionRatesData = JSON.parse(cachedData);
           const isExpired = Date.now() - timestamp > CACHE_DURATION;
@@ -78,18 +83,20 @@ export const useContributionRatesCache = () => {
             setEpfRates(epfRates);
             setSocsoRates(socsoRates);
             setSipRates(sipRates);
+            setIncomeTaxRates(incomeTaxRates || []); // Handle backward compatibility
             setIsLoading(false);
             setError(null);
-            return { epfRates, socsoRates, sipRates };
+            return { epfRates, socsoRates, sipRates, incomeTaxRates };
           }
         }
       }
 
       // Fetch fresh data if cache is missing, expired, or force refresh
-      const [epfData, socsoData, sipData] = await Promise.all([
+      const [epfData, socsoData, sipData, incomeTaxData] = await Promise.all([
         api.get("/api/contribution-rates/epf"),
         api.get("/api/contribution-rates/socso"),
         api.get("/api/contribution-rates/sip"),
+        api.get("/api/contribution-rates/income-tax"),
       ]);
 
       // Update cache
@@ -97,6 +104,7 @@ export const useContributionRatesCache = () => {
         epfRates: epfData,
         socsoRates: socsoData,
         sipRates: sipData,
+        incomeTaxRates: incomeTaxData,
         timestamp: Date.now(),
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -104,6 +112,7 @@ export const useContributionRatesCache = () => {
       setEpfRates(epfData);
       setSocsoRates(socsoData);
       setSipRates(sipData);
+      setIncomeTaxRates(incomeTaxData);
       setError(null);
 
       return cacheData;
@@ -132,10 +141,11 @@ export const useContributionRatesCache = () => {
   useEffect(() => {
     const handleRatesUpdated = (event: CustomEvent) => {
       if (event.detail) {
-        const { epfRates, socsoRates, sipRates } = event.detail;
+        const { epfRates, socsoRates, sipRates, incomeTaxRates } = event.detail;
         setEpfRates(epfRates);
         setSocsoRates(socsoRates);
         setSipRates(sipRates);
+        setIncomeTaxRates(incomeTaxRates || []);
       } else {
         fetchContributionRates(true);
       }
@@ -166,6 +176,7 @@ export const useContributionRatesCache = () => {
     epfRates,
     socsoRates,
     sipRates,
+    incomeTaxRates,
     isLoading,
     error,
     invalidateCache,
