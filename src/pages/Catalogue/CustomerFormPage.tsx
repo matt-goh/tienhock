@@ -808,8 +808,8 @@ const CustomerFormPage: React.FC = () => {
 
                       <p className="text-sm text-indigo-600 mb-2">
                         {branchInfo.isMainBranch
-                          ? "This is the main branch. Changes to pricing or e-Invoice information will affect all branches."
-                          : "This is a branch location. Pricing and e-Invoice information are synchronized with the main branch."}
+                          ? "This is the main branch. Changes to pricing, phone number, and e-Invoice information will affect all branches."
+                          : "This is a branch location. Pricing, phone number, and e-Invoice information are synchronized with the main branch."}
                       </p>
 
                       {branchInfo.branches.length > 1 && (

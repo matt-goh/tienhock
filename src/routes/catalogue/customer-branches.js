@@ -56,23 +56,24 @@ export default function (pool) {
       if (mainBranch) {
         // Get e-Invoice information from main branch
         const mainBranchQuery = `
-    SELECT tin_number, id_number, id_type
-    FROM customers
-    WHERE id = $1
-  `;
+          SELECT tin_number, id_number, id_type, phone_number
+          FROM customers
+          WHERE id = $1
+        `;
+
         const mainBranchResult = await client.query(mainBranchQuery, [
           mainBranch.customer_id,
         ]);
 
         if (mainBranchResult.rows.length > 0) {
-          const { tin_number, id_number, id_type } = mainBranchResult.rows[0];
+          const { tin_number, id_number, id_type, phone_number } =
+            mainBranchResult.rows[0];
 
-          // Apply to all other branches in the group
           const updateQuery = `
-      UPDATE customers
-      SET tin_number = $1, id_number = $2, id_type = $3
-      WHERE id = $4
-    `;
+            UPDATE customers
+            SET tin_number = $1, id_number = $2, id_type = $3, phone_number = $4
+            WHERE id = $5
+          `;
 
           for (const branch of branches) {
             if (branch.customer_id !== mainBranch.customer_id) {
@@ -80,6 +81,7 @@ export default function (pool) {
                 tin_number,
                 id_number,
                 id_type,
+                phone_number,
                 branch.customer_id,
               ]);
             }
@@ -136,22 +138,24 @@ export default function (pool) {
 
       // Find the main branch for this group to get e-Invoice info
       const mainBranchQuery = `
-      SELECT c.tin_number, c.id_number, c.id_type, cbm.customer_id
-      FROM customer_branch_mappings cbm
-      JOIN customers c ON cbm.customer_id = c.id
-      WHERE cbm.group_id = $1 AND cbm.is_main_branch = true
-    `;
+        SELECT c.tin_number, c.id_number, c.id_type, c.phone_number, cbm.customer_id
+        FROM customer_branch_mappings cbm
+        JOIN customers c ON cbm.customer_id = c.id
+        WHERE cbm.group_id = $1 AND cbm.is_main_branch = true
+      `;
 
       const mainBranchResult = await client.query(mainBranchQuery, [groupId]);
 
       let tin_number = null;
       let id_number = null;
       let id_type = null;
+      let phone_number = null;
 
       if (mainBranchResult.rows.length > 0) {
         tin_number = mainBranchResult.rows[0].tin_number;
         id_number = mainBranchResult.rows[0].id_number;
         id_type = mainBranchResult.rows[0].id_type;
+        phone_number = mainBranchResult.rows[0].phone_number;
       }
 
       // Add each customer to the group
@@ -175,18 +179,24 @@ export default function (pool) {
 
           await client.query(addMappingQuery, [groupId, customerId]);
 
-          // Update e-Invoice info if available
-          if (tin_number !== null || id_number !== null || id_type !== null) {
+          // Update e-Invoice info and phone number if available
+          if (
+            tin_number !== null ||
+            id_number !== null ||
+            id_type !== null ||
+            phone_number !== null
+          ) {
             const updateQuery = `
-            UPDATE customers
-            SET tin_number = $1, id_number = $2, id_type = $3
-            WHERE id = $4
-          `;
+              UPDATE customers
+              SET tin_number = $1, id_number = $2, id_type = $3, phone_number = $4
+              WHERE id = $5
+            `;
 
             await client.query(updateQuery, [
               tin_number,
               id_number,
               id_type,
+              phone_number,
               customerId,
             ]);
           }
