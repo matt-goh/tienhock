@@ -10,7 +10,8 @@ export default function (pool) {
     customerId,
     tinNumber,
     idNumber,
-    idType
+    idType,
+    phoneNumber = null
   ) => {
     // Find all branch relationships
     const branchQuery = `
@@ -29,8 +30,8 @@ export default function (pool) {
       // Update e-Invoice info for all related branches
       const updateQuery = `
       UPDATE customers 
-      SET tin_number = $1, id_number = $2, id_type = $3
-      WHERE id = $4
+      SET tin_number = $1, id_number = $2, id_type = $3, phone_number = $4
+      WHERE id = $5
     `;
 
       for (const row of branchResult.rows) {
@@ -38,6 +39,7 @@ export default function (pool) {
           tinNumber,
           idNumber,
           idType,
+          phoneNumber,
           row.customer_id,
         ]);
       }
@@ -568,7 +570,8 @@ export default function (pool) {
               id,
               tin_number,
               id_number,
-              id_type
+              id_type,
+              phone_number
             );
           }
 
