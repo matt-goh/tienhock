@@ -118,7 +118,7 @@ const HomePage: React.FC = () => {
   const buildGreenTargetItems = (): NavigationItem[] => {
     return GreenTargetSidebarData.map((item) => ({
       name: item.name,
-      path: item.path || "/",
+      path: `/greentarget${item.path || ""}`,
       icon: item.icon,
       description: getDescriptionForGreenTarget(item.name),
     }));
@@ -132,7 +132,9 @@ const HomePage: React.FC = () => {
     return [
       {
         name: "Sales",
-        path: invoiceSubItem?.path || "/jellypolly/sales/invoice",
+        path: invoiceSubItem?.path
+          ? `/jellypolly${invoiceSubItem.path}`
+          : "/jellypolly",
         icon: salesItem?.icon,
         description: "Sales and invoice management",
       },
