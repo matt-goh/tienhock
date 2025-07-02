@@ -155,8 +155,8 @@ const CustomerFormPage: React.FC = () => {
         throw new Error(`Customer with ID ${id} not found in cache`);
       }
 
-      // Set customer form data
-      setFormData({
+      // Create the form data object
+      const fetchedFormData = {
         ...cachedCustomer,
         // Ensure values have proper defaults
         closeness: cachedCustomer.closeness || "Local",
@@ -171,19 +171,25 @@ const CustomerFormPage: React.FC = () => {
         id_type: cachedCustomer.id_type || "",
         credit_limit: cachedCustomer.credit_limit ?? 3000,
         credit_used: cachedCustomer.credit_used ?? 0,
-      });
+      };
 
-      initialFormDataRef.current = { ...formData };
+      // Set customer form data
+      setFormData(fetchedFormData);
+
+      // IMPORTANT: Set initial ref to the fetched data, not current formData
+      initialFormDataRef.current = { ...fetchedFormData };
 
       // Set custom products
       if (
         cachedCustomer.customProducts &&
         cachedCustomer.customProducts.length > 0
       ) {
-        setCustomProducts(cachedCustomer.customProducts);
-        initialCustomProductsRef.current = JSON.parse(
+        // Create a deep copy of customProducts for accurate comparison
+        const fetchedProducts = JSON.parse(
           JSON.stringify(cachedCustomer.customProducts)
         );
+        setCustomProducts(fetchedProducts);
+        initialCustomProductsRef.current = fetchedProducts;
         setOriginalProductIds(
           new Set(cachedCustomer.customProducts.map((p) => p.product_id))
         );
@@ -193,7 +199,7 @@ const CustomerFormPage: React.FC = () => {
         setOriginalProductIds(new Set());
       }
 
-      // Set branch info
+      // Set branch info (rest of the code remains the same)
       if (
         cachedCustomer.branchInfo &&
         cachedCustomer.branchInfo.isInBranchGroup !== undefined &&
@@ -232,14 +238,16 @@ const CustomerFormPage: React.FC = () => {
       if (!isLoading) {
         fetchFromCache();
       }
-      // Don't set loading to false here, as we're now waiting for fetchFromCache
     } else {
-      // For new customer, ensure initial refs are set for change detection
-      initialFormDataRef.current = { ...formData };
-      initialCustomProductsRef.current = [...customProducts];
-      setLoading(false); // Not loading if creating new
+      // For new customer, ensure initial refs are set to the current empty form state
+      // Use deep copies to avoid reference issues
+      initialFormDataRef.current = JSON.parse(JSON.stringify(formData));
+      initialCustomProductsRef.current = JSON.parse(
+        JSON.stringify(customProducts)
+      );
+      setLoading(false);
     }
-  }, [isEditMode, fetchFromCache, isLoading]); // Add isLoading to dependencies
+  }, [isEditMode, fetchFromCache, isLoading]);
 
   // --- Populate Salesmen Options ---
   useEffect(() => {

@@ -624,10 +624,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
       {pdfPages.map(
         (
           pageInvoices,
-          pageIndex // Changed variable name here
+          pageIndex
         ) => (
           <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
-            {/* ... Header rendering remains the same ... */}
             {pageIndex === 0 && (
               <View style={styles.header}>
                 <Image src={TienHockLogo} style={styles.logo} />
