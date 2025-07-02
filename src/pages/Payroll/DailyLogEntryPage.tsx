@@ -1033,8 +1033,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   useEffect(() => {
     if (
       Object.keys(employeeSelectionState.selectedJobs).length > 0 &&
-      !loadingPayCodeMappings &&
-      mode !== "edit" // Don't run this in edit mode if activities are already loaded
+      !loadingPayCodeMappings
     ) {
       fetchAndApplyActivities();
     }
@@ -1047,11 +1046,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   ]);
 
   const fetchAndApplyActivities = () => {
-    // Skip if we're in edit mode and have already loaded activities
-    if (mode === "edit" && Object.keys(employeeActivities).length > 0) {
-      return;
-    }
-
     // Get all unique job types from selected employees
     const jobTypes = Array.from(
       new Set(
@@ -1100,78 +1094,88 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Convert map back to array
           const mergedPayCodes = Array.from(allPayCodes.values());
 
-          // Check if we already have activities for this employee/job
-          const existingActivities = employeeActivities[rowKey] || [];
+          // Get existing activities for this employee/job if in edit mode
+          const existingActivitiesForRow = employeeActivities[rowKey] || [];
 
           // For salesmen, we don't filter by hours since hours aren't applicable
           const filteredPayCodes = isSalesmanJob
             ? mergedPayCodes
             : hours > 8
-            ? mergedPayCodes // If overtime, include all pay codes
-            : mergedPayCodes.filter(
-                (pc) => pc.pay_type === "Base" || pc.pay_type === "Tambahan"
-              ); // Otherwise, only Base and Tambahan
+            ? mergedPayCodes
+            : mergedPayCodes.filter((pc) => pc.rate_unit !== "OT");
 
+          // Convert to activity format
           const activities = filteredPayCodes.map((payCode) => {
-            // Check if this activity already exists
-            const existingActivity = existingActivities.find(
-              (a) => a.payCodeId === payCode.id
-            );
+            const isContextLinked = contextLinkedPayCodes[payCode.id];
+
+            // Find existing activity for this pay code if in edit mode
+            const existingActivity =
+              mode === "edit"
+                ? existingActivitiesForRow.find(
+                    (ea) => ea.payCodeId === payCode.id
+                  )
+                : null;
 
             // Determine rate based on day type
-            let rate = 0;
+            let rate = payCode.rate_biasa;
             if (formData.dayType === "Ahad") {
-              rate =
-                payCode.override_rate_ahad !== null
-                  ? payCode.override_rate_ahad
-                  : payCode.rate_ahad;
+              rate = payCode.override_rate_ahad || payCode.rate_ahad;
             } else if (formData.dayType === "Umum") {
-              rate =
-                payCode.override_rate_umum !== null
-                  ? payCode.override_rate_umum
-                  : payCode.rate_umum;
+              rate = payCode.override_rate_umum || payCode.rate_umum;
             } else {
-              rate =
-                payCode.override_rate_biasa !== null
-                  ? payCode.override_rate_biasa
-                  : payCode.rate_biasa;
+              rate = payCode.override_rate_biasa || payCode.rate_biasa;
             }
 
-            // Check if this pay code is linked to a context field
-            const contextField = contextLinkedPayCodes[payCode.id];
-            const isContextLinked = !!contextField;
+            // Determine if selected based on specific rules
+            let isSelected = false;
 
-            // For overtime pay codes, determine if they should be auto-selected
-            const isOvertimeCode = payCode.pay_type === "Overtime";
-            const shouldAutoSelect =
-              !isSalesmanJob && isOvertimeCode && hours > 8;
+            if (mode === "edit" && existingActivity) {
+              // In edit mode, only preserve selection if activity was actually saved
+              isSelected = existingActivity.isSelected;
+            } else {
+              // Apply selection rules for new/unsaved activities
+              if (payCode.pay_type === "Tambahan") {
+                // NEVER auto-select Tambahan pay codes
+                isSelected = false;
+              } else if (payCode.pay_type === "Overtime") {
+                // Only auto-select OT codes if hours > 8
+                isSelected = !isSalesmanJob && hours > 8;
+              } else if (payCode.pay_type === "Base") {
+                // Base pay codes follow default settings
+                isSelected = payCode.is_default_setting;
+              } else {
+                // Fallback to default setting
+                isSelected = payCode.is_default_setting;
+              }
 
-            // For context-linked pay codes or Bag rate units, don't auto-select
-            let isSelected = existingActivity
-              ? existingActivity.isSelected
-              : isContextLinked ||
+              // Special rules for specific rate units
+              if (
+                isContextLinked ||
                 payCode.rate_unit === "Bag" ||
                 payCode.rate_unit === "Trip" ||
-                payCode.rate_unit === "Day" ||
-                payCode.pay_type === "Tambahan"
-              ? false // Don't auto-select context-linked pay codes or Bag rate units
-              : shouldAutoSelect || payCode.is_default_setting;
+                payCode.rate_unit === "Day"
+              ) {
+                // Don't auto-select these types
+                isSelected = false;
+              }
 
-            // Always deselect Hour-based pay codes for salesmen
-            if (isSalesmanJob && payCode.rate_unit === "Hour") {
-              isSelected = false;
+              // Always deselect Hour-based pay codes for salesmen
+              if (isSalesmanJob && payCode.rate_unit === "Hour") {
+                isSelected = false;
+              }
             }
 
-            // For context-linked pay codes, use context value as units
-            const unitsProduced = isContextLinked
-              ? formData.contextData[contextField.id] || 0
-              : existingActivity
-              ? existingActivity.unitsProduced
-              : payCode.requires_units_input
-              ? 0
-              : null;
+            // Determine units produced
+            const unitsProduced =
+              isContextLinked && contextLinkedPayCodes[payCode.id]
+                ? formData.contextData[contextLinkedPayCodes[payCode.id].id] ||
+                  0
+                : existingActivity
+                ? existingActivity.unitsProduced
+                : payCode.requires_units_input
+                ? 0
+                : null;
 
-            // After creating the activity object, calculate the amount using the shared function
             return {
               payCodeId: payCode.id,
               description: payCode.description,
@@ -1181,8 +1185,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               isDefault: payCode.is_default_setting,
               isSelected: isSelected,
               unitsProduced: unitsProduced,
-              isContextLinked: isContextLinked, // Flag for special handling
-              source: payCode.source, // Track source (job or employee)
+              isContextLinked: isContextLinked,
+              source: payCode.source,
               calculatedAmount: calculateActivityAmount(
                 {
                   isSelected,
@@ -1197,7 +1201,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             };
           });
 
-          // Then apply auto-deselection logic to all activities
+          // Apply auto-deselection logic to all activities
           const processedActivities = calculateActivitiesAmounts(
             activities,
             hours,

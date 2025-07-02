@@ -10,7 +10,8 @@ export default function (pool) {
     customerId,
     tinNumber,
     idNumber,
-    idType
+    idType,
+    phoneNumber = null
   ) => {
     // Find all branch relationships
     const branchQuery = `
@@ -29,8 +30,8 @@ export default function (pool) {
       // Update e-Invoice info for all related branches
       const updateQuery = `
       UPDATE customers 
-      SET tin_number = $1, id_number = $2, id_type = $3
-      WHERE id = $4
+      SET tin_number = $1, id_number = $2, id_type = $3, phone_number = $4
+      WHERE id = $5
     `;
 
       for (const row of branchResult.rows) {
@@ -38,6 +39,7 @@ export default function (pool) {
           tinNumber,
           idNumber,
           idType,
+          phoneNumber,
           row.customer_id,
         ]);
       }
@@ -52,7 +54,10 @@ export default function (pool) {
       await client.query("BEGIN");
 
       // 1. Get all customers
-      const customersQuery = "SELECT * FROM customers ORDER BY name";
+      const customersQuery = `
+        SELECT * FROM customers 
+        ORDER BY updated_at DESC NULLS LAST
+      `;
       const customersResult = await client.query(customersQuery);
       const customers = customersResult.rows;
 
@@ -268,22 +273,11 @@ export default function (pool) {
     try {
       const query = `
         INSERT INTO customers (
-          id, 
-          name, 
-          closeness, 
-          salesman, 
-          tin_number,
-          phone_number,
-          email,
-          address,
-          city,
-          state,
-          id_number,
-          id_type,
-          credit_limit,
-          credit_used
+          id, name, closeness, salesman, tin_number,
+          phone_number, email, address, city, state,
+          id_number, id_type, credit_limit, credit_used, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
         RETURNING *
       `;
 
@@ -482,9 +476,9 @@ export default function (pool) {
           const insertQuery = `
             INSERT INTO customers (
               id, name, closeness, salesman, tin_number, phone_number, email, 
-              address, city, state, id_number, id_type, credit_limit, credit_used
+              address, city, state, id_number, id_type, credit_limit, credit_used, updated_at
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP
             ) RETURNING *
           `;
 
@@ -541,7 +535,8 @@ export default function (pool) {
               id_number = $10,
               id_type = $11,
               credit_limit = $12,
-              credit_used = $13
+              credit_used = $13,
+              updated_at = CURRENT_TIMESTAMP
             WHERE id = $14
             RETURNING *
           `;
@@ -575,7 +570,8 @@ export default function (pool) {
               id,
               tin_number,
               id_number,
-              id_type
+              id_type,
+              phone_number
             );
           }
 

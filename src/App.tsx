@@ -17,6 +17,7 @@ import Sidebar from "./components/Sidebar/Sidebar";
 import "./index.css";
 import LoadingSpinner from "./components/LoadingSpinner";
 import Button from "./components/Button";
+import HomePage from "./pages/HomePage";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -121,7 +122,7 @@ const Layout: React.FC = () => {
             path="/"
             element={
               <ProtectedRoute>
-                <Navigate to="/" replace />
+                <HomePage />
               </ProtectedRoute>
             }
           />
@@ -131,7 +132,7 @@ const Layout: React.FC = () => {
             path="/greentarget"
             element={
               <ProtectedRoute>
-                <Navigate to="/greentarget" replace />
+                <HomePage />
               </ProtectedRoute>
             }
           />
@@ -140,7 +141,7 @@ const Layout: React.FC = () => {
             path="/jellypolly"
             element={
               <ProtectedRoute>
-                <Navigate to="/jellypolly" replace />
+                <HomePage />
               </ProtectedRoute>
             }
           />

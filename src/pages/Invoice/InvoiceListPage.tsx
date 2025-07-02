@@ -56,6 +56,7 @@ import {
 import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
+import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -455,6 +456,24 @@ const InvoiceListPage: React.FC = () => {
     },
     [filters, handleApplyFilters]
   ); // Depends on current filters and the apply function
+
+  // Today Button Handler
+  const handleTodayClick = useCallback(() => {
+    const today = new Date();
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfToday,
+        end: endOfToday,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
 
   // Month Change Handler (Applies Immediately)
   const handleMonthChange = useCallback(
@@ -857,13 +876,15 @@ const InvoiceListPage: React.FC = () => {
         // Validate customer has necessary identification
         inv.customerTin &&
         inv.customerIdNumber && // Ensure both TIN and ID number are present
+        inv.customerPhone && // Ensure phone number is present
+        // Check if invoice date is within the last 3 days
         isInvoiceDateEligibleForEinvoice(inv.createddate)
     );
 
     if (eligibleInvoices.length === 0) {
       toast.error(
-        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID, and not already Valid/Cancelled).",
-        { duration: 8000 }
+        "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID and phone number, and not already Valid/Cancelled).",
+        { duration: 12000 }
       );
       return;
     }
@@ -871,7 +892,7 @@ const InvoiceListPage: React.FC = () => {
       const ineligibleCount = selectedInvoiceIds.size - eligibleInvoices.length;
       toast.error(
         `${ineligibleCount} selected invoice(s) are ineligible (check date, status, customer info). Proceeding with ${eligibleInvoices.length} eligible invoice(s).`,
-        { duration: 6000 }
+        { duration: 8000 }
       );
     }
 
@@ -1173,21 +1194,36 @@ const InvoiceListPage: React.FC = () => {
               </Listbox>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:flex-1 md:max-w-md">
-              <IconSearch
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onBlur={handleSearchBlur}
-                onKeyDown={handleSearchKeyDown}
-              />
+            {/* Search Input and Daily Button */}
+            <div className="flex items-center gap-2 w-full sm:flex-1 md:max-w-md">
+              <div className="relative flex-1">
+                <IconSearch
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  onBlur={handleSearchBlur}
+                  onKeyDown={handleSearchKeyDown}
+                />
+              </div>
+
+              {/* Daily Print Button */}
+              <InvoiceDailyPrintMenu filters={filters} />
+              
+              {/* Today Button */}
+              <Button
+                onClick={handleTodayClick}
+                variant="outline"
+                size="sm"
+                className="h-[42px] px-3 whitespace-nowrap"
+              >
+                Today
+              </Button>
             </div>
 
             {/* Filter Menu Button */}

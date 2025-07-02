@@ -66,6 +66,22 @@ export async function submitInvoicesToMyInvois(
             };
           }
 
+          if (
+            !customerData.phone_number ||
+            customerData.phone_number.trim() === ""
+          ) {
+            return {
+              error: {
+                type: "validation",
+                code: "MISSING_PHONE_NUMBER",
+                message: `Missing phone number for customer ${
+                  customerData.name || "unknown"
+                }. Phone number is required for e-Invoice submission.`,
+                invoiceNo: invoice.id,
+              },
+            };
+          }
+
           const transformedInvoice = await EInvoiceTemplate(
             invoice,
             customerData
