@@ -34,7 +34,10 @@ const ITEMS_PER_PAGE = 20;
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
   const { customers, isLoading, error } = useCustomersCache();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    // Retrieve saved search term from sessionStorage
+    return sessionStorage.getItem("customerSearchTerm") || "";
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
   const [selectedSalesman, setSelectedSalesman] =
@@ -45,6 +48,10 @@ const CustomerPage: React.FC = () => {
   );
   const { salesmen: salesmenData } = useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.setItem("customerSearchTerm", searchTerm);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (salesmenData.length > 0) {
