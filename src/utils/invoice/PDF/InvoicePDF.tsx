@@ -626,7 +626,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
           pageInvoices,
           pageIndex // Changed variable name here
         ) => (
-          <Page key={`page-${pageIndex}`} size="LETTER" style={styles.page}>
+          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
             {/* ... Header rendering remains the same ... */}
             {pageIndex === 0 && (
               <View style={styles.header}>
