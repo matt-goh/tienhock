@@ -14,7 +14,7 @@ interface InvoicePDFProps {
 const ROWS_PER_PAGE = 32;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
-const SUMMARY_ROWS = 2;
+const SUMMARY_ROWS = 3;
 
 // Color palette for easy customization
 const colors = {
