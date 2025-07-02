@@ -42,7 +42,10 @@ export default function (pool) {
            s.date_resigned as "dateResigned",
            s.job,
            s.location,
-           s.updated_at as "updatedAt"`;
+           s.updated_at as "updatedAt",
+           s.marital_status as "maritalStatus",
+           s.spouse_employment_status as "spouseEmploymentStatus",
+           s.number_of_children as "numberOfChildren"`;
 
       let query = `
       SELECT ${columns}
@@ -114,6 +117,9 @@ export default function (pool) {
       race,
       agama,
       dateResigned,
+      maritalStatus,
+      spouseEmploymentStatus,
+      numberOfChildren,
     } = req.body;
 
     try {
@@ -130,9 +136,9 @@ export default function (pool) {
           id, name, telephone_no, email, gender, nationality, birthdate, address,
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
-          race, agama, date_resigned
+          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
         RETURNING *
       `;
 
@@ -159,6 +165,9 @@ export default function (pool) {
         race,
         agama,
         dateResigned ? new Date(dateResigned) : null,
+        maritalStatus || "Single",
+        spouseEmploymentStatus || null,
+        numberOfChildren || 0,
       ];
 
       const result = await pool.query(query, values);
@@ -237,7 +246,10 @@ export default function (pool) {
           s.agama,
           s.date_resigned as "dateResigned",
           s.job,
-          s.location
+          s.location,
+          s.marital_status as "maritalStatus",
+          s.spouse_employment_status as "spouseEmploymentStatus",
+          s.number_of_children as "numberOfChildren"
         FROM 
           staffs s
         WHERE
@@ -310,6 +322,9 @@ export default function (pool) {
       agama,
       dateResigned,
       newId,
+      maritalStatus,
+      spouseEmploymentStatus,
+      numberOfChildren,
     } = req.body;
 
     try {
@@ -334,8 +349,9 @@ export default function (pool) {
               birthdate = $7, address = $8, job = $9, location = $10, date_joined = $11, 
               ic_no = $12, bank_account_number = $13, epf_no = $14, income_tax_no = $15, 
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
-              race = $20, agama = $21, date_resigned = $22
-          WHERE id = $23
+              race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
+              spouse_employment_status = $24, number_of_children = $25
+          WHERE id = $26
           RETURNING *
         `;
 
@@ -362,6 +378,9 @@ export default function (pool) {
           race,
           agama,
           dateResigned ? new Date(dateResigned) : null,
+          maritalStatus || "Single",
+          spouseEmploymentStatus || null,
+          numberOfChildren || 0,
           id,
         ];
 
