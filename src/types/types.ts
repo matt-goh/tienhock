@@ -335,6 +335,7 @@ export interface InvoiceData {
   consolidated_invoices: string[] | null; // Array of invoice IDs or null
   customerTin?: string;
   customerIdNumber?: number;
+  customerPhone?: string; // Phone number for e-invoice compliance
 
   // Status fields
   invoice_status: InvoiceStatus;

@@ -120,7 +120,7 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.id_type as customerIdType,
+          c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.phone_number, c.id_type as customerIdType,
           (
             SELECT jsonb_build_object(
               'id', con.id,
@@ -146,7 +146,7 @@ export default function (pool, config) {
       i.invoice_status, i.einvoice_status, i.balance_due,
       i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
       i.is_consolidated, i.consolidated_invoices,
-      c.name, c.tin_number, c.id_number, c.id_type`;
+      c.name, c.tin_number, c.id_number, c.phone_number, c.id_type`;
 
       const filterParams = []; // Parameters ONLY for filtering (WHERE clause)
       let filterParamCounter = 1;
@@ -286,6 +286,7 @@ export default function (pool, config) {
         customerName: row.customername || row.customerid,
         customerTin: row.customertin,
         customerIdNumber: row.customeridnumber,
+        customerPhone: row.phone_number,
         customerIdType: row.customeridtype,
       }));
 
@@ -506,7 +507,7 @@ export default function (pool, config) {
         i.invoice_status, i.einvoice_status, i.balance_due,
         i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
         i.is_consolidated, i.consolidated_invoices,
-        c.name as customerName, c.tin_number, c.id_number,
+        c.name as customerName, c.tin_number, c.id_number, c.phone_number,
         COALESCE(
           json_agg(
             json_build_object(
@@ -529,7 +530,7 @@ export default function (pool, config) {
       LEFT JOIN customers c ON i.customerid = c.id
       LEFT JOIN order_details od ON i.id = od.invoiceid
       WHERE i.id IN (${placeholders})
-      GROUP BY i.id, c.name, c.tin_number, c.id_number
+      GROUP BY i.id, c.name, c.tin_number, c.id_number, c.phone_number
     `;
 
       const result = await pool.query(query, invoiceIds);
@@ -557,6 +558,7 @@ export default function (pool, config) {
         customerName: invoice.customername || invoice.customerid,
         customerTin: invoice.tin_number,
         customerIdNumber: invoice.id_number,
+        customerPhone: invoice.phone_number,
         products: (invoice.products || []).map((product) => ({
           id: product.id,
           code: product.code,
@@ -1580,7 +1582,7 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
-          c.name as customerName, c.tin_number, c.id_number,
+          c.name as customerName, c.tin_number, c.id_number, c.phone_number,
           (
             SELECT jsonb_build_object(
               'id', con.id,
@@ -1616,7 +1618,7 @@ export default function (pool, config) {
         LEFT JOIN customers c ON i.customerid = c.id
         LEFT JOIN order_details od ON i.id = od.invoiceid
         WHERE i.id = $1
-        GROUP BY i.id, c.name, c.tin_number, c.id_number
+        GROUP BY i.id, c.name, c.tin_number, c.id_number, c.phone_number
       `;
 
       const result = await pool.query(query, [id]);
@@ -1651,6 +1653,7 @@ export default function (pool, config) {
         customerName: invoice.customername || invoice.customerid,
         customerTin: invoice.tin_number,
         customerIdNumber: invoice.id_number,
+        customerPhone: invoice.phone_number,
         products: (invoice.products || []).map((product) => ({
           id: product.id,
           code: product.code,
