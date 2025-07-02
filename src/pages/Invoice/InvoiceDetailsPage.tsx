@@ -958,7 +958,14 @@ const InvoiceDetailsPage: React.FC = () => {
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Customer
               </span>
-              <span className="text-gray-900 font-medium">
+              <span
+                className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                title={`${invoiceData.customerName} (${invoiceData.customerid})`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/catalogue/customer/${invoiceData.customerid}`);
+                }}
+              >
                 {invoiceData.customerName || invoiceData.customerid}
               </span>
             </div>
@@ -966,7 +973,14 @@ const InvoiceDetailsPage: React.FC = () => {
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Salesman
               </span>
-              <span className="text-gray-900 font-medium">
+              <span
+                className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                title={invoiceData.salespersonid}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/catalogue/staff/${invoiceData.salespersonid}`);
+                }}
+              >
                 {invoiceData.salespersonid}
               </span>
             </div>
