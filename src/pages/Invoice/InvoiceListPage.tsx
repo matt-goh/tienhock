@@ -457,6 +457,24 @@ const InvoiceListPage: React.FC = () => {
     [filters, handleApplyFilters]
   ); // Depends on current filters and the apply function
 
+  // Today Button Handler
+  const handleTodayClick = useCallback(() => {
+    const today = new Date();
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfToday,
+        end: endOfToday,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
   // Month Change Handler (Applies Immediately)
   const handleMonthChange = useCallback(
     (month: MonthOption) => {
@@ -1196,6 +1214,16 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Daily Print Button */}
               <InvoiceDailyPrintMenu filters={filters} />
+              
+              {/* Today Button */}
+              <Button
+                onClick={handleTodayClick}
+                variant="outline"
+                size="sm"
+                className="h-[42px] px-3 whitespace-nowrap"
+              >
+                Today
+              </Button>
             </div>
 
             {/* Filter Menu Button */}
