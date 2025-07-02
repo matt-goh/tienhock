@@ -432,6 +432,9 @@ export interface Employee {
   agama: string;
   dateResigned: string;
   newId: string;
+  maritalStatus: string;
+  spouseEmploymentStatus: string;
+  numberOfChildren: number;
   updatedAt?: string;
 }
 
