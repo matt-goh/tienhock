@@ -10,7 +10,7 @@ const ContributionRatesPage: React.FC = () => {
     <div className="relative w-full space-y-4 mx-4 md:mx-6 -mt-8">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
-          EPF, SOCSO & SIP Rates
+          Contribution Rates
         </h1>
       </div>
 

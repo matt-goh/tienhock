@@ -137,7 +137,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "EPF, SOCSO & SIP",
+    name: "Contribution Rates",
     path: "/payroll/contribution-rates",
     component: ContributionRatesPage,
     icon: IconCalculator,
