@@ -11,7 +11,7 @@ interface InvoicePDFProps {
   companyContext?: "tienhock" | "jellypolly";
 }
 
-const ROWS_PER_PAGE = 32;
+const ROWS_PER_PAGE = 30;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
 const SUMMARY_ROWS = 3;
