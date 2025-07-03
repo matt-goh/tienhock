@@ -95,7 +95,7 @@ export default function (pool, config) {
     }
   };
 
-  // GET /api/invoices - List Invoices (Updated Schema)
+  // GET /api/invoices - List Invoices
   router.get("/", async (req, res) => {
     try {
       const {
